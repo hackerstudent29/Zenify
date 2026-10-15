@@ -69,7 +69,7 @@ export default function TrackPage() {
   }, [currentTrack, previousTrackId, router]);
 
   /* ─── Queries ─── */
- const { data: track, isLoading } = useQuery({
+ const { data: dbTrack, isLoading } = useQuery({
    queryKey: ["track-detail", id],
    queryFn: async () => (await api.get(`/tracks/${id}`)).data,
    enabled: !!id,
@@ -81,6 +81,38 @@ export default function TrackPage() {
      return false;
    },
  });
+
+  // Fallback to active player track or queue track if DB record was cleared/purged
+  const currentOrQueueTrack = (currentTrack && (currentTrack.id === id || (currentTrack as any).youtubeId === id))
+    ? currentTrack
+    : queue.find(t => t.id === id || (t as any).youtubeId === id);
+
+  const track = dbTrack || currentOrQueueTrack;
+
+  // Background auto-healing: if song is playing but not yet persistent in DB, instantly import it
+  useEffect(() => {
+    if (!dbTrack && currentOrQueueTrack && !isLoading) {
+      console.log(`[TrackPage] Song "${currentOrQueueTrack.title}" not in DB. Triggering instant background import...`);
+      api.post('/tracks/import-instant', {
+        title: currentOrQueueTrack.title,
+        artistName: currentOrQueueTrack.artist?.name || (currentOrQueueTrack as any).artistName || 'Unknown Artist',
+        albumTitle: currentOrQueueTrack.album?.title || (currentOrQueueTrack as any).albumTitle,
+        coverUrl: currentOrQueueTrack.coverUrl,
+        audioUrl: currentOrQueueTrack.audioUrl,
+        duration: currentOrQueueTrack.duration,
+        lyrics: currentOrQueueTrack.lyrics,
+        id: currentOrQueueTrack.id,
+        sourceId: (currentOrQueueTrack as any).youtubeId
+      }).then(res => {
+        if (res.data) {
+          queryClient.setQueryData(["track-detail", id], res.data);
+          queryClient.invalidateQueries({ queryKey: ["track-detail", id] });
+        }
+      }).catch(err => {
+        console.warn('[TrackPage] Instant auto-import warning:', err.message);
+      });
+    }
+  }, [dbTrack, currentOrQueueTrack, isLoading, id, queryClient]);
 
  const updateCurrentTrackData = usePlayerStore(s => s.updateCurrentTrackData);
 
@@ -230,7 +262,7 @@ export default function TrackPage() {
  };
 
  /* ─── Loading / not-found ─── */
- if (isLoading) return (
+ if (isLoading && !track) return (
  <div className="flex items-center justify-center min-h-[60vh]">
  <ZenLoading size="md" />
  </div>

@@ -462,8 +462,13 @@ export class LyricEnrichmentService {
                     }
                 } else {
                     // Outcome B: Plain lyrics were found, but have no timestamps
-                    plainLyricsToAlign = lrcCandidate.lyrics;
-                    console.log(`[LyricEnrichment] Plain lyrics retrieved from LRCLib (${plainLyricsToAlign.length} chars). Proceeding to audio-alignment.`);
+                    if (LyricsEnhancementService.isValidSongLyrics(lrcCandidate.lyrics)) {
+                        plainLyricsToAlign = lrcCandidate.lyrics;
+                        console.log(`[LyricEnrichment] Valid plain lyrics retrieved from LRCLib (${plainLyricsToAlign.length} chars). Proceeding to audio-alignment.`);
+                    } else {
+                        console.warn(`[LyricEnrichment] Plain text for "${track.title}" rejected: appears to be video credits / description.`);
+                        plainLyricsToAlign = undefined;
+                    }
                 }
             }
 

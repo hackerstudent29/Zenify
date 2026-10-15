@@ -28,6 +28,54 @@ export class LyricsEnhancementService {
     /**
      * Aggressively scrubs unwanted text like "Lyrics for X", "Submit Corrections", etc.
      */
+    /**
+     * Strictly verifies whether a text represents genuine song lyrics vs movie credits, video descriptions, or artist rosters.
+     */
+    static isValidSongLyrics(text: string): boolean {
+        if (!text || typeof text !== 'string') return false;
+        const clean = text.trim();
+        if (clean.length < 30) return false;
+
+        const lines = clean.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length < 4) return false;
+
+        // Keywords indicative of descriptions, video credits, or streaming links
+        const garbageKeywordsRegex = /\b(directed by|music by|sung by|singers?|starring|cast|lyricist|choreograph(er|y)|dop|cinematograph(er|y)|editor|producer|production|co-producer|executive producer|banner|music label|audio label|audio on|streaming on|stream on|stream now|listen on|download on|available on|subscribe|subscribers|official video|lyric video|official audio|all rights reserved|copyright|recorded at|mixed by|mastered by|guitars?|bass|percussion|flute|sound engineer|pro:|pr:|release date|label:|movie:|film:)\b/i;
+
+        let garbageLinesCount = 0;
+        let colonKeyValueLines = 0;
+
+        for (const line of lines) {
+            if (line.startsWith('http://') || line.startsWith('https://')) {
+                garbageLinesCount++;
+                continue;
+            }
+            if (garbageKeywordsRegex.test(line)) {
+                garbageLinesCount++;
+            }
+            // Lines like "Role: Name" or "Credit: Value"
+            if (/^[A-Za-z\s]{3,20}\s*:\s*[A-Za-z0-9\s,.-]{2,}$/.test(line)) {
+                colonKeyValueLines++;
+            }
+        }
+
+        // If more than 20% of lines are credit garbage or more than 35% are key-value lines, reject
+        if (garbageLinesCount / lines.length > 0.20) {
+            console.log(`[LyricsValidator] Rejected lyrics candidate: ${garbageLinesCount}/${lines.length} lines contain video credits/description keywords.`);
+            return false;
+        }
+
+        if (colonKeyValueLines / lines.length > 0.35) {
+            console.log(`[LyricsValidator] Rejected lyrics candidate: ${colonKeyValueLines}/${lines.length} lines are key-value credit pairs.`);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Aggressively scrubs unwanted text like "Lyrics for X", "Submit Corrections", description headers, etc.
+     */
     static cleanLyricsText(lyrics: string): string {
         if (!lyrics) return '';
         let clean = lyrics;
@@ -39,7 +87,17 @@ export class LyricsEnhancementService {
         clean = clean.replace(/<!-- Usage of azlyrics.*?-->/gis, '');
         clean = clean.replace(/\d*Embed$/i, '');
         clean = clean.replace(/You might also like/gi, '');
-        return clean.trim();
+
+        // Remove video description footer links & social calls
+        const lines = clean.split('\n');
+        const filteredLines = lines.filter(l => {
+            const line = l.trim().toLowerCase();
+            if (line.startsWith('http://') || line.startsWith('https://')) return false;
+            if (line.startsWith('follow us on') || line.startsWith('subscribe to') || line.startsWith('stream full song')) return false;
+            return true;
+        });
+
+        return filteredLines.join('\n').trim();
     }
 
     /**

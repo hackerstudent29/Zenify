@@ -269,7 +269,7 @@ export class TrackService {
             }
         }
 
-        const track = await prisma.track.findFirst({
+        let track = await prisma.track.findFirst({
             where: { 
                 id, 
                 deletedAt: null,
@@ -285,6 +285,49 @@ export class TrackService {
                 album: { include: { artist: true } },
             }
         });
+
+        // Fallback 1: Search by youtubeId
+        if (!track) {
+            track = await prisma.track.findFirst({
+                where: {
+                    youtubeId: id,
+                    deletedAt: null
+                },
+                include: { artist: true, album: { include: { artist: true } } }
+            });
+        }
+
+        // Fallback 2: Search by audioUrl containing id
+        if (!track && id.length >= 8) {
+            track = await prisma.track.findFirst({
+                where: {
+                    audioUrl: { contains: id },
+                    deletedAt: null
+                },
+                include: { artist: true, album: { include: { artist: true } } }
+            });
+        }
+
+        // Fallback 3: If id is an 11-char YouTube video ID, dynamically resolve & JIT import
+        if (!track && /^[a-zA-Z0-9_-]{11}$/.test(id)) {
+            try {
+                const { ExternalMetadataService } = await import('./external-metadata.service.js');
+                const watchUrl = `https://www.youtube.com/watch?v=${id}`;
+                const meta = await ExternalMetadataService.fetchFromUrl(watchUrl).catch(() => null);
+                if (meta && meta.title) {
+                    return await this.importExternal({
+                        title: meta.title,
+                        artistName: meta.artist || 'Unknown Artist',
+                        coverUrl: meta.cover || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+                        audioUrl: watchUrl,
+                        duration: meta.duration || 180,
+                    }) as any;
+                }
+            } catch (jitErr: any) {
+                console.warn(`[TrackService] JIT resolution failed for ${id}:`, jitErr.message);
+            }
+        }
+
         if (!track) throw this.server.httpErrors.notFound('Track not found');
 
         // Dynamically trigger background elastic lyrics check / onset calibration for the fetched track

@@ -609,22 +609,18 @@ export class LyricsSyncService {
                         const fullVideo = JSON.parse(infoRes);
                         const desc = fullVideo.description || '';
                         if (desc && desc.length > 150) {
-                            const descLines = desc.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
-                            const lyricCandidates = descLines.filter((l: string) =>
-                                !l.startsWith('http') &&
-                                !l.toLowerCase().includes('subscribe') &&
-                                !l.toLowerCase().includes('director') &&
-                                !l.toLowerCase().includes('composer') &&
-                                !l.toLowerCase().includes('producer') &&
-                                !l.toLowerCase().includes('rights') &&
-                                !l.toLowerCase().includes('records') &&
-                                !l.startsWith('#') &&
-                                l.length < 100
-                            );
-                            if (lyricCandidates.length >= 8) {
-                                const candidateText = lyricCandidates.join('\n');
-                                if (this.isLyricsLanguageAcceptable(candidateText, songLang)) {
-                                    return candidateText;
+                            // Only extract if there is an explicit LYRICS section marker in the description!
+                            const lyricsMarkerMatch = desc.match(/(?:^|\n)\s*(?:lyrics|song lyrics|lyrics in (?:english|tamil|hindi|telugu))\s*[:\-—]*\s*\n([\s\S]+)/i);
+                            if (lyricsMarkerMatch && lyricsMarkerMatch[1]) {
+                                const rawCandidate = lyricsMarkerMatch[1].split(/(?:\n\s*(?:credits|cast & crew|movie credits|audio rights|follow us|stream now|available on|audio on|copyright))/i)[0];
+                                const candidateLines = rawCandidate.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0 && !l.startsWith('http'));
+                                if (candidateLines.length >= 6) {
+                                    const candidateText = candidateLines.join('\n');
+                                    const { LyricsEnhancementService } = await import('./lyrics-enhancement.service.js');
+                                    if (LyricsEnhancementService.isValidSongLyrics(candidateText) && this.isLyricsLanguageAcceptable(candidateText, songLang)) {
+                                        console.log(`[LyricsSync/YTDesc] Verified genuine lyrics section from description for "${title}"`);
+                                        return candidateText;
+                                    }
                                 }
                             }
                         }

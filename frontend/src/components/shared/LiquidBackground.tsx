@@ -465,8 +465,8 @@ export function LiquidBackground({
 
   return (
     <div 
-      className={cn("absolute inset-0 z-0 overflow-hidden bg-black pointer-events-none isolate", className)}
-      style={{ transform: "translateZ(0)", backfaceVisibility: "hidden", backgroundColor: "#000000" }}
+      className={cn("absolute inset-0 z-0 overflow-hidden bg-[#121214] pointer-events-none isolate", className)}
+      style={{ transform: "translateZ(0)", backfaceVisibility: "hidden", backgroundColor: "#121214" }}
     >
       <div 
         className={cn(

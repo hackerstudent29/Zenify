@@ -211,13 +211,13 @@ export function PCFullScreenPlayer() {
  mass: 0.7
  }}
  style={{ zIndex: 850, transform: "translateZ(0)", backfaceVisibility: "hidden", willChange: "transform, opacity" }}
- className="fixed inset-0 bg-black overflow-hidden font-sans isolate"
+ className="fixed inset-0 bg-[#121214] overflow-hidden font-sans isolate"
  onClick={() => setFullScreenPlayerOpen(false)}
  >
  {/* Reactive Background with Premium Apple Music Liquid Glassmorphism */}
  {showReactiveBg ? (
  <div 
- className="absolute inset-0 z-0 transition-colors duration-1000 bg-black"
+ className="absolute inset-0 z-0 transition-colors duration-1000 bg-[#121214]"
  >
  <LiquidBackground coverUrl={trackCover} speedMultiplier={2.5} />
  <motion.div 
@@ -228,7 +228,7 @@ export function PCFullScreenPlayer() {
  />
  </div>
  ) : (
- <div className="absolute inset-0 bg-black pointer-events-none" />
+ <div className="absolute inset-0 bg-[#121214] pointer-events-none" />
  )}
 
  {/* Top-right controls — fade on idle */}

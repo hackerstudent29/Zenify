@@ -347,7 +347,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
  return (
  <div className={cn(
- "flex flex-col w-full bg-black text-foreground h-[100dvh] overflow-hidden relative z-0"
+ "flex flex-col w-full bg-[#121214] text-foreground h-[100dvh] overflow-hidden relative z-0"
  )}>
   {(() => {
     if (isFullScreenPlayerOpen) return null;
@@ -410,10 +410,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     className={cn(
     "z-[100] transition-all duration-300 ease-[0.16,1,0.3,1] w-full absolute top-0 left-0 right-0 safe-area-top",
     isMobile 
-      ? "bg-black/95 backdrop-blur-md border-b border-white/5" 
+      ? "bg-[#121214]/95 backdrop-blur-md border-b border-white/5" 
       : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/"))
         ? "bg-transparent"
-        : "bg-gradient-to-b from-black/60 to-transparent",
+        : "bg-gradient-to-b from-[#121214]/80 to-transparent",
     isMobile && isHeaderHidden && "-translate-y-full opacity-0 pointer-events-none"
     )}
   style={{
