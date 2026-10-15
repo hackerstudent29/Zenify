@@ -219,7 +219,7 @@ export class TrackService {
 
         // 3. Intercept Virtual iTunes IDs and JIT resolve/import into PostgreSQL
         if (id.startsWith('itunes-')) {
-            const itunesId = id.replace('itunes-', '');
+            const itunesId = id.replace(/^(itunes-)+/, '');
             const existing = await prisma.track.findFirst({
                 where: {
                     OR: [

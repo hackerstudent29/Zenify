@@ -33,33 +33,37 @@ interface LyricsViewProps {
 }
 
 export function cleanLyricText(text: string): string {
- if (!text) return "";
- if (text.trim() === "• • •") return "• • •";
- 
- // Catch common Genius/Musixmatch garbage lines
- if (/Português|Türkçe|Español|Việt|Italiano|Français|Deutsch/i.test(text)) return "";
- if (/^\d+$/.test(text.trim())) return ""; // raw numbers like "107"
- if (text.trim().toLowerCase() === "lyrics") return "";
- if (text.toLowerCase().includes("lyrics") && text.length < 60) {
- // e.g. "Without A Warning Lyrics"
- // We'll just strip the word "Lyrics" or drop it entirely if it looks like a header
- if (text.toLowerCase().endsWith("lyrics")) return "";
- }
+  if (!text) return "";
+  const trimmed = text.trim();
+  if (trimmed === "• • •") return "• • •";
+  
+  // Convert explicit instrumental and musical bridge markers to 3 dots
+  if (/^(\[|\()?\s*(instrumental|music|solo|interlude|guitar solo|bgm|musical interlude)\s*(\]|\))?$/i.test(trimmed)) {
+    return "• • •";
+  }
 
- return text
- // 1. Remove all square brackets and their contents (typically artist tags or section names like [Chorus])
- .replace(/\[[^\]]*\]/g, "")
- // 2. Remove parenthesized tags like (Chorus), (Male), (Instrumental), (Music), (Solo)
- .replace(/\(\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|music|instrumental|solo|spoken)([^)]*?)\)/gi, "")
- // 3. Remove prefixes/colons like "Male:", "Chorus:", "View:", "Singer:" at the start of the line
- .replace(/^\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|singer)\s*:\s*/gi, "")
- // 4. Remove standalone metadata keywords
- .replace(/\b(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|instrumental)\b/gi, "")
- // 5. Cleanup remaining empty/whitespace parentheses
- .replace(/\(\s*\)/g, "")
- // 6. Clean extra spaces
- .replace(/\s+/g, " ")
- .trim();
+  // Catch common Genius/Musixmatch garbage lines
+  if (/Português|Türkçe|Español|Việt|Italiano|Français|Deutsch/i.test(text)) return "";
+  if (/^\d+$/.test(trimmed)) return ""; // raw numbers like "107"
+  if (trimmed.toLowerCase() === "lyrics") return "";
+  if (text.toLowerCase().includes("lyrics") && text.length < 60) {
+    if (text.toLowerCase().endsWith("lyrics")) return "";
+  }
+
+  return text
+    // 1. Remove artist tags or bracketed section names like [Chorus] (unless instrumental)
+    .replace(/\[\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|spoken)[^\]]*\]/gi, "")
+    // 2. Remove parenthesized tags like (Chorus), (Male), (Spoken)
+    .replace(/\(\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|spoken)([^)]*?)\)/gi, "")
+    // 3. Remove prefixes/colons like "Male:", "Chorus:", "View:", "Singer:" at the start of the line
+    .replace(/^\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|singer)\s*:\s*/gi, "")
+    // 4. Remove standalone metadata keywords
+    .replace(/\b(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)\b/gi, "")
+    // 5. Cleanup remaining empty/whitespace parentheses
+    .replace(/\(\s*\)/g, "")
+    // 6. Clean extra spaces
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 
@@ -359,33 +363,63 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       splitLines.push(line);
     }
 
-    // 2. Insert virtual interlude lines (triple dots) for long instrumental breaks (greater than 7.0 seconds)
+    // 2. Insert virtual interlude lines (triple dots) for intro, breaks (> 3.2s), and outro
     const result: any[] = [];
+    const trackDur = duration || usePlayerStore.getState().duration || 0;
+
+    // Intro instrumental interlude
+    if (splitLines.length > 0 && splitLines[0].time > 3.2 && splitLines[0].text !== '• • •') {
+      result.push({
+        time: 0,
+        endTime: Math.max(0.5, splitLines[0].time - 0.3),
+        text: "• • •",
+        isInterlude: true
+      });
+    }
+
     for (let i = 0; i < splitLines.length; i++) {
-      result.push(splitLines[i]);
-      
       const currentLine = splitLines[i];
+      if (currentLine.text === '• • •') {
+        currentLine.isInterlude = true;
+      }
+      result.push(currentLine);
+      
       const nextLine = splitLines[i + 1];
       if (nextLine) {
         // Calculate the actual silence duration between the end of this line and start of next
         const wordCount = currentLine.text ? currentLine.text.trim().split(/\s+/).length : 0;
-        
-        // Use true endTime if available, else estimate generously (so we don't cut off slow singing)
-        const estimatedDuration = Math.min(Math.max(2.5, wordCount * 0.6), nextLine.time - currentLine.time); 
+        const estimatedDuration = Math.min(Math.max(2.0, wordCount * 0.55), Math.max(0.5, nextLine.time - currentLine.time)); 
         const lineEndTime = currentLine.endTime ? currentLine.endTime : (currentLine.time + estimatedDuration);
         
         const actualSilence = nextLine.time - lineEndTime;
         
-        // Only show dots if there's at least 6 seconds of pure silence
-        if (actualSilence > 6.0) {
+        // Show 3 dots if there is a musical break >= 3.2 seconds
+        if (actualSilence >= 3.2 && nextLine.text !== '• • •') {
           result.push({
-            time: lineEndTime + 0.5, // Start dots slightly after the singer finishes
+            time: lineEndTime + 0.3,
+            endTime: Math.max(lineEndTime + 0.8, nextLine.time - 0.2),
             text: "• • •",
             isInterlude: true
           });
         }
       }
     }
+
+    // Outro instrumental interlude
+    if (result.length > 0 && trackDur > 0) {
+      const lastLine = result[result.length - 1];
+      const lastWordCount = lastLine.text ? lastLine.text.trim().split(/\s+/).length : 0;
+      const lastLineEnd = lastLine.endTime || (lastLine.time + Math.max(2.5, lastWordCount * 0.6));
+      if (trackDur - lastLineEnd >= 4.5 && lastLine.text !== '• • •') {
+        result.push({
+          time: lastLineEnd + 0.5,
+          endTime: trackDur - 0.5,
+          text: "• • •",
+          isInterlude: true
+        });
+      }
+    }
+
     return result;
   }, [activeData, activePlainLyrics, duration, data?.source]);
 
@@ -621,17 +655,14 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
           }
         }
 
-        // Apple Music fluid spring scroll: creamy kinetic tracking without abrupt snapping
-        const springParams = isFullscreen
-          ? { stiffness: 90, damping: 24, mass: 0.85 }
-          : { stiffness: 110, damping: 24, mass: 0.9 };
-
-                scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-          type: "spring",
-          ...springParams,
-          onUpdate: (v) => { el.scrollTop = v; },
+        // Apple Music fluid kinetic scroll: creamy tracking without spring bounce or snapping
+        const animDuration = Math.min(0.55, Math.max(0.28, scrollDuration / 1000));
+        scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
+          duration: animDuration,
+          ease: [0.22, 1, 0.36, 1],
+          onUpdate: (v) => { if (el) el.scrollTop = v; },
           onComplete: () => {
-            setTimeout(() => { isProgrammaticScroll.current = false; }, 250);
+            setTimeout(() => { isProgrammaticScroll.current = false; }, 200);
           }
         });
       }
@@ -974,7 +1005,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
    if (isSyncingRef.current) return;
    touchMovedRef.current = false;
  }}
- onTouchMove={(e) => {
+  onTouchMove={(e) => {
    if (touchStartYRef.current !== null && Math.abs(e.touches[0].clientY - touchStartYRef.current) > 10) {
      touchMovedRef.current = true;
    }
@@ -988,16 +1019,73 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
    const audio = audioEngine.getActiveAudioElement();
    if (audio) {
      isSeekingRef.current = true;
-     // Subtract lyrics offset so the audio seeks accurately to the vocal breath
-     const targetAudioTime = Math.max(0, line.time - offsetRef.current - 0.15);
+     const trackDuration = (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0)
+       ? audio.duration
+       : (duration || usePlayerStore.getState().duration || 9999);
+
+     // Safeguard seeking within playable/seekable boundaries to prevent browser ended/error loop back to 00:00
+     let maxSeek = Math.max(0, trackDuration - 1.2);
+     try {
+       if (audio.seekable && audio.seekable.length > 0) {
+         const seekableEnd = audio.seekable.end(audio.seekable.length - 1);
+         if (seekableEnd > 1) {
+           maxSeek = Math.min(maxSeek, seekableEnd - 0.5);
+         }
+       }
+     } catch {}
+
+     const targetAudioTime = Math.max(0, Math.min(line.time - offsetRef.current - 0.15, maxSeek));
+     
      setActiveIndex(idx);
      smoothTimeValue.set(line.time);
-     audio.currentTime = targetAudioTime;
-     const { setCurrentTime } = usePlayerStore.getState();
+
+     try {
+       audio.currentTime = targetAudioTime;
+     } catch (seekErr) {
+       console.warn("[LyricsView] Seek error:", seekErr);
+     }
+
+     const { setCurrentTime, setIsPlaying } = usePlayerStore.getState();
      setCurrentTime(targetAudioTime);
+     setIsPlaying(true);
      setIsUserScrolling(false);
+
+     audioEngine.resume();
+     if (audio.paused) {
+       audio.play().catch(err => {
+         if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+         console.warn("[LyricsView] audio.play() after seek failed:", err);
+       });
+     }
      const targetVol = usePlayerStore.getState().volume ?? 1;
      audioEngine.setVolume(targetVol);
+
+     // Smoothly and immediately glide the lyrics view directly to the clicked line
+     const el = containerRef.current;
+     const clickedEl = e.currentTarget.parentElement;
+     if (el && clickedEl) {
+       const clientH = el.clientHeight || 360;
+       let centerRatio = 0.5;
+       if (isFullscreen) centerRatio = 0.38;
+       else if (isMobile) centerRatio = 0.35;
+       else centerRatio = 0.35;
+
+       const containerCenter = clientH * centerRatio;
+       const targetScrollTop = clickedEl.offsetTop - containerCenter + (clickedEl.clientHeight / 2);
+       const maxScroll = el.scrollHeight - el.clientHeight;
+       const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
+
+       isProgrammaticScroll.current = true;
+       if (scrollAnimRef.current) scrollAnimRef.current.stop();
+       scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
+         duration: 0.52,
+         ease: [0.22, 1, 0.36, 1],
+         onUpdate: (v) => { if (el) el.scrollTop = v; },
+         onComplete: () => {
+           setTimeout(() => { isProgrammaticScroll.current = false; }, 150);
+         }
+       });
+     }
 
      const onSeeked = () => {
        isSeekingRef.current = false;
@@ -1006,7 +1094,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
      audio.addEventListener('seeked', onSeeked, { once: true });
      setTimeout(() => {
        isSeekingRef.current = false;
-     }, 800);
+     }, 600);
    }
  }}
  >
