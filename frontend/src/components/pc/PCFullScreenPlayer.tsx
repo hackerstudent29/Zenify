@@ -147,6 +147,9 @@ export function PCFullScreenPlayer() {
  return () => clearInterval(interval);
  }, [currentTrack?.id, currentTrack?.palette]);
 
+ // Performance Optimization: Delay WebGL during modal motion for 120fps GPU transitions
+ const [isTransitionComplete, setIsTransitionComplete] = useState(false);
+
  // --- Universal 5-second idle timer (always active in full-screen) ---
  const [isIdle, setIsIdle] = useState(false);
  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -200,34 +203,37 @@ export function PCFullScreenPlayer() {
 
  return (
  <motion.div
- initial={{ opacity: 0, scale: 0.94, y: 30 }}
+ initial={{ opacity: 0, scale: 0.96, y: 24 }}
  animate={{ opacity: 1, scale: 1, y: 0 }}
- exit={{ opacity: 0, scale: 0.94, y: 30 }}
+ exit={{ opacity: 0, scale: 0.96, y: 24 }}
  transition={{
  type: "spring",
- stiffness: 320,
- damping: 30,
- mass: 0.8
+ stiffness: 400,
+ damping: 34,
+ mass: 0.6
  }}
+ onAnimationComplete={() => setIsTransitionComplete(true)}
  style={{ zIndex: 850, transform: "translateZ(0)", backfaceVisibility: "hidden", willChange: "transform, opacity" }}
  className="fixed inset-0 bg-black overflow-hidden font-sans isolate"
- onClick={() => setFullScreenPlayerOpen(false)}
+ onClick={() => {
+   setIsTransitionComplete(false);
+   setFullScreenPlayerOpen(false);
+ }}
  >
- {/* Reactive Background with Premium Apple Music Liquid Glassmorphism */}
- {showReactiveBg ? (
- <div 
- className="absolute inset-0 z-0 transition-colors duration-1000 bg-black"
- >
- <LiquidBackground coverUrl={trackCover} speedMultiplier={2.5} />
- <motion.div 
- animate={{ opacity: isLyricsOpen ? 1 : 0 }}
- transition={{ duration: 0.5 }}
- className="absolute inset-0 bg-white/15 mix-blend-overlay z-10 pointer-events-none"
- />
+ {/* Background with Smooth Transition Isolation */}
+ <div className="absolute inset-0 z-0 overflow-hidden bg-black isolate">
+   <div 
+     className={cn(
+       "absolute inset-0 bg-cover bg-center filter blur-3xl scale-125 transition-opacity duration-700 pointer-events-none",
+       isTransitionComplete ? "opacity-0" : "opacity-40"
+     )}
+     style={{ backgroundImage: `url(${trackCover})` }}
+   />
+   {showReactiveBg && isTransitionComplete && (
+     <LiquidBackground coverUrl={trackCover} speedMultiplier={2.5} />
+   )}
+   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none z-10" />
  </div>
- ) : (
- <div className="absolute inset-0 bg-black pointer-events-none" />
- )}
 
  {/* Top-right controls — fade on idle */}
  <motion.div
@@ -288,7 +294,7 @@ export function PCFullScreenPlayer() {
    scale: isPlaying ? 1 : 0.88,
    opacity: isPlaying ? 1 : 0.85 
  }}
- transition={{ type: "spring", stiffness: 260, damping: 20, mass: 0.7 }}
+ transition={{ type: "spring", stiffness: 300, damping: 22, mass: 0.6 }}
  className={cn(
  "relative shrink-0 rounded-lg overflow-hidden shadow-xl aspect-square border border-white/10",
  isLyricsOpen

@@ -180,7 +180,7 @@ export function PCPlayerBar() {
                                          scale: isPlaying ? 1 : 0.88,
                                          opacity: isPlaying ? 1 : 0.85 
                                      }}
-                                     transition={{ type: "spring", stiffness: 260, damping: 20, mass: 0.7 }}
+                                     transition={{ type: "spring", stiffness: 300, damping: 22, mass: 0.6 }}
                                      onClick={(e) => {
                                          e.stopPropagation();
                                          setFullScreenPlayerOpen(true);
