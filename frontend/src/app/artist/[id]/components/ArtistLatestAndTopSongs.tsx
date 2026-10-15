@@ -91,7 +91,7 @@ export function ArtistLatestAndTopSongs({
 
     return (
       <div
-        key={track.id || index}
+        key={`${track.id || "t"}-${index}`}
         onClick={() => onPlayTrack(track)}
         className={cn(
           "group flex items-center justify-between gap-3 px-2 py-1.5 rounded-xl transition-all duration-150 cursor-pointer select-none",

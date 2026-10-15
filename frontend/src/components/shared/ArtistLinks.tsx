@@ -40,8 +40,12 @@ export function extractTrackArtists(track: any): ExtractedArtist[] {
       const lower = clean.toLowerCase();
       if (!seen.has(lower)) {
         seen.add(lower);
+        // Only assign specific entity ID if there was exactly 1 artist part;
+        // if this was a combined artist string (e.g. "Anirudh Ravichander & Arivu"),
+        // do not assign the joint group ID to the individual split artists.
+        const individualId = parts.length === 1 ? id : undefined;
         credits.push({
-          id,
+          id: individualId,
           name: formatDisplayTitle(clean),
           role,
           isMain
@@ -170,7 +174,7 @@ export function ArtistLinks({
         const routeTarget = artist.id ? `/artist/${artist.id}` : `/artist/${encodeURIComponent(artist.name)}`;
 
         return (
-          <React.Fragment key={artist.id || artist.name || idx}>
+          <React.Fragment key={`${track?.id || 'track'}-${artist.id || artist.name}-${idx}`}>
             <span className="inline-flex items-baseline">
               <Link
                 href={routeTarget}

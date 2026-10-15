@@ -391,7 +391,7 @@ export default function AlbumPage() {
 
   return (
   <div
-  key={track.id}
+  key={`${track.id}-${index}`}
   onClick={() => handlePlayTrack(track)}
   className="group flex items-center gap-4 px-3 py-3 rounded-lg transition-all cursor-pointer hover:bg-white/[0.02]"
   >
