@@ -406,11 +406,11 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                setFullScreenPlayerOpen(false);
              }
            }}
-           className="fixed inset-0 z-[1100] bg-black rounded-t-[28px] sm:rounded-t-none border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col pointer-events-auto select-none"
+           className="fixed inset-0 z-[1100] bg-[#121214] rounded-t-[28px] sm:rounded-t-none border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col pointer-events-auto select-none"
            style={{ willChange: "transform" }}
          >
            {/* Background */}
-           <div className="absolute inset-0 z-0 overflow-hidden bg-black isolate" style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}>
+           <div className="absolute inset-0 z-0 overflow-hidden bg-[#121214] isolate" style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}>
              {showReactiveBg && <LiquidBackground coverUrl={stablecover} />}
              <motion.div 
                animate={{ opacity: isLyricsOpen ? 1 : 0 }}

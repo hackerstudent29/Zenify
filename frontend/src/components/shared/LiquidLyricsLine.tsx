@@ -132,8 +132,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   // Large, punchy Apple Music PC-style typography for mobile and desktop full-view player
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(32px, 8.5vw, 46px)" : "clamp(34px, 4vw, 52px)") 
-    : (isMobile ? "clamp(26px, 6.5vw, 34px)" : "24px");
+    ? (isMobile ? "clamp(22px, 5.8vw, 30px)" : "clamp(34px, 4vw, 52px)") 
+    : (isMobile ? "clamp(18px, 4.8vw, 24px)" : "24px");
   const origin = isFullscreen ? "left center" : "center center";
 
   if (isInterlude) {
@@ -187,7 +187,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
           "relative flex flex-wrap cursor-pointer select-none",
           origin.includes("left") ? "justify-start" : "justify-center"
         )} 
-        style={{ transformOrigin: origin, gap: "0.25em" }}
+        style={{ transformOrigin: origin, gap: "0.25em", wordBreak: "break-word", overflowWrap: "anywhere" }}
       >
         {wordTokens.map((word, i) => {
           const explicitWord = words?.[i];
@@ -363,7 +363,8 @@ function UnifiedWordFill({
   return (
     <span 
       ref={containerRef}
-      className="relative inline-block origin-center overflow-visible"
+      className="relative inline-block origin-center overflow-visible max-w-full break-words"
+      style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
     >
       {/* Base Dim Text — Apple style translucent white */}
       <span className={cn("font-bold transition-colors duration-300", isUserScrolling ? "text-white/80" : "text-white/50")}>{word}</span>
