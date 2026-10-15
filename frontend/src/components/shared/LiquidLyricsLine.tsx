@@ -51,42 +51,42 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     targetScale = "scale(1)";
     targetTranslate = "translateY(0)";
   } else if (isMobile) {
-    // Current mobile style: smooth flowing down-to-top kinetic motion curve
+    // Clean, structured mobile depth curve — prevents lines from overlapping on 2-line wraps
     if (distFromActive === 1) {
-      targetOpacity = 0.68;
+      targetOpacity = 0.62;
       targetBlur = "blur(0px)";
-      targetScale = "scale(0.97)";
-      targetTranslate = "translateY(10px)";
+      targetScale = "scale(0.98)";
+      targetTranslate = "translateY(0)";
     } else if (distFromActive === 2) {
-      targetOpacity = 0.40;
+      targetOpacity = 0.36;
       targetBlur = "blur(2px)";
-      targetScale = "scale(0.93)";
-      targetTranslate = "translateY(20px)";
+      targetScale = "scale(0.94)";
+      targetTranslate = "translateY(1px)";
     } else if (distFromActive === 3) {
-      targetOpacity = 0.20;
+      targetOpacity = 0.18;
       targetBlur = "blur(4px)";
-      targetScale = "scale(0.89)";
-      targetTranslate = "translateY(30px)";
+      targetScale = "scale(0.90)";
+      targetTranslate = "translateY(2px)";
     } else if (distFromActive > 3) {
       targetOpacity = 0.08;
       targetBlur = "blur(6px)";
-      targetScale = "scale(0.85)";
-      targetTranslate = "translateY(40px)";
+      targetScale = "scale(0.86)";
+      targetTranslate = "translateY(3px)";
     } else if (distFromActive === -1) {
-      targetOpacity = 0.35;
+      targetOpacity = 0.32;
       targetBlur = "blur(1.5px)";
-      targetScale = "scale(0.96)";
-      targetTranslate = "translateY(-10px)";
+      targetScale = "scale(0.97)";
+      targetTranslate = "translateY(0)";
     } else if (distFromActive === -2) {
-      targetOpacity = 0.18;
+      targetOpacity = 0.16;
       targetBlur = "blur(3px)";
-      targetScale = "scale(0.91)";
-      targetTranslate = "translateY(-20px)";
+      targetScale = "scale(0.92)";
+      targetTranslate = "translateY(-1px)";
     } else {
       targetOpacity = 0.06;
       targetBlur = "blur(6px)";
-      targetScale = "scale(0.86)";
-      targetTranslate = "translateY(-30px)";
+      targetScale = "scale(0.87)";
+      targetTranslate = "translateY(-2px)";
     }
   } else {
     // PC / Desktop: Exact Apple Music Depth Curve restored from commit 6d6e745
@@ -170,8 +170,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   // PC: Classic Apple Music restored from yesterday's commit (clamp(34px, 4vw, 52px) on fullscreen, 24px on sidebar)
   // Mobile: Increased font size per user request (clamp(26px, 6.5vw, 36px) on fullscreen, clamp(22px, 5.5vw, 28px) on mobile view)
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(26px, 6.5vw, 36px)" : "clamp(34px, 4vw, 52px)") 
-    : (isMobile ? "clamp(22px, 5.5vw, 28px)" : "24px");
+    ? (isMobile ? "clamp(23px, 5.8vw, 27px)" : "clamp(34px, 4vw, 52px)") 
+    : (isMobile ? "clamp(20px, 5vw, 24px)" : "24px");
   const origin = isFullscreen ? "left center" : "center center";
 
   if (isInterlude) {
@@ -198,6 +198,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   // Scrub punctuation without spaces to prevent words from being glued together
   const cleanedText = (text || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\[\d{1,2}:\d{2}[^\]]*\]/g, " ")
     .replace(/([,;:!?])([A-Za-z0-9\u0B80-\u0D7F])/g, '$1 $2')
     .replace(/\s+/g, ' ')
     .trim();
@@ -225,27 +227,24 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         transform: `${targetScale} ${targetTranslate} translateZ(0)`,
         transformOrigin: origin,
         willChange: "transform, opacity, filter",
-        ...(isMobile ? { maxHeight: "4.8em", overflow: "hidden" } : {})
+        display: "flex",
+        alignItems: "center"
       }}
     >
       <div 
         className={cn(
           "relative flex flex-wrap cursor-pointer select-none",
-          origin.includes("left") ? "justify-start" : "justify-center",
-          isMobile ? "line-clamp-3" : ""
+          origin.includes("left") ? "justify-start text-left" : "justify-center text-center",
+          "line-clamp-2"
         )} 
         style={{ 
           transformOrigin: origin, 
-          gap: "0.25em", 
+          gap: "0.26em", 
           wordBreak: "break-word", 
           overflowWrap: "anywhere",
-          ...(isMobile ? {
-            maxHeight: "4.8em",
-            overflow: "hidden",
-            display: "-webkit-box",
-            WebkitBoxOrient: "vertical",
-            WebkitLineClamp: 3
-          } : {})
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: 2
         }}
       >
         {wordTokens.map((word, i) => {

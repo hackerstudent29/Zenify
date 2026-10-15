@@ -341,7 +341,7 @@ export function transliterateLineRuleBased(line: string): string {
     }
 
     // Capitalize first letter of line for casual readability if it's lower
-    return result;
+    return result.replace(/<[^>]+>/g, " ").replace(/([,;:!?])([A-Za-z0-9\u0B80-\u0D7F])/g, "$1 $2").replace(/\s+/g, " ").trim();
 }
 
 /**

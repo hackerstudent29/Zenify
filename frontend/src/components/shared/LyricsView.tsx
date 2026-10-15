@@ -51,6 +51,8 @@ export function cleanLyricText(text: string): string {
   }
 
   return text
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\[\d{1,2}:\d{2}[^\]]*\]/g, " ")
     // 1. Remove artist tags or bracketed section names like [Chorus] (unless instrumental)
     .replace(/\[\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|spoken)[^\]]*\]/gi, "")
     // 2. Remove parenthesized tags like (Chorus), (Male), (Spoken)
@@ -322,7 +324,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     const splitLines: any[] = [];
     for (const line of baseLines) {
       const words = (line.text || '').trim().split(/\s+/);
-      if (words.length > 8 || line.text.length > 48) {
+      if (words.length > 16 || line.text.length > 95) {
         const mid = Math.ceil(words.length / 2);
         let splitIdx = mid;
         for (let j = Math.max(1, mid - 2); j <= Math.min(words.length - 2, mid + 2); j++) {
@@ -910,12 +912,12 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
                 key={`${trackId}-unsynced-${idx}`}
                 className={cn(
                   "text-white/70 text-center leading-relaxed",
-                  isMobile ? "line-clamp-3 max-h-[4.05em] text-[18px]" : (isFullscreen ? "line-clamp-2 max-h-[2.65em] text-[26px]" : "line-clamp-2 max-h-[2.65em] text-[20px]")
+                  isMobile ? "line-clamp-2 text-[20px]" : (isFullscreen ? "line-clamp-2 text-[26px]" : "line-clamp-2 text-[20px]")
                 )}
                 style={{
                   display: "-webkit-box",
                   WebkitBoxOrient: "vertical",
-                  WebkitLineClamp: isMobile ? 3 : 2,
+                  WebkitLineClamp: 2,
                   overflow: "hidden"
                 }}
               >
@@ -968,11 +970,11 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  <div
  className={cn(
  "flex flex-col relative w-full",
- isFullscreen ? (isMobile ? "px-4 gap-8 max-w-full mx-auto" : "px-10 gap-12 max-w-5xl mx-auto") : (isMobile ? "px-2 items-center gap-6" : "px-8 items-center gap-10")
+ isFullscreen ? (isMobile ? "px-6 gap-6 max-w-full mx-auto" : "px-10 gap-12 max-w-5xl mx-auto") : (isMobile ? "px-4 items-center gap-6" : "px-8 items-center gap-10")
  )}
  >
  {/* Spacer block to push the very first line precisely to the vertical focal zone */}
-  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "45vh" : (isFullscreen ? "38vh" : "40vh") }} />
+  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "28vh" : (isFullscreen ? "38vh" : "40vh") }} />
 
  {processedLines.map((line: any, idx: number) => {
  const isCurrent = idx === activeIndex;
@@ -1123,7 +1125,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  })}
 
   {/* Spacer block to push the very last line precisely to the vertical focal zone */}
-  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "50vh" : (isFullscreen ? "62vh" : "40vh") }} />
+  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "32vh" : (isFullscreen ? "62vh" : "40vh") }} />
 
   {/* Outro / Credits Section */}
   <div className="w-full flex flex-col items-center justify-center gap-4 mt-10 mb-10 opacity-40 hover:opacity-80 transition-opacity">
