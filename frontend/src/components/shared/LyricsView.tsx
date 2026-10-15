@@ -61,7 +61,9 @@ export function cleanLyricText(text: string): string {
     .replace(/\b(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)\b/gi, "")
     // 5. Cleanup remaining empty/whitespace parentheses
     .replace(/\(\s*\)/g, "")
-    // 6. Clean extra spaces
+    // 6. Ensure space after punctuation glued to words
+    .replace(/([,;:!?])([A-Za-z0-9\u0B80-\u0D7F])/g, "$1 $2")
+    // 7. Clean extra spaces
     .replace(/\s+/g, " ")
     .trim();
 }

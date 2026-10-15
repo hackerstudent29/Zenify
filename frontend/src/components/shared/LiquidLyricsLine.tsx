@@ -50,51 +50,111 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     targetBlur = "blur(0px)";
     targetScale = "scale(1)";
     targetTranslate = "translateY(0)";
-  } else {
-    // Normal synced playback mode
-    // Smooth flowing down-to-top kinetic motion curve across all view modes
+  } else if (isMobile) {
+    // Current mobile style: smooth flowing down-to-top kinetic motion curve
     if (distFromActive === 1) {
-      // 1st upcoming line: rising from below
-      targetOpacity = 0.65;
+      targetOpacity = 0.68;
       targetBlur = "blur(0px)";
       targetScale = "scale(0.97)";
-      targetTranslate = "translateY(12px)";
+      targetTranslate = "translateY(10px)";
     } else if (distFromActive === 2) {
-      // 2nd upcoming line
-      targetOpacity = 0.38;
+      targetOpacity = 0.40;
       targetBlur = "blur(2px)";
       targetScale = "scale(0.93)";
-      targetTranslate = "translateY(24px)";
+      targetTranslate = "translateY(20px)";
     } else if (distFromActive === 3) {
-      // 3rd upcoming line
-      targetOpacity = 0.18;
-      targetBlur = "blur(5px)";
+      targetOpacity = 0.20;
+      targetBlur = "blur(4px)";
       targetScale = "scale(0.89)";
-      targetTranslate = "translateY(36px)";
+      targetTranslate = "translateY(30px)";
     } else if (distFromActive > 3) {
-      // Far upcoming lines
       targetOpacity = 0.08;
-      targetBlur = "blur(8px)";
+      targetBlur = "blur(6px)";
       targetScale = "scale(0.85)";
-      targetTranslate = "translateY(48px)";
+      targetTranslate = "translateY(40px)";
     } else if (distFromActive === -1) {
-      // Immediate past line: gliding smoothly upward and away
       targetOpacity = 0.35;
       targetBlur = "blur(1.5px)";
       targetScale = "scale(0.96)";
-      targetTranslate = "translateY(-12px)";
+      targetTranslate = "translateY(-10px)";
     } else if (distFromActive === -2) {
-      // 2nd past line
       targetOpacity = 0.18;
-      targetBlur = "blur(4px)";
+      targetBlur = "blur(3px)";
       targetScale = "scale(0.91)";
-      targetTranslate = "translateY(-24px)";
+      targetTranslate = "translateY(-20px)";
     } else {
-      // Far past lines
       targetOpacity = 0.06;
-      targetBlur = "blur(8px)";
+      targetBlur = "blur(6px)";
       targetScale = "scale(0.86)";
-      targetTranslate = "translateY(-36px)";
+      targetTranslate = "translateY(-30px)";
+    }
+  } else {
+    // PC / Desktop: Exact Apple Music Depth Curve restored from commit 6d6e745
+    if (!isFullscreen) {
+      if (distFromActive === 1) {
+        targetOpacity = 0.72;
+        targetBlur = "blur(0px)";
+        targetScale = "scale(0.98)";
+        targetTranslate = "translateY(0)";
+      } else if (distFromActive === 2) {
+        targetOpacity = 0.45;
+        targetBlur = "blur(2.5px)";
+        targetScale = "scale(0.95)";
+        targetTranslate = "translateY(0)";
+      } else if (distFromActive === -1) {
+        targetOpacity = 0.35;
+        targetBlur = "blur(3.5px)";
+        targetScale = "scale(0.96)";
+        targetTranslate = "translateY(0)";
+      } else if (distFromActive >= 3) {
+        targetOpacity = 0.18;
+        targetBlur = "blur(6px)";
+        targetScale = "scale(0.92)";
+        targetTranslate = "translateY(0)";
+      } else {
+        targetOpacity = 0.10;
+        targetBlur = "blur(8px)";
+        targetScale = "scale(0.90)";
+        targetTranslate = "translateY(0)";
+      }
+    } else {
+      // Apple Music Fullview Depth Curve (PC)
+      if (distFromActive === 1) {
+        targetOpacity = 0.58;
+        targetBlur = "blur(0px)";
+        targetScale = "scale(0.97)";
+        targetTranslate = "translateY(0)";
+      } else if (distFromActive === 2) {
+        targetOpacity = 0.34;
+        targetBlur = "blur(2.5px)";
+        targetScale = "scale(0.93)";
+        targetTranslate = "translateY(1px)";
+      } else if (distFromActive === 3) {
+        targetOpacity = 0.18;
+        targetBlur = "blur(5px)";
+        targetScale = "scale(0.89)";
+        targetTranslate = "translateY(2px)";
+      } else if (distFromActive > 3) {
+        targetOpacity = 0.08;
+        targetBlur = "blur(8px)";
+        targetScale = "scale(0.86)";
+        targetTranslate = "translateY(3px)";
+      } else if (distFromActive === -1) {
+        targetOpacity = 0.32;
+        targetBlur = "blur(2px)";
+        targetScale = "scale(0.96)";
+        targetTranslate = "translateY(-1px)";
+      } else if (distFromActive === -2) {
+        targetOpacity = 0.16;
+        targetBlur = "blur(5px)";
+        targetScale = "scale(0.91)";
+        targetTranslate = "translateY(-2px)";
+      } else {
+        targetOpacity = 0.06;
+        targetBlur = "blur(8px)";
+        targetScale = "scale(0.86)";
+        targetTranslate = "translateY(-3px)";
+      }
     }
   }
 
@@ -106,16 +166,13 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     targetTranslate = "translateY(0)";
   }
 
-  // Scaled Apple Music typography tuned so stanzas fit comfortably:
-  // Consistent, standardized typography scale across all songs:
-  // Mobile: 18px (strictly 3 lines max)
-  // PC Sidebar: 20px (strictly 2 lines max)
-  // PC / Tablet Fullscreen Split-Screen: 26px (strictly 2 lines max)
+  // Typography:
+  // PC: Classic Apple Music restored from yesterday's commit (clamp(34px, 4vw, 52px) on fullscreen, 24px on sidebar)
+  // Mobile: Increased font size per user request (clamp(26px, 6.5vw, 36px) on fullscreen, clamp(22px, 5.5vw, 28px) on mobile view)
   const fontSize = isFullscreen 
-    ? (isMobile ? "18px" : "26px") 
-    : (isMobile ? "18px" : "20px");
+    ? (isMobile ? "clamp(26px, 6.5vw, 36px)" : "clamp(34px, 4vw, 52px)") 
+    : (isMobile ? "clamp(22px, 5.5vw, 28px)" : "24px");
   const origin = isFullscreen ? "left center" : "center center";
-  const maxLineHeight = isMobile ? "4.05em" : "2.65em";
 
   if (isInterlude) {
     return (
@@ -139,7 +196,13 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     );
   }
 
-  const wordTokens = text.split(" ");
+  // Scrub punctuation without spaces to prevent words from being glued together
+  const cleanedText = (text || "")
+    .replace(/([,;:!?])([A-Za-z0-9\u0B80-\u0D7F])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const wordTokens = cleanedText.split(" ");
   const totalWords = wordTokens.length;
   const totalChars = wordTokens.reduce((acc, w) => acc + w.length, 0);
   let charAccumulator = 0;
@@ -148,7 +211,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     <div
       data-lyrics-line="true"
       className={cn(
-        "w-full leading-[1.25] px-4 flex transition-[transform,opacity,filter] duration-[650ms] ease-[cubic-bezier(0.2,0.9,0.3,1)] transform-gpu group cursor-pointer",
+        "w-full leading-[1.25] px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer",
         isFullscreen ? "justify-start text-left" : "justify-center text-center"
       )}
       style={{
@@ -162,26 +225,27 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         transform: `${targetScale} ${targetTranslate} translateZ(0)`,
         transformOrigin: origin,
         willChange: "transform, opacity, filter",
-        maxHeight: maxLineHeight,
-        overflow: "hidden"
+        ...(isMobile ? { maxHeight: "4.8em", overflow: "hidden" } : {})
       }}
     >
       <div 
         className={cn(
           "relative flex flex-wrap cursor-pointer select-none",
           origin.includes("left") ? "justify-start" : "justify-center",
-          isMobile ? "line-clamp-3" : "line-clamp-2"
+          isMobile ? "line-clamp-3" : ""
         )} 
         style={{ 
           transformOrigin: origin, 
           gap: "0.25em", 
           wordBreak: "break-word", 
           overflowWrap: "anywhere",
-          maxHeight: maxLineHeight,
-          overflow: "hidden",
-          display: "-webkit-box",
-          WebkitBoxOrient: "vertical",
-          WebkitLineClamp: isMobile ? 3 : 2
+          ...(isMobile ? {
+            maxHeight: "4.8em",
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: 3
+          } : {})
         }}
       >
         {wordTokens.map((word, i) => {
@@ -214,7 +278,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
             />
           );
         })}
-        <span className="sr-only">{text}</span>
+        <span className="sr-only">{cleanedText}</span>
       </div>
     </div>
   );

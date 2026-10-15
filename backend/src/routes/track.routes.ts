@@ -140,10 +140,36 @@ export async function trackRoutes(server: FastifyInstance) {
             }, true);
 
             if (!resolution.watchUrl && !resolution.streamUrl) {
-                return reply.status(422).send({
-                    error: 'Failed to retrieve validated full audio stream',
-                    details: resolution.decisionLog
-                });
+                // Secondary Fallback: Try ExternalMetadataService.fetchAudio directly
+                try {
+                    const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                    const fallbackAudio = await ExternalMetadataService.fetchAudio(
+                        track.title,
+                        track.artist?.name || '',
+                        track.duration,
+                        undefined,
+                        { bypassCache: true }
+                    );
+                    if (fallbackAudio && (fallbackAudio.watchUrl || fallbackAudio.url)) {
+                        resolution.watchUrl = fallbackAudio.watchUrl || fallbackAudio.url;
+                        resolution.streamUrl = fallbackAudio.url;
+                        resolution.score = 75;
+                        resolution.verified = true;
+                    }
+                } catch (fbErr) {
+                    console.warn('[RefetchAudio] Secondary fetchAudio fallback failed:', fbErr);
+                }
+
+                // Tertiary Fallback: Generate stream proxy query
+                if (!resolution.watchUrl && !resolution.streamUrl) {
+                    const cleanT = track.title.replace(/\(.*?\)/g, '').split('|')[0].trim();
+                    const cleanA = (track.artist?.name || '').split(/[,&/|]/)[0].trim();
+                    const fallbackQuery = `${cleanA} - ${cleanT}`;
+                    resolution.watchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(fallbackQuery)}`;
+                    resolution.streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(fallbackQuery)}&trackId=${track.id}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(cleanA)}`;
+                    resolution.score = 60;
+                    resolution.verified = true;
+                }
             }
 
             // Invalidate cache
@@ -174,6 +200,226 @@ export async function trackRoutes(server: FastifyInstance) {
         } catch (err: any) {
             server.log.error(`[RefetchAudio] Error for track ${id}: ${err.message}`);
             return reply.status(500).send({ error: 'Audio refetch failed', message: err.message });
+        }
+    });
+
+
+    // Multi-Provider Manual and Automated Refetch Lyrics Endpoint
+    server.post('/:id/refetch-lyrics', async (req, reply) => {
+        const { id } = req.params as { id: string };
+        const { provider = 'auto', force = true } = (req.body || {}) as { provider?: string; force?: boolean };
+        const { prisma } = await import('../utils/prisma.js');
+        const { LyricEnrichmentService } = await import('../services/lyric-enrichment.service.js');
+        const { DeepgramLyricsService } = await import('../services/deepgram-lyrics.service.js');
+        const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
+        const { LyricsSyncService } = await import('../services/lyrics-sync.service.js');
+        const { AIAudioAlignerService } = await import('../services/ai-audio-aligner.service.js');
+        const { enqueueRomanization } = await import('../queues/romanization.queue.js');
+
+        const track = await prisma.track.findUnique({
+            where: { id },
+            include: { artist: true, album: true }
+        });
+
+        if (!track) {
+            return reply.status(404).send({ error: 'Track not found in database' });
+        }
+
+        const artistName = track.artist?.name || '';
+        let syncedTokens: any[] = [];
+        let plainLyrics = track.lyrics || '';
+        let rawLrc: string | undefined;
+        let chosenSource = provider;
+
+        try {
+            if (provider === 'deepgram') {
+                const dg = await DeepgramLyricsService.syncTrackLyrics(track.id, { force: true, tryVocals: true });
+                if (dg?.syncedTokens?.length) {
+                    syncedTokens = dg.syncedTokens;
+                    plainLyrics = dg.plainLyrics || plainLyrics;
+                    chosenSource = 'DEEPGRAM_AI';
+                }
+            } else if (provider === 'lrclib') {
+                const lrc = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration);
+                if (lrc?.lyrics) {
+                    if (lrc.isSynced) {
+                        const parsed = LyricsSyncService.parseLRC(lrc.lyrics);
+syncedTokens = parsed;
+rawLrc = lrc.lyrics;
+plainLyrics = parsed.map((p: any) => p.text).filter(Boolean).join('\n');
+                    } else {
+                        plainLyrics = lrc.lyrics;
+                    }
+                    chosenSource = 'LRCLIB';
+                }
+            } else if (provider === 'spotify') {
+                const sp = await LyricsEnhancementService.fetchSpotifyRapidApiLyrics(track.title, artistName);
+                if (sp?.lyrics) {
+                    if (sp.isSynced) {
+                        const parsed = LyricsSyncService.parseLRC(sp.lyrics);
+syncedTokens = parsed;
+rawLrc = sp.lyrics;
+                    }
+                    plainLyrics = sp.lyrics;
+                    chosenSource = 'SPOTIFY_LRC';
+                }
+            } else if (provider === 'musixmatch') {
+                const mm = await LyricsEnhancementService.fetchMusixmatchRapidApiLyrics(track.title, artistName, track.duration)
+                    || await LyricsEnhancementService.fetchMusixmatchLyrics(track.title, artistName);
+                if (mm?.lyrics) {
+                    plainLyrics = mm.lyrics;
+                    chosenSource = 'MUSIXMATCH';
+                }
+            } else if (provider === 'genius') {
+                const gn = await LyricsEnhancementService.fetchGeniusRapidApiLyrics(track.title, artistName)
+                    || await LyricsEnhancementService.fetchGeniusRapidApi5Lyrics(track.title, artistName);
+                if (gn?.lyrics) {
+                    plainLyrics = gn.lyrics;
+                    chosenSource = 'GENIUS';
+                }
+            } else if (provider === 'azlyrics') {
+                const az = await LyricsEnhancementService.fetchAZLyrics(track.title, artistName);
+                if (az?.lyrics) {
+                    plainLyrics = az.lyrics;
+                    chosenSource = 'AZLYRICS';
+                }
+            } else if (provider === 'youtube') {
+                const yt = await LyricsSyncService.fetchYouTubeSubtitles(track.title, artistName, track.audioUrl || undefined, track.duration);
+                if (yt?.syncedTokens?.length) {
+                    syncedTokens = yt.syncedTokens;
+                    rawLrc = yt.rawLrc;
+                    chosenSource = 'YOUTUBE_CAPTIONS';
+                }
+            } else if (provider === 'ai_align') {
+                if (plainLyrics.trim()) {
+                    const aligned = await AIAudioAlignerService.alignPlainLyricsToAudio({
+                        trackId: track.id,
+                        audioUrl: track.audioUrl || undefined,
+                        plainLyrics,
+                        title: track.title,
+                        artist: artistName,
+                        duration: track.duration
+                    });
+                    if (aligned?.syncedTokens?.length) {
+                        syncedTokens = aligned.syncedTokens;
+                        rawLrc = aligned.rawLrc;
+                        chosenSource = 'AI_AUDIO_ALIGNER';
+                    }
+                }
+            } else {
+                // Auto / Best Available Pipeline:
+                // 1. Deepgram if audioUrl is present
+                if (track.audioUrl && DeepgramLyricsService.isAvailable()) {
+                    const dg = await DeepgramLyricsService.syncTrackLyrics(track.id, { force: true }).catch(() => null);
+                    if (dg?.syncedTokens?.length) {
+                        syncedTokens = dg.syncedTokens;
+                        plainLyrics = dg.plainLyrics || plainLyrics;
+                        chosenSource = 'DEEPGRAM_AI';
+                    }
+                }
+                // 2. LRCLIB
+                if (!syncedTokens.length) {
+                    const lrc = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration).catch(() => null);
+                    if (lrc?.lyrics) {
+                        if (lrc.isSynced) {
+                            const parsed = LyricsSyncService.parseLRC(lrc.lyrics);
+syncedTokens = parsed;
+rawLrc = lrc.lyrics;
+plainLyrics = parsed.map((p: any) => p.text).filter(Boolean).join('\n');
+                            chosenSource = 'LRCLIB';
+                        } else {
+                            plainLyrics = lrc.lyrics;
+                        }
+                    }
+                }
+                // 3. Spotify
+                if (!syncedTokens.length) {
+                    const sp = await LyricsEnhancementService.fetchSpotifyRapidApiLyrics(track.title, artistName).catch(() => null);
+                    if (sp?.lyrics) {
+                        if (sp.isSynced) {
+                            const parsed = LyricsSyncService.parseLRC(sp.lyrics);
+syncedTokens = parsed;
+rawLrc = sp.lyrics;
+                            chosenSource = 'SPOTIFY_LRC';
+                        }
+                        plainLyrics = sp.lyrics;
+                    }
+                }
+                // 4. YouTube Subtitles
+                if (!syncedTokens.length && track.audioUrl) {
+                    const yt = await LyricsSyncService.fetchYouTubeSubtitles(track.title, artistName, track.audioUrl, track.duration).catch(() => null);
+                    if (yt?.syncedTokens?.length) {
+                        syncedTokens = yt.syncedTokens;
+                        rawLrc = yt.rawLrc;
+                        chosenSource = 'YOUTUBE_CAPTIONS';
+                    }
+                }
+                // 5. Genius/AZLyrics + AI Alignment
+                if (!syncedTokens.length && !plainLyrics.trim()) {
+                    const gn = await LyricsEnhancementService.fetchGeniusRapidApiLyrics(track.title, artistName).catch(() => null)
+                        || await LyricsEnhancementService.fetchAZLyrics(track.title, artistName).catch(() => null);
+                    if (gn?.lyrics) {
+                        plainLyrics = gn.lyrics;
+                    }
+                }
+                if (!syncedTokens.length && plainLyrics.trim()) {
+                    const aligned = await AIAudioAlignerService.alignPlainLyricsToAudio({
+                        trackId: track.id,
+                        audioUrl: track.audioUrl || undefined,
+                        plainLyrics,
+                        title: track.title,
+                        artist: artistName,
+                        duration: track.duration
+                    }).catch(() => null);
+                    if (aligned?.syncedTokens?.length) {
+                        syncedTokens = aligned.syncedTokens;
+                        rawLrc = aligned.rawLrc;
+                        chosenSource = 'AI_AUDIO_ALIGNER';
+                    }
+                }
+            }
+
+            // Clean & structure lyrics
+            if (syncedTokens.length > 0) {
+                syncedTokens = syncedTokens.map(t => ({
+                    ...t,
+                    text: LyricEnrichmentService.formatLyricLine(t.text || '')
+                }));
+            }
+            if (plainLyrics) {
+                plainLyrics = plainLyrics.split('\n').map(l => LyricEnrichmentService.formatLyricLine(l)).join('\n');
+            }
+
+            // Update database
+            const updateData: any = {};
+            if (plainLyrics) updateData.lyrics = plainLyrics;
+            if (syncedTokens.length > 0) {
+                updateData.synced_lyrics = syncedTokens;
+                updateData.sync_source = chosenSource;
+                if (rawLrc) updateData.raw_lrc = rawLrc;
+            }
+
+            const updated = await prisma.track.update({
+                where: { id: track.id },
+                data: updateData,
+                select: { id: true, title: true, lyrics: true, synced_lyrics: true, raw_lrc: true, sync_source: true, romanizedLyrics: true, romanizedSyncedLyrics: true, romanizedLang: true }
+            });
+
+            // Enqueue romanization in background
+            await enqueueRomanization({ trackId: track.id, force: true }).catch(() => {});
+
+            return reply.send({
+                success: true,
+                message: `Lyrics refetched via ${chosenSource}`,
+                provider: chosenSource,
+                track: updated,
+                syncedTokens: updated.synced_lyrics || [],
+                plainLyrics: updated.lyrics || '',
+                hasSynced: Boolean(updated.synced_lyrics && (updated.synced_lyrics as any[]).length > 0)
+            });
+        } catch (err: any) {
+            server.log.error(`[RefetchLyrics] Error for track ${id}: ${err.message}`);
+            return reply.status(500).send({ error: 'Lyrics refetch failed', message: err.message });
         }
     });
 

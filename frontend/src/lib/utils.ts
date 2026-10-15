@@ -385,60 +385,90 @@ export function splitArtistNames(raw: string | string[]): string[] {
 export function formatArtists(track: any, fallback: string = "Unknown Artist"): string {
   if (!track) return fallback;
 
-  let rawNames: string[] = [];
-
-  // 1. Primary artist array (common in APIs like JioSaavn/Spotify)
-  if (Array.isArray(track.artists)) {
-    const extracted = track.artists.map((a: any) => typeof a === 'string' ? a : a.name).filter(Boolean);
-    rawNames.push(...extracted);
-  } else if (typeof track.artists === 'string') {
-    rawNames.push(track.artists);
-  }
-
-  // 2. Primary artist field (fallback if array not present)
-  if (track.artist) {
-    if (typeof track.artist === 'string') {
-      rawNames.push(track.artist);
-    } else if (track.artist.name) {
-      rawNames.push(track.artist.name);
-    }
-  } else if (track.artistName) {
-    rawNames.push(track.artistName);
-  } else if (track.album?.artist?.name) {
-    rawNames.push(track.album.artist.name);
-  }
-
-  // 3. Featured Artists
-  if (track.featuredArtists) {
-    if (Array.isArray(track.featuredArtists)) {
-      const extracted = track.featuredArtists.map((a: any) => typeof a === 'string' ? a : a.name).filter(Boolean);
-      rawNames.push(...extracted);
-    } else if (typeof track.featuredArtists === 'string') {
-      rawNames.push(track.featuredArtists);
-    }
-  }
-
-  // Split any combo artist strings into clean individual names
-  const splitNames = splitArtistNames(rawNames);
-
-  // Deduplicate case-insensitively and filter empty strings
   const seen = new Set<string>();
-  const uniqueNames: string[] = [];
-  
-  for (const name of splitNames) {
-    if (!name) continue;
-    const clean = name.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim();
-    if (!clean || clean.length < 2 || /^\d+$/.test(clean) || /^itunes\s*artist/i.test(clean)) continue;
-    const lower = clean.toLowerCase();
-    if (!seen.has(lower)) {
-      seen.add(lower);
-      uniqueNames.push(clean);
+  const parts: string[] = [];
+
+  const add = (name: string, role?: string) => {
+    if (!name) return;
+    const split = splitArtistNames(name);
+    for (const item of split) {
+      const clean = item.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim();
+      if (!clean || clean.length < 2 || /^\d+$/.test(clean) || /^itunes\s*artist/i.test(clean)) continue;
+      const lower = clean.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        const title = formatDisplayTitle(clean);
+        parts.push(role ? `${title} (${role})` : title);
+      }
     }
+  };
+
+  // 1. Main artist is the composer / music director
+  const rawComposers = track.composers || 
+                       track.music || 
+                       track.musicDirector || 
+                       track.more_info?.music || 
+                       track.more_info?.composer || 
+                       track.album?.musicDirector || 
+                       track.album?.composer;
+  const rawBgm = track.bgmComposer || track.bgm || track.more_info?.bgm;
+
+  let hasComposer = false;
+  if (rawComposers) {
+    add(String(rawComposers));
+    hasComposer = parts.length > 0;
+  }
+  if (rawBgm) {
+    add(String(rawBgm), "BGM");
   }
 
-  if (uniqueNames.length === 0) return fallback;
+  // 2. Fall back to primary artist if composer missing
+  let rawPrimary = "";
+  if (Array.isArray(track.artists) && track.artists.length > 0) {
+    const first = track.artists[0];
+    rawPrimary = typeof first === 'string' ? first : first?.name;
+  } else if (track.artist) {
+    rawPrimary = typeof track.artist === 'string' ? track.artist : track.artist.name;
+  } else if (track.artistName) {
+    rawPrimary = track.artistName;
+  } else if (track.primaryArtists) {
+    rawPrimary = track.primaryArtists;
+  } else if (track.album?.artist?.name) {
+    rawPrimary = track.album.artist.name;
+  }
 
-  return uniqueNames.map(n => formatDisplayTitle(n)).join(', ');
+  if (!hasComposer && rawPrimary) {
+    add(rawPrimary);
+  }
+
+  // 3. Secondary artists: Singers
+  const rawSingers = track.singers || 
+                     track.more_info?.singers || 
+                     track.singer || 
+                     track.vocals || 
+                     track.sungBy;
+  if (rawSingers) {
+    add(String(rawSingers), "Singer");
+  } else if (hasComposer && rawPrimary) {
+    add(rawPrimary, "Singer");
+  }
+
+  // 4. Secondary artists: Lyricists
+  const rawLyricists = track.lyricist || 
+                       track.lyricists || 
+                       track.more_info?.lyricist || 
+                       track.more_info?.lyrics;
+  if (rawLyricists) {
+    add(String(rawLyricists), "Lyricist");
+  }
+
+  // 5. Featured / other credits
+  if (track.featuredArtists) {
+    add(String(track.featuredArtists), "Featured");
+  }
+
+  if (parts.length === 0) return fallback;
+  return parts.join(' • ');
 }
 
 /**

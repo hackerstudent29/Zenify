@@ -394,11 +394,12 @@ export class ITunesCatalogProvider implements CatalogProvider {
             }
           }
 
-          if (r.collectionName && !albumsMap.has(r.collectionName.toLowerCase())) {
-            albumsMap.set(r.collectionName.toLowerCase(), {
-              id: `itunes-album-${r.collectionId || r.trackId}`,
+          const releaseId = String(r.collectionId || r.trackId);
+          if (r.collectionName && releaseId && !albumsMap.has(releaseId)) {
+            albumsMap.set(releaseId, {
+              id: `itunes-album-${releaseId}`,
               source: 'itunes',
-              sourceId: String(r.collectionId || r.trackId),
+              sourceId: releaseId,
               title: r.collectionName,
               artist: { id: `itunes-artist-${r.artistId}`, name: r.artistName },
               coverUrl: t.artwork,

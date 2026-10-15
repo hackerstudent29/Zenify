@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Library, Plus, Search, Heart, Disc, User, ChevronRight, Play, Filter, MoreHorizontal, Trash2, Share2 } from "lucide-react";
+import { Library, Plus, Search, Heart, Disc, User, ChevronRight, Play, Filter, MoreHorizontal, Trash2, Share2, ListPlus } from "lucide-react";
 import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
 import { useQueryClient } from "@tanstack/react-query";

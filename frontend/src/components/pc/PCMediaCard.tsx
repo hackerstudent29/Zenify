@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic } from "lucide-react";
+import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic, ListPlus } from "lucide-react";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -300,6 +300,36 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  </button>
  }
  items={[
+ {
+ id: 'add-to-queue',
+ icon: <ListPlus size={16} className="opacity-70 text-brand" />,
+ label: "Add to Queue",
+ onClick: async (e: any) => {
+   e.stopPropagation();
+   try {
+     if (isAlbum) {
+       const albumData = (track as any).tracks ? track : (await api.get(`/albums/${track.id}`)).data;
+       if (albumData?.tracks?.length) {
+         usePlayerStore.getState().addToUserQueue(albumData.tracks, { contextName: track.title || (track as any).name });
+       } else {
+         showToast("Album has no tracks", "error");
+       }
+     } else if (isPlaylist) {
+       const plData = (track as any).tracks ? track : (await api.get(`/playlists/${track.id}`)).data;
+       const tracks = plData?.tracks?.map((t: any) => t.track || t) || [];
+       if (tracks.length) {
+         usePlayerStore.getState().addToUserQueue(tracks, { contextName: track.title || (track as any).name });
+       } else {
+         showToast("Playlist has no tracks", "error");
+       }
+     } else {
+       usePlayerStore.getState().addToUserQueue(track);
+     }
+   } catch (err) {
+     showToast("Failed to queue items", "error");
+   }
+ }
+ },
  ...(!isAlbum ? [{
  id: 'favorite',
  icon: <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />,

@@ -206,7 +206,7 @@ export class LyricsSyncService {
                                 words[w].endTime = words[w + 1].time;
                             }
                         }
-                        displayText = rawText.replace(/<\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?>/g, '').replace(/\s+/g, ' ').trim();
+                        displayText = rawText.replace(/<\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?>/g, ' ').replace(/\s+/g, ' ').trim();
                     }
 
                     let cleaned = this.cleanLyricsText(displayText);

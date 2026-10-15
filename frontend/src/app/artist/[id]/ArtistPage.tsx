@@ -200,7 +200,7 @@ export default function ArtistPage() {
 
  if (isLoading) {
  return (
- <div className="flex items-center justify-center min-h-[60vh] bg-black">
+ <div className="flex items-center justify-center min-h-[60vh] bg-transparent">
  <ZenLoading size="md" />
  </div>
  );
@@ -208,7 +208,7 @@ export default function ArtistPage() {
 
  if (!artist) {
  return (
- <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 opacity-30 bg-black">
+ <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 opacity-30 bg-transparent">
  <Disc3 size={64} strokeWidth={1} />
  <p className="text-sm font-bold tracking-tight text-white/40">Artist not found</p>
  </div>

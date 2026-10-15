@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/authStore";
 import { audioEngine } from "@/lib/audio-engine";
 import { getMediaUrl, getTrackCover } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUIStore } from "@/store/ui";
 
 export function GlobalAudio() {
   const currentTrack = usePlayerStore(state => state.currentTrack);
@@ -38,6 +39,7 @@ export function GlobalAudio() {
   volumeRef.current = volume;
   const prefetchedTrackIds = useRef<Set<string>>(new Set());
   const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRecoveryAttempts = useRef<Record<string, number>>({});
 
   // Initialize Audio Engine & Background Resilience Listeners
   useEffect(() => {
@@ -283,43 +285,68 @@ export function GlobalAudio() {
         src: audio.src
       });
 
-      // Self-healing fallback: If audio failed to load (e.g. 502 / bot block on stream proxy), attempt canonical resolution
       const current = usePlayerStore.getState().currentTrack;
-      if (current && !audio.src.includes('resolved-fallback=true')) {
-        console.warn("[GlobalAudio] Stream failed. Attempting canonical audio recovery for:", current.title);
+      if (!current) {
+        setIsPlaying(false);
+        return;
+      }
+
+      // Track failure count to prevent infinite recovery loops
+      const trackId = current.id;
+      const attemptCount = (audioRecoveryAttempts.current[trackId] || 0) + 1;
+      audioRecoveryAttempts.current[trackId] = attemptCount;
+
+      console.warn(`[GlobalAudio/Automator] Error detected for "${current.title}" (Attempt ${attemptCount}/3). Resolving alternative stream...`);
+
+      if (attemptCount <= 2) {
         import('@/lib/api').then(({ default: api }) => {
-          api.post('tracks/import-instant', {
-            id: current.id,
-            title: current.title,
-            artistName: current.artist?.name || (current as any).artistName || '',
-            albumTitle: current.album?.title || '',
-            duration: current.duration
-          }).then((res: any) => {
-            const rawResolved = res.data?.audioUrl;
-            if (rawResolved) {
-              const fallbackMediaUrl = getMediaUrl(rawResolved, 'audio', {
+          // 1. First attempt: call refetch-audio to resolve fresh verified stream
+          api.post(`/tracks/${trackId}/refetch-audio`).then((res: any) => {
+            const newUrl = res.data?.audioUrl || res.data?.track?.audioUrl;
+            if (newUrl) {
+              const fallbackMediaUrl = getMediaUrl(newUrl, 'audio', {
                 id: current.id,
                 title: current.title,
                 artist: current.artist?.name || (current as any).artistName || '',
                 language: (current as any).language
               });
-              if (fallbackMediaUrl && fallbackMediaUrl !== audio.src) {
-                console.log("[GlobalAudio] Recovered with canonical stream:", fallbackMediaUrl);
+              if (fallbackMediaUrl) {
+                console.log("[GlobalAudio/Automator] Auto-recovered audio stream:", fallbackMediaUrl);
                 usePlayerStore.setState(state => ({
                   currentTrack: state.currentTrack ? { ...state.currentTrack, audioUrl: fallbackMediaUrl } : null
                 }));
                 const sep = fallbackMediaUrl.includes('?') ? '&' : '?';
-                audio.src = `${fallbackMediaUrl}${sep}resolved-fallback=true`;
+                audio.src = `${fallbackMediaUrl}${sep}auto-recovered=true&t=${Date.now()}`;
                 audio.load();
-                audio.play().catch(console.warn);
+                audio.play().catch((playErr) => {
+                  if (playErr?.name === 'AbortError') return;
+                  console.warn("[GlobalAudio/Automator] Secondary playback attempt failed:", playErr);
+                  // Advance to next song if recovery stream also fails to play
+                  setTimeout(() => {
+                    useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
+                    playNext(true);
+                  }, 300);
+                });
                 return;
               }
             }
-          }).catch(console.warn);
-        }).catch(console.warn);
+            // If refetch returned no valid stream, advance to next track
+            useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
+            playNext(true);
+          }).catch((err) => {
+            console.warn("[GlobalAudio/Automator] Refetch audio error:", err);
+            useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
+            playNext(true);
+          });
+        }).catch(() => {
+          playNext(true);
+        });
+      } else {
+        // Attempt limit exceeded: smoothly advance to next song in queue
+        console.warn(`[GlobalAudio/Automator] Audio recovery exhausted for "${current.title}". Advancing to next track.`);
+        useUIStore.getState().showToast(`Audio unavailable for "${current.title}". Playing next song.`, 'error');
+        playNext(true);
       }
-
-      setIsPlaying(false);
     };
 
     const handleSeeked = () => {

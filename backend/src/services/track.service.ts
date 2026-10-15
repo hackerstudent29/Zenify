@@ -243,11 +243,18 @@ export class TrackService {
                     const cleanTitle = (item.trackName || '').trim();
                     const artistName = (item.artistName || 'Unknown Artist').trim();
 
-                    // Check if already in DB by title & artist
+                    // Check if already in DB matching this release
                     const dbTrack = await prisma.track.findFirst({
                         where: {
-                            title: { equals: cleanTitle, mode: 'insensitive' },
-                            artist: { name: { equals: artistName, mode: 'insensitive' } },
+                            OR: [
+                                { id },
+                                { youtubeId: itunesId },
+                                {
+                                    title: { equals: cleanTitle, mode: 'insensitive' },
+                                    artist: { name: { equals: artistName, mode: 'insensitive' } },
+                                    ...(item.collectionName ? { album: { title: { equals: item.collectionName, mode: 'insensitive' } } } : {})
+                                }
+                            ],
                             deletedAt: null
                         },
                         include: { artist: true, album: { include: { artist: true } } }
@@ -1250,11 +1257,11 @@ export class TrackService {
         let isMovieAlbum = false;
 
         if (!hasSubstantialAlbum) {
-            if (classification.isMovie && classification.movieName) {
+            if (refined.album) {
+                albumTitleToUse = refined.album.trim();
+            } else if (classification.isMovie && classification.movieName) {
                 albumTitleToUse = classification.movieName.trim();
                 isMovieAlbum = true;
-            } else if (refined.album) {
-                albumTitleToUse = refined.album.trim();
             }
         } else {
             albumTitleToUse = currentAlbum;
@@ -1285,20 +1292,11 @@ export class TrackService {
             TrackService.importLocks.set(fingerprint, new Promise(resolve => lockResolver = resolve));
 
             try {
-                // Find existing album by title and artist (for regular albums) or just title (for movies)
+                // Find existing album strictly by exact title and artist for this release
                 const existingAlbum = await prisma.album.findFirst({
                     where: {
-                        OR: [
-                            // 1. Exact or fingerprint title match for this artist
-                            {
-                                artistId: artist.id,
-                                title: { equals: albumTitleToUse, mode: 'insensitive' }
-                            },
-                            // 2. Global fingerprint match for movies (which can have multiple artists)
-                            isMovieAlbum ? {
-                                title: { equals: albumTitleToUse, mode: 'insensitive' }
-                            } : { id: 'none' } // Use an impossible condition for non-movies
-                        ]
+                        artistId: artist.id,
+                        title: { equals: albumTitleToUse, mode: 'insensitive' }
                     }
                 });
 
@@ -1338,22 +1336,15 @@ export class TrackService {
             }
         }
 
-        // Duplicate Check: Strict canonical & fingerprint match to prevent duplicate track records
+        // Duplicate Check: Scoped strictly to this album release
         let existingTrack = await prisma.track.findFirst({
             where: {
                 title: { equals: refined.title, mode: 'insensitive' },
                 artistId: artist.id,
+                ...(albumId ? { albumId } : { albumId: null }),
             },
             include: { artist: true, album: true }
         });
-        
-        if (!existingTrack) {
-            existingTrack = await DeduplicationService.findExistingDuplicate(
-                refined.title,
-                artist.name,
-                duration ? Math.round(Number(duration)) : undefined
-            ) as any;
-        }
 
         if (existingTrack) {
             console.log(`[Import] Found existing track: "${existingTrack.title}" (ID: ${existingTrack.id}) for refined title: "${refined.title}"`);

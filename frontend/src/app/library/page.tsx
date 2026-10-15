@@ -13,6 +13,7 @@ import {
  Play,
   LayoutDashboard,
   MoreHorizontal,
+  ListPlus,
   Trash2,
   Share2,
   Edit2
@@ -432,6 +433,24 @@ export default function LibraryPage() {
  onClick: () => handlePlayPlaylist(playlist.id)
  },
  {
+ id: 'queue',
+ icon: <ListPlus size={13} className="text-brand" />,
+ label: 'Add to Queue',
+ onClick: async () => {
+   try {
+     const res = await api.get(`/playlists/${playlist.id}`);
+     const tracks = res.data?.tracks?.map((t: any) => t.track || t) || [];
+     if (tracks.length > 0) {
+       usePlayerStore.getState().addToUserQueue(tracks, { contextName: playlist.name });
+     } else {
+       showToast("Playlist has no tracks", "error");
+     }
+   } catch (e) {
+     showToast("Failed to load playlist tracks", "error");
+   }
+ }
+ },
+ {
  id: 'add-songs',
             icon: <Plus size={13} className="text-brand" />,
             label: 'Add Songs',
@@ -551,6 +570,24 @@ export default function LibraryPage() {
  icon: <Play size={13} className="text-brand fill-current" />,
  label: 'Play',
  onClick: () => handlePlayPlaylist(playlist.id)
+ },
+ {
+ id: 'queue',
+ icon: <ListPlus size={13} className="text-brand" />,
+ label: 'Add to Queue',
+ onClick: async () => {
+   try {
+     const res = await api.get(`/playlists/${playlist.id}`);
+     const tracks = res.data?.tracks?.map((t: any) => t.track || t) || [];
+     if (tracks.length > 0) {
+       usePlayerStore.getState().addToUserQueue(tracks, { contextName: playlist.name });
+     } else {
+       showToast("Playlist has no tracks", "error");
+     }
+   } catch (e) {
+     showToast("Failed to load playlist tracks", "error");
+   }
+ }
  },
  {
  id: 'add-songs',

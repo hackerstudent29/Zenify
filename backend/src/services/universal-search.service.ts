@@ -9,6 +9,7 @@ export interface UniversalTrackItem {
   trackName: string;
   artistName: string;
   artists: { items: { profile: { name: string } }[] };
+  albumId?: string | number;
   collectionName: string;
   albumOfTrack: { name: string; coverArt: { sources: { url: string; width?: number }[] } };
   artworkUrl100: string;
@@ -214,6 +215,7 @@ export class UniversalSearchService {
             trackName: t.title,
             artistName: t.artist?.name || 'Unknown Artist',
             artists: { items: [{ profile: { name: t.artist?.name || 'Unknown Artist' } }] },
+            albumId: t.album?.id || t.albumId,
             collectionName: t.album?.title || 'Single',
             albumOfTrack: {
               name: t.album?.title || 'Single',

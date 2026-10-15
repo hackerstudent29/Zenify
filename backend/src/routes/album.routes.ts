@@ -77,19 +77,22 @@ export async function albumRoutes(server: FastifyInstance) {
                 }).catch(console.error);
             }
 
-            // Insert or link tracks with strict pre-insert deduplication
+            // Insert tracks strictly belonging to this album release
             for (const t of tracksData) {
                 const trackDuration = t.trackTimeMillis ? Math.floor(t.trackTimeMillis / 1000) : 180;
-                const existing = await DeduplicationService.findExistingDuplicate(t.trackName, artist.name, trackDuration);
+                const existingInThisAlbum = await prisma.track.findFirst({
+                    where: {
+                        albumId: album.id,
+                        title: { equals: t.trackName, mode: 'insensitive' }
+                    }
+                });
 
-                if (existing) {
-                    console.log(`[AlbumImport] Found existing track for "${t.trackName}". Attaching to album ${album.title}.`);
+                if (existingInThisAlbum) {
                     await prisma.track.update({
-                        where: { id: existing.id },
+                        where: { id: existingInThisAlbum.id },
                         data: {
-                            albumId: album.id,
-                            trackNumber: t.trackNumber || existing.trackNumber || 1,
-                            coverUrl: existing.coverUrl || cloudinaryCover || '',
+                            trackNumber: t.trackNumber || existingInThisAlbum.trackNumber || 1,
+                            coverUrl: existingInThisAlbum.coverUrl || cloudinaryCover || '',
                         }
                     }).catch(() => {});
                 } else {
@@ -330,14 +333,14 @@ export async function albumRoutes(server: FastifyInstance) {
                         where: { name: { equals: artistName, mode: 'insensitive' } }
                     }).catch(() => null);
 
-                    const songTitles = songs.map((s: any) => (s.trackName || '').trim()).filter(Boolean);
+                    // Match local tracks strictly belonging to this release ID
                     const localTracks = await prisma.track.findMany({
                         where: {
                             deletedAt: null,
                             audioUrl: { not: '' },
                             OR: [
-                                ...(dbArtist ? [{ artistId: dbArtist.id }] : []),
-                                { title: { in: songTitles, mode: 'insensitive' } }
+                                { albumId: `itunes-album-${collectionId}` },
+                                { albumId: collectionId }
                             ]
                         },
                         include: { artist: true, album: true }
@@ -461,20 +464,10 @@ export async function albumRoutes(server: FastifyInstance) {
             return reply.status(404).send({ message: 'Album not found' });
         }
 
-        // Find ALL sibling albums with the same title (handles fragmented batch imports)
-        const siblingAlbums = await prisma.album.findMany({
-            where: {
-                title: album.title,
-                artistId: album.artistId
-            },
-            select: { id: true }
-        });
-        const siblingIds = siblingAlbums.map((a: any) => a.id);
-
-        // Aggregate all tracks from all sibling albums
+        // Fetch tracks strictly for this specific album release ID
         const allTracks: any[] = await prisma.track.findMany({
             where: {
-                albumId: { in: siblingIds },
+                albumId: album.id,
                 deletedAt: null,
                 audioUrl: { not: '' },
                 OR: [
@@ -489,94 +482,14 @@ export async function albumRoutes(server: FastifyInstance) {
             ]
         });
 
-        // 3. Enrich partial album with full external tracklist if album has < 5 tracks
-        if (allTracks.length < 5 && !album.title.toLowerCase().includes('single')) {
-            try {
-                const { default: axios } = await import('axios');
-                const searchQuery = `${album.title} ${album.artist?.name || ''}`.trim();
-                const itunesSearch = await axios.get(`https://itunes.apple.com/search`, {
-                    params: { term: searchQuery, media: 'music', entity: 'album', limit: 3, country: 'IN' },
-                    timeout: 4000
-                }).catch(() => null);
-
-                if (itunesSearch?.data?.results?.length > 0) {
-                    const match = itunesSearch.data.results.find((col: any) => 
-                        col.collectionName.toLowerCase().includes(album.title.toLowerCase()) ||
-                        album.title.toLowerCase().includes(col.collectionName.toLowerCase())
-                    ) || itunesSearch.data.results[0];
-
-                    if (match && match.collectionId) {
-                        const songRes = await axios.get(`https://itunes.apple.com/lookup`, {
-                            params: { id: match.collectionId, entity: 'song', country: 'IN' },
-                            timeout: 4000
-                        }).catch(() => null);
-
-                        if (songRes?.data?.results?.length > 1) {
-                            const songs = songRes.data.results.slice(1);
-                            const existingTitles = new Set(allTracks.map(t => t.title.toLowerCase().trim()));
-                            const artwork = match.artworkUrl100 ? match.artworkUrl100.replace('100x100bb', '600x600bb') : album.coverUrl;
-
-                            const songTitles = songs.map((s: any) => (s.trackName || '').trim()).filter(Boolean);
-                            const localTracks = await prisma.track.findMany({
-                                where: {
-                                    deletedAt: null,
-                                    audioUrl: { not: '' },
-                                    OR: [
-                                        ...(album.artistId ? [{ artistId: album.artistId }] : []),
-                                        { albumId: album.id },
-                                        { title: { in: songTitles, mode: 'insensitive' } }
-                                    ]
-                                },
-                                include: { artist: true }
-                            }).catch(() => []) as any[];
-                            const localTrackMap = new Map<string, any>();
-                            for (const t of localTracks) localTrackMap.set(t.title.toLowerCase().trim(), t);
-
-                            for (const s of songs) {
-                                const cleanSongTitle = (s.trackName || '').trim();
-                                if (cleanSongTitle && !existingTitles.has(cleanSongTitle.toLowerCase())) {
-                                    existingTitles.add(cleanSongTitle.toLowerCase());
-                                    const localMatch = localTrackMap.get(cleanSongTitle.toLowerCase());
-                                    const instantAudioUrl = (localMatch && localMatch.audioUrl && !localMatch.audioUrl.includes('audio-ssl') && !localMatch.audioUrl.includes('mzstatic') && !localMatch.audioUrl.includes('itunes.apple.com'))
-                                        ? localMatch.audioUrl
-                                        : `/api/utils/stream-youtube?url=${encodeURIComponent(`${album.artist?.name || ''} - ${cleanSongTitle}`)}`;
-
-                                    allTracks.push({
-                                        id: localMatch ? localMatch.id : `itunes-${s.trackId}`,
-                                        title: cleanSongTitle,
-                                        duration: (localMatch?.duration) || (s.trackTimeMillis ? Math.floor(s.trackTimeMillis / 1000) : 180),
-                                        trackNumber: s.trackNumber || (allTracks.length + 1),
-                                        coverUrl: localMatch?.coverUrl || artwork,
-                                        audioUrl: instantAudioUrl,
-                                        previewUrl: s.previewUrl || undefined,
-                                        artistId: album.artistId,
-                                        artist: album.artist,
-                                        album: { id: album.id, title: album.title, coverUrl: artwork },
-                                        isVirtual: !localMatch,
-                                        isLocalAvailable: !!localMatch,
-                                        streams: localMatch?.streams || 0,
-                                        like_count: 0
-                                    });
-                                }
-                            }
-                            allTracks.sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
-                        }
-                    }
-                }
-            } catch (enrichErr: any) {
-                console.warn(`[AlbumRoute] Could not enrich tracklist for "${album.title}":`, enrichErr.message);
-            }
-        }
-
         return {
             ...album,
             tracks: allTracks
         };
     });
 
-    // List all albums (for library/browse pages)
+    // List all albums (for library/browse pages) - each release is an independent entity
     server.get('/', async (_req: FastifyRequest, reply: FastifyReply) => {
-        // Return distinct albums by title (deduplicated)
         const albums = await prisma.album.findMany({
             where: {
                 tracks: {
@@ -593,18 +506,7 @@ export async function albumRoutes(server: FastifyInstance) {
             orderBy: { createdAt: 'desc' }
         });
 
-        // Group by title, keep first occurrence (which has coverUrl etc.)
-        const seen = new Set<string>();
-        const unique: any[] = albums.filter((a: any) => {
-            const lowerTitle = a.title.trim().toLowerCase();
-            if (seen.has(lowerTitle)) return false;
-            seen.add(lowerTitle);
-            return true;
-        });
-
-
-
-        return unique;
+        return albums;
     });
 
     // Create a new album manually

@@ -10,7 +10,7 @@ export function StaticGlassBackground({ coverUrl, className }: StaticGlassBackgr
   if (!coverUrl) return null;
   
   return (
-    <div className={cn("fixed inset-0 z-0 overflow-hidden bg-black pointer-events-none", className)}>
+    <div className={cn("fixed inset-0 z-0 overflow-hidden bg-[#121214] pointer-events-none", className)}>
       {/* Intensely blurred, scaled, and saturated cover image acts as a static color gradient */}
       <img 
         src={coverUrl} 
@@ -18,7 +18,7 @@ export function StaticGlassBackground({ coverUrl, className }: StaticGlassBackgr
         alt=""
       />
       {/* Soft overlay so text remains readable everywhere but colors pop vibrantly */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/80 to-[#000000]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#121214]/40 via-[#121214]/80 to-[#121214]" />
     </div>
   );
 }

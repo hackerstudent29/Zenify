@@ -1,7 +1,7 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User, Music, Mic, RefreshCw } from "lucide-react";
+import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User, Music, Mic, RefreshCw, ListPlus } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -16,6 +16,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
+import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { getRefetchLyricsAnimatedMenuItem } from "@/components/shared/RefetchLyricsSubMenu";
 
 interface TrackItemProps {
  track: Track;
@@ -36,6 +38,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
  const openDownloadModal = useUIStore(state => state.openDownloadModal);
  const openAddToPlaylistModal = useUIStore(state => state.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
  const queryClient = useQueryClient();
  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -217,8 +220,17 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
   </motion.button>
   }
  items={[
- {
- id: 'like',
+  {
+  id: 'add-to-queue',
+  icon: <ListPlus size={14} className="opacity-70 text-brand" />,
+  label: "Add to Queue",
+  onClick: (e) => {
+    e?.stopPropagation();
+    usePlayerStore.getState().addToUserQueue(track);
+  }
+  },
+  {
+  id: 'like',
  icon: <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />,
  label: isLiked ? "Liked" : "Add to Favorites",
  onClick: (e) => {
