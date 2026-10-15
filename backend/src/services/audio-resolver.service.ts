@@ -349,11 +349,17 @@ export class AudioResolverService {
         const reqLang = canonical.language.toLowerCase().trim();
         const candCombined = `${candTitleLower} ${uploaderLower} ${descLower}`;
         const knownLanguages = ['tamil', 'telugu', 'hindi', 'malayalam', 'kannada', 'punjabi', 'bengali', 'marathi', 'gujarati', 'english', 'spanish', 'korean'];
-        const conflictingLangs = knownLanguages.filter(l => l !== reqLang && candCombined.includes(l));
 
-        if (conflictingLangs.length > 0 && !candCombined.includes(reqLang)) {
-          const conf = conflictingLangs.join(', ');
-          reasons.push(`Hard reject: Language mismatch (contains ${conf}, requested ${reqLang})`);
+        // Check if candidate title explicitly declares another conflicting language (e.g. "[Telugu]", "(Telugu)", "- Telugu", "Telugu Song", "Telugu Lyric")
+        const titleConflicting = knownLanguages.filter(l => {
+          if (l === reqLang) return false;
+          const langPat = new RegExp(`([\\[\\(\\-\\–\\|]\\s*${l}\\s*[\\]\\)\\-\\–\\|]|\\b${l}\\s*(version|audio|song|track|lyric|video)?\\b)`, 'i');
+          return langPat.test(candTitleLower);
+        });
+
+        if (titleConflicting.length > 0) {
+          const conf = titleConflicting.join(', ');
+          reasons.push(`Hard reject: Candidate title explicitly declares conflicting language (${conf}, requested ${reqLang})`);
           otherVersions.push({
             id: cand.id,
             title: cand.title,
@@ -370,9 +376,33 @@ export class AudioResolverService {
           continue;
         }
 
-        if (candCombined.includes(reqLang)) {
-          score += 35;
-          reasons.push(`+35 Confirmed requested language: ${reqLang}`);
+        // Secondary metadata check
+        const conflictingLangs = knownLanguages.filter(l => l !== reqLang && candCombined.includes(l));
+        if (conflictingLangs.length > 0 && !candTitleLower.includes(reqLang) && !candCombined.includes(reqLang)) {
+          const conf = conflictingLangs.join(', ');
+          reasons.push(`Hard reject: Language mismatch in metadata (contains ${conf}, requested ${reqLang})`);
+          otherVersions.push({
+            id: cand.id,
+            title: cand.title,
+            uploader: cand.uploader || cand.channel,
+            versionType: `lang_${conf}`
+          });
+          scored.push({
+            candidate: cand,
+            score: -999,
+            reasons,
+            isHardRejected: true,
+            versionType: `lang_${conf}`
+          });
+          continue;
+        }
+
+        if (candTitleLower.includes(reqLang)) {
+          score += 45;
+          reasons.push(`+45 Confirmed requested language in candidate title: ${reqLang}`);
+        } else if (candCombined.includes(reqLang)) {
+          score += 20;
+          reasons.push(`+20 Confirmed requested language in metadata: ${reqLang}`);
         }
       }
 
@@ -680,7 +710,7 @@ export class AudioResolverService {
 
     const queries = [
       `${primaryArtist} ${cleanT} ${movieTag}${langTag}official audio`.trim(),
-      `${primaryArtist} ${cleanT} ${movieTag}song`.trim(),
+      `${primaryArtist} ${cleanT} ${movieTag}${langTag}song`.trim(),
       `${primaryArtist} ${title} ${langTag}official audio`.trim(),
       `${primaryArtist} ${cleanT} ${movieTag}${langTag}official lyric video`.trim(),
       `${primaryArtist} ${cleanT} ${langTag}- topic`.trim(),
@@ -742,7 +772,7 @@ export class AudioResolverService {
     // Priority 2.5: If still low candidates, try title + artist query without extra tags
     if (candidateMap.size < 4) {
       try {
-        const broadSearchQuery = `${primaryArtist} ${cleanT} ${movieTag}`.trim();
+        const broadSearchQuery = `${primaryArtist} ${cleanT} ${movieTag}${langTag}`.trim();
         const { stdout } = await runYtDlp([
           '--socket-timeout', '12',
           '--no-check-certificates',
@@ -773,7 +803,7 @@ export class AudioResolverService {
     if (candidateMap.size < 5) {
       try {
         const { ExternalMetadataService } = await import('./external-metadata.service.js');
-        const fallbackResults = await ExternalMetadataService.searchYoutubeDirect(`${primaryArtist} ${cleanT} ${movieTag} official audio`.trim()).catch(() => []);
+        const fallbackResults = await ExternalMetadataService.searchYoutubeDirect(`${primaryArtist} ${cleanT} ${movieTag}${langTag}official audio`.trim()).catch(() => []);
         for (const fb of fallbackResults) {
           if (fb.id && !candidateMap.has(fb.id)) {
             candidateMap.set(fb.id, {

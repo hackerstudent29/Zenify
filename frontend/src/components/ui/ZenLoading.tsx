@@ -75,7 +75,7 @@ export function ZenLoading({ className, size = "md", showText = false, text = "L
 // Full page loader utility
 export function ZenPageLoader() {
  return (
- <div className="fixed inset-0 z-[999] bg-[#09090b]/95 backdrop-blur-md flex items-center justify-center">
+ <div className="fixed inset-0 z-[999] bg-[#121214]/95 backdrop-blur-md flex items-center justify-center">
  <ZenLoading size="lg" showText />
  </div>
  );
