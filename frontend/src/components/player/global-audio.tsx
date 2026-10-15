@@ -39,10 +39,27 @@ export function GlobalAudio() {
   const prefetchedTrackIds = useRef<Set<string>>(new Set());
   const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Initialize Audio Engine
+  // Initialize Audio Engine & Background Resilience Listeners
   useEffect(() => {
     audioEngine.init();
     audioEngine.setVolume(volumeRef.current);
+
+    const handleVisibilitySync = () => {
+      audioEngine.resume();
+      const audio = audioEngine.getActiveAudioElement();
+      if (audio && usePlayerStore.getState().isPlaying && audio.paused) {
+        audio.play().catch(err => {
+          if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilitySync);
+    window.addEventListener('focus', handleVisibilitySync);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilitySync);
+      window.removeEventListener('focus', handleVisibilitySync);
+    };
   }, []);
 
   // FX & Volume Sync
@@ -495,10 +512,8 @@ export function GlobalAudio() {
         isCrossfadingRef.current = false;
         prefetchedTrackIds.current.clear();
 
-        // 1. Immediately pause and silence the old audio
-        if (!audio.paused) {
-          try { audio.pause(); } catch {}
-        }
+        // 1. If currently playing, we avoid audio.pause() or audio.load() to maintain continuous media session token in background tabs
+        const wasActive = isPlaying && !audio.paused;
 
         // 2. Clear out old playback progress immediately
         audio.currentTime = 0;
@@ -511,9 +526,11 @@ export function GlobalAudio() {
           audio.crossOrigin = 'anonymous';
         }
         audio.src = targetSrc;
-        audio.load();
+        if (!wasActive) {
+          audio.load();
+        }
 
-        // 4. Begin playback of the newly clicked track immediately
+        // 4. Begin playback of the newly clicked or next track immediately
         if (isPlaying) {
           audioEngine.resume();
           const crossfadeActive = useAuthStore.getState().user?.preferences?.crossfade;
@@ -524,7 +541,7 @@ export function GlobalAudio() {
           }
           audio.play().catch(err => {
             if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-            console.warn("[GlobalAudio] Immediate Play failed:", err);
+            console.warn("[GlobalAudio] Play failed:", err);
           });
         }
 

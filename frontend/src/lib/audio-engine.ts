@@ -23,6 +23,8 @@ class ZenAudioEngine {
  private activeElement: 'A' | 'B' = 'A';
  private initialized = false;
  private analyser: AnalyserNode | null = null;
+ private keepAliveOsc: OscillatorNode | null = null;
+ private keepAliveGain: GainNode | null = null;
 
  // 8D State & LFOs
  private lfoX: OscillatorNode | null = null;
@@ -49,21 +51,49 @@ class ZenAudioEngine {
  return ZenAudioEngine.instance;
  }
 
+ private ensureDomAttachment() {
+  if (typeof document === 'undefined') return;
+  try {
+   let host = document.getElementById('zenify-audio-host');
+   if (!host) {
+    host = document.createElement('div');
+    host.id = 'zenify-audio-host';
+    host.style.position = 'fixed';
+    host.style.width = '0px';
+    host.style.height = '0px';
+    host.style.opacity = '0';
+    host.style.pointerEvents = 'none';
+    host.style.bottom = '-9999px';
+    host.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(host);
+   }
+   if (this.audioA && !host.contains(this.audioA)) {
+    host.appendChild(this.audioA);
+   }
+   if (this.audioB && !host.contains(this.audioB)) {
+    host.appendChild(this.audioB);
+   }
+  } catch (e) {
+   console.warn("⚠️ ZenAudioEngine: DOM attachment warning:", e);
+  }
+ }
+
  init() {
- if (this.initialized) return;
- 
- console.log("🎵 ZenAudioEngine: Initializing Isolated Audio Elements");
- if (!this.audioA) {
- this.audioA = new Audio();
- this.audioA.crossOrigin = "anonymous";
- this.audioA.preload = "auto";
- }
- if (!this.audioB) {
- this.audioB = new Audio();
- this.audioB.crossOrigin = "anonymous";
- this.audioB.preload = "auto";
- }
- this.setupGraph();
+  if (this.initialized) return;
+  
+  console.log("🎵 ZenAudioEngine: Initializing Isolated Audio Elements");
+  if (!this.audioA) {
+  this.audioA = new Audio();
+  this.audioA.crossOrigin = "anonymous";
+  this.audioA.preload = "auto";
+  }
+  if (!this.audioB) {
+  this.audioB = new Audio();
+  this.audioB.crossOrigin = "anonymous";
+  this.audioB.preload = "auto";
+  }
+  this.ensureDomAttachment();
+  this.setupGraph();
   const unlockAudio = () => {
     this.resume();
     window.removeEventListener('pointerdown', unlockAudio);
@@ -76,6 +106,19 @@ class ZenAudioEngine {
     window.addEventListener('touchstart', unlockAudio, { passive: true });
     window.addEventListener('keydown', unlockAudio, { passive: true });
     window.addEventListener('click', unlockAudio, { passive: true });
+
+    // Ensure AudioContext and DOM attachment are maintained across tab switches
+    document.addEventListener('visibilitychange', () => {
+      this.ensureDomAttachment();
+      if (this.context && this.context.state === 'suspended') {
+        this.context.resume().catch(() => {});
+      }
+    });
+    window.addEventListener('focus', () => {
+      if (this.context && this.context.state === 'suspended') {
+        this.context.resume().catch(() => {});
+      }
+    });
   }
  }
 
@@ -88,6 +131,28 @@ class ZenAudioEngine {
  }
 
  const ctx = this.context!;
+
+ // Auto-resume if AudioContext enters suspended state while engine is initialized
+ ctx.onstatechange = () => {
+   if (ctx.state === 'suspended' && this.initialized) {
+     ctx.resume().catch(() => {});
+   }
+ };
+
+ // Sub-audible keep-alive oscillator: prevents Chromium audio thread from suspending in background tabs
+ if (!this.keepAliveOsc) {
+   try {
+     this.keepAliveOsc = ctx.createOscillator();
+     this.keepAliveGain = ctx.createGain();
+     this.keepAliveOsc.frequency.value = 1; // 1 Hz (inaudible)
+     this.keepAliveGain.gain.value = 0.00001; // virtually zero
+     this.keepAliveOsc.connect(this.keepAliveGain);
+     this.keepAliveGain.connect(ctx.destination);
+     this.keepAliveOsc.start();
+   } catch (e) {
+     console.warn("⚠️ ZenAudioEngine: Keep-alive oscillator warning:", e);
+   }
+ }
 
  // 1. Create Nodes if they don't exist
  if (!this.inputMixer) {
@@ -449,6 +514,15 @@ class ZenAudioEngine {
  if (this.featureWorker) {
  this.featureWorker.terminate();
  this.featureWorker = null;
+ }
+
+ if (this.keepAliveOsc) {
+  try { this.keepAliveOsc.stop(); this.keepAliveOsc.disconnect(); } catch (e) {}
+  this.keepAliveOsc = null;
+ }
+ if (this.keepAliveGain) {
+  try { this.keepAliveGain.disconnect(); } catch (e) {}
+  this.keepAliveGain = null;
  }
 
  if (this.context && this.context.state !== 'closed') {

@@ -99,6 +99,28 @@ interface PlayerState {
   updateCurrentTrackData: (partial: Partial<Track>) => void;
 }
 
+function extractTrackVibeParams(track: Track, limit = 25) {
+  const trackMood = track.aura_vibe || (track as any).mood || (track as any).vibeProfile?.aura_vibe || (track as any).analysisData?.mood || '';
+  const trackMovie = (typeof track.album === 'string' ? track.album : track.album?.title) || (track as any).albumTitle || (track as any).movie || '';
+  const trackArtist = track.artist?.name || (track as any).artistName || '';
+  const trackLang = (track as any).language || (track as any).vibeProfile?.language || '';
+  const trackGenre = track.genre || (track as any).vibeProfile?.genre || '';
+
+  return {
+    seedType: 'track',
+    seedId: track.id,
+    title: track.title,
+    artist: trackArtist,
+    language: trackLang,
+    genre: trackGenre,
+    album: trackMovie,
+    movie: trackMovie,
+    mood: trackMood,
+    aura_vibe: trackMood,
+    limit
+  };
+}
+
 export const usePlayerStore = create<PlayerState>()(
  persist(
  (set, get) => ({
@@ -179,22 +201,13 @@ export const usePlayerStore = create<PlayerState>()(
  } catch (e) {}
 
  // Autoplay enrichment: proactively fetch contextual radio queue by language, genre, country, and artist
- if (!contextTracks || contextTracks.length <= 1) {
+ if (!contextTracks || contextTracks.length <= 3) {
    (async () => {
      try {
        const api = (await import("@/lib/api")).default;
        const radioRes = await api.get('/queue/radio', {
-         params: {
-           seedType: 'track',
-           seedId: track.id,
-           title: track.title,
-           artist: track.artist?.name || (track as any).artistName || '',
-           language: (track as any).language || '',
-           genre: track.genre || '',
-           country: (track as any).countryName || (track as any).countryCode || '',
-           limit: 25
-         }
-       });
+          params: extractTrackVibeParams(track, 25)
+        });
        if (radioRes.data?.tracks?.length) {
          const fresh = radioRes.data.tracks.filter((t: Track) => t.id !== track.id);
          const state = usePlayerStore.getState();
@@ -362,17 +375,8 @@ export const usePlayerStore = create<PlayerState>()(
      // 1. First priority: Contextual recommendations radio queue
      try {
        const radioRes = await api.get('/queue/radio', {
-         params: {
-           seedType: 'track',
-           seedId: currentTrack.id,
-           title: currentTrack.title,
-            artist: currentTrack.artist?.name || (currentTrack as any).artistName || '',
-            language: (currentTrack as any).language || '',
-            genre: currentTrack.genre || '',
-            country: (currentTrack as any).countryName || (currentTrack as any).countryCode || '',
-            limit: 25
-         }
-       });
+          params: extractTrackVibeParams(currentTrack, 25)
+        });
        if (radioRes.data?.tracks?.length) {
          candidateTracks = radioRes.data.tracks;
        }
@@ -450,12 +454,8 @@ export const usePlayerStore = create<PlayerState>()(
        try {
          const api = (await import("@/lib/api")).default;
          const radioRes = await api.get('/queue/radio', {
-           params: {
-             seedType: 'track',
-             seedId: nextTrack.id,
-             limit: 10
-           }
-         });
+            params: extractTrackVibeParams(nextTrack, 15)
+          });
          if (radioRes.data?.tracks?.length) {
            const currentQ = get().queue;
            const fresh = radioRes.data.tracks.filter((t: Track) => !currentQ.some(q => q.id === t.id));
