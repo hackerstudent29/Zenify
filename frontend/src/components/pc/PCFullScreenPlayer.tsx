@@ -170,6 +170,16 @@ export function PCFullScreenPlayer() {
  };
  }, [resetIdleTimer]);
 
+ useEffect(() => {
+ const handleKeyDown = (e: KeyboardEvent) => {
+ if (e.key === "Escape") {
+ setFullScreenPlayerOpen(false);
+ }
+ };
+ window.addEventListener("keydown", handleKeyDown);
+ return () => window.removeEventListener("keydown", handleKeyDown);
+ }, [setFullScreenPlayerOpen]);
+
  const [swipeDirection, setSwipeDirection] = useState(1);
 
  const handleNext = useCallback(() => {
@@ -190,13 +200,13 @@ export function PCFullScreenPlayer() {
 
  return (
  <motion.div
- initial={{ y: "100%", opacity: 0 }}
- animate={{ y: 0, opacity: 1 }}
- exit={{ y: "100%", opacity: 0 }}
+ initial={{ opacity: 0, scale: 0.94, y: 30 }}
+ animate={{ opacity: 1, scale: 1, y: 0 }}
+ exit={{ opacity: 0, scale: 0.94, y: 30 }}
  transition={{
  type: "spring",
- stiffness: 420,
- damping: 38,
+ stiffness: 320,
+ damping: 30,
  mass: 0.8
  }}
  style={{ zIndex: 850, transform: "translateZ(0)", backfaceVisibility: "hidden", willChange: "transform, opacity" }}
@@ -275,10 +285,10 @@ export function PCFullScreenPlayer() {
  layout
  layoutId={`zenify-album-art-container-${currentTrack.id}`}
  animate={{ 
-   scale: isPlaying ? 1 : 0.85,
-   opacity: isPlaying ? 1 : 0.8 
+   scale: isPlaying ? 1 : 0.88,
+   opacity: isPlaying ? 1 : 0.85 
  }}
- transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
+ transition={{ type: "spring", stiffness: 260, damping: 20, mass: 0.7 }}
  className={cn(
  "relative shrink-0 rounded-lg overflow-hidden shadow-xl aspect-square border border-white/10",
  isLyricsOpen
@@ -290,7 +300,7 @@ export function PCFullScreenPlayer() {
  <motion.img
  key={currentTrack.id}
  layout
- layoutId={`fs-album-art-${currentTrack.id}`}
+ layoutId={`zenify-album-art-${currentTrack.id}`}
  src={trackCover}
  className="w-full h-full object-cover pointer-events-none"
  initial={{ opacity: 0, x: swipeDirection > 0 ? 200 : -200 }}

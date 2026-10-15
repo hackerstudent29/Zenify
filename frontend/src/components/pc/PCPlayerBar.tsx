@@ -177,10 +177,10 @@ export function PCPlayerBar() {
                                  <motion.button
                                      layoutId={`zenify-album-art-container-${currentTrack.id}`}
                                      animate={{ 
-                                         scale: isPlaying ? 1 : 0.85,
-                                         opacity: isPlaying ? 1 : 0.8 
+                                         scale: isPlaying ? 1 : 0.88,
+                                         opacity: isPlaying ? 1 : 0.85 
                                      }}
-                                     transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
+                                     transition={{ type: "spring", stiffness: 260, damping: 20, mass: 0.7 }}
                                      onClick={(e) => {
                                          e.stopPropagation();
                                          setFullScreenPlayerOpen(true);

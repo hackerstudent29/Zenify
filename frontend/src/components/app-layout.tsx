@@ -373,13 +373,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  className={cn(
  "flex-1 flex flex-row relative overflow-hidden isolate"
  )}
- style={{ transform: "translateZ(0)", backfaceVisibility: "hidden", willChange: "transform" }}
- animate={{
- scale: isFullScreenPlayerOpen ? (isMobile ? 0.93 : 0.98) : 1,
- y: isFullScreenPlayerOpen ? (isMobile ? 10 : 0) : 0,
- borderRadius: isFullScreenPlayerOpen ? "24px" : "0px",
+ style={{ 
+   transform: "translateZ(0)", 
+   backfaceVisibility: "hidden", 
+   willChange: "transform, border-radius, filter",
+   transformOrigin: "center top"
  }}
- transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+ animate={{
+   scale: isFullScreenPlayerOpen && isMobile ? 0.93 : 1,
+   y: isFullScreenPlayerOpen && isMobile ? 12 : 0,
+   borderRadius: isFullScreenPlayerOpen && isMobile ? "28px" : "0px",
+   filter: isFullScreenPlayerOpen && isMobile ? "brightness(0.75)" : "brightness(1)",
+ }}
+ transition={{ type: "spring", stiffness: 340, damping: 30, mass: 0.8 }}
  >
  {/* Sidebar (Desktop) */}
  {hasSidebar && (
@@ -528,8 +534,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  animate={{
  y: (isMobile && isFullScreenPlayerOpen) ? 100 : 0,
  opacity: (isMobile && isFullScreenPlayerOpen) ? 0 : 1,
+ scale: (isMobile && isFullScreenPlayerOpen) ? 0.94 : 1,
  }}
- transition={{ type: "spring", stiffness: 350, damping: 32, mass: 0.8 }}
+ transition={{ type: "spring", stiffness: 340, damping: 30, mass: 0.8 }}
  >
  <div className="pointer-events-auto flex flex-col items-stretch">
  {!isInfoPage && (
