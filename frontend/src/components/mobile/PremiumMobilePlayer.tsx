@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
-import { motion, AnimatePresence, useMotionValue, useTransform, animate, LayoutGroup } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
@@ -197,18 +197,12 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const [isIdle, setIsIdle] = useState(false);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
- // Performance Optimization: Prevent canvas mounting & heavy filtering during scaling/morph transitions
- // Performance Optimization: Delay WebGL during sheet motion for pure 120fps GPU transitions
- const [isTransitionComplete, setIsTransitionComplete] = useState(false);
-
- const dragY = useMotionValue(0);
-
  const APPLE_SPRINGS = useMemo(() => ({
  sheet: {
  type: "spring" as const,
- stiffness: 420,
- damping: 36,
- mass: 0.6,
+ stiffness: 380,
+ damping: 34,
+ mass: 0.7,
  },
  artworkBounce: {
  type: "spring" as const,
@@ -222,43 +216,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  damping: 34,
  mass: 0.6,
  },
- snapBack: {
- type: "spring" as const,
- stiffness: 450,
- damping: 34,
- mass: 0.6,
- },
  }), []);
-
- const handleClose = useCallback(() => {
- setIsTransitionComplete(false);
- animate(dragY, window.innerHeight, {
- ...APPLE_SPRINGS.sheet,
- onComplete: () => {
- setFullScreenPlayerOpen(false);
- dragY.set(0);
- }
- });
- }, [dragY, setFullScreenPlayerOpen, APPLE_SPRINGS.sheet]);
-
- const handleDragEnd = useCallback((_: any, info: any) => {
- if (info.velocity.y > 300 || info.offset.y > 80) {
- setIsTransitionComplete(false);
- animate(dragY, window.innerHeight, {
- type: "spring",
- velocity: info.velocity.y,
- stiffness: 350,
- damping: 32,
- mass: 0.6,
- onComplete: () => {
- setFullScreenPlayerOpen(false);
- dragY.set(0);
- }
- });
- } else {
- animate(dragY, 0, APPLE_SPRINGS.snapBack);
- }
- }, [dragY, setFullScreenPlayerOpen, APPLE_SPRINGS.snapBack]);
 
  const handleNext = useCallback(() => {
  setSwipeDirection(1);
@@ -269,16 +227,6 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  setSwipeDirection(-1);
  playPrev();
  }, [playPrev]);
-
- // Reset transition complete state and drag position
- useEffect(() => {
- if (isFullScreenPlayerOpen) {
- dragY.set(0);
- setIsTransitionComplete(true);
- } else {
- setIsTransitionComplete(false);
- }
- }, [isFullScreenPlayerOpen, dragY]);
 
  // ── Image preloading ─────────────────────────────────────────────────
  useEffect(() => {
@@ -333,35 +281,36 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   if (!currentTrack) return null;
 
  return (
- <LayoutGroup id="mobile-player-group">
- <AnimatePresence initial={false}>
- {hidePlayer ? null : !isFullScreenPlayerOpen ? (
- /* MINI PLAYER VIEW */
- <motion.div
- key="mini-player"
- initial={{ opacity: 0, scale: 0.94, y: 20 }}
- animate={{ opacity: 1, scale: 1, y: 0 }}
- exit={{ opacity: 0, scale: 0.95, y: 15 }}
- transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.6 }}
- drag="y"
- dragConstraints={{ top: 0, bottom: 0 }}
- dragElastic={{ top: 0.35, bottom: 0 }}
- onDragEnd={(_, info) => {
-   if (info.offset.y < -25 || info.velocity.y < -200) {
-     dragY.set(0);
-     setFullScreenPlayerOpen(true);
-   }
- }}
- className={cn(
- "fixed z-[300] pointer-events-auto",
- "left-3 right-3 select-none"
- )}
- style={{ 
- bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
- height: "62px",
- willChange: "transform, opacity"
- }}
- >
+   <>
+     {/* MINI PLAYER VIEW */}
+     {!hidePlayer && (
+       <motion.div
+         key="mini-player"
+         animate={{ 
+           y: isFullScreenPlayerOpen ? 60 : 0,
+           opacity: isFullScreenPlayerOpen ? 0 : 1,
+           scale: isFullScreenPlayerOpen ? 0.94 : 1,
+           pointerEvents: isFullScreenPlayerOpen ? "none" : "auto",
+         }}
+         transition={APPLE_SPRINGS.sheet}
+         drag={!isFullScreenPlayerOpen ? "y" : false}
+         dragConstraints={{ top: 0, bottom: 0 }}
+         dragElastic={{ top: 0.35, bottom: 0 }}
+         onDragEnd={(_, info) => {
+           if (info.offset.y < -25 || info.velocity.y < -200) {
+             setFullScreenPlayerOpen(true);
+           }
+         }}
+         className={cn(
+           "fixed z-[300]",
+           "left-3 right-3 select-none"
+         )}
+         style={{ 
+           bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
+           height: "62px",
+           willChange: "transform, opacity"
+         }}
+       >
  {/* Mini Pod Background */}
  <div 
  className={cn(
@@ -382,7 +331,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  className="relative h-full flex items-center px-4 cursor-pointer"
  >
  {/* Inner flex wrapper handles opening the immersive player when clicking the blank space / center */}
- <div className="flex-1 flex items-center min-w-0 h-full cursor-pointer" onClick={() => { dragY.set(0); setFullScreenPlayerOpen(true); }}>
+ <div className="flex-1 flex items-center min-w-0 h-full cursor-pointer" onClick={() => setFullScreenPlayerOpen(true)}>
  <div className="w-11 h-11 rounded-[8px] overflow-hidden shadow-lg relative shrink-0 ring-1 ring-white/10 bg-zinc-900">
  <motion.img
  key={currentTrack.id}
@@ -435,56 +384,47 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  </button>
  </div>
  </HorizontalSwipeArea>
- </motion.div>
- ) : (
- /* FULL SCREEN PLAYER VIEW */
- <motion.div
- key="full-player-sheet"
- initial={{ y: "100%" }}
- animate={{ y: 0 }}
- exit={{ y: "100%" }}
- transition={APPLE_SPRINGS.sheet}
- onAnimationComplete={() => {
-   if (isFullScreenPlayerOpen) {
-     setIsTransitionComplete(true);
-   }
- }}
- className="fixed inset-0 z-[1100] bg-black rounded-t-[28px] sm:rounded-t-none border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col pointer-events-auto select-none"
- style={{ willChange: "transform" }}
- >
- <motion.div
- key="drag-wrapper"
- style={{ y: dragY }}
- className="absolute inset-0 w-full h-full flex flex-col overflow-hidden"
- drag="y"
- dragConstraints={{ top: 0 }}
- dragElastic={{ top: 0, bottom: 0.35 }}
- onDragEnd={handleDragEnd}
- >
-    {/* Background */}
-    <div className="absolute inset-0 z-0 overflow-hidden bg-black isolate" style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}>
-      {/* Ambient blurred glow during transition */}
-      <div 
-        className={cn(
-          "absolute inset-0 bg-cover bg-center filter blur-2xl scale-125 transition-opacity duration-700 pointer-events-none",
-          isTransitionComplete ? "opacity-0" : "opacity-40"
-        )}
-        style={{ backgroundImage: `url(${stablecover})` }}
-      />
-      {/* Reactive WebGL Background mounted ONLY when transition completes */}
-      {showReactiveBg && isTransitionComplete && (
-        <LiquidBackground coverUrl={stablecover} />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none z-10" />
-    </div>
+       </motion.div>
+     )}
 
- {/* Apple Music Drag Grabber Pill */}
- <div 
-   onClick={handleClose} 
-   className="w-full pt-3 pb-2 flex items-center justify-center cursor-grab active:cursor-grabbing z-20 shrink-0"
- >
-   <div className="w-10 h-1.5 bg-white/35 hover:bg-white/50 rounded-full transition-colors" />
- </div>
+     {/* FULL SCREEN PLAYER VIEW */}
+     <AnimatePresence>
+       {isFullScreenPlayerOpen && (
+         <motion.div
+           key="full-player-sheet"
+           initial={{ y: "100%" }}
+           animate={{ y: 0 }}
+           exit={{ y: "100%" }}
+           transition={APPLE_SPRINGS.sheet}
+           drag="y"
+           dragConstraints={{ top: 0, bottom: 0 }}
+           dragElastic={{ top: 0, bottom: 0.6 }}
+           onDragEnd={(_, info) => {
+             if (info.velocity.y > 350 || info.offset.y > 100) {
+               setFullScreenPlayerOpen(false);
+             }
+           }}
+           className="fixed inset-0 z-[1100] bg-black rounded-t-[28px] sm:rounded-t-none border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col pointer-events-auto select-none"
+           style={{ willChange: "transform" }}
+         >
+           {/* Background */}
+           <div className="absolute inset-0 z-0 overflow-hidden bg-black isolate" style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}>
+             {showReactiveBg && <LiquidBackground coverUrl={stablecover} />}
+             <motion.div 
+               animate={{ opacity: isLyricsOpen ? 1 : 0 }}
+               transition={{ duration: 0.5 }}
+               className="absolute inset-0 bg-white/15 mix-blend-overlay pointer-events-none z-10"
+               style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
+             />
+           </div>
+
+           {/* Apple Music Drag Grabber Pill */}
+           <div 
+             onClick={() => setFullScreenPlayerOpen(false)} 
+             className="w-full pt-3 pb-2 flex items-center justify-center cursor-grab active:cursor-grabbing z-20 shrink-0"
+           >
+             <div className="w-10 h-1.5 bg-white/35 hover:bg-white/50 rounded-full transition-colors" />
+           </div>
 
   {/* Top Bar */}
   <motion.div 
@@ -496,7 +436,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     transition={APPLE_SPRINGS.controls}
     className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,10px)+4px)] mb-1"
   >
-    <button onClick={handleClose} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
+    <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
       <ChevronDown size={32} strokeWidth={2.5} />
     </button>
     <div className="absolute left-1/2 -translate-x-1/2 w-[60%] text-center h-10 top-[calc(env(safe-area-inset-top,20px)+24px)] pointer-events-auto">
@@ -515,7 +455,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             className="text-[17px] font-bold leading-tight text-center max-w-full tracking-tight text-white drop-shadow-sm"
           />
           <span className="text-[12px] text-white/60 font-medium block truncate max-w-full font-sans tracking-wide">
-            <ArtistLinks track={currentTrack} maxArtists={3} onClick={handleClose} />
+            <ArtistLinks track={currentTrack} maxArtists={3} onClick={() => setFullScreenPlayerOpen(false)} />
           </span>
         </motion.div>
       ) : (
@@ -676,7 +616,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   exit={{ opacity: 0, y: -10 }}
   transition={{ duration: 0.2 }}
   onClick={() => {
-  handleClose();
+  setFullScreenPlayerOpen(false);
   setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
   }}
   className="inline-block font-bold"
@@ -701,7 +641,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   <DropdownMenuItem onSelect={() => {
   const target = getArtistTarget(currentTrack);
   if (target) {
-    handleClose();
+    setFullScreenPlayerOpen(false);
     setTimeout(() => router.push(target), 50);
   }
   }}>
@@ -730,12 +670,12 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         onClick={() => {
           const target = getArtistTarget(currentTrack);
           if (target) {
-            handleClose();
+            setFullScreenPlayerOpen(false);
             setTimeout(() => router.push(target), 50);
           }
         }}
       >
-        <ArtistLinks track={currentTrack} maxArtists={3} linkClassName="text-zinc-400 text-[15px] font-normal font-sans hover:underline hover:text-white transition-colors" onClick={handleClose} />
+        <ArtistLinks track={currentTrack} maxArtists={3} linkClassName="text-zinc-400 text-[15px] font-normal font-sans hover:underline hover:text-white transition-colors" onClick={() => setFullScreenPlayerOpen(false)} />
       </motion.div>
     </AnimatePresence>
   </MarqueeText>
@@ -841,10 +781,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </button>
   </motion.div>
   </motion.div>
-  </motion.div>
  </motion.div>
  )}
  </AnimatePresence>
- </LayoutGroup>
+ </>
  );
 }
