@@ -216,61 +216,139 @@ export class RecommendationsService {
   // getSameVibeTracks(trackId, limit, meta)
   static async getSameVibeTracks(
     trackId: string, 
-    limit = 20, 
-    meta?: { title?: string; artist?: string; language?: string; genre?: string; country?: string }
+    limit = 25, 
+    meta?: { 
+      title?: string; 
+      artist?: string; 
+      language?: string; 
+      genre?: string; 
+      country?: string;
+      album?: string;
+      movie?: string;
+      mood?: string;
+      aura_vibe?: string;
+    }
   ) {
-    const cacheKey = `sim:track:${trackId}:${meta?.language || ''}:${meta?.genre || ''}`;
+    const cacheKey = `sim:track:${trackId}:${meta?.language || ''}:${meta?.genre || ''}:${meta?.mood || ''}`;
     const cached = await getCacheVal(cacheKey);
-    if (cached) return cached;
+    if (cached && Array.isArray(cached) && cached.length >= 8) return cached;
 
-    let baseTrack = await prisma.track.findUnique({
-      where: { id: trackId },
-      include: { vibeProfile: true, artist: true }
-    });
+    let baseTrack: any = null;
+    try {
+      baseTrack = await prisma.track.findUnique({
+        where: { id: trackId },
+        include: { vibeProfile: true, artist: true, album: true }
+      });
+    } catch {}
 
-    const lang = baseTrack?.language || meta?.language;
-    const gen = baseTrack?.genre || meta?.genre;
-    const artId = baseTrack?.artistId;
-    const artName = baseTrack?.artist?.name || meta?.artist;
-    const ctry = baseTrack?.countryName || meta?.country;
+    const lang = (baseTrack?.language || meta?.language || '').trim();
+    const gen = (baseTrack?.genre || meta?.genre || '').trim();
+    const artName = (baseTrack?.artist?.name || meta?.artist || '').trim();
+    const movieName = (baseTrack?.album?.title || meta?.movie || meta?.album || '').trim();
+    const seedTitle = (baseTrack?.title || meta?.title || '').trim();
+    const moodStr = (meta?.mood || meta?.aura_vibe || baseTrack?.vibeProfile?.aura_vibe || (baseTrack?.vibeProfile as any)?.moodTags?.[0] || gen || '').toLowerCase().trim();
 
-    // 1. Query local database tracks matching artist, genre, or vibe profile (NEVER country or language alone!)
-    let similar = await prisma.track.findMany({
-      where: {
-        id: { not: trackId },
-        deletedAt: null,
-        audioUrl: { not: '' },
-        OR: [
-          ...(artId ? [{ artistId: artId }] : []),
-          ...(artName ? [{ artist: { name: { contains: artName, mode: 'insensitive' as const } } }] : []),
-          ...(gen ? [{ genre: { equals: gen, mode: 'insensitive' as const } }] : [])
-        ]
-      },
-      take: limit,
-      orderBy: { streams: 'desc' },
-      include: {
-        artist: { select: { id: true, name: true, imageUrl: true } },
-        album: { select: { id: true, title: true, coverUrl: true } },
-        vibeProfile: true
+    // 1. Detect Vibe signature
+    let vibeKeywords = 'hit songs';
+    if (/mass|energy|energetic|party|dance|beat|kuthu|fast|club|edm|celebration/i.test(moodStr) || /arabic|halamithi|jimmiki|badass|naa ready|kaavaalaa|dance|party/i.test(seedTitle)) {
+      vibeKeywords = 'energetic dance party hit songs';
+    } else if (/romantic|melody|love|soul|acoustic|sweet|heart/i.test(moodStr) || /melody|romantic|love|kadhal|kannazhaga|enna sona|kesariya/i.test(seedTitle)) {
+      vibeKeywords = 'romantic melody soulful songs';
+    } else if (/chill|lofi|relax|calm|ambient|peaceful|night/i.test(moodStr)) {
+      vibeKeywords = 'chill lofi relaxing songs';
+    } else if (/sad|emotional|heartbreak|breakup|pain/i.test(moodStr)) {
+      vibeKeywords = 'emotional sad songs';
+    } else if (lang) {
+      vibeKeywords = 'super hit songs';
+    }
+
+    const similar: any[] = [];
+    const seenTitles = new Set<string>();
+    const artistTrackCount: Record<string, number> = {};
+
+    const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    const cleanSeedTitle = norm(seedTitle);
+    if (cleanSeedTitle) seenTitles.add(cleanSeedTitle);
+
+    const addCandidate = (cand: any) => {
+      if (!cand || !cand.id) return false;
+      const cTitle = norm(cand.title || '');
+      if (!cTitle || seenTitles.has(cTitle)) return false;
+
+      const aName = (cand.artist?.name || cand.artistName || 'Unknown').toLowerCase().trim();
+      // USER RULE: Strict diversity cap: Max 2 tracks per artist so we explore songs across different artists
+      if ((artistTrackCount[aName] || 0) >= 2) return false;
+
+      artistTrackCount[aName] = (artistTrackCount[aName] || 0) + 1;
+      seenTitles.add(cTitle);
+      similar.push(cand);
+      return true;
+    };
+
+    // 2. Query local database tracks matching language, genre, or mood tags
+    try {
+      const dbCandidates = await prisma.track.findMany({
+        where: {
+          id: { not: trackId },
+          deletedAt: null,
+          audioUrl: { not: '' },
+          OR: [
+            ...(lang ? [{ language: { equals: lang, mode: 'insensitive' as const } }] : []),
+            ...(gen ? [{ genre: { contains: gen, mode: 'insensitive' as const } }] : []),
+            ...(artName ? [{ artist: { name: { not: artName } } }] : [])
+          ]
+        },
+        take: limit * 2,
+        orderBy: { streams: 'desc' },
+        include: {
+          artist: { select: { id: true, name: true, imageUrl: true } },
+          album: { select: { id: true, title: true, coverUrl: true } },
+          vibeProfile: true
+        }
+      });
+
+      for (const t of dbCandidates) {
+        if (similar.length >= limit) break;
+        addCandidate(t);
       }
-    });
+    } catch (dbErr: any) {
+      console.warn('[Recommendations] Local vibe candidates query error:', dbErr.message);
+    }
 
-    // 2. Verified External Retrieval: Only search for specific artist songs or verified track related songs
-    if (similar.length < 5 && (artName || meta?.title)) {
+    // 3. Multi-Source External Music Search (YouTube Music) to discover different artists in this vibe
+    if (similar.length < limit) {
       try {
         const { ExternalMetadataService } = await import('./external-metadata.service.js');
         const queriesToTry: string[] = [];
-        if (artName && meta?.title) queriesToTry.push(`${meta.title} ${artName}`);
-        else if (artName) queriesToTry.push(`${artName} songs`);
 
-        for (const q of queriesToTry.slice(0, 1)) {
+        // Query 1: Language + Vibe hit songs (e.g. "Tamil energetic dance party hit songs")
+        if (lang) {
+          queriesToTry.push(`${lang} ${vibeKeywords}`);
+        }
+
+        // Query 2: Movie context if available (e.g. "Tamil movie songs like Beast" or "Tamil songs like Master")
+        if (movieName && movieName.toLowerCase() !== seedTitle.toLowerCase()) {
+          queriesToTry.push(`${lang || ''} movie songs like ${movieName}`.trim());
+        }
+
+        // Query 3: Songs similar to title (explores cross-artist musical vibe)
+        if (seedTitle) {
+          queriesToTry.push(`${lang || ''} songs similar to ${seedTitle}`.trim());
+        }
+
+        // Query 4: Fallback vibe search
+        if (queriesToTry.length === 0) {
+          queriesToTry.push(artName ? `songs like ${seedTitle} by ${artName}` : `${vibeKeywords}`);
+        }
+
+        for (const q of queriesToTry) {
           if (similar.length >= limit) break;
           const ytmResults = await ExternalMetadataService.searchYoutubeMusic(q).catch(() => []);
           for (const item of ytmResults) {
             if (similar.length >= limit) break;
             const parsed = ExternalMetadataService.parseYoutubeVideoToTrack(item);
-            if (!similar.some(s => s.id === parsed.id || s.title.toLowerCase() === parsed.title.toLowerCase())) {
-              similar.push(parsed as any);
+            if (parsed) {
+              addCandidate(parsed);
             }
           }
         }
@@ -280,7 +358,7 @@ export class RecommendationsService {
     }
 
     if (similar.length > 0) {
-      await setCacheVal(cacheKey, similar, 24 * 3600);
+      await setCacheVal(cacheKey, similar, 6 * 3600); // 6h TTL
     }
     return similar;
   }
@@ -609,11 +687,22 @@ export class RecommendationsService {
     userId: string | undefined, 
     seed: RecommendationSeed, 
     size = 30,
-    meta?: { title?: string; artist?: string; language?: string; genre?: string; country?: string }
+    meta?: { 
+      title?: string; 
+      artist?: string; 
+      language?: string; 
+      genre?: string; 
+      country?: string;
+      album?: string;
+      movie?: string;
+      mood?: string;
+      aura_vibe?: string;
+    }
   ) {
+    let engineTracks: any[] = [];
     try {
       const { RecommendationEngineService } = await import('./recommendation-engine.service.js');
-      const radioTracks = await RecommendationEngineService.buildRadioQueue(userId, {
+      engineTracks = await RecommendationEngineService.buildRadioQueue(userId, {
         type: seed.type,
         id: seed.id,
         title: meta?.title,
@@ -621,36 +710,42 @@ export class RecommendationsService {
         genre: meta?.genre,
         language: meta?.language
       }, size);
-
-      if (radioTracks.length > 0) {
-        return radioTracks;
-      }
     } catch (e: any) {
       console.warn('[Recommendations] RecommendationEngineService radio queue error:', e.message);
     }
 
-    const userProfile = userId
-      ? await prisma.userInterestProfile.findUnique({ where: { userId } })
-      : null;
-
-    const sessionTaste = this.getSessionTaste(userId);
-
-    let candidates: any[] = [];
-    if (seed.type === 'track') {
-      candidates = await this.getSameVibeTracks(seed.id, size * 2, meta);
-    } else if (seed.type === 'artist') {
-      const catalog = await this.getArtistCatalog(seed.id);
-      const similar = await this.getSameVibeTracks(catalog.topTracks[0]?.id || seed.id, size * 2, meta);
-      candidates = [...catalog.topTracks, ...similar];
-    } else {
-      candidates = await this.getSameVibeTracks(seed.id, size * 2, meta);
+    // If recommendation engine returned a rich queue (>= 12 tracks), return it
+    if (engineTracks && engineTracks.length >= 12) {
+      return engineTracks;
     }
 
-    const scored = candidates.map(t =>
-      this.scoreCandidate(t, seed, userProfile, sessionTaste)
-    );
+    // Otherwise, invoke our smart multi-source vibe discovery
+    const vibeTracks = await this.getSameVibeTracks(seed.id, size, meta);
 
-    const diversified = this.diversifyTracks(scored, userProfile, 2);
-    return diversified.slice(0, size);
+    const combined = [...(engineTracks || []), ...vibeTracks];
+    const artistCounts: Record<string, number> = {};
+    const seenTitles = new Set<string>();
+    const finalQueue: any[] = [];
+
+    const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+    const seedTitleNorm = meta?.title ? norm(meta.title) : '';
+
+    for (const t of combined) {
+      if (!t || !t.id) continue;
+      const tNorm = norm(t.title || '');
+      if (seedTitleNorm && tNorm === seedTitleNorm) continue;
+      if (seenTitles.has(tNorm)) continue;
+
+      const aName = (t.artist?.name || t.artistName || 'Unknown').toLowerCase().trim();
+      // Strict diversity cap: Max 2 tracks per artist so queue explores wide musical horizons
+      if ((artistCounts[aName] || 0) >= 2) continue;
+
+      artistCounts[aName] = (artistCounts[aName] || 0) + 1;
+      seenTitles.add(tNorm);
+      finalQueue.push(t);
+      if (finalQueue.length >= size) break;
+    }
+
+    return finalQueue;
   }
 }

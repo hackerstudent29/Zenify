@@ -771,10 +771,15 @@ export class RecommendationEngineService {
         )
       );
 
-      // NON-NEGOTIABLE CORE GATE: Weak Signals Alone (Language/Country/Popularity) DO NOT QUALIFY!
-      // When a seed track is active: candidate MUST have a verified relationship to the seed track!
+      // NON-NEGOTIABLE CORE GATE: When a seed track is active, candidates must have an artist connection,
+      // content similarity, co-listening support, or a verified genre/vibe match to explore other artists with the same vibe!
       if (options.seedTrack) {
-        if (!hasArtistConnection && !hasContentSimilarity && !hasCoListening) {
+        const hasGenreOrVibeMatch = Boolean(
+          (options.seedTrack.genre && c.genre && options.seedTrack.genre.toLowerCase() === c.genre.toLowerCase()) ||
+          (c.similarityEvidence?.vibeScore && c.similarityEvidence.vibeScore >= 0.40) ||
+          hasTasteAlignment
+        );
+        if (!hasArtistConnection && !hasContentSimilarity && !hasCoListening && !hasGenreOrVibeMatch) {
           rejectionReasons.weak_signals_only++;
           continue;
         }
