@@ -582,7 +582,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
    initial={{ opacity: 0, y: 30 }}
    animate={{ 
      opacity: showBottomControls ? 1 : 0, 
-     y: showBottomControls ? (isIdle && !isLyricsOpen ? -36 : 0) : 100,
+     y: showBottomControls ? 0 : 100,
      pointerEvents: showBottomControls ? "auto" : "none"
    }}
    transition={APPLE_SPRINGS.controls}
@@ -681,18 +681,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   </MarqueeText>
   </div>
 
-  {/* Seekbar / Scrubber */}
-  <motion.div
-    animate={{
-      height: isIdle ? 0 : "auto",
-      opacity: isIdle ? 0 : 1,
-      pointerEvents: isIdle ? "none" : "auto"
-    }}
-    transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
-    className="w-full max-w-[360px] mx-auto px-1 overflow-hidden"
-  >
+  {/* Seekbar / Scrubber — ALWAYS visible (even when idle) */}
+  <div className="w-full max-w-[360px] mx-auto px-1 transition-all duration-500 ease-[cubic-bezier(0.3,0,0,1)]">
     <MobileScrubber isLyricsOpen={isLyricsOpen} />
-  </motion.div>
+  </div>
 
   {/* Playback Controls */}
   <motion.div
