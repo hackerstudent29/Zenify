@@ -32,7 +32,8 @@ import {
 export default function TrackPage() {
   const params = useParams();
   const router = useRouter();
-  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
+  const rawId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
+  const id = rawId ? rawId.replace(/^(itunes-)+/, 'itunes-') : rawId;
 
   const currentTrack = usePlayerStore(s => s.currentTrack);
   const isPlaying = usePlayerStore(s => s.isPlaying);
@@ -115,13 +116,22 @@ export default function TrackPage() {
   }, [dbTrack, currentOrQueueTrack, isLoading, id, queryClient]);
 
  const updateCurrentTrackData = usePlayerStore(s => s.updateCurrentTrackData);
-
- // Real-time sync: push incoming background metadata, palette & lyrics straight into active player
- useEffect(() => {
-   if (track && currentTrack?.id === track.id) {
-     updateCurrentTrackData(track);
-   }
- }, [track, currentTrack?.id, updateCurrentTrackData]);
+  // Real-time sync: push incoming background metadata, palette & lyrics straight into active player
+  useEffect(() => {
+    if (dbTrack && currentTrack?.id === dbTrack.id) {
+      const needsLyrics = !currentTrack.lyrics && dbTrack.lyrics;
+      const needsPalette = !currentTrack.palette && dbTrack.palette;
+      const needsSynced = !currentTrack.synced_lyrics && dbTrack.synced_lyrics;
+      if (needsLyrics || needsPalette || needsSynced) {
+        updateCurrentTrackData({
+          lyrics: dbTrack.lyrics || currentTrack.lyrics,
+          synced_lyrics: dbTrack.synced_lyrics || currentTrack.synced_lyrics,
+          romanizedLyrics: dbTrack.romanizedLyrics || currentTrack.romanizedLyrics,
+          palette: dbTrack.palette || currentTrack.palette
+        });
+      }
+    }
+  }, [dbTrack?.id, dbTrack?.lyrics, dbTrack?.palette, dbTrack?.synced_lyrics, currentTrack?.id, updateCurrentTrackData]);
 
  // Listen for instant background worker updates
  useEffect(() => {

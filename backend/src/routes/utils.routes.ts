@@ -1002,7 +1002,7 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
 
         // Parse title/artist candidates and videoId for ultra-fast local DB check
-        let candId = trackId;
+        let candId = trackId ? trackId.replace(/^(itunes-)+/, 'itunes-') : trackId;
         let candTitle = (title || '').trim();
         let candArtist = (artist || '').trim();
         let candAlbum = (album || '').trim();
@@ -1149,17 +1149,20 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
 
         // Direct support for itunes:trackId fallback - ALWAYS resolve to full artist - title song query for YouTube
-        if (targetUrl.startsWith('itunes:')) {
-            const trackId = targetUrl.replace('itunes:', '').trim();
-            try {
-                const itunesRes = await axios.get(`https://itunes.apple.com/lookup?id=${trackId}&entity=song`, { timeout: 3500 }).catch(() => null);
-                const item = itunesRes?.data?.results?.[0];
-                if (item) {
-                    targetUrl = `${item.artistName || ''} - ${item.trackName || ''}`.trim();
-                    server.log.info(`[stream-youtube] Resolved itunes:${trackId} to full search query: "${targetUrl}"`);
+        if (targetUrl.startsWith('itunes:') || targetUrl.startsWith('itunes-')) {
+            const cleanId = targetUrl.replace(/^itunes:|^itunes-+/g, '').replace(/^(itunes-)+/, '').trim();
+            const numericId = cleanId.replace(/[^0-9]/g, '');
+            if (numericId) {
+                try {
+                    const itunesRes = await axios.get(`https://itunes.apple.com/lookup?id=${numericId}&entity=song`, { timeout: 3500 }).catch(() => null);
+                    const item = itunesRes?.data?.results?.[0];
+                    if (item) {
+                        targetUrl = `${item.artistName || ''} - ${item.trackName || ''}`.trim();
+                        server.log.info(`[stream-youtube] Resolved itunes:${numericId} to full search query: "${targetUrl}"`);
+                    }
+                } catch (err: any) {
+                    server.log.warn(`[stream-youtube] Failed to lookup itunes:${numericId}: ${err.message}`);
                 }
-            } catch (err: any) {
-                server.log.warn(`[stream-youtube] Failed to lookup itunes:${trackId}: ${err.message}`);
             }
         }
 
