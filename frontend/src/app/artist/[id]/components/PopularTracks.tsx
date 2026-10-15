@@ -51,7 +51,7 @@ export function PopularTracks({
           >
             {top5Tracks.map((track, index) => (
               <MediaCard 
-                key={track.id}
+                key={`${track.id}-${index}`}
                 track={track} 
                 index={index} 
                 contextTracks={tracks} 
@@ -69,7 +69,7 @@ export function PopularTracks({
           >
             {tracks.map((track, index) => (
               <TrackItem
-                key={track.id}
+                key={`${track.id}-${index}`}
                 track={track}
                 index={index}
                 contextTracks={tracks}

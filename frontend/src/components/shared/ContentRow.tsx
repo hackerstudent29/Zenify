@@ -119,7 +119,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
  ) : (
    (Array.isArray(items) ? items : []).map((item, index) => (
      <MediaCard
-       key={item.id || index}
+       key={`${item.id || "item"}-${index}`}
        track={item}
        index={index}
        contextTracks={Array.isArray(items) ? items : []}
