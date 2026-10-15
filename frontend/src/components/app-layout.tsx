@@ -469,15 +469,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   className="pointer-events-auto relative max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full h-[72px]"
   >
     <div 
-      className="absolute inset-0 pointer-events-none rounded-full overflow-hidden backdrop-blur-2xl bg-black/55 border border-white/15 ring-1 ring-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.75)]"
+      className="absolute inset-0 pointer-events-none rounded-full overflow-hidden backdrop-blur-lg bg-black/10 border border-white/10"
+      style={{
+        boxShadow: "0 14px 34px -10px rgba(0,0,0,0.45)"
+      }}
     >
-      {/* Specular Curvature Gradient Highlight */}
-      <div className="absolute inset-0 bg-gradient-to-b from-white/[0.08] via-transparent to-black/30 pointer-events-none" />
-      <div className="absolute -inset-1 opacity-70">
+      <div className="absolute -inset-1">
         <Glass
           className="w-full h-full"
           radius={36}
-          blur={16}
+          blur={12}
           behind="transparent"
           optics={{
             chroma: 0.1,

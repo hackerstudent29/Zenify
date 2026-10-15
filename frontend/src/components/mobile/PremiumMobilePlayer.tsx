@@ -305,27 +305,25 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
            "fixed z-[300]",
            "left-3 right-3 select-none"
          )}
-         style={{ 
-           bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
-           height: "62px",
-           willChange: "transform, opacity"
-         }}
-       >
- {/* Mini Pod Background */}
- <div 
- className={cn(
- "absolute inset-0 shadow-[0_16px_40px_rgba(0,0,0,0.7)] rounded-full transition-colors overflow-hidden",
- isGlassmorphism 
- ? "border border-white/15 bg-black/50 backdrop-blur-2xl ring-1 ring-white/10" 
- : "bg-[#1c1c1e] border border-white/10"
- )}
- >
- {isGlassmorphism && (
-   <div className="absolute inset-0 bg-gradient-to-b from-white/[0.08] via-transparent to-black/30 pointer-events-none" />
- )}
- </div>
+          style={{
+            bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
+            height: "62px",
+          }}
+        >
+          {/* Mini Pod Background */}
+          <div
+            className={cn(
+              "absolute inset-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] rounded-full transition-colors",
+              isGlassmorphism
+                ? "border border-white/10 bg-white/5 backdrop-blur-xl ring-1 ring-white/5"
+                : "bg-[#1c1c1e] border border-white/10"
+            )}
+            style={isGlassmorphism ? {
+              WebkitBackdropFilter: "blur(20px)",
+              backdropFilter: "blur(20px)",
+            } : undefined}
+          />
 
- {/* Progress Line */}
  <MiniPlayerProgress />
 
  <HorizontalSwipeArea
