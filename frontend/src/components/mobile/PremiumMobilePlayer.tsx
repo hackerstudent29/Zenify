@@ -6,10 +6,12 @@ import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
+import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { useAuthStore } from "@/store/authStore";
 import { 
  Play, Pause, SkipBack, SkipForward, 
- Heart, MoreVertical, ChevronDown, User,
+ Heart, MoreVertical, ChevronDown, User, ListPlus,
  ListMusic, Sparkles, ScrollText, PlusCircle, Bookmark,
  Download, Shuffle, Repeat, Repeat1, Layers, RefreshCw
 } from "lucide-react";
@@ -133,6 +135,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  const showReactiveBg = useReactiveBgStore(state => state.player);
  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
 
  const { 
  currentTrack, 
@@ -640,6 +643,14 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
    </DropdownMenuTrigger>
   <DropdownMenuPortal>
   <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]">
+ <DropdownMenuItem onSelect={() => {
+ if (currentTrack) {
+   usePlayerStore.getState().addToUserQueue(currentTrack);
+ }
+ }}>
+ <ListPlus size={18} className="mr-3 opacity-40 text-brand" />
+ <span className="font-bold">Add to Queue</span>
+ </DropdownMenuItem>
   <DropdownMenuItem onSelect={() => {
   const target = getArtistTarget(currentTrack);
   if (target) {

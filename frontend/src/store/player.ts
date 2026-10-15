@@ -3,100 +3,144 @@ import { persist } from "zustand/middleware";
 import { audioEngine } from "@/lib/audio-engine";
 
 export interface Artist {
- id: string;
- name: string;
- bio?: string;
- imageUrl?: string;
- totalStreams?: number;
+  id: string;
+  name: string;
+  bio?: string;
+  imageUrl?: string;
+  totalStreams?: number;
 }
 
 export interface Album {
- id: string;
- title: string;
- coverUrl?: string;
- artistId: string;
- palette?: Array<{r: number; g: number; b: number}>;
+  id: string;
+  title: string;
+  coverUrl?: string;
+  artistId: string;
+  palette?: Array<{r: number; g: number; b: number}>;
 }
 
 export interface Track {
- id: string;
- title: string;
- artistId: string;
- albumId?: string;
- artist: Artist;
- artistName?: string;
- album?: Album;
- coverUrl?: string;
- audioUrl: string;
- duration: number;
- genre?: string;
- lyrics?: string;
- synced_lyrics?: any;
- raw_lrc?: string;
- lyricsOffset?: number;
- romanizedLyrics?: string;
- romanizedSyncedLyrics?: any;
- romanizedLang?: string;
- isFeatured?: boolean;
- isTrending?: boolean;
- price?: number;
- isPurchased?: boolean;
- streams?: number;
- featuredArtists?: string;
- aura_color?: string;
- aura_vibe?: string;
- analysisData?: any;
- palette?: Array<{r: number; g: number; b: number}>;
- isVirtual?: boolean;
- isYoutube?: boolean;
- youtubeId?: string;
- isRapid?: boolean;
+  id: string;
+  title: string;
+  artistId: string;
+  albumId?: string;
+  artist: Artist;
+  artistName?: string;
+  album?: Album;
+  coverUrl?: string;
+  audioUrl: string;
+  duration: number;
+  genre?: string;
+  lyrics?: string;
+  synced_lyrics?: any;
+  raw_lrc?: string;
+  lyricsOffset?: number;
+  romanizedLyrics?: string;
+  romanizedSyncedLyrics?: any;
+  romanizedLang?: string;
+  isFeatured?: boolean;
+  isTrending?: boolean;
+  price?: number;
+  isPurchased?: boolean;
+  streams?: number;
+  featuredArtists?: string;
+  composers?: string;
+  music?: string;
+  musicDirector?: string;
+  singers?: string;
+  lyricist?: string;
+  lyricists?: string;
+  bgmComposer?: string;
+  aura_color?: string;
+  aura_vibe?: string;
+  analysisData?: any;
+  palette?: Array<{r: number; g: number; b: number}>;
+  isVirtual?: boolean;
+  isYoutube?: boolean;
+  youtubeId?: string;
+  isRapid?: boolean;
+}
+
+export interface UserQueueItem {
+  queueId: string;
+  track: Track;
 }
 
 interface PlayerState {
- currentTrack: Track | null;
- isPlaying: boolean;
- queue: Track[];
- originalQueue: Track[]; // To restore after shuffle
- isShuffled: boolean;
- repeatMode: "off" | "one" | "two" | "all";
- repeatCounter: number;
- volume: number;
- currentTime: number;
- duration: number;
- audioFx: {
- eq: number[];
- reverb: string;
- is8D: boolean;
- direction8D: "clockwise" | "counter-clockwise";
- speed8D: number;
- speed: number;
- pitch: number;
- crossfade: number;
- };
+  currentTrack: Track | null;
+  isPlaying: boolean;
 
- setTrack: (track: Track, contextTracks?: Track[]) => void;
- setQueue: (tracks: Track[]) => void;
- addToQueue: (track: Track) => void;
- playNextTrack: (track: Track) => void;
- removeFromQueue: (trackId: string) => void;
- reorderQueue: (startIndex: number, endIndex: number) => void;
- clearQueue: () => void;
+  // 3-Part Queue Model:
+  userQueue: UserQueueItem[];    // Items added manually by user (FIFO)
+  contextQueue: Track[];         // Remaining tracks from playing album / playlist
+  contextOriginalQueue: Track[]; // For restoring context after shuffle
+  contextName?: string;          // Name of the context source (e.g. album or playlist name)
+  playHistory: Track[];          // History for "Previous" navigation
+  queue: Track[];                // Total computed queue for backward compatibility
+  originalQueue: Track[];
 
- togglePlay: () => void;
- setIsPlaying: (isPlaying: boolean) => void;
+  isShuffled: boolean;
+  repeatMode: "off" | "one" | "two" | "all";
+  repeatCounter: number;
+  volume: number;
+  currentTime: number;
+  duration: number;
+  audioFx: {
+    eq: number[];
+    reverb: string;
+    is8D: boolean;
+    direction8D: "clockwise" | "counter-clockwise";
+    speed8D: number;
+    speed: number;
+    pitch: number;
+    crossfade: number;
+  };
 
- playNext: (force?: boolean) => void;
- playPrev: () => void;
+  // Modern 3-tier queue actions
+  setTrack: (track: Track, contextTracks?: Track[], contextName?: string) => void;
+  addToUserQueue: (trackOrTracks: Track | Track[], options?: { feedback?: boolean; contextName?: string }) => void;
+  removeFromUserQueue: (queueId: string) => void;
+  reorderUserQueue: (startIndex: number, endIndex: number) => void;
+  clearUserQueue: () => void;
+  removeFromContextQueue: (trackId: string) => void;
 
- toggleShuffle: () => void;
- toggleRepeat: () => void;
- setVolume: (volume: number) => void;
- setCurrentTime: (time: number) => void;
- setDuration: (duration: number) => void;
- setFx: (fx: Partial<PlayerState["audioFx"]>) => void;
- setLyricsOffset: (offset: number) => void;
+  // Backward compatibility actions
+  setQueue: (tracks: Track[]) => void;
+  addToQueue: (track: Track) => void;
+  playNextTrack: (track: Track) => void;
+  removeFromQueue: (trackIdOrQueueId: string) => void;
+  reorderQueue: (startIndex: number, endIndex: number) => void;
+  clearQueue: () => void;
+
+  togglePlay: () => void;
+  setIsPlaying: (isPlaying: boolean) => void;
+
+  playNext: (force?: boolean) => void;
+  playPrev: () => void;
+
+  toggleShuffle: () => void;
+  toggleRepeat: () => void;
+  setVolume: (volume: number) => void;
+  setCurrentTime: (time: number) => void;
+  setDuration: (duration: number) => void;
+  setFx: (fx: Partial<PlayerState["audioFx"]>) => void;
+  setLyricsOffset: (offset: number) => void;
   updateCurrentTrackData: (partial: Partial<Track>) => void;
+}
+
+function computeTotalQueue(currentTrack: Track | null, userQueue: UserQueueItem[], contextQueue: Track[]): Track[] {
+  const result: Track[] = [];
+  if (currentTrack) result.push(currentTrack);
+  if (Array.isArray(userQueue)) {
+    for (const u of userQueue) {
+      if (u && u.track) result.push(u.track);
+    }
+  }
+  if (Array.isArray(contextQueue)) {
+    for (const c of contextQueue) {
+      if (c) result.push(c);
+    }
+  }
+  return result;
 }
 
 function extractTrackVibeParams(track: Track, limit = 25) {
@@ -122,457 +166,521 @@ function extractTrackVibeParams(track: Track, limit = 25) {
 }
 
 export const usePlayerStore = create<PlayerState>()(
- persist(
- (set, get) => ({
- currentTrack: null,
- isPlaying: false,
- queue: [],
- originalQueue: [],
- isShuffled: false,
- repeatMode: "off",
- repeatCounter: 0,
- volume: 1,
- currentTime: 0,
- duration: 0,
- audioFx: {
- eq: [0, 0, 0],
- reverb: "none",
- is8D: false,
- direction8D: "clockwise",
- speed8D: 0.15,
- speed: 1,
- pitch: 1,
- crossfade: 5,
- },
+  persist(
+    (set, get) => ({
+      currentTrack: null,
+      isPlaying: false,
+      userQueue: [],
+      contextQueue: [],
+      contextOriginalQueue: [],
+      contextName: undefined,
+      playHistory: [],
+      queue: [],
+      originalQueue: [],
+      isShuffled: false,
+      repeatMode: "off",
+      repeatCounter: 0,
+      volume: 1,
+      currentTime: 0,
+      duration: 0,
+      audioFx: {
+        eq: [0, 0, 0],
+        reverb: "none",
+        is8D: false,
+        direction8D: "clockwise",
+        speed8D: 0.15,
+        speed: 1,
+        pitch: 1,
+        crossfade: 5,
+      },
 
- setTrack: (track, contextTracks) => {
-  try { audioEngine.resume(); } catch (e) {}
-  const { isShuffled, queue, originalQueue } = get();
-  
-  let baseQueue = contextTracks && contextTracks.length > 0
-  ? contextTracks
-  : queue.length > 0
-  ? (isShuffled ? originalQueue : queue)
-  : [track];
+      setTrack: (track, contextTracks, contextName) => {
+        try { audioEngine.resume(); } catch (e) {}
+        const { userQueue, playHistory, currentTrack: prevTrack, isShuffled } = get();
 
-  // If we're falling back to existing queue but the track isn't in it, we must reset the queue to just this track
-  if (!baseQueue.find((t) => t.id === track.id)) {
-    baseQueue = [track];
-  }
+        let newContextQueue: Track[] = [];
+        const fullContext = contextTracks && contextTracks.length > 0 ? contextTracks : [track];
 
-  let newQueue = [...baseQueue];
-  if (isShuffled) {
-  const others = baseQueue.filter((t) => t.id !== track.id);
-  // Fisher-Yates shuffle
-  for (let i = others.length - 1; i > 0; i--) {
-  const j = Math.floor(Math.random() * (i + 1));
-  [others[i], others[j]] = [others[j], others[i]];
-  }
-  newQueue = [track, ...others];
-  } else {
-  // If shuffle is off, rotate the queue so the clicked track is at index 0
-  const index = baseQueue.findIndex(t => t.id === track.id);
-  if (index !== -1) {
-    newQueue = [...baseQueue.slice(index), ...baseQueue.slice(0, index)];
-  }
-  }
+        const clickedIndex = fullContext.findIndex(t => t.id === track.id);
+        if (clickedIndex !== -1) {
+          newContextQueue = fullContext.slice(clickedIndex + 1);
+        } else {
+          newContextQueue = fullContext.filter(t => t.id !== track.id);
+        }
 
- set({
- currentTrack: track,
- isPlaying: true,
- queue: newQueue,
- originalQueue: baseQueue,
- repeatCounter: 0,
- currentTime: 0,
- duration: track.duration || 0,
- });
+        const finalContext = [...newContextQueue];
+        if (isShuffled) {
+          // Shuffle Context only; User Queue order is NEVER changed
+          for (let i = finalContext.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [finalContext[i], finalContext[j]] = [finalContext[j], finalContext[i]];
+          }
+        }
 
- // Track play persistence: record to local recent plays (max 10) and notify real-time listeners
- try {
-  if (typeof window !== 'undefined' && track && track.id) {
-   const RAW = localStorage.getItem('zenify_recently_played_tracks');
-   const list = RAW ? JSON.parse(RAW) : [];
-   const filtered = Array.isArray(list) ? list.filter((t: any) => t && t.id !== track.id) : [];
-   const updated = [track, ...filtered].slice(0, 10);
-   localStorage.setItem('zenify_recently_played_tracks', JSON.stringify(updated));
-   window.dispatchEvent(new CustomEvent('zenify:track-played', { detail: { track } }));
-   window.dispatchEvent(new CustomEvent('zenify:track-updated'));
-  }
- } catch (e) {}
+        const resolvedContextName = contextName || track.album?.title || (typeof track.album === 'string' ? track.album : undefined) || "Album";
+        const updatedHistory = prevTrack ? [...playHistory, prevTrack].slice(-50) : playHistory;
 
- // Autoplay enrichment: proactively fetch contextual radio queue by language, genre, country, and artist
- if (!contextTracks || contextTracks.length <= 3) {
-   (async () => {
-     try {
-       const api = (await import("@/lib/api")).default;
-       const radioRes = await api.get('/queue/radio', {
-          params: extractTrackVibeParams(track, 25)
+        set({
+          currentTrack: track,
+          isPlaying: true,
+          contextQueue: finalContext,
+          contextOriginalQueue: newContextQueue,
+          contextName: resolvedContextName,
+          playHistory: updatedHistory,
+          repeatCounter: 0,
+          currentTime: 0,
+          duration: track.duration || 0,
+          queue: computeTotalQueue(track, userQueue, finalContext),
+          originalQueue: computeTotalQueue(track, userQueue, newContextQueue),
         });
-       if (radioRes.data?.tracks?.length) {
-         const fresh = radioRes.data.tracks.filter((t: Track) => t.id !== track.id);
-         const state = usePlayerStore.getState();
-         if (state.currentTrack?.id === track.id) {
-           const curQ = state.queue;
-           const toAdd = fresh.filter((t: Track) => !curQ.some(q => q.id === t.id));
-           if (toAdd.length > 0) {
-             set(s => ({
-               queue: [...s.queue, ...toAdd],
-               originalQueue: [...s.originalQueue, ...toAdd]
-             }));
-           }
-         }
-       }
-     } catch (err) {
-       console.warn("[Autoplay] Proactive queue population failed:", err);
-     }
-   })();
- }
- },
 
- // Set entire queue (e.g. from playlist)
- setQueue: (tracks) => set({ queue: tracks, originalQueue: tracks, repeatCounter: 0 }),
+        // Track play persistence: record to local recent plays
+        try {
+          if (typeof window !== 'undefined' && track && track.id) {
+            const RAW = localStorage.getItem('zenify_recently_played_tracks');
+            const list = RAW ? JSON.parse(RAW) : [];
+            const filtered = Array.isArray(list) ? list.filter((t: any) => t && t.id !== track.id) : [];
+            const updated = [track, ...filtered].slice(0, 10);
+            localStorage.setItem('zenify_recently_played_tracks', JSON.stringify(updated));
+            window.dispatchEvent(new CustomEvent('zenify:track-played', { detail: { track } }));
+            window.dispatchEvent(new CustomEvent('zenify:track-updated'));
+          }
+        } catch (e) {}
+      },
 
- addToQueue: (track) =>
- set((state) => ({
- queue: [...state.queue, track],
- originalQueue: [...state.originalQueue, track],
- })),
+      addToUserQueue: (trackOrTracks, options) => {
+        const rawList = Array.isArray(trackOrTracks) ? trackOrTracks : (trackOrTracks ? [trackOrTracks] : []);
+        const validTracks = rawList.filter(t => t && t.id);
+        if (validTracks.length === 0) return;
 
- playNextTrack: (track) =>
-  set((state) => {
-  const { currentTrack, queue, originalQueue } = state;
-  if (!currentTrack) {
-  return {
-  currentTrack: track,
-  queue: [track],
-  originalQueue: [track],
-  isPlaying: true
-  };
-  }
-  const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
-  const newQueue = [...queue];
-  newQueue.splice(currentIndex + 1, 0, track);
-  
-  const origIndex = originalQueue.findIndex(t => t.id === currentTrack.id);
-  const newOrigQueue = [...originalQueue];
-  if (origIndex !== -1) {
-    newOrigQueue.splice(origIndex + 1, 0, track);
-  } else {
-    newOrigQueue.push(track);
-  }
+        // Feedback toast notification
+        if (options?.feedback !== false) {
+          try {
+            // Lazy import UI store for toast
+            import("@/store/ui").then(({ useUIStore }) => {
+              if (validTracks.length === 1) {
+                useUIStore.getState().showToast("Added to queue", "success");
+              } else {
+                useUIStore.getState().showToast(`${validTracks.length} songs added to queue`, "success");
+              }
+            }).catch(() => {});
+          } catch (e) {}
+        }
 
-  return {
-  queue: newQueue,
-  originalQueue: newOrigQueue
-  };
-  }),
+        const { currentTrack, userQueue, contextQueue } = get();
 
- removeFromQueue: (trackId) =>
-  set((state) => {
-  const newQueue = state.queue.filter((t) => t.id !== trackId);
-  const isRemovingCurrent = state.currentTrack?.id === trackId;
+        // Edge case: Empty player / nothing playing -> first added item plays immediately, rest are queued
+        if (!currentTrack) {
+          const first = validTracks[0];
+          const remaining = validTracks.slice(1);
+          const newItems: UserQueueItem[] = remaining.map((t, idx) => ({
+            queueId: `${t.id}-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+            track: t
+          }));
 
-  if (isRemovingCurrent && newQueue.length > 0) {
-  const currentIndex = state.queue.findIndex(t => t.id === trackId);
-  const nextTrack = newQueue[currentIndex] || newQueue[0];
-  return {
-  queue: newQueue,
-  originalQueue: state.originalQueue.filter((t) => t.id !== trackId),
-  currentTrack: nextTrack
-  };
-  }
-
-  return {
-  queue: newQueue,
-  originalQueue: state.originalQueue.filter((t) => t.id !== trackId),
-  };
-  }),
-
- reorderQueue: (startIndex, endIndex) =>
- set((state) => {
- const newQueue = [...state.queue];
- const [removed] = newQueue.splice(startIndex, 1);
- newQueue.splice(endIndex, 0, removed);
- return { queue: newQueue };
- }),
-
- clearQueue: () =>
- set((state) => ({
- queue: state.currentTrack ? [state.currentTrack] : [],
- originalQueue: state.currentTrack ? [state.currentTrack] : [],
- })),
-
- togglePlay: () => {
- try { audioEngine.resume(); } catch (e) {}
- set((state) => ({ isPlaying: !state.isPlaying }));
- },
- setIsPlaying: (isPlaying) => {
- if (isPlaying) try { audioEngine.resume(); } catch (e) {}
- set({ isPlaying });
- },
-
- playNext: (force = false) => {
- try { audioEngine.resume(); } catch (e) {}
- const { currentTrack, queue, repeatMode, repeatCounter } = get();
- if (!currentTrack || queue.length === 0) return;
-
- // Handle Repeat modes
- if (!force) {
-   if (repeatMode === "one") {
-     const audio = audioEngine.getActiveAudioElement();
-     if (audio) {
-       audio.currentTime = 0;
-       audio.play().catch(err => {
-         if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-         console.error("Repeat mode 'one' play failed:", err);
-       });
-       set({ currentTime: 0 });
-     }
-     return;
-   }
-
-   if (repeatMode === "two") {
-     if (repeatCounter < 1) { // Current play is #1 (counter 0), so replay once more for total 2
-       const audio = audioEngine.getActiveAudioElement();
-       if (audio) {
-         audio.currentTime = 0;
-         audio.play().catch(err => {
-           if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-           console.error("Repeat mode 'two' play failed:", err);
-         });
-         set({
-           currentTime: 0,
-           repeatCounter: repeatCounter + 1
-         });
-       }
-       return;
-     }
-   }
- }
-
- const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
- const isLastTrack = currentIndex === queue.length - 1;
-
- if (isLastTrack && repeatMode === "off" && !force) {
-  let isAutoplay = true;
-  try {
-   if (typeof window !== "undefined") {
-    const localPref = localStorage.getItem("zenify_autoplay");
-    if (localPref !== null) isAutoplay = localPref === "true";
-   }
-   const authStore = (window as any).__ZENIFY_AUTH_STORE__;
-   if (authStore?.getState?.()?.user?.preferences?.autoplay !== undefined) {
-    isAutoplay = authStore.getState().user.preferences.autoplay;
-   }
-  } catch {}
-
-  if (isAutoplay) {
-   (async () => {
-    try {
-     const api = (await import("@/lib/api")).default;
-     let candidateTracks: Track[] = [];
-
-     // 1. First priority: Contextual recommendations radio queue
-     try {
-       const radioRes = await api.get('/queue/radio', {
-          params: extractTrackVibeParams(currentTrack, 25)
-        });
-       if (radioRes.data?.tracks?.length) {
-         candidateTracks = radioRes.data.tracks;
-       }
-     } catch (radioErr) {
-       console.warn("[Autoplay] Radio queue fallback:", radioErr);
-     }
-
-     // 2. Second fallback: Same artist tracks
-     const artistId = (currentTrack as any).artistId || currentTrack.artist?.id;
-     if (candidateTracks.length === 0 && artistId) {
-      const res = await api.get(`/artists/${artistId}`);
-      if (res.data?.tracks?.length) {
-       candidateTracks = res.data.tracks;
-      }
-     }
-
-     // 3. Third fallback: Trending tracks
-     if (candidateTracks.length === 0) {
-      const res = await api.get("/tracks/trending");
-      if (Array.isArray(res.data)) {
-       candidateTracks = res.data;
-      }
-     }
-
-     const freshTracks = candidateTracks.filter(t => !queue.some(q => q.id === t.id));
-     if (freshTracks.length > 0) {
-      const nextTrack = freshTracks[0];
-      set(state => ({
-       queue: [...state.queue, ...freshTracks.slice(0, 10)],
-       originalQueue: [...state.originalQueue, ...freshTracks.slice(0, 10)],
-       currentTrack: nextTrack,
-       isPlaying: true,
-       currentTime: 0,
-       repeatCounter: 0,
-       duration: nextTrack.duration || 0,
-      }));
-      return;
-     }
-    } catch (err) {
-     console.warn("[Keep Playing] Failed to fetch autoplay tracks:", err);
-    }
-    const firstTrack = queue[0];
-    set({ currentTrack: firstTrack, isPlaying: true, repeatCounter: 0, currentTime: 0, duration: firstTrack.duration || 0 });
-   })();
-   return;
-  }
-
-  set({ isPlaying: false, currentTime: 0 });
-  const audio = audioEngine.getActiveAudioElement();
-  if (audio) audio.pause();
-  return;
- }
-
- const nextIndex = (currentIndex + 1) % queue.length;
- const nextTrack = queue[nextIndex];
- set({ currentTrack: nextTrack, isPlaying: true, repeatCounter: 0, currentTime: 0, duration: nextTrack.duration || 0 });
-
- // Proactive background radio top-up when nearing the end of the queue (<= 5 tracks left)
- const remainingInQueue = queue.length - 1 - nextIndex;
- if (remainingInQueue <= 5 && repeatMode === "off") {
-   let isAutoplay = true;
-   try {
-     if (typeof window !== "undefined") {
-       const localPref = localStorage.getItem("zenify_autoplay");
-       if (localPref !== null) isAutoplay = localPref === "true";
-     }
-     const authStore = (window as any).__ZENIFY_AUTH_STORE__;
-     if (authStore?.getState?.()?.user?.preferences?.autoplay !== undefined) {
-       isAutoplay = authStore.getState().user.preferences.autoplay;
-     }
-   } catch {}
-
-   if (isAutoplay && nextTrack) {
-     (async () => {
-       try {
-         const api = (await import("@/lib/api")).default;
-         const radioRes = await api.get('/queue/radio', {
-            params: extractTrackVibeParams(nextTrack, 15)
+          try { audioEngine.resume(); } catch (e) {}
+          set({
+            currentTrack: first,
+            isPlaying: true,
+            userQueue: newItems,
+            currentTime: 0,
+            duration: first.duration || 0,
+            queue: computeTotalQueue(first, newItems, contextQueue),
+            originalQueue: computeTotalQueue(first, newItems, contextQueue),
           });
-         if (radioRes.data?.tracks?.length) {
-           const currentQ = get().queue;
-           const fresh = radioRes.data.tracks.filter((t: Track) => !currentQ.some(q => q.id === t.id));
-           if (fresh.length > 0) {
-             set(state => ({
-               queue: [...state.queue, ...fresh],
-               originalQueue: [...state.originalQueue, ...fresh]
-             }));
-           }
-         }
-       } catch (err) {}
-     })();
-   }
- }
- },
+          return;
+        }
 
- playPrev: () => {
- try { audioEngine.resume(); } catch (e) {}
- const { currentTrack, queue } = get();
- if (!currentTrack || queue.length === 0) return;
+        // Duplicates allowed: each addition receives an independent unique queueId
+        const newItems: UserQueueItem[] = validTracks.map((t, idx) => ({
+          queueId: `${t.id}-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+          track: t
+        }));
 
- const audio = audioEngine.getActiveAudioElement();
- if (audio && audio.currentTime > 3) {
- audio.currentTime = 0;
- set({ currentTime: 0 });
- return;
- }
+        const updatedUserQueue = [...(userQueue || []), ...newItems];
+        set({
+          userQueue: updatedUserQueue,
+          queue: computeTotalQueue(currentTrack, updatedUserQueue, contextQueue),
+          originalQueue: computeTotalQueue(currentTrack, updatedUserQueue, contextQueue),
+        });
+      },
 
- const currentIndex = queue.findIndex((t) => t.id === currentTrack.id);
- const prevIndex = (currentIndex - 1 + queue.length) % queue.length;
- const prevTrack = queue[prevIndex];
- set({ currentTrack: prevTrack, isPlaying: true, repeatCounter: 0, currentTime: 0, duration: prevTrack.duration || 0 });
- },
+      removeFromUserQueue: (queueId) => {
+        const { userQueue, currentTrack, contextQueue } = get();
+        const updated = (userQueue || []).filter(item => item.queueId !== queueId);
+        set({
+          userQueue: updated,
+          queue: computeTotalQueue(currentTrack, updated, contextQueue),
+          originalQueue: computeTotalQueue(currentTrack, updated, contextQueue),
+        });
+      },
 
- toggleShuffle: () => {
- const { isShuffled, originalQueue, currentTrack } = get();
+      reorderUserQueue: (startIndex, endIndex) => {
+        const { userQueue, currentTrack, contextQueue } = get();
+        const newQueue = [...(userQueue || [])];
+        const [removed] = newQueue.splice(startIndex, 1);
+        if (removed) {
+          newQueue.splice(endIndex, 0, removed);
+        }
+        set({
+          userQueue: newQueue,
+          queue: computeTotalQueue(currentTrack, newQueue, contextQueue),
+          originalQueue: computeTotalQueue(currentTrack, newQueue, contextQueue),
+        });
+      },
 
- if (isShuffled) {
- // Turn Shuffle OFF
- set({ isShuffled: false, queue: originalQueue });
- } else {
- // Turn Shuffle ON
- if (currentTrack && originalQueue.length > 0) {
- const others = originalQueue.filter(
- (t) => t.id !== currentTrack.id,
- );
- for (let i = others.length - 1; i > 0; i--) {
- const j = Math.floor(Math.random() * (i + 1));
- [others[i], others[j]] = [others[j], others[i]];
- }
- const shuffled = [currentTrack, ...others];
- set({ isShuffled: true, queue: shuffled });
- } else {
- const copy = [...originalQueue];
- for (let i = copy.length - 1; i > 0; i--) {
- const j = Math.floor(Math.random() * (i + 1));
- [copy[i], copy[j]] = [copy[j], copy[i]];
- }
- set({ isShuffled: true, queue: copy });
- }
- }
- },
+      clearUserQueue: () => {
+        const { currentTrack, contextQueue } = get();
+        set({
+          userQueue: [],
+          queue: computeTotalQueue(currentTrack, [], contextQueue),
+          originalQueue: computeTotalQueue(currentTrack, [], contextQueue),
+        });
+      },
 
- toggleRepeat: () =>
- set((state) => {
- const modes: ("off" | "one" | "two" | "all")[] = ["off", "one", "two", "all"];
- const nextIndex = (modes.indexOf(state.repeatMode) + 1) % modes.length;
- return { repeatMode: modes[nextIndex], repeatCounter: 0 };
- }),
+      removeFromContextQueue: (trackId) => {
+        const { contextQueue, currentTrack, userQueue } = get();
+        const updated = (contextQueue || []).filter(t => t.id !== trackId);
+        set({
+          contextQueue: updated,
+          queue: computeTotalQueue(currentTrack, userQueue, updated),
+          originalQueue: computeTotalQueue(currentTrack, userQueue, updated),
+        });
+      },
 
- setVolume: (volume) => set({ volume }),
- setCurrentTime: (currentTime) => set({ currentTime }),
- setDuration: (duration) => set({ duration }),
+      // Backwards-compatible queue methods
+      addToQueue: (track) => {
+        get().addToUserQueue(track);
+      },
 
- setFx: (fx) =>
- set((state) => ({
- audioFx: { ...state.audioFx, ...fx },
- })),
+      setQueue: (tracks) => {
+        if (!tracks || tracks.length === 0) return;
+        get().setTrack(tracks[0], tracks);
+      },
 
-   setLyricsOffset: (offset) => 
-  set((state) => {
-      if (state.currentTrack) {
-          return {
+      playNextTrack: (track) => {
+        const { userQueue, currentTrack, contextQueue } = get();
+        const newItem: UserQueueItem = {
+          queueId: `${track.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          track
+        };
+        const updated = [newItem, ...(userQueue || [])];
+        set({
+          userQueue: updated,
+          queue: computeTotalQueue(currentTrack, updated, contextQueue),
+          originalQueue: computeTotalQueue(currentTrack, updated, contextQueue),
+        });
+      },
+
+      removeFromQueue: (trackIdOrQueueId) => {
+        const { userQueue, contextQueue, currentTrack } = get();
+        const inUser = (userQueue || []).some(u => u.queueId === trackIdOrQueueId || u.track.id === trackIdOrQueueId);
+        if (inUser) {
+          const updatedUser = userQueue.filter(u => u.queueId !== trackIdOrQueueId && u.track.id !== trackIdOrQueueId);
+          set({
+            userQueue: updatedUser,
+            queue: computeTotalQueue(currentTrack, updatedUser, contextQueue)
+          });
+          return;
+        }
+
+        const inContext = (contextQueue || []).some(t => t.id === trackIdOrQueueId);
+        if (inContext) {
+          const updatedContext = contextQueue.filter(t => t.id !== trackIdOrQueueId);
+          set({
+            contextQueue: updatedContext,
+            queue: computeTotalQueue(currentTrack, userQueue, updatedContext)
+          });
+          return;
+        }
+
+        // If removing the currently playing item
+        if (currentTrack?.id === trackIdOrQueueId) {
+          get().playNext(true);
+        }
+      },
+
+      reorderQueue: (startIndex, endIndex) => {
+        get().reorderUserQueue(startIndex, endIndex);
+      },
+
+      clearQueue: () => {
+        get().clearUserQueue();
+      },
+
+      togglePlay: () => {
+        try { audioEngine.resume(); } catch (e) {}
+        set((state) => ({ isPlaying: !state.isPlaying }));
+      },
+
+      setIsPlaying: (isPlaying) => {
+        if (isPlaying) try { audioEngine.resume(); } catch (e) {}
+        set({ isPlaying });
+      },
+
+      playNext: (force = false) => {
+        try { audioEngine.resume(); } catch (e) {}
+        const { currentTrack, userQueue, contextQueue, contextOriginalQueue, repeatMode, repeatCounter, playHistory } = get();
+        if (!currentTrack) return;
+
+        // 1. Repeat mode "one": repeats the current song
+        if (!force) {
+          if (repeatMode === "one") {
+            const audio = audioEngine.getActiveAudioElement();
+            if (audio) {
+              audio.currentTime = 0;
+              audio.play().catch(err => {
+                if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+              });
+              set({ currentTime: 0 });
+            }
+            return;
+          }
+
+          if (repeatMode === "two") {
+            if (repeatCounter < 1) {
+              const audio = audioEngine.getActiveAudioElement();
+              if (audio) {
+                audio.currentTime = 0;
+                audio.play().catch(err => {
+                  if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+                });
+                set({ currentTime: 0, repeatCounter: repeatCounter + 1 });
+              }
+              return;
+            }
+          }
+        }
+
+        const updatedHistory = [...playHistory, currentTrack].slice(-50);
+
+        // 2. User Queue order: User Queue plays first! Played User Queue items are removed.
+        if (userQueue && userQueue.length > 0) {
+          const [nextItem, ...remainingUserQueue] = userQueue;
+          const nextTrack = nextItem.track;
+          set({
+            currentTrack: nextTrack,
+            isPlaying: true,
+            userQueue: remainingUserQueue,
+            playHistory: updatedHistory,
+            repeatCounter: 0,
+            currentTime: 0,
+            duration: nextTrack.duration || 0,
+            queue: computeTotalQueue(nextTrack, remainingUserQueue, contextQueue),
+            originalQueue: computeTotalQueue(nextTrack, remainingUserQueue, contextQueue),
+          });
+          return;
+        }
+
+        // 3. User Queue empty: Next takes from Context
+        if (contextQueue && contextQueue.length > 0) {
+          const [nextContextTrack, ...remainingContext] = contextQueue;
+          set({
+            currentTrack: nextContextTrack,
+            isPlaying: true,
+            contextQueue: remainingContext,
+            playHistory: updatedHistory,
+            repeatCounter: 0,
+            currentTime: 0,
+            duration: nextContextTrack.duration || 0,
+            queue: computeTotalQueue(nextContextTrack, [], remainingContext),
+            originalQueue: computeTotalQueue(nextContextTrack, [], remainingContext),
+          });
+          return;
+        }
+
+        // 4. Repeat mode "all": loops the Context. User Queue items are played once and removed.
+        if (repeatMode === "all" && contextOriginalQueue && contextOriginalQueue.length > 0) {
+          const [firstTrack, ...remainingContext] = contextOriginalQueue;
+          set({
+            currentTrack: firstTrack,
+            isPlaying: true,
+            contextQueue: remainingContext,
+            playHistory: updatedHistory,
+            repeatCounter: 0,
+            currentTime: 0,
+            duration: firstTrack.duration || 0,
+            queue: computeTotalQueue(firstTrack, [], remainingContext),
+            originalQueue: computeTotalQueue(firstTrack, [], remainingContext),
+          });
+          return;
+        }
+
+        // 5. End of queue: Autoplay fallback or stop playback
+        let isAutoplay = true;
+        try {
+          if (typeof window !== "undefined") {
+            const localPref = localStorage.getItem("zenify_autoplay");
+            if (localPref !== null) isAutoplay = localPref === "true";
+          }
+        } catch {}
+
+        if (isAutoplay) {
+          (async () => {
+            try {
+              const api = (await import("@/lib/api")).default;
+              const radioRes = await api.get('/queue/radio', {
+                params: extractTrackVibeParams(currentTrack, 20)
+              });
+              if (radioRes.data?.tracks?.length) {
+                const fresh = radioRes.data.tracks.filter((t: Track) => t.id !== currentTrack.id);
+                if (fresh.length > 0) {
+                  const [nextTrack, ...restFresh] = fresh;
+                  set({
+                    currentTrack: nextTrack,
+                    isPlaying: true,
+                    contextQueue: restFresh,
+                    contextOriginalQueue: restFresh,
+                    contextName: "Recommended Radio",
+                    repeatCounter: 0,
+                    currentTime: 0,
+                    duration: nextTrack.duration || 0,
+                    queue: computeTotalQueue(nextTrack, [], restFresh),
+                    originalQueue: computeTotalQueue(nextTrack, [], restFresh),
+                  });
+                  return;
+                }
+              }
+            } catch (err) {
+              console.warn("[Autoplay] Failed to fetch autoplay queue:", err);
+            }
+            set({ isPlaying: false, currentTime: 0 });
+            const audio = audioEngine.getActiveAudioElement();
+            if (audio) audio.pause();
+          })();
+          return;
+        }
+
+        set({ isPlaying: false, currentTime: 0 });
+        const audio = audioEngine.getActiveAudioElement();
+        if (audio) audio.pause();
+      },
+
+      playPrev: () => {
+        try { audioEngine.resume(); } catch (e) {}
+        const { currentTrack, playHistory, currentTime, userQueue, contextQueue } = get();
+        if (!currentTrack) return;
+
+        const audio = audioEngine.getActiveAudioElement();
+        // Previous rule: restarts current song if it has played for more than a few seconds (3s threshold)
+        if (currentTime > 3 || (audio && audio.currentTime > 3)) {
+          if (audio) audio.currentTime = 0;
+          set({ currentTime: 0 });
+          return;
+        }
+
+        // Previous rule: goes back through play history
+        if (playHistory && playHistory.length > 0) {
+          const newHistory = [...playHistory];
+          const prevTrack = newHistory.pop()!;
+          const updatedContext = [currentTrack, ...(contextQueue || [])];
+          set({
+            currentTrack: prevTrack,
+            isPlaying: true,
+            playHistory: newHistory,
+            contextQueue: updatedContext,
+            repeatCounter: 0,
+            currentTime: 0,
+            duration: prevTrack.duration || 0,
+            queue: computeTotalQueue(prevTrack, userQueue, updatedContext),
+            originalQueue: computeTotalQueue(prevTrack, userQueue, updatedContext),
+          });
+          return;
+        }
+
+        // Fallback: restart current song
+        if (audio) audio.currentTime = 0;
+        set({ currentTime: 0 });
+      },
+
+      toggleShuffle: () => {
+        const { isShuffled, contextQueue, contextOriginalQueue, userQueue, currentTrack } = get();
+        if (isShuffled) {
+          // Turn Shuffle OFF: restore context to original sequence
+          const remainingSet = new Set((contextQueue || []).map(t => t.id));
+          const unShuffledContext = (contextOriginalQueue || []).filter(t => remainingSet.has(t.id));
+          set({
+            isShuffled: false,
+            contextQueue: unShuffledContext,
+            queue: computeTotalQueue(currentTrack, userQueue, unShuffledContext),
+          });
+        } else {
+          // Turn Shuffle ON: Shuffles the Context only. User Queue order is NEVER changed.
+          const shuffledContext = [...(contextQueue || [])];
+          for (let i = shuffledContext.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledContext[i], shuffledContext[j]] = [shuffledContext[j], shuffledContext[i]];
+          }
+          set({
+            isShuffled: true,
+            contextQueue: shuffledContext,
+            queue: computeTotalQueue(currentTrack, userQueue, shuffledContext),
+          });
+        }
+      },
+
+      toggleRepeat: () =>
+        set((state) => {
+          const modes: ("off" | "all" | "one")[] = ["off", "all", "one"];
+          const nextIndex = (modes.indexOf(state.repeatMode as any) + 1) % modes.length;
+          return { repeatMode: modes[nextIndex], repeatCounter: 0 };
+        }),
+
+      setVolume: (volume) => set({ volume }),
+      setCurrentTime: (currentTime) => set({ currentTime }),
+      setDuration: (duration) => set({ duration }),
+
+      setFx: (fx) =>
+        set((state) => ({
+          audioFx: { ...state.audioFx, ...fx },
+        })),
+
+      setLyricsOffset: (offset) =>
+        set((state) => {
+          if (state.currentTrack) {
+            return {
               currentTrack: { ...state.currentTrack, lyricsOffset: offset }
-          };
-      }
-      return state;
-  }),
+            };
+          }
+          return state;
+        }),
 
-  updateCurrentTrackData: (partial) =>
-  set((state) => {
-      if (!state.currentTrack) return state;
-      if (partial.id && state.currentTrack.id !== partial.id) return state;
-      const updated = { ...state.currentTrack, ...partial };
-      const updateInList = (list: Track[]) =>
-        list.map((t) => (t.id === updated.id ? { ...t, ...partial } : t));
-      return {
-          currentTrack: updated,
-          queue: updateInList(state.queue),
-          originalQueue: updateInList(state.originalQueue),
-      };
-  }),
- }),
- {
- name: "player-storage",
- version: 6, // Bumping to clear transient states like currentTrack/isPlaying on refresh
- migrate: (persistedState: any) => {
- // Drop transient session state to ensure fresh state on refresh
- const { audioFx: _dropped, currentTrack: _t, isPlaying: _p, ...rest } = persistedState ?? {};
- return rest;
- },
- partialize: (state) => ({
- volume: state.volume,
- repeatMode: state.repeatMode,
- isShuffled: state.isShuffled,
- audioFx: state.audioFx,
- }),
- },
- ),
+      updateCurrentTrackData: (partial) =>
+        set((state) => {
+          if (!state.currentTrack) return state;
+          if (partial.id && state.currentTrack.id !== partial.id) return state;
+          const updated = { ...state.currentTrack, ...partial };
+          const updateInList = (list: Track[]) =>
+            list.map((t) => (t.id === updated.id ? { ...t, ...partial } : t));
+          const updatedUserQueue = (state.userQueue || []).map(item =>
+            item.track.id === updated.id ? { ...item, track: { ...item.track, ...partial } } : item
+          );
+          const updatedContextQueue = updateInList(state.contextQueue || []);
+
+          return {
+            currentTrack: updated,
+            userQueue: updatedUserQueue,
+            contextQueue: updatedContextQueue,
+            queue: computeTotalQueue(updated, updatedUserQueue, updatedContextQueue),
+            originalQueue: updateInList(state.originalQueue || []),
+          };
+        }),
+    }),
+    {
+      name: "player-storage",
+      version: 7,
+      partialize: (state) => ({
+        volume: state.volume,
+        repeatMode: state.repeatMode,
+        isShuffled: state.isShuffled,
+        currentTrack: state.currentTrack,
+        userQueue: state.userQueue,
+        contextQueue: state.contextQueue,
+        contextOriginalQueue: state.contextOriginalQueue,
+        contextName: state.contextName,
+        playHistory: state.playHistory,
+        audioFx: state.audioFx,
+      }),
+    }
+  )
 );

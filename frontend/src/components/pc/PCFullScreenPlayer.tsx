@@ -5,6 +5,10 @@ import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
+import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuPortal, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, RefreshCw, ListPlus, Download } from "lucide-react";
 import {
  Play,
  Pause,
@@ -68,6 +72,7 @@ export function PCFullScreenPlayer() {
  const showReactiveBg = useReactiveBgStore(state => state.player);
  const openAddToPlaylistModal = useUIStore(state => state.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
 
  const { data: likedTrackIds } = useQuery({
  queryKey: ['liked-track-ids'],

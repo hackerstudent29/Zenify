@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Play, Pause, MoreHorizontal, ChevronRight, Plus, Download, Share2, Disc, RefreshCw } from "lucide-react";
+import { Play, Pause, MoreHorizontal, ChevronRight, Plus, Download, Share2, Disc, RefreshCw, ListPlus } from "lucide-react";
 import { cn, getMediaUrl, formatDisplayTitle, getTrackCover } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -17,8 +17,11 @@ import {
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { useUIStore } from "@/store/ui";
+import { usePlayerStore } from "@/store/player";
 import api from "@/lib/api";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
+import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 
 interface ArtistLatestAndTopSongsProps {
   artist: any;
@@ -43,6 +46,7 @@ export function ArtistLatestAndTopSongs({
   const [showAllTop, setShowAllTop] = useState(false);
   const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
   const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
 
   const topTracks: any[] = artist?.topTracks || [];
   if (topTracks.length === 0 && (!artist?.albums || artist.albums.length === 0)) {
@@ -145,6 +149,9 @@ export function ArtistLatestAndTopSongs({
             </DropdownMenuTrigger>
             <DropdownMenuPortal>
               <DropdownMenuContent align="end" className="w-52 bg-zinc-900/95 border-white/10 backdrop-blur-2xl rounded-2xl p-1.5 z-[1200]">
+ <DropdownMenuItem onClick={() => usePlayerStore.getState().addToUserQueue(track)}>
+ <ListPlus size={14} className="mr-2 text-brand" /> Add to Queue
+ </DropdownMenuItem>
                 {track.album?.id && (
                   <DropdownMenuItem onClick={() => router.push(`/album/${track.album.id}`)}>
                     <Disc size={14} className="mr-2 opacity-60" /> Go to Album

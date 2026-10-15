@@ -854,3 +854,26 @@ html.reduce-motion *::after {
   scroll-behavior: auto !important;
 }
 
+
+
+/* ── Premium Tactile Micro-Spring Button Animation ────────────────────────── */
+button:not([data-no-spring]),
+[role="button"]:not([data-no-spring]),
+input[type="button"],
+input[type="submit"] {
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.22s ease,
+              background-color 0.18s ease,
+              border-color 0.18s ease,
+              color 0.18s ease,
+              opacity 0.18s ease !important;
+  transform-origin: center center;
+}
+
+button:active:not(:disabled):not([aria-disabled="true"]):not([data-no-spring]),
+[role="button"]:active:not(:disabled):not([aria-disabled="true"]):not([data-no-spring]),
+input[type="button"]:active:not(:disabled),
+input[type="submit"]:active:not(:disabled) {
+  transform: scale(0.96) !important;
+  transition: transform 0.07s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}

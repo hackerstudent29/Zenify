@@ -11,129 +11,190 @@ interface ArtistLinksProps {
   linkClassName?: string;
   onClick?: (e: React.MouseEvent) => void;
   maxArtists?: number;
+  showRoles?: boolean;
 }
 
 export interface ExtractedArtist {
   id?: string;
   name: string;
+  role?: string;
+  isMain?: boolean;
 }
 
+/**
+ * Extracts artists with composer / music director as primary prominent credit,
+ * followed by secondary artists (singers, lyricists, featured) labeled with their roles.
+ */
 export function extractTrackArtists(track: any): ExtractedArtist[] {
   if (!track) return [];
 
-  const rawCandidates: Array<{ id?: string; name: string }> = [];
-
-  // 1. Primary artist array (e.g. from JioSaavn/Spotify/API)
-  if (Array.isArray(track.artists) && track.artists.length > 0) {
-    for (const a of track.artists) {
-      if (typeof a === "string" && a.trim()) {
-        rawCandidates.push({ name: a.trim() });
-      } else if (a && typeof a === "object" && a.name) {
-        rawCandidates.push({ id: a.id || a._id, name: a.name.trim() });
-      }
-    }
-  }
-
-  // 2. Primary artist object / string
-  if (rawCandidates.length === 0 && track.artist) {
-    if (typeof track.artist === "string" && track.artist.trim()) {
-      rawCandidates.push({ name: track.artist.trim() });
-    } else if (typeof track.artist === "object" && track.artist.name) {
-      rawCandidates.push({ id: track.artist.id || track.artist._id, name: track.artist.name.trim() });
-    }
-  } else if (rawCandidates.length === 0 && track.artistName) {
-    rawCandidates.push({ name: track.artistName.trim() });
-  }
-
-  // 3. Featured artists
-  if (track.featuredArtists) {
-    if (Array.isArray(track.featuredArtists)) {
-      for (const fa of track.featuredArtists) {
-        if (typeof fa === "string" && fa.trim()) {
-          rawCandidates.push({ name: fa.trim() });
-        } else if (fa && typeof fa === "object" && fa.name) {
-          rawCandidates.push({ id: fa.id || fa._id, name: fa.name.trim() });
-        }
-      }
-    } else if (typeof track.featuredArtists === "string") {
-      const split = splitArtistNames(track.featuredArtists);
-      for (const s of split) {
-        if (s) rawCandidates.push({ name: s });
-      }
-    }
-  }
-
-  // 4. Split all candidates on combo delimiters (&, comma, feat, ft, etc.)
-  const flattened: ExtractedArtist[] = [];
-  for (const item of rawCandidates) {
-    const parts = splitArtistNames(item.name);
-    if (parts.length <= 1) {
-      // Single atomic artist name: preserve ID if available
-      flattened.push({ id: item.id, name: parts[0] || item.name });
-    } else {
-      // Multi-artist combo string: each sub-artist gets their own separate record.
-      // Do not reuse the combo ID for sub-artists.
-      for (const subName of parts) {
-        if (subName.trim()) {
-          flattened.push({ name: subName.trim() });
-        }
-      }
-    }
-  }
-
-  // Deduplicate case-insensitively and sanitize names
   const seen = new Set<string>();
-  const unique: ExtractedArtist[] = [];
+  const credits: ExtractedArtist[] = [];
 
-  for (const item of flattened) {
-    if (!item.name) continue;
-    const clean = item.name.replace(/^[,\s/&·•\-–—|]+|[,\s/&·•\-–—|]+$/g, '').trim();
-    if (!clean || clean.length < 2 || /^\d+$/.test(clean) || /^itunes\s*artist\s*\d+/i.test(clean)) continue;
-    const key = clean.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push({
-        id: item.id,
-        name: formatDisplayTitle(clean),
-      });
+  const addCredit = (name: string, role?: string, id?: string, isMain = false) => {
+    if (!name) return;
+    const parts = splitArtistNames(name);
+    for (const p of parts) {
+      const clean = p.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim();
+      if (!clean || clean.length < 2 || /^\d+$/.test(clean) || /^itunes\s*artist\s*\d+/i.test(clean)) continue;
+      const lower = clean.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        credits.push({
+          id,
+          name: formatDisplayTitle(clean),
+          role,
+          isMain
+        });
+      }
+    }
+  };
+
+  // 1. Check for Composer / Music Director / Primary Music Creator
+  const rawComposers = track.composers || 
+                       track.music || 
+                       track.musicDirector || 
+                       track.more_info?.music || 
+                       track.more_info?.composer || 
+                       track.album?.musicDirector || 
+                       track.album?.composer;
+
+  const rawBgm = track.bgmComposer || track.bgm || track.more_info?.bgm;
+
+  let hasComposer = false;
+  if (rawComposers) {
+    addCredit(String(rawComposers), undefined, undefined, true);
+    hasComposer = credits.some(c => c.isMain);
+  }
+
+  if (rawBgm) {
+    addCredit(String(rawBgm), "BGM", undefined, true);
+  }
+
+  // 2. Fall back to primary artist if composer data is missing
+  let rawPrimary = "";
+  let primaryId: string | undefined = undefined;
+
+  if (Array.isArray(track.artists) && track.artists.length > 0) {
+    const first = track.artists[0];
+    if (typeof first === 'string') rawPrimary = first;
+    else if (first && first.name) {
+      rawPrimary = first.name;
+      primaryId = first.id || first._id;
+    }
+  } else if (track.artist) {
+    if (typeof track.artist === 'string') rawPrimary = track.artist;
+    else if (track.artist.name) {
+      rawPrimary = track.artist.name;
+      primaryId = track.artist.id || track.artist._id;
+    }
+  } else if (track.artistName) {
+    rawPrimary = track.artistName;
+  } else if (track.primaryArtists) {
+    rawPrimary = track.primaryArtists;
+  } else if (track.album?.artist?.name) {
+    rawPrimary = track.album.artist.name;
+  }
+
+  if (!hasComposer) {
+    // Primary artist takes the main role when no composer is recorded
+    if (rawPrimary) {
+      addCredit(rawPrimary, undefined, primaryId, true);
     }
   }
 
-  return unique;
+  // 3. Secondary Artists: Singers
+  const rawSingers = track.singers || 
+                     track.more_info?.singers || 
+                     track.singer || 
+                     track.vocals || 
+                     track.sungBy;
+  if (rawSingers) {
+    addCredit(String(rawSingers), "Singer");
+  } else if (hasComposer && rawPrimary) {
+    // When composer is main, the primary artist listed on metadata is usually the lead singer
+    addCredit(rawPrimary, "Singer", primaryId);
+  }
+
+  // 4. Secondary Artists: Lyricists
+  const rawLyricists = track.lyricist || 
+                       track.lyricists || 
+                       track.more_info?.lyricist || 
+                       track.more_info?.lyrics;
+  if (rawLyricists) {
+    addCredit(String(rawLyricists), "Lyricist");
+  }
+
+  // 5. Secondary Artists: Featured / Collaborators
+  if (track.featuredArtists) {
+    addCredit(String(track.featuredArtists), "Featured");
+  }
+
+  // 6. Any other artists in track.artists array not yet captured
+  if (Array.isArray(track.artists)) {
+    for (const a of track.artists) {
+      const name = typeof a === 'string' ? a : a?.name;
+      const id = typeof a === 'object' ? (a?.id || a?._id) : undefined;
+      if (name) addCredit(name, "Singer", id);
+    }
+  }
+
+  // Final fallback to ensure no blanks
+  if (credits.length === 0) {
+    credits.push({ name: "Unknown Artist", isMain: true });
+  }
+
+  return credits;
 }
 
-export function ArtistLinks({ track, className, linkClassName, onClick, maxArtists }: ArtistLinksProps) {
+export function ArtistLinks({ 
+  track, 
+  className, 
+  linkClassName, 
+  onClick, 
+  maxArtists, 
+  showRoles = true 
+}: ArtistLinksProps) {
   const allArtists = extractTrackArtists(track);
 
   if (allArtists.length === 0) {
     return <span className={cn("text-zinc-400", className)}>Unknown Artist</span>;
   }
 
-  // If maxArtists is specified (e.g. 1-3), display only those top artists without altering underlying metadata
   const artists = (maxArtists && maxArtists > 0) ? allArtists.slice(0, maxArtists) : allArtists;
 
   return (
-    <span className={cn("inline-flex flex-nowrap whitespace-nowrap items-center", className)}>
+    <span className={cn("inline-flex flex-nowrap whitespace-nowrap items-center gap-1.5", className)}>
       {artists.map((artist, idx) => {
         const isLast = idx === artists.length - 1;
         const routeTarget = artist.id ? `/artist/${artist.id}` : `/artist/${encodeURIComponent(artist.name)}`;
 
         return (
           <React.Fragment key={artist.id || artist.name || idx}>
-            <Link
-              href={routeTarget}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onClick) onClick(e);
-              }}
-              className={cn(
-                "hover:underline hover:text-white transition-colors cursor-pointer inline-block",
-                linkClassName
+            <span className="inline-flex items-baseline">
+              <Link
+                href={routeTarget}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onClick) onClick(e);
+                }}
+                className={cn(
+                  "hover:underline transition-colors cursor-pointer inline-block",
+                  artist.isMain 
+                    ? "text-white/90 font-medium hover:text-white" 
+                    : "text-zinc-400 hover:text-zinc-200",
+                  linkClassName
+                )}
+              >
+                {artist.name}
+              </Link>
+              {showRoles && artist.role && (
+                <span className="text-[10px] text-white/40 ml-1 font-normal select-none">
+                  ({artist.role})
+                </span>
               )}
-            >
-              {artist.name}
-            </Link>
-            {!isLast && <span className="opacity-60 select-none mr-1.5">,</span>}
+            </span>
+            {!isLast && <span className="text-white/30 select-none">•</span>}
           </React.Fragment>
         );
       })}

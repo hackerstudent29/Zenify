@@ -6,12 +6,14 @@ import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import {
   Play, Pause, Heart, Download, Plus, Share2,
-  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText, Mic, RefreshCw
+  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText, Mic, RefreshCw, ListPlus
 } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
+import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget } from "@/lib/utils";
 import Link from "next/link";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
@@ -43,11 +45,13 @@ export default function TrackPage() {
   const toggleShuffle = usePlayerStore(s => s.toggleShuffle);
   const queue = usePlayerStore(s => s.queue);
   const addToQueue = usePlayerStore(s => s.addToQueue);
+  const addToUserQueue = usePlayerStore(s => s.addToUserQueue);
 
   const { openDownloadModal, setPlayerMinimized, isLyricsOpen, setIsLyricsOpen } = useUIStore();
   const { user } = useAuthStore();
   const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
   const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
   const queryClient = useQueryClient();
 
   const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
@@ -294,8 +298,9 @@ export default function TrackPage() {
  const totalSecs = track.duration % 60;
  const durationStr = `${totalMins}:${String(totalSecs).padStart(2, "0")}`;
 
-  const albumDisplay = track.album?.title || (track as any).albumTitle || `${formatDisplayTitle(track.title)} - Single`;
-  const albumHref = track.album?.id ? `/album/${track.album.id}` : undefined;
+  const albumReleaseId = track.album?.id || track.albumId || (track as any).collectionId;
+  const albumDisplay = track.album?.title || (track as any).albumTitle || (track.albumId ? "Album" : `${formatDisplayTitle(track.title)} - Single`);
+  const albumHref = albumReleaseId ? `/album/${albumReleaseId}` : undefined;
   const rawLabel = (track as any).label || (track as any).publisher || (track.album as any)?.label;
   const labelDisplay = (!rawLabel || rawLabel.trim().toLowerCase() === "unknown" || rawLabel.trim().toLowerCase() === "null")
     ? "Zenify"
@@ -338,20 +343,26 @@ export default function TrackPage() {
             {formatDisplayTitle(track.title)}
           </h1>
 
-          {/* 2. Artist Names */}
+          {/* 2. Album Name (Mandatory: Directly below song name) */}
+          {albumDisplay && (
+            <div className="text-sm sm:text-base text-brand font-semibold mb-2 drop-shadow-md">
+              {albumHref ? (
+                <Link href={albumHref} className="hover:underline transition-colors inline-flex items-center gap-1.5 hover:text-rose-400">
+                  <Disc3 size={15} className="inline shrink-0 opacity-80" />
+                  <span className="truncate">{albumDisplay}</span>
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-white/80">
+                  <Disc3 size={15} className="inline shrink-0 opacity-80" />
+                  <span className="truncate">{albumDisplay}</span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* 3. Artist Names */}
           <div className="text-sm font-medium text-zinc-400 hover:text-zinc-300 transition-colors mb-2 block w-fit">
             <ArtistLinks track={track} maxArtists={4} linkClassName="text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:underline" />
-          </div>
-
-          {/* 3. Album Name */}
-          <div className="text-sm sm:text-base text-white/80 font-medium mb-1.5 drop-shadow-md">
-            {albumHref ? (
-              <Link href={albumHref} className="hover:text-white transition-colors hover:underline">
-                {albumDisplay}
-              </Link>
-            ) : (
-              <span>{albumDisplay}</span>
-            )}
           </div>
 
           {/* 4. Label Name */}
@@ -428,6 +439,9 @@ export default function TrackPage() {
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent className="w-56" align="start">
+      <DropdownMenuItem onClick={() => addToUserQueue(track)}>
+        <ListPlus size={14} className="mr-2 text-white/60" /> Add to Queue
+      </DropdownMenuItem>
       <DropdownMenuItem onClick={() => toggleLikeMutation.mutate()}>
         <Heart size={14} className={cn("mr-2", isLiked ? "text-brand fill-brand" : "text-white/60")} />
         {isLiked ? "Liked" : "Like"}
@@ -532,6 +546,11 @@ export default function TrackPage() {
  </button>
  </DropdownMenuTrigger>
  <DropdownMenuContent className="w-52" align="end">
+ <DropdownMenuItem onClick={() => {
+ usePlayerStore.getState().addToUserQueue(track);
+ }}>
+ <ListPlus size={13} className="mr-2 text-brand" /> Add to Queue
+ </DropdownMenuItem>
  <DropdownMenuItem onClick={() => {
  if (!isCurrentTrack && track) {
  setTrack(track, [track]);

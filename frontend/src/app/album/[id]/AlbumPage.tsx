@@ -5,13 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X, Mic, RefreshCw } from "lucide-react";
+import { Play, MoreHorizontal, Pause, Shuffle, Share2, Plus, Download, User, Disc3, Music2, AudioLines, Check, X, Mic, RefreshCw, ListPlus } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { getMediaUrl, cn, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
+import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -43,6 +45,7 @@ export default function AlbumPage() {
  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
  const { setTrack, setQueue, currentTrack, isPlaying, togglePlay, isShuffled, toggleShuffle } = usePlayerStore();
  const { openDownloadModal, setFullScreenPlayerOpen, setPlayerMinimized, isFullScreenPlayerOpen } = useUIStore();
  const queryClient = useQueryClient();
@@ -355,6 +358,16 @@ export default function AlbumPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="start">
               <DropdownMenuItem onClick={() => {
+                if (!album.tracks || album.tracks.length === 0) {
+                  showToast("This album has no tracks", "error");
+                  return;
+                }
+                usePlayerStore.getState().addToUserQueue(album.tracks, { contextName: album.title });
+              }}>
+                <ListPlus size={14} className="mr-2 text-brand" />
+                <span>Add to Queue</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
                 if (typeof window !== "undefined") {
                   navigator.clipboard.writeText(window.location.href);
                   useUIStore.getState().showToast("Album link copied to clipboard", "success");
@@ -435,6 +448,12 @@ export default function AlbumPage() {
  </button>
  </DropdownMenuTrigger>
  <DropdownMenuContent className="w-56" align="end">
+ <DropdownMenuItem onClick={() => {
+ usePlayerStore.getState().addToUserQueue(track);
+ }}>
+ <ListPlus size={14} className="mr-2 text-brand" />
+ <span>Add to Queue</span>
+ </DropdownMenuItem>
  <DropdownMenuItem onClick={() => {
  const target = getArtistTarget(track) || getArtistTarget(album);
  if (target) router.push(target);

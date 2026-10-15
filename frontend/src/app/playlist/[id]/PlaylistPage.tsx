@@ -5,7 +5,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check, Mic, RefreshCw } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check, Mic, RefreshCw, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
@@ -16,6 +16,8 @@ import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
+import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { EditPlaylistCoverModal } from "@/components/shared/EditPlaylistCoverModal";
 import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistModal";
 import {
@@ -57,6 +59,7 @@ export default function PlaylistDetailPage() {
   const playlistId = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : '';
  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
 
  
 
@@ -320,6 +323,17 @@ export default function PlaylistDetailPage() {
                 </>
               )}
               <DropdownMenuItem onClick={() => {
+                if (!playlist || playlist.tracks.length === 0) {
+                  showToast("This playlist has no tracks yet", "error");
+                  return;
+                }
+                const tracks = playlist.tracks.map((t: any) => t.track || t);
+                usePlayerStore.getState().addToUserQueue(tracks, { contextName: playlist.name });
+              }}>
+                <ListPlus size={14} className="mr-2 text-brand" />
+                <span>Add to Queue</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
                 if (typeof window !== 'undefined') {
                   navigator.clipboard.writeText(window.location.href);
                   showToast("Playlist link copied to clipboard!", "success");
@@ -427,6 +441,12 @@ export default function PlaylistDetailPage() {
  </button>
  </DropdownMenuTrigger>
  <DropdownMenuContent className="w-52" align="end">
+ <DropdownMenuItem onClick={() => {
+ usePlayerStore.getState().addToUserQueue(track);
+ }}>
+ <ListPlus size={14} className="mr-2 text-brand" />
+ <span>Add to Queue</span>
+ </DropdownMenuItem>
  {getArtistTarget(track) && (
  <DropdownMenuItem onClick={() => {
  const target = getArtistTarget(track);
