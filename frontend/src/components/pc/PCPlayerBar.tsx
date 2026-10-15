@@ -175,7 +175,6 @@ export function PCPlayerBar() {
                                  onClick={(e) => e.stopPropagation()}
                              >
                                  <motion.button
-                                     layoutId={`zenify-album-art-container-${currentTrack.id}`}
                                      animate={{ 
                                          scale: isPlaying ? 1 : 0.88,
                                          opacity: isPlaying ? 1 : 0.85 
@@ -190,7 +189,6 @@ export function PCPlayerBar() {
                                  >
                                      <motion.img
                                          key={currentTrack.id}
-                                         layoutId={`zenify-album-art-${currentTrack.id}`}
                                          src={getTrackCover(currentTrack)}
                                          alt="Cover"
                                          className="h-full w-full object-cover"

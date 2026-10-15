@@ -376,21 +376,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      )} 
    />
  )}
- {/* Main Wrapper — scales down when mobile player is expanded */}
- <motion.div 
+ {/* Main Wrapper */}
+ <div 
  className={cn(
  "flex-1 flex flex-row relative overflow-hidden isolate"
  )}
- style={{ 
-   transformOrigin: "center top",
-   willChange: "transform, opacity"
- }}
- animate={{
-   scale: isFullScreenPlayerOpen && isMobile ? 0.94 : 1,
-   y: isFullScreenPlayerOpen && isMobile ? 10 : 0,
-   opacity: isFullScreenPlayerOpen && isMobile ? 0.85 : 1,
- }}
- transition={{ type: "spring", stiffness: 400, damping: 34, mass: 0.6 }}
  >
  {/* Sidebar (Desktop) */}
  {hasSidebar && (
@@ -456,7 +446,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  </main>
  </div>
  {!isMobile && <GlobalLyricsSidebar />}
- </motion.div>
+ </div>
 
  {/* Desktop Player — hidden on mobile, visible sm+ only */}
  {!isMobile && isMobile !== null && (
