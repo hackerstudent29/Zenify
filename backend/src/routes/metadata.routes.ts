@@ -184,4 +184,36 @@ export async function metadataRoutes(server: FastifyInstance) {
         },
         handler: controller.calibrateLyricsOnset.bind(controller)
     });
+
+    // Automated Song Playback Health & Self-Healing Endpoints
+    server.get('/playback-health/report', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
+        handler: controller.getPlaybackHealthReport.bind(controller)
+    });
+
+    server.post('/playback-health/sweep', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
+        schema: {
+            body: z.object({
+                batchSize: z.number().optional()
+            }).optional()
+        },
+        handler: controller.triggerPlaybackHealthSweep.bind(controller)
+    });
+
+    server.post('/playback-health/check-track', {
+        preHandler: [server.authenticate],
+        schema: {
+            body: z.object({
+                trackId: z.string()
+            })
+        },
+        handler: controller.diagnoseAndHealTrack.bind(controller)
+    });
+
+    // Real-Time System Workers Health Status
+    server.get('/workers/status', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
+        handler: controller.getAllWorkersStatus.bind(controller)
+    });
 }

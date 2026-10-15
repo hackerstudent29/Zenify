@@ -861,5 +861,97 @@ export class MetadataController {
             return reply.status(500).send({ message: err.message || 'Calibration failed' });
         }
     };
+
+    getPlaybackHealthReport = async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            const { SongPlaybackHealthService } = await import('../services/song-playback-health.service.js');
+            const report = await SongPlaybackHealthService.getHealthReport();
+            return reply.send(report);
+        } catch (err: any) {
+            console.error('[MetadataController] getPlaybackHealthReport error:', err);
+            return reply.status(500).send({ message: err.message || 'Failed to get health report' });
+        }
+    };
+
+    triggerPlaybackHealthSweep = async (req: FastifyRequest<{ Body?: { batchSize?: number } }>, reply: FastifyReply) => {
+        try {
+            const batchSize = (req.body as any)?.batchSize || 25;
+            const { SongPlaybackHealthService } = await import('../services/song-playback-health.service.js');
+            const result = await SongPlaybackHealthService.runAutomatedHealthSweep(batchSize);
+            return reply.send({ success: true, ...result });
+        } catch (err: any) {
+            console.error('[MetadataController] triggerPlaybackHealthSweep error:', err);
+            return reply.status(500).send({ message: err.message || 'Health sweep failed' });
+        }
+    };
+
+    diagnoseAndHealTrack = async (req: FastifyRequest<{ Body: { trackId: string } }>, reply: FastifyReply) => {
+        try {
+            const { trackId } = req.body;
+            if (!trackId) {
+                return reply.status(400).send({ message: 'trackId is required' });
+            }
+            const { SongPlaybackHealthService } = await import('../services/song-playback-health.service.js');
+            const analysis = await SongPlaybackHealthService.analyzeTrackPlaybackHealth(trackId);
+            let healResult = null;
+            if (!analysis.isHealthy) {
+                healResult = await SongPlaybackHealthService.healTrackPlayback(trackId, analysis.issue || undefined);
+            }
+            return reply.send({
+                success: true,
+                analysis,
+                healed: !!healResult?.success,
+                healResult
+            });
+        } catch (err: any) {
+            console.error('[MetadataController] diagnoseAndHealTrack error:', err);
+            return reply.status(500).send({ message: err.message || 'Track diagnosis failed' });
+        }
+    };
+
+    getAllWorkersStatus = async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            const { ElasticLyricWorker } = await import('../queues/lyric-enrichment.worker.js');
+            const { LyricEnrichmentService } = await import('../services/lyric-enrichment.service.js');
+            const { SongPlaybackHealthService } = await import('../services/song-playback-health.service.js');
+
+            const lyricWorkerMetrics = ElasticLyricWorker.getMetrics();
+            const lyricStats = await LyricEnrichmentService.getStats();
+            const healthReport = await SongPlaybackHealthService.getHealthReport();
+
+            return reply.send({
+                timestamp: new Date().toISOString(),
+                workers: {
+                    lyricsWorker: {
+                        status: 'ONLINE',
+                        elasticMetrics: lyricWorkerMetrics,
+                        databaseStats: lyricStats
+                    },
+                    playbackHealthChecker: {
+                        status: 'ONLINE',
+                        latestReport: healthReport
+                    },
+                    metadataEnrichment: {
+                        status: 'ONLINE',
+                        intervalMinutes: 30,
+                        bootTrigger: true
+                    },
+                    romanizationQueue: {
+                        status: 'ONLINE',
+                        intervalMinutes: 15,
+                        bootTrigger: true
+                    },
+                    deduplicationService: {
+                        status: 'ONLINE',
+                        intervalMinutes: 10,
+                        bootTrigger: true
+                    }
+                }
+            });
+        } catch (err: any) {
+            console.error('[MetadataController] getAllWorkersStatus error:', err);
+            return reply.status(500).send({ message: err.message || 'Failed to get workers status' });
+        }
+    };
 }
 
