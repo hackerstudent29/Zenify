@@ -29,6 +29,17 @@ export class CronService {
             }
         });
 
+        // Run every 15 minutes: Regional Lyrics Transliteration & Deepgram Synchronization Sweep
+        cron.schedule('*/15 * * * *', async () => {
+            console.log('[Cron] Running 15-minute regional lyrics romanization sweep...');
+            try {
+                const { runRomanizationSweep } = await import('../queues/romanization.queue.js');
+                await runRomanizationSweep();
+            } catch (romErr: any) {
+                console.error('[Cron] Romanization sweep error:', romErr.message);
+            }
+        });
+
         // Trigger automated workers on boot (staggered to prevent database I/O spikes)
         setTimeout(() => {
             DeduplicationService.runActiveWatcher().catch((err: any) => {

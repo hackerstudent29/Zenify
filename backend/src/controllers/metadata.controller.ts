@@ -272,6 +272,17 @@ export class MetadataController {
 
             if (!force && track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
                 console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
+                // If romanization is missing and track contains regional non-Latin text, enqueue background romanization
+                if (!track.romanizedLyrics) {
+                    const combined = (track.lyrics || '') + ' ' + (track.synced_lyrics as any[]).map(t => t.text || '').join(' ');
+                    import('../services/romanization.service.js').then(({ RomanizationService }) => {
+                        if (RomanizationService.containsNonLatin(combined)) {
+                            import('../queues/romanization.queue.js').then(({ enqueueRomanization }) => {
+                                enqueueRomanization({ trackId: track.id }).catch(() => {});
+                            });
+                        }
+                    }).catch(() => {});
+                }
                 return reply.send({ 
                     status: 'available',
                     syncedTokens: track.synced_lyrics, 
@@ -546,6 +557,71 @@ export class MetadataController {
             return reply.status(500).send({ message: err?.message || 'Failed to align plain lyrics to audio' });
         }
     }
+
+    /** On-demand regional transliteration & Deepgram synchronization */
+    romanizeTrack = async (req: FastifyRequest<{ Body: { trackId: string; force?: boolean } }>, reply: FastifyReply) => {
+        const { trackId, force } = req.body;
+        if (!trackId) {
+            return reply.status(400).send({ message: 'trackId is required' });
+        }
+        try {
+            const prisma = (await import('../utils/prisma.js')).prisma;
+            const track = await prisma.track.findUnique({
+                where: { id: trackId },
+                select: { id: true, title: true, lyrics: true, synced_lyrics: true, audioUrl: true, romanizedLyrics: true, romanizedSyncedLyrics: true, romanizedLang: true }
+            });
+            if (!track) {
+                return reply.status(404).send({ message: 'Track not found' });
+            }
+
+            const { RomanizationService } = await import('../services/romanization.service.js');
+            const hasLyrics = Boolean(track.lyrics?.trim() || (Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0));
+
+            if (hasLyrics) {
+                const result = await RomanizationService.processTrack(track.id, force ?? true);
+                const updated = await prisma.track.findUnique({
+                    where: { id: track.id },
+                    select: { romanizedLyrics: true, romanizedSyncedLyrics: true, romanizedLang: true }
+                });
+                return reply.send({
+                    success: true,
+                    romanizedLyrics: updated?.romanizedLyrics,
+                    romanizedSyncedLyrics: updated?.romanizedSyncedLyrics,
+                    romanizedLang: updated?.romanizedLang || result.lang
+                });
+            }
+
+            // If track has NO lyrics, attempt Deepgram STT worker
+            if (track.audioUrl) {
+                const { DeepgramLyricsService } = await import('../services/deepgram-lyrics.service.js');
+                if (DeepgramLyricsService.isAvailable()) {
+                    console.log(`[RomanizationController] No lyrics found for "${track.title}". Invoking Deepgram STT worker...`);
+                    const dgResult = await DeepgramLyricsService.syncTrackLyrics(track.id, { force: true });
+                    if (dgResult && dgResult.syncedTokens && dgResult.syncedTokens.length > 0) {
+                        const updated = await prisma.track.findUnique({
+                            where: { id: track.id },
+                            select: { romanizedLyrics: true, romanizedSyncedLyrics: true, romanizedLang: true, synced_lyrics: true }
+                        });
+                        return reply.send({
+                            success: true,
+                            romanizedLyrics: updated?.romanizedLyrics,
+                            romanizedSyncedLyrics: updated?.romanizedSyncedLyrics,
+                            romanizedLang: updated?.romanizedLang,
+                            syncedTokens: updated?.synced_lyrics
+                        });
+                    }
+                }
+            }
+
+            return reply.send({
+                success: false,
+                message: 'No lyrics available to transliterate'
+            });
+        } catch (err: any) {
+            console.error(`[RomanizationController] Error romanizing track ${trackId}:`, err);
+            return reply.status(500).send({ success: false, error: err.message });
+        }
+    };
 
     /** Save manually synced lyrics from the Lyric Sync Studio admin tool */
     saveSyncedLyrics = async (req: FastifyRequest<{ 

@@ -130,11 +130,14 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     targetTranslate = "translateY(0)";
   }
 
-  // Large, punchy Apple Music PC-style typography for mobile and desktop full-view player
+  // Scaled Apple Music typography tuned so stanzas fit comfortably:
+  // PC: strictly 2 lines max
+  // Mobile: 2 lines preferred, strictly 3 lines max
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(22px, 5.8vw, 30px)" : "clamp(34px, 4vw, 52px)") 
-    : (isMobile ? "clamp(18px, 4.8vw, 24px)" : "24px");
+    ? (isMobile ? "clamp(18px, 4.2vw, 22px)" : "clamp(22px, 2.4vw, 32px)") 
+    : (isMobile ? "clamp(15px, 3.6vw, 18px)" : "20px");
   const origin = isFullscreen ? "left center" : "center center";
+  const maxLineHeight = isMobile ? "4.05em" : "2.65em";
 
   if (isInterlude) {
     return (
@@ -173,21 +176,35 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       style={{
         fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
         fontSize,
+        lineHeight: 1.3,
         fontWeight: isFullscreen ? 800 : 700,
         letterSpacing: isFullscreen ? "-0.025em" : "-0.015em",
         opacity: targetOpacity,
         filter: targetBlur,
         transform: `${targetScale} ${targetTranslate} translateZ(0)`,
         transformOrigin: origin,
-        willChange: "transform, opacity, filter"
+        willChange: "transform, opacity, filter",
+        maxHeight: maxLineHeight,
+        overflow: "hidden"
       }}
     >
       <div 
         className={cn(
           "relative flex flex-wrap cursor-pointer select-none",
-          origin.includes("left") ? "justify-start" : "justify-center"
+          origin.includes("left") ? "justify-start" : "justify-center",
+          isMobile ? "line-clamp-3" : "line-clamp-2"
         )} 
-        style={{ transformOrigin: origin, gap: "0.25em", wordBreak: "break-word", overflowWrap: "anywhere" }}
+        style={{ 
+          transformOrigin: origin, 
+          gap: "0.25em", 
+          wordBreak: "break-word", 
+          overflowWrap: "anywhere",
+          maxHeight: maxLineHeight,
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: isMobile ? 3 : 2
+        }}
       >
         {wordTokens.map((word, i) => {
           const explicitWord = words?.[i];
