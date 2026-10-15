@@ -129,7 +129,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  const router = useRouter();
  const queryClient = useQueryClient();
  const { user } = useAuthStore();
- const isGlassmorphism = user?.preferences?.globalPlayerStyle === "glassmorphism";
+ const isGlassmorphism = user?.preferences?.globalPlayerStyle !== "classic" && user?.preferences?.globalPlayerStyle !== "solid";
  const showReactiveBg = useReactiveBgStore(state => state.player);
  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
@@ -314,12 +314,16 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  {/* Mini Pod Background */}
  <div 
  className={cn(
- "absolute inset-0 shadow-[0_10px_35px_rgba(0,0,0,0.65)] rounded-full transition-colors",
+ "absolute inset-0 shadow-[0_16px_40px_rgba(0,0,0,0.7)] rounded-full transition-colors overflow-hidden",
  isGlassmorphism 
- ? "border border-white/10 bg-zinc-900/85 backdrop-blur-2xl ring-1 ring-white/10" 
+ ? "border border-white/15 bg-black/50 backdrop-blur-2xl ring-1 ring-white/10" 
  : "bg-[#1c1c1e] border border-white/10"
  )}
- />
+ >
+ {isGlassmorphism && (
+   <div className="absolute inset-0 bg-gradient-to-b from-white/[0.08] via-transparent to-black/30 pointer-events-none" />
+ )}
+ </div>
 
  {/* Progress Line */}
  <MiniPlayerProgress />
