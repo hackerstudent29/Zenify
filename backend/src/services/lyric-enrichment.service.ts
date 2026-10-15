@@ -15,8 +15,8 @@ export interface LyricEnrichmentResult {
 }
 
 export class LyricEnrichmentService {
-    // 5-minute strict import grace period (in milliseconds)
-    public static readonly IMPORT_GRACE_PERIOD_MS = 5 * 60 * 1000;
+    // 5-second import grace period (allows audio/metadata write to finish before enrichment)
+    public static readonly IMPORT_GRACE_PERIOD_MS = 5 * 1000;
     public static readonly MAX_JOB_ATTEMPTS = 3;
     public static readonly STALE_LOCK_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -127,22 +127,23 @@ export class LyricEnrichmentService {
      * Step 1 — Discover eligible songs that need lyrics enrichment
      */
     static async discoverEligibleTracks(batchSize = 5): Promise<any[]> {
-        const fiveMinutesAgo = new Date(Date.now() - this.IMPORT_GRACE_PERIOD_MS);
+        const gracePeriodAgo = new Date(Date.now() - this.IMPORT_GRACE_PERIOD_MS);
         const now = new Date();
 
-        // 1. Discover tracks imported at least 5 minutes ago without usable lyrics
+        // 1. Discover tracks imported beyond grace period without usable lyrics
         const candidates = await prisma.track.findMany({
             where: {
                 deletedAt: null,
-                createdAt: { lte: fiveMinutesAgo }, // STRICT 5-MINUTE GRACE PERIOD
+                createdAt: { lte: gracePeriodAgo },
                 OR: [
                     { lyrics: null },
                     { lyrics: '' },
                     { synced_lyrics: { equals: Prisma.JsonNull } },
-                    { synced_lyrics: { equals: Prisma.AnyNull } }
+                    { synced_lyrics: { equals: Prisma.AnyNull } },
+                    { synced_lyrics: { equals: [] } }
                 ]
             },
-            take: batchSize * 3, // Over-fetch to filter locked / retry_wait / terminal jobs
+            take: batchSize * 4, // Over-fetch to filter locked / retry_wait / terminal jobs
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
@@ -188,7 +189,11 @@ export class LyricEnrichmentService {
                         continue;
                     }
                     if (job.status === 'no_lyrics_detected') {
-                        continue;
+                        // Allow re-evaluating after 1 hour in case new lyrics became available
+                        const noLyricsThreshold = new Date(now.getTime() - 60 * 60 * 1000);
+                        if (job.updatedAt && job.updatedAt > noLyricsThreshold) {
+                            continue;
+                        }
                     }
 
                     // If job is in retry_wait and nextRetryAt has not elapsed yet, skip
@@ -196,9 +201,12 @@ export class LyricEnrichmentService {
                         continue;
                     }
 
-                    // If max attempts reached and failed, skip
-                    if (job.status === 'failed' && job.attempts >= this.MAX_JOB_ATTEMPTS) {
-                        continue;
+                    // If failed, allow retry if older than 15 minutes
+                    if (job.status === 'failed') {
+                        const failedRetryThreshold = new Date(now.getTime() - 15 * 60 * 1000);
+                        if (job.updatedAt && job.updatedAt > failedRetryThreshold) {
+                            continue;
+                        }
                     }
 
                     // Active lock in-flight (< 15 mins) by another worker

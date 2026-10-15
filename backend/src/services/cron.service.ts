@@ -5,6 +5,7 @@ import { AnalyticsService } from './analytics.service.js';
 import { TrendingService } from './trending.service.js';
 import { MetadataMaintenanceService } from './metadata-maintenance.service.js';
 import { DeduplicationService } from './deduplication.service.js';
+import { SongPlaybackHealthService } from './song-playback-health.service.js';
 
 export class CronService {
     static init() {
@@ -18,12 +19,60 @@ export class CronService {
             }
         });
 
-        // Trigger active duplicate watcher on boot (staggered by 5 seconds)
+        // Run every 10 minutes: Automated Song Playback Health & Self-Healing Resolver
+        cron.schedule('*/10 * * * *', async () => {
+            console.log('[Cron] Running 10-minute automated playback health & self-healing sweep...');
+            try {
+                await SongPlaybackHealthService.runAutomatedHealthSweep(25);
+            } catch (healthErr: any) {
+                console.error('[Cron] Playback health sweep error:', healthErr.message);
+            }
+        });
+
+        // Trigger automated workers on boot (staggered to prevent database I/O spikes)
         setTimeout(() => {
             DeduplicationService.runActiveWatcher().catch((err: any) => {
                 console.warn('[Cron] Boot deduplication sweep notice:', err.message);
             });
         }, 5000);
+
+        setTimeout(async () => {
+            try {
+                console.log('[Cron] Boot trigger: Running Country & Language Metadata Enrichment...');
+                const { MetadataEnrichmentWorker } = await import('../workers/metadata-enrichment.worker.js');
+                await MetadataEnrichmentWorker.runEnrichmentCycle();
+            } catch (err: any) {
+                console.warn('[Cron] Boot metadata enrichment notice:', err.message);
+            }
+        }, 10000);
+
+        setTimeout(async () => {
+            try {
+                console.log('[Cron] Boot trigger: Running regional lyrics romanization sweep...');
+                const { runRomanizationSweep } = await import('../queues/romanization.queue.js');
+                await runRomanizationSweep();
+            } catch (err: any) {
+                console.warn('[Cron] Boot romanization sweep notice:', err.message);
+            }
+        }, 15000);
+
+        setTimeout(async () => {
+            try {
+                console.log('[Cron] Boot trigger: Running metadata maintenance sweep...');
+                await MetadataMaintenanceService.runMaintenance(25);
+            } catch (err: any) {
+                console.warn('[Cron] Boot metadata maintenance notice:', err.message);
+            }
+        }, 20000);
+
+        setTimeout(async () => {
+            try {
+                console.log('[Cron] Boot trigger: Running song playback health & self-healing sweep...');
+                await SongPlaybackHealthService.runAutomatedHealthSweep(25);
+            } catch (err: any) {
+                console.warn('[Cron] Boot playback health sweep notice:', err.message);
+            }
+        }, 25000);
 
         // Run every Sunday at 9:00 AM IST (3:30 AM UTC)
         cron.schedule('30 3 * * 0', async () => {
@@ -78,7 +127,7 @@ export class CronService {
             }
         });
         
-        console.log('[Cron] Cron jobs initialized (Active Deduplication Watcher, Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize Sweep, 90-Day Retention Clean, 30-Min Country/Language Enrichment).');
+        console.log('[Cron] Cron jobs initialized (Playback Health & Self-Healing, Deduplication Watcher, Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize, 30-Min Country/Language Enrichment).');
     }
 
     /**

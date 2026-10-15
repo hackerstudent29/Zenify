@@ -29,7 +29,7 @@ interface QueueJob {
  * to the same track simultaneously share the single active resolution promise.
  */
 export class ElasticLyricWorker {
-    private static readonly POLL_INTERVAL_MS = 60 * 1000; // 60 seconds background sweep
+    private static readonly POLL_INTERVAL_MS = 30 * 1000; // 30 seconds background sweep
     private static readonly MAX_ALLOWED_CONCURRENCY = 128; // Dynamic scaling ceiling
     private static readonly SWEEP_DISCOVERY_BATCH = 50; // Batch discovery size for sweeps
 
@@ -180,12 +180,12 @@ export class ElasticLyricWorker {
             console.error('[ElasticLyricWorker] Error during startup stale job recovery:', err.message);
         });
 
-        // 2. Initial sweep 10 seconds after server launch
+        // 2. Initial sweep 3 seconds after server launch
         setTimeout(() => {
             ElasticLyricWorker.runSweep().catch((err: any) => {
                 console.error('[ElasticLyricWorker] Initial sweep error:', err.message);
             });
-        }, 10000);
+        }, 3000);
 
         // 3. Continuous scheduled interval every 60 seconds
         if (!this.sweepIntervalTimer) {
