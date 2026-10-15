@@ -104,7 +104,7 @@ export default function LyricSyncPage() {
  /* ── Track Selector ─────────────────────────────────────── */
  if (!selectedTrackId) {
  return (
- <div className="min-h-screen pb-32 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] bg-[#0a0a0b] text-white">
+ <div className="min-h-screen pb-32 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] bg-[#121214] text-white">
  <div className="max-w-5xl mx-auto px-4 md:px-6">
 
  {/* Header */}
@@ -131,7 +131,7 @@ export default function LyricSyncPage() {
  </div>
 
  {/* Filters & Search - Glassmorphic Sticky Panel */}
- <div className="relative md:sticky md:top-4 z-30 bg-[#0a0a0b]/80 backdrop-blur-xl border border-white/10 p-4 rounded-3xl mb-8 flex flex-col md:flex-row gap-4 shadow-xl">
+ <div className="relative md:sticky md:top-4 z-30 bg-[#121214]/80 backdrop-blur-xl border border-white/10 p-4 rounded-3xl mb-8 flex flex-col md:flex-row gap-4 shadow-xl">
  {/* Search Input */}
  <div className="relative flex-1">
  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
@@ -309,7 +309,7 @@ export default function LyricSyncPage() {
  if (selectedTrackId) {
  if (isFetchingTrack || !selectedTrack) {
  return (
- <div className="min-h-screen bg-[#0a0a0b] flex flex-col items-center justify-center text-white gap-4">
+ <div className="min-h-screen bg-[#121214] flex flex-col items-center justify-center text-white gap-4">
  <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.2em]">Loading track studio...</p>
  </div>

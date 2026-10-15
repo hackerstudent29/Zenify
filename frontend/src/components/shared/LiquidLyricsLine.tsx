@@ -107,11 +107,13 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   }
 
   // Scaled Apple Music typography tuned so stanzas fit comfortably:
-  // PC: strictly 2 lines max
-  // Mobile: 2 lines preferred, strictly 3 lines max
+  // Consistent, standardized typography scale across all songs:
+  // Mobile: 18px (strictly 3 lines max)
+  // PC Sidebar: 20px (strictly 2 lines max)
+  // PC / Tablet Fullscreen Split-Screen: 26px (strictly 2 lines max)
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(18px, 4.2vw, 22px)" : "clamp(22px, 2.4vw, 32px)") 
-    : (isMobile ? "clamp(15px, 3.6vw, 18px)" : "20px");
+    ? (isMobile ? "18px" : "26px") 
+    : (isMobile ? "18px" : "20px");
   const origin = isFullscreen ? "left center" : "center center";
   const maxLineHeight = isMobile ? "4.05em" : "2.65em";
 

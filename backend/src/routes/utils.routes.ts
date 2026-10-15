@@ -1176,6 +1176,23 @@ export async function utilsRoutes(server: FastifyInstance) {
             }
         }
 
+        // ── Language Auto-Detection (Heuristics + Low-cost Vercel Gateway LLM) ──
+        let resolvedSongLang = language || (localTrack as any)?.language;
+        if (!resolvedSongLang || resolvedSongLang === 'english') {
+            try {
+                const { AILyricsService } = await import('../services/ai-lyrics.service.js');
+                const langRes = await AILyricsService.detectSongLanguageDetails({
+                    title: cleanCandTitle || candTitle || targetUrl,
+                    artist: cleanCandArtist || candArtist || '',
+                    album: candAlbum || localTrack?.album?.title
+                });
+                if (langRes && langRes.language && !langRes.isEnglish) {
+                    resolvedSongLang = langRes.language.toLowerCase();
+                    server.log.info(`[stream-youtube] Auto-detected song original release language: ${resolvedSongLang}`);
+                }
+            } catch {}
+        }
+
         // ── 0.5. ULTRA-FAST CLEAN 320KBPS CDN RESOLVER (Protocol-Verified) ──
         if (cleanCandTitle && cleanCandArtist) {
             try {
@@ -1184,7 +1201,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                     title: cleanCandTitle,
                     primaryArtist: cleanCandArtist,
                     duration: localTrack?.duration,
-                    language: language || (localTrack as any)?.language
+                    language: resolvedSongLang
                 });
                 if (cdnResult?.url) {
                     server.log.info(`[stream-youtube] Protocol-Verified Clean CDN match (320kbps): "${cdnResult.title}" by "${cdnResult.artist}"`);
@@ -1223,7 +1240,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                     primaryArtist: candArtist || cleanCandArtist || (localTrack?.artist?.name || ''),
                     album: candAlbum || localTrack?.album?.title,
                     duration: localTrack?.duration,
-                    language: language || (localTrack as any)?.language
+                    language: resolvedSongLang
                 });
                 const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 4500));
                 const resolution: any = await Promise.race([resolverPromise, timeoutPromise]);

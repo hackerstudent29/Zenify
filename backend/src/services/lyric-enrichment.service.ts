@@ -20,8 +20,97 @@ export class LyricEnrichmentService {
     public static readonly MAX_JOB_ATTEMPTS = 3;
     public static readonly STALE_LOCK_TIMEOUT_MS = 15 * 60 * 1000;
 
+        /**
+     * Fixes squished words without spaces (camelCase or missing punctuation spacing),
+     * unescapes HTML entities, and scrubs junk description tokens.
+     */
+    static formatLyricLine(rawText: string): string {
+        if (!rawText) return '';
+        let text = rawText.trim();
+
+        // Decode common HTML entities
+        text = text
+            .replace(/&amp;/g, '&')
+            .replace(/&#39;/g, "'")
+            .replace(/&quot;/g, '"')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&nbsp;/g, ' ');
+
+        // Split camelCase words stuck together (e.g., "loveYou" -> "love You", "solvathellamUnmai" -> "solvathellam Unmai")
+        text = text.replace(/([a-zऀ-ൿ])([A-Z])/g, '$1 $2');
+
+        // Fix missing spaces after punctuation (e.g., "hello,world" -> "hello, world")
+        text = text.replace(/([,;:!?])([A-Za-z0-9ऀ-ൿ])/g, '$1 $2');
+
+        // Remove junk bracketed markers like [Music], (Music), [Chorus], [Verse 1], etc.
+        text = text.replace(/^[\(\[](music|applause|cheers|intro|outro|verse\s*\d*|chorus|hook|bridge|pre-chorus|instrumental)[\)\]]/i, '').trim();
+
+        // Collapse multiple whitespace
+        text = text.replace(/\s+/g, ' ').trim();
+
+        return text;
+    }
+
     /**
-     * Parse raw LRC string into Zenify's SyncedLyricLine format
+     * Fills long silence gaps between lyric lines with instrumental tokens "• • •".
+     */
+    static insertInstrumentalGaps(tokens: SyncedLyricLine[], trackDuration?: number): SyncedLyricLine[] {
+        if (!tokens || tokens.length === 0) return tokens;
+
+        const result: SyncedLyricLine[] = [];
+        const GAP_THRESHOLD = 3.2; // seconds
+
+        // 1. Check Intro gap
+        if (tokens[0].time >= GAP_THRESHOLD) {
+            result.push({
+                time: 0,
+                endTime: Math.round(tokens[0].time * 100) / 100,
+                text: '• • •',
+                type: 'instrumental'
+            });
+        }
+
+        // 2. Check gaps between lines
+        for (let i = 0; i < tokens.length; i++) {
+            const current = tokens[i];
+            result.push(current);
+
+            if (i < tokens.length - 1) {
+                const next = tokens[i + 1];
+                const currentEnd = current.endTime || (current.time + 3.0);
+                const gap = next.time - currentEnd;
+
+                if (gap >= GAP_THRESHOLD && current.type !== 'instrumental' && next.type !== 'instrumental') {
+                    result.push({
+                        time: Math.round(currentEnd * 100) / 100,
+                        endTime: Math.round(next.time * 100) / 100,
+                        text: '• • •',
+                        type: 'instrumental'
+                    });
+                }
+            }
+        }
+
+        // 3. Check Outro gap
+        if (trackDuration && result.length > 0) {
+            const last = result[result.length - 1];
+            const lastEnd = last.endTime || (last.time + 3.0);
+            if (trackDuration - lastEnd >= 4.5 && last.type !== 'instrumental') {
+                result.push({
+                    time: Math.round(lastEnd * 100) / 100,
+                    endTime: Math.round(trackDuration * 100) / 100,
+                    text: '• • •',
+                    type: 'instrumental'
+                });
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Parse raw LRC string into Zenify's SyncedLyricLine format with word timing and instrumental gap detection
      */
     static parseLrcToSyncedTokens(lrcText: string, trackDuration?: number): {
         syncedTokens: SyncedLyricLine[];
@@ -46,17 +135,45 @@ export class LyricEnrichmentService {
                 const time = Math.round((minutes * 60 + seconds) * 100) / 100;
                 let text = match[3].trim();
 
-                // Strip inline word timestamp tags like <00:12.34> if present
+                // Extract word-by-word timestamps like <00:12.34> if present
+                const wordMatches = [...text.matchAll(/<(\d{2}):(\d{2}(?:\.\d{1,3})?)>([^<]+)/g)];
+                let words: Array<{ word: string; time: number; endTime?: number }> | undefined = undefined;
+
+                if (wordMatches.length > 0) {
+                    words = [];
+                    for (let wIdx = 0; wIdx < wordMatches.length; wIdx++) {
+                        const wm = wordMatches[wIdx];
+                        const wMin = parseInt(wm[1], 10);
+                        const wSec = parseFloat(wm[2]);
+                        const wStart = Math.round((wMin * 60 + wSec) * 100) / 100;
+                        const wText = this.formatLyricLine(wm[3].trim());
+                        
+                        let wEnd = wStart + 0.6;
+                        if (wIdx + 1 < wordMatches.length) {
+                            const nextWm = wordMatches[wIdx + 1];
+                            const nextMin = parseInt(nextWm[1], 10);
+                            const nextSec = parseFloat(nextWm[2]);
+                            wEnd = Math.round((nextMin * 60 + nextSec) * 100) / 100;
+                        }
+                        if (wText) {
+                            words.push({ word: wText, time: wStart, endTime: wEnd });
+                        }
+                    }
+                }
+
+                // Strip inline word timestamp tags like <00:12.34>
                 text = text.replace(/<\d{2}:\d{2}(?:\.\d{1,3})?>/g, '').trim();
+                text = this.formatLyricLine(text);
 
                 if (text && !text.startsWith('[ti:') && !text.startsWith('[ar:') && !text.startsWith('[al:')) {
-                    tokens.push({ time, text });
+                    tokens.push({ time, text, words: words && words.length > 0 ? words : undefined });
                     plainLines.push(text);
                 }
             } else if (!line.startsWith('[ti:') && !line.startsWith('[ar:') && !line.startsWith('[al:') && !line.startsWith('[by:')) {
                 // Informational or plain line
                 if (line.length > 0 && !/^\[.*?\]$/.test(line)) {
-                    plainLines.push(line);
+                    const cleanPlain = this.formatLyricLine(line);
+                    if (cleanPlain) plainLines.push(cleanPlain);
                 }
             }
         }
@@ -74,8 +191,11 @@ export class LyricEnrichmentService {
             tokens[i].endTime = Math.round(Math.min(tokens[i].time + 8.0, nextTime) * 100) / 100;
         }
 
+        // Fill long gaps with instrumental tokens ("• • •")
+        const syncedWithGaps = this.insertInstrumentalGaps(tokens, trackDuration);
+
         return {
-            syncedTokens: tokens,
+            syncedTokens: syncedWithGaps,
             plainLyrics: plainLines.join('\n').trim(),
             rawLrc: lrcText.trim()
         };
@@ -130,7 +250,7 @@ export class LyricEnrichmentService {
         const gracePeriodAgo = new Date(Date.now() - this.IMPORT_GRACE_PERIOD_MS);
         const now = new Date();
 
-        // 1. Discover tracks imported beyond grace period without usable lyrics
+        // 1. Discover tracks imported beyond grace period without usable lyrics or missing romanization / instrumental gaps
         const candidates = await prisma.track.findMany({
             where: {
                 deletedAt: null,
@@ -140,7 +260,9 @@ export class LyricEnrichmentService {
                     { lyrics: '' },
                     { synced_lyrics: { equals: Prisma.JsonNull } },
                     { synced_lyrics: { equals: Prisma.AnyNull } },
-                    { synced_lyrics: { equals: [] } }
+                    { synced_lyrics: { equals: [] } },
+                    { romanizedLyrics: null },
+                    { romanizedSyncedLyrics: { equals: Prisma.JsonNull } }
                 ]
             },
             take: batchSize * 4, // Over-fetch to filter locked / retry_wait / terminal jobs
@@ -153,6 +275,8 @@ export class LyricEnrichmentService {
                 createdAt: true,
                 lyrics: true,
                 synced_lyrics: true,
+                romanizedLyrics: true,
+                romanizedSyncedLyrics: true,
                 language: true,
                 genre: true,
                 artist: { select: { name: true } },
@@ -380,9 +504,24 @@ export class LyricEnrichmentService {
 
             let plainLyricsToAlign: string | null = (track.lyrics && track.lyrics.trim().length > 0) ? track.lyrics.trim() : null;
 
-            // 5. Step 2 — Search existing and approved lyrics sources first (Outcome A / B / C)
-            console.log(`[LyricEnrichment] Searching approved lyrics sources (LRCLib) for "${track.title}"...`);
-            const lrcCandidate = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration);
+            // 5. Step 1: Word-by-word synced lyrics search first (lrc.red Apple Music / Musixmatch)
+            console.log(`[LyricEnrichment] Step 1: Searching word-by-word synced lyrics (lrc.red) for "${track.title}"...`);
+            let lrcCandidate: any = null;
+            try {
+                const wordCandidate = await LyricsEnhancementService.fetchLrcRed(track.title, artistName);
+                if (wordCandidate && wordCandidate.lyrics) {
+                    lrcCandidate = wordCandidate;
+                    console.log(`[LyricEnrichment] Word-by-word synced lyrics found via ${wordCandidate.source}!`);
+                }
+            } catch (wErr: any) {
+                console.warn(`[LyricEnrichment] Word-by-word check skipped: ${wErr.message}`);
+            }
+
+            // Step 2: Line-by-line synced lyrics from LRCLib if word-by-word not found
+            if (!lrcCandidate) {
+                console.log(`[LyricEnrichment] Step 2: Searching line-by-line approved lyrics sources (LRCLib) for "${track.title}"...`);
+                lrcCandidate = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration);
+            }
 
             if (lrcCandidate && lrcCandidate.lyrics) {
                 // Outcome A: Time-synchronized lyrics are available from trusted source
@@ -433,10 +572,10 @@ export class LyricEnrichmentService {
                             }
                         });
 
-                        // Trigger romanization sweep if non-Latin
+                        // Dual Regional & English Lyrics: Trigger Romanization immediately
                         try {
-                            const { enqueueRomanization } = await import('../queues/romanization.queue.js');
-                            await enqueueRomanization({ trackId: track.id }).catch(() => {});
+                            const { RomanizationService } = await import('./romanization.service.js');
+                            await RomanizationService.processTrack(track.id, true).catch(() => {});
                         } catch {}
 
                         await prisma.lyricEnrichmentJob.update({

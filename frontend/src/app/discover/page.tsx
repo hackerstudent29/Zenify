@@ -423,7 +423,7 @@ export default function DiscoverPage() {
   const userLanguages = homeData?.languages?.length ? homeData.languages : DEFAULT_LANGUAGES;
 
   return (
-    <div className="min-h-screen bg-[#070709] text-foreground relative selection:bg-brand selection:text-white pt-[calc(64px+env(safe-area-inset-top,0px))] md:pt-[calc(72px+env(safe-area-inset-top,0px))] pb-[calc(80px+64px+env(safe-area-inset-bottom,0px))] md:pb-[calc(90px+env(safe-area-inset-bottom,0px))]">
+    <div className="min-h-screen bg-[#121214] text-foreground relative selection:bg-brand selection:text-white pt-[calc(64px+env(safe-area-inset-top,0px))] md:pt-[calc(72px+env(safe-area-inset-top,0px))] pb-[calc(80px+64px+env(safe-area-inset-bottom,0px))] md:pb-[calc(90px+env(safe-area-inset-bottom,0px))]">
       {/* Subtle Apple Music Ambient Glow */}
       <div className="absolute top-0 inset-x-0 h-96 bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,rgba(225,29,72,0.12),transparent)] pointer-events-none" />
 
@@ -432,105 +432,128 @@ export default function DiscoverPage() {
         {/* ========================================================= */}
         {/* STICKY SEARCH BAR (Sits right below the fixed header)     */}
         {/* ========================================================= */}
-        <div className="relative md:sticky md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 bg-[#070709]/95 backdrop-blur-2xl py-3 border-b border-white/5 space-y-3">
+        <div className="relative md:sticky md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 bg-[#121214]/95 backdrop-blur-2xl py-2 md:py-3 border-b border-white/5 space-y-2 md:space-y-3">
           
-          <div className="flex items-center justify-between gap-4">
+          {/* Desktop Heading */}
+          <div className="hidden md:flex items-center justify-between gap-4">
             <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">
               <Compass className="text-brand w-7 h-7 shrink-0" />
               <span>Discover</span>
             </h1>
           </div>
 
-          {/* Search Input Container with Combobox Accessibility */}
-          <div className="relative group rounded-2xl transition-all">
-            <div className="absolute inset-y-0 left-4 sm:left-5 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-brand transition-colors">
-              <SearchIcon size={20} />
-            </div>
+          {/* Mobile Apple Music Large Title */}
+          <div className="flex md:hidden items-center justify-between pt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-white">Search</h1>
+          </div>
 
-            <input
-              ref={inputRef}
-              type="text"
-              role="combobox"
-              aria-autocomplete="list"
-              aria-expanded={isInputFocused && !!suggestions?.length}
-              aria-controls="search-suggestions-listbox"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSelectedSuggestionIndex(-1);
-              }}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={() => {
-                setTimeout(() => setIsInputFocused(false), 200);
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholderText + (cursorBlink ? "|" : "")}
-              className="w-full bg-zinc-900/90 hover:bg-zinc-900 border border-white/10 focus:border-brand/50 rounded-2xl py-3.5 sm:py-4 pl-12 sm:pl-14 pr-24 text-base sm:text-lg text-white placeholder:text-zinc-500 outline-none backdrop-blur-xl shadow-xl transition-all"
-            />
+          {/* Search Input Container - Apple Music iOS Style on Mobile */}
+          <div className="flex items-center gap-2.5">
+            <div className="relative group rounded-xl md:rounded-2xl transition-all flex-1">
+              <div className="absolute inset-y-0 left-3.5 sm:left-5 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-brand transition-colors">
+                <SearchIcon size={18} className="md:w-5 md:h-5" />
+              </div>
 
-            <div className="absolute inset-y-0 right-3 flex items-center gap-2">
-              {query && (
-                <button
-                  onClick={() => {
-                    setQuery("");
-                    inputRef.current?.focus();
-                  }}
-                  className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-                  title="Clear search"
-                >
-                  <X size={18} />
-                </button>
-              )}
+              <input
+                ref={inputRef}
+                type="text"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={isInputFocused && !!suggestions?.length}
+                aria-controls="search-suggestions-listbox"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSelectedSuggestionIndex(-1);
+                }}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => {
+                  setTimeout(() => setIsInputFocused(false), 200);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={isMobile ? "Artists, Songs, Lyrics, and More" : (placeholderText + (cursorBlink ? "|" : ""))}
+                className="w-full bg-zinc-800/60 md:bg-zinc-900/90 hover:bg-zinc-800/80 md:hover:bg-zinc-900 border border-white/10 focus:border-brand/50 rounded-xl md:rounded-2xl py-2.5 sm:py-4 pl-10 sm:pl-14 pr-10 md:pr-24 text-sm sm:text-lg text-white placeholder:text-zinc-500 outline-none backdrop-blur-xl shadow-md md:shadow-xl transition-all"
+              />
 
-              <button
-                onClick={() => setIsSmartSearching(!isSmartSearching)}
-                className={cn(
-                  "hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
-                  isSmartSearching
-                    ? "bg-brand/20 border-brand/40 text-brand shadow-[0_0_15px_rgba(225,29,72,0.3)]"
-                    : "bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
+              <div className="absolute inset-y-0 right-2.5 md:right-3 flex items-center gap-1.5 md:gap-2">
+                {query && (
+                  <button
+                    onClick={() => {
+                      setQuery("");
+                      inputRef.current?.focus();
+                    }}
+                    className="p-1 md:p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X size={15} className="md:w-[18px] md:h-[18px]" />
+                  </button>
                 )}
-                title="Toggle AI Semantic Search"
-              >
-                <Sparkles size={12} className={cn(isSmartSearching && "text-brand animate-pulse")} />
-                <span>{isSmartSearching ? "AI Active" : "AI Search"}</span>
-              </button>
+
+                <button
+                  onClick={() => setIsSmartSearching(!isSmartSearching)}
+                  className={cn(
+                    "hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+                    isSmartSearching
+                      ? "bg-brand/20 border-brand/40 text-brand shadow-[0_0_15px_rgba(225,29,72,0.3)]"
+                      : "bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
+                  )}
+                  title="Toggle AI Semantic Search"
+                >
+                  <Sparkles size={12} className={cn(isSmartSearching && "text-brand animate-pulse")} />
+                  <span>{isSmartSearching ? "AI Active" : "AI Search"}</span>
+                </button>
+              </div>
+
+              {/* Live Suggestions Autocomplete Dropdown */}
+              <AnimatePresence>
+                {isInputFocused && suggestions && suggestions.length > 0 && (
+                  <motion.div
+                    id="search-suggestions-listbox"
+                    role="listbox"
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-0 right-0 top-full mt-2 bg-zinc-900/95 border border-white/15 rounded-2xl shadow-2xl backdrop-blur-2xl z-50 overflow-hidden divide-y divide-white/5"
+                  >
+                    {suggestions.slice(0, 6).map((hint: any, idx: number) => (
+                      <div
+                        key={hint.id || idx}
+                        role="option"
+                        aria-selected={selectedSuggestionIndex === idx}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectSuggestion(hint.title);
+                        }}
+                        className={cn(
+                          "flex items-center gap-3 px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/10 cursor-pointer transition-colors",
+                          selectedSuggestionIndex === idx && "bg-brand/20 text-brand font-bold"
+                        )}
+                      >
+                        <SearchIcon size={14} className="text-zinc-500 shrink-0" />
+                        <span className="truncate flex-1">{hint.title}</span>
+                        <ArrowRight size={13} className="text-zinc-600 shrink-0" />
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Live Suggestions Autocomplete Dropdown */}
-            <AnimatePresence>
-              {isInputFocused && suggestions && suggestions.length > 0 && (
-                <motion.div
-                  id="search-suggestions-listbox"
-                  role="listbox"
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute left-0 right-0 top-full mt-2 bg-zinc-900/95 border border-white/15 rounded-2xl shadow-2xl backdrop-blur-2xl z-50 overflow-hidden divide-y divide-white/5"
-                >
-                  {suggestions.slice(0, 6).map((hint: any, idx: number) => (
-                    <div
-                      key={hint.id || idx}
-                      role="option"
-                      aria-selected={selectedSuggestionIndex === idx}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        handleSelectSuggestion(hint.title);
-                      }}
-                      className={cn(
-                        "flex items-center gap-3 px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/10 cursor-pointer transition-colors",
-                        selectedSuggestionIndex === idx && "bg-brand/20 text-brand font-bold"
-                      )}
-                    >
-                      <SearchIcon size={14} className="text-zinc-500 shrink-0" />
-                      <span className="truncate flex-1">{hint.title}</span>
-                      <ArrowRight size={13} className="text-zinc-600 shrink-0" />
-                    </div>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Apple Music Cancel Button for Mobile */}
+            {isMobile && (isInputFocused || query) && (
+              <button
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setQuery("");
+                  setIsInputFocused(false);
+                  inputRef.current?.blur();
+                }}
+                className="text-sm font-semibold text-brand hover:opacity-80 transition-opacity shrink-0 px-1 py-1"
+              >
+                Cancel
+              </button>
+            )}
           </div>
 
           {/* Category Filter Pills (When query is active) */}

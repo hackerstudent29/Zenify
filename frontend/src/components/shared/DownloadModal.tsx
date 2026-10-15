@@ -478,11 +478,11 @@ export function DownloadModal() {
  animate={{ opacity: 1, y: 0, scale: 1 }}
  exit={{ opacity: 0, y: 100, scale: 0.95 }}
  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
- className="relative w-full max-w-4xl bg-[#0a0a0b] md:rounded-[2rem] rounded-t-[2rem] border border-white/10 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+ className="relative w-full max-w-4xl bg-[#121214] md:rounded-[2rem] rounded-t-[2rem] border border-white/10 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
  onClick={(e) => e.stopPropagation()}
  >
  {/* Header */}
- <div className="flex items-center justify-between p-4 md:px-8 md:pt-8 border-b border-white/5 sticky top-0 bg-[#0a0a0b]/90 backdrop-blur-md z-50">
+ <div className="flex items-center justify-between p-4 md:px-8 md:pt-8 border-b border-white/5 sticky top-0 bg-[#121214]/90 backdrop-blur-md z-50">
  <div>
  <h1 className="text-xl md:text-2xl font-black font-brand tracking-tight text-white">Download Studio</h1>
  <p className="text-[11px] md:text-xs text-white/40 font-medium mt-1">Select formats and combine multiple StudioFX effects.</p>

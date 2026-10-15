@@ -908,7 +908,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
                 key={`${trackId}-unsynced-${idx}`}
                 className={cn(
                   "text-white/70 text-center leading-relaxed",
-                  isMobile ? "line-clamp-3 max-h-[4.05em] text-sm" : "line-clamp-2 max-h-[2.65em] text-base"
+                  isMobile ? "line-clamp-3 max-h-[4.05em] text-[18px]" : (isFullscreen ? "line-clamp-2 max-h-[2.65em] text-[26px]" : "line-clamp-2 max-h-[2.65em] text-[20px]")
                 )}
                 style={{
                   display: "-webkit-box",

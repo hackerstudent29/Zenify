@@ -1360,7 +1360,7 @@ export function LyricSyncStudio({ track, onClose, onSaved }: LyricSyncStudioProp
  animate={{ y: 0 }}
  exit={{ y: "100%" }}
  transition={{ type: "spring", stiffness: 300, damping: 30 }}
- className="w-full max-h-[80vh] overflow-y-auto bg-[#0a0a0b] border-t border-white/10 rounded-t-[2rem] p-6 text-left"
+ className="w-full max-h-[80vh] overflow-y-auto bg-[#121214] border-t border-white/10 rounded-t-[2rem] p-6 text-left"
  >
  <div className="flex justify-between items-center mb-6">
  <h3 className="font-brand font-bold text-lg text-white">Daw Workspace Settings</h3>
