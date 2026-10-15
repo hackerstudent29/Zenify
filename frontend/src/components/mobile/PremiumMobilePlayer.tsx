@@ -198,60 +198,60 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
  // Performance Optimization: Prevent canvas mounting & heavy filtering during scaling/morph transitions
- const [isTransitionComplete, setIsTransitionComplete] = useState(true);
+ // Performance Optimization: Delay WebGL during sheet motion for pure 120fps GPU transitions
+ const [isTransitionComplete, setIsTransitionComplete] = useState(false);
 
  const dragY = useMotionValue(0);
- const dragScale = useTransform(dragY, [0, 450], [1, 0.88]);
- const dragOpacity = useTransform(dragY, [0, 450], [1, 0.5]);
- const dragRadius = useTransform(dragY, [0, 250], ["0px", "32px"]);
 
  const APPLE_SPRINGS = useMemo(() => ({
  sheet: {
  type: "spring" as const,
- stiffness: 340,
- damping: 30,
- mass: 0.8,
+ stiffness: 420,
+ damping: 36,
+ mass: 0.6,
  },
  artworkBounce: {
  type: "spring" as const,
- stiffness: 260,
- damping: 20,
- mass: 0.7,
+ stiffness: 300,
+ damping: 22,
+ mass: 0.6,
  },
  controls: {
  type: "spring" as const,
- stiffness: 360,
- damping: 32,
- mass: 0.7,
+ stiffness: 400,
+ damping: 34,
+ mass: 0.6,
  },
  snapBack: {
  type: "spring" as const,
- stiffness: 420,
- damping: 32,
- mass: 0.8,
+ stiffness: 450,
+ damping: 34,
+ mass: 0.6,
  },
  }), []);
 
  const handleClose = useCallback(() => {
+ setIsTransitionComplete(false);
  animate(dragY, window.innerHeight, {
  ...APPLE_SPRINGS.sheet,
  onComplete: () => {
- handleClose();
+ setFullScreenPlayerOpen(false);
  dragY.set(0);
  }
  });
  }, [dragY, setFullScreenPlayerOpen, APPLE_SPRINGS.sheet]);
 
  const handleDragEnd = useCallback((_: any, info: any) => {
- if (info.velocity.y > 350 || info.offset.y > 110) {
+ if (info.velocity.y > 300 || info.offset.y > 80) {
+ setIsTransitionComplete(false);
  animate(dragY, window.innerHeight, {
  type: "spring",
  velocity: info.velocity.y,
- stiffness: 300,
- damping: 30,
- mass: 0.8,
+ stiffness: 350,
+ damping: 32,
+ mass: 0.6,
  onComplete: () => {
- handleClose();
+ setFullScreenPlayerOpen(false);
  dragY.set(0);
  }
  });
@@ -339,10 +339,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  /* MINI PLAYER VIEW */
  <motion.div
  key="mini-player"
- initial={{ opacity: 0, y: 35, scale: 0.96 }}
- animate={{ opacity: 1, y: 0, scale: 1 }}
- exit={{ opacity: 0, y: 25, scale: 0.95 }}
- transition={APPLE_SPRINGS.sheet}
+ initial={{ opacity: 0, scale: 0.94, y: 20 }}
+ animate={{ opacity: 1, scale: 1, y: 0 }}
+ exit={{ opacity: 0, scale: 0.95, y: 15 }}
+ transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.6 }}
  drag="y"
  dragConstraints={{ top: 0, bottom: 0 }}
  dragElastic={{ top: 0.35, bottom: 0 }}
@@ -440,21 +440,21 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  /* FULL SCREEN PLAYER VIEW */
  <motion.div
  key="full-player-sheet"
- initial={{ y: "100%", borderRadius: "32px" }}
- animate={{ y: 0, borderRadius: "0px" }}
- exit={{ y: "100%", borderRadius: "32px" }}
+ initial={{ y: "100%" }}
+ animate={{ y: 0 }}
+ exit={{ y: "100%" }}
  transition={APPLE_SPRINGS.sheet}
- className="fixed inset-0 z-[1100] bg-black overflow-hidden flex flex-col pointer-events-auto select-none"
- style={{ willChange: "transform, border-radius" }}
+ onAnimationComplete={() => {
+   if (isFullScreenPlayerOpen) {
+     setIsTransitionComplete(true);
+   }
+ }}
+ className="fixed inset-0 z-[1100] bg-black rounded-t-[28px] sm:rounded-t-none border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col pointer-events-auto select-none"
+ style={{ willChange: "transform" }}
  >
  <motion.div
  key="drag-wrapper"
- style={{ 
- y: dragY, 
- scale: dragScale,
- opacity: dragOpacity,
- borderRadius: dragRadius,
- }}
+ style={{ y: dragY }}
  className="absolute inset-0 w-full h-full flex flex-col overflow-hidden"
  drag="y"
  dragConstraints={{ top: 0 }}
@@ -463,13 +463,19 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  >
     {/* Background */}
     <div className="absolute inset-0 z-0 overflow-hidden bg-black isolate" style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}>
-      {showReactiveBg && <LiquidBackground coverUrl={stablecover} />}
-      <motion.div 
-        animate={{ opacity: isLyricsOpen ? 1 : 0 }}
-        transition={{ duration: 0.5 }}
-        className="absolute inset-0 bg-white/15 mix-blend-overlay pointer-events-none z-10"
-        style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
+      {/* Ambient blurred glow during transition */}
+      <div 
+        className={cn(
+          "absolute inset-0 bg-cover bg-center filter blur-2xl scale-125 transition-opacity duration-700 pointer-events-none",
+          isTransitionComplete ? "opacity-0" : "opacity-40"
+        )}
+        style={{ backgroundImage: `url(${stablecover})` }}
       />
+      {/* Reactive WebGL Background mounted ONLY when transition completes */}
+      {showReactiveBg && isTransitionComplete && (
+        <LiquidBackground coverUrl={stablecover} />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none z-10" />
     </div>
 
  {/* Apple Music Drag Grabber Pill */}

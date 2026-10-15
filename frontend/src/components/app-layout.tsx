@@ -368,24 +368,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   })()}
  <FullScreenPlayer />
+ {isMobile && (
+   <div 
+     className={cn(
+       "fixed inset-0 bg-black pointer-events-none z-[250] transition-opacity duration-300",
+       isFullScreenPlayerOpen ? "opacity-45" : "opacity-0"
+     )} 
+   />
+ )}
  {/* Main Wrapper — scales down when mobile player is expanded */}
  <motion.div 
  className={cn(
  "flex-1 flex flex-row relative overflow-hidden isolate"
  )}
  style={{ 
-   transform: "translateZ(0)", 
-   backfaceVisibility: "hidden", 
-   willChange: "transform, border-radius, filter",
-   transformOrigin: "center top"
+   transformOrigin: "center top",
+   willChange: "transform, opacity"
  }}
  animate={{
-   scale: isFullScreenPlayerOpen && isMobile ? 0.93 : 1,
-   y: isFullScreenPlayerOpen && isMobile ? 12 : 0,
-   borderRadius: isFullScreenPlayerOpen && isMobile ? "28px" : "0px",
-   filter: isFullScreenPlayerOpen && isMobile ? "brightness(0.75)" : "brightness(1)",
+   scale: isFullScreenPlayerOpen && isMobile ? 0.94 : 1,
+   y: isFullScreenPlayerOpen && isMobile ? 10 : 0,
+   opacity: isFullScreenPlayerOpen && isMobile ? 0.85 : 1,
  }}
- transition={{ type: "spring", stiffness: 340, damping: 30, mass: 0.8 }}
+ transition={{ type: "spring", stiffness: 400, damping: 34, mass: 0.6 }}
  >
  {/* Sidebar (Desktop) */}
  {hasSidebar && (
@@ -468,7 +473,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  initial={{ y: 80, opacity: 0 }}
  animate={isPlayerMinimized ? { y: 80, opacity: 0 } : { y: 0, opacity: 1 }}
  exit={{ y: 80, opacity: 0 }}
- transition={{ type: "spring", stiffness: 380, damping: 35, mass: 0.8 }}
+ transition={{ type: "spring", stiffness: 400, damping: 34, mass: 0.6 }}
   id="tour-player"
   data-tour="player"
   className="pointer-events-auto relative max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full h-[72px]"
@@ -536,7 +541,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  opacity: (isMobile && isFullScreenPlayerOpen) ? 0 : 1,
  scale: (isMobile && isFullScreenPlayerOpen) ? 0.94 : 1,
  }}
- transition={{ type: "spring", stiffness: 340, damping: 30, mass: 0.8 }}
+ transition={{ type: "spring", stiffness: 400, damping: 34, mass: 0.6 }}
  >
  <div className="pointer-events-auto flex flex-col items-stretch">
  {!isInfoPage && (
