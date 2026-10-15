@@ -186,6 +186,7 @@ ${lines.join('\n')}`;
                     const { text } = await generateText({
                         model,
                         prompt,
+                        abortSignal: AbortSignal.timeout(4000),
                     });
 
                     if (!text || text.trim().length === 0) {

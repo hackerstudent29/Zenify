@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ScrollText, Minus, Plus, Timer, Music2, X } from "lucide-react";
 import { LiquidLyricsLine } from "./LiquidLyricsLine";
-import { transliterateLineRuleBased } from '@/lib/indic-transliterator';
+import { transliterateLineRuleBased, transliterateTextRuleBased } from '@/lib/indic-transliterator';
 import { audioEngine } from "@/lib/audio-engine";
 import { usePlayerStore } from "@/store/player";
 
@@ -106,13 +106,6 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }
   });
 
-  const handleModeChange = (romanized: boolean) => {
-    setIsRomanized(romanized);
-    try {
-      localStorage.setItem("zenify_lyrics_lang_mode", romanized ? "romanized" : "original");
-    } catch {}
-  };
-
   const romanizedSynced = data?.romanizedSyncedLyrics || currentTrack?.romanizedSyncedLyrics;
   const romanizedPlain = data?.romanizedLyrics || currentTrack?.romanizedLyrics;
   const romanizedLang = data?.romanizedLang || currentTrack?.romanizedLang;
@@ -122,6 +115,38 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     (typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0)
   );
 
+  const hasRegionalScript = React.useMemo(() => {
+    const sample = [
+      rawLyrics || "",
+      ...(data?.syncedTokens?.map((t: any) => t.text) || []),
+      ...(currentTrack?.synced_lyrics?.map((t: any) => t.text) || []),
+      title || "",
+    ].join(" ");
+    return /[\u0900-\u0D7F]/.test(sample);
+  }, [rawLyrics, data?.syncedTokens, currentTrack?.synced_lyrics, title]);
+
+  const canTranslate = hasRomanized || hasRegionalScript;
+
+  const handleModeChange = (romanized: boolean) => {
+    setIsRomanized(romanized);
+    try {
+      localStorage.setItem("zenify_lyrics_lang_mode", romanized ? "romanized" : "original");
+    } catch {}
+
+    // Call background worker to persist transliteration or connect Deepgram if not already stored
+    if (romanized && trackId && !hasRomanized) {
+      api.post('metadata/romanize-track', { trackId })
+        .then(res => {
+          if (res.data?.success) {
+            queryClient.invalidateQueries({ queryKey: ['lyrics', trackId, title, artist] });
+          }
+        })
+        .catch(err => {
+          console.warn("[LyricsView] Background romanization notice:", err.message);
+        });
+    }
+  };
+
   const romanizedLabel = React.useMemo(() => {
     const lang = (romanizedLang || "").toLowerCase();
     if (lang.includes("ta") || lang.includes("tamil")) return "Tanglish";
@@ -130,10 +155,24 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     if (lang.includes("kn") || lang.includes("kannada")) return "Kanglish";
     if (lang.includes("ml") || lang.includes("malayalam")) return "Manglish";
     if (lang.includes("bn") || lang.includes("bengali")) return "Benglish";
-    if (lang.includes("pa") || lang.includes("punjabi")) return "Punglish";
+    if (lang.includes("pa") || lang.includes("punjabi")) return "Punjabi";
     if (lang.includes("gu") || lang.includes("gujarati")) return "Gujlish";
+
+    // Detect from actual characters if romanizedLang not set
+    const sample = [rawLyrics || "", ...(data?.syncedTokens?.map((t: any) => t.text) || []), title || ""].join(" ");
+    for (const ch of sample) {
+      const code = ch.charCodeAt(0);
+      if (code >= 0x0B80 && code <= 0x0BFF) return "Tanglish";
+      if (code >= 0x0900 && code <= 0x097F) return "Hinglish";
+      if (code >= 0x0C00 && code <= 0x0C7F) return "Tenglish";
+      if (code >= 0x0C80 && code <= 0x0CFF) return "Kanglish";
+      if (code >= 0x0D00 && code <= 0x0D7F) return "Manglish";
+      if (code >= 0x0980 && code <= 0x09FF) return "Benglish";
+      if (code >= 0x0A00 && code <= 0x0A7F) return "Punjabi";
+      if (code >= 0x0A80 && code <= 0x0AFF) return "Gujlish";
+    }
     return "Tanglish";
-  }, [romanizedLang]);
+  }, [romanizedLang, rawLyrics, data?.syncedTokens, title]);
 
     React.useEffect(() => {
     const hasSync = Boolean(data?.syncedTokens && data.syncedTokens.length > 0);
@@ -219,8 +258,12 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   }, [isRomanized, romanizedSynced, romanizedPlain, data?.syncedTokens, currentTrack?.synced_lyrics]);
 
   const activePlainLyrics = React.useMemo(() => {
-    if (isRomanized && typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0) {
+    if (!isRomanized) return rawLyrics;
+    if (typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0) {
       return romanizedPlain;
+    }
+    if (rawLyrics && rawLyrics.trim().length > 0) {
+      return transliterateTextRuleBased(rawLyrics);
     }
     return rawLyrics;
   }, [isRomanized, romanizedPlain, rawLyrics]);
@@ -233,10 +276,24 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
     // Fallback if no synced lyrics but raw plain text lyrics exist
     if ((!activeData || activeData.length === 0) && activePlainLyrics && activePlainLyrics.trim() !== '') {
-      return activePlainLyrics.split('\n')
+      const rawLines = activePlainLyrics.split('\n')
         .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0)
-        .map((line: string, idx: number) => ({
+        .filter((line: string) => line.length > 0);
+
+      const expandedLines: string[] = [];
+      for (const line of rawLines) {
+        const words = line.split(/\s+/);
+        if (words.length > 8 || line.length > 50) {
+          const mid = Math.ceil(words.length / 2);
+          expandedLines.push(words.slice(0, mid).join(' '));
+          expandedLines.push(words.slice(mid).join(' '));
+        } else {
+          expandedLines.push(line);
+        }
+      }
+
+      return expandedLines
+        .map((line: string) => ({
           time: -999999,
           text: cleanLyricText(line),
           isUnsynced: true
@@ -255,8 +312,52 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }).filter((line: any) => line.text.length > 0)
     .sort((a: any, b: any) => a.time - b.time);
 
-    // 1. Skip splitting lines, just use base lines
-    const splitLines: any[] = baseLines;
+    // 1. Split overlong lines so each stanza fits into strictly 2 lines on PC, max 3 lines on Mobile
+    const splitLines: any[] = [];
+    for (const line of baseLines) {
+      const words = (line.text || '').trim().split(/\s+/);
+      if (words.length > 8 || line.text.length > 48) {
+        const mid = Math.ceil(words.length / 2);
+        let splitIdx = mid;
+        for (let j = Math.max(1, mid - 2); j <= Math.min(words.length - 2, mid + 2); j++) {
+          if (/[,;?!—–-]/.test(words[j])) {
+            splitIdx = j + 1;
+            break;
+          }
+        }
+
+        const part1Text = words.slice(0, splitIdx).join(' ');
+        const part2Text = words.slice(splitIdx).join(' ');
+
+        if (part1Text && part2Text) {
+          const hasWordTimings = Array.isArray(line.words) && line.words.length === words.length;
+          const lineStart = Number(line.time || 0);
+          const lineEnd = Number(line.endTime || (lineStart + Math.max(2.5, words.length * 0.5)));
+          const totalDur = Math.max(0.5, lineEnd - lineStart);
+          const ratio = part1Text.length / (line.text.length || 1);
+          const splitTime = hasWordTimings && line.words[splitIdx]?.time
+            ? line.words[splitIdx].time
+            : (lineStart + totalDur * ratio);
+
+          splitLines.push({
+            ...line,
+            text: part1Text,
+            time: lineStart,
+            endTime: splitTime,
+            words: hasWordTimings ? line.words.slice(0, splitIdx) : undefined
+          });
+          splitLines.push({
+            ...line,
+            text: part2Text,
+            time: splitTime,
+            endTime: lineEnd,
+            words: hasWordTimings ? line.words.slice(splitIdx) : undefined
+          });
+          continue;
+        }
+      }
+      splitLines.push(line);
+    }
 
     // 2. Insert virtual interlude lines (triple dots) for long instrumental breaks (greater than 7.0 seconds)
     const result: any[] = [];
@@ -659,7 +760,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   // Elevated Top Header Controls Bar (Minimal round pill style, compact language option, compact offset & close X)
   const renderTopControls = () => {
     const showSyncOffset = processedLines.length > 0 && !isUnsynced && data?.source !== 'QUICKLRC';
-    if (!hasRomanized && !showSyncOffset && !onClose) return null;
+    if (!canTranslate && !showSyncOffset && !onClose) return null;
 
     return (
       <div 
@@ -667,7 +768,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
         className="shrink-0 w-full px-4 py-2 flex items-center justify-between gap-3 z-40 bg-transparent border-none relative select-none"
       >
         {/* Language Changing Button (OG vs EN) Minimal Compact Style */}
-        {hasRomanized ? (
+        {canTranslate ? (
           <div className="flex items-center gap-0.5 p-0.5 rounded-full bg-zinc-900/60 hover:bg-zinc-900/90 backdrop-blur-xl border border-white/10 select-none transition-all">
             <button
               type="button"
@@ -774,7 +875,16 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
             {processedLines.map((line: any, idx: number) => (
               <p
                 key={`${trackId}-unsynced-${idx}`}
-                className="text-white/70 text-center text-base leading-relaxed"
+                className={cn(
+                  "text-white/70 text-center leading-relaxed",
+                  isMobile ? "line-clamp-3 max-h-[4.05em] text-sm" : "line-clamp-2 max-h-[2.65em] text-base"
+                )}
+                style={{
+                  display: "-webkit-box",
+                  WebkitBoxOrient: "vertical",
+                  WebkitLineClamp: isMobile ? 3 : 2,
+                  overflow: "hidden"
+                }}
               >
                 {line.text}
               </p>

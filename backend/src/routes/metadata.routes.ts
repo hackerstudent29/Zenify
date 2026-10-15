@@ -16,6 +16,22 @@ export async function metadataRoutes(server: FastifyInstance) {
         }
     }, controller.fetchMetadata);
 
+    server.post('/romanize-track', {
+        config: {
+            rateLimit: {
+                max: 30,
+                timeWindow: '1 minute'
+            }
+        },
+        schema: {
+            body: z.object({
+                trackId: z.string(),
+                force: z.boolean().optional()
+            })
+        },
+        handler: controller.romanizeTrack.bind(controller)
+    });
+
     server.post('/sync-lyrics', {
         config: {
             rateLimit: {
