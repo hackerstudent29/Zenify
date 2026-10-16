@@ -720,7 +720,18 @@ export function GlobalAudio() {
         currentTrack.audioUrl.startsWith('data:')
       ));
 
-    if (isLocalTrack) return;
+    const isVirtualTrack = Boolean(
+      currentTrack.isVirtual ||
+      (typeof currentTrack.id === 'string' && (
+        currentTrack.id.startsWith('jiosaavn-') ||
+        currentTrack.id.startsWith('saavn-') ||
+        currentTrack.id.startsWith('itunes-') ||
+        currentTrack.id.startsWith('sp-') ||
+        currentTrack.id.startsWith('yt-')
+      ))
+    );
+
+    if (isLocalTrack || isVirtualTrack) return;
     
     const isR2OrCloudinary = currentTrack.audioUrl && (
       currentTrack.audioUrl.includes('r2.dev') ||

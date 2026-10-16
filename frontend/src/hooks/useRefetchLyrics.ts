@@ -54,12 +54,14 @@ export function useRefetchLyrics() {
 
     try {
       let trackId = track.id;
-      if (track.isVirtual || trackId.startsWith('itunes-') || trackId.startsWith('saavn-') || trackId.startsWith('sp-') || trackId.startsWith('yt-')) {
+      if (track.isVirtual || trackId.startsWith('jiosaavn-') || trackId.startsWith('saavn-') || trackId.startsWith('itunes-') || trackId.startsWith('sp-') || trackId.startsWith('yt-')) {
+        const artistName = track.artist?.name || (typeof track.artist === 'string' ? track.artist : '') || track.artistName || '';
+        const albumTitle = track.album?.title || (typeof track.album === 'string' ? track.album : '') || '';
         const importRes = await api.post('/tracks/import-instant', {
           id: track.id,
           title: track.title,
-          artistName: track.artist?.name || track.artistName || '',
-          albumTitle: track.album?.title || '',
+          artistName,
+          albumTitle,
           duration: track.duration,
           coverUrl: track.coverUrl
         });

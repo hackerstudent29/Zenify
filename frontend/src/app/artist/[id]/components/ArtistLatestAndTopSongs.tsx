@@ -164,6 +164,7 @@ export function ArtistLatestAndTopSongs({
                     <RefreshCw size={14} className={cn("mr-2 opacity-60", isRefetching === track.id && "animate-spin text-brand")} />
                     <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
                   </DropdownMenuItem>
+<RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={(msg, type) => useUIStore.getState().showToast(msg, type)} />
                 <DropdownMenuItem onClick={() => openDownloadModal(track)}>
                   <Download size={14} className="mr-2 opacity-60" /> Download
                 </DropdownMenuItem>

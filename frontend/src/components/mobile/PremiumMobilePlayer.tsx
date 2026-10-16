@@ -135,7 +135,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  const showReactiveBg = useReactiveBgStore(state => state.player);
  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
-  const { refetchTrackLyrics } = useRefetchLyrics();
+ const { refetchTrackLyrics } = useRefetchLyrics();
+ const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+   useUIStore.getState().showToast(msg, type);
+ };
 
  const { 
  currentTrack, 
@@ -651,6 +654,11 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
  <ListPlus size={18} className="mr-3 opacity-40 text-brand" />
  <span className="font-bold">Add to Queue</span>
  </DropdownMenuItem>
+  <DropdownMenuItem onSelect={() => refetchTrackAudio(currentTrack, showToast)}>
+    <RefreshCw size={18} className={cn("mr-3 opacity-40", isRefetching === currentTrack?.id && "animate-spin text-brand")} />
+    <span className="font-bold">{isRefetching === currentTrack?.id ? "Refetching..." : "Refetch Audio"}</span>
+  </DropdownMenuItem>
+  <RefetchLyricsSubMenu track={currentTrack} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
   <DropdownMenuItem onSelect={() => {
   const target = getArtistTarget(currentTrack);
   if (target) {

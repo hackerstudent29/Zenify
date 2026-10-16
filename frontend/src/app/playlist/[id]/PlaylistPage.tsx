@@ -464,6 +464,7 @@ export default function PlaylistDetailPage() {
   <RefreshCw size={14} className={cn("mr-2 text-white/60", isRefetching === track.id && "animate-spin text-brand")} />
   <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
 </DropdownMenuItem>
+<RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
 <DropdownMenuItem onClick={() => openDownloadModal(track)}>
  <Download size={14} className="mr-2 text-white/60" />
  <span>Download</span>

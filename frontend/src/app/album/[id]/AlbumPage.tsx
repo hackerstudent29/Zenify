@@ -469,6 +469,7 @@ export default function AlbumPage() {
  <RefreshCw size={14} className={cn("mr-2", isRefetching === track.id && "animate-spin text-brand")} />
  <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
  </DropdownMenuItem>
+<RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
  <DropdownMenuItem onClick={() => openDownloadModal({ ...track, artist: album.artist })}>
  <Download size={14} className="mr-2" /> Download
  </DropdownMenuItem>

@@ -179,6 +179,7 @@ export function AnimatedDropdown({
                                       key={subItem.id}
                                       onSelect={(e) => {
                                         subItem.onClick?.(e as any);
+                                        setOpen(false);
                                       }}
                                       className={cn(
                                         "h-[34px] rounded-md flex gap-2 w-full items-center px-2.5 py-1.5 z-10 relative cursor-pointer group/subitem transition-colors",
