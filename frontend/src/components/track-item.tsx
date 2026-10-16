@@ -275,6 +275,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
     refetchTrackAudio(track, showToast);
   }
   },
+  getRefetchLyricsAnimatedMenuItem(track, refetchTrackLyrics, showToast),
  ...(user?.role === 'ADMIN' ? [{
  id: 'sync-lyrics',
  icon: <Mic size={14} className="opacity-70 text-violet-400" />,

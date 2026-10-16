@@ -1,7 +1,10 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic, ListPlus } from "lucide-react";
+import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic, ListPlus, RefreshCw } from "lucide-react";
+import { useRefetchAudio } from "@/hooks/useRefetchAudio";
+import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { getRefetchLyricsAnimatedMenuItem } from "@/components/shared/RefetchLyricsSubMenu";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -122,6 +125,8 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  const setFullScreenPlayerOpen = useUIStore(state => state.setFullScreenPlayerOpen);
  const setPlayerMinimized = useUIStore(state => state.setPlayerMinimized);
  const openDownloadModal = useUIStore(state => state.openDownloadModal);
+  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
  const queryClient = useQueryClient();
  const isArtist = (track as any).isArtist;
  const isAlbum = (track as any).isAlbum;
@@ -330,7 +335,16 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
    }
  }
  },
- ...(!isAlbum ? [{
+ ...(!isAlbum && !isPlaylist ? [
+  {
+    id: 'refetch-audio',
+    icon: <RefreshCw size={16} className={cn("opacity-70", isRefetching === track.id && "animate-spin text-brand")} />,
+    label: isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio",
+    onClick: (e: any) => { e.stopPropagation(); refetchTrackAudio(track, showToast); }
+  },
+  getRefetchLyricsAnimatedMenuItem(track, refetchTrackLyrics, showToast),
+] : []),
+  ...(!isAlbum ? [{
  id: 'favorite',
  icon: <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />,
  label: isLiked ? "Saved to Library" : "Save to Library",

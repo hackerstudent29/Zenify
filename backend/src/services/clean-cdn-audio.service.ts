@@ -33,7 +33,7 @@ const CDN_HARD_REJECT_TERMS = [
 ];
 
 export class CleanCdnAudioService {
-    private static decryptSaavnMediaUrl(encBase64: string): string | null {
+    public static decryptSaavnMediaUrl(encBase64: string): string | null {
         try {
             if (!encBase64 || typeof encBase64 !== 'string') return null;
             const key = Buffer.from('38346591');

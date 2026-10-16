@@ -276,6 +276,70 @@ export class TrackService {
             }
         }
 
+        // 4. Intercept Virtual JioSaavn IDs and JIT resolve/import into PostgreSQL
+        if (id.startsWith('saavn-') || id.startsWith('jiosaavn-')) {
+            const saavnId = id.replace(/^(jiosaavn-)?saavn-/, '');
+            const existing = await prisma.track.findFirst({
+                where: {
+                    OR: [
+                        { id },
+                        { youtubeId: id },
+                        { youtubeId: saavnId },
+                        { audioUrl: { contains: saavnId } }
+                    ],
+                    deletedAt: null
+                },
+                include: {
+                    artist: true,
+                    album: { include: { artist: true } },
+                }
+            });
+            if (existing) return existing;
+
+            try {
+                const { default: axios } = await import('axios');
+                const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
+                const res = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'song.getDetails',
+                        pids: saavnId,
+                        _format: 'json',
+                        _marker: '0',
+                        ctx: 'web6dot0'
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+                    timeout: 4500
+                }).catch(() => null);
+
+                const songData = res?.data?.[saavnId] || res?.data?.songs?.[0];
+                if (songData && (songData.song || songData.title)) {
+                    const cleanTitle = (songData.song || songData.title || '').trim();
+                    const rawSingers = songData.singers || songData.primary_artists || songData.more_info?.singers || 'Unknown Artist';
+                    const artistName = (typeof rawSingers === 'string' ? rawSingers.split(',')[0] : 'Unknown Artist').trim();
+                    let artwork = songData.image || '';
+                    artwork = artwork.replace('150x150', '500x500').replace('50x50', '500x500');
+                    const duration = parseInt(songData.duration || songData.more_info?.duration, 10) || 180;
+
+                    let cdnAudio = '';
+                    const encUrl = songData.encrypted_media_url || songData.more_info?.encrypted_media_url;
+                    if (encUrl) {
+                        cdnAudio = CleanCdnAudioService.decryptSaavnMediaUrl(encUrl) || '';
+                    }
+
+                    return await this.importExternal({
+                        title: cleanTitle,
+                        artistName,
+                        albumTitle: songData.album || songData.more_info?.album || 'Single',
+                        coverUrl: artwork,
+                        audioUrl: cdnAudio || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${cleanTitle}`)}`,
+                        duration,
+                    });
+                }
+            } catch (saavnErr: any) {
+                console.warn(`[TrackService] JioSaavn lookup failed for ${id}:`, saavnErr.message);
+            }
+        }
+
         let track = await prisma.track.findFirst({
             where: { 
                 id, 
