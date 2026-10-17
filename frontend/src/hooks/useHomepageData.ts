@@ -63,10 +63,15 @@ export function useHomepageData() {
       queryClient.invalidateQueries({ queryKey: ['home-discover-country-lang'] });
     };
 
+    const handleTrackPlayed = () => {
+      queryClient.invalidateQueries({ queryKey: ['home-recently-played'] });
+      queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
+    };
+
     window.addEventListener('zenify:track-updated', handleInvalidate);
     window.addEventListener('zenify:track-created', handleInvalidate);
     window.addEventListener('zenify:track-deleted', handleInvalidate);
-    window.addEventListener('zenify:track-played', handleInvalidate);
+    window.addEventListener('zenify:track-played', handleTrackPlayed);
     window.addEventListener('zenify:playlist-updated', handleInvalidate);
     window.addEventListener('zenify:preferences-updated', handleInvalidate);
     window.addEventListener('zenify:country-language-changed', handleCountryLangChanged);
@@ -75,15 +80,15 @@ export function useHomepageData() {
       window.removeEventListener('zenify:track-updated', handleInvalidate);
       window.removeEventListener('zenify:track-created', handleInvalidate);
       window.removeEventListener('zenify:track-deleted', handleInvalidate);
-      window.removeEventListener('zenify:track-played', handleInvalidate);
+      window.removeEventListener('zenify:track-played', handleTrackPlayed);
       window.removeEventListener('zenify:playlist-updated', handleInvalidate);
       window.removeEventListener('zenify:preferences-updated', handleInvalidate);
       window.removeEventListener('zenify:country-language-changed', handleCountryLangChanged);
     };
   }, [queryClient]);
 
-  const REFETCH_INTERVAL = 45 * 1000; // 45 seconds
-  const STALE_TIME = 30 * 1000; // 30 seconds
+  const REFETCH_INTERVAL = false as const; // Disable background periodic polling of all shelves
+  const STALE_TIME = 5 * 60 * 1000; // 5 minutes fresh cache
 
   const results = useQueries({
     queries: [

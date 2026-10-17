@@ -22,7 +22,16 @@ export class MetadataMaintenanceService {
                         { metadataConfidence: { lt: 0.85 } }
                     ]
                 },
-                include: { artist: true },
+                select: {
+                    id: true,
+                    title: true,
+                    coverUrl: true,
+                    genre: true,
+                    artistId: true,
+                    featuredArtists: true,
+                    releaseDate: true,
+                    artist: { select: { name: true } }
+                },
                 take: batchSize
             });
 

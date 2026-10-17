@@ -49,7 +49,20 @@ export class MetadataEnrichmentWorker {
             { metadataStatus: null }
           ]
         },
-        include: { artist: true },
+        select: {
+          id: true,
+          title: true,
+          isrc: true,
+          language: true,
+          region: true,
+          lyrics: true,
+          countryCode: true,
+          countryName: true,
+          languageCode: true,
+          languageName: true,
+          languages: true,
+          artist: { select: { name: true } }
+        },
         take: this.BATCH_SIZE,
         orderBy: { createdAt: 'desc' }
       });
@@ -143,7 +156,22 @@ export class MetadataEnrichmentWorker {
         take: BATCH,
         skip: cursor ? 1 : 0,
         cursor: cursor ? { id: cursor } : undefined,
-        include: { artist: true },
+        select: {
+          id: true,
+          title: true,
+          isrc: true,
+          language: true,
+          region: true,
+          lyrics: true,
+          countryCode: true,
+          countryName: true,
+          languageCode: true,
+          languageName: true,
+          languages: true,
+          metadataStatus: true,
+          metadataConfidence: true,
+          artist: { select: { name: true } }
+        },
         orderBy: { id: 'asc' }
       });
 

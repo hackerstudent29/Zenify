@@ -207,9 +207,9 @@ export class DeduplicationService {
 
         // Community engagement
         score += (track.streams || 0) * 10;
-        score += (track.likes?.length || 0) * 50;
-        score += (track.playlistTracks?.length || 0) * 80;
-        score += (track.history?.length || 0) * 20;
+        score += ((track._count?.likes ?? track.likes?.length) || 0) * 50;
+        score += ((track._count?.playlistTracks ?? track.playlistTracks?.length) || 0) * 80;
+        score += ((track._count?.history ?? track.history?.length) || 0) * 20;
 
         // Full duration vs teaser penalty
         if (track.duration && track.duration < 75) score -= 2000;
@@ -520,81 +520,109 @@ export class DeduplicationService {
         try {
             console.log('[Deduplication] Starting active catalog duplicate scan...');
 
-            // Fetch all non-deleted tracks with key metadata
-            const tracks = await prisma.track.findMany({
+            // Stage 1: Ultra-lightweight fingerprint scan (no lyrics, no history arrays)
+            const trackSummaries = await prisma.track.findMany({
                 where: { deletedAt: null },
                 select: {
                     id: true,
                     title: true,
-                    audioUrl: true,
-                    coverUrl: true,
-                    duration: true,
-                    streams: true,
-                    lyrics: true,
-                    synced_lyrics: true,
-                    raw_lrc: true,
-                    releaseStatus: true,
-                    albumId: true,
                     createdAt: true,
                     artist: {
                         select: {
                             id: true,
                             name: true,
                         }
-                    },
-                    likes: { select: { id: true } },
-                    playlistTracks: { select: { id: true } },
-                    history: { select: { id: true } },
+                    }
                 }
             });
 
             // Group by strict track fingerprint
-            const duplicateBuckets = new Map<string, typeof tracks>();
+            const duplicateBuckets = new Map<string, typeof trackSummaries>();
 
-            for (const track of tracks) {
+            for (const track of trackSummaries) {
                 const fp = generateTrackFingerprint(track.title, track.artist?.name || 'Unknown');
                 const bucket = duplicateBuckets.get(fp) || [];
                 bucket.push(track);
                 duplicateBuckets.set(fp, bucket);
             }
 
+            // Stage 2: Only fetch full scoring fields for actual duplicate groups (>= 2 tracks)
+            const candidateGroups = Array.from(duplicateBuckets.entries()).filter(([_, group]) => group.length >= 2);
+            
             let duplicateGroupsFound = 0;
             let tracksConsolidated = 0;
 
-            for (const [fingerprint, group] of duplicateBuckets.entries()) {
-                if (group.length < 2) continue;
-
-                duplicateGroupsFound++;
-                console.log(`[Deduplication] Detected duplicate group [${fingerprint}] with ${group.length} tracks.`);
-
-                // Sort by quality and completeness score descending
-                const ranked = [...group].sort((a, b) => {
-                    const scoreA = this.scoreTrack(a);
-                    const scoreB = this.scoreTrack(b);
-                    if (scoreB !== scoreA) return scoreB - scoreA;
-                    // Tie-breaker: older created date preferred
-                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+            if (candidateGroups.length > 0) {
+                const candidateTrackIds = candidateGroups.flatMap(([_, group]) => group.map(t => t.id));
+                const detailedCandidates = await prisma.track.findMany({
+                    where: { id: { in: candidateTrackIds } },
+                    select: {
+                        id: true,
+                        title: true,
+                        audioUrl: true,
+                        coverUrl: true,
+                        duration: true,
+                        streams: true,
+                        lyrics: true,
+                        synced_lyrics: true,
+                        raw_lrc: true,
+                        releaseStatus: true,
+                        albumId: true,
+                        createdAt: true,
+                        artist: {
+                            select: {
+                                id: true,
+                                name: true,
+                            }
+                        },
+                        _count: {
+                            select: {
+                                likes: true,
+                                playlistTracks: true,
+                                history: true
+                            }
+                        }
+                    }
                 });
 
-                const winner = ranked[0];
-                const losers = ranked.slice(1);
+                const candidateMap = new Map(detailedCandidates.map(t => [t.id, t]));
 
-                console.log(`[Deduplication] Elected Winner: "${winner.title}" (${winner.id}) [Score: ${this.scoreTrack(winner)}]`);
-                console.log(`[Deduplication] Merging ${losers.length} inferior duplicates into winner...`);
+                for (const [fingerprint, group] of candidateGroups) {
+                    duplicateGroupsFound++;
+                    console.log(`[Deduplication] Detected duplicate group [${fingerprint}] with ${group.length} tracks.`);
 
-                await this.consolidateDuplicates(winner.id, losers.map(l => l.id));
-                tracksConsolidated += losers.length;
+                    const detailedGroup = group.map(t => candidateMap.get(t.id)).filter(Boolean) as typeof detailedCandidates;
+                    if (detailedGroup.length < 2) continue;
+
+                    // Sort by quality and completeness score descending
+                    const ranked = [...detailedGroup].sort((a, b) => {
+                        const scoreA = this.scoreTrack(a);
+                        const scoreB = this.scoreTrack(b);
+                        if (scoreB !== scoreA) return scoreB - scoreA;
+                        // Tie-breaker: older created date preferred
+                        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                    });
+
+                    const winner = ranked[0];
+                    const losers = ranked.slice(1);
+
+                    console.log(`[Deduplication] Elected Winner: "${winner.title}" (${winner.id}) [Score: ${this.scoreTrack(winner)}]`);
+                    console.log(`[Deduplication] Merging ${losers.length} inferior duplicates into winner...`);
+
+                    await this.consolidateDuplicates(winner.id, losers.map(l => l.id));
+                    tracksConsolidated += losers.length;
+                }
             }
 
             // Also sweep for duplicate artists
             const artistsMerged = await this.deduplicateArtists();
 
             const durationMs = Date.now() - startTime;
-            console.log(`[Deduplication] Sweep finished in ${durationMs}ms: Scanned ${tracks.length} tracks, found ${duplicateGroupsFound} duplicate groups, merged ${tracksConsolidated} duplicate tracks, merged ${artistsMerged} duplicate artists.`);
+            console.log(`[Deduplication] Sweep finished in ${durationMs}ms: Scanned ${trackSummaries.length} tracks, found ${duplicateGroupsFound} duplicate groups, merged ${tracksConsolidated} duplicate tracks, merged ${artistsMerged} duplicate artists.`);
 
             return {
                 timestamp: new Date(),
-                tracksScanned: tracks.length,
+                tracksScanned: trackSummaries.length,
                 duplicateGroupsFound,
                 tracksConsolidated,
                 artistsScanned: 0,

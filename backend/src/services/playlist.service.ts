@@ -288,7 +288,30 @@ export class PlaylistService {
                     },
                     include: {
                         track: {
-                            include: { artist: true, album: true }
+                            select: {
+                                id: true,
+                                title: true,
+                                coverUrl: true,
+                                audioUrl: true,
+                                duration: true,
+                                genre: true,
+                                streams: true,
+                                releaseStatus: true,
+                                createdAt: true,
+                                engagement_score: true,
+                                bpm: true,
+                                language: true,
+                                like_count: true,
+                                aura_color: true,
+                                aura_vibe: true,
+                                palette: true,
+                                artistId: true,
+                                albumId: true,
+                                trackNumber: true,
+                                featuredArtists: true,
+                                artist: { select: { id: true, name: true, imageUrl: true } },
+                                album: { select: { id: true, title: true, coverUrl: true, palette: true } }
+                            }
                         },
                     },
                     orderBy: { addedAt: 'asc' }
