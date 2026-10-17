@@ -196,7 +196,8 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  return res.data as { id: string, name: string }[];
  } catch (e) { return []; }
  },
- enabled: isAuthenticated && !isLink
+ enabled: isAuthenticated && !isLink,
+ staleTime: 5 * 60 * 1000
  });
 
  const addToPlaylistMutation = useMutation({

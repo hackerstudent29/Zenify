@@ -202,7 +202,16 @@ export class UniversalSearchService {
               { featuredArtists: { contains: cleanQ, mode: 'insensitive' } }
             ]
           },
-          include: { artist: true, album: true },
+          select: {
+            id: true,
+            title: true,
+            coverUrl: true,
+            duration: true,
+            audioUrl: true,
+            albumId: true,
+            artist: { select: { id: true, name: true } },
+            album: { select: { id: true, title: true, coverUrl: true } }
+          },
           take: 12
         });
 
@@ -444,8 +453,12 @@ export class UniversalSearchService {
 
     // 5. Cross-reference all items with local DB to flag existing tracks as isZenify
     try {
-      const dbAll = await prisma.track.findMany({
-        where: { deletedAt: null },
+      const candidateTitles = Array.from(resultMap.values()).map(item => item.name).filter(Boolean);
+      const dbAll = candidateTitles.length === 0 ? [] : await prisma.track.findMany({
+        where: {
+          deletedAt: null,
+          title: { in: candidateTitles, mode: 'insensitive' }
+        },
         select: { id: true, title: true, artist: { select: { name: true } }, audioUrl: true }
       });
       const dbMap = new Map<string, any>();

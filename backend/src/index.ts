@@ -210,9 +210,9 @@ const start = async () => {
         await server.listen({ port: config.PORT, host: '0.0.0.0' });
         server.log.info(`Server listening on port ${config.PORT}`);
 
-        // Run engagement score update on startup + every 15 minutes
+        // Run engagement score update on startup + every 3 hours
         HomepageService.updateEngagementScores();
-        setInterval(() => HomepageService.updateEngagementScores(), 15 * 60 * 1000);
+        setInterval(() => HomepageService.updateEngagementScores(), 3 * 60 * 60 * 1000);
 
         // Start scheduled publishing service
         ScheduledPublishService.start();

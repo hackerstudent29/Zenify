@@ -231,6 +231,10 @@ export class HomeSectionsService {
    * Helper: Resolves User Taste Profile seeds without querying Track rows
    */
   private static async getUserTaste(userId?: string) {
+    const cacheKey = `user_taste:${userId || 'anon'}`;
+    const cached = await getCacheVal(cacheKey);
+    if (cached) return cached;
+
     if (!userId) {
       return {
         languages: ['Tamil', 'English'],
@@ -364,7 +368,7 @@ export class HomeSectionsService {
       }
     }
 
-    return {
+    const result = {
       languages: languageNames,
       languageNames,
       languageCodes,
@@ -375,6 +379,8 @@ export class HomeSectionsService {
       favoriteArtistsMap,
       topArtists: favoriteArtistNames.slice(0, 4)
     };
+    await setCacheVal(cacheKey, result, 600); // 10 minutes cache
+    return result;
   }
 
   /**

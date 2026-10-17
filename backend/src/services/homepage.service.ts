@@ -549,6 +549,7 @@ export class HomepageService {
                     id: true,
                     streams: true,
                     like_count: true,
+                    engagement_score: true,
                     userStats: {
                         select: {
                             streamCount: true,
@@ -582,11 +583,15 @@ export class HomepageService {
                     (1 - skipRate) * 20 +                      // lower skip = better
                     Math.min(likeCount / 50, 1) * 10;         // normalize likes (cap at 50)
 
-                await prisma.track.update({
-                    where: { id: track.id },
-                    data: { engagement_score: Math.round(score * 100) / 100 }
-                });
-                updated++;
+                const newScore = Math.round(score * 100) / 100;
+                // Only execute DB write over pooler if score actually shifted
+                if (Math.abs((track.engagement_score || 0) - newScore) > 0.02) {
+                    await prisma.track.update({
+                        where: { id: track.id },
+                        data: { engagement_score: newScore }
+                    });
+                    updated++;
+                }
             }
 
             const elapsed = Date.now() - startTime;

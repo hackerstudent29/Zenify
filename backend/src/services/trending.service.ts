@@ -64,7 +64,7 @@ export class TrendingService {
                         { releaseStatus: 'SCHEDULED', scheduledAt: { lte: now } }
                     ]
                 },
-                select: { id: true, createdAt: true, engagement_score: true, streams: true }
+                select: { id: true, createdAt: true, engagement_score: true, streams: true, trendingScore: true }
             });
 
             const updates: Promise<any>[] = [];
@@ -91,12 +91,15 @@ export class TrendingService {
 
                 const finalTrendingScore = Math.max(0, rawScore * timeDecay);
 
-                updates.push(
-                    prisma.track.update({
-                        where: { id: track.id },
-                        data: { trendingScore: finalTrendingScore }
-                    })
-                );
+                // Only issue update if score moved significantly
+                if (Math.abs((track.trendingScore || 0) - finalTrendingScore) > 0.05) {
+                    updates.push(
+                        prisma.track.update({
+                            where: { id: track.id },
+                            data: { trendingScore: finalTrendingScore }
+                        })
+                    );
+                }
             }
 
             await Promise.all(updates);

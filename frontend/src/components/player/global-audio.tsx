@@ -743,7 +743,14 @@ export function GlobalAudio() {
     const needsUpdate = !isR2OrCloudinary || !currentTrack.synced_lyrics;
     if (!needsUpdate) return;
 
+    let pollAttempts = 0;
+    const MAX_POLL_ATTEMPTS = 3;
+
     const interval = setInterval(async () => {
+      pollAttempts++;
+      if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+        clearInterval(interval);
+      }
       try {
         const api = (await import("@/lib/api")).default;
         const res = await api.get(`/tracks/${currentTrack.id}`);

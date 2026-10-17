@@ -140,7 +140,12 @@ export function PCFullScreenPlayer() {
  // Real-time synchronization for reactive background palette while in Full View
  useEffect(() => {
  if (!currentTrack || currentTrack.palette) return;
+ let attempts = 0;
  const interval = setInterval(async () => {
+ attempts++;
+ if (attempts >= 3) {
+ clearInterval(interval);
+ }
  try {
  const res = await api.get(`/tracks/${currentTrack.id}`);
  if (res.data?.palette) {

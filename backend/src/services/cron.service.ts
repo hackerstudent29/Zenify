@@ -9,9 +9,9 @@ import { SongPlaybackHealthService } from './song-playback-health.service.js';
 
 export class CronService {
     static init() {
-        // Run every 10 minutes: Active Duplicate Detection & Elimination Watcher
-        cron.schedule('*/10 * * * *', async () => {
-            console.log('[Cron] Running 10-minute active catalog deduplication sweep...');
+        // Run daily at 2:00 AM UTC (7:30 AM IST): Active Duplicate Detection & Elimination Watcher
+        cron.schedule('0 2 * * *', async () => {
+            console.log('[Cron] Running daily active catalog deduplication sweep...');
             try {
                 await DeduplicationService.runActiveWatcher();
             } catch (dedupErr: any) {
@@ -19,9 +19,9 @@ export class CronService {
             }
         });
 
-        // Run every 10 minutes: Automated Song Playback Health & Self-Healing Resolver
-        cron.schedule('*/10 * * * *', async () => {
-            console.log('[Cron] Running 10-minute automated playback health & self-healing sweep...');
+        // Run every 6 hours: Automated Song Playback Health & Self-Healing Resolver
+        cron.schedule('0 */6 * * *', async () => {
+            console.log('[Cron] Running 6-hour automated playback health & self-healing sweep...');
             try {
                 await SongPlaybackHealthService.runAutomatedHealthSweep(25);
             } catch (healthErr: any) {
@@ -29,9 +29,9 @@ export class CronService {
             }
         });
 
-        // Run every 15 minutes: Regional Lyrics Transliteration & Deepgram Synchronization Sweep
-        cron.schedule('*/15 * * * *', async () => {
-            console.log('[Cron] Running 15-minute regional lyrics romanization sweep...');
+        // Run every 6 hours: Regional Lyrics Transliteration & Deepgram Synchronization Sweep
+        cron.schedule('0 */6 * * *', async () => {
+            console.log('[Cron] Running 6-hour regional lyrics romanization sweep...');
             try {
                 const { runRomanizationSweep } = await import('../queues/romanization.queue.js');
                 await runRomanizationSweep();
@@ -109,17 +109,6 @@ export class CronService {
             await MetadataMaintenanceService.runMaintenance();
         });
 
-        // Run every 15 minutes: Auto-Romanize lyrics sweep for regional songs
-        cron.schedule('*/15 * * * *', async () => {
-            try {
-                console.log('[Cron] Running 15-minute lyrics romanization sweep...');
-                const { runRomanizationSweep } = await import('../queues/romanization.queue.js');
-                await runRomanizationSweep();
-            } catch (sweepErr: any) {
-                console.error('[Cron] Romanization sweep failed:', sweepErr.message);
-            }
-        });
-        
         // Run daily at 4:00 AM UTC (9:30 AM IST): 90-day activity event retention cleanup
         cron.schedule('0 4 * * *', async () => {
             console.log('[Cron] Cleaning up activity events older than 90 days...');
@@ -127,8 +116,8 @@ export class CronService {
             await ActivityService.cleanOldActivityEvents();
         });
         
-        // Run every 30 minutes: Automated Country & Language Metadata Enrichment cycle
-        cron.schedule('*/30 * * * *', async () => {
+        // Run every 4 hours: Automated Country & Language Metadata Enrichment cycle
+        cron.schedule('0 */4 * * *', async () => {
             console.log('[Cron] Running country & language metadata enrichment cycle...');
             try {
                 const { MetadataEnrichmentWorker } = await import('../workers/metadata-enrichment.worker.js');
@@ -138,7 +127,7 @@ export class CronService {
             }
         });
         
-        console.log('[Cron] Cron jobs initialized (Playback Health & Self-Healing, Deduplication Watcher, Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 15-Min Romanize, 30-Min Country/Language Enrichment).');
+        console.log('[Cron] Cron jobs initialized (Playback Health & Self-Healing, Deduplication Watcher, Weekly Summaries, Daily Reminders, Hourly Trending, 6-Hour Maintenance, 6-Hour Romanize, 4-Hour Country/Language Enrichment).');
     }
 
     /**

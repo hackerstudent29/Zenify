@@ -37,6 +37,36 @@ function validateTrackUpload(fieldname: string, filename: string, mimetype?: str
     }
 }
 
+export const TRACK_LIST_SELECT = {
+    id: true,
+    title: true,
+    coverUrl: true,
+    audioUrl: true,
+    duration: true,
+    genre: true,
+    streams: true,
+    releaseStatus: true,
+    releaseDate: true,
+    createdAt: true,
+    engagement_score: true,
+    bpm: true,
+    language: true,
+    like_count: true,
+    aura_color: true,
+    aura_vibe: true,
+    palette: true,
+    artistId: true,
+    albumId: true,
+    trackNumber: true,
+    featuredArtists: true,
+    artist: {
+        select: { id: true, name: true, imageUrl: true }
+    },
+    album: {
+        select: { id: true, title: true, coverUrl: true, palette: true, artist: { select: { id: true, name: true } } }
+    }
+};
+
 export class TrackService {
     // Memory lock to prevent race conditions during concurrent imports
     private static importLocks = new Map<string, Promise<void>>();
@@ -133,10 +163,7 @@ export class TrackService {
             take: limit + 1,
             cursor: cursor ? { id: cursor } : undefined,
             where: whereClause,
-            include: {
-                artist: true,
-                album: { include: { artist: true } },
-            },
+            select: TRACK_LIST_SELECT,
             orderBy: { createdAt: 'desc' },
         });
 
@@ -710,7 +737,7 @@ export class TrackService {
         // Automatically fetch the highest streamed tracks (most played)
         return prisma.track.findMany({
             where: { deletedAt: null },
-            include: { artist: true, album: true },
+            select: TRACK_LIST_SELECT,
             orderBy: { streams: 'desc' },
             take: 15
         });
@@ -840,7 +867,7 @@ export class TrackService {
             },
             include: {
                 track: {
-                    include: { artist: true, album: true }
+                    select: TRACK_LIST_SELECT
                 }
             },
             orderBy: { createdAt: 'desc' }

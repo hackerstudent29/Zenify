@@ -121,16 +121,25 @@ export async function enqueueRomanization(data: RomanizationJobData): Promise<vo
  * 2) sourceHash has changed or is missing.
  */
 export async function runRomanizationSweep(): Promise<{ scanned: number; enqueued: number }> {
-    console.log('[RomanizationSweep] Starting 15-minute romanization sweep...');
+    console.log('[RomanizationSweep] Starting periodic romanization sweep (capped at 50 tracks)...');
     try {
         const tracks = await prisma.track.findMany({
             where: {
                 deletedAt: null,
                 OR: [
-                    { lyrics: { not: null } },
-                    { synced_lyrics: { not: null } }
+                    { romanizedLyrics: null },
+                    { sourceHash: null }
+                ],
+                AND: [
+                    {
+                        OR: [
+                            { lyrics: { not: null } },
+                            { synced_lyrics: { not: null } }
+                        ]
+                    }
                 ]
             },
+            take: 50,
             select: {
                 id: true,
                 title: true,

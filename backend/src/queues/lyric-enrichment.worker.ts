@@ -29,9 +29,9 @@ interface QueueJob {
  * to the same track simultaneously share the single active resolution promise.
  */
 export class ElasticLyricWorker {
-    private static readonly POLL_INTERVAL_MS = 15 * 1000; // 15 seconds 24/7 background sweep // 30 seconds background sweep
+    private static readonly POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes background sweep (on-demand enrichment handles active playback)
     private static readonly MAX_ALLOWED_CONCURRENCY = 128; // Dynamic scaling ceiling
-    private static readonly SWEEP_DISCOVERY_BATCH = 50; // Batch discovery size for sweeps
+    private static readonly SWEEP_DISCOVERY_BATCH = 15; // Batch discovery size for sweeps
 
     private static queue: QueueJob[] = [];
     private static activeWorkers = 0;

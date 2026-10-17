@@ -475,7 +475,30 @@ export async function albumRoutes(server: FastifyInstance) {
                     { releaseStatus: 'SCHEDULED', scheduledAt: { lte: new Date() } }
                 ]
             },
-            include: { artist: true, album: true },
+            select: {
+                id: true,
+                title: true,
+                coverUrl: true,
+                audioUrl: true,
+                duration: true,
+                genre: true,
+                streams: true,
+                releaseStatus: true,
+                createdAt: true,
+                engagement_score: true,
+                bpm: true,
+                language: true,
+                like_count: true,
+                aura_color: true,
+                aura_vibe: true,
+                palette: true,
+                artistId: true,
+                albumId: true,
+                trackNumber: true,
+                featuredArtists: true,
+                artist: { select: { id: true, name: true, imageUrl: true } },
+                album: { select: { id: true, title: true, coverUrl: true, palette: true } }
+            },
             orderBy: [
                 { trackNumber: 'asc' },
                 { createdAt: 'asc' }
@@ -489,8 +512,10 @@ export async function albumRoutes(server: FastifyInstance) {
     });
 
     // List all albums (for library/browse pages) - each release is an independent entity
-    server.get('/', async (_req: FastifyRequest, reply: FastifyReply) => {
+    server.get('/', async (req: FastifyRequest<{ Querystring: { limit?: string } }>, reply: FastifyReply) => {
+        const limit = Math.min(parseInt(req.query?.limit || '60', 10), 100);
         const albums = await prisma.album.findMany({
+            take: limit,
             where: {
                 tracks: {
                     some: {

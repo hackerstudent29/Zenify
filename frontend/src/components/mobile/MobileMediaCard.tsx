@@ -142,7 +142,8 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  return res.data as { id: string, name: string }[];
  } catch (e) { return []; }
  },
- enabled: !isLink
+ enabled: !isLink,
+ staleTime: 5 * 60 * 1000
  });
 
  const addToPlaylistMutation = useMutation({

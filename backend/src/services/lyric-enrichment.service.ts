@@ -250,7 +250,7 @@ export class LyricEnrichmentService {
         const gracePeriodAgo = new Date(Date.now() - this.IMPORT_GRACE_PERIOD_MS);
         const now = new Date();
 
-        // 1. Discover tracks imported beyond grace period without usable lyrics or missing romanization / instrumental gaps
+        // 1. Discover tracks imported beyond grace period missing plain or synced lyrics
         const candidates = await prisma.track.findMany({
             where: {
                 deletedAt: null,
@@ -260,12 +260,10 @@ export class LyricEnrichmentService {
                     { lyrics: '' },
                     { synced_lyrics: { equals: Prisma.JsonNull } },
                     { synced_lyrics: { equals: Prisma.AnyNull } },
-                    { synced_lyrics: { equals: [] } },
-                    { romanizedLyrics: null },
-                    { romanizedSyncedLyrics: { equals: Prisma.JsonNull } }
+                    { synced_lyrics: { equals: [] } }
                 ]
             },
-            take: batchSize * 4, // Over-fetch to filter locked / retry_wait / terminal jobs
+            take: batchSize * 2,
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
@@ -275,13 +273,15 @@ export class LyricEnrichmentService {
                 createdAt: true,
                 lyrics: true,
                 synced_lyrics: true,
-                romanizedLyrics: true,
-                romanizedSyncedLyrics: true,
-                language: true,
-                genre: true,
-                artist: { select: { name: true } },
-                album: { select: { title: true } },
-                lyricJob: true
+                lyricJob: {
+                    select: {
+                        status: true,
+                        audioHash: true,
+                        updatedAt: true,
+                        nextRetryAt: true,
+                        lastProcessedAt: true
+                    }
+                }
             }
         });
 
