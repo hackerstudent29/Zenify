@@ -2,8 +2,9 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "cleanUrls": true,
+  "cleanUrls": false,
   "rewrites": [
+    { "source": "/google66ee582c33341a73.html", "destination": "/google66ee582c33341a73.html" },
     { "source": "/((?!assets/|favicon|manifest|logo|zenify_logo|og-image|sitemap|robots|google|fonts/|.*\\..*).*)", "destination": "/index.html" }
   ],
   "headers": [
