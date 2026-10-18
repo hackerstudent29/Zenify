@@ -38,9 +38,12 @@ export function ArtistPlaylists({ artistName, playlists }: ArtistPlaylistsProps)
                   {playlist.coverUrl ? (
                     <img
                       src={getMediaUrl(playlist.coverUrl)}
-                      alt={playlist.name || playlist.title}
+                      alt={playlist.name || playlist.title || "Playlist cover"}
+                      width={200}
+                      height={200}
                       className="w-full h-full object-cover"
                       loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-zinc-700">

@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -230,6 +231,11 @@ export default function SectionPage() {
 
   return (
     <div className="min-h-screen bg-background pb-36 text-foreground font-sans select-none relative overflow-hidden">
+      <SEO
+        title={`${sectionInfo.title} – Zenify`}
+        description={`Browse ${sectionInfo.title.toLowerCase()} with synchronized lyrics and high fidelity audio on Zenify.`}
+        path={`/section/${rawType}`}
+      />
       {/* Dynamic Header Banner */}
       <div className="pt-4 sm:pt-8 md:pt-12 px-4 md:px-8 max-w-7xl mx-auto">
         <div className="flex items-center gap-3 mb-6">

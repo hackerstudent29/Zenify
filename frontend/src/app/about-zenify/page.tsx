@@ -5,6 +5,7 @@ import { ChevronLeft, Zap, Music, Shield, Sparkles, Volume2, Database, Cpu } fro
 import { useRouter } from "next/navigation";
 import pkg from "../../../package.json";
 import { ZenifyLogo } from '@/components/shared/ZenifyLogo';
+import { SEO } from '@/components/shared/SEO';
 
 const bentoItems = [
   {
@@ -83,6 +84,11 @@ export default function AboutZenifyPage() {
 
   return (
     <div className="w-full min-h-screen bg-[#030303] text-[#F2F2F3] selection:bg-brand/30 pb-36 font-sans relative overflow-hidden">
+      <SEO
+        title="About Zenify – Next-Generation Web Music Player"
+        description="Learn about Zenify's open architecture, Web Audio DSP engine, syllable-level synchronized lyrics, and the mission behind ad-free music."
+        path="/about-zenify"
+      />
       {/* Background radial effects */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[1200px] h-[500px] bg-[radial-gradient(circle_at_top,_rgba(207,200,182,0.06)_0%,_transparent_65%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
@@ -133,73 +139,72 @@ export default function AboutZenifyPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-8 relative z-10 space-y-28">
-        
-        {/* Bento Grid Features */}
+        {/* Architecture Bento Grid */}
         <section className="space-y-6">
-          <div className="text-left max-w-md">
-            <h2 className="text-xl font-bold tracking-tight mb-2">Core Optimization Engines</h2>
-            <p className="text-zinc-500 text-xs leading-relaxed">
-              Precision metrics, sandboxed security, and clean container pipelines working silently in the background.
-            </p>
+          <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[#A3A4AB]">Pillars of Design</h2>
+            <span className="text-[10px] font-mono text-zinc-600">01 / CAPABILITIES</span>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5">
-            {bentoItems.map((feature, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {bentoItems.map((item, index) => (
               <motion.div
-                key={i}
+                key={index}
                 initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.08 }}
-                className={`${feature.className} relative overflow-hidden rounded-2xl p-6.5 backdrop-blur-2xl transition-all duration-300 group flex flex-col justify-between min-h-[180px]`}
+                transition={{ duration: 0.4, delay: index * 0.05 }}
+                className={`relative p-8 rounded-2xl flex flex-col justify-between overflow-hidden transition-all duration-300 min-h-[220px] ${item.className}`}
               >
-                <div className="flex flex-col gap-3">
-                  <div className="w-9 h-9 bg-white/[0.04] text-brand rounded-xl flex items-center justify-center group-hover:scale-105 group-hover:bg-brand/10 transition-all duration-300 w-fit">
-                    {feature.icon}
+                {item.visual}
+                <div className="relative z-10 space-y-4">
+                  <div className="w-9 h-9 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center">
+                    {item.icon}
                   </div>
-                  <h3 className="text-sm font-bold text-white/95">{feature.title}</h3>
-                  <p className="text-zinc-400 leading-relaxed text-xs font-sans max-w-[90%]">
-                    {feature.description}
-                  </p>
+                  <div>
+                    <h3 className="text-base font-medium text-white mb-1.5">{item.title}</h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed max-w-[90%]">{item.description}</p>
+                  </div>
                 </div>
-                {feature.visual}
               </motion.div>
             ))}
           </div>
         </section>
 
-        {/* Technical Flow */}
+        {/* Audio Pipeline Timeline */}
         <section className="space-y-8">
-          <div className="text-left max-w-md">
-            <h2 className="text-xl font-bold tracking-tight mb-2">The Playback Pipeline</h2>
-            <p className="text-zinc-500 text-xs leading-relaxed">
-              Step-by-step metadata parsing and routing that powers every track in your queue.
-            </p>
+          <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[#A3A4AB]">Streaming Lifecycles</h2>
+            <span className="text-[10px] font-mono text-zinc-600">02 / PIPELINE</span>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {timelineSteps.map((step, index) => (
+              <div key={index} className="space-y-3 relative">
+                <span className="font-mono text-xs font-bold text-brand">{step.no}</span>
+                <h3 className="text-sm font-medium text-white">{step.title}</h3>
+                <h4 className="text-[11px] font-mono text-[#CFC8B6] tracking-wider uppercase">{step.subtitle}</h4>
+                <p className="text-xs text-zinc-400 leading-relaxed">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6.5 relative">
-            {timelineSteps.map((step, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -10 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.12 }}
-                className="bg-white/[0.01] border border-white/[0.03] rounded-2xl p-6 flex flex-col justify-between min-h-[160px] relative hover:border-white/[0.06] transition-colors"
-              >
-                <div className="text-xs font-bold text-brand uppercase tracking-wider font-mono absolute top-4 right-4 bg-brand/5 border border-brand/10 px-2 py-0.5 rounded">
-                  {step.no}
-                </div>
-                <div className="space-y-2 mt-4">
-                  <h3 className="text-sm font-bold text-white/90">{step.title}</h3>
-                  <p className="text-[10px] font-bold text-zinc-500 font-mono uppercase tracking-wider">
-                    {step.subtitle}
-                  </p>
-                  <p className="text-zinc-400 leading-relaxed text-xs font-sans pt-1">
-                    {step.description}
-                  </p>
-                </div>
-              </motion.div>
+        {/* System Tech Stack */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between border-b border-white/[0.04] pb-4">
+            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-[#A3A4AB]">Ecosystem Core</h2>
+            <span className="text-[10px] font-mono text-zinc-600">03 / STACK</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { label: "FRONTEND", val: "Vite 6 + React 19" },
+              { label: "STYLING", val: "Tailwind 4 + Glass" },
+              { label: "STATE ENGINE", val: "Zustand Reactive" },
+              { label: "STREAM CORE", val: "Fastify Node Runtime" }
+            ].map((stat, i) => (
+              <div key={i} className="p-5 rounded-2xl bg-white/[0.01] border border-white/[0.04] space-y-1">
+                <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">{stat.label}</p>
+                <p className="text-xs font-bold text-white tracking-wide">{stat.val}</p>
+              </div>
             ))}
           </div>
         </section>

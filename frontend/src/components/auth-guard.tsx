@@ -16,9 +16,9 @@ import { ZenLoading } from "@/components/ui/ZenLoading";
  * - Authentication (/login, /register)
  */
 export const isPublicRoute = (pathname?: string | null): boolean => {
-  const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
-  const current = (pathname && pathname !== '/') ? pathname : (hash || pathname || '');
-  if (!current) return false;
+  if (!pathname) return false;
+  const current = pathname.split('?')[0].split('#')[0];
+  if (current === '/' || current === '') return true;
   return (
     current.startsWith("/login") ||
     current.startsWith("/register") ||
@@ -26,7 +26,17 @@ export const isPublicRoute = (pathname?: string | null): boolean => {
     current.startsWith("/privacy") ||
     current.startsWith("/about") ||
     current.startsWith("/creator") ||
-    current.startsWith("/local-library")
+    current.startsWith("/pricing") ||
+    current.startsWith("/discover") ||
+    current.startsWith("/search") ||
+    current.startsWith("/radio") ||
+    current.startsWith("/local-library") ||
+    current.startsWith("/track") ||
+    current.startsWith("/artist") ||
+    current.startsWith("/album") ||
+    current.startsWith("/playlist") ||
+    current.startsWith("/explore") ||
+    current.startsWith("/section")
   );
 };
 

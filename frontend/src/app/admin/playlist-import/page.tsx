@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -65,6 +66,7 @@ function MiniSlider({ getAudioEl, isPlaying, knownDuration }: { getAudioEl: () =
  };
  return (
  <div className="flex items-center gap-2 mt-2">
+      <SEO title="Playlist Import – Zenify Admin" noindex={true} path="/admin/playlist-import" />
  <span className="text-[9px] text-white/20 font-mono w-7">{fmt(cur)}</span>
  <div className="flex-1 h-[12px] flex items-center cursor-pointer group" onClick={e => {
  if (!audioEl || !dur || dur === Infinity) return;

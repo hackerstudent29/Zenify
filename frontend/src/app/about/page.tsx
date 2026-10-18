@@ -6,6 +6,7 @@ import { Mail, MapPin, Sparkles, Radio, Heart, ChevronLeft } from "lucide-react"
 import { useRouter } from "next/navigation";
 import TextType from "@/components/ui/TextType";
 import pkg from "../../../package.json";
+import { SEO } from "@/components/shared/SEO";
 import "@fontsource/zalando-sans-semiexpanded/400.css";
 import "@fontsource/zalando-sans-semiexpanded/500.css";
 import "@fontsource/zalando-sans-semiexpanded/700.css";
@@ -64,6 +65,11 @@ export default function AboutPage() {
 
   return (
     <div className="w-full min-h-screen bg-[#0A0A0C] text-brand selection:bg-zinc-900/30 pb-32" style={{ fontFamily: '"Zalando Sans SemiExpanded", sans-serif' }}>
+      <SEO
+        title="Creator & Developer – Zenify Music"
+        description="Meet the creator behind Zenify, an open-source audio streaming platform featuring real-time DSP, lyrics synchronization, and modern web tech."
+        path="/about"
+      />
       
       {/* Navigation Overlay */}
       <div className="absolute top-8 left-8 z-[100]">

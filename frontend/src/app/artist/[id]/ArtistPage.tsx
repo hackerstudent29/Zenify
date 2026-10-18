@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import { useParams } from "next/navigation";
@@ -305,6 +306,9 @@ return (
  if (!el.src.includes('proxy-image')) el.src = proxy(bannerUrl || '');
  }}
  className="absolute inset-0 w-full h-full object-cover object-[50%_25%]"
+ alt={artist.name ? `Banner for ${artist.name}` : "Artist banner"}
+ fetchPriority="high"
+ decoding="async"
  />
  ) : (
  <div className="absolute inset-0 bg-black/10" />
@@ -413,8 +417,7 @@ return (
     if (!el.src.includes('proxy-image')) el.src = proxy(imageUrl || '');
     }}
     className="w-full h-full object-cover"
-    alt={artist.name}
-    />
+    alt={artist.name ? `Portrait of ${artist.name}` : "Artist portrait"} width={128} height={128} loading="lazy" decoding="async" />
     ) : (
     <div className="w-full h-full flex items-center justify-center text-white/20 font-bold text-3xl">
     {artist.name?.charAt(0).toUpperCase()}
@@ -535,7 +538,7 @@ return (
  )}
  >
  <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
- {cover ? <img src={getMediaUrl(cover)} className="w-full h-full object-cover" alt="" /> : (
+ {cover ? <img src={getMediaUrl(cover)} className="w-full h-full object-cover" alt={track.title || "Track artwork"} width={40} height={40} loading="lazy" decoding="async" /> : (
  <div className="w-full h-full flex items-center justify-center">
  <Music2 size={12} className="text-zinc-600" />
  </div>

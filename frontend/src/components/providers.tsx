@@ -2,7 +2,6 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import { PricingModal } from "@/components/PricingModal";
 import { ConfirmModal } from "@/components/shared/ConfirmModal";
 import { useUIStore } from "@/store/ui";
@@ -12,44 +11,42 @@ import api from "@/lib/api";
 import { applyAccentColor } from "@/lib/accent-colors";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
- const [queryClient] = useState(() => new QueryClient({
- defaultOptions: {
- queries: {
- staleTime: 1000 * 60 * 60, // 1 hour
- gcTime: 1000 * 60 * 60 * 2, // 2 hours
- refetchOnWindowFocus: false, // Don't refetch just because user switched tabs
- },
- },
- }));
- const { isPricingModalOpen, setPricingModalOpen } = useUIStore();
- const { isAuthenticated, user } = useAuthStore();
- const [currentPlan, setCurrentPlan] = useState("Eclipse");
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 60, // 1 hour
+        gcTime: 1000 * 60 * 60 * 2, // 2 hours
+        refetchOnWindowFocus: false, // Don't refetch just because user switched tabs
+      },
+    },
+  }));
+  const { isPricingModalOpen, setPricingModalOpen } = useUIStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const [currentPlan, setCurrentPlan] = useState("Eclipse");
 
- // Dynamic Accent Color Sync
- useEffect(() => {
- const accent = user?.preferences?.accentColor || "rose";
- applyAccentColor(accent);
- }, [user?.preferences?.accentColor]);
+  // Dynamic Accent Color Sync
+  useEffect(() => {
+    const accent = user?.preferences?.accentColor || "rose";
+    applyAccentColor(accent);
+  }, [user?.preferences?.accentColor]);
 
- useEffect(() => {
- if (isPricingModalOpen && isAuthenticated) {
- api.get("/auth/subscription")
- .then(res => setCurrentPlan(res.data?.status === 'ACTIVE' ? res.data.plan : "Eclipse"))
- .catch(() => setCurrentPlan("Eclipse"));
- }
- }, [isPricingModalOpen, isAuthenticated]);
+  useEffect(() => {
+    if (isPricingModalOpen && isAuthenticated) {
+      api.get("/auth/subscription")
+        .then(res => setCurrentPlan(res.data?.status === 'ACTIVE' ? res.data.plan : "Eclipse"))
+        .catch(() => setCurrentPlan("Eclipse"));
+    }
+  }, [isPricingModalOpen, isAuthenticated]);
 
- return (
- <GoogleOAuthProvider clientId="362498893988-fnrqfrbcb6nbs2j2gvnev10qabc4c2en.apps.googleusercontent.com">
- <QueryClientProvider client={queryClient}>
- {children}
- <PricingModal
- isOpen={isPricingModalOpen}
- onOpenChange={setPricingModalOpen}
- currentPlan={currentPlan}
- />
- <ConfirmModal />
- </QueryClientProvider>
- </GoogleOAuthProvider>
- );
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+      <PricingModal
+        isOpen={isPricingModalOpen}
+        onOpenChange={setPricingModalOpen}
+        currentPlan={currentPlan}
+      />
+      <ConfirmModal />
+    </QueryClientProvider>
+  );
 }

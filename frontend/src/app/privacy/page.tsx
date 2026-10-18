@@ -9,8 +9,9 @@ export default function PrivacyPage() {
   return (
     <>
       <SEO
-        title="Privacy Policy"
+        title="Privacy Policy – Zenify"
         description="Learn how Zenify protects your personal data, audio listening history, and privacy."
+        path="/privacy"
       />
       <div className="max-w-4xl mx-auto px-6 py-12 text-zinc-300">
         <div className="mb-8">

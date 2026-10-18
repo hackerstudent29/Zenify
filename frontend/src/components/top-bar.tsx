@@ -463,7 +463,7 @@ export function TopBar() {
   id: 'share',
   icon: <Share2 size={14} className="opacity-70" />,
   label: "Copy Link",
-  onClick: () => { navigator.clipboard.writeText(`${window.location.origin}/#/artist/${item.id}`); }
+  onClick: () => { navigator.clipboard.writeText(`${window.location.origin}/artist/${item.id}`); }
   }
   ]}
   />
@@ -489,8 +489,7 @@ export function TopBar() {
  >
  <img
  src={getMediaUrl(item.coverUrl) || `/logo.png`}
- className="w-full h-full object-cover"
- alt={item.title || item.name}
+ className="w-full h-full object-cover" alt={item.title || item.name || "Cover artwork"} width={40} height={40} loading="lazy" decoding="async"
  />
  </div>
  <div className="flex-1 min-w-0 flex flex-col justify-center">
@@ -541,7 +540,7 @@ export function TopBar() {
   id: 'share',
   icon: <Share2 size={14} className="opacity-70" />,
   label: "Copy Link",
-  onClick: () => { navigator.clipboard.writeText(`${window.location.origin}/#/${item.isAlbum ? "album" : "playlist"}/${item.id}`); }
+  onClick: () => { navigator.clipboard.writeText(`${window.location.origin}/${item.isAlbum ? "album" : "playlist"}/${item.id}`); }
   }
   ]}
   />
@@ -590,8 +589,7 @@ export function TopBar() {
  >
  <img
  src={getTrackCover(item)}
- className="w-full h-full object-cover"
- alt={item.title}
+ className="w-full h-full object-cover" alt={item.title || "Track artwork"} width={40} height={40} loading="lazy" decoding="async"
  />
  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
  <Play size={16} className="text-white fill-current ml-0.5" />
@@ -776,7 +774,7 @@ export function TopBar() {
       trigger={
         <button className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none">
           {user?.avatarUrl ? (
-            <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
+            <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt={user.name ? `${user.name} profile` : "User profile"} width={40} height={40} loading="lazy" decoding="async" />
           ) : (
             <UserIcon size={16} className="text-zinc-400" />
           )}
@@ -868,7 +866,7 @@ export function TopBar() {
               <div className="flex items-center gap-3 p-2.5 rounded-lg bg-white/5 border border-white/10 pointer-events-none w-full">
                 <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
                   {user?.avatarUrl ? (
-                    <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Avatar" />
+                    <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt={user.name ? `${user.name} avatar` : "User avatar"} width={36} height={36} loading="lazy" decoding="async" />
                   ) : (
                     <span className="text-xs font-normal text-zinc-300 uppercase">
                       {user?.name?.[0] || user?.username?.[0] || user?.email?.[0] || '?'}

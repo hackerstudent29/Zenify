@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 import React, { useState } from 'react';
 import { toast } from 'sonner';
@@ -85,6 +86,7 @@ export default function EditArtistPage() {
  if (isLoadingArtist) {
  return (
  <div className="min-h-screen flex items-center justify-center bg-[#050505]">
+      <SEO title="Edit Artist – Zenify Admin" noindex={true} path="/admin/artists" />
  <div className="flex flex-col items-center gap-4">
  <Loader2 className="w-10 h-10 text-brand animate-spin" strokeWidth={1} />
  <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.3em]">Accessing Core Identity...</p>

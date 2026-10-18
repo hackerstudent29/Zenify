@@ -3,6 +3,12 @@ Allow: /
 Disallow: /admin
 Disallow: /library
 Disallow: /api
+Disallow: /payment
+Disallow: /onboarding
+Disallow: /profile
+Disallow: /settings
+Disallow: /history
+Disallow: /notifications
 
 # AI Search Engine Crawlers & Assistants (Explicitly Allowed for GEO / AIO)
 User-agent: GPTBot

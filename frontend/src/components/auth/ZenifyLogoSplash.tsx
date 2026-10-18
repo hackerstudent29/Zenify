@@ -254,7 +254,7 @@ export function ZenifyLogoSplash({ onComplete }: ZenifyLogoSplashProps) {
               letterRefs.current[idx] = el;
             }}
             src={src}
-            alt=""
+            alt="" width={140} height={256} decoding="async"
             className={`l absolute opacity-0 will-change-transform will-change-filter ${
               idx === 1 ? "zenify-letter-e" : ""
             }`}

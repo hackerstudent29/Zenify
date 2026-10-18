@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import { useAuthStore } from "@/store/authStore";
@@ -31,11 +32,12 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
 
  return (
  <div className="pb-48 pt-4 px-4 space-y-2">
+      <SEO title="Your Profile – Zenify" noindex={true} path="/profile" />
  {/* User Header */}
  <div className="flex items-center gap-4 mb-6 px-1">
  <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/10 overflow-hidden shrink-0 shadow-lg">
  {user.avatarUrl
- ? <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="" />
+ ? <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt={user.name || "User avatar"} width={40} height={40} loading="lazy" decoding="async" />
  : <div className="w-full h-full flex items-center justify-center text-xl font-black text-white">
  {(user.username?.[0] || user.name?.[0] || user.email[0]).toUpperCase()}
  </div>
@@ -161,7 +163,7 @@ function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void })
  <div className="absolute inset-[2px] rounded-xl bg-zinc-900 border border-white/5 z-10" />
  <div className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/10 to-transparent z-10" />
  {user.avatarUrl ? (
- <img src={getMediaUrl(user.avatarUrl)} alt={user.name} className="w-full h-full object-cover rounded-[1.2rem] relative z-20" />
+ <img src={getMediaUrl(user.avatarUrl)} alt={user.name ? `${user.name} profile portrait` : "User avatar"} width={160} height={160} loading="lazy" decoding="async" className="w-full h-full object-cover rounded-[1.2rem] relative z-20" />
  ) : (
  <span className="text-3xl font-semibold text-white/80 relative z-20">
  {(user.username?.[0] || user.name?.[0] || user.email[0]).toUpperCase()}

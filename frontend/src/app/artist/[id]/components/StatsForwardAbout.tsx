@@ -37,6 +37,8 @@ export function StatsForwardAbout({ artist }: StatsForwardAboutProps) {
               src={getMediaUrl(imageUrl)} 
               className="w-full h-full object-cover opacity-60 saturate-50 blur-[2px]" 
               alt="" 
+              loading="lazy"
+              decoding="async"
             />
           )}
         </div>

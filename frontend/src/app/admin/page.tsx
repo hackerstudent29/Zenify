@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import React from 'react';
@@ -27,6 +28,7 @@ export default function AdminPage() {
  if (isAuthenticated && user?.role !== 'ADMIN') {
  return (
  <div className="flex flex-col items-center justify-center min-h-[80vh] text-center px-6">
+      <SEO title="Admin Console – Zenify" noindex={true} path="/admin" />
  <div className="w-20 h-20 rounded-3xl bg-danger/10 flex items-center justify-center mb-8 border border-danger/20">
  <Shield className="w-10 h-10 text-danger" />
  </div>

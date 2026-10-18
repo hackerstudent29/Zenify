@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import { useParams, useRouter, usePathname } from "next/navigation";
@@ -323,7 +324,15 @@ export default function TrackPage() {
         <div
           className="shrink-0 rounded-lg shadow-xl overflow-hidden bg-zinc-900 border border-white/10 w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] h-[42vw] sm:h-[180px] md:h-[210px] lg:h-[220px] xl:h-[230px] transition-all duration-300 hover:scale-[1.02]"
         >
-          <img src={coverUrl} alt={track.title} className="w-full h-full object-cover" />
+          <img 
+            src={coverUrl} 
+            alt={`Cover art for ${track.title}`} 
+            width={230} 
+            height={230} 
+            fetchPriority="high" 
+            decoding="async" 
+            className="w-full h-full object-cover" 
+          />
         </div>
 
         {/* Metadata */}

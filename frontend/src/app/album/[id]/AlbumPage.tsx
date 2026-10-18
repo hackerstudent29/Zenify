@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 
@@ -275,7 +276,7 @@ export default function AlbumPage() {
  animate={{ opacity: 1, scale: 1 }}
  className="shrink-0 w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] h-[42vw] sm:h-[180px] md:h-[210px] lg:h-[220px] xl:h-[230px] rounded-lg shadow-xl overflow-hidden bg-zinc-900 border border-white/10"
  >
- <img src={coverUrl} alt={album.title} className="w-full h-full object-cover" />
+ <img src={coverUrl} alt={album.title ? `Cover art for ${album.title}` : "Album cover"} width={230} height={230} fetchPriority="high" decoding="async" className="w-full h-full object-cover" />
  </motion.div>
 
  {/* Info */}
@@ -418,7 +419,7 @@ export default function AlbumPage() {
  {/* Track Cover */}
  <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-zinc-800 relative shadow-md">
    {track.coverUrl || album.coverUrl ? (
-     <img src={getMediaUrl(track.coverUrl || album.coverUrl)} className="w-full h-full object-cover" alt="" />
+     <img src={getMediaUrl(track.coverUrl || album.coverUrl)} className="w-full h-full object-cover" alt={track.title || "Track artwork"} width={40} height={40} loading="lazy" decoding="async" />
    ) : (
      <div className="w-full h-full flex items-center justify-center">
        <Music2 size={16} className="text-zinc-600" />

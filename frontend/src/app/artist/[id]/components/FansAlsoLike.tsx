@@ -104,7 +104,11 @@ export function FansAlsoLike({ currentArtistId, initialRelated }: FansAlsoLikePr
                   <img 
                     src={getMediaUrl(artist.imageUrl || artist.coverUrl || artist.picture_xl)} 
                     className="w-full h-full object-cover pointer-events-none" 
-                    alt={artist.name} 
+                    alt={artist.name ? `Similar artist ${artist.name}` : "Artist"} 
+                    width={160}
+                    height={160}
+                    loading="lazy"
+                    decoding="async"
                     draggable={false}
                   />
                 ) : (
