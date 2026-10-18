@@ -7,10 +7,10 @@ import { useRouter } from "next/navigation";
 import TextType from "@/components/ui/TextType";
 import pkg from "../../../package.json";
 import { SEO } from "@/components/shared/SEO";
-import "@fontsource/zalando-sans-semiexpanded/400.css";
-import "@fontsource/zalando-sans-semiexpanded/500.css";
-import "@fontsource/zalando-sans-semiexpanded/700.css";
-import "@fontsource/zalando-sans-semiexpanded/900.css";
+import "@fontsource/zalando-sans-semiexpanded/latin-400.css";
+import "@fontsource/zalando-sans-semiexpanded/latin-500.css";
+import "@fontsource/zalando-sans-semiexpanded/latin-700.css";
+import "@fontsource/zalando-sans-semiexpanded/latin-900.css";
 
 const SpotifyIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>

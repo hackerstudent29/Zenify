@@ -4,8 +4,11 @@ import React from "react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { PCFullScreenPlayer } from "@/components/pc/PCFullScreenPlayer";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
+
+const PCFullScreenPlayer = React.lazy(() =>
+  import("@/components/pc/PCFullScreenPlayer").then((m) => ({ default: m.PCFullScreenPlayer }))
+);
 
 export function FullScreenPlayer() {
  const isMobile = useIsMobile(768);
@@ -15,7 +18,9 @@ export function FullScreenPlayer() {
  return (
  <AnimatePresence>
  {isFullScreenPlayerOpen && currentTrack && !isMobile && (
- <PCFullScreenPlayer key="pc-full-player" />
+   <React.Suspense fallback={null}>
+     <PCFullScreenPlayer key="pc-full-player" />
+   </React.Suspense>
  )}
  </AnimatePresence>
  );
