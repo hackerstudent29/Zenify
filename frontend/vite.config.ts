@@ -85,23 +85,38 @@ export default defineConfig({
       },
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('zustand')) {
-              return 'vendor-react';
-            }
-            if (id.includes('framer-motion') || id.includes('gsap')) {
-              return 'vendor-motion';
-            }
-            if (id.includes('@radix-ui') || id.includes('radix-ui')) {
-              return 'vendor-radix';
-            }
-            if (id.includes('lucide-react') || id.includes('@animateicons')) {
+          const normalized = id.replace(/\\/g, '/');
+          if (normalized.includes('/node_modules/')) {
+            if (normalized.includes('lucide-react') || normalized.includes('@animateicons')) {
               return 'vendor-icons';
             }
-            if (id.includes('@tanstack')) {
+            if (normalized.includes('@radix-ui') || normalized.includes('/radix-ui/')) {
+              return 'vendor-radix';
+            }
+            if (normalized.includes('framer-motion') || normalized.includes('gsap')) {
+              return 'vendor-motion';
+            }
+            if (normalized.includes('@tanstack')) {
               return 'vendor-query';
             }
-            if (id.includes('axios') || id.includes('date-fns') || id.includes('colorthief') || id.includes('idb-keyval')) {
+            if (normalized.includes('react-hook-form') || normalized.includes('@hookform') || normalized.includes('/zod/')) {
+              return 'vendor-forms';
+            }
+            if (normalized.includes('@hello-pangea') || normalized.includes('react-image-crop') || normalized.includes('react-day-picker')) {
+              return 'vendor-heavy-ui';
+            }
+            if (
+              normalized.includes('/node_modules/react/') ||
+              normalized.includes('/node_modules/react-dom/') ||
+              normalized.includes('/node_modules/react-router-dom/') ||
+              normalized.includes('/node_modules/react-router/') ||
+              normalized.includes('/node_modules/zustand/') ||
+              normalized.includes('/node_modules/react-helmet-async/') ||
+              normalized.includes('/node_modules/scheduler/')
+            ) {
+              return 'vendor-react';
+            }
+            if (normalized.includes('axios') || normalized.includes('date-fns') || normalized.includes('colorthief') || normalized.includes('idb-keyval') || normalized.includes('clsx') || normalized.includes('tailwind-merge')) {
               return 'vendor-utils';
             }
           }

@@ -1,5 +1,4 @@
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
-import { AddTrackToPlaylistModal } from "@/components/shared/AddTrackToPlaylistModal";
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
@@ -8,16 +7,11 @@ import { PlayerBar } from "@/components/player-bar";
 import { TopBar } from "@/components/top-bar";
 import { MobileNav } from "@/components/mobile-nav";
 import { PremiumMobilePlayer } from "@/components/mobile/PremiumMobilePlayer";
-import { DownloadModal } from "@/components/shared/DownloadModal";
 import { FullScreenPlayer } from "@/components/player/full-screen-player";
-import { AudioFxModal } from "@/components/player/audio-fx-modal";
 import { GlobalAudio } from "@/components/player/global-audio";
 import { QueuePanel } from "@/components/player/queue-panel";
 import { cn } from "@/lib/utils";
 import { Maximize2, Check, X, AlertCircle } from "lucide-react";
-import { BatchImportToast } from "@/components/shared/batch-import-toast";
-import { CloudSyncSidePopup } from "@/components/shared/CloudSyncSidePopup";
-import { ShortcutHelpModal } from "@/components/shared/shortcut-help-modal";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
@@ -29,7 +23,16 @@ import { useAuthStore } from "@/store/authStore";
 import { GlobalLyricsSidebar } from "@/components/shared/GlobalLyricsSidebar";
 import { LiquidBackground } from "@/components/shared/LiquidBackground";
 import { Glass } from "@/components/ui/glass";
-import { UserOnboardingTour } from "@/components/shared/UserOnboardingTour";
+
+// Lazy-loaded auxiliary modals to minimize critical initial chunk size
+const DownloadModal = React.lazy(() => import("@/components/shared/DownloadModal").then(m => ({ default: m.DownloadModal })));
+const AddTrackToPlaylistModal = React.lazy(() => import("@/components/shared/AddTrackToPlaylistModal").then(m => ({ default: m.AddTrackToPlaylistModal })));
+const AudioFxModal = React.lazy(() => import("@/components/player/audio-fx-modal").then(m => ({ default: m.AudioFxModal })));
+const ShortcutHelpModal = React.lazy(() => import("@/components/shared/shortcut-help-modal").then(m => ({ default: m.ShortcutHelpModal })));
+const UserOnboardingTour = React.lazy(() => import("@/components/shared/UserOnboardingTour").then(m => ({ default: m.UserOnboardingTour })));
+const CloudSyncSidePopup = React.lazy(() => import("@/components/shared/CloudSyncSidePopup").then(m => ({ default: m.CloudSyncSidePopup })));
+const BatchImportToast = React.lazy(() => import("@/components/shared/batch-import-toast").then(m => ({ default: m.BatchImportToast })));
+
 
 function GlobalToast() {
  const toast = useUIStore(s => s.toast);
@@ -545,16 +548,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <PremiumMobilePlayer hidePlayer={isLyricSyncPage} />
  )}
 
- <DownloadModal />
-  <AddTrackToPlaylistModal />
+ <React.Suspense fallback={null}>
+   <DownloadModal />
+   <AddTrackToPlaylistModal />
+ </React.Suspense>
  <GlobalAudio />
- <AudioFxModal />
+ <React.Suspense fallback={null}>
+   <AudioFxModal />
+ </React.Suspense>
  <QueuePanel />
- <BatchImportToast />
- <CloudSyncSidePopup />
+ <React.Suspense fallback={null}>
+   <BatchImportToast />
+   <CloudSyncSidePopup />
+ </React.Suspense>
  <GlobalToast />
- <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
- <UserOnboardingTour />
+ <React.Suspense fallback={null}>
+   <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+   <UserOnboardingTour />
+ </React.Suspense>
  </div>
  );
 }
