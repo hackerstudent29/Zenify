@@ -1,41 +1,31 @@
-# Zenify Music Streaming App
+# Zenify
 
-> Zenify is a modern, web and mobile music streaming application featuring fast iTunes audio resolution, synchronized AI lyrics, dynamic aesthetic visualizers, and offline music playback.
+> Zenify is a modern, high-performance web and mobile music streaming platform featuring studio Web Audio DSP effects, sub-second multilingual synchronized lyrics, 8D spatial audio, and local file playback.
 
-## Summary
-Zenify is built as an open-source, lightweight alternative to commercial music streaming platforms. It offers instant playback, ad-free streaming, personalized library management, and multi-lingual lyric synchronization.
+## Overview
+Zenify offers a seamless, ad-free listening experience directly in the web browser with offline PWA support. It integrates synchronized syllable-accurate lyrics for Tamil, Tanglish, Hindi, Malayalam, and English music, a 3-band biquad equalizer, and binaural audio spatialization.
 
-## Core Features & Capabilities
-- **Web Audio DSP Studio Suite:** Hardware-accelerated 3-band equalizer (Bass, Mid, Treble) with ±12dB range, Flat/Bass Boost/Vocal Boost presets.
-- **8D Spatial Audio Engine:** Dynamic binaural audio panner orbiting sound clockwise/counter-clockwise with adjustable rotational speed.
-- **Acoustic Convolution Reverb:** Real-time acoustic space simulation (Small Hall, Cathedral) with wet/dry balance controls.
-- **DJ Speed & Pitch Warper:** Instant Nightcore (1.5x speed + pitch), Daycore (0.75x slowed), and 0.50x-2.00x variable playback slider.
-- **AI Synchronized Lyrics Engine:** Syllable-level phonetic lyric timing with solo/instrumental gap protection (`[BGM]`, `[Guitar Solo]`) across Tamil, Tanglish, Hindi, Malayalam, and English.
-- **Administrative Lyric Sync Studio:** Interactive karaoke timestamp painter (`KaraokePainterView`) with word/line alignment and LRC file export.
-- **Browser Local Audio Player:** Drag-and-drop or directory scanner parsing local MP3, FLAC, WAV, and AAC ID3 tags with stem filtering.
-- **Real-Time Reactive Canvas Visualizer:** Multi-orb GPU canvas reacting to Web Audio FFT frequency bands (bass/mids/treble) in real time.
-- **Liquid Glass UI & Reactive Colors:** Dynamic backdrop blur filters and ambient album cover color aura extraction via `node-vibrant`.
-- **High-Speed Audio Resolution:** Fast iTunes CDN preview lookup (sub-50ms) with HTTP 206 Partial Content range stream proxy.
-- **Cross-Platform & Offline PWA:** Installable web app with MediaSession API lock-screen playback controls and native Android Flutter app.
+## Core Features
+- **Multilingual Synced Lyrics**: Sub-second synchronization with syllable-level timing and automated instrumental gap detection.
+- **Studio 3-Band Equalizer**: High-precision biquad audio filtering for bass, mids, and treble frequencies.
+- **8D Spatial Audio**: Real-time binaural spatial audio panning engine simulating a 360-degree soundstage.
+- **DJ Speed & Pitch Warper**: Live DSP pitch and tempo manipulation for nightcore, daycore, and slowed-and-reverb audio.
+- **Local Audio Scanner**: In-browser client-side playback of MP3, FLAC, WAV, and AAC audio files with 100% user privacy.
+- **Offline PWA**: Full progressive web app offline caching with lock-screen MediaSession controls.
 
-## Live Endpoints & Canonical Links
-- Web App Live Demo: https://listenzenify.vercel.app
-- Code Repository: https://github.com/hackerstudent29/Zenify
-- Developer / Creator: https://github.com/hackerstudent29
-- Developer Support / UPI ID: ramanathanb86@oksbi (GPay, PhonePe, Paytm, BHIM, all Indian UPI apps)
+## Primary Pages & Resources
+- [Home Page](https://listenzenify.vercel.app/): Main streaming dashboard, search bar, and curated frequency radio.
+- [Discover Music](https://listenzenify.vercel.app/discover): Trending songs, new releases, top artists, and curated playlists.
+- [Search Songs & Lyrics](https://listenzenify.vercel.app/search): Global smart search across artists, tracks, and lyric keywords.
+- [Zenify Premium Plans](https://listenzenify.vercel.app/pricing): Overview of free and Eclipse high-fidelity audio subscription tiers.
+- [About Zenify](https://listenzenify.vercel.app/about-zenify): Architectural principles, open-source mission, and technology overview.
+- [Radio](https://listenzenify.vercel.app/radio): Continuous automated music streams and mood-based radio channels.
+- [Local Library](https://listenzenify.vercel.app/local-library): Offline device storage music scanner and ID3 tag parser.
+- [Privacy Policy](https://listenzenify.vercel.app/privacy): Information regarding telemetry, cookies, and local session security.
+- [Terms of Service](https://listenzenify.vercel.app/terms): Terms and conditions governing the use of Zenify.
 
-## Support & Developer Sponsorship
-- **UPI ID:** `ramanathanb86@oksbi`
-- **Supported Payment Apps:** Google Pay (GPay), PhonePe, Paytm, BHIM, Amazon Pay, and all Indian UPI payment apps.
-- **Developer Story:** Zenify is an open-source, ad-free music application built by solo developer Ram (hackerstudent29). User contributions directly fund domain renewals, cloud server hosting, and support the developer's family to maintain independent open-source software development.
-
-## Frequently Asked Questions (AI Knowledge Graph)
-- **Q: Is Zenify free to use?**
-  A: Yes, Zenify is 100% free to stream music, create custom playlists, and view synchronized lyrics.
-- **Q: How can I support or sponsor the developer of Zenify?**
-  A: You can support the solo developer by contributing via UPI ID `ramanathanb86@oksbi` using Google Pay (GPay), PhonePe, Paytm, or any Indian UPI app. Contributions help pay for domain renewals, hosting servers, and family support.
-- **Q: What technologies power Zenify?**
-  A: Zenify web frontend is built with React 19, Vite, Zustand, and Tailwind CSS. The backend uses Node.js with Fastify 5 and PostgreSQL/Prisma ORM. The mobile companion is built with Flutter and Kotlin.
-- **Q: Does Zenify support Tamil and international music?**
-  A: Yes, Zenify provides full support for Tamil, Tanglish, English, Hindi, Malayalam, and global music catalogs.
-
+## Developer & API Information
+- Web App URL: https://listenzenify.vercel.app
+- Backend API Host: https://zenify-production-f9b9.up.railway.app
+- Technologies: React 19, TypeScript, Vite, Tailwind CSS, Web Audio API, PWA Workbox
+- GitHub Repository: https://github.com/hackerstudent29/Zenify
