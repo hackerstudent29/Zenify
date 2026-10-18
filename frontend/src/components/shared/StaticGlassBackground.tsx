@@ -16,6 +16,8 @@ export function StaticGlassBackground({ coverUrl, className }: StaticGlassBackgr
         src={coverUrl} 
         className="absolute inset-0 w-full h-full object-cover blur-[140px] opacity-60 saturate-[1.5] scale-125"
         alt=""
+        loading="lazy"
+        decoding="async"
       />
       {/* Soft overlay so text remains readable everywhere but colors pop vibrantly */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#121214]/40 via-[#121214]/80 to-[#121214]" />

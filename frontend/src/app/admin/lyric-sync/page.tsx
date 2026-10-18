@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -105,6 +106,7 @@ export default function LyricSyncPage() {
  if (!selectedTrackId) {
  return (
  <div className="min-h-screen pb-32 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] bg-[#121214] text-white">
+      <SEO title="Lyric Sync Studio – Zenify Admin" noindex={true} path="/admin/lyric-sync" />
  <div className="max-w-5xl mx-auto px-4 md:px-6">
 
  {/* Header */}

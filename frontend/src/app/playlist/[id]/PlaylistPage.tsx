@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 
@@ -232,7 +233,7 @@ export default function PlaylistDetailPage() {
  <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-lg font-bold text-white/50 mb-6">
  <div className="flex items-center">
  {playlist.user?.avatarUrl ? (
- <img src={getMediaUrl(playlist.user.avatarUrl)} alt="" className="h-5 w-5 rounded-full mr-2 object-cover" />
+ <img src={getMediaUrl(playlist.user.avatarUrl)} alt={playlist.user?.name || "User avatar"} width={20} height={20} loading="lazy" decoding="async" className="h-5 w-5 rounded-full mr-2 object-cover" />
  ) : (
  <div className="h-5 w-5 rounded-full bg-white/10 mr-2 flex-shrink-0" />
  )}
@@ -403,7 +404,7 @@ export default function PlaylistDetailPage() {
  {/* Track Cover */}
  <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-zinc-800 relative shadow-md">
  {track.coverUrl || track.album?.coverUrl ? (
- <img src={getMediaUrl(track.coverUrl || track.album?.coverUrl)} className="w-full h-full object-cover" alt="" />
+ <img src={getMediaUrl(track.coverUrl || track.album?.coverUrl)} className="w-full h-full object-cover" alt={track.title || "Track cover"} width={40} height={40} loading="lazy" decoding="async" />
  ) : (
  <div className="w-full h-full flex items-center justify-center">
  <Music size={16} className="text-zinc-600" />

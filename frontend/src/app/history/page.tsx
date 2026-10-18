@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import { Construction, ArrowLeft } from "lucide-react";
@@ -9,6 +10,7 @@ export default function PlaceholderPage() {
 
  return (
  <div className="flex flex-col items-center justify-center h-[80vh] gap-6 px-6 text-center">
+      <SEO title="Listening History – Zenify" noindex={true} path="/history" />
  <div className="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
  <Construction className="text-violet-500 w-8 h-8" />
  </div>

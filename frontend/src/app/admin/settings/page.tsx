@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -90,6 +91,7 @@ export default function AdminSettingsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
+      <SEO title="Admin Settings – Zenify" noindex={true} path="/admin/settings" />
         <Loader2 className="animate-spin text-white/50 w-8 h-8" />
       </div>
     );

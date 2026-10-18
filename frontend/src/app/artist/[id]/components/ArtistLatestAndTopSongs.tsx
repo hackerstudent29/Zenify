@@ -101,7 +101,7 @@ export function ArtistLatestAndTopSongs({
         {/* Left Thumbnail & Titles */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="relative shrink-0 w-11 h-11 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-sm">
-            <img src={trackCover} alt={track.title} className="w-full h-full object-cover" />
+            <img src={trackCover} alt={track.title || "Track artwork"} width={44} height={44} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             <div className={cn(
               "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
               isThisPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
@@ -200,7 +200,11 @@ export function ArtistLatestAndTopSongs({
               <div className="relative shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-zinc-900 border border-white/10 shadow-lg">
                 <img
                   src={latestReleaseCover}
-                  alt={latestReleaseTitle}
+                  alt={latestReleaseTitle || "Latest release"}
+                  width={128}
+                  height={128}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                 />
               </div>

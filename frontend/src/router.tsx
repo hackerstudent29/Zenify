@@ -96,7 +96,7 @@ export default function AppRouter() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/filter" element={<FilterSettingsPage />} />
           <Route path="/discover" element={<DiscoverPage />} />
-          <Route path="/search" element={<SearchRedirect />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/radio" element={<RadioPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />

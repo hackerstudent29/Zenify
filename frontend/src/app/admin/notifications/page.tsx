@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import { useAuthStore } from "@/store/authStore";
@@ -72,6 +73,7 @@ export default function AdminNotificationsPage() {
 
  return (
  <div className="flex-1 w-full max-w-4xl mx-auto py-8 px-4 md:px-8 pb-32">
+      <SEO title="Push Notifications – Zenify Admin" noindex={true} path="/admin/notifications" />
  <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
  <div>
  <div className="flex items-center gap-3 mb-1">

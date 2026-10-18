@@ -7,8 +7,9 @@ export default function NotFoundPage() {
   return (
     <>
       <SEO
-        title="Page Not Found"
+        title="Page Not Found – Zenify"
         description="The frequency you are looking for does not exist on Zenify."
+        noindex={true}
       />
       <div className="min-h-[75vh] flex flex-col items-center justify-center px-6 text-center select-none">
         <div className="relative mb-8">

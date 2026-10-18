@@ -285,8 +285,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
                       >
                         <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-white/5 border border-white/5 shadow-md">
                           <img 
-                            src={item.artworkUrl100} 
-                            alt="" 
+                            src={item.artworkUrl100} alt={item.trackName || "Track artwork"} width={48} height={48} loading="lazy" decoding="async" 
                             className="w-full h-full object-cover" 
                             onError={(e: any) => { e.currentTarget.src = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=300"; }}
                           />

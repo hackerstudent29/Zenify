@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "vite --port 3001",
-    "build": "tsc && vite build",
+    "prebuild": "node scripts/generate-sitemap.mjs",
+    "build": "tsc && vite build && node scripts/prerender.mjs",
     "preview": "vite preview --port 3001",
     "lint": "eslint"
   },
@@ -15,6 +16,7 @@
     "@fontsource/bodoni-moda": "^5.2.7",
     "@fontsource/cormorant-garamond": "^5.2.11",
     "@fontsource/inter": "^5.2.8",
+    "@fontsource/outfit": "^5.3.0",
     "@fontsource/yeseva-one": "^5.2.7",
     "@fontsource/zalando-sans-semiexpanded": "^5.2.1",
     "@hello-pangea/dnd": "^18.0.1",

@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -56,6 +57,7 @@ export default function NotificationsPage() {
 
     return (
         <div className="min-h-screen pb-32 pt-[52px] md:pt-[calc(var(--header-height)+2.5rem)] px-6 md:px-10 max-w-4xl mx-auto">
+      <SEO title="Notifications – Zenify" noindex={true} path="/notifications" />
             <div className="flex flex-col gap-8">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">

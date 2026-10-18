@@ -35,8 +35,7 @@ export default function Navbar() {
  {user?.avatarUrl ? (
  <img 
  src={getMediaUrl(user.avatarUrl)} 
- className="w-full h-full object-cover" 
- alt="" 
+ className="w-full h-full object-cover" alt={user?.name || "User avatar"} width={28} height={28} loading="lazy" decoding="async" 
  />
  ) : (
  <span className="text-[10px] font-black text-accent">

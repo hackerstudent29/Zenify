@@ -2,8 +2,9 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "cleanUrls": true,
   "rewrites": [
-    { "source": "/((?!assets/|favicon|manifest|logo|zenify_logo|.*\\..*).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|favicon|manifest|logo|zenify_logo|og-image|sitemap|robots|google|fonts/|.*\\..*).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -50,6 +51,14 @@
         {
           "key": "Strict-Transport-Security",
           "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "cross-origin"
         }
       ]
     }

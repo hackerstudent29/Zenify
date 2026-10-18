@@ -12,6 +12,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: null,
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'Zenify Music',
@@ -83,9 +84,27 @@ export default defineConfig({
         warn(warning);
       },
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom', 'zustand'],
-          'vendor-motion': ['framer-motion'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom') || id.includes('zustand')) {
+              return 'vendor-react';
+            }
+            if (id.includes('framer-motion') || id.includes('gsap')) {
+              return 'vendor-motion';
+            }
+            if (id.includes('@radix-ui') || id.includes('radix-ui')) {
+              return 'vendor-radix';
+            }
+            if (id.includes('lucide-react') || id.includes('@animateicons')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('@tanstack')) {
+              return 'vendor-query';
+            }
+            if (id.includes('axios') || id.includes('date-fns') || id.includes('colorthief') || id.includes('idb-keyval')) {
+              return 'vendor-utils';
+            }
+          }
         }
       }
     },

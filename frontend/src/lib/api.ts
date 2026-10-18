@@ -23,15 +23,24 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => {
-    console.log(`✅ API Response: ${response.status} from ${response.config.url}`);
+    if (import.meta.env.DEV) {
+      console.log(`✅ API Response: ${response.status} from ${response.config.url}`);
+    }
     return response;
   },
   (error) => {
     const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${error.config.url}` : error.config?.url;
     
+    // Suppress expected 401s for guest session checks (auth/me, auth/refresh)
+    const isGuestAuthCheck = error.response?.status === 401 && (fullUrl?.includes('auth/me') || fullUrl?.includes('auth/refresh'));
+
     // Suppress expected 404s for gracefully handled UI states to prevent dev overlays
-    if (error.response?.status === 404 && (fullUrl?.includes('sync-lyrics') || fullUrl?.includes('search/smart'))) {
-      console.warn(`⚠️ API Info: Resource not found from ${fullUrl} (Expected behavior)`);
+    const isExpected404 = error.response?.status === 404 && (fullUrl?.includes('sync-lyrics') || fullUrl?.includes('search/smart'));
+
+    if (isGuestAuthCheck || isExpected404) {
+      if (import.meta.env.DEV) {
+        console.debug(`ℹ️ Handled API Response: ${error.response?.status} from ${fullUrl}`);
+      }
     } else {
       console.error(`❌ API Error: ${error.response?.status || 'Network'} from ${fullUrl}`);
     }
@@ -90,8 +99,9 @@ api.interceptors.response.use(
               useAuthStore.getState().logout();
 
               // Do not force-redirect to /login if user is on a public page
-              const publicPaths = ['/login', '/register', '/terms', '/privacy', '/about', '/about-zenify', '/creator', '/local-library'];
-              const isCurrentlyPublic = publicPaths.some(p => window.location.pathname.startsWith(p));
+              const publicPaths = ['/login', '/register', '/terms', '/privacy', '/about', '/about-zenify', '/creator', '/local-library', '/pricing', '/discover', '/search', '/radio', '/track', '/artist', '/album', '/playlist', '/explore', '/section'];
+              const currentPath = window.location.pathname;
+              const isCurrentlyPublic = currentPath === '/' || publicPaths.some(p => currentPath.startsWith(p));
               if (!isCurrentlyPublic) {
                 window.location.href = '/login';
               }

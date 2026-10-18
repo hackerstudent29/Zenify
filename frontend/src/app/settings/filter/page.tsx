@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -38,6 +39,7 @@ function SettingRow({
 }) {
  return (
  <div className="group flex items-center justify-between py-5 px-6 rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/5 mb-1">
+      <SEO title="Filter Settings – Zenify" noindex={true} path="/settings/filter" />
  <div className="flex items-center gap-5 min-w-0">
  {Icon && (
  <div className="shrink-0 w-11 h-11 flex items-center justify-center text-white/40 group-hover:text-brand transition-all duration-300">

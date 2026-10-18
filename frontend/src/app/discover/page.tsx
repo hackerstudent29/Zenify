@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
+import { SEO } from "@/components/shared/SEO";
 
 // Spotify & Apple Music Curated Browse Categories
 const DISCOVER_GENRES = [
@@ -124,7 +125,7 @@ const DEFAULT_LANGUAGES = [
 
 type FilterTab = "all" | "tracks" | "artists" | "albums" | "playlists";
 
-export default function DiscoverPage() {
+export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?: boolean } = {}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -424,6 +425,11 @@ export default function DiscoverPage() {
 
   return (
     <div className="min-h-screen bg-[#121214] text-foreground relative selection:bg-brand selection:text-white pt-[calc(64px+env(safe-area-inset-top,0px))] md:pt-[calc(72px+env(safe-area-inset-top,0px))] pb-[calc(80px+64px+env(safe-area-inset-bottom,0px))] md:pb-[calc(90px+env(safe-area-inset-bottom,0px))]">
+      <SEO
+        title={isSearchRoute ? "Search Songs, Artists & Multilingual Lyrics – Zenify" : "Discover Trending Music, New Releases & Top Charts – Zenify"}
+        description={isSearchRoute ? "Search millions of tracks, albums, and artists with instant playback and synchronized lyrics in Tamil, Hindi, and English on Zenify." : "Explore trending tracks, newly released albums, and curated multilingual playlists with real-time synchronized lyrics on Zenify."}
+        path={isSearchRoute ? "/search" : "/discover"}
+      />
       {/* Subtle Apple Music Ambient Glow */}
       <div className="absolute top-0 inset-x-0 h-96 bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,rgba(225,29,72,0.12),transparent)] pointer-events-none" />
 
@@ -434,17 +440,12 @@ export default function DiscoverPage() {
         {/* ========================================================= */}
         <div className="relative md:sticky md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 bg-[#121214]/95 backdrop-blur-2xl py-2 md:py-3 border-b border-white/5 space-y-2 md:space-y-3">
           
-          {/* Desktop Heading */}
-          <div className="hidden md:flex items-center justify-between gap-4">
+          {/* Unified Single Page Heading */}
+          <div className="flex items-center justify-between gap-4 pt-1 md:pt-0">
             <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">
-              <Compass className="text-brand w-7 h-7 shrink-0" />
-              <span>Discover</span>
+              <Compass className="text-brand w-6 h-6 sm:w-7 sm:h-7 shrink-0" />
+              <span>{isSearchRoute ? "Search Music & Lyrics" : "Discover"}</span>
             </h1>
-          </div>
-
-          {/* Mobile Apple Music Large Title */}
-          <div className="flex md:hidden items-center justify-between pt-1">
-            <h1 className="text-3xl font-bold tracking-tight text-white">Search</h1>
           </div>
 
           {/* Search Input Container - Apple Music iOS Style on Mobile */}
@@ -655,7 +656,11 @@ export default function DiscoverPage() {
                         <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-900 border border-white/5 mb-2.5 shadow-md">
                           <img
                             src={getMediaUrl(track.coverUrl) || "/logo.png"}
-                            alt={track.title}
+                            alt={track.title || "Track artwork"}
+                            width={160}
+                            height={160}
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                           <div
@@ -810,8 +815,11 @@ export default function DiscoverPage() {
                       <img
                         src={genre.image}
                         alt={genre.name}
+                        width={80}
+                        height={80}
                         className="w-full h-full object-cover"
                         loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   </div>
@@ -853,7 +861,11 @@ export default function DiscoverPage() {
                         <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 shrink-0 shadow-md">
                           <img
                             src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=120"}
-                            alt={track.title}
+                            alt={track.title || "Track artwork"}
+                            width={48}
+                            height={48}
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />
                           <div
@@ -929,7 +941,11 @@ export default function DiscoverPage() {
                       <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10">
                         <img
                           src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=300"}
-                          alt={album.title}
+                          alt={album.title || "Album artwork"}
+                          width={160}
+                          height={160}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -969,7 +985,11 @@ export default function DiscoverPage() {
                       <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border-2 border-white/10 group-hover:border-brand/40">
                         <img
                           src={getMediaUrl(artist.imageUrl) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200"}
-                          alt={artist.name}
+                          alt={artist.name || "Artist portrait"}
+                          width={96}
+                          height={96}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -1028,7 +1048,11 @@ export default function DiscoverPage() {
                         >
                           <img
                             src={getMediaUrl(topResult.item.coverUrl || topResult.item.imageUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=200"}
-                            alt={topResult.item.title || topResult.item.name}
+                            alt={topResult.item.title || topResult.item.name || "Top search result"}
+                            width={96}
+                            height={96}
+                            fetchPriority="high"
+                            decoding="async"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />
                         </div>
@@ -1113,7 +1137,11 @@ export default function DiscoverPage() {
                                   <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
                                     <img
                                       src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100"}
-                                      alt={track.title}
+                                      alt={track.title || "Track artwork"}
+                                      width={40}
+                                      height={40}
+                                      loading="lazy"
+                                      decoding="async"
                                       className="w-full h-full object-cover"
                                     />
                                     <div
@@ -1205,7 +1233,11 @@ export default function DiscoverPage() {
                                 <div className="w-9 h-9 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
                                   <img
                                     src={getMediaUrl(track.coverUrl)}
-                                    alt={track.title}
+                                    alt={track.title || "Track artwork"}
+                                    width={36}
+                                    height={36}
+                                    loading="lazy"
+                                    decoding="async"
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
@@ -1255,7 +1287,11 @@ export default function DiscoverPage() {
                             <div className="w-24 h-24 rounded-full overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10 group-hover:border-brand/40">
                               <img
                                 src={getMediaUrl(artist.imageUrl) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200"}
-                                alt={artist.name}
+                                alt={artist.name || "Artist portrait"}
+                                width={96}
+                                height={96}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-full object-cover"
                               />
                             </div>
@@ -1303,7 +1339,11 @@ export default function DiscoverPage() {
                             <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10">
                               <img
                                 src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=300"}
-                                alt={album.title}
+                                alt={album.title || "Album artwork"}
+                                width={160}
+                                height={160}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-full object-cover"
                               />
                             </div>
@@ -1336,7 +1376,11 @@ export default function DiscoverPage() {
                             {playlist.coverUrl ? (
                               <img
                                 src={getMediaUrl(playlist.coverUrl)}
-                                alt={playlist.name}
+                                alt={playlist.name || "Playlist cover"}
+                                width={160}
+                                height={160}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-full object-cover"
                               />
                             ) : (

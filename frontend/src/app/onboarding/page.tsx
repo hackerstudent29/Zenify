@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -387,6 +388,7 @@ export default function OnboardingPage() {
         height: viewportHeight ? `${viewportHeight}px` : '100dvh'
       }}
     >
+      <SEO title="Welcome – Zenify" noindex={true} path="/onboarding" />
       {/* ── Stable Header & Progress Indicator ── */}
       <div className="shrink-0 max-w-4xl w-full mx-auto space-y-3">
         <div className="flex items-center justify-between">

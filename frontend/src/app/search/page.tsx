@@ -3,5 +3,5 @@
 import DiscoverPage from "../discover/page";
 
 export default function SearchPage() {
-  return <DiscoverPage />;
+  return <DiscoverPage isSearchRoute={true} />;
 }

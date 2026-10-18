@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -68,6 +69,7 @@ export default function PaymentCallbackPage() {
 
  return (
  <div className="flex flex-col items-center justify-center min-h-[70vh] px-6 text-center">
+      <SEO title="Payment Processing – Zenify" noindex={true} path="/payment/callback" />
  <motion.div
  initial={{ scale: 0.9, opacity: 0 }}
  animate={{ scale: 1, opacity: 1 }}

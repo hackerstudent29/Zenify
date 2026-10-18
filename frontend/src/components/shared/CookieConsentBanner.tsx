@@ -30,7 +30,7 @@ export function CookieConsentBanner() {
           <Cookie className="w-4 h-4" />
         </div>
         <div className="space-y-1.5 flex-1 pr-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-white">Audio & Session Storage</h4>
+          <p className="text-xs font-bold uppercase tracking-wider text-white">Audio & Session Storage</p>
           <p className="text-[11px] text-zinc-400 leading-relaxed">
             Zenify uses essential cookies and local audio storage to maintain your login session, save EQ audio presets, and provide fast playback. Learn more in our{' '}
             <Link to="/privacy" className="text-brand hover:underline font-medium">Privacy Policy</Link>.

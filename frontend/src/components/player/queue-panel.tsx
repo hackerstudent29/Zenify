@@ -169,7 +169,11 @@ export function QueuePanel() {
                       <img
                         src={getMediaUrl(track.coverUrl) || "/logo.png"}
                         className="w-full h-full object-cover"
-                        alt=""
+                        alt={track.title || "Track artwork"}
+                        width={40}
+                        height={40}
+                        loading="lazy"
+                        decoding="async"
                       />
                     </div>
                     <div className="flex-1 min-w-0">

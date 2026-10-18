@@ -9,8 +9,9 @@ export default function TermsPage() {
   return (
     <>
       <SEO
-        title="Terms of Service"
+        title="Terms of Service – Zenify"
         description="Read the terms and conditions governing the use of Zenify music streaming platform."
+        path="/terms"
       />
       <div className="max-w-4xl mx-auto px-6 py-12 text-zinc-300">
         <div className="mb-8">

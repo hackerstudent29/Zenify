@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,13 +6,13 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import api from "@/lib/api";
-import { useGoogleLogin } from '@react-oauth/google';
+import { useGoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { Eye, EyeOff, Check, X, Loader2, AlertCircle } from "lucide-react";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
 import { LiquidBackground } from "@/components/shared/LiquidBackground";
 import { cn } from "@/lib/utils";
 
-export default function AuthPage() {
+function AuthPageContent() {
   const router = useRouter();
   const { login, isAuthenticated } = useAuthStore();
   const showLoginSplash = useUIStore(s => s.showLoginSplash);
@@ -283,7 +284,7 @@ export default function AuthPage() {
   };
 
   const getInputClass = (hasError?: boolean) => cn(
-    "w-full rounded-xl border bg-black/60 backdrop-blur-xl px-4 py-2.5 text-[13px] text-white placeholder:text-zinc-400 focus:outline-none transition-all shadow-inner font-medium",
+    "w-full h-11 min-h-[44px] rounded-xl border bg-black/60 backdrop-blur-xl px-4 py-2.5 text-[13px] text-white placeholder:text-zinc-400 focus:outline-none transition-all shadow-inner font-medium",
     hasError 
       ? "border-brand/70 ring-1 ring-brand/40 focus:border-brand focus:ring-brand" 
       : "border-white/20 focus:border-brand focus:ring-1 focus:ring-brand/50"
@@ -294,7 +295,8 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black">
+    <main role="main" className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black">
+      <SEO title="Log In – Zenify" noindex={true} path="/login" />
       <LiquidBackground coverUrl="/logo.png" />
       <div className="relative z-10 w-full max-w-[360px] px-5">
 
@@ -357,7 +359,7 @@ export default function AuthPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[13px] font-bold text-brand shadow-lg border border-white/10 transition-all active:scale-95 disabled:opacity-50 mt-4 cursor-pointer"
+                className="w-full h-11 min-h-[44px] flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[13px] font-bold text-white shadow-lg border border-white/10 hover:border-brand/40 transition-all active:scale-95 disabled:opacity-50 mt-4 cursor-pointer"
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin text-brand" /> : "Complete registration"}
               </button>
@@ -448,7 +450,7 @@ export default function AuthPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-11 flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[13px] font-bold text-brand shadow-lg border border-white/10 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                className="w-full h-11 min-h-[44px] flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[13px] font-bold text-white shadow-lg border border-white/10 hover:border-brand/40 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
               >
                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin text-brand" /> : (resetStep === 'request' ? "Send Code" : "Update Password")}
               </button>
@@ -546,7 +548,8 @@ export default function AuthPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -592,7 +595,7 @@ export default function AuthPage() {
                       <span className="text-[12px] text-zinc-300 font-medium leading-tight">
                         I agree to the{" "}
                         <a
-                          href="#/terms"
+                          href="/terms"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-brand hover:underline font-semibold"
@@ -601,7 +604,7 @@ export default function AuthPage() {
                         </a>{" "}
                         &amp;{" "}
                         <a
-                          href="#/privacy"
+                          href="/privacy"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-brand hover:underline font-semibold"
@@ -632,7 +635,7 @@ export default function AuthPage() {
                 <button
                   type="submit"
                   disabled={isLoading || isGoogleLoading}
-                  className="w-full h-11 flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[13px] font-bold text-brand shadow-lg border border-white/10 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                  className="w-full h-11 min-h-[44px] flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[13px] font-bold text-white shadow-lg border border-white/10 hover:border-brand/40 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin text-brand" />
@@ -721,6 +724,14 @@ export default function AuthPage() {
           <span className="text-[13px] font-semibold tracking-tight">{toast.msg}</span>
         </div>
       )}
-    </div>
+    </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <GoogleOAuthProvider clientId="362498893988-fnrqfrbcb6nbs2j2gvnev10qabc4c2en.apps.googleusercontent.com">
+      <AuthPageContent />
+    </GoogleOAuthProvider>
   );
 }

@@ -73,7 +73,11 @@ export function DiscographyTabs({ albums }: DiscographyTabsProps) {
                       <img
                         src={getMediaUrl(album.coverUrl)}
                         className="w-full h-full object-cover"
-                        alt={album.title}
+                        alt={album.title || "Album cover"}
+                        width={200}
+                        height={200}
+                        loading="lazy"
+                        decoding="async"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

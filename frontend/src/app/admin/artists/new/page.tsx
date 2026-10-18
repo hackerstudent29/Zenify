@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 import React from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -29,6 +30,7 @@ export default function NewArtistPage() {
 
  return (
  <div className="min-h-screen pb-32 pt-[52px] md:pt-[calc(var(--header-height)+2rem)] bg-[#050505]">
+      <SEO title="New Artist – Zenify Admin" noindex={true} path="/admin/artists/new" />
  <div className="max-w-6xl mx-auto px-4 md:px-6 relative z-10">
  <div className="flex items-center gap-4 mb-12">
  <Button

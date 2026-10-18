@@ -23,6 +23,7 @@ import { useCloudSyncStore } from "@/store/cloudSyncStore";
 import { formatDuration, cn, formatDisplayTitle, getMediaUrl, formatBytes, calculateCompressedCloudSize } from "@/lib/utils";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
+import { SEO } from "@/components/shared/SEO";
 
 export default function LocalLibraryPage() {
   const router = useRouter();
@@ -434,7 +435,7 @@ export default function LocalLibraryPage() {
           </span>
           <div className="w-10 h-10 rounded-lg bg-zinc-900 border border-white/5 overflow-hidden shrink-0 flex items-center justify-center text-zinc-500 relative">
             {cover ? (
-              <img src={getMediaUrl(cover)} alt={t.title} className="w-full h-full object-cover" />
+              <img src={getMediaUrl(cover)} alt={t.title || "Track artwork"} width={40} height={40} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             ) : (
               <Music size={16} />
             )}
@@ -566,6 +567,11 @@ export default function LocalLibraryPage() {
         setActiveMenuFolderPath(null);
       }}
     >
+      <SEO
+        title="Local Audio Player – Play MP3, FLAC & WAV in Browser – Zenify"
+        description="Play your local music files directly in browser with ID3 metadata parsing, 8D audio effects, equalizer, and private playback."
+        path="/local-library"
+      />
       {/* Hidden File & Folder Inputs */}
       <input
         type="file"
@@ -864,7 +870,7 @@ export default function LocalLibraryPage() {
                       >
                         <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-brand/50 group-hover:scale-[1.02] transition-all relative flex items-center justify-center">
                           {cover ? (
-                            <img src={getMediaUrl(cover)} alt={folder.name} className="w-full h-full object-cover" />
+                            <img src={getMediaUrl(cover)} alt={folder.name || "Folder cover"} width={40} height={40} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-950 flex flex-col items-center justify-center gap-2 text-zinc-500">
                               <Folder size={32} className="text-brand/60" />
@@ -953,7 +959,7 @@ export default function LocalLibraryPage() {
                     >
                       <div className="w-full aspect-square rounded-full overflow-hidden bg-zinc-900 border border-white/10 group-hover:ring-2 ring-brand/50 transition-all shadow-xl shadow-black/40 relative">
                         {artist.coverUrl ? (
-                          <img src={getMediaUrl(artist.coverUrl)} alt={artist.name} className="w-full h-full object-cover" />
+                          <img src={getMediaUrl(artist.coverUrl)} alt={artist.name || "Artist portrait"} width={40} height={40} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-zinc-800 text-zinc-400">
                             <User size={32} />

@@ -1,3 +1,4 @@
+import { SEO } from "@/components/shared/SEO";
 "use client";
 
 import {
@@ -180,6 +181,7 @@ export default function LibraryPage() {
  if (isMobile) {
  return (
  <>
+      <SEO title="Your Library – Zenify" noindex={true} path="/library" />
  <MobileLibraryPage onOpenCreatePlaylist={() => setIsCreateModalOpen(true)} />
  <CreatePlaylistModal
         isOpen={isCreateModalOpen}
@@ -324,8 +326,7 @@ export default function LibraryPage() {
  >
  <div className="w-full aspect-square rounded-full overflow-hidden bg-white/5 border border-white/10 group- transition-transform shadow-lg shadow-black/50">
  <img
- src={getArtistProfileImage(artist)}
- alt={artist.name}
+ src={getArtistProfileImage(artist)} alt={artist.name || "Artist portrait"} width={160} height={160} loading="lazy" decoding="async"
  className="w-full h-full object-cover"
  />
  </div>
@@ -362,7 +363,7 @@ export default function LibraryPage() {
  getMediaUrl(album.coverUrl) ||
  "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400"
  }
- alt={album.title}
+  alt={album.title || "Album cover"} width={160} height={160} loading="lazy" decoding="async"
  className="w-full h-full object-cover"
  />
  </div>
@@ -397,7 +398,7 @@ export default function LibraryPage() {
  {playlist.coverUrl ? (
  <img
  src={getMediaUrl(playlist.coverUrl)}
- alt={playlist.name}
+  alt={playlist.name || "Playlist cover"} width={160} height={160} loading="lazy" decoding="async"
  className="w-full h-full object-cover"
  />
  ) : (
@@ -531,9 +532,7 @@ export default function LibraryPage() {
  >
  <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
  {playlist.coverUrl ? (
- <img
- src={getMediaUrl(playlist.coverUrl, 'image')}
- className="w-full h-full object-cover transition-all duration-700"
+ <img src={getMediaUrl(playlist.coverUrl, "image")} alt={playlist.name || "Playlist cover"} width={160} height={160} loading="lazy" decoding="async" className="w-full h-full object-cover transition-all duration-700"
  onError={(e) => {
  (e.target as HTMLImageElement).src =
  "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&q=80&fit=crop";
@@ -665,9 +664,7 @@ export default function LibraryPage() {
  >
  <div className="aspect-square bg-zinc-900 rounded-lg overflow-hidden shadow-xl ring-1 ring-white/5 group-hover:ring-accent/50 group-hover:scale-[1.02] transition-all flex items-center justify-center">
  {album.coverUrl ? (
- <img
- src={getMediaUrl(album.coverUrl)}
- className="w-full h-full object-cover transition-all duration-700"
+ <img src={getMediaUrl(album.coverUrl)} alt={album.title || "Album cover"} width={160} height={160} loading="lazy" decoding="async" className="w-full h-full object-cover transition-all duration-700"
  onError={(e) => {
  (e.target as HTMLImageElement).src =
  "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&q=80&fit=crop";
@@ -676,7 +673,7 @@ export default function LibraryPage() {
  ) : (
  <img
  src={`https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&q=80`}
- className="w-full h-full object-cover opacity-40 mix-blend-luminosity"
+ className="w-full h-full object-cover opacity-40 mix-blend-luminosity" alt={album.title || "Album placeholder cover"} width={160} height={160} loading="lazy" decoding="async"
  />
  )}
  </div>
