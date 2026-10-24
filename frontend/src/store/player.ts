@@ -143,11 +143,58 @@ function computeTotalQueue(currentTrack: Track | null, userQueue: UserQueueItem[
   return result;
 }
 
-function extractTrackVibeParams(track: Track, limit = 25) {
+export function detectTrackLanguage(track: Track): string {
+  // 1. Explicit track language
+  const explicit = (track as any).language || (track as any).vibeProfile?.language;
+  if (explicit && typeof explicit === 'string' && explicit.trim() && explicit.toLowerCase() !== 'unknown') {
+    return explicit.trim().toLowerCase();
+  }
+
+  // 2. Romanized language tag (e.g. from lyrics romanization)
+  const romLang = (track as any).romanizedLang;
+  if (romLang && typeof romLang === 'string' && romLang.trim()) {
+    const l = romLang.toLowerCase();
+    if (l.includes('ta') || l.includes('tamil')) return 'tamil';
+    if (l.includes('hi') || l.includes('hindi')) return 'hindi';
+    if (l.includes('te') || l.includes('telugu')) return 'telugu';
+    if (l.includes('ml') || l.includes('malayalam')) return 'malayalam';
+    if (l.includes('kn') || l.includes('kannada')) return 'kannada';
+    if (l.includes('pa') || l.includes('punjabi')) return 'punjabi';
+    if (l.includes('bn') || l.includes('bengali')) return 'bengali';
+    if (l.includes('gu') || l.includes('gujarati')) return 'gujarati';
+    if (l.includes('en') || l.includes('english')) return 'english';
+  }
+
+  // 3. Script character range detection on title, lyrics, and artist
+  const sample = `${track.title || ''} ${track.lyrics || ''} ${(track as any).artistName || ''} ${track.artist?.name || ''}`;
+  for (let i = 0; i < sample.length; i++) {
+    const code = sample.charCodeAt(i);
+    if (code >= 0x0B80 && code <= 0x0BFF) return 'tamil';
+    if (code >= 0x0900 && code <= 0x097F) return 'hindi';
+    if (code >= 0x0C00 && code <= 0x0C7F) return 'telugu';
+    if (code >= 0x0D00 && code <= 0x0D7F) return 'malayalam';
+    if (code >= 0x0C80 && code <= 0x0CFF) return 'kannada';
+    if (code >= 0x0A00 && code <= 0x0A7F) return 'punjabi';
+    if (code >= 0x0980 && code <= 0x09FF) return 'bengali';
+    if (code >= 0x0A80 && code <= 0x0AFF) return 'gujarati';
+  }
+
+  // 4. Check user preferences from localStorage
+  try {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('zenify_preferred_language') || localStorage.getItem('zenify_language');
+      if (stored) return stored.toLowerCase();
+    }
+  } catch {}
+
+  return 'english';
+}
+
+export function extractTrackVibeParams(track: Track, limit = 25) {
   const trackMood = track.aura_vibe || (track as any).mood || (track as any).vibeProfile?.aura_vibe || (track as any).analysisData?.mood || '';
   const trackMovie = (typeof track.album === 'string' ? track.album : track.album?.title) || (track as any).albumTitle || (track as any).movie || '';
   const trackArtist = track.artist?.name || (track as any).artistName || '';
-  const trackLang = (track as any).language || (track as any).vibeProfile?.language || '';
+  const trackLang = detectTrackLanguage(track);
   const trackGenre = track.genre || (track as any).vibeProfile?.genre || '';
 
   return {
@@ -515,23 +562,26 @@ export const usePlayerStore = create<PlayerState>()(
           }
         } catch {}
 
-        if (isAutoplay) {
+        if (isAutoplay && currentTrack) {
           (async () => {
             try {
               const api = (await import("@/lib/api")).default;
+              const vibeParams = extractTrackVibeParams(currentTrack, 25);
               const radioRes = await api.get('/queue/radio', {
-                params: extractTrackVibeParams(currentTrack, 20)
+                params: vibeParams
               });
-              if (radioRes.data?.tracks?.length) {
-                const fresh = radioRes.data.tracks.filter((t: Track) => t.id !== currentTrack.id);
+              const fetchedTracks: Track[] = radioRes.data?.tracks || [];
+              if (fetchedTracks.length > 0) {
+                const fresh = fetchedTracks.filter((t: Track) => t.id !== currentTrack.id);
                 if (fresh.length > 0) {
                   const [nextTrack, ...restFresh] = fresh;
+                  const langTitle = vibeParams.language ? (vibeParams.language.charAt(0).toUpperCase() + vibeParams.language.slice(1)) : 'Recommended';
                   set({
                     currentTrack: nextTrack,
                     isPlaying: true,
                     contextQueue: restFresh,
                     contextOriginalQueue: restFresh,
-                    contextName: "Recommended Radio",
+                    contextName: `${langTitle} Radio`,
                     repeatCounter: 0,
                     currentTime: 0,
                     duration: nextTrack.duration || 0,

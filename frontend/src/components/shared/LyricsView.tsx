@@ -906,20 +906,14 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
           onWheel={handleWheel}
           onTouchMove={handleTouchMove}
         >
-          <div className={cn("flex flex-col gap-3 pb-20", isFullscreen ? "max-w-5xl mx-auto" : "")}>
+          <div className={cn("flex flex-col gap-8 pb-24", isFullscreen ? "max-w-5xl mx-auto" : "")}>
             {processedLines.map((line: any, idx: number) => (
               <p
                 key={`${trackId}-unsynced-${idx}`}
                 className={cn(
-                  "text-white/70 text-center leading-relaxed",
-                  isMobile ? "line-clamp-2 text-[20px]" : (isFullscreen ? "line-clamp-2 text-[26px]" : "line-clamp-2 text-[20px]")
+                  "text-white/80 text-center leading-[1.65] font-semibold tracking-normal",
+                  isMobile ? "text-[20px]" : (isFullscreen ? "text-[28px]" : "text-[22px]")
                 )}
-                style={{
-                  display: "-webkit-box",
-                  WebkitBoxOrient: "vertical",
-                  WebkitLineClamp: 2,
-                  overflow: "hidden"
-                }}
               >
                 {line.text}
               </p>
@@ -970,7 +964,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  <div
  className={cn(
  "flex flex-col relative w-full",
- isFullscreen ? (isMobile ? "px-6 gap-6 max-w-full mx-auto" : "px-10 gap-12 max-w-5xl mx-auto") : (isMobile ? "px-4 items-center gap-6" : "px-8 items-center gap-10")
+ isFullscreen ? (isMobile ? "px-6 gap-8 max-w-full mx-auto" : "px-10 gap-14 max-w-5xl mx-auto") : (isMobile ? "px-4 items-center gap-8" : "px-8 items-center gap-12")
  )}
  >
  {/* Spacer block to push the very first line precisely to the vertical focal zone */}

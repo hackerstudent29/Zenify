@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePlayerStore } from "@/store/player";
+import { usePlayerStore, extractTrackVibeParams } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { audioEngine } from "@/lib/audio-engine";
 import { getMediaUrl, getTrackCover } from "@/lib/utils";
@@ -31,6 +31,7 @@ export function GlobalAudio() {
   const lastUpdateTime = useRef(0);
   const accumulatedSecondsRef = useRef(0);
   const isCrossfadingRef = useRef(false);
+  const isPrefetchingRadioRef = useRef(false);
   const queryClient = useQueryClient();
 
   const audioFxRef = useRef(audioFx);
@@ -196,6 +197,49 @@ export function GlobalAudio() {
                     artist: nextTrack.artist?.name || nextTrack.artistName || '',
                     duration: nextTrack.duration
                   }).catch(() => {});
+                });
+              }
+            }
+          }
+        }
+
+        // Proactive Radio Queue Refill: when queue is down to its last song and ~18s remain
+        if (audio.duration >= 20) {
+          const timeLeft = audio.duration - audio.currentTime;
+          if (timeLeft <= 18 && timeLeft > 2) {
+            const state = usePlayerStore.getState();
+            const curr = state.currentTrack;
+            const isEndOfQueue = state.contextQueue.length === 0 && (state.userQueue || []).length === 0;
+            if (isEndOfQueue && curr && !isPrefetchingRadioRef.current) {
+              let isAutoplay = true;
+              try {
+                const localPref = localStorage.getItem("zenify_autoplay");
+                if (localPref !== null) isAutoplay = localPref === "true";
+              } catch {}
+              if (isAutoplay) {
+                isPrefetchingRadioRef.current = true;
+                import("@/lib/api").then(({ default: api }) => {
+                  const vibeParams = extractTrackVibeParams(curr, 25);
+                  api.get('/queue/radio', { params: vibeParams }).then((res: any) => {
+                    const fresh = (res.data?.tracks || []).filter((t: any) => t.id !== curr.id);
+                    if (fresh.length > 0) {
+                      const langTitle = vibeParams.language ? (vibeParams.language.charAt(0).toUpperCase() + vibeParams.language.slice(1)) : 'Recommended';
+                      usePlayerStore.setState(s => ({
+                        contextQueue: fresh,
+                        contextOriginalQueue: fresh,
+                        contextName: `${langTitle} Radio`,
+                        queue: [
+                          s.currentTrack,
+                          ...(s.userQueue ? s.userQueue.map(u => u.track) : []),
+                          ...fresh
+                        ].filter(Boolean) as any
+                      }));
+                    }
+                  }).catch((err) => {
+                    console.warn("[GlobalAudio/Radio] Prefetch radio queue notice:", err);
+                  }).finally(() => {
+                    setTimeout(() => { isPrefetchingRadioRef.current = false; }, 10000);
+                  });
                 });
               }
             }
@@ -538,6 +582,7 @@ export function GlobalAudio() {
         isSourceChanging.current = true;
         isCrossfadingRef.current = false;
         prefetchedTrackIds.current.clear();
+        isPrefetchingRadioRef.current = false;
 
         // 1. If currently playing, we avoid audio.pause() or audio.load() to maintain continuous media session token in background tabs
         const wasActive = isPlaying && !audio.paused;
