@@ -326,7 +326,7 @@ export function TopBar() {
  placeholder={placeholderText + (cursorBlink ? "|" : "")}
  value={query}
  onFocus={() => setSearchFocused(true)}
- className="w-full bg-[#18181b]/80 backdrop-blur-2xl transition-all border border-white/20 hover:border-white/35 focus:border-white/60 focus:shadow-[0_0_20px_rgba(255,255,255,0.15)] focus:bg-[#18181b]/95 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none text-white placeholder:text-white/60 font-sans shadow-lg"
+ className="w-full glass-panel transition-all border border-white/20 hover:border-white/30 focus:border-white/50 focus:shadow-[0_0_15px_rgba(255,255,255,0.15)] focus:bg-white/10 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none text-white placeholder:text-white/60 font-sans"
  onChange={(e) => setQuery(e.target.value)}
  />
 
@@ -338,7 +338,7 @@ export function TopBar() {
  animate={{ opacity: 1, scale: 1, y: 0 }}
  exit={{ opacity: 0, scale: 0.98, y: -10 }}
  transition={{ duration: 0.1, ease: "easeOut" }}
- className="absolute top-[calc(100%+12px)] left-0 w-full rounded-2xl z-[9998] overflow-visible flex flex-col max-h-[80vh] bg-[#121214]/95 backdrop-blur-2xl border border-white/15 shadow-2xl search-container"
+ className="absolute top-[calc(100%+12px)] left-0 w-full rounded-2xl z-[9998] overflow-visible flex flex-col max-h-[80vh] glass-panel search-container"
  onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
  >
  {/* Filter Bar */}
