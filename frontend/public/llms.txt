@@ -26,6 +26,6 @@ Zenify offers a seamless, ad-free listening experience directly in the web brows
 
 ## Developer & API Information
 - Web App URL: https://listenzenify.vercel.app
-- Backend API Host: https://zenify-production-f9b9.up.railway.app
+- Backend API Host: https://zenify-78e257420386.herokuapp.com
 - Technologies: React 19, TypeScript, Vite, Tailwind CSS, Web Audio API, PWA Workbox
 - GitHub Repository: https://github.com/hackerstudent29/Zenify
