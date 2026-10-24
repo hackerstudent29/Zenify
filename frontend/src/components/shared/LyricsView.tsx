@@ -226,7 +226,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     return () => window.removeEventListener('zenify:track-updated', handleTrackUpdated);
   }, [trackId, queryClient]);
 
-  // Guaranteed synced romanization: Never drops sync or unblurs all lines when changing language
+  // Guaranteed synced romanization: STRICTLY anchored to baseSynced timestamps so Tanglish/English timing is 100% identical!
   const activeData = React.useMemo(() => {
     const baseSynced = (data?.syncedTokens && data.syncedTokens.length > 0)
       ? data.syncedTokens
@@ -236,30 +236,35 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
       return baseSynced;
     }
 
-    // 1. If pre-computed romanized synced tokens exist, use them
+    // When Romanized/Tanglish is active, use baseSynced as the absolute master clock:
+    // Every single line and syllable preserves its exact time, endTime, and word timestamps!
+    if (baseSynced.length > 0) {
+      const romLines = (typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0)
+        ? romanizedPlain.split("\n").map(l => l.trim()).filter(Boolean)
+        : null;
+
+      const hasPrecomputedSynced = Array.isArray(romanizedSynced) && romanizedSynced.length > 0;
+
+      return baseSynced.map((token: any, idx: number) => {
+        const precomputedToken = hasPrecomputedSynced ? romanizedSynced[idx] : null;
+        const text = precomputedToken?.text || (romLines && romLines[idx]) || transliterateLineRuleBased(token.text || "");
+
+        // Word-level syllable timestamps strictly preserved from baseSynced
+        const words = token.words?.map((w: any, wIdx: number) => ({
+          ...w, // Preserves time, endTime!
+          word: (precomputedToken?.words && precomputedToken.words[wIdx]?.word) || transliterateLineRuleBased(w.word || "")
+        }));
+
+        return {
+          ...token, // Preserves time, endTime, isInterlude!
+          text,
+          words: words || token.words
+        };
+      });
+    }
+
     if (Array.isArray(romanizedSynced) && romanizedSynced.length > 0) {
       return romanizedSynced;
-    }
-
-    // 2. If plain romanized lyrics exist and base synced lyrics exist, project plain romanized lines onto synced timestamps!
-    if (baseSynced.length > 0 && typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0) {
-      const romLines = romanizedPlain.split("\n").map(l => l.trim()).filter(Boolean);
-      if (romLines.length > 0) {
-        return baseSynced.map((token: any, idx: number) => ({
-          ...token,
-          text: romLines[idx] || transliterateLineRuleBased(token.text || ""),
-          words: token.words ? token.words.map((w: any) => ({ ...w, word: transliterateLineRuleBased(w.word || "") })) : undefined
-        }));
-      }
-    }
-
-    // 3. Fallback: rule-based instant transliteration over base synced tokens so sync never breaks!
-    if (baseSynced.length > 0) {
-      return baseSynced.map((token: any) => ({
-        ...token,
-        text: transliterateLineRuleBased(token.text || ""),
-        words: token.words ? token.words.map((w: any) => ({ ...w, word: transliterateLineRuleBased(w.word || "") })) : undefined
-      }));
     }
 
     return [];
@@ -428,7 +433,13 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   }, [activeData, activePlainLyrics, duration, data?.source]);
 
  // 60fps RAF smoothTime rendering & active index calculation (unified single RAF loop)
-  const initialTime = React.useMemo(() => usePlayerStore.getState().currentTime, []);
+  const initialTime = React.useMemo(() => {
+    const audio = audioEngine.getActiveAudioElement();
+    const t = (audio && Number.isFinite(audio.currentTime)) 
+      ? audio.currentTime 
+      : usePlayerStore.getState().currentTime;
+    return Math.max(0, t + (currentTrack?.lyricsOffset || 0) / 1000);
+  }, [currentTrack?.lyricsOffset]);
   const smoothTimeValue = useMotionValue(initialTime);
   const isSeekingRef = React.useRef(false);
 
@@ -452,7 +463,22 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }, 500);
   }, [trackId, lyricsOffsetMs, setLyricsOffsetStore]);
 
-  const [activeIndex, setActiveIndex] = React.useState(0);
+  const [activeIndex, setActiveIndex] = React.useState(() => {
+    const audio = audioEngine.getActiveAudioElement();
+    const t = (audio && Number.isFinite(audio.currentTime)) 
+      ? audio.currentTime 
+      : usePlayerStore.getState().currentTime;
+    const targetT = Math.max(0, t + (currentTrack?.lyricsOffset || 0) / 1000);
+    if (processedLines && processedLines.length > 0) {
+      let idx = 0;
+      for (let i = 0; i < processedLines.length; i++) {
+        if (targetT >= processedLines[i].time) idx = i;
+        else break;
+      }
+      return idx;
+    }
+    return 0;
+  });
   const processedLinesRef = React.useRef<any[]>([]);
   
   React.useEffect(() => {
@@ -737,14 +763,21 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
   const [showLoading, setShowLoading] = React.useState(false);
   
   React.useEffect(() => {
-    if (isLoading) {
+    const hasLyricsInMemory = Boolean(
+      (data?.syncedTokens && data.syncedTokens.length > 0) ||
+      (currentTrack?.synced_lyrics && currentTrack.synced_lyrics.length > 0) ||
+      (data as any)?.plainLyrics ||
+      rawLyrics ||
+      processedLines.length > 0
+    );
+    if (isLoading && !hasLyricsInMemory) {
       setShowLoading(true);
-      const timer = setTimeout(() => setShowLoading(false), 2000); // 2 seconds max loading spinner
+      const timer = setTimeout(() => setShowLoading(false), 2000);
       return () => clearTimeout(timer);
     } else {
       setShowLoading(false);
     }
-  }, [isLoading, trackId]);
+  }, [isLoading, trackId, data, currentTrack?.synced_lyrics, rawLyrics, processedLines.length]);
 
   if (showLoading) {
     return (

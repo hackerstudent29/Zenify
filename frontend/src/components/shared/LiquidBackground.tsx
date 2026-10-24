@@ -327,9 +327,8 @@ export const LiquidBackground = React.memo(function LiquidBackground({
 
     const currentLoadId = ++activeLoadIdRef.current;
 
-    const applyFallback = (useBrand = false) => {
-      // Never wipe an already active real texture back to neutral fallback
-      if (hasUploadedRealTextureRef.current) return;
+    const applyFallback = (useBrand = false, force = false) => {
+      if (hasUploadedRealTextureRef.current && !force) return;
       try {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, useBrand ? brandPixels : fallbackPixels);
@@ -338,16 +337,16 @@ export const LiquidBackground = React.memo(function LiquidBackground({
       }
     };
 
-    const loadImage = (srcUrl: string) => {
-      if (!srcUrl || srcUrl.includes("/logo.png") || srcUrl.endsWith("placeholder.jpg")) {
-        applyFallback(srcUrl.includes("/logo.png"));
+    const loadImage = (rawUrl: string) => {
+      if (!rawUrl || rawUrl.includes("/logo.png") || rawUrl.endsWith("placeholder.jpg")) {
+        applyFallback(rawUrl?.includes("/logo.png"), true);
         return;
       }
 
       // Check instant in-memory cache for seamless 0ms swap
-      if (imageCache.has(srcUrl)) {
+      if (imageCache.has(rawUrl)) {
         try {
-          const cachedImg = imageCache.get(srcUrl)!;
+          const cachedImg = imageCache.get(rawUrl)!;
           gl.bindTexture(gl.TEXTURE_2D, texture);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cachedImg);
           hasUploadedRealTextureRef.current = true;
@@ -357,29 +356,38 @@ export const LiquidBackground = React.memo(function LiquidBackground({
         }
       }
 
-      const img = new Image();
-      if (srcUrl.startsWith("http")) {
-        img.crossOrigin = "anonymous";
-      }
-      img.src = srcUrl;
-      img.onload = () => {
-        if (isDestroyedRef.current || activeLoadIdRef.current !== currentLoadId) return;
-        try {
-          imageCache.set(srcUrl, img);
-          gl.bindTexture(gl.TEXTURE_2D, texture);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-          hasUploadedRealTextureRef.current = true;
-        } catch (err) {
-          console.warn("[LiquidBackground] WebGL texture upload error:", err);
-          applyFallback();
+      // Try direct CDN load first (Apple Music, Saavn, Cloudinary, etc. have permissive CORS)
+      const tryLoad = (src: string, isFallback: boolean = false) => {
+        const img = new Image();
+        if (src.startsWith("http")) {
+          img.crossOrigin = "anonymous";
         }
+        img.src = src;
+        img.onload = () => {
+          if (isDestroyedRef.current || activeLoadIdRef.current !== currentLoadId) return;
+          try {
+            imageCache.set(rawUrl, img);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            hasUploadedRealTextureRef.current = true;
+          } catch (err) {
+            console.warn("[LiquidBackground] WebGL texture upload error:", err);
+            if (!isFallback) tryLoad(getCorsUrl(rawUrl), true);
+            else applyFallback();
+          }
+        };
+        img.onerror = () => {
+          if (activeLoadIdRef.current !== currentLoadId) return;
+          if (!isFallback && !src.includes("proxy-image")) {
+            tryLoad(getCorsUrl(rawUrl), true);
+          } else {
+            console.warn("[LiquidBackground] Failed to load cover image:", src);
+            applyFallback();
+          }
+        };
       };
-      img.onerror = () => {
-        if (activeLoadIdRef.current === currentLoadId) {
-          console.warn("[LiquidBackground] Failed to load cover image:", srcUrl);
-          applyFallback();
-        }
-      };
+
+      tryLoad(rawUrl, false);
     };
 
     const loadMultiImages = (urls: string[]) => {
@@ -477,7 +485,7 @@ export const LiquidBackground = React.memo(function LiquidBackground({
     if (covers && covers.length > 1) {
       loadMultiImages(covers);
     } else {
-      loadImage(getCorsUrl(coverUrl || ""));
+      loadImage(coverUrl || "");
     }
   }, [coverUrl, covers ? covers.join(',') : '', brandPixels, fallbackPixels]);
 

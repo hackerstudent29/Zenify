@@ -219,7 +219,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       style={{
         fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
         fontSize,
-        lineHeight: 1.5,
+        lineHeight: 1.15,
         fontWeight: isFullscreen ? 800 : 700,
         letterSpacing: "normal",
         opacity: targetOpacity,
@@ -238,8 +238,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         )} 
         style={{ 
           transformOrigin: origin, 
-          rowGap: "0.25em",
-          columnGap: "0.26em",
+          rowGap: "0.04em",
+          columnGap: "0.24em",
           wordBreak: "normal", 
           overflowWrap: "normal"
         }}

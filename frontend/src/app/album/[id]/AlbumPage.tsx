@@ -81,14 +81,13 @@ export default function AlbumPage() {
    if (singleCover) {
      const resolvedCover = getMediaUrl(singleCover) || singleCover;
      setPageCoverUrl(resolvedCover);
+     setPageCovers(null);
    }
 
-   const covers = album?.tracks?.slice(0, 4).map((t: any) => {
-     return t?.coverUrl ? (getMediaUrl(t.coverUrl) || t.coverUrl) : null;
-   }).filter(Boolean);
-   if (covers && covers.length > 0) {
-     setPageCovers(covers);
-   }
+   return () => {
+     setPageCoverUrl(null);
+     setPageCovers(null);
+   };
  }, [album?.coverUrl, album?.tracks, setPageCoverUrl, setPageCovers]);
 
  const { data: playlists } = useQuery({
