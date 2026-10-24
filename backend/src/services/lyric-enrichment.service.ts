@@ -517,10 +517,16 @@ export class LyricEnrichmentService {
                 console.warn(`[LyricEnrichment] Word-by-word check skipped: ${wErr.message}`);
             }
 
-            // Step 2: Line-by-line synced lyrics from LRCLib if word-by-word not found
             if (!lrcCandidate) {
                 console.log(`[LyricEnrichment] Step 2: Searching line-by-line approved lyrics sources (LRCLib) for "${track.title}"...`);
-                lrcCandidate = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration);
+                const detectedLang = track.language || (
+                    track.title.toLowerCase().includes('tamil') ? 'tamil' :
+                    track.title.toLowerCase().includes('telugu') ? 'telugu' :
+                    track.title.toLowerCase().includes('hindi') ? 'hindi' :
+                    track.title.toLowerCase().includes('malayalam') ? 'malayalam' :
+                    track.title.toLowerCase().includes('kannada') ? 'kannada' : undefined
+                );
+                lrcCandidate = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration, detectedLang);
             }
 
             if (lrcCandidate && lrcCandidate.lyrics) {

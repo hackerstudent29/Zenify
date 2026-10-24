@@ -74,8 +74,19 @@ export async function metadataRoutes(server: FastifyInstance) {
 
         const provider = body.provider || 'auto';
         const artistName = track.artist?.name || '';
+        const targetLanguage = track.language || (
+            track.title.toLowerCase().includes('tamil') ? 'tamil' :
+            track.title.toLowerCase().includes('telugu') ? 'telugu' :
+            track.title.toLowerCase().includes('hindi') ? 'hindi' :
+            track.title.toLowerCase().includes('malayalam') ? 'malayalam' :
+            track.title.toLowerCase().includes('kannada') ? 'kannada' : undefined
+        );
+
         let syncedTokens: any[] = [];
-        let plainLyrics = track.lyrics || '';
+        let plainLyrics = '';
+        if (track.lyrics && (!targetLanguage || !LyricsEnhancementService.isLyricsLanguageMismatch(track.lyrics, targetLanguage))) {
+            plainLyrics = track.lyrics;
+        }
         let rawLrc: string | undefined;
         let chosenSource = provider;
 
@@ -87,13 +98,13 @@ export async function metadataRoutes(server: FastifyInstance) {
                 chosenSource = 'DEEPGRAM_AI';
             }
         } else if (provider === 'lrclib') {
-            const lrc = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration).catch(() => null);
+            const lrc = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration, targetLanguage).catch(() => null);
             if (lrc?.lyrics) {
                 if (lrc.isSynced) {
                     const parsed = LyricsSyncService.parseLRC(lrc.lyrics);
-syncedTokens = parsed;
-rawLrc = lrc.lyrics;
-plainLyrics = parsed.map((p: any) => p.text).filter(Boolean).join('\n');
+                    syncedTokens = parsed;
+                    rawLrc = lrc.lyrics;
+                    plainLyrics = parsed.map((p: any) => p.text).filter(Boolean).join('\n');
                 } else {
                     plainLyrics = lrc.lyrics;
                 }
@@ -104,8 +115,8 @@ plainLyrics = parsed.map((p: any) => p.text).filter(Boolean).join('\n');
             if (sp?.lyrics) {
                 if (sp.isSynced) {
                     const parsed = LyricsSyncService.parseLRC(sp.lyrics);
-syncedTokens = parsed;
-rawLrc = sp.lyrics;
+                    syncedTokens = parsed;
+                    rawLrc = sp.lyrics;
                 }
                 plainLyrics = sp.lyrics;
                 chosenSource = 'SPOTIFY_LRC';
@@ -154,8 +165,22 @@ rawLrc = sp.lyrics;
                 }
             }
         } else {
-            // Auto
-            if (track.audioUrl && DeepgramLyricsService.isAvailable()) {
+            // Auto / Best Available Pipeline:
+            // 1. LRCLIB with language verification
+            const lrc = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration, targetLanguage).catch(() => null);
+            if (lrc?.lyrics) {
+                if (lrc.isSynced) {
+                    const parsed = LyricsSyncService.parseLRC(lrc.lyrics);
+                    syncedTokens = parsed;
+                    rawLrc = lrc.lyrics;
+                    plainLyrics = parsed.map((p: any) => p.text).filter(Boolean).join('\n');
+                    chosenSource = 'LRCLIB';
+                } else {
+                    plainLyrics = lrc.lyrics;
+                }
+            }
+            // 2. Deepgram if audioUrl is present and still not synced
+            if (!syncedTokens.length && track.audioUrl && DeepgramLyricsService.isAvailable()) {
                 const dg = await DeepgramLyricsService.syncTrackLyrics(track.id, { force: true }).catch(() => null);
                 if (dg?.syncedTokens?.length) {
                     syncedTokens = dg.syncedTokens;
@@ -163,27 +188,14 @@ rawLrc = sp.lyrics;
                     chosenSource = 'DEEPGRAM_AI';
                 }
             }
-            if (!syncedTokens.length) {
-                const lrc = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration).catch(() => null);
-                if (lrc?.lyrics) {
-                    if (lrc.isSynced) {
-                        const parsed = LyricsSyncService.parseLRC(lrc.lyrics);
-syncedTokens = parsed;
-rawLrc = lrc.lyrics;
-plainLyrics = parsed.map((p: any) => p.text).filter(Boolean).join('\n');
-                        chosenSource = 'LRCLIB';
-                    } else {
-                        plainLyrics = lrc.lyrics;
-                    }
-                }
-            }
+            // 3. Spotify
             if (!syncedTokens.length) {
                 const sp = await LyricsEnhancementService.fetchSpotifyRapidApiLyrics(track.title, artistName).catch(() => null);
                 if (sp?.lyrics) {
                     if (sp.isSynced) {
                         const parsed = LyricsSyncService.parseLRC(sp.lyrics);
-syncedTokens = parsed;
-rawLrc = sp.lyrics;
+                        syncedTokens = parsed;
+                        rawLrc = sp.lyrics;
                         chosenSource = 'SPOTIFY_LRC';
                     }
                     plainLyrics = sp.lyrics;
@@ -208,6 +220,10 @@ rawLrc = sp.lyrics;
             updateData.sync_source = chosenSource;
             if (rawLrc) updateData.raw_lrc = rawLrc;
         }
+        // Purge previous conflicting language romanizations
+        updateData.romanizedLyrics = null;
+        updateData.romanizedSyncedLyrics = null;
+        updateData.romanizedLang = null;
 
         const updated = await prisma.track.update({
             where: { id: track.id },
