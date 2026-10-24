@@ -46,9 +46,9 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "📡 Deployment Status:"
     echo ""
-    echo "🔧 Backend (Railway):"
-    echo "   URL: https://zenify-production-f9b9.up.railway.app"
-    echo "   Status: Deploying... (check Railway dashboard)"
+    echo "🔧 Backend (Heroku):"
+    echo "   URL: https://zenify-78e257420386.herokuapp.com"
+    echo "   Status: Deploying... (check Heroku dashboard)"
     echo ""
     echo "🌐 Frontend (Vercel):"
     echo "   URL: https://listenzenify.vercel.app"
@@ -61,11 +61,11 @@ if [ $? -eq 0 ]; then
     echo "   • Frontend: ~1-2 minutes"
     echo ""
     echo "🔍 Check deployment status:"
-    echo "   • Railway: https://railway.app/dashboard"
+    echo "   • Heroku: https://dashboard.heroku.com/apps/zenify/activity"
     echo "   • Vercel: https://vercel.com/dashboard"
     echo ""
     echo "🧪 After deployment completes, test your app:"
-    echo "   1. Health Check: curl https://zenify-production-f9b9.up.railway.app/health"
+    echo "   1. Health Check: curl https://zenify-78e257420386.herokuapp.com/health"
     echo "   2. Login: https://listenzenify.vercel.app/login"
     echo ""
 else
@@ -85,7 +85,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     
     echo ""
     echo "🧪 Testing backend health..."
-    health_status=$(curl -s -o /dev/null -w "%{http_code}" https://zenify-production-f9b9.up.railway.app/health)
+    health_status=$(curl -s -o /dev/null -w "%{http_code}" https://zenify-78e257420386.herokuapp.com/health)
     
     if [ "$health_status" == "200" ]; then
         echo -e "${GREEN}✅ Backend is healthy!${NC}"
@@ -94,11 +94,11 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo ""
         echo "Your app is now live at:"
         echo "   Frontend: https://listenzenify.vercel.app"
-        echo "   Backend: https://zenify-production-f9b9.up.railway.app"
+        echo "   Backend: https://zenify-78e257420386.herokuapp.com"
         echo ""
     else
         echo -e "${YELLOW}⚠️  Backend health check returned: $health_status${NC}"
-        echo "Check Railway logs for more details."
+        echo "Check Heroku logs for more details."
     fi
 else
     echo ""

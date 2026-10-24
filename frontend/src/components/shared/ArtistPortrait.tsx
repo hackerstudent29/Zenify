@@ -12,7 +12,7 @@ interface ArtistPortraitProps {
 }
 
 export function ArtistPortrait({ imageUrl, name, className, size = 512, priority = false }: ArtistPortraitProps) {
-  const API_URL = import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL || 'https://zenify-production-f9b9.up.railway.app/api';
+  const API_URL = import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL || 'https://zenify-78e257420386.herokuapp.com/api';
   const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
 
   const [imgSrc, setImgSrc] = useState<string | null>(() => (imageUrl ? getMediaUrl(imageUrl) || null : null));
