@@ -566,15 +566,23 @@ export const usePlayerStore = create<PlayerState>()(
           (async () => {
             try {
               const api = (await import("@/lib/api")).default;
-              const vibeParams = extractTrackVibeParams(currentTrack, 25);
+              const vibeParams = extractTrackVibeParams(currentTrack, 30);
+              const playedIds = new Set([currentTrack.id, ...(updatedHistory || []).map(t => t.id)]);
+              const excludeIdsStr = Array.from(playedIds).slice(-40).join(',');
+
               const radioRes = await api.get('/queue/radio', {
-                params: vibeParams
+                params: {
+                  ...vibeParams,
+                  excludeIds: excludeIdsStr
+                }
               });
               const fetchedTracks: Track[] = radioRes.data?.tracks || [];
               if (fetchedTracks.length > 0) {
-                const fresh = fetchedTracks.filter((t: Track) => t.id !== currentTrack.id);
-                if (fresh.length > 0) {
-                  const [nextTrack, ...restFresh] = fresh;
+                // Strictly exclude any song that was already played!
+                const fresh = fetchedTracks.filter((t: Track) => !playedIds.has(t.id));
+                const candidates = fresh.length > 0 ? fresh : fetchedTracks.filter((t: Track) => t.id !== currentTrack.id);
+                if (candidates.length > 0) {
+                  const [nextTrack, ...restFresh] = candidates;
                   const langTitle = vibeParams.language ? (vibeParams.language.charAt(0).toUpperCase() + vibeParams.language.slice(1)) : 'Recommended';
                   set({
                     currentTrack: nextTrack,

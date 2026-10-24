@@ -14,6 +14,7 @@ const radioQueueSchema = z.object({
   movie: z.string().optional(),
   mood: z.string().optional(),
   aura_vibe: z.string().optional(),
+  excludeIds: z.string().optional(),
   limit: z.coerce.number().optional().default(30)
 });
 
@@ -39,12 +40,20 @@ export async function queueRoutes(server: FastifyInstance) {
       // Allow guest / unauthenticated sessions
     }
 
-    const { seedType, seedId, title, artist, language, genre, country, album, movie, mood, aura_vibe, limit } = req.query;
+    const { seedType, seedId, title, artist, language, genre, country, album, movie, mood, aura_vibe, excludeIds, limit } = req.query;
+
+    const excludedSet = new Set<string>();
+    if (excludeIds) {
+      excludeIds.split(',').forEach(id => {
+        const trimmed = id.trim();
+        if (trimmed) excludedSet.add(trimmed);
+      });
+    }
 
     const tracks = await RecommendationsService.buildRadioQueue(userId, {
       type: (seedType === 'artist' || seedType === 'album') ? seedType : 'track',
       id: seedId
-    }, limit, { title, artist, language, genre, country, album, movie, mood, aura_vibe });
+    }, limit, { title, artist, language, genre, country, album, movie, mood, aura_vibe, excludeIds: excludedSet });
 
     return reply.send({
       seedType,

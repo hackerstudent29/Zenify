@@ -228,6 +228,7 @@ export class RecommendationsService {
       movie?: string;
       mood?: string;
       aura_vibe?: string;
+      excludeIds?: Set<string>;
     }
   ) {
     const cacheKey = `sim:track:${trackId}:${meta?.language || ''}:${meta?.genre || ''}:${meta?.mood || ''}`;
@@ -273,6 +274,7 @@ export class RecommendationsService {
 
     const addCandidate = (cand: any) => {
       if (!cand || !cand.id) return false;
+      if (meta?.excludeIds && meta.excludeIds.has(cand.id)) return false;
       const cTitle = norm(cand.title || '');
       if (!cTitle || seenTitles.has(cTitle)) return false;
 
@@ -361,12 +363,22 @@ export class RecommendationsService {
           }).catch(() => null);
 
           const results = saavnRes?.data?.results || [];
+          const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
           for (const s of results) {
             if (similar.length >= limit) break;
             const sLang = (s.language || '').toLowerCase().trim();
             if (lang && sLang && sLang !== lang.toLowerCase() && !sLang.includes(lang.toLowerCase())) continue;
 
             const cover = s.image ? s.image.replace('150x150', '500x500') : null;
+            const encUrl = s.encrypted_media_url || s.more_info?.encrypted_media_url;
+            let audioUrl = '';
+            if (encUrl) {
+              audioUrl = CleanCdnAudioService.decryptSaavnMediaUrl(encUrl) || '';
+            }
+            if (!audioUrl && s.media_preview_url) {
+              audioUrl = s.media_preview_url;
+            }
+
             const parsed = {
               id: `saavn-${s.id}`,
               title: s.song || s.title,
@@ -383,7 +395,7 @@ export class RecommendationsService {
               },
               coverUrl: cover,
               duration: Number(s.duration) || 180,
-              audioUrl: s.media_preview_url || '',
+              audioUrl: audioUrl,
               language: s.language || lang,
               type: 'track'
             };
@@ -395,40 +407,59 @@ export class RecommendationsService {
       }
     }
 
-    // 4. Multi-Source Search #2: YouTube Music (Expansive artist & vibe catalog)
+    // 4. Multi-Source Search #2: iTunes Music API (Licensed high-quality audio & 600x600 covers)
     if (similar.length < limit) {
       try {
-        const { ExternalMetadataService } = await import('./external-metadata.service.js');
-        const queriesToTry: string[] = [];
-
-        // STRICT LANGUAGE PREFIX: Every search query includes the target language
+        const itunesQueries: string[] = [];
         if (lang) {
-          queriesToTry.push(`${lang} ${vibeKeywords}`);
-          if (movieName && movieName.toLowerCase() !== seedTitle.toLowerCase()) {
-            queriesToTry.push(`${lang} movie songs like ${movieName}`);
-          }
-          if (seedTitle) {
-            queriesToTry.push(`${lang} songs similar to ${seedTitle}`);
-          }
-          queriesToTry.push(`${lang} top songs by various artists`);
+          if (seedTitle) itunesQueries.push(`${lang} ${seedTitle}`);
+          itunesQueries.push(`${lang} ${vibeKeywords}`);
+          if (artName) itunesQueries.push(`${lang} ${artName}`);
         } else {
-          queriesToTry.push(artName ? `songs like ${seedTitle} by ${artName}` : `${vibeKeywords}`);
+          if (seedTitle) itunesQueries.push(artName ? `${seedTitle} ${artName}` : seedTitle);
+          itunesQueries.push(vibeKeywords);
         }
 
-        for (const q of queriesToTry) {
+        for (const q of itunesQueries) {
           if (similar.length >= limit) break;
-          const ytmResults = await ExternalMetadataService.searchYoutubeMusic(q).catch(() => []);
-          for (const item of ytmResults) {
+          const itunesRes = await axios.get(`https://itunes.apple.com/search`, {
+            params: {
+              term: q,
+              entity: 'song',
+              limit: 25
+            },
+            timeout: 4000
+          }).catch(() => null);
+
+          const itunesItems = itunesRes?.data?.results || [];
+          for (const item of itunesItems) {
             if (similar.length >= limit) break;
-            const parsed = ExternalMetadataService.parseYoutubeVideoToTrack(item);
-            if (parsed) {
-              if (lang) (parsed as any).language = lang;
-              addCandidate(parsed);
-            }
+            const cover = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : null;
+            const parsed = {
+              id: `itunes-${item.trackId}`,
+              title: item.trackName,
+              artist: {
+                id: `itunes-artist-${item.artistId || item.trackId}`,
+                name: item.artistName || 'Various Artists',
+                imageUrl: null
+              },
+              artistName: item.artistName || 'Various Artists',
+              album: {
+                id: `itunes-album-${item.collectionId || item.trackId}`,
+                title: item.collectionName || 'Single',
+                coverUrl: cover
+              },
+              coverUrl: cover,
+              duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 180,
+              audioUrl: item.previewUrl || '',
+              language: lang || 'English',
+              type: 'track'
+            };
+            addCandidate(parsed);
           }
         }
-      } catch (extErr: any) {
-        console.warn('[Recommendations] External vibe search error:', extErr.message);
+      } catch (itunesErr: any) {
+        console.warn('[Recommendations] iTunes vibe search error:', itunesErr.message);
       }
     }
 
@@ -772,32 +803,12 @@ export class RecommendationsService {
       movie?: string;
       mood?: string;
       aura_vibe?: string;
+      excludeIds?: Set<string>;
     }
   ) {
-    let engineTracks: any[] = [];
-    try {
-      const { RecommendationEngineService } = await import('./recommendation-engine.service.js');
-      engineTracks = await RecommendationEngineService.buildRadioQueue(userId, {
-        type: seed.type,
-        id: seed.id,
-        title: meta?.title,
-        artistName: meta?.artist,
-        genre: meta?.genre,
-        language: meta?.language
-      }, size);
-    } catch (e: any) {
-      console.warn('[Recommendations] RecommendationEngineService radio queue error:', e.message);
-    }
-
-    // If recommendation engine returned a rich queue (>= 12 tracks), return it
-    if (engineTracks && engineTracks.length >= 12) {
-      return engineTracks;
-    }
-
-    // Otherwise, invoke our smart multi-source vibe discovery
+    // Invoke our smart multi-source vibe discovery directly
     const vibeTracks = await this.getSameVibeTracks(seed.id, size, meta);
 
-    const combined = [...(engineTracks || []), ...vibeTracks];
     const artistCounts: Record<string, number> = {};
     const seenTitles = new Set<string>();
     const finalQueue: any[] = [];
@@ -805,8 +816,9 @@ export class RecommendationsService {
     const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
     const seedTitleNorm = meta?.title ? norm(meta.title) : '';
 
-    for (const t of combined) {
+    for (const t of vibeTracks) {
       if (!t || !t.id) continue;
+      if (meta?.excludeIds && meta.excludeIds.has(t.id)) continue;
       const tNorm = norm(t.title || '');
       if (seedTitleNorm && tNorm === seedTitleNorm) continue;
       if (seenTitles.has(tNorm)) continue;

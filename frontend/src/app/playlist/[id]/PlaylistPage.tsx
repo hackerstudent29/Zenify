@@ -107,6 +107,11 @@ export default function PlaylistDetailPage() {
     if (covers && covers.length > 0) {
       setPageCovers(covers);
     }
+
+    return () => {
+      setPageCoverUrl(null);
+      setPageCovers(null);
+    };
   }, [playlist?.coverUrl, playlist?.tracks, setPageCoverUrl, setPageCovers]);
 
  const deletePlaylistMutation = useMutation({

@@ -90,9 +90,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  
  // Use page cover if available, fallback to playing track cover
  const pageCoverUrl = useUIStore(state => state.pageCoverUrl);
- const pageCovers = useUIStore(state => state.pageCovers);
  const isAlbumOrPlaylist = pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/");
- const activeCoverUrl = isAlbumOrPlaylist ? (pageCoverUrl || undefined) : (pageCoverUrl || currentTrack?.coverUrl);
+ const isPlaylistPage = pathname?.startsWith("/playlist/");
+ const activeCoverUrl = isAlbumOrPlaylist ? (pageCoverUrl || currentTrack?.coverUrl) : (currentTrack?.coverUrl || pageCoverUrl);
 
  const isPlaying = usePlayerStore(state => state.isPlaying);
  const togglePlay = usePlayerStore(state => state.togglePlay);
@@ -364,7 +364,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none">
         <LiquidBackground
           coverUrl={activeCoverUrl || currentTrack?.coverUrl || "/logo.png"}
-          covers={pageCovers || undefined}
+          covers={isPlaylistPage ? (useUIStore.getState().pageCovers || undefined) : undefined}
           speedMultiplier={2.2}
         />
       </div>
