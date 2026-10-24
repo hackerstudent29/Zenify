@@ -11,10 +11,10 @@ export function useHomepageData() {
   const localLang = typeof window !== 'undefined' ? (localStorage.getItem('zenify_selected_language') || localStorage.getItem('zenify_selected_lang')) : null;
   const localCountry = typeof window !== 'undefined' ? localStorage.getItem('zenify_selected_country') : null;
 
-  const rawLang = (user as any)?.preferences?.selectedLanguageName ||
+  const rawLang = user?.preferences?.languages?.[0] ||
+                  (user as any)?.preferences?.selectedLanguageName ||
                   (user as any)?.preferences?.selectedLanguageCode ||
                   localLang ||
-                  user?.preferences?.languages?.[0] ||
                   'Tamil';
 
   const userLang = rawLang.trim();
@@ -208,7 +208,7 @@ export function useHomepageData() {
             const localCountry = typeof window !== 'undefined' ? localStorage.getItem("zenify_selected_country") : null;
             const localLang = typeof window !== 'undefined' ? localStorage.getItem("zenify_selected_language") : null;
             const countryParam = userCountry || localCountry || 'IN';
-            const langParam = userLang || localLang || 'en';
+            const langParam = userLang || localLang || 'ta';
             const res = await api.get(`/discover/sections?country=${encodeURIComponent(countryParam)}&language=${encodeURIComponent(langParam)}`);
             return res.data;
           } catch (e) {
@@ -262,8 +262,16 @@ export function useHomepageData() {
   const discoverData = results[9]?.data;
   const verifiedRegionalShelves: any[] = [];
   if (discoverData?.sections && Array.isArray(discoverData.sections)) {
+    const userSelectedLang = userLang.toLowerCase();
     for (const sec of discoverData.sections) {
       if (sec.items && sec.items.length > 0) {
+        const titleLower = (sec.title || '').toLowerCase();
+        // Strict language check: if shelf title mentions an unselected language like "Hindi" or "Telugu", discard it!
+        if (titleLower.includes('popular in') || titleLower.includes('from your country')) {
+          if (!titleLower.includes(userSelectedLang) && !titleLower.includes('tamil') && !titleLower.includes('india')) {
+            continue;
+          }
+        }
         verifiedRegionalShelves.push({
           type: sec.id,
           title: sec.title,
