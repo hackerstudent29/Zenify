@@ -86,13 +86,23 @@ export class PreferencesController {
 
     await AnalysisSchedulerService.assignUserSlot(userId);
 
-    // 2. Upsert UserPreferences
+    // 2. Resolve normalized country and language to keep in sync
+    const { CountryLanguageService } = await import('../services/country-language.service.js');
+    const primaryLang = data.languages[0] || 'ta';
+    const normLang = CountryLanguageService.normalizeLanguage(primaryLang) || { code: 'ta', name: 'Tamil' };
+    const normCountry = CountryLanguageService.normalizeCountry(data.country) || { code: 'IN', name: 'India' };
+
+    // 3. Upsert UserPreferences
     const updatedPreferences = await prisma.userPreferences.upsert({
       where: { userId },
       update: {
         onboardingCompleted: true,
         onboardingCompletedAt: new Date(),
         languages: data.languages,
+        selectedLanguageCode: normLang.code,
+        selectedLanguageName: normLang.name,
+        selectedCountryCode: normCountry.code,
+        selectedCountryName: normCountry.name,
         preferredGenres: data.preferredGenres,
         favoriteArtists: data.favoriteArtists
       },
@@ -101,6 +111,10 @@ export class PreferencesController {
         onboardingCompleted: true,
         onboardingCompletedAt: new Date(),
         languages: data.languages,
+        selectedLanguageCode: normLang.code,
+        selectedLanguageName: normLang.name,
+        selectedCountryCode: normCountry.code,
+        selectedCountryName: normCountry.name,
         preferredGenres: data.preferredGenres,
         favoriteArtists: data.favoriteArtists
       }

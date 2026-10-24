@@ -276,16 +276,6 @@ export class HomeSectionsService {
         primaryLangName = rawReqLang;
         primaryLangCode = rawReqLang.slice(0, 2).toLowerCase();
       }
-    } else if (preferences?.selectedLanguageName || preferences?.selectedLanguageCode) {
-      const selected = preferences.selectedLanguageName || preferences.selectedLanguageCode;
-      const mapped = LANG_MAP[selected.toLowerCase()];
-      if (mapped) {
-        primaryLangName = mapped.name;
-        primaryLangCode = mapped.code;
-      } else {
-        primaryLangName = preferences.selectedLanguageName || selected;
-        primaryLangCode = (preferences.selectedLanguageCode || 'ta').toLowerCase();
-      }
     } else if (preferences?.languages && preferences.languages.length > 0) {
       const first = preferences.languages[0];
       const mapped = LANG_MAP[first.toLowerCase()];
@@ -295,6 +285,16 @@ export class HomeSectionsService {
       } else {
         primaryLangName = first;
         primaryLangCode = first.slice(0, 2).toLowerCase();
+      }
+    } else if (preferences?.selectedLanguageName || preferences?.selectedLanguageCode) {
+      const selected = preferences.selectedLanguageName || preferences.selectedLanguageCode;
+      const mapped = LANG_MAP[selected.toLowerCase()];
+      if (mapped) {
+        primaryLangName = mapped.name;
+        primaryLangCode = mapped.code;
+      } else {
+        primaryLangName = preferences.selectedLanguageName || selected;
+        primaryLangCode = (preferences.selectedLanguageCode || 'ta').toLowerCase();
       }
     } else if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
       const topLang = Object.entries(profile.languageWeights as Record<string, number>)

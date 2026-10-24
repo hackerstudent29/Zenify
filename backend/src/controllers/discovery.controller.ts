@@ -143,8 +143,8 @@ export class DiscoveryController {
     if ((!countryCode || !languageCode) && userId) {
       const prefs = await prisma.userPreferences.findUnique({ where: { userId } });
       if (prefs) {
-        countryCode = countryCode || prefs.selectedCountryCode || undefined;
-        languageCode = languageCode || prefs.selectedLanguageCode || undefined;
+        countryCode = countryCode || (prefs.languages?.[0] === 'ta' ? 'IN' : prefs.selectedCountryCode) || undefined;
+        languageCode = languageCode || (prefs.languages && prefs.languages.length > 0 ? prefs.languages[0] : prefs.selectedLanguageCode) || undefined;
       }
     }
 
