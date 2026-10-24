@@ -1249,6 +1249,9 @@ export class TrackService {
             }
             if (iTunesMeta.releaseDate) refined.releaseDate = iTunesMeta.releaseDate;
             if (iTunesMeta.genre && (!data.genre || data.genre === 'Unknown')) refined.genre = iTunesMeta.genre;
+            if (iTunesMeta.album && (!refined.album || genericAlbumTitles.includes(refined.album.toLowerCase()))) {
+                refined.album = iTunesMeta.album;
+            }
         }
         
         let artist: import('@prisma/client').Artist | null = null;
@@ -1353,6 +1356,12 @@ export class TrackService {
             } else if (classification.isMovie && classification.movieName) {
                 albumTitleToUse = classification.movieName.trim();
                 isMovieAlbum = true;
+            } else {
+                const match = (refined.title || '').match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i);
+                if (match) {
+                    albumTitleToUse = match[1].trim();
+                    isMovieAlbum = true;
+                }
             }
         } else {
             albumTitleToUse = currentAlbum;
@@ -1391,13 +1400,11 @@ export class TrackService {
                     }
                 });
 
-                const isBulk = data.isBulk === true;
-
                 if (existingAlbum) {
                     console.log(`[Import] Found existing album: ${existingAlbum.title}`);
                     albumId = existingAlbum.id;
-                } else if (isBulk) {
-                    console.log(`[Import] Creating new album (bulk import): ${albumTitleToUse}`);
+                } else if (albumTitleToUse && !genericAlbumTitles.includes(albumTitleToUse.toLowerCase()) && albumTitleToUse.toLowerCase() !== refined.title.toLowerCase()) {
+                    console.log(`[Import] Creating album: ${albumTitleToUse}`);
                     const newAlbum = await prisma.album.create({
                         data: {
                             title: albumTitleToUse,
@@ -1407,7 +1414,7 @@ export class TrackService {
                     });
                     albumId = newAlbum.id;
                 } else {
-                    console.log(`[Import] Skipping album creation for single track import: ${albumTitleToUse}`);
+                    console.log(`[Import] Skipping album creation for single: ${albumTitleToUse}`);
                 }
             } finally {
                 lockResolver();

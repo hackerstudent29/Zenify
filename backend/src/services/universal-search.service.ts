@@ -175,7 +175,7 @@ export class UniversalSearchService {
    * High-speed, comprehensive track search across Zenify DB, JioSaavn 320k CDN, iTunes IN/US, and YouTube Music.
    * Guarantees zero missing songs for both Western and regional tracks.
    */
-  static async searchTracks(query: string, options: { country?: string; limit?: number } = {}): Promise<UniversalTrackItem[]> {
+  static async searchTracks(query: string, options: { country?: string; limit?: number; language?: string } = {}): Promise<UniversalTrackItem[]> {
     const cleanQ = (query || '').trim();
     if (!cleanQ) return [];
 
@@ -298,11 +298,26 @@ export class UniversalSearchService {
           const key = dedupeKey(title, artist);
           let cover = s.image || s.more_info?.image || '';
           cover = cover.replace('150x150', '500x500').replace('50x50', '500x500');
-          const score = scoreTrack(title, artist, cleanQ, 'jiosaavn', album);
+          const candLang = (s.language || s.more_info?.language || '').toLowerCase().trim();
+          let score = scoreTrack(title, artist, cleanQ, 'jiosaavn', album);
+          const preferredLang = (options.language || '').toLowerCase().trim();
+          if (preferredLang) {
+            if (candLang === preferredLang) score += 200;
+            else if (candLang && candLang !== 'unknown') score -= 150;
+          }
 
           const existing = resultMap.get(key);
           if (existing) {
-            // Merge higher resolution cover or update audio hint
+            const existingLang = ((existing as any).language || '').toLowerCase().trim();
+            if (preferredLang && candLang === preferredLang && existingLang !== preferredLang) {
+              existing.coverUrl = cover;
+              existing.artworkUrl100 = cover;
+              existing.collectionName = album;
+              existing.albumOfTrack.name = album;
+              existing.albumOfTrack.coverArt.sources = [{ url: cover, width: 500 }];
+              (existing as any).language = candLang;
+              (existing as any).id = `saavn-${s.id}`;
+            }
             if (!existing.coverUrl && cover) {
               existing.coverUrl = cover;
               existing.artworkUrl100 = cover;

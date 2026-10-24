@@ -69,6 +69,15 @@ export class CleanCdnAudioService {
      */
     static async resolveAudio(queryOrOpts: string | CleanAudioOptions): Promise<CleanAudioResult | null> {
         try {
+            let detectedLang: string | undefined = undefined;
+            const rawQueryStr = (typeof queryOrOpts === 'string' ? queryOrOpts : (queryOrOpts.title || '')).toLowerCase();
+            if (rawQueryStr.includes('tamil') || rawQueryStr.includes('(ta)')) detectedLang = 'tamil';
+            else if (rawQueryStr.includes('telugu') || rawQueryStr.includes('(te)')) detectedLang = 'telugu';
+            else if (rawQueryStr.includes('hindi') || rawQueryStr.includes('(hi)')) detectedLang = 'hindi';
+            else if (rawQueryStr.includes('kannada') || rawQueryStr.includes('(kn)')) detectedLang = 'kannada';
+            else if (rawQueryStr.includes('malayalam') || rawQueryStr.includes('(ml)')) detectedLang = 'malayalam';
+            else if (rawQueryStr.includes('punjabi') || rawQueryStr.includes('(pa)')) detectedLang = 'punjabi';
+
             let opts: CleanAudioOptions;
             if (typeof queryOrOpts === 'string') {
                 if (!queryOrOpts || typeof queryOrOpts !== 'string') return null;
@@ -92,6 +101,9 @@ export class CleanCdnAudioService {
             } else {
                 opts = queryOrOpts;
             }
+            if (!opts.language && detectedLang) {
+                opts.language = detectedLang;
+            }
 
             const rawTitle = (opts.title || '').trim();
             if (!rawTitle) return null;
@@ -113,7 +125,8 @@ export class CleanCdnAudioService {
                 .replace(/\s+/g, ' ')
                 .trim();
 
-            const searchQuery = (cleanA ? `${cleanA} ${cleanT}` : cleanT).slice(0, 120).trim();
+            const langSuffix = opts.language && !cleanT.includes(opts.language.toLowerCase()) ? ` ${opts.language}` : '';
+            const searchQuery = (cleanA ? `${cleanA} ${cleanT}${langSuffix}` : `${cleanT}${langSuffix}`).slice(0, 120).trim();
             console.log(`[CleanCdnAudio] Searching CDN candidate for: "${searchQuery}" (Req Lang: ${opts.language || 'any'}, Artist: ${cleanA || 'any'})`);
 
             // 1. Fetch Candidates via Search API and Autocomplete

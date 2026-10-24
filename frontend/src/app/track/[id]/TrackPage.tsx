@@ -304,8 +304,23 @@ export default function TrackPage() {
  const totalSecs = track.duration % 60;
  const durationStr = `${totalMins}:${String(totalSecs).padStart(2, "0")}`;
 
+  // Extract movie or album title from title brackets like (From "3 (Tamil)") or (From Jailer)
+  const extractMovieFromTitle = (titleStr: string): string | null => {
+    if (!titleStr) return null;
+    const match = titleStr.match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i);
+    return match ? match[1].trim() : null;
+  };
+
   const albumReleaseId = track.album?.id || track.albumId || (track as any).collectionId;
-  const albumDisplay = track.album?.title || (track as any).albumTitle || (track.albumId ? "Album" : `${formatDisplayTitle(track.title)} - Single`);
+  const embeddedMovie = extractMovieFromTitle(track.title);
+  const rawAlbumTitle = (track.album?.title || (track as any).albumTitle || (track as any).collectionName || '').trim();
+  const isSameAsSong = rawAlbumTitle.toLowerCase() === track.title.trim().toLowerCase();
+
+  const albumDisplay = embeddedMovie
+    ? embeddedMovie
+    : (!isSameAsSong && rawAlbumTitle && rawAlbumTitle.toLowerCase() !== 'unknown')
+      ? rawAlbumTitle
+      : 'Single';
   const albumHref = albumReleaseId ? `/album/${albumReleaseId}` : undefined;
   const rawLabel = (track as any).label || (track as any).publisher || (track.album as any)?.label;
   const labelDisplay = (!rawLabel || rawLabel.trim().toLowerCase() === "unknown" || rawLabel.trim().toLowerCase() === "null")
