@@ -35,9 +35,9 @@ export function getApiBaseUrl() {
  if (!envUrl && typeof process !== 'undefined' && process.env) {
  envUrl = (process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_URL || '') as string;
  }
- let rawUrl = envUrl || 'https://zenify-production-f9b9.up.railway.app/api';
- if (rawUrl.includes('zenify-production-7f21')) {
- rawUrl = rawUrl.replace('zenify-production-7f21', 'zenify-production-f9b9');
+ let rawUrl = envUrl || 'https://zenify-78e257420386.herokuapp.com/api';
+ if (rawUrl.includes('railway.app') || rawUrl.includes('zenify-production')) {
+ rawUrl = 'https://zenify-78e257420386.herokuapp.com/api';
  }
  if (rawUrl && !rawUrl.startsWith('http://') && !rawUrl.startsWith('https://') && !rawUrl.startsWith('/')) {
  rawUrl = `https://${rawUrl}`;

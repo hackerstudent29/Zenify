@@ -1,0 +1,12 @@
+node_modules
+frontend
+mobile
+flutter_app
+.git
+.agents
+brain
+scratch
+assets
+docs
+*.log
+*.exe

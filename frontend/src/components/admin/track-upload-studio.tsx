@@ -773,7 +773,7 @@ const errMsg = err?.message || "Could not fetch preview.";
  
  setIsFetchingBatchImage(true);
  try {
- const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-production-f9b9.up.railway.app';
+ const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL)?.replace('/api', '') || 'https://zenify-78e257420386.herokuapp.com';
  let targetUrl = batchImageUrl.trim();
 
  // Check if it's a media link (Apple Music, YouTube, Spotify) instead of a direct image

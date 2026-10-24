@@ -19,7 +19,7 @@ export class AIAestheticService {
         // Resolve full cover URL
         let fullCoverUrl = track.coverUrl;
         if (!fullCoverUrl.startsWith('http')) {
-            fullCoverUrl = `https://zenify-production-f9b9.up.railway.app/uploads/${fullCoverUrl.replace(/^\/+/, '')}`;
+            fullCoverUrl = `https://zenify-78e257420386.herokuapp.com/uploads/${fullCoverUrl.replace(/^\/+/, '')}`;
         }
 
         console.log(`[AIAesthetic] Extracting colors for: ${track.title} at ${fullCoverUrl}`);
@@ -71,7 +71,7 @@ export class AIAestheticService {
 
         let fullCoverUrl = album.coverUrl;
         if (!fullCoverUrl.startsWith('http')) {
-            fullCoverUrl = `https://zenify-production-f9b9.up.railway.app/uploads/${fullCoverUrl.replace(/^\/+/, '')}`;
+            fullCoverUrl = `https://zenify-78e257420386.herokuapp.com/uploads/${fullCoverUrl.replace(/^\/+/, '')}`;
         }
 
         try {

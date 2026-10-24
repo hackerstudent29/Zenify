@@ -11,7 +11,7 @@ const REDIS_HOST_URL = config.REDIS_URL;
 let redisConnection: IORedis | null = null;
 let homeShelvesWorker: Worker<HomeShelvesJobData> | null = null;
 
-const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT_NAME;
+const isProd = process.env.NODE_ENV === 'production' || !!process.env.HEROKU_APP_ID || !!process.env.RAILWAY_ENVIRONMENT_NAME;
 const isLocalhostRedis = REDIS_HOST_URL ? (REDIS_HOST_URL.includes('127.0.0.1') || REDIS_HOST_URL.includes('localhost')) : true;
 const shouldUseRedis = !!REDIS_HOST_URL && !(isProd && isLocalhostRedis);
 

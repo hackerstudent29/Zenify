@@ -36,7 +36,7 @@ export async function runRomanizationTask(data: RomanizationJobData) {
 }
 
 // Initialize BullMQ Queue and Worker if Redis is configured
-const isProd = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT_NAME;
+const isProd = process.env.NODE_ENV === 'production' || !!process.env.HEROKU_APP_ID || !!process.env.RAILWAY_ENVIRONMENT_NAME;
 const isLocalhostRedis = config.REDIS_URL ? (config.REDIS_URL.includes('127.0.0.1') || config.REDIS_URL.includes('localhost')) : true;
 const shouldUseRedis = !!config.REDIS_URL && !(isProd && isLocalhostRedis);
 
