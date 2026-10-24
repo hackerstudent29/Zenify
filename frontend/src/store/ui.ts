@@ -110,9 +110,15 @@ export const useUIStore = create<UIState>((set) => ({
   stickyPageTitle: null,
   setStickyPageTitle: (title) => set({ stickyPageTitle: title }),
   pageCoverUrl: null,
-  setPageCoverUrl: (url) => set({ pageCoverUrl: url }),
+  setPageCoverUrl: (url) => set((state) => state.pageCoverUrl === url ? state : { pageCoverUrl: url }),
   pageCovers: null,
-  setPageCovers: (covers) => set({ pageCovers: covers }),
+  setPageCovers: (covers) => set((state) => {
+    if (!covers && !state.pageCovers) return state;
+    if (covers && state.pageCovers && covers.length === state.pageCovers.length && covers.every((c, i) => c === state.pageCovers![i])) {
+      return state;
+    }
+    return { pageCovers: covers };
+  }),
   confirmModal: {
     isOpen: false,
     title: '',

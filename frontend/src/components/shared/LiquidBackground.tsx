@@ -115,7 +115,7 @@ const fragmentShaderSource = `
 
 const imageCache = new Map<string, HTMLImageElement>();
 
-export function LiquidBackground({ 
+export const LiquidBackground = React.memo(function LiquidBackground({ 
   coverUrl, 
   covers,
   className,
@@ -131,19 +131,47 @@ export function LiquidBackground({
   speedMultiplier?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isLoaded, setIsLoaded] = React.useState(true);
   const speedRef = useRef(speedMultiplier);
+  const shaderZoomRef = useRef(shaderZoom);
+  const glRef = useRef<WebGLRenderingContext | null>(null);
+  const textureRef = useRef<WebGLTexture | null>(null);
+  const programRef = useRef<WebGLProgram | null>(null);
+  const resolutionLocRef = useRef<WebGLUniformLocation | null>(null);
+  const hasUploadedRealTextureRef = useRef<boolean>(false);
+  const activeLoadIdRef = useRef<number>(0);
+  const isDestroyedRef = useRef<boolean>(false);
 
   useEffect(() => {
     speedRef.current = speedMultiplier;
   }, [speedMultiplier]);
 
   useEffect(() => {
+    shaderZoomRef.current = shaderZoom;
+  }, [shaderZoom]);
+
+  // 3x3 Neutral Dark Charcoal Matrix (#121214) for seamless ambient bloom
+  const fallbackPixels = React.useMemo(() => new Uint8Array([
+    18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255,
+    18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255,
+    18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255
+  ]), []);
+
+  // 3x3 Signature Crimson, Vibrant Rose & Dark Obsidian Matrix for authentic Zenify fluid liquid motion on Auth pages
+  const brandPixels = React.useMemo(() => new Uint8Array([
+    18, 18, 20, 255,      244, 63, 94, 255,    76, 5, 25, 255,
+    225, 29, 72, 255,     14, 14, 16, 255,     251, 113, 133, 255,
+    158, 35, 57, 255,     24, 24, 27, 255,     244, 63, 94, 255
+  ]), []);
+
+  // 1. Initialise WebGL Context, Geometry and Render Loop ONCE
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    isDestroyedRef.current = false;
     
     const gl = canvas.getContext("webgl", { alpha: false, antialias: false });
     if (!gl) return;
+    glRef.current = gl;
 
     // Compile Shader
     const compileShader = (type: number, source: string) => {
@@ -169,6 +197,7 @@ export function LiquidBackground({
     gl.attachShader(program, fs);
     gl.linkProgram(program);
     gl.useProgram(program);
+    programRef.current = program;
 
     // Geometry
     const positionBuffer = gl.createBuffer();
@@ -182,59 +211,146 @@ export function LiquidBackground({
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
 
-    // 3x3 Neutral Dark Charcoal Matrix (#121214) for seamless ambient bloom on normal player views
-    const fallbackPixels = new Uint8Array([
-      18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255,
-      18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255,
-      18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255
-    ]);
-
-    // 3x3 Signature Crimson, Vibrant Rose & Dark Obsidian Matrix for authentic Zenify fluid liquid motion on Auth pages
-    const brandPixels = new Uint8Array([
-      18, 18, 20, 255,      244, 63, 94, 255,    76, 5, 25, 255,
-      225, 29, 72, 255,     14, 14, 16, 255,     251, 113, 133, 255,
-      158, 35, 57, 255,     24, 24, 27, 255,     244, 63, 94, 255
-    ]);
-
     const isBrandOrAuth = !coverUrl || coverUrl === '/logo.png' || coverUrl.includes('/logo.png');
 
-    // Texture (Initialize immediately with brand colors for auth/logo, or neutral for player)
+    // Create & initialize persistent texture
     const texture = gl.createTexture();
+    if (!texture) return;
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, isBrandOrAuth ? brandPixels : fallbackPixels);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    textureRef.current = texture;
 
-    let hasUploadedRealTexture = false;
+    // Uniforms
+    const timeLoc = gl.getUniformLocation(program, "u_time");
+    const resolutionLoc = gl.getUniformLocation(program, "u_resolution");
+    const zoomLoc = gl.getUniformLocation(program, "u_zoom");
+    resolutionLocRef.current = resolutionLoc;
 
-    const applyFallbackTexture = (useBrand = false) => {
-      // If a real image texture was already uploaded, preserve it rather than resetting to fallback
-      if (hasUploadedRealTexture) return;
+    let isPaused = false;
+    let isIntersecting = true;
+    let animationFrameId: number;
+    let lastTime = performance.now();
+    let accumulatedTime = 0;
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        isPaused = true;
+        cancelAnimationFrame(animationFrameId);
+      } else {
+        isPaused = false;
+        if (!isDestroyedRef.current && isIntersecting) {
+          lastTime = performance.now();
+          animationFrameId = requestAnimationFrame(render);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    let observer: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(([entry]) => {
+        isIntersecting = entry.isIntersecting;
+        if (isIntersecting && !isDestroyedRef.current && !isPaused && !document.hidden) {
+          lastTime = performance.now();
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = requestAnimationFrame(render);
+        }
+      }, { threshold: 0 });
+      observer.observe(canvas);
+    }
+
+    const resize = () => {
+      if (isDestroyedRef.current || !canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = rect.width > 0 ? rect.width : window.innerWidth;
+      const h = rect.height > 0 ? rect.height : window.innerHeight;
+      canvas.width = Math.max(Math.min(Math.floor(w * 0.35 * dpr), 300), 150);
+      canvas.height = Math.max(Math.min(Math.floor(h * 0.35 * dpr), 300), 150);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(program);
+      gl.uniform2f(resolutionLoc, canvas.width, canvas.height);
+    };
+    
+    window.addEventListener('resize', resize);
+    requestAnimationFrame(resize);
+
+    const render = (now: number) => {
+      if (isDestroyedRef.current || isPaused || document.hidden) return;
+      animationFrameId = requestAnimationFrame(render);
+
+      if (canvas.width === 0 || canvas.height === 0) {
+        resize();
+      }
+      
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      accumulatedTime += dt * (speedRef.current ?? 1.0);
+
+      gl.useProgram(program);
+      gl.uniform1f(timeLoc, accumulatedTime);
+      gl.uniform1f(zoomLoc, shaderZoomRef.current ?? 0.8);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    };
+    render(performance.now());
+
+    return () => {
+      isDestroyedRef.current = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationFrameId);
+      try {
+        gl.deleteProgram(program);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        gl.deleteBuffer(positionBuffer);
+        gl.deleteTexture(texture);
+      } catch (e) {
+        // Ignore webgl context release warnings
+      }
+      glRef.current = null;
+      textureRef.current = null;
+      programRef.current = null;
+    };
+  }, []); // Run ONCE on mount
+
+  // 2. Texture Updates without context teardown or flickering
+  useEffect(() => {
+    const gl = glRef.current;
+    const texture = textureRef.current;
+    if (!gl || !texture || isDestroyedRef.current) return;
+
+    const currentLoadId = ++activeLoadIdRef.current;
+
+    const applyFallback = (useBrand = false) => {
+      // Never wipe an already active real texture back to neutral fallback
+      if (hasUploadedRealTextureRef.current) return;
       try {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 3, 3, 0, gl.RGBA, gl.UNSIGNED_BYTE, useBrand ? brandPixels : fallbackPixels);
       } catch (e) {
         console.warn("[LiquidBackground] Failed to apply fallback texture:", e);
       }
-      setIsLoaded(true);
     };
 
     const loadImage = (srcUrl: string) => {
       if (!srcUrl || srcUrl.includes("/logo.png") || srcUrl.endsWith("placeholder.jpg")) {
-        applyFallbackTexture(srcUrl.includes("/logo.png") || isBrandOrAuth);
+        applyFallback(srcUrl.includes("/logo.png"));
         return;
       }
 
-      // Check instant in-memory cache
+      // Check instant in-memory cache for seamless 0ms swap
       if (imageCache.has(srcUrl)) {
         try {
           const cachedImg = imageCache.get(srcUrl)!;
           gl.bindTexture(gl.TEXTURE_2D, texture);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cachedImg);
-          hasUploadedRealTexture = true;
-          setIsLoaded(true);
+          hasUploadedRealTextureRef.current = true;
           return;
         } catch (e) {
           // Ignore stale cache element
@@ -247,20 +363,22 @@ export function LiquidBackground({
       }
       img.src = srcUrl;
       img.onload = () => {
+        if (isDestroyedRef.current || activeLoadIdRef.current !== currentLoadId) return;
         try {
           imageCache.set(srcUrl, img);
           gl.bindTexture(gl.TEXTURE_2D, texture);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-          hasUploadedRealTexture = true;
+          hasUploadedRealTextureRef.current = true;
         } catch (err) {
           console.warn("[LiquidBackground] WebGL texture upload error:", err);
-          applyFallbackTexture();
+          applyFallback();
         }
-        setIsLoaded(true);
       };
       img.onerror = () => {
-        console.warn("[LiquidBackground] Failed to load cover image:", srcUrl);
-        applyFallbackTexture();
+        if (activeLoadIdRef.current === currentLoadId) {
+          console.warn("[LiquidBackground] Failed to load cover image:", srcUrl);
+          applyFallback();
+        }
       };
     };
 
@@ -294,15 +412,15 @@ export function LiquidBackground({
       let hasUploaded = false;
 
       const uploadCanvasToTexture = () => {
-        if (isDestroyed) return;
+        if (isDestroyedRef.current || activeLoadIdRef.current !== currentLoadId) return;
         try {
           gl.bindTexture(gl.TEXTURE_2D, texture);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, offscreen);
-          setIsLoaded(true);
           hasUploaded = true;
+          hasUploadedRealTextureRef.current = true;
         } catch (err) {
           console.warn("[LiquidBackground] Multi-image canvas texture upload error:", err);
-          if (!hasUploaded) applyFallbackTexture();
+          if (!hasUploaded) applyFallback();
         }
       };
 
@@ -338,7 +456,7 @@ export function LiquidBackground({
         }
         img.src = srcUrl;
         img.onload = () => {
-          if (isDestroyed) return;
+          if (isDestroyedRef.current || activeLoadIdRef.current !== currentLoadId) return;
           try {
             ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h);
             loadedCount++;
@@ -349,8 +467,8 @@ export function LiquidBackground({
         };
         img.onerror = () => {
           loadedCount++;
-          if (loadedCount === targetUrls.length && !hasUploaded) {
-            applyFallbackTexture();
+          if (loadedCount === targetUrls.length && !hasUploaded && activeLoadIdRef.current === currentLoadId) {
+            applyFallback();
           }
         };
       });
@@ -361,100 +479,7 @@ export function LiquidBackground({
     } else {
       loadImage(getCorsUrl(coverUrl || ""));
     }
-
-    // Uniforms
-    const timeLoc = gl.getUniformLocation(program, "u_time");
-    const resolutionLoc = gl.getUniformLocation(program, "u_resolution");
-    const zoomLoc = gl.getUniformLocation(program, "u_zoom");
-    
-    let isDestroyed = false;
-    let isPaused = false;
-    let isIntersecting = true;
-    let animationFrameId: number;
-    let lastTime = performance.now();
-    let accumulatedTime = 0;
-
-    // Pause rendering immediately when document/tab is not visible
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        isPaused = true;
-        cancelAnimationFrame(animationFrameId);
-      } else {
-        isPaused = false;
-        if (!isDestroyed && isIntersecting) {
-          lastTime = performance.now();
-          animationFrameId = requestAnimationFrame(render);
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
-    // Pause rendering if element is offscreen or hidden
-    let observer: IntersectionObserver | null = null;
-    if (typeof IntersectionObserver !== 'undefined') {
-      observer = new IntersectionObserver(([entry]) => {
-        isIntersecting = entry.isIntersecting;
-        if (isIntersecting && !isDestroyed && !isPaused && !document.hidden) {
-          lastTime = performance.now();
-          cancelAnimationFrame(animationFrameId);
-          animationFrameId = requestAnimationFrame(render);
-        }
-      }, { threshold: 0 });
-      observer.observe(canvas);
-    }
-
-    const resize = () => {
-      if (isDestroyed) return;
-      const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const w = rect.width > 0 ? rect.width : window.innerWidth;
-      const h = rect.height > 0 ? rect.height : window.innerHeight;
-      canvas.width = Math.max(Math.min(Math.floor(w * 0.35 * dpr), 300), 150);
-      canvas.height = Math.max(Math.min(Math.floor(h * 0.35 * dpr), 300), 150);
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.useProgram(program);
-      gl.uniform2f(resolutionLoc, canvas.width, canvas.height);
-    };
-    
-    window.addEventListener('resize', resize);
-    requestAnimationFrame(resize);
-
-    const render = (now: number) => {
-      if (isDestroyed || isPaused || document.hidden) return;
-      animationFrameId = requestAnimationFrame(render);
-
-      if (canvas.width === 0 || canvas.height === 0) {
-        resize();
-      }
-      
-      const dt = Math.min((now - lastTime) / 1000, 0.05);
-      lastTime = now;
-      accumulatedTime += dt * (speedRef.current ?? 1.0);
-
-      gl.useProgram(program);
-      gl.uniform1f(timeLoc, accumulatedTime);
-      gl.uniform1f(zoomLoc, shaderZoom);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-    };
-    render(performance.now());
-
-    return () => {
-      isDestroyed = true;
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      if (observer) observer.disconnect();
-      window.removeEventListener('resize', resize);
-      cancelAnimationFrame(animationFrameId);
-      try {
-        gl.deleteProgram(program);
-        gl.deleteShader(vs);
-        gl.deleteShader(fs);
-        gl.deleteBuffer(positionBuffer);
-        gl.deleteTexture(texture);
-      } catch (e) {
-        // Ignore webgl context release warnings
-      }
-    };
-  }, [coverUrl, covers ? covers.join(',') : '', shaderZoom]);
+  }, [coverUrl, covers ? covers.join(',') : '', brandPixels, fallbackPixels]);
 
   return (
     <div 
@@ -462,10 +487,7 @@ export function LiquidBackground({
       style={{ transform: "translateZ(0)", backfaceVisibility: "hidden", backgroundColor: "#121214" }}
     >
       <div 
-        className={cn(
-          "absolute inset-0 transition-opacity duration-500 ease-out",
-          isLoaded ? "opacity-100" : "opacity-0"
-        )} 
+        className="absolute inset-0" 
         style={{ transform: `scale(${cssScale}) translateZ(0)`, backfaceVisibility: "hidden" }}
       >
         <canvas 
@@ -487,4 +509,4 @@ export function LiquidBackground({
       />
     </div>
   );
-}
+});

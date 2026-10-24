@@ -8,7 +8,11 @@
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "storage-stats": "npx ts-node scratch/storage-stats.ts"
+    "storage-stats": "npx ts-node scratch/storage-stats.ts",
+    "check:r2": "node scripts/check-cloudflare-storage.js",
+    "check:cloudinary": "node scripts/check-cloudinary-storage.js",
+    "check:db": "node scripts/check-heroku-db-storage.js",
+    "check:all": "node scripts/check-cloudflare-storage.js && node scripts/check-cloudinary-storage.js && node scripts/check-heroku-db-storage.js"
   },
   "keywords": [],
   "author": "",
