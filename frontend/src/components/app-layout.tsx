@@ -21,7 +21,6 @@ import { audioEngine } from "@/lib/audio-engine";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useAuthStore } from "@/store/authStore";
 import { GlobalLyricsSidebar } from "@/components/shared/GlobalLyricsSidebar";
-import { LiquidBackground } from "@/components/shared/LiquidBackground";
 import { Glass } from "@/components/ui/glass";
 
 // Lazy-loaded auxiliary modals to minimize critical initial chunk size
@@ -352,23 +351,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <div className={cn(
  "flex flex-col w-full bg-[#121214] text-foreground h-[100dvh] overflow-hidden relative z-0"
  )}>
-  {(() => {
-    if (isFullScreenPlayerOpen) return null;
-    const isTrack = pathname?.startsWith("/track/");
-    const isAlbum = pathname?.startsWith("/album/");
-    const isPlaylist = pathname?.startsWith("/playlist/");
-    const showBg = (isTrack && trackBg) || (isAlbum && albumBg) || (isPlaylist && playlistBg);
-    if (!showBg) return null;
-
-    return (
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        <LiquidBackground
-          coverUrl={activeCoverUrl || currentTrack?.coverUrl || "/logo.png"}
-          covers={isPlaylistPage ? (useUIStore.getState().pageCovers || undefined) : undefined}
-        />
-      </div>
-    );
-  })()}
+  
  <FullScreenPlayer />
  {isMobile && (
    <div 

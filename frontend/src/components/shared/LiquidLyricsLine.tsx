@@ -176,23 +176,14 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   if (isInterlude) {
     return (
-      <div
-        className="flex gap-3 items-center w-full justify-center py-2 transition-opacity duration-[600ms] ease-out"
-        style={{ opacity: targetOpacity }}
-      >
-        {[0, 1, 2].map(i => (
-          <span
-            key={i}
-            className={cn(
-              "rounded-full transition-all duration-500",
-              isCurrent 
-                ? "w-3.5 h-3.5 bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)] animate-pulse" 
-                : "w-2 h-2 bg-white/40"
-            )}
-            style={isCurrent ? { animationDelay: `${i * 0.2}s` } : undefined}
-          />
-        ))}
-      </div>
+      <GapDots
+        isCurrent={isCurrent}
+        isPast={isPast}
+        lineStartTime={lineStartTime}
+        lineEndTime={lineEndTime}
+        smoothTimeValue={smoothTimeValue}
+        targetOpacity={targetOpacity}
+      />
     );
   }
 
@@ -213,7 +204,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     <div
       data-lyrics-line="true"
       className={cn(
-        "w-full px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer",
+        "w-full px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer lyric-line",
         isFullscreen ? "justify-start text-left" : "justify-center text-center"
       )}
       style={{
@@ -458,3 +449,60 @@ function UnifiedWordFill({
     </span>
   );
 }
+
+function GapDots({
+  isCurrent,
+  isPast,
+  lineStartTime,
+  lineEndTime,
+  smoothTimeValue,
+  targetOpacity
+}: {
+  isCurrent: boolean;
+  isPast: boolean;
+  lineStartTime: number;
+  lineEndTime: number;
+  smoothTimeValue: any;
+  targetOpacity: number;
+}) {
+  const [progress, setProgress] = React.useState(isPast ? 1 : 0);
+
+  useMotionValueEvent(smoothTimeValue, "change", (t: number) => {
+    if (!isCurrent) {
+      setProgress(isPast ? 1 : 0);
+      return;
+    }
+    const dur = Math.max(0.5, lineEndTime - lineStartTime);
+    const p = Math.max(0, Math.min(1, (t - lineStartTime) / dur));
+    setProgress(p);
+  });
+
+  // 3-dot Apple-style progressive fill: dot 1 (0-33%), dot 2 (33-66%), dot 3 (66-100%)
+  const getDotStyles = (i: number) => {
+    const minP = i * 0.33;
+    const maxP = (i + 1) * 0.33;
+    let localP = 0;
+    if (progress >= maxP) localP = 1;
+    else if (progress <= minP) localP = 0;
+    else localP = (progress - minP) / 0.33;
+
+    const s = 0.75 + localP * 0.55;
+    const o = 0.35 + localP * 0.65;
+    return {
+      "--s": String(s),
+      "--o": String(o),
+    } as React.CSSProperties;
+  };
+
+  return (
+    <div
+      className="gap-dots flex gap-2.5 items-center w-full justify-center py-3 select-none"
+      style={{ opacity: targetOpacity }}
+    >
+      {[0, 1, 2].map((i) => (
+        <span key={i} style={getDotStyles(i)} />
+      ))}
+    </div>
+  );
+}
+

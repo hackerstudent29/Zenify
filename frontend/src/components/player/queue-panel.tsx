@@ -23,6 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 
 export function QueuePanel() {
   const router = useRouter();
@@ -180,7 +181,9 @@ export function QueuePanel() {
                       <h4 className="font-sans text-[12.5px] font-semibold text-white/90 truncate group-hover:text-white transition-colors leading-snug">
                         {formatDisplayTitle(track.title)}
                       </h4>
-                      <p className="text-[10.5px] text-white/40 font-medium truncate mt-0.5">{formatArtists(track)}</p>
+                      <div className="mt-0.5 truncate">
+                        <ArtistLinks track={track} maxArtists={2} className="text-[10.5px] text-white/40 font-medium truncate" onClick={() => setIsQueueOpen(false)} />
+                      </div>
                     </div>
                     <button
                       onClick={(e) => {
@@ -228,7 +231,9 @@ export function QueuePanel() {
                         >
                           {formatDisplayTitle(currentTrack.title)}
                         </h4>
-                        <p className="text-[11px] text-white/45 font-medium truncate mt-0.5">{formatArtists(currentTrack)}</p>
+                        <div className="mt-0.5 truncate">
+                          <ArtistLinks track={currentTrack} maxArtists={3} className="text-[11px] text-white/45 font-medium truncate" onClick={() => setIsQueueOpen(false)} />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -302,7 +307,9 @@ export function QueuePanel() {
                                       <h4 className="font-sans text-[12.5px] font-semibold text-white/90 truncate group-hover:text-white transition-colors leading-snug">
                                         {formatDisplayTitle(item.track.title)}
                                       </h4>
-                                      <p className="text-[10.5px] text-white/40 font-medium truncate mt-0.5">{formatArtists(item.track)}</p>
+                                      <div className="mt-0.5 truncate">
+                                        <ArtistLinks track={item.track} maxArtists={2} className="text-[10.5px] text-white/40 font-medium truncate" onClick={() => setIsQueueOpen(false)} />
+                                      </div>
                                     </div>
 
                                     <button
@@ -357,7 +364,9 @@ export function QueuePanel() {
                             <h4 className="font-sans text-[12.5px] font-semibold text-white/90 truncate group-hover:text-white transition-colors leading-snug">
                               {formatDisplayTitle(track.title)}
                             </h4>
-                            <p className="text-[10.5px] text-white/40 font-medium truncate mt-0.5">{formatArtists(track)}</p>
+                            <div className="mt-0.5 truncate">
+                              <ArtistLinks track={track} maxArtists={2} className="text-[10.5px] text-white/40 font-medium truncate" onClick={() => setIsQueueOpen(false)} />
+                            </div>
                           </div>
 
                           <button

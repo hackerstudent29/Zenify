@@ -6,7 +6,7 @@ import { LyricsView } from "@/components/shared/LyricsView";
 import { X } from "lucide-react";
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { cn, getTrackCover } from "@/lib/utils";
-import { LiquidBackground } from "@/components/shared/LiquidBackground";
+import { DynamicBackground } from "@/components/shared/DynamicBackground";
 
 export function GlobalLyricsSidebar() {
   const { isLyricsOpen, setIsLyricsOpen, isFullScreenPlayerOpen } = useUIStore();
@@ -51,7 +51,7 @@ export function GlobalLyricsSidebar() {
             {/* Reactive Liquid Background for sidebar lyrics (Default OFF) */}
             {showReactiveBg && (
               <div className="absolute inset-0 z-0 overflow-hidden">
-                <LiquidBackground coverUrl={loadedCover} />
+                <DynamicBackground surface="other" coverUrl={loadedCover} />
                 <div className="absolute inset-0 bg-black/40 pointer-events-none z-10" />
               </div>
             )}

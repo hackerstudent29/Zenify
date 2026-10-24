@@ -8,7 +8,7 @@ import api from "@/lib/api";
 import { useGoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { Eye, EyeOff, Check, X, Loader2, AlertCircle } from "lucide-react";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
-import { LiquidBackground } from "@/components/shared/LiquidBackground";
+import { DynamicBackground } from "@/components/shared/DynamicBackground";
 import { SEO } from "@/components/shared/SEO";
 import { cn } from "@/lib/utils";
 
@@ -297,7 +297,7 @@ function AuthPageContent() {
   return (
     <main role="main" className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black">
       <SEO title="Log In – Zenify" noindex={true} path="/login" />
-      <LiquidBackground coverUrl="/logo.png" speedMultiplier={1.8} />
+      <DynamicBackground surface="other" coverUrl="/logo.png" />
       <div className="relative z-10 w-full max-w-[360px] px-5">
 
         {/* Animated Logo + Header */}

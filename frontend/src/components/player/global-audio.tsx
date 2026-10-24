@@ -291,17 +291,13 @@ export function GlobalAudio() {
       const error = audio.error;
       if (!error || error.code === 0) return;
 
-      // Guard: Ignore errors if audio.src is empty, "/", or pointing to the application website root
-      const isAppPageUrl = typeof window !== 'undefined' && (
+      const isObsoleteSrc = typeof window !== 'undefined' && (
         !audio.src ||
-        audio.src === window.location.href ||
-        audio.src === window.location.origin ||
-        audio.src === `${window.location.origin}/` ||
-        audio.src.startsWith(`${window.location.origin}/?`)
+        (currentTrackIdRef.current && !audio.src.includes(currentTrackIdRef.current) && !audio.src.includes('stream-youtube') && !audio.src.includes('apple.com'))
       );
 
-      if (isAppPageUrl) {
-        console.warn("[GlobalAudio] Ignored audio error for invalid or empty source URL:", audio.src);
+      if (isObsoleteSrc) {
+        console.warn("[GlobalAudio] Ignored audio error for obsolete source URL:", audio.src);
         return;
       }
 
@@ -554,9 +550,19 @@ export function GlobalAudio() {
         targetSrc = getMediaUrl(`/api/utils/stream-youtube?${streamParams.toString()}`, 'audio', trackContext);
       }
 
+      const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://zenify-78e257420386.herokuapp.com/api').replace(/\/api$/, '');
+
       if (targetSrc && targetSrc.includes('/stream-youtube')) {
         try {
-          const u = new URL(targetSrc, window.location.origin);
+          // ALWAYS resolve against backend API origin, NEVER against frontend SPA origin (Vercel)
+          let baseForUrl = BACKEND_BASE;
+          if (targetSrc.startsWith('http://') || targetSrc.startsWith('https://')) {
+            // If it accidentally targeted frontend origin, rewrite it
+            if (typeof window !== 'undefined' && targetSrc.startsWith(window.location.origin)) {
+              targetSrc = targetSrc.replace(window.location.origin, BACKEND_BASE);
+            }
+          }
+          const u = new URL(targetSrc, BACKEND_BASE);
           if (!u.searchParams.has('trackId') && currentTrack.id) u.searchParams.set('trackId', currentTrack.id);
           if (!u.searchParams.has('title') && currentTrack.title) u.searchParams.set('title', currentTrack.title);
           if (!u.searchParams.has('artist') && currentArtist) u.searchParams.set('artist', currentArtist);
@@ -564,6 +570,12 @@ export function GlobalAudio() {
           if (!u.searchParams.has('language') && trackLang) u.searchParams.set('language', trackLang);
           targetSrc = u.toString();
         } catch {}
+      }
+
+      // Final safeguard: if targetSrc is relative, prepend backend base
+      if (targetSrc && !targetSrc.startsWith('http://') && !targetSrc.startsWith('https://') && !targetSrc.startsWith('blob:')) {
+        const cleanRel = targetSrc.startsWith('/') ? targetSrc : '/' + targetSrc;
+        targetSrc = BACKEND_BASE + cleanRel;
       }
 
       if (playbackSessionIdRef.current !== sessionId) return;

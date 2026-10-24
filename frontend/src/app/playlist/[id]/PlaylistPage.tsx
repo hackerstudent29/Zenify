@@ -14,7 +14,6 @@ import { useUIStore } from "@/store/ui";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";

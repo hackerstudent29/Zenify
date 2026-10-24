@@ -15,7 +15,8 @@ import { useAlbumColor } from "@/hooks/useAlbumColor";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
 import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
-import { StaticGlassBackground } from "@/components/shared/StaticGlassBackground";
+import { DynamicBackground } from "@/components/shared/DynamicBackground";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -266,6 +267,7 @@ export default function AlbumPage() {
 
  return (
  <div className="min-h-screen w-full bg-transparent overflow-x-hidden text-white relative">
+      <DynamicBackground surface="albumPage" coverUrl={coverUrl} />
  <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
  <div className="relative px-6 pt-4 pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
@@ -286,12 +288,18 @@ export default function AlbumPage() {
  </MarqueeText>
  </h1>
 
- <Link
- href={`/artist/${album.artistId}`}
- className="text-sm md:text-base font-sans font-medium text-white/80 hover:text-white transition-colors mb-4 block"
- >
- {formatDisplayTitle(album.artist?.name)}
- </Link>
+         {album.artistId ? (
+          <Link
+            href={`/artist/${album.artistId}`}
+            className="text-sm md:text-base font-sans font-medium text-white/80 hover:text-white transition-colors mb-4 block"
+          >
+            {formatDisplayTitle(album.artist?.name)}
+          </Link>
+        ) : (
+          <span className="text-sm md:text-base font-sans font-medium text-white/80 mb-4 block">
+            {formatDisplayTitle(album.artist?.name)}
+          </span>
+        )}
 
  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-[11px] font-bold text-white/50 uppercase tracking-widest mb-8">
  <span>{album.genre || "Soundtrack"}</span>
@@ -432,7 +440,7 @@ export default function AlbumPage() {
  {formatDisplayTitle(track.title)}
  </div>
  <div className="text-[12px] font-medium text-white/50 truncate">
- {formatArtists(track, album.artist?.name)}
+ <ArtistLinks track={track} className="text-[12px] font-medium text-white/50" />
  </div>
  </div>
 

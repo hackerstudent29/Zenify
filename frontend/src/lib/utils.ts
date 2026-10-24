@@ -370,10 +370,70 @@ export function formatDisplayTitle(input?: string | null): string {
   return text;
 }
 
-export const ARTIST_DELIMITER_REGEX = /\s*(?:&|\band\b|,\s*|\bfeat\.?|\bft\.?|\bfeaturing\b|\bvs\.?|\bx\b|\/)\s+/i;
+export const PROTECTED_ARTISTS = [
+  "simon & garfunkel",
+  "simon and garfunkel",
+  "crosby, stills, nash & young",
+  "crosby, stills, nash and young",
+  "brooks & dunn",
+  "brooks and dunn",
+  "hall & oates",
+  "hall and oates",
+  "earth, wind & fire",
+  "earth, wind and fire",
+  "kool & the gang",
+  "kool and the gang",
+  "florence + the machine",
+  "florence and the machine",
+  "mumford & sons",
+  "mumford and sons",
+  "iron & wine",
+  "iron and wine",
+  "raghu dixit project",
+  "the local train"
+];
+
+export const HONORIFIC_TITLES = [
+  "thenisai thendral",
+  "isaignani",
+  "isai gnani",
+  "isai puyal",
+  "isaipuyal",
+  "padmashri",
+  "padma shri",
+  "padmabhushan",
+  "padma bhushan",
+  "padmavibhushan",
+  "padma vibhushan",
+  "maestro",
+  "kavignar",
+  "makkal thilagam",
+  "nadigar thilagam",
+  "puratchi thalaivar",
+  "puratchi thalaivi",
+  "captain",
+  "dr.",
+  "dr",
+  "sir"
+];
+
+export function stripHonorifics(name: string): string {
+  if (!name) return "";
+  let clean = name.trim();
+  for (const h of HONORIFIC_TITLES) {
+    const escaped = h.replace(/[.*+?^\$\{\}()|[\]\\]/g, '\\$&');
+    const reg = new RegExp('^' + escaped + '\\s+', 'i');
+    clean = clean.replace(reg, '').trim();
+  }
+  return clean || name.trim();
+}
+
+export const ARTIST_DELIMITER_REGEX = /\s*(?:&|\band\b|,\s*|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b|\bvs\.?|\bx\b|\/)\s+/i;
 
 /**
  * Splits raw artist strings on common delimiters (&, comma, feat, ft, etc.)
+ * Preserves recognized multi-word protected groups (e.g. "Simon & Garfunkel")
+ * and strips common honorific titles (e.g. "Thenisai Thendral Deva" -> "Deva").
  */
 export function splitArtistNames(raw: string | string[]): string[] {
   if (!raw) return [];
@@ -383,9 +443,17 @@ export function splitArtistNames(raw: string | string[]): string[] {
     if (typeof item !== 'string') continue;
     const sanitized = item.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim();
     if (!sanitized) continue;
+
+    const lower = sanitized.toLowerCase();
+    if (PROTECTED_ARTISTS.some(p => p === lower || lower === p.replace(/&/g, 'and'))) {
+      result.push(stripHonorifics(sanitized));
+      continue;
+    }
+
     const parts = sanitized
       .split(ARTIST_DELIMITER_REGEX)
       .map(p => p.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim())
+      .map(p => stripHonorifics(p))
       .filter(p => p.length > 0 && !/^\d+$/.test(p) && !/^itunes\s*artist/i.test(p));
     result.push(...parts);
   }

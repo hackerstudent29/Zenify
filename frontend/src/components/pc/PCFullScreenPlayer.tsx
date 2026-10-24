@@ -35,7 +35,7 @@ import { audioEngine } from "@/lib/audio-engine";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
-import { LiquidBackground } from "../shared/LiquidBackground";
+import { DynamicBackground } from "../shared/DynamicBackground";
 import { PCFullScreenScrubber } from "./../player/PlayerProgress";
 
 import { LyricsView } from "../shared/LyricsView";
@@ -230,7 +230,7 @@ export function PCFullScreenPlayer() {
  <div 
  className="absolute inset-0 z-0 transition-colors duration-1000 bg-[#121214]"
  >
- <LiquidBackground coverUrl={trackCover} speedMultiplier={2.5} />
+ <DynamicBackground surface="fullPlayer" coverUrl={trackCover} />
  <motion.div 
  animate={{ opacity: isLyricsOpen ? 1 : 0 }}
  transition={{ duration: 0.5 }}
