@@ -304,7 +304,7 @@ export async function albumRoutes(server: FastifyInstance) {
         }
 
         // 1. Virtual Album Resolution (iTunes/Apple Music collection)
-        if (decodedId.startsWith('itunes-album-') || decodedId.startsWith('itunes-') || decodedId.startsWith('sp-album-')) {
+        if (/^\d+$/.test(decodedId) || decodedId.startsWith('itunes-album-') || decodedId.startsWith('itunes-') || decodedId.startsWith('sp-album-')) {
             const collectionId = decodedId.replace(/^itunes-album-/, '').replace(/^itunes-/, '').replace(/^sp-album-/, '');
             try {
                 const { default: axios } = await import('axios');

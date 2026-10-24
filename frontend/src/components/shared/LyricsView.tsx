@@ -10,6 +10,7 @@ import { LiquidLyricsLine } from "./LiquidLyricsLine";
 import { transliterateLineRuleBased, transliterateTextRuleBased } from '@/lib/indic-transliterator';
 import { audioEngine } from "@/lib/audio-engine";
 import { usePlayerStore } from "@/store/player";
+import { splitLyricLine } from "@/lib/lyrics-timeline";
 
 interface LyricsViewProps {
  trackId: string;
@@ -325,51 +326,29 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }).filter((line: any) => line.text.length > 0)
     .sort((a: any, b: any) => a.time - b.time);
 
-    // 1. Split overlong lines so each stanza fits into strictly 2 lines on PC, max 3 lines on Mobile
+    // 1. Split lines with splitLyricLine: strictly max 60 chars (desktop) or 44 chars (mobile)
+    const maxChars = isMobile ? 44 : 60;
     const splitLines: any[] = [];
-    for (const line of baseLines) {
-      const words = (line.text || '').trim().split(/\s+/);
-      if (words.length > 16 || line.text.length > 95) {
-        const mid = Math.ceil(words.length / 2);
-        let splitIdx = mid;
-        for (let j = Math.max(1, mid - 2); j <= Math.min(words.length - 2, mid + 2); j++) {
-          if (/[,;?!—–-]/.test(words[j])) {
-            splitIdx = j + 1;
-            break;
-          }
-        }
-
-        const part1Text = words.slice(0, splitIdx).join(' ');
-        const part2Text = words.slice(splitIdx).join(' ');
-
-        if (part1Text && part2Text) {
-          const hasWordTimings = Array.isArray(line.words) && line.words.length === words.length;
-          const lineStart = Number(line.time || 0);
-          const lineEnd = Number(line.endTime || (lineStart + Math.max(2.5, words.length * 0.5)));
-          const totalDur = Math.max(0.5, lineEnd - lineStart);
-          const ratio = part1Text.length / (line.text.length || 1);
-          const splitTime = hasWordTimings && line.words[splitIdx]?.time
-            ? line.words[splitIdx].time
-            : (lineStart + totalDur * ratio);
-
+    for (let i = 0; i < baseLines.length; i++) {
+      const line = baseLines[i];
+      const nextStart = baseLines[i + 1]?.time ?? (duration || line.time + 4.5);
+      const parts = splitLyricLine(
+        { text: line.text, start: line.time, end: line.endTime },
+        nextStart,
+        maxChars
+      );
+      if (parts.length > 1) {
+        for (const p of parts) {
           splitLines.push({
             ...line,
-            text: part1Text,
-            time: lineStart,
-            endTime: splitTime,
-            words: hasWordTimings ? line.words.slice(0, splitIdx) : undefined
+            text: p.text,
+            time: p.start,
+            endTime: p.end,
           });
-          splitLines.push({
-            ...line,
-            text: part2Text,
-            time: splitTime,
-            endTime: lineEnd,
-            words: hasWordTimings ? line.words.slice(splitIdx) : undefined
-          });
-          continue;
         }
+      } else {
+        splitLines.push(line);
       }
-      splitLines.push(line);
     }
 
     // 2. Insert virtual interlude lines (triple dots) for intro, breaks (> 3.2s), and outro

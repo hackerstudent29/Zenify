@@ -32,7 +32,7 @@ import {
  DropdownMenuSeparator,
  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
-import { LiquidBackground } from "../shared/LiquidBackground";
+import { DynamicBackground } from "../shared/DynamicBackground";
 import { LyricsView } from "../shared/LyricsView";
 import { AnimatedHeartButton } from "@/components/ui/AnimatedHeartButton";
 import { AnimatedShareButton } from "@/components/ui/AnimatedShareButton";
@@ -418,7 +418,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
          >
            {/* Background */}
            <div className="absolute inset-0 z-0 overflow-hidden bg-[#121214] isolate" style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}>
-             {showReactiveBg && <LiquidBackground coverUrl={stablecover} />}
+             <DynamicBackground surface="fullPlayer" coverUrl={stablecover} />
              <motion.div 
                animate={{ opacity: isLyricsOpen ? 1 : 0 }}
                transition={{ duration: 0.5 }}
@@ -688,14 +688,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -10 }}
         transition={{ duration: 0.2 }}
-        className="text-zinc-400 text-[15px] font-normal inline-block font-sans cursor-pointer hover:underline hover:text-white transition-colors"
-        onClick={() => {
-          const target = getArtistTarget(currentTrack);
-          if (target) {
-            setFullScreenPlayerOpen(false);
-            setTimeout(() => router.push(target), 50);
-          }
-        }}
+        className="text-zinc-400 text-[15px] font-normal inline-block font-sans"
       >
         <ArtistLinks track={currentTrack} maxArtists={3} linkClassName="text-zinc-400 text-[15px] font-normal font-sans hover:underline hover:text-white transition-colors" onClick={() => setFullScreenPlayerOpen(false)} />
       </motion.div>

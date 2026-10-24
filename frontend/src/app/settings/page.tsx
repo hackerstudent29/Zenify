@@ -46,6 +46,7 @@ import {
   Maximize2,
   ScrollText,
   Sparkles,
+  User,
 } from "lucide-react";
 import { useShortcutStore } from "@/store/shortcuts";
 import { useUIStore } from "@/store/ui";
@@ -504,23 +505,37 @@ export default function SettingsPage() {
         <div className="flex items-center gap-2 mb-1">
           <Waves size={16} className="text-brand" />
           <h3 className="text-[13px] md:text-sm font-bold text-white tracking-wide uppercase font-sans">
-            Default reactive background
+            Reactive Canvas Background
           </h3>
         </div>
         <p className="text-[11px] md:text-xs text-zinc-500 font-medium">
-          Choose which screens display the fluid reactive audio background by default
+          Choose which surfaces render the Apple Music style fluid mesh background. Disabling stops canvas and rAF execution completely.
         </p>
       </div>
 
       <SettingRow
-        label="Track Page"
-        icon={Music}
-        description="Display reactive liquid canvas on track detail pages"
+        label="Full View Player"
+        icon={Maximize2}
+        description="Display fluid mesh canvas in the full screen player"
       >
         <Switch
-          checked={reactiveBgStore.track}
+          checked={reactiveBgStore.reactiveBg.fullPlayer}
           onCheckedChange={v => {
-            reactiveBgStore.setReactiveBg('track', v);
+            reactiveBgStore.setSurface('fullPlayer', v);
+            showToast(v ? "Full Player reactive background enabled" : "Full Player reactive background disabled");
+          }}
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Track Detail Page"
+        icon={Music}
+        description="Display fluid mesh canvas on track detail views"
+      >
+        <Switch
+          checked={reactiveBgStore.reactiveBg.trackPage}
+          onCheckedChange={v => {
+            reactiveBgStore.setSurface('trackPage', v);
             showToast(v ? "Track Page reactive background enabled" : "Track Page reactive background disabled");
           }}
         />
@@ -529,55 +544,41 @@ export default function SettingsPage() {
       <SettingRow
         label="Album Page"
         icon={Disc3}
-        description="Display reactive liquid canvas on album pages"
+        description="Display fluid mesh canvas on album views"
       >
         <Switch
-          checked={reactiveBgStore.album}
+          checked={reactiveBgStore.reactiveBg.albumPage}
           onCheckedChange={v => {
-            reactiveBgStore.setReactiveBg('album', v);
+            reactiveBgStore.setSurface('albumPage', v);
             showToast(v ? "Album Page reactive background enabled" : "Album Page reactive background disabled");
           }}
         />
       </SettingRow>
 
       <SettingRow
-        label="Playlist Page"
-        icon={ListMusic}
-        description="Display reactive liquid canvas on playlist pages"
+        label="Artist Page"
+        icon={User}
+        description="Display fluid mesh canvas on artist header views"
       >
         <Switch
-          checked={reactiveBgStore.playlist}
+          checked={reactiveBgStore.reactiveBg.artistPage}
           onCheckedChange={v => {
-            reactiveBgStore.setReactiveBg('playlist', v);
-            showToast(v ? "Playlist Page reactive background enabled" : "Playlist Page reactive background disabled");
+            reactiveBgStore.setSurface('artistPage', v);
+            showToast(v ? "Artist Page reactive background enabled" : "Artist Page reactive background disabled");
           }}
         />
       </SettingRow>
 
       <SettingRow
-        label="Full View Player"
-        icon={Maximize2}
-        description="Display reactive liquid audio background in the full view player"
-      >
-        <Switch
-          checked={reactiveBgStore.player}
-          onCheckedChange={v => {
-            reactiveBgStore.setReactiveBg('player', v);
-            showToast(v ? "Full View Player reactive background enabled" : "Full View Player reactive background disabled");
-          }}
-        />
-      </SettingRow>
-
-      <SettingRow
-        label="Sidebar Lyrics tab"
+        label="Other Panels & Lyrics"
         icon={ScrollText}
-        description="Display reactive liquid canvas behind the sidebar lyrics panel"
+        description="Display fluid mesh canvas behind sidebar lyrics & other surfaces"
       >
         <Switch
-          checked={reactiveBgStore.lyrics}
+          checked={reactiveBgStore.reactiveBg.other}
           onCheckedChange={v => {
-            reactiveBgStore.setReactiveBg('lyrics', v);
-            showToast(v ? "Sidebar Lyrics tab reactive background enabled" : "Sidebar Lyrics tab reactive background disabled");
+            reactiveBgStore.setSurface('other', v);
+            showToast(v ? "Other Panels reactive background enabled" : "Other Panels reactive background disabled");
           }}
         />
       </SettingRow>
