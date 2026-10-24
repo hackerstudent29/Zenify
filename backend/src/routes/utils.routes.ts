@@ -1639,13 +1639,14 @@ export async function utilsRoutes(server: FastifyInstance) {
     // ── UNIVERSAL GLOBAL CATALOG SEARCH ──
     // Powers GlobalSearchModal and search bar. Guarantees 0 missing songs by federating Local DB, JioSaavn 320k, iTunes multi-country, and YouTube Music.
     server.get('/search-spotify', async (request, reply) => {
-        const { q, country, limit } = request.query as { q?: string; country?: string; limit?: string };
+        const { q, country, limit, language } = request.query as { q?: string; country?: string; limit?: string; language?: string };
         if (!q || !q.trim()) return reply.status(400).send({ error: 'Query parameter "q" is required' });
         try {
             const { UniversalSearchService } = await import('../services/universal-search.service.js');
             const items = await UniversalSearchService.searchTracks(q.trim(), {
                 country: country || 'in',
-                limit: limit ? parseInt(limit, 10) : 30
+                limit: limit ? parseInt(limit, 10) : 30,
+                language: language || undefined
             });
             return reply.send(items);
         } catch (err: any) {
@@ -1655,13 +1656,14 @@ export async function utilsRoutes(server: FastifyInstance) {
     });
 
     server.get('/search-global', async (request, reply) => {
-        const { q, country, limit } = request.query as { q?: string; country?: string; limit?: string };
+        const { q, country, limit, language } = request.query as { q?: string; country?: string; limit?: string; language?: string };
         if (!q || !q.trim()) return reply.status(400).send({ error: 'Query parameter "q" is required' });
         try {
             const { UniversalSearchService } = await import('../services/universal-search.service.js');
             const items = await UniversalSearchService.searchTracks(q.trim(), {
                 country: country || 'in',
-                limit: limit ? parseInt(limit, 10) : 30
+                limit: limit ? parseInt(limit, 10) : 30,
+                language: language || undefined
             });
             return reply.send(items);
         } catch (err: any) {

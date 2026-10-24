@@ -338,11 +338,11 @@ export function TopBar() {
  animate={{ opacity: 1, scale: 1, y: 0 }}
  exit={{ opacity: 0, scale: 0.98, y: -10 }}
  transition={{ duration: 0.1, ease: "easeOut" }}
- className="absolute top-[calc(100%+12px)] left-0 w-full rounded-2xl z-[9998] overflow-visible flex flex-col max-h-[80vh] glass-panel search-container"
+ className="absolute top-[calc(100%+12px)] left-0 w-full rounded-2xl z-[9998] overflow-hidden flex flex-col max-h-[80vh] bg-[#0e0f14]/95 backdrop-blur-3xl border border-white/10 shadow-[0_24px_70px_rgba(0,0,0,0.85)] ring-1 ring-white/5 search-container"
  onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
  >
  {/* Filter Bar */}
- <div className="flex gap-2 p-4 pt-3 border-b border-white/5 no-scrollbar overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth flex-shrink-0">
+ <div className="flex gap-2 p-4 pt-3 border-b border-white/5 bg-[#0e0f14]/60 backdrop-blur-md no-scrollbar overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth flex-shrink-0">
  {["all", "songs", "artists", "albums", "playlists"].map((f) => (
  <button
  key={f}
@@ -403,7 +403,7 @@ export function TopBar() {
   return (
   <div
  key={item.id}
- className="group/artist flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0"
+ className="group/artist flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0 hover:bg-white/[0.04] rounded-xl"
  >
  <div 
  onMouseDown={(e) => {
@@ -476,7 +476,7 @@ export function TopBar() {
   return (
   <div
  key={item.id}
- className="group/meta flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0"
+ className="group/meta flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0 hover:bg-white/[0.04] rounded-xl"
  >
  <div 
  onMouseDown={(e) => {
@@ -552,7 +552,7 @@ export function TopBar() {
   return (
   <div
  key={item.id}
- className="group/item flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0"
+ className="group/item flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0 hover:bg-white/[0.04] rounded-xl"
  >
  <div 
  onMouseDown={async (e) => {

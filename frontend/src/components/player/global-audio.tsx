@@ -302,8 +302,6 @@ export function GlobalAudio() {
 
       if (isAppPageUrl) {
         console.warn("[GlobalAudio] Ignored audio error for invalid or empty source URL:", audio.src);
-        audio.removeAttribute('src');
-        setIsPlaying(false);
         return;
       }
 
@@ -603,7 +601,8 @@ export function GlobalAudio() {
         }
 
         // 4. Begin playback of the newly clicked or next track immediately
-        if (isPlaying) {
+        const shouldPlay = isPlaying || usePlayerStore.getState().isPlaying;
+        if (shouldPlay) {
           audioEngine.resume();
           const crossfadeActive = useAuthStore.getState().user?.preferences?.crossfade;
           if (crossfadeActive) {
