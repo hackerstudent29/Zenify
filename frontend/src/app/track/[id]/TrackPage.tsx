@@ -20,6 +20,7 @@ import Link from "next/link";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { AppleFluidArtworkBackground } from "@/components/shared/AppleFluidArtworkBackground";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -329,9 +330,11 @@ export default function TrackPage() {
 
  return (
  <div className="min-h-screen w-full text-foreground relative overflow-hidden">
+  {/* Apple Music Fluid Flowing Artwork Background */}
+  <AppleFluidArtworkBackground coverUrl={coverUrl} className="opacity-95" />
 
- {/* ── Page content ── */}
- <div className="relative z-10 px-4 sm:px-10 lg:px-12">
+  {/* ── Page content ── */}
+  <div className="relative z-10 px-4 sm:px-10 lg:px-12">
 
  {/* ── Hero: cover + metadata ── */}
       <motion.section

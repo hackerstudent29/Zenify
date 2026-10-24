@@ -89,9 +89,9 @@ export function useRefetchLyrics() {
                 lyrics: updated.lyrics || state.currentTrack.lyrics,
                 synced_lyrics: updated.synced_lyrics || state.currentTrack.synced_lyrics,
                 raw_lrc: updated.raw_lrc || state.currentTrack.raw_lrc,
-                romanizedLyrics: updated.romanizedLyrics || state.currentTrack.romanizedLyrics,
-                romanizedSyncedLyrics: updated.romanizedSyncedLyrics || state.currentTrack.romanizedSyncedLyrics,
-                romanizedLang: updated.romanizedLang || state.currentTrack.romanizedLang,
+                romanizedLyrics: updated.romanizedLyrics || null,
+                romanizedSyncedLyrics: updated.romanizedSyncedLyrics || null,
+                romanizedLang: updated.romanizedLang || null,
               }
             };
           });

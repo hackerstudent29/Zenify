@@ -15,12 +15,12 @@ export interface ReactiveBgState {
 export const useReactiveBgStore = create<ReactiveBgState>()(
   persist(
     (set) => ({
-      // Strict required defaults:
-      track: false,
-      album: false,
-      playlist: false,
+      // Apple Music Fluid Artwork background defaults (ON across all musical experiences):
+      track: true,
+      album: true,
+      playlist: true,
       player: true,
-      lyrics: false,
+      lyrics: true,
 
       setReactiveBg: (page, enabled) => {
         set({ [page]: enabled });
@@ -32,6 +32,15 @@ export const useReactiveBgStore = create<ReactiveBgState>()(
     }),
     {
       name: 'zenify-reactive-bg-preferences',
+      version: 3,
+      migrate: (persistedState: any) => ({
+        ...persistedState,
+        track: true,
+        album: true,
+        playlist: true,
+        player: true,
+        lyrics: true,
+      }),
       storage: createJSONStorage(() => localStorage),
     }
   )

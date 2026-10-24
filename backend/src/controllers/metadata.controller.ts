@@ -270,7 +270,23 @@ export class MetadataController {
                     select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true, sync_source: true, romanizedLyrics: true, romanizedSyncedLyrics: true, romanizedLang: true }
                   });
 
-            if (!force && track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
+            const targetLang = (track as any)?.language || (
+                (title || track?.title || '').toLowerCase().includes('tamil') ? 'tamil' :
+                (title || track?.title || '').toLowerCase().includes('telugu') ? 'telugu' :
+                (title || track?.title || '').toLowerCase().includes('hindi') ? 'hindi' :
+                (title || track?.title || '').toLowerCase().includes('malayalam') ? 'malayalam' :
+                (title || track?.title || '').toLowerCase().includes('kannada') ? 'kannada' : undefined
+            );
+
+            const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
+            const hasLangMismatch = Boolean(
+                targetLang && track && (
+                    (track.lyrics && LyricsEnhancementService.isLyricsLanguageMismatch(track.lyrics, targetLang)) ||
+                    (Array.isArray(track.synced_lyrics) && LyricsEnhancementService.isLyricsLanguageMismatch(track.synced_lyrics.map((t: any) => t.text).join(' '), targetLang))
+                )
+            );
+
+            if (!force && !hasLangMismatch && track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
                 console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
                 // If romanization is missing and track contains regional non-Latin text, enqueue background romanization
                 if (!track.romanizedLyrics) {
@@ -294,7 +310,7 @@ export class MetadataController {
             }
 
             const effectiveAudioUrl = audioUrl || track?.audioUrl || undefined;
-            const effectiveLyrics = rawLyrics || track?.lyrics || undefined;
+            const effectiveLyrics = hasLangMismatch ? undefined : (rawLyrics || track?.lyrics || undefined);
             const numDuration = duration || track?.duration || undefined;
 
             const syncedData = await LyricsSyncService.getSyncedLyrics(title, artist, effectiveAudioUrl, effectiveLyrics, numDuration);
