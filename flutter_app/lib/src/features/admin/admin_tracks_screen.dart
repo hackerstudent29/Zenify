@@ -82,10 +82,10 @@ class _AdminTracksScreenState extends ConsumerState<AdminTracksScreen> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search frequencies...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                 prefixIcon: const Icon(LucideIcons.search, color: Colors.white54, size: 18),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.white.withValues(alpha: 0.05),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -118,9 +118,9 @@ class _AdminTracksScreenState extends ConsumerState<AdminTracksScreen> {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.02),
+                              color: Colors.white.withValues(alpha: 0.02),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withOpacity(0.05)),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                             ),
                             child: ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -138,7 +138,7 @@ class _AdminTracksScreenState extends ConsumerState<AdminTracksScreen> {
                                 child: track.coverUrl == null ? const Icon(LucideIcons.music, color: Colors.white24) : null,
                               ),
                               title: Text(track.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                              subtitle: Text(track.artist?.name ?? 'Unknown Artist', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: Text(track.artist?.name ?? 'Unknown Artist', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
                               trailing: IconButton(
                                 icon: const Icon(LucideIcons.edit2, color: Colors.white54, size: 16),
                                 onPressed: () {
@@ -191,9 +191,9 @@ class _AdminTracksScreenState extends ConsumerState<AdminTracksScreen> {
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Track Title',
-                  labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                  labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: Colors.white.withValues(alpha: 0.05),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
               ),
@@ -203,9 +203,9 @@ class _AdminTracksScreenState extends ConsumerState<AdminTracksScreen> {
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Artist Name',
-                  labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                  labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: Colors.white.withValues(alpha: 0.05),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
               ),

@@ -38,7 +38,7 @@ class ArtistDetailScreen extends ConsumerWidget {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(LucideIcons.arrowLeft, color: Colors.white, size: 20),
@@ -88,7 +88,7 @@ class ArtistDetailScreen extends ConsumerWidget {
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.black, Colors.black.withOpacity(0.4), Colors.transparent],
+                        colors: [Colors.black, Colors.black.withValues(alpha: 0.4), Colors.transparent],
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         stops: const [0.0, 0.4, 1.0],
@@ -117,7 +117,7 @@ class ArtistDetailScreen extends ConsumerWidget {
                         minimumSize: const Size(0, 48),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
                         ),
                       ),
                     ),
@@ -135,7 +135,7 @@ class ArtistDetailScreen extends ConsumerWidget {
                         minimumSize: const Size(0, 48),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                          side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
                         ),
                       ),
                     ),

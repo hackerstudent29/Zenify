@@ -324,10 +324,10 @@ class _MiniTrackCard extends ConsumerWidget {
                             decoration: BoxDecoration(
                               color: const Color(0xFF18181B), // zinc-900
                               borderRadius: isCircular ? BorderRadius.circular(cardWidth / 2) : BorderRadius.circular(8),
-                              border: Border.all(color: Colors.white.withOpacity(0.05)),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
+                                  color: Colors.black.withValues(alpha: 0.2),
                                   blurRadius: 15,
                                   offset: const Offset(0, 10),
                                 ),
@@ -348,9 +348,9 @@ class _MiniTrackCard extends ConsumerWidget {
                               child: Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.4),
+                                  color: Colors.black.withValues(alpha: 0.4),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                                 ),
                                 child: const _DancingBars(),
                               ),
@@ -364,7 +364,7 @@ class _MiniTrackCard extends ConsumerWidget {
                       child: Text(
                         title,
                         style: TextStyle(
-                          color: isCurrentlyPlaying ? const Color(0xFFE11D48) : Colors.white.withOpacity(0.95), 
+                          color: isCurrentlyPlaying ? const Color(0xFFE11D48) : Colors.white.withValues(alpha: 0.95), 
                           fontWeight: FontWeight.w400, // sans is normal, we use w400 
                           fontSize: 14, // text-sm
                           height: 1.25, // leading-snug

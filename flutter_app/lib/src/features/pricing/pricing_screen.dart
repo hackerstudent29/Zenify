@@ -31,7 +31,7 @@ class PricingScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                 ),
               ),
               const SizedBox(height: 48),
@@ -43,12 +43,12 @@ class PricingScreen extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      const Color(0xFFE11D48).withOpacity(0.15),
+                      const Color(0xFFE11D48).withValues(alpha: 0.15),
                       Colors.transparent,
                     ],
                   ),
                   borderRadius: BorderRadius.circular(32),
-                  border: Border.all(color: const Color(0xFFE11D48).withOpacity(0.3)),
+                  border: Border.all(color: const Color(0xFFE11D48).withValues(alpha: 0.3)),
                 ),
                 padding: const EdgeInsets.all(32),
                 child: Column(
@@ -69,7 +69,7 @@ class PricingScreen extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 32.0),
                           child: Text(
                             '/month',
-                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 16, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
@@ -108,7 +108,7 @@ class PricingScreen extends StatelessWidget {
                 'Cancel anytime. Terms and conditions apply.',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.3),
                 ),
               ),
             ],
@@ -126,7 +126,7 @@ class PricingScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFFE11D48).withOpacity(0.2),
+              color: const Color(0xFFE11D48).withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: const Icon(LucideIcons.check, color: Color(0xFFE11D48), size: 14),

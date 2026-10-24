@@ -86,10 +86,10 @@ class _AdminArtistsScreenState extends ConsumerState<AdminArtistsScreen> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Search roster...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                 prefixIcon: const Icon(LucideIcons.search, color: Colors.white54, size: 18),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.white.withValues(alpha: 0.05),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
@@ -122,9 +122,9 @@ class _AdminArtistsScreenState extends ConsumerState<AdminArtistsScreen> {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.02),
+                              color: Colors.white.withValues(alpha: 0.02),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withOpacity(0.05)),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                             ),
                             child: ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -194,9 +194,9 @@ class _AdminArtistsScreenState extends ConsumerState<AdminArtistsScreen> {
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
                   labelText: 'Artist Name',
-                  labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                  labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: Colors.white.withValues(alpha: 0.05),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
               ),
@@ -207,9 +207,9 @@ class _AdminArtistsScreenState extends ConsumerState<AdminArtistsScreen> {
                 maxLines: 3,
                 decoration: InputDecoration(
                   labelText: 'Biography',
-                  labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                  labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
+                  fillColor: Colors.white.withValues(alpha: 0.05),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
               ),

@@ -2,11 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:marquee/marquee.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:audio_service/audio_service.dart';
 import '../../features/player/presentation/player_overlay.dart';
-import '../../shared/providers/audio_provider.dart';
 
 class AppLayout extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -57,7 +53,7 @@ class AppLayout extends StatelessWidget {
                           color: const Color.fromRGBO(10, 10, 10, 0.45),
                           border: Border(
                             top: BorderSide(
-                              color: Colors.white.withOpacity(0.08),
+                              color: Colors.white.withValues(alpha: 0.08),
                               width: 0.5,
                             ),
                           ),
@@ -126,7 +122,6 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isActive ? const Color(0xFFE11D48) : const Color(0xFF71717A);
-    final iconWeight = isActive ? FontWeight.w600 : FontWeight.w400;
 
     return GestureDetector(
       onTap: onTap,

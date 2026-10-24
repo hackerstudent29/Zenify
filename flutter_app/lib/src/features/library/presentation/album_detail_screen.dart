@@ -61,7 +61,7 @@ class AlbumDetailScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.5),
+                              color: Colors.black.withValues(alpha: 0.5),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             )
@@ -97,7 +97,7 @@ class AlbumDetailScreen extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
                       ),
                       
@@ -109,15 +109,15 @@ class AlbumDetailScreen extends ConsumerWidget {
                         children: [
                           Text(
                             fullAlbum.genre ?? 'Soundtrack',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white.withOpacity(0.4), letterSpacing: 1.5),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white.withValues(alpha: 0.4), letterSpacing: 1.5),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                            child: Text('•', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.4))),
+                            child: Text('•', style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.4))),
                           ),
                           Text(
                             '$releaseYear',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white.withOpacity(0.4), letterSpacing: 1.5),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white.withValues(alpha: 0.4), letterSpacing: 1.5),
                           ),
                         ],
                       ),
@@ -139,7 +139,7 @@ class AlbumDetailScreen extends ConsumerWidget {
                                 minimumSize: const Size(0, 48),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
                                 ),
                               ),
                             ),
@@ -157,7 +157,7 @@ class AlbumDetailScreen extends ConsumerWidget {
                                 minimumSize: const Size(0, 48),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
                                 ),
                               ),
                             ),
@@ -181,13 +181,13 @@ class AlbumDetailScreen extends ConsumerWidget {
                         child: Center(
                           child: Text(
                             '${index + 1}',
-                            style: TextStyle(color: Colors.white.withOpacity(0.2), fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ),
                       ),
-                      title: Text(track.title, style: TextStyle(color: Colors.white.withOpacity(0.8), fontWeight: FontWeight.bold, fontSize: 14)),
-                      subtitle: Text(track.artist?.name ?? fullAlbum.artist?.name ?? 'Unknown', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w500)),
-                      trailing: Icon(LucideIcons.moreHorizontal, color: Colors.white.withOpacity(0.2), size: 20),
+                      title: Text(track.title, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(track.artist?.name ?? fullAlbum.artist?.name ?? 'Unknown', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12, fontWeight: FontWeight.w500)),
+                      trailing: Icon(LucideIcons.moreHorizontal, color: Colors.white.withValues(alpha: 0.2), size: 20),
                       onTap: () {
                         final handler = ref.read(audioHandlerProvider) as MyAudioHandler;
                         final newQueue = tracks.map((t) => MediaItem(

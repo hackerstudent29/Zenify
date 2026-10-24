@@ -74,7 +74,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w500,
-            color: Colors.white.withOpacity(0.4),
+            color: Colors.white.withValues(alpha: 0.4),
           ),
         ),
         const SizedBox(height: 6),
@@ -85,17 +85,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           style: const TextStyle(color: Colors.white, fontSize: 13),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.03),
+            fillColor: Colors.white.withValues(alpha: 0.03),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -105,7 +105,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ? IconButton(
                     icon: Icon(
                       _showPassword ? LucideIcons.eyeOff : LucideIcons.eye,
-                      color: Colors.white.withOpacity(0.4),
+                      color: Colors.white.withValues(alpha: 0.4),
                       size: 16,
                     ),
                     onPressed: () => setState(() => _showPassword = !_showPassword),
@@ -143,7 +143,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFE11D48).withOpacity(0.15),
+                color: const Color(0xFFE11D48).withValues(alpha: 0.15),
               ),
             ).animate(onPlay: (controller) => controller.repeat()).custom(
               duration: 10.seconds,
@@ -190,7 +190,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             _isLogin ? 'Sign in to continue listening' : 'Start your music journey',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white.withOpacity(0.5),
+                              color: Colors.white.withValues(alpha: 0.5),
                             ),
                           ),
                         ],
@@ -232,11 +232,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   value: true,
                                   onChanged: (v) {},
                                   activeColor: const Color(0xFFE11D48),
-                                  side: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                                 ),
                                 Text(
                                   'I agree to the Terms & Privacy Policy',
-                                  style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.5)),
+                                  style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.5)),
                                 ),
                               ],
                             ).animate().fadeIn(delay: 300.ms),
@@ -266,12 +266,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           // Divider
                           Row(
                             children: [
-                              Expanded(child: Divider(color: Colors.white.withOpacity(0.05))),
+                              Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.05))),
                               Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Text('OR', style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.3), letterSpacing: 1.0)),
+                                child: Text('OR', style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.3), letterSpacing: 1.0)),
                               ),
-                              Expanded(child: Divider(color: Colors.white.withOpacity(0.05))),
+                              Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.05))),
                             ],
                           ).animate().fadeIn(delay: 400.ms),
                           
@@ -283,8 +283,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             icon: const Icon(LucideIcons.globe, color: Colors.white, size: 16),
                             label: const Text('Google', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
                             style: OutlinedButton.styleFrom(
-                              backgroundColor: Colors.white.withOpacity(0.02),
-                              side: BorderSide(color: Colors.white.withOpacity(0.08)),
+                              backgroundColor: Colors.white.withValues(alpha: 0.02),
+                              side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
@@ -300,7 +300,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         children: [
                           Text(
                             _isLogin ? "Don't have an account?" : "Already have an account?",
-                            style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.4)),
+                            style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.4)),
                           ),
                           TextButton(
                             onPressed: () => setState(() {

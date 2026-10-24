@@ -357,8 +357,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const isTrack = pathname?.startsWith("/track/");
     const isAlbum = pathname?.startsWith("/album/");
     const isPlaylist = pathname?.startsWith("/playlist/");
-    const hasActiveSong = Boolean(currentTrack?.coverUrl || activeCoverUrl);
-    const showBg = hasActiveSong || (isTrack && trackBg) || (isAlbum && albumBg) || (isPlaylist && playlistBg);
+    const showBg = (isTrack && trackBg) || (isAlbum && albumBg) || (isPlaylist && playlistBg);
     if (!showBg) return null;
 
     return (

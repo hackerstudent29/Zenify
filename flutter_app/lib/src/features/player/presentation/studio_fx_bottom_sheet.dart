@@ -15,7 +15,6 @@ class _StudioFxBottomSheetState extends ConsumerState<StudioFxBottomSheet> {
   double _pitch = 1.0;
   
   // Placeholders for UI parity
-  final List<double> _eq = [0, 0, 0];
   bool _is8D = false;
   String _reverb = 'none';
 
@@ -89,7 +88,8 @@ class _StudioFxBottomSheetState extends ConsumerState<StudioFxBottomSheet> {
             title: const Text('8D Audio', style: TextStyle(color: Colors.white)),
             subtitle: const Text('Simulates 360° sound', style: TextStyle(color: Colors.white54, fontSize: 12)),
             value: _is8D,
-            activeColor: const Color(0xFFE11D48),
+            activeThumbColor: const Color(0xFFE11D48),
+            activeTrackColor: const Color(0xFFE11D48),
             onChanged: (val) {
               setState(() => _is8D = val);
             },
@@ -152,7 +152,7 @@ class _StudioFxBottomSheetState extends ConsumerState<StudioFxBottomSheet> {
             activeTrackColor: const Color(0xFFE11D48),
             inactiveTrackColor: Colors.white12,
             thumbColor: Colors.white,
-            overlayColor: const Color(0xFFE11D48).withOpacity(0.1),
+            overlayColor: const Color(0xFFE11D48).withValues(alpha: 0.1),
           ),
           child: Slider(
             value: value,
@@ -174,7 +174,7 @@ class _StudioFxBottomSheetState extends ConsumerState<StudioFxBottomSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFE11D48).withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? const Color(0xFFE11D48).withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? const Color(0xFFE11D48) : Colors.white12,

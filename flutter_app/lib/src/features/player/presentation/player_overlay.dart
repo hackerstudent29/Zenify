@@ -40,7 +40,6 @@ class PlayerOverlay extends ConsumerWidget {
                 playerExpandProgress.value = percentage;
               }
             });
-            final isMini = percentage < 0.1;
             
             // Crossfade between mini and full player
             return Stack(
@@ -68,10 +67,10 @@ class PlayerOverlay extends ConsumerWidget {
                         height: 60,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: Colors.white.withOpacity(0.12), width: 0.8),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 0.8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.4),
+                              color: Colors.black.withValues(alpha: 0.4),
                               blurRadius: 15,
                               offset: const Offset(0, 8),
                             )
@@ -82,7 +81,7 @@ class PlayerOverlay extends ConsumerWidget {
                           child: BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                             child: Container(
-                              color: Colors.white.withOpacity(0.06),
+                              color: Colors.white.withValues(alpha: 0.06),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               child: StreamBuilder<PlaybackState>(
                                 stream: audioHandler.playbackState,

@@ -5,7 +5,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart' as dio;
 import '../../core/api/api_client.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AdminScreen extends ConsumerStatefulWidget {
   const AdminScreen({super.key});
@@ -26,9 +25,6 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
   double _uploadProgress = 0.0;
 
   bool _isAdmin() {
-    final user = Supabase.instance.client.auth.currentSession?.user;
-    // For now, allow all or check role if metadata exists
-    // final role = user?.userMetadata?['role'];
     return true; 
   }
 
@@ -129,16 +125,16 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.2)),
+                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.2)),
                 ),
                 child: const Icon(LucideIcons.shield, color: Color(0xFFEF4444), size: 32),
               ),
               const SizedBox(height: 24),
               const Text('Access Restricted', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
               const SizedBox(height: 8),
-              Text('This terminal is reserved for platform administrators.', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.5))),
+              Text('This terminal is reserved for platform administrators.', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5))),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () => context.go('/'),
@@ -175,9 +171,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF18181B), // zinc-900
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10),
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10),
                         ],
                       ),
                       child: const Center(
@@ -203,7 +199,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                             fontSize: 10,
                             letterSpacing: 2.0,
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.3),
+                            color: Colors.white.withValues(alpha: 0.3),
                           ),
                         ),
                       ],
@@ -224,7 +220,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 2.0,
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -239,33 +235,33 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                         _buildNavCard(
                           title: 'ARTISTS MANAGEMENT',
                           icon: LucideIcons.shield,
-                          color: Colors.white.withOpacity(0.7),
-                          bgColor: Colors.white.withOpacity(0.05),
-                          borderColor: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.7),
+                          bgColor: Colors.white.withValues(alpha: 0.05),
+                          borderColor: Colors.white.withValues(alpha: 0.1),
                           onTap: () => context.push('/admin/artists'),
                         ),
                         _buildNavCard(
                           title: 'TRACK DATABASE',
                           icon: LucideIcons.music,
-                          color: Colors.white.withOpacity(0.7),
-                          bgColor: Colors.white.withOpacity(0.05),
-                          borderColor: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.7),
+                          bgColor: Colors.white.withValues(alpha: 0.05),
+                          borderColor: Colors.white.withValues(alpha: 0.1),
                           onTap: () => context.push('/admin/tracks'),
                         ),
                         _buildNavCard(
                           title: 'LYRIC SYNC STUDIO',
                           icon: LucideIcons.mic,
-                          color: Colors.white.withOpacity(0.7),
-                          bgColor: Colors.white.withOpacity(0.05),
-                          borderColor: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.7),
+                          bgColor: Colors.white.withValues(alpha: 0.05),
+                          borderColor: Colors.white.withValues(alpha: 0.1),
                           onTap: () => context.push('/admin/lyric-sync'),
                         ),
                         _buildNavCard(
                           title: 'BATCH INTAKE',
                           icon: LucideIcons.sparkles,
                           color: const Color(0xFFE11D48),
-                          bgColor: const Color(0xFFE11D48).withOpacity(0.1),
-                          borderColor: const Color(0xFFE11D48).withOpacity(0.2),
+                          bgColor: const Color(0xFFE11D48).withValues(alpha: 0.1),
+                          borderColor: const Color(0xFFE11D48).withValues(alpha: 0.2),
                           onTap: () => context.push('/admin/playlist-import'),
                         ),
                       ],
@@ -280,16 +276,16 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 2.0,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                       ),
                     ),
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.02),
+                        color: Colors.white.withValues(alpha: 0.02),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                       ),
                       child: Form(
                         key: _formKey,
@@ -301,9 +297,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                               style: const TextStyle(color: Colors.white, fontSize: 14),
                               decoration: InputDecoration(
                                 labelText: 'Track Title',
-                                labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                                labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                                 enabledBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 focusedBorder: OutlineInputBorder(
@@ -322,9 +318,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                               style: const TextStyle(color: Colors.white, fontSize: 14),
                               decoration: InputDecoration(
                                 labelText: 'Artist Name',
-                                labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                                labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                                 enabledBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 focusedBorder: OutlineInputBorder(
@@ -343,9 +339,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                               style: const TextStyle(color: Colors.white, fontSize: 14),
                               decoration: InputDecoration(
                                 labelText: 'Album Title (Optional)',
-                                labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                                labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                                 enabledBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 focusedBorder: OutlineInputBorder(
@@ -373,7 +369,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: _audioFile != null ? const Color(0xFFE11D48).withOpacity(0.2) : const Color(0xFF222222),
+                                      backgroundColor: _audioFile != null ? const Color(0xFFE11D48).withValues(alpha: 0.2) : const Color(0xFF222222),
                                       padding: const EdgeInsets.symmetric(vertical: 12),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),
@@ -391,7 +387,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: _coverFile != null ? const Color(0xFFE11D48).withOpacity(0.2) : const Color(0xFF222222),
+                                      backgroundColor: _coverFile != null ? const Color(0xFFE11D48).withValues(alpha: 0.2) : const Color(0xFF222222),
                                       padding: const EdgeInsets.symmetric(vertical: 12),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                     ),

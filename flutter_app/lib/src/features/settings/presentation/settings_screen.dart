@@ -30,9 +30,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 48),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.01),
+        color: Colors.white.withValues(alpha: 0.01),
         borderRadius: BorderRadius.circular(48),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
@@ -59,7 +59,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.white.withOpacity(0.4)),
+          Icon(icon, size: 18, color: Colors.white.withValues(alpha: 0.4)),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -70,7 +70,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -79,7 +79,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                   ),
                 ),
               ],
@@ -105,9 +105,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF18181B).withOpacity(0.8),
+                  color: const Color(0xFF18181B).withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(32),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -118,7 +118,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         icon: const Icon(LucideIcons.arrowLeft, color: Colors.white, size: 18),
                         onPressed: () => context.pop(),
                       ),
-                      Container(width: 1, height: 24, color: Colors.white.withOpacity(0.1), margin: const EdgeInsets.only(right: 8)),
+                      Container(width: 1, height: 24, color: Colors.white.withValues(alpha: 0.1), margin: const EdgeInsets.only(right: 8)),
                       ..._sections.map((section) {
                         final isActive = _activeSection == section['id'];
                         return GestureDetector(
@@ -126,7 +126,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
-                              color: isActive ? Colors.white.withOpacity(0.1) : Colors.transparent,
+                              color: isActive ? Colors.white.withValues(alpha: 0.1) : Colors.transparent,
                               borderRadius: BorderRadius.circular(24),
                             ),
                             child: Row(
@@ -134,7 +134,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 Icon(
                                   section['icon'],
                                   size: 15,
-                                  color: isActive ? Colors.white : Colors.white.withOpacity(0.5),
+                                  color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
@@ -142,14 +142,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: isActive ? Colors.white : Colors.white.withOpacity(0.5),
+                                    color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.5),
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
                 ),
@@ -193,7 +193,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailing: Switch(
                               value: true,
                               onChanged: (v) {},
-                              activeColor: const Color(0xFFE11D48),
+                              activeThumbColor: const Color(0xFFE11D48),
                             ),
                           ),
                           _buildSettingRow(
@@ -203,7 +203,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailing: Switch(
                               value: false,
                               onChanged: (v) {},
-                              activeColor: const Color(0xFFE11D48),
+                              activeThumbColor: const Color(0xFFE11D48),
                             ),
                           ),
                         ],
@@ -222,7 +222,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailing: Switch(
                               value: false,
                               onChanged: (v) {},
-                              activeColor: const Color(0xFFE11D48),
+                              activeThumbColor: const Color(0xFFE11D48),
                             ),
                           ),
                           _buildSettingRow(
@@ -232,7 +232,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailing: Switch(
                               value: true,
                               onChanged: (v) {},
-                              activeColor: const Color(0xFFE11D48),
+                              activeThumbColor: const Color(0xFFE11D48),
                             ),
                           ),
                         ],
@@ -285,7 +285,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailing: Switch(
                               value: false,
                               onChanged: (v) {},
-                              activeColor: const Color(0xFFE11D48),
+                              activeThumbColor: const Color(0xFFE11D48),
                             ),
                           ),
                         ],
@@ -304,7 +304,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailing: Switch(
                               value: true,
                               onChanged: (v) {},
-                              activeColor: const Color(0xFFE11D48),
+                              activeThumbColor: const Color(0xFFE11D48),
                             ),
                           ),
                           _buildSettingRow(
@@ -314,7 +314,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailing: Switch(
                               value: true,
                               onChanged: (v) {},
-                              activeColor: const Color(0xFFE11D48),
+                              activeThumbColor: const Color(0xFFE11D48),
                             ),
                           ),
                         ],
@@ -333,7 +333,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailing: Switch(
                               value: false,
                               onChanged: (v) {},
-                              activeColor: const Color(0xFFE11D48),
+                              activeThumbColor: const Color(0xFFE11D48),
                             ),
                           ),
                           _buildSettingRow(
@@ -343,7 +343,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailing: Switch(
                               value: true,
                               onChanged: (v) {},
-                              activeColor: const Color(0xFFE11D48),
+                              activeThumbColor: const Color(0xFFE11D48),
                             ),
                           ),
                         ],

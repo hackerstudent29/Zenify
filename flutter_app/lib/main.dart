@@ -10,8 +10,6 @@ import 'src/features/player/services/audio_handler.dart';
 import 'src/shared/providers/audio_provider.dart';
 import 'dart:ui';
 
-import 'package:device_frame/device_frame.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -19,7 +17,7 @@ void main() async {
 
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL'] ?? '',
-    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '', // ignore: deprecated_member_use
   );
   
   final audioHandler = await initAudioService();
