@@ -34,8 +34,12 @@ api.interceptors.response.use(
     // Suppress expected 401s for guest session checks (auth/me, auth/refresh)
     const isGuestAuthCheck = error.response?.status === 401 && (fullUrl?.includes('auth/me') || fullUrl?.includes('auth/refresh'));
 
-    // Suppress expected 404s for gracefully handled UI states to prevent dev overlays
-    const isExpected404 = error.response?.status === 404 && (fullUrl?.includes('sync-lyrics') || fullUrl?.includes('search/smart'));
+    // Suppress expected 404s for gracefully handled UI states to prevent dev overlays and alarm
+    const isExpected404 = error.response?.status === 404 && (
+      fullUrl?.includes('sync-lyrics') || 
+      fullUrl?.includes('search/smart') ||
+      fullUrl?.includes('/tracks/')
+    );
 
     if (isGuestAuthCheck || isExpected404) {
       if (import.meta.env.DEV) {

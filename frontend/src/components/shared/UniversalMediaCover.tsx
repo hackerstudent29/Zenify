@@ -51,6 +51,11 @@ export function UniversalMediaCover({
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         fetchPriority={priority ? "high" : "auto"}
+        onError={(e) => {
+          if (!e.currentTarget.src.endsWith('/logo.png')) {
+            e.currentTarget.src = '/logo.png';
+          }
+        }}
         className={cn("w-full h-full object-cover", isYtImg ? "scale-[1.35]" : "", className)} 
       />
     );
@@ -110,6 +115,11 @@ export function UniversalMediaCover({
           loading={priority ? "eager" : "lazy"}
           decoding="async"
           fetchPriority={priority ? "high" : "auto"}
+          onError={(e) => {
+            if (!e.currentTarget.src.endsWith('/logo.png')) {
+              e.currentTarget.src = '/logo.png';
+            }
+          }}
           className={cn("w-full h-full object-cover", isYtImg ? "scale-[1.35]" : "")} 
         />
       );
@@ -129,6 +139,11 @@ export function UniversalMediaCover({
       loading={priority ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={priority ? "high" : "auto"}
+      onError={(e) => {
+        if (!e.currentTarget.src.endsWith('/logo.png')) {
+          e.currentTarget.src = '/logo.png';
+        }
+      }}
       className={cn("w-full h-full object-cover", className)}
     />
   );
