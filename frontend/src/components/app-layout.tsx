@@ -357,13 +357,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const isTrack = pathname?.startsWith("/track/");
     const isAlbum = pathname?.startsWith("/album/");
     const isPlaylist = pathname?.startsWith("/playlist/");
-    const showBg = (isTrack && trackBg) || (isAlbum && albumBg) || (isPlaylist && playlistBg);
+    const hasActiveSong = Boolean(currentTrack?.coverUrl || activeCoverUrl);
+    const showBg = hasActiveSong || (isTrack && trackBg) || (isAlbum && albumBg) || (isPlaylist && playlistBg);
     if (!showBg) return null;
 
     return (
       <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none">
         <LiquidBackground
-          coverUrl={activeCoverUrl || "/logo.png"}
+          coverUrl={activeCoverUrl || currentTrack?.coverUrl || "/logo.png"}
           covers={pageCovers || undefined}
           speedMultiplier={2.2}
         />
