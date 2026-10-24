@@ -196,8 +196,8 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
     // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active 5-min circuit breaker cooldown)
     const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
     if (ytBin && !isLocalBlocked) {
-        // Priority: android_music, android_vr, tv_embedded bypass datacenter IP bot challenges; avoid premature circuit break
-        const gClients: (string | null)[] = ['android_music', 'android_vr', 'tv_embedded', 'web_embedded', null, 'android', 'web'];
+        // Priority: android_music, tv_embedded bypass datacenter IP bot challenges; keep timeout strictly within 8s total to prevent Heroku H12 router cutoff
+        const gClients: (string | null)[] = ['android_music', 'tv_embedded'];
         let allThrottled = true;
         for (const client of gClients) {
             try {
@@ -215,10 +215,10 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
                     ...(client ? ['--extractor-args', `youtube:player_client=${client}`] : []),
                     '-f', 'ba/18/b/best',
                     '--no-playlist',
-                    '--socket-timeout', '15',
+                    '--socket-timeout', '6',
                     url
                 ];
-                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 12000 });
+                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 4500 });
                 const urls = stdout.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('http'));
                 const directMediaUrl = urls.find(u => u.includes('mime=audio') || u.includes('audio')) || urls[0];
                 if (directMediaUrl && directMediaUrl.startsWith('http')) {
@@ -1198,7 +1198,8 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const langRes = await AILyricsService.detectSongLanguageDetails({
                     title: cleanCandTitle || candTitle || targetUrl,
                     artist: cleanCandArtist || candArtist || '',
-                    album: candAlbum || localTrack?.album?.title
+                    album: candAlbum || localTrack?.album?.title,
+                    skipLLM: true
                 });
                 if (langRes && langRes.language && !langRes.isEnglish) {
                     resolvedSongLang = langRes.language.toLowerCase();

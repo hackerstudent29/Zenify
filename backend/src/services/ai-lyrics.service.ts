@@ -91,8 +91,9 @@ export class AILyricsService {
         artist: string;
         album?: string;
         lyrics?: string;
+        skipLLM?: boolean;
     }): Promise<DetectedSongLanguage> {
-        const { title, artist, album, lyrics } = params;
+        const { title, artist, album, lyrics, skipLLM } = params;
 
         // Step 0: Highest Priority — Explicit language tag in title or album (e.g. [Tamil], (Telugu), [Hindi], etc.)
         const combinedTitle = `${title || ''} ${album || ''}`.toLowerCase();
@@ -212,6 +213,15 @@ export class AILyricsService {
                 code: 'te',
                 isEnglish: false,
                 romanizedLang: 'Tenglish'
+            };
+        }
+
+        if (skipLLM) {
+            return {
+                language: 'English',
+                code: 'en',
+                isEnglish: true,
+                romanizedLang: 'English'
             };
         }
 
