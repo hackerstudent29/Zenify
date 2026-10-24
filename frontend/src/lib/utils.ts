@@ -160,6 +160,8 @@ export function getMediaUrl(
       trimmedPath.includes('r2.dev') ||
       trimmedPath.includes('cloudflarestorage.com') ||
       trimmedPath.includes('mzstatic.com') || 
+      trimmedPath.includes('saavncdn.com') ||
+      trimmedPath.includes('jiosaavn.com') ||
       (trimmedPath.includes('apple.com') && !trimmedPath.includes('music.apple.com'))
     )) {
       return trimmedPath;
