@@ -6,6 +6,7 @@ import { setCacheVal } from '../utils/cache';
 import { CompositeCatalogService, CatalogTrack } from '../services/catalog-provider.service';
 import { HomeShelvesJobData } from './home-shelves.queue';
 import { isCompilationOrPlaylist, cleanArtistNames } from '../services/universal-search.service';
+import { AICurationService } from '../services/ai-curation.service';
 
 const REDIS_HOST_URL = config.REDIS_URL;
 let redisConnection: IORedis | null = null;
@@ -69,19 +70,25 @@ export async function buildUserShelves(userId: string): Promise<UserHomeShelvesP
     : 'in';
   const countryName = countryCode === 'us' ? 'United States' : countryCode === 'gb' ? 'United Kingdom' : 'India';
 
-  // Resolve Languages (User's language weights first, never alphabetical)
+  // Resolve Languages (User's selected language first)
   const languageNames: string[] = [];
-  if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
+  if (preferences?.selectedLanguageName) {
+    languageNames.push(preferences.selectedLanguageName);
+  } else if (preferences?.selectedLanguageCode) {
+    languageNames.push(preferences.selectedLanguageCode === 'ta' ? 'Tamil' : preferences.selectedLanguageCode);
+  } else if (preferences?.languages && preferences.languages.length > 0) {
+    languageNames.push(preferences.languages[0]);
+  } else if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
     const sorted = Object.entries(profile.languageWeights as Record<string, number>)
       .sort((a, b) => b[1] - a[1])
       .map(e => e[0]);
     languageNames.push(...sorted);
-  } else if (preferences?.languages && preferences.languages.length > 0) {
-    languageNames.push(...preferences.languages);
   }
   if (languageNames.length === 0) {
-    languageNames.push('Tamil', 'English');
+    languageNames.push('Tamil');
   }
+
+  const primaryLang = languageNames[0] || 'Tamil';
 
   // Resolve Favorite Artists
   const seedArtists: string[] = [];
@@ -95,9 +102,14 @@ export async function buildUserShelves(userId: string): Promise<UserHomeShelvesP
     const aName = l.track?.artist?.name?.trim();
     if (aName && !seedArtists.includes(aName)) seedArtists.push(aName);
   }
-  if (seedArtists.length === 0) {
-    seedArtists.push('Anirudh Ravichander', 'A.R. Rahman', 'The Weeknd');
-  }
+
+  const curation = await AICurationService.getCuration({
+    language: primaryLang,
+    country: countryName,
+    favoriteArtists: seedArtists
+  });
+
+  const finalArtists = (seedArtists.length > 0 ? seedArtists : curation.artists).slice(0, 4);
 
   // Set of tracks played in the last 24h to drop from discovery shelves
   const recentlyPlayedTitles = new Set<string>();
@@ -108,11 +120,12 @@ export async function buildUserShelves(userId: string): Promise<UserHomeShelvesP
     if (h.track?.youtubeId) recentlyPlayedIds.add(h.track.youtubeId.toLowerCase().trim());
   }
 
-  // Step 2 & 3: Parallel Catalog Queries
-  const [countryCharts, ...artistTracksResults] = await Promise.all([
-    CompositeCatalogService.getCharts(countryCode, 30),
-    ...seedArtists.slice(0, 4).map(artist => CompositeCatalogService.getArtistTopSongs(artist, countryCode, 15))
+  // Step 2 & 3: Parallel Catalog Queries strictly for primary language
+  const [langTopSearch, ...artistTracksResults] = await Promise.all([
+    CompositeCatalogService.search(`Top ${primaryLang} Songs 2026`, countryCode, 30),
+    ...finalArtists.map(artist => CompositeCatalogService.getArtistTopSongs(artist, countryCode, 15))
   ]);
+  const countryCharts = langTopSearch.tracks;
 
   // Step 4: Rank, Dedupe & Filter
   const dedupeAndFilter = (tracks: CatalogTrack[], isDiscovery = false): CatalogTrack[] => {

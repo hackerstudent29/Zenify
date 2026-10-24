@@ -1678,5 +1678,19 @@ export async function utilsRoutes(server: FastifyInstance) {
             return reply.status(500).send({ error: err.message });
         }
     });
+
+    // Flush all caches (Redis DB + in-memory cache)
+    server.post('/flush-cache', async (request, reply) => {
+        try {
+            const { flushAllCaches } = await import('../utils/cache.js');
+            const result = await flushAllCaches();
+            server.log.info('[Utils] All cache DBs flushed cleanly.');
+            return reply.send({ success: true, message: 'All cache DBs flushed cleanly.', result });
+        } catch (err: any) {
+            server.log.error(`flush-cache error: ${err.message}`);
+            return reply.status(500).send({ error: err.message });
+        }
+    });
 }
+
 

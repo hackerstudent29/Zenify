@@ -32,7 +32,7 @@ async function transliterateTamilToTanglish(text: string): Promise<string> {
         `;
 
         const res = await axios.post(`https://integrate.api.nvidia.com/v1/chat/completions`, {
-            model: 'meta/llama-3.1-70b-instruct',
+            model: 'nvidia/nemotron-3.5-bolt-e4b',
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.1
         }, { headers: { Authorization: `Bearer ${NVIDIA_API_KEY}` }});
@@ -62,7 +62,7 @@ async function detectLanguage(text: string): Promise<string> {
         `;
 
         const res = await axios.post(`https://integrate.api.nvidia.com/v1/chat/completions`, {
-            model: 'meta/llama-3.1-70b-instruct',
+            model: 'nvidia/nemotron-3.5-bolt-e4b',
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.1
         }, { headers: { Authorization: `Bearer ${NVIDIA_API_KEY}` }});

@@ -73,7 +73,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         }
       }
     } catch (e) {
-      print('Error performing search: $e');
+      debugPrint('Error performing search: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

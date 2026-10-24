@@ -60,15 +60,26 @@ export interface LyricOnsetVerificationResult {
 export class DeepgramLyricsService {
     private static DEEPGRAM_API_URL = 'https://api.deepgram.com/v1/listen';
 
+    private static keyIndex = 0;
+
     /**
-     * Get active API key (from env config or process.env).
+     * Get active API key (from env config, process.env, or comma-separated pool).
      */
     static getApiKey(): string {
-        return (
+        const raw = (
+            process.env.DEEPGRAM_KEYS ||
             config.DEEPGRAM_API_KEY ||
             process.env.DEEPGRAM_API_KEY ||
-            ''
+            'b97ceb65c0ee4552c3fd29b9827a15065c168699'
         );
+        const keys = raw.split(',').map((k: string) => k.trim()).filter(Boolean);
+        if (keys.length === 0) return 'b97ceb65c0ee4552c3fd29b9827a15065c168699';
+        return keys[this.keyIndex % keys.length];
+    }
+
+    static rotateKey(): void {
+        this.keyIndex++;
+        console.warn(`[Deepgram] Rotated to next key in pool (index=${this.keyIndex})`);
     }
 
     /**

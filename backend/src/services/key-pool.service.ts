@@ -14,20 +14,42 @@ export class KeyPoolService {
   private static readonly SETTINGS_CACHE_TTL = 30000; // 30s
   private static defaultKeys: Record<string, string[]> = {
     rapidapi: [
-      process.env.RAPIDAPI_KEY || '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188'
-    ],
+      process.env.RAPIDAPI_KEY || '',
+      ...(process.env.RAPIDAPI_KEYS ? process.env.RAPIDAPI_KEYS.split(',').map(s => s.trim()) : []),
+      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
+      'e9a22f3c78msh7958b19f074d251p1d198ejsn3a1b4d0812cf',
+      '79b4d18ec2msh6345a07e868b94ap104642jsn47b19dc6312a',
+      'bf105d890amsh1258d4477839ec9p1726a2jsnb7c569a35e80',
+      'd4850c4103msh89073e72c842b0fp10e429jsne1a2df335198'
+    ].filter(k => k && k.length > 5),
     spotify: [
-      process.env.SPOTIFY_API_KEY || process.env.RAPIDAPI_KEY || '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188'
-    ],
+      process.env.SPOTIFY_API_KEY || '',
+      process.env.RAPIDAPI_KEY || '',
+      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
+      'e9a22f3c78msh7958b19f074d251p1d198ejsn3a1b4d0812cf',
+      '79b4d18ec2msh6345a07e868b94ap104642jsn47b19dc6312a'
+    ].filter(k => k && k.length > 5),
     genius: [
-      process.env.GENIUS_API_KEY || process.env.RAPIDAPI_KEY || '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188'
-    ],
+      process.env.GENIUS_API_KEY || '',
+      process.env.RAPIDAPI_KEY || '',
+      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
+      'e9a22f3c78msh7958b19f074d251p1d198ejsn3a1b4d0812cf',
+      '79b4d18ec2msh6345a07e868b94ap104642jsn47b19dc6312a'
+    ].filter(k => k && k.length > 5),
     youtube: [
-      process.env.YOUTUBE_API_KEY || process.env.RAPIDAPI_KEY || '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188'
-    ],
+      process.env.YOUTUBE_API_KEY || '',
+      process.env.RAPIDAPI_KEY || '',
+      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
+      'bf105d890amsh1258d4477839ec9p1726a2jsnb7c569a35e80',
+      'd4850c4103msh89073e72c842b0fp10e429jsne1a2df335198'
+    ].filter(k => k && k.length > 5),
     lyrics: [
-      process.env.LYRICS_API_KEY || process.env.RAPIDAPI_KEY || '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188'
-    ]
+      process.env.LYRICS_API_KEY || '',
+      process.env.RAPIDAPI_KEY || '',
+      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
+      'e9a22f3c78msh7958b19f074d251p1d198ejsn3a1b4d0812cf',
+      'bf105d890amsh1258d4477839ec9p1726a2jsnb7c569a35e80'
+    ].filter(k => k && k.length > 5)
   };
 
   /**
@@ -174,14 +196,19 @@ export class KeyPoolService {
         return result;
       } catch (err: any) {
         const status = err.response?.status;
-        const msg = (err.message || '').toLowerCase();
-        const isQuotaError = status === 429 || status === 403 || 
+        const respMsg = (typeof err.response?.data?.message === 'string' ? err.response.data.message : '') + ' ' + (typeof err.response?.data === 'string' ? err.response.data : '');
+        const msg = ((err.message || '') + ' ' + respMsg).toLowerCase();
+        const isQuotaOrKeyError = status === 429 || status === 403 || status === 401 ||
                              msg.includes('rate limit') || 
-                             msg.includes('quota exceeded') ||
-                             msg.includes('too many requests');
+                             msg.includes('quota') ||
+                             msg.includes('monthly quota') ||
+                             msg.includes('exceeded') ||
+                             msg.includes('too many requests') ||
+                             msg.includes('invalid api key') ||
+                             msg.includes('not subscribed');
 
-        if (isQuotaError) {
-          this.markRateLimited(poolName, key);
+        if (isQuotaOrKeyError) {
+          this.markRateLimited(poolName, key, 60 * 60 * 1000); // 1 hour cooldown for exhausted keys
           // Loop will retry with next key in the pool
           continue;
         }

@@ -100,3 +100,21 @@ export async function invalidateCache(key: string): Promise<void> {
   // Local Memory Fallback
   localMemoryCache.delete(key);
 }
+
+/**
+ * Flushes all caches (Redis DB and in-memory map) completely
+ */
+export async function flushAllCaches(): Promise<{ redisCleared: boolean; memoryCleared: boolean }> {
+  localMemoryCache.clear();
+  let redisCleared = false;
+  if (redisClient && redisClient.status === 'ready') {
+    try {
+      await redisClient.flushdb();
+      redisCleared = true;
+    } catch (err: any) {
+      console.warn('[Cache] Redis flushdb failed:', err.message);
+    }
+  }
+  console.log(`[Cache] Successfully flushed all caches (Redis: ${redisCleared}, Memory: cleared).`);
+  return { redisCleared, memoryCleared: true };
+}

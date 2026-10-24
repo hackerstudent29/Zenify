@@ -8,9 +8,18 @@ export function useHomepageData() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const userId = user?.id || 'guest';
-  const userCountry = user?.country?.trim() || '';
+  const localLang = typeof window !== 'undefined' ? (localStorage.getItem('zenify_selected_language') || localStorage.getItem('zenify_selected_lang')) : null;
+  const localCountry = typeof window !== 'undefined' ? localStorage.getItem('zenify_selected_country') : null;
 
-  const userLang = user?.preferences?.languages?.[0]?.trim() || '';
+  const rawLang = (user as any)?.preferences?.selectedLanguageName ||
+                  (user as any)?.preferences?.selectedLanguageCode ||
+                  localLang ||
+                  user?.preferences?.languages?.[0] ||
+                  'Tamil';
+
+  const userLang = rawLang.trim();
+  const rawCountry = user?.country?.trim() || localCountry || 'India';
+  const userCountry = rawCountry.trim();
 
   const countryDisplayName = userCountry
     ? (userCountry.toUpperCase() === 'US' || userCountry.toLowerCase() === 'usa' ? 'United States'
@@ -24,7 +33,12 @@ export function useHomepageData() {
     const cacheKey = `homepage_cache_${userId}_${path}`;
 
     try {
-      const res = await api.get(`/homepage${path}`);
+      const res = await api.get(`/homepage${path}`, {
+        headers: {
+          'x-user-language': userLang,
+          'x-user-country': userCountry
+        }
+      });
       if (res.data) {
         await set(cacheKey, res.data); // Save fresh data to local cache
       }
@@ -56,6 +70,8 @@ export function useHomepageData() {
     };
 
     const handleCountryLangChanged = () => {
+      queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
+      queryClient.invalidateQueries({ queryKey: ['home-trending-now'] });
       queryClient.invalidateQueries({ queryKey: ['home-featured'] });
       queryClient.invalidateQueries({ queryKey: ['home-top-country'] });
       queryClient.invalidateQueries({ queryKey: ['home-new-releases-lang'] });
@@ -135,38 +151,38 @@ export function useHomepageData() {
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 3. Made for you (personalized by language, genre, artist weights)
+      // 3. Made for you (personalized strictly by selected language, genre, artist weights)
       {
-        queryKey: ['home-made-for-you', userId],
-        queryFn: () => fetchSection('/made-for-you'),
+        queryKey: ['home-made-for-you', userId, userLang, userCountry],
+        queryFn: () => fetchSection(`/made-for-you?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 4. Top songs in your country
+      // 4. Top songs in your country (strictly for selected language)
       {
-        queryKey: ['home-top-country', userId, userCountry],
-        queryFn: () => fetchSection(`/top-country${userCountry ? `?country=${encodeURIComponent(userCountry)}` : ''}`),
+        queryKey: ['home-top-country', userId, userCountry, userLang],
+        queryFn: () => fetchSection(`/top-country?country=${encodeURIComponent(userCountry)}&language=${encodeURIComponent(userLang)}`),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 5. New releases in your languages
+      // 5. New releases in your languages (strictly in selected language)
       {
-        queryKey: ['home-new-releases-lang', userId],
-        queryFn: () => fetchSection('/new-releases-lang'),
+        queryKey: ['home-new-releases-lang', userId, userLang, userCountry],
+        queryFn: () => fetchSection(`/new-releases-lang?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 6. Trending now
+      // 6. Trending now (strictly in selected language)
       {
-        queryKey: ['home-trending-now', userId],
-        queryFn: () => fetchSection('/trending-now'),
+        queryKey: ['home-trending-now', userId, userLang, userCountry],
+        queryFn: () => fetchSection(`/trending-now?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 7. Popular artists in your languages
+      // 7. Popular artists in your languages (strictly in selected language)
       {
-        queryKey: ['home-popular-artists-lang', userId],
-        queryFn: () => fetchSection('/popular-artists-lang'),
+        queryKey: ['home-popular-artists-lang', userId, userLang, userCountry],
+        queryFn: () => fetchSection(`/popular-artists-lang?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },

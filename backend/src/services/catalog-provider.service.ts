@@ -607,60 +607,61 @@ export class ITunesCatalogProvider implements CatalogProvider {
 
 export class RapidApiCatalogProvider implements CatalogProvider {
   name = 'rapidapi';
-  private rapidApiKey = process.env.RAPIDAPI_KEY || '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188';
   private bucket = new TokenBucket(10, 3);
   private circuit = new CircuitBreaker(4, 45000);
 
   isAvailable(): boolean {
-    return Boolean(this.rapidApiKey && !this.circuit.isOpen());
+    return !this.circuit.isOpen();
   }
 
   async search(query: string, storefront: string, limit = 10): Promise<CatalogSearchResult> {
     await this.bucket.acquire();
     try {
-      // Query Spotify/YouTube Music through RapidAPI
-      const res = await axios.get('https://spotify23.p.rapidapi.com/search/', {
-        params: { q: query, type: 'tracks,artists', limit: Math.min(limit, 10) },
-        headers: {
-          'x-rapidapi-key': this.rapidApiKey,
-          'x-rapidapi-host': 'spotify23.p.rapidapi.com'
-        },
-        timeout: 4500
-      });
+      const { KeyPoolService } = await import('./key-pool.service.js');
+      const tracks: CatalogTrack[] = await KeyPoolService.executeWithFailover('rapidapi', async (rapidApiKey) => {
+        const res = await axios.get('https://spotify23.p.rapidapi.com/search/', {
+          params: { q: query, type: 'tracks,artists', limit: Math.min(limit, 10) },
+          headers: {
+            'x-rapidapi-key': rapidApiKey,
+            'x-rapidapi-host': 'spotify23.p.rapidapi.com'
+          },
+          timeout: 4500
+        });
+
+        const rawTracks = res.data?.tracks?.items || [];
+        return rawTracks.map((item: any) => {
+          const t = item.data || item;
+          const artistName = t.artists?.items?.[0]?.profile?.name || t.artists?.[0]?.name || 'Unknown Artist';
+          const cover = t.albumOfTrack?.coverArt?.sources?.[0]?.url || t.album?.images?.[0]?.url || '';
+          const artistObj: CatalogArtistRef = {
+            id: `rapid-artist-${encodeURIComponent(artistName)}`,
+            name: artistName,
+            imageUrl: cover
+          };
+
+          return {
+            id: `rapid-${t.id}`,
+            source: 'rapidapi',
+            sourceId: t.id,
+            title: t.name || 'Untitled',
+            artists: [artistObj],
+            artist: artistObj,
+            album: t.albumOfTrack?.name ? {
+              id: `rapid-album-${t.id}`,
+              title: t.albumOfTrack.name,
+              coverUrl: cover
+            } : undefined,
+            duration: Math.round((t.duration?.totalMilliseconds || 180000) / 1000),
+            artwork: cover,
+            coverUrl: cover,
+            storefront,
+            fetchedAt: Date.now(),
+            isVirtual: true
+          };
+        });
+      }, async () => []);
+
       this.circuit.recordSuccess();
-
-      const rawTracks = res.data?.tracks?.items || [];
-      const tracks: CatalogTrack[] = rawTracks.map((item: any) => {
-        const t = item.data || item;
-        const artistName = t.artists?.items?.[0]?.profile?.name || t.artists?.[0]?.name || 'Unknown Artist';
-        const cover = t.albumOfTrack?.coverArt?.sources?.[0]?.url || t.album?.images?.[0]?.url || '';
-        const artistObj: CatalogArtistRef = {
-          id: `rapid-artist-${encodeURIComponent(artistName)}`,
-          name: artistName,
-          imageUrl: cover
-        };
-
-        return {
-          id: `rapid-${t.id}`,
-          source: 'rapidapi',
-          sourceId: t.id,
-          title: t.name || 'Untitled',
-          artists: [artistObj],
-          artist: artistObj,
-          album: t.albumOfTrack?.name ? {
-            id: `rapid-album-${t.id}`,
-            title: t.albumOfTrack.name,
-            coverUrl: cover
-          } : undefined,
-          duration: Math.round((t.duration?.totalMilliseconds || 180000) / 1000),
-          artwork: cover,
-          coverUrl: cover,
-          storefront,
-          fetchedAt: Date.now(),
-          isVirtual: true
-        };
-      });
-
       return { tracks, artists: [], albums: [] };
     } catch (err: any) {
       this.circuit.recordFailure(err.response?.status === 429);
@@ -699,6 +700,11 @@ export class CompositeCatalogService {
   private static itunesProvider = new ITunesCatalogProvider();
   private static rapidProvider = new RapidApiCatalogProvider();
 
+  // In-flight single-flight request coalescing to eliminate duplicate egress calls
+  private static inFlightSearches: Map<string, Promise<CatalogSearchResult>> = new Map();
+  private static inFlightCharts: Map<string, Promise<CatalogTrack[]>> = new Map();
+  private static inFlightArtistTops: Map<string, Promise<CatalogTrack[]>> = new Map();
+
   private static getActiveProviders(): CatalogProvider[] {
     const list: CatalogProvider[] = [];
     if (this.appleProvider.isAvailable()) list.push(this.appleProvider);
@@ -708,7 +714,8 @@ export class CompositeCatalogService {
   }
 
   /**
-   * Search external catalog with automatic failover and universal multi-engine coverage
+   * Search external catalog with automatic failover and universal multi-engine coverage.
+   * Single-flight request coalescing prevents duplicate concurrent egress requests.
    */
   static async search(query: string, storefront = 'in', limit = 15): Promise<CatalogSearchResult> {
     const clean = query.toLowerCase().trim();
@@ -716,31 +723,45 @@ export class CompositeCatalogService {
     const cached = await getCacheVal(cacheKey);
     if (cached) return cached as CatalogSearchResult;
 
-    // Primary: Universal Multi-Engine Search (Local DB + JioSaavn + iTunes IN/US + YouTube Music)
-    try {
-      const { UniversalSearchService } = await import('./universal-search.service.js');
-      const universalResult = await UniversalSearchService.searchCatalog(query, storefront, limit);
-      if (universalResult.tracks.length > 0 || universalResult.artists.length > 0) {
-        await setCacheVal(cacheKey, universalResult, 300); // 5 min TTL
-        return universalResult;
-      }
-    } catch (err: any) {
-      console.warn('[Catalog] UniversalSearchService primary search failed, trying fallback providers:', err.message);
+    // Return in-flight promise if query is already being executed concurrently
+    if (this.inFlightSearches.has(cacheKey)) {
+      return this.inFlightSearches.get(cacheKey)!;
     }
 
-    for (const provider of this.getActiveProviders()) {
+    const task = (async (): Promise<CatalogSearchResult> => {
+      // Primary: Universal Multi-Engine Search (Local DB + JioSaavn + iTunes IN/US + YouTube Music)
       try {
-        const result = await provider.search(query, storefront, limit);
-        if (result.tracks.length > 0 || result.artists.length > 0) {
-          await setCacheVal(cacheKey, result, 300); // 5 min TTL
-          return result;
+        const { UniversalSearchService } = await import('./universal-search.service.js');
+        const universalResult = await UniversalSearchService.searchCatalog(query, storefront, limit);
+        if (universalResult.tracks.length > 0 || universalResult.artists.length > 0) {
+          await setCacheVal(cacheKey, universalResult, 300); // 5 min TTL
+          return universalResult;
         }
       } catch (err: any) {
-        console.warn(`[Catalog] Provider ${provider.name} search failed:`, err.message);
+        console.warn('[Catalog] UniversalSearchService primary search failed, trying fallback providers:', err.message);
       }
-    }
 
-    return { tracks: [], artists: [], albums: [] };
+      for (const provider of this.getActiveProviders()) {
+        try {
+          const result = await provider.search(query, storefront, limit);
+          if (result.tracks.length > 0 || result.artists.length > 0) {
+            await setCacheVal(cacheKey, result, 300); // 5 min TTL
+            return result;
+          }
+        } catch (err: any) {
+          console.warn(`[Catalog] Provider ${provider.name} search failed:`, err.message);
+        }
+      }
+
+      return { tracks: [], artists: [], albums: [] };
+    })();
+
+    this.inFlightSearches.set(cacheKey, task);
+    try {
+      return await task;
+    } finally {
+      this.inFlightSearches.delete(cacheKey);
+    }
   }
 
   /**
@@ -764,29 +785,42 @@ export class CompositeCatalogService {
   }
 
   /**
-   * Shared Top Songs Charts per storefront (15 min TTL)
+   * Shared Top Songs Charts per storefront (15 min TTL) with single-flight egress deduplication
    */
   static async getCharts(storefront = 'in', limit = 25): Promise<CatalogTrack[]> {
     const cacheKey = `catalog:charts:${storefront}:${limit}`;
     const cached = await getCacheVal(cacheKey);
     if (cached) return cached as CatalogTrack[];
 
-    for (const provider of this.getActiveProviders()) {
-      try {
-        const charts = await provider.getCharts(storefront, limit);
-        if (charts.length > 0) {
-          await setCacheVal(cacheKey, charts, 900); // 15 min TTL
-          return charts;
-        }
-      } catch (err: any) {
-        console.warn(`[Catalog] Provider ${provider.name} charts failed:`, err.message);
-      }
+    if (this.inFlightCharts.has(cacheKey)) {
+      return this.inFlightCharts.get(cacheKey)!;
     }
-    return [];
+
+    const task = (async (): Promise<CatalogTrack[]> => {
+      for (const provider of this.getActiveProviders()) {
+        try {
+          const charts = await provider.getCharts(storefront, limit);
+          if (charts.length > 0) {
+            await setCacheVal(cacheKey, charts, 900); // 15 min TTL
+            return charts;
+          }
+        } catch (err: any) {
+          console.warn(`[Catalog] Provider ${provider.name} charts failed:`, err.message);
+        }
+      }
+      return [];
+    })();
+
+    this.inFlightCharts.set(cacheKey, task);
+    try {
+      return await task;
+    } finally {
+      this.inFlightCharts.delete(cacheKey);
+    }
   }
 
   /**
-   * Shared Top Songs per artist (6 hour TTL)
+   * Shared Top Songs per artist (6 hour TTL) with single-flight egress deduplication
    */
   static async getArtistTopSongs(artistName: string, storefront = 'in', limit = 15): Promise<CatalogTrack[]> {
     const clean = artistName.toLowerCase().trim();
@@ -794,17 +828,30 @@ export class CompositeCatalogService {
     const cached = await getCacheVal(cacheKey);
     if (cached) return cached as CatalogTrack[];
 
-    for (const provider of this.getActiveProviders()) {
-      try {
-        const tracks = await provider.getArtistTopSongs(artistName, storefront, limit);
-        if (tracks.length > 0) {
-          await setCacheVal(cacheKey, tracks, 21600); // 6 hours TTL
-          return tracks;
-        }
-      } catch (err: any) {
-        console.warn(`[Catalog] Provider ${provider.name} artist top songs failed for "${artistName}":`, err.message);
-      }
+    if (this.inFlightArtistTops.has(cacheKey)) {
+      return this.inFlightArtistTops.get(cacheKey)!;
     }
-    return [];
+
+    const task = (async (): Promise<CatalogTrack[]> => {
+      for (const provider of this.getActiveProviders()) {
+        try {
+          const tracks = await provider.getArtistTopSongs(artistName, storefront, limit);
+          if (tracks.length > 0) {
+            await setCacheVal(cacheKey, tracks, 21600); // 6 hours TTL
+            return tracks;
+          }
+        } catch (err: any) {
+          console.warn(`[Catalog] Provider ${provider.name} artist top songs failed for "${artistName}":`, err.message);
+        }
+      }
+      return [];
+    })();
+
+    this.inFlightArtistTops.set(cacheKey, task);
+    try {
+      return await task;
+    } finally {
+      this.inFlightArtistTops.delete(cacheKey);
+    }
   }
 }

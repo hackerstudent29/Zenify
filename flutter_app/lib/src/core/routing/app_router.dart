@@ -57,10 +57,9 @@ List<RouteBase> _getDetailRoutes() {
       builder: (context, state) {
         final track = state.extra as Track?;
         if (track == null) return const Scaffold(body: Center(child: Text('Error: No track provided')));
-        // TODO: implement TrackDetailScreen if it exists, or just return empty for now
         return Scaffold(
           appBar: AppBar(title: Text(track.title)),
-          body: Center(child: Text('Track Detail Screen Coming Soon')),
+          body: const Center(child: Text('Track Detail')),
         );
       },
     ),

@@ -8,6 +8,7 @@ import { enqueueHomeShelvesBuild } from '../queues/home-shelves.queue';
 import { UserHomeShelvesPayload, buildUserShelves } from '../queues/home-shelves.worker';
 import { isCompilationOrPlaylist, cleanArtistNames } from './universal-search.service';
 import { isFakeOrNumericArtistName } from '../utils/artist';
+import { AICurationService } from './ai-curation.service';
 
 // Cache TTL constants
 const CHARTS_CACHE_TTL = 900; // 15 min
@@ -228,110 +229,97 @@ export class HomeSectionsService {
   }
 
   /**
-   * Helper: Resolves User Taste Profile seeds without querying Track rows
+   * Helper: Resolves User Taste Profile seeds with strict language isolation
    */
-  private static async getUserTaste(userId?: string) {
-    const cacheKey = `user_taste:${userId || 'anon'}`;
+  private static async getUserTaste(userId?: string, requestedLang?: string, requestedCountry?: string) {
+    const rawReqLang = (requestedLang || '').trim();
+    const rawReqCountry = (requestedCountry || '').trim();
+    const cacheKey = `user_taste:v3:${userId || 'anon'}:${rawReqLang.toLowerCase()}:${rawReqCountry.toLowerCase()}`;
     const cached = await getCacheVal(cacheKey);
     if (cached) return cached;
 
-    if (!userId) {
-      return {
-        languages: ['Tamil', 'English'],
-        languageNames: ['Tamil', 'English'],
-        languageCodes: ['ta', 'en'],
-        genres: ['Pop', 'Film Music', 'Hip-Hop', 'Soundtrack'],
-        countryName: 'India',
-        countryCode: 'in',
-        favoriteArtistNames: ['Anirudh Ravichander', 'A.R. Rahman', 'The Weeknd'],
-        topArtists: ['Anirudh Ravichander', 'A.R. Rahman', 'The Weeknd']
-      };
+    let dbUser: any = null;
+    let profile: any = null;
+    let preferences: any = null;
+    let recentLikes: any[] = [];
+
+    if (userId) {
+      [dbUser, profile, preferences, recentLikes] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId }, select: { country: true } }),
+        prisma.userInterestProfile.findUnique({ where: { userId } }),
+        prisma.userPreferences.findUnique({ where: { userId } }),
+        prisma.like.findMany({
+          where: { userId },
+          include: { track: { select: { artist: { select: { name: true } }, genre: true, language: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 20
+        })
+      ]);
     }
 
-    const [user, profile, preferences, recentLikes] = await Promise.all([
-      prisma.user.findUnique({ where: { id: userId }, select: { country: true } }),
-      prisma.userInterestProfile.findUnique({ where: { userId } }),
-      prisma.userPreferences.findUnique({ where: { userId } }),
-      prisma.like.findMany({
-        where: { userId },
-        include: { track: { select: { artist: { select: { name: true } }, genre: true, language: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 20
-      })
-    ]);
-
-    // 1. Country / Storefront
-    const rawCountry = (user?.country || 'India').trim().toLowerCase();
+    // 1. Country / Storefront Resolution
+    const userCountryRaw = rawReqCountry || preferences?.selectedCountryCode || preferences?.selectedCountryName || dbUser?.country || 'India';
+    const rawCountry = userCountryRaw.trim().toLowerCase();
     const countryCode = COUNTRY_MAP[rawCountry] || 'in';
     const countryName = COUNTRY_DISPLAY_NAME_MAP[rawCountry] || COUNTRY_DISPLAY_NAME_MAP[countryCode] || 'India';
 
-    // 2. Languages (user's language weights first, never alphabetical)
-    const languageNames: string[] = [];
-    const languageCodes: string[] = [];
+    // 2. Strict Language Resolution (Single Selected Language First)
+    let primaryLangName = 'Tamil';
+    let primaryLangCode = 'ta';
 
-    if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
-      const sorted = Object.entries(profile.languageWeights as Record<string, number>)
-        .sort((a, b) => b[1] - a[1])
-        .map(e => e[0]);
-      for (const l of sorted) {
-        const mapped = LANG_MAP[l.toLowerCase()];
-        if (mapped && !languageCodes.includes(mapped.code)) {
-          languageCodes.push(mapped.code);
-          languageNames.push(mapped.name);
-        }
+    if (rawReqLang) {
+      const mapped = LANG_MAP[rawReqLang.toLowerCase()];
+      if (mapped) {
+        primaryLangName = mapped.name;
+        primaryLangCode = mapped.code;
+      } else {
+        primaryLangName = rawReqLang;
+        primaryLangCode = rawReqLang.slice(0, 2).toLowerCase();
+      }
+    } else if (preferences?.selectedLanguageName || preferences?.selectedLanguageCode) {
+      const selected = preferences.selectedLanguageName || preferences.selectedLanguageCode;
+      const mapped = LANG_MAP[selected.toLowerCase()];
+      if (mapped) {
+        primaryLangName = mapped.name;
+        primaryLangCode = mapped.code;
+      } else {
+        primaryLangName = preferences.selectedLanguageName || selected;
+        primaryLangCode = (preferences.selectedLanguageCode || 'ta').toLowerCase();
       }
     } else if (preferences?.languages && preferences.languages.length > 0) {
-      for (const l of preferences.languages) {
-        const mapped = LANG_MAP[l.toLowerCase()];
-        if (mapped && !languageCodes.includes(mapped.code)) {
-          languageCodes.push(mapped.code);
-          languageNames.push(mapped.name);
-        } else if (!languageNames.includes(l)) {
-          languageNames.push(l);
+      const first = preferences.languages[0];
+      const mapped = LANG_MAP[first.toLowerCase()];
+      if (mapped) {
+        primaryLangName = mapped.name;
+        primaryLangCode = mapped.code;
+      } else {
+        primaryLangName = first;
+        primaryLangCode = first.slice(0, 2).toLowerCase();
+      }
+    } else if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
+      const topLang = Object.entries(profile.languageWeights as Record<string, number>)
+        .sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (topLang) {
+        const mapped = LANG_MAP[topLang.toLowerCase()];
+        if (mapped) {
+          primaryLangName = mapped.name;
+          primaryLangCode = mapped.code;
         }
       }
     }
 
-    if (languageNames.length === 0) {
-      if (countryCode === 'cn' || countryCode === 'tw') {
-        languageNames.push('Mandarin Chinese');
-        languageCodes.push('zh');
-      } else if (countryCode === 'hk') {
-        languageNames.push('Cantonese');
-        languageCodes.push('yue');
-      } else if (countryCode === 'jp') {
-        languageNames.push('Japanese');
-        languageCodes.push('ja');
-      } else if (countryCode === 'kr') {
-        languageNames.push('Korean');
-        languageCodes.push('ko');
-      } else if (countryCode === 'us' || countryCode === 'gb' || countryCode === 'ca' || countryCode === 'au') {
-        languageNames.push('English');
-        languageCodes.push('en');
-      } else if (countryCode === 'fr') {
-        languageNames.push('French');
-        languageCodes.push('fr');
-      } else if (countryCode === 'de') {
-        languageNames.push('German');
-        languageCodes.push('de');
-      } else if (countryCode === 'es' || countryCode === 'mx') {
-        languageNames.push('Spanish');
-        languageCodes.push('es');
-      } else {
-        languageNames.push('Tamil', 'English');
-        languageCodes.push('ta', 'en');
-      }
-    }
+    const languageNames: string[] = [primaryLangName];
+    const languageCodes: string[] = [primaryLangCode];
 
     // 3. Genres
     let genres: string[] = [];
-    if (profile?.genreWeights && Object.keys(profile.genreWeights as any).length > 0) {
-      genres = Object.keys(profile.genreWeights as any);
-    } else if (preferences?.preferredGenres && preferences.preferredGenres.length > 0) {
+    if (preferences?.preferredGenres && preferences.preferredGenres.length > 0) {
       genres = preferences.preferredGenres;
+    } else if (profile?.genreWeights && Object.keys(profile.genreWeights as any).length > 0) {
+      genres = Object.keys(profile.genreWeights as any);
     }
     if (genres.length === 0) {
-      genres = ['Pop', 'Film Music', 'Soundtrack', 'Hip-Hop'];
+      genres = ['Pop', 'Film Music', 'Melody', 'Soundtrack'];
     }
 
     // 4. Favorite Artists
@@ -354,21 +342,10 @@ export class HomeSectionsService {
         favoriteArtistNames.push(artistName);
       }
     }
-    if (favoriteArtistNames.length === 0) {
-      if (countryCode === 'cn' || countryCode === 'tw' || languageCodes.includes('zh')) {
-        favoriteArtistNames.push('Jay Chou', 'JJ Lin', 'G.E.M.', 'Eason Chan');
-      } else if (countryCode === 'jp' || languageCodes.includes('ja')) {
-        favoriteArtistNames.push('YOASOBI', 'Kenshi Yonezu', 'Ado', 'Fujii Kaze');
-      } else if (countryCode === 'kr' || languageCodes.includes('ko')) {
-        favoriteArtistNames.push('BTS', 'BLACKPINK', 'NewJeans', 'IU');
-      } else if (countryCode === 'us' || countryCode === 'gb' || countryCode === 'ca' || countryCode === 'au') {
-        favoriteArtistNames.push('Taylor Swift', 'The Weeknd', 'Drake', 'Billie Eilish');
-      } else {
-        favoriteArtistNames.push('Anirudh Ravichander', 'A.R. Rahman', 'The Weeknd');
-      }
-    }
 
     const result = {
+      primaryLangName,
+      primaryLangCode,
       languages: languageNames,
       languageNames,
       languageCodes,
@@ -441,36 +418,53 @@ export class HomeSectionsService {
   }
 
   /**
-   * 1. Made For You (Pure Catalog — Section 13)
+   * 1. Made For You (AI-Personalized strictly by user's selected language, country & artists)
    */
-  static async getMadeForYou(userId?: string) {
-    if (userId) {
-      const saved = await this.getSavedUserShelves(userId);
-      const shelf = saved?.shelves.find(s => s.section === 'made_for_you');
-      if (shelf && shelf.items.length > 0) {
-        return {
-          title: shelf.title,
-          subtitle: shelf.subtitle,
-          type: 'made_for_you',
-          items: shelf.items.map(formatTrackItem)
-        };
-      }
-    }
-
-    const { topArtists, countryCode } = await this.getUserTaste(userId);
-    const key = `catalog:made_for_you:${userId || 'anon'}`;
+  static async getMadeForYou(userId?: string, requestedLang?: string, requestedCountry?: string) {
+    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry);
+    const primaryLang = taste.languageNames[0] || 'Tamil';
+    const key = `catalog:made_for_you:v2:${userId || 'anon'}:${primaryLang.toLowerCase()}:${taste.countryCode}`;
 
     return this.getCachedOrFetch(key, SHELVES_CACHE_TTL, async () => {
-      // Fetch catalog top songs for user's favorite artists in parallel
-      const trackBatches = await Promise.all(
-        topArtists.slice(0, 3).map(artist => CompositeCatalogService.getArtistTopSongs(artist, countryCode, 6))
-      );
-      const merged = trackBatches.flat().filter(t => !isCompilationOrPlaylist(t.title, t.duration));
-      const annotated = await this.annotateInLibrary(merged);
+      const curation = await AICurationService.getCuration({
+        language: primaryLang,
+        country: taste.countryName,
+        genres: taste.genres,
+        favoriteArtists: taste.favoriteArtistNames
+      });
 
+      const artistsToQuery = (taste.favoriteArtistNames.length > 0 ? taste.favoriteArtistNames : curation.artists).slice(0, 4);
+      const trackBatches = await Promise.all(
+        artistsToQuery.map(artist => CompositeCatalogService.getArtistTopSongs(artist, taste.countryCode, 5))
+      );
+      let merged = trackBatches.flat().filter(t => !isCompilationOrPlaylist(t.title, t.duration));
+
+      // Supplement with curated trending tracks of that language if needed
+      if (merged.length < 12) {
+        for (const songTitle of curation.trendingSongs.slice(0, 6)) {
+          try {
+            const songRes = await CompositeCatalogService.search(`${songTitle} ${primaryLang}`, taste.countryCode, 3);
+            merged.push(...songRes.tracks);
+            if (merged.length >= 15) break;
+          } catch {}
+        }
+      }
+
+      // Deduplicate by title
+      const seen = new Set<string>();
+      const deduplicated: CatalogTrack[] = [];
+      for (const t of merged) {
+        const cleanT = (t.title || '').toLowerCase().trim();
+        if (!seen.has(cleanT)) {
+          seen.add(cleanT);
+          deduplicated.push({ ...t, language: primaryLang });
+        }
+      }
+
+      const annotated = await this.annotateInLibrary(deduplicated);
       return {
         title: 'Made For You',
-        subtitle: 'TAILORED TO YOUR MUSIC TASTE',
+        subtitle: `TAILORED TO YOUR ${primaryLang.toUpperCase()} MUSIC TASTE`,
         type: 'made_for_you',
         items: annotated.slice(0, 15).map(formatTrackItem)
       };
@@ -478,81 +472,78 @@ export class HomeSectionsService {
   }
 
   /**
-   * 2. Top Songs in [user's country] (Pure Catalog Charts — Section 13)
+   * 2. Top Songs in [user's country] (Strictly for User's Selected Language)
    */
-  static async getTopSongsInCountry(userId?: string, countryParam?: string) {
-    const { countryCode, countryName } = await this.getUserTaste(userId);
-    const effectiveCode = countryParam ? (COUNTRY_MAP[countryParam.toLowerCase()] || countryParam) : countryCode;
-    const effectiveName = COUNTRY_DISPLAY_NAME_MAP[effectiveCode] || countryName;
+  static async getTopSongsInCountry(userId?: string, countryParam?: string, requestedLang?: string) {
+    const taste = await this.getUserTaste(userId, requestedLang, countryParam);
+    const primaryLang = taste.languageNames[0] || 'Tamil';
+    const effectiveCode = countryParam ? (COUNTRY_MAP[countryParam.toLowerCase()] || countryParam) : taste.countryCode;
+    const effectiveName = COUNTRY_DISPLAY_NAME_MAP[effectiveCode] || taste.countryName;
 
-    if (userId) {
-      const saved = await this.getSavedUserShelves(userId);
-      const shelf = saved?.shelves.find(s => s.section === 'top_country');
-      if (shelf && shelf.items.length > 0) {
-        return {
-          title: shelf.title,
-          subtitle: shelf.subtitle,
-          type: 'top_country',
-          items: shelf.items.filter(t => !isCompilationOrPlaylist(t.title, t.duration)).map(formatTrackItem)
-        };
-      }
-    }
-
-    const key = `catalog:top_country:${effectiveCode}`;
+    const key = `catalog:top_country:v2:${effectiveCode}:${primaryLang.toLowerCase()}`;
     return this.getCachedOrFetch(key, CHARTS_CACHE_TTL, async () => {
-      const charts = await CompositeCatalogService.getCharts(effectiveCode, 35);
-      const filtered = charts.filter(t => !isCompilationOrPlaylist(t.title, t.duration));
+      const searchRes = await CompositeCatalogService.search(`Top ${primaryLang} Songs 2026`, effectiveCode, 20);
+      const filtered = searchRes.tracks.filter(t => !isCompilationOrPlaylist(t.title, t.duration));
       const annotated = await this.annotateInLibrary(filtered);
 
       return {
-        title: `Top Songs in ${effectiveName}`,
+        title: `Top ${primaryLang} Songs in ${effectiveName}`,
         subtitle: `WHAT'S BIG IN YOUR REGION`,
         type: 'top_country',
-        items: annotated.slice(0, 15).map(formatTrackItem)
+        items: annotated.slice(0, 15).map(t => ({ ...formatTrackItem(t), language: primaryLang }))
       };
     });
   }
 
   /**
-   * 3. New Releases in Your Languages (Pure Catalog — Section 13)
+   * 3. New Releases in Your Languages (Strictly in Selected Language)
    */
-  static async getNewReleasesInLanguages(userId?: string) {
-    const { languageNames, countryCode } = await this.getUserTaste(userId);
-    const key = `catalog:new_releases:${userId || 'anon'}`;
+  static async getNewReleasesInLanguages(userId?: string, requestedLang?: string, requestedCountry?: string) {
+    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry);
+    const primaryLang = taste.languageNames[0] || 'Tamil';
+    const key = `catalog:new_releases:v2:${primaryLang.toLowerCase()}:${taste.countryCode}`;
 
     return this.getCachedOrFetch(key, SHELVES_CACHE_TTL, async () => {
-      // Query external catalog for top latest tracks in user's languages
-      const targetLangs = languageNames.slice(0, 3);
-      const results: CatalogTrack[] = [];
-      const seenTitles = new Set<string>();
+      const curation = await AICurationService.getCuration({
+        language: primaryLang,
+        country: taste.countryName,
+        genres: taste.genres
+      });
 
-      for (const lang of targetLangs) {
-        const searchRes = await CompositeCatalogService.search(`${lang} songs`, countryCode, 12);
-        for (const t of searchRes.tracks) {
-          if (isCompilationOrPlaylist(t.title, t.duration)) continue;
-          const lower = (t.title || '').toLowerCase().trim();
-          if (!seenTitles.has(lower)) {
-            seenTitles.add(lower);
-            const cleanArtist = cleanArtistNames(t.artist?.name || t.artists?.[0]?.name || '');
-            results.push({ 
-              ...t, 
-              language: lang,
-              artist: {
-                ...t.artist,
-                id: cleanArtist ? `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : '',
-                name: cleanArtist
-              }
-            });
-            if (results.length >= 15) break;
+      const tracks: CatalogTrack[] = [];
+      const seen = new Set<string>();
+
+      for (const song of curation.newReleases.slice(0, 8)) {
+        try {
+          const res = await CompositeCatalogService.search(`${song} ${primaryLang}`, taste.countryCode, 3);
+          for (const t of res.tracks) {
+            const cleanT = (t.title || '').toLowerCase().trim();
+            if (!seen.has(cleanT) && !isCompilationOrPlaylist(t.title, t.duration)) {
+              seen.add(cleanT);
+              tracks.push({ ...t, language: primaryLang });
+              break;
+            }
           }
-        }
-        if (results.length >= 15) break;
+          if (tracks.length >= 15) break;
+        } catch {}
       }
 
-      const annotated = await this.annotateInLibrary(results);
+      if (tracks.length < 10) {
+        const freshRes = await CompositeCatalogService.search(`New ${primaryLang} Songs 2026`, taste.countryCode, 15);
+        for (const t of freshRes.tracks) {
+          const cleanT = (t.title || '').toLowerCase().trim();
+          if (!seen.has(cleanT) && !isCompilationOrPlaylist(t.title, t.duration)) {
+            seen.add(cleanT);
+            tracks.push({ ...t, language: primaryLang });
+          }
+          if (tracks.length >= 15) break;
+        }
+      }
+
+      const annotated = await this.annotateInLibrary(tracks);
 
       return {
-        title: 'New Releases in Your Languages',
+        title: `New ${primaryLang} Releases`,
         subtitle: 'FRESH DROPS IN YOUR FAVORITE FREQUENCIES',
         type: 'new_releases_lang',
         items: annotated.map(formatTrackItem)
@@ -561,18 +552,54 @@ export class HomeSectionsService {
   }
 
   /**
-   * 4. Trending Now (Pure Catalog Charts — Section 13)
+   * 4. Trending Now (Strictly in Selected Language)
    */
-  static async getTrendingNow() {
-    const key = 'catalog:trending_now';
+  static async getTrendingNow(userId?: string, requestedLang?: string, requestedCountry?: string) {
+    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry);
+    const primaryLang = taste.languageNames[0] || 'Tamil';
+    const key = `catalog:trending_now:v2:${primaryLang.toLowerCase()}:${taste.countryCode}`;
+
     return this.getCachedOrFetch(key, CHARTS_CACHE_TTL, async () => {
-      const charts = await CompositeCatalogService.getCharts('in', 35);
-      const filtered = charts.filter(t => !isCompilationOrPlaylist(t.title, t.duration));
-      const trending = filtered.slice(0, 15); // Trending subset of top charts
-      const annotated = await this.annotateInLibrary(trending);
+      const curation = await AICurationService.getCuration({
+        language: primaryLang,
+        country: taste.countryName,
+        genres: taste.genres
+      });
+
+      const tracks: CatalogTrack[] = [];
+      const seen = new Set<string>();
+
+      for (const song of curation.trendingSongs.slice(0, 8)) {
+        try {
+          const res = await CompositeCatalogService.search(`${song} ${primaryLang}`, taste.countryCode, 3);
+          for (const t of res.tracks) {
+            const cleanT = (t.title || '').toLowerCase().trim();
+            if (!seen.has(cleanT) && !isCompilationOrPlaylist(t.title, t.duration)) {
+              seen.add(cleanT);
+              tracks.push({ ...t, language: primaryLang });
+              break;
+            }
+          }
+          if (tracks.length >= 15) break;
+        } catch {}
+      }
+
+      if (tracks.length < 10) {
+        const topRes = await CompositeCatalogService.search(`Top ${primaryLang} Songs 2026`, taste.countryCode, 15);
+        for (const t of topRes.tracks) {
+          const cleanT = (t.title || '').toLowerCase().trim();
+          if (!seen.has(cleanT) && !isCompilationOrPlaylist(t.title, t.duration)) {
+            seen.add(cleanT);
+            tracks.push({ ...t, language: primaryLang });
+          }
+          if (tracks.length >= 15) break;
+        }
+      }
+
+      const annotated = await this.annotateInLibrary(tracks);
 
       return {
-        title: 'Trending Now',
+        title: `Trending in ${primaryLang}`,
         subtitle: 'THE MOST PLAYED TRACKS RIGHT NOW',
         type: 'trending_now',
         items: annotated.map(formatTrackItem)
@@ -593,22 +620,31 @@ export class HomeSectionsService {
   }
 
   /**
-   * 6. Popular Artists in Your Languages (Catalog & Preferences)
+   * 6. Popular Artists in Your Languages (Strictly in Selected Language)
    */
-  static async getPopularArtistsInLanguages(userId?: string) {
-    const key = `catalog:artists_lang:${userId || 'anon'}`;
+  static async getPopularArtistsInLanguages(userId?: string, requestedLang?: string, requestedCountry?: string) {
+    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry);
+    const primaryLang = taste.languageNames[0] || 'Tamil';
+    const key = `catalog:artists_lang:v2:${primaryLang.toLowerCase()}:${userId || 'anon'}`;
+
     return this.getCachedOrFetch(key, ARTIST_CACHE_TTL, async () => {
-      const { languageCodes, favoriteArtistNames, favoriteArtistsMap } = await this.getUserTaste(userId);
+      const curation = await AICurationService.getCuration({
+        language: primaryLang,
+        country: taste.countryName,
+        genres: taste.genres,
+        favoriteArtists: taste.favoriteArtistNames
+      });
+
       const items: any[] = [];
       const seenNames = new Set<string>();
 
-      // 1. User's chosen favorite artists first
-      for (const artistName of favoriteArtistNames) {
+      // 1. User's chosen favorite artists if provided
+      for (const artistName of taste.favoriteArtistNames) {
         if (!artistName || isFakeOrNumericArtistName(artistName)) continue;
         const lower = artistName.toLowerCase().trim();
         if (!seenNames.has(lower)) {
           seenNames.add(lower);
-          const image = (favoriteArtistsMap && favoriteArtistsMap[lower]) || await PreferencesService.resolveArtistImage(artistName);
+          const image = (taste.favoriteArtistsMap && taste.favoriteArtistsMap[lower]) || await PreferencesService.resolveArtistImage(artistName);
           items.push({
             id: `artist-${artistName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
             name: artistName,
@@ -621,32 +657,28 @@ export class HomeSectionsService {
         }
       }
 
-      // 2. High-relevance seed artists for user's selected languages
-      for (const code of languageCodes) {
-        const seeds = SEED_ARTISTS_BY_LANG[code] || [];
-        for (const name of seeds.slice(0, 4)) {
-          if (!name || isFakeOrNumericArtistName(name)) continue;
-          const lower = name.toLowerCase().trim();
-          if (!seenNames.has(lower)) {
-            seenNames.add(lower);
-            const image = await PreferencesService.resolveArtistImage(name);
-            items.push({
-              id: `artist-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-              name,
-              imageUrl: image || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=18181b&color=e11d48&size=300`,
-              coverUrl: image || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=18181b&color=e11d48&size=300`,
-              isArtist: true,
-              type: 'artist',
-              href: `/artist/artist-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
-            });
-            if (items.length >= 16) break;
-          }
+      // 2. High-relevance curated artists strictly for this language
+      for (const name of curation.artists) {
+        if (!name || isFakeOrNumericArtistName(name)) continue;
+        const lower = name.toLowerCase().trim();
+        if (!seenNames.has(lower)) {
+          seenNames.add(lower);
+          const image = await PreferencesService.resolveArtistImage(name);
+          items.push({
+            id: `artist-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+            name,
+            imageUrl: image || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=18181b&color=e11d48&size=300`,
+            coverUrl: image || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=18181b&color=e11d48&size=300`,
+            isArtist: true,
+            type: 'artist',
+            href: `/artist/artist-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
+          });
+          if (items.length >= 16) break;
         }
-        if (items.length >= 16) break;
       }
 
       return {
-        title: 'Popular Artists in Your Languages',
+        title: `Popular ${primaryLang} Artists`,
         subtitle: 'VOICES LEADING THE SCENE',
         type: 'popular_artists_lang',
         items

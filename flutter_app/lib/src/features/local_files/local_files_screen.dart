@@ -45,11 +45,13 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
         _localFiles = existingFiles;
       });
     } catch (e) {
-      print('Error loading saved local files: $e');
+      debugPrint('Error loading saved local files: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -59,7 +61,7 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
       final paths = files.map((f) => f.path).toList();
       await prefs.setStringList('local_audio_paths', paths);
     } catch (e) {
-      print('Error saving local files paths: $e');
+      debugPrint('Error saving local files paths: $e');
     }
   }
 
@@ -87,13 +89,14 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
         }
       }
     } catch (e) {
-      print('Error listing dir $path: $e');
+      debugPrint('Error listing dir $path: $e');
     }
     return audioFiles;
   }
 
   Future<void> _scanStorage() async {
     final hasPermission = await _requestPermissions();
+    if (!mounted) return;
     if (!hasPermission) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -129,30 +132,38 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
       }
 
       if (uniqueNewFiles.isNotEmpty) {
-        setState(() {
-          _localFiles.addAll(uniqueNewFiles);
-        });
+        if (mounted) {
+          setState(() {
+            _localFiles.addAll(uniqueNewFiles);
+          });
+        }
         await _saveFiles(_localFiles);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Found and added ${uniqueNewFiles.length} new local files.'),
-            backgroundColor: const Color(0xFF059669),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Found and added ${uniqueNewFiles.length} new local files.'),
+              backgroundColor: const Color(0xFF059669),
+            ),
+          );
+        }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No new audio files found in Music or Download folders.'),
-            backgroundColor: Color(0xFF52525B),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No new audio files found in Music or Download folders.'),
+              backgroundColor: Color(0xFF52525B),
+            ),
+          );
+        }
       }
     } catch (e) {
-      print('Error scanning storage: $e');
+      debugPrint('Error scanning storage: $e');
     } finally {
-      setState(() {
-        _isScanning = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+      }
     }
   }
 
@@ -177,20 +188,24 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
         }
 
         if (uniqueNewFiles.isNotEmpty) {
-          setState(() {
-            _localFiles.addAll(uniqueNewFiles);
-          });
+          if (mounted) {
+            setState(() {
+              _localFiles.addAll(uniqueNewFiles);
+            });
+          }
           await _saveFiles(_localFiles);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Imported ${uniqueNewFiles.length} files successfully.'),
-              backgroundColor: const Color(0xFF059669),
-            ),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Imported ${uniqueNewFiles.length} files successfully.'),
+                backgroundColor: const Color(0xFF059669),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
-      print('Error picking files: $e');
+      debugPrint('Error picking files: $e');
     }
   }
 

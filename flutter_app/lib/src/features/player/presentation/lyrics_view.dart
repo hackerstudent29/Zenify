@@ -89,7 +89,7 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
         _lines = tokens.map((json) => LyricLine.fromJson(json)).toList();
       }
     } catch (e) {
-      print('Error fetching synced lyrics: $e');
+      debugPrint('Error fetching synced lyrics: $e');
     }
 
     // Fallback if no synced lyrics
