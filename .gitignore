@@ -121,7 +121,10 @@ scratch*.js
 scratch*.ts
 yt-test*.json
 backend/scratch/
-backend/scripts/
+backend/scripts/*
+!backend/scripts/check-cloudflare-storage.js
+!backend/scripts/check-cloudinary-storage.js
+!backend/scripts/check-heroku-db-storage.js
 backend/test-*.js
 backend/fix-*.js
 "zenify images/"

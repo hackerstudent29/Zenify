@@ -154,8 +154,13 @@ export default function TrackPage() {
    if (track?.coverUrl) {
      setPageCoverUrl(track.coverUrl);
    }
-   return () => setPageCoverUrl(null);
  }, [track?.coverUrl, setPageCoverUrl]);
+
+ useEffect(() => {
+   return () => {
+     setPageCoverUrl(null);
+   };
+ }, [setPageCoverUrl]);
 
  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
  const showToast = (msg: string, type: "success" | "error" = "success") => {
