@@ -78,7 +78,7 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
         }
       }
     } catch (e) {
-      print('Error checking liked state: $e');
+      debugPrint('Error checking liked state: $e');
     }
   }
 
@@ -94,7 +94,7 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
           _isLiked = !_isLiked;
         });
       }
-      print('Error toggling like: $e');
+      debugPrint('Error toggling like: $e');
     }
   }
 

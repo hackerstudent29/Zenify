@@ -54,7 +54,7 @@ export class AILyricsService {
                         'Authorization': `Bearer ${nvidiaKey}`,
                     },
                     body: JSON.stringify({
-                        model: 'meta/llama-3.1-70b-instruct',
+                        model: 'nvidia/nemotron-3.5-bolt-e4b',
                         messages: [{
                             role: 'user',
                             content: prompt

@@ -15,30 +15,38 @@ export class HomepageController {
 
     // ── Dedicated Real-Time Section Handlers ──
 
-    getMadeForYou = async (req: FastifyRequest, reply: FastifyReply) => {
+    getMadeForYou = async (req: FastifyRequest<{ Querystring: { language?: string; country?: string } }>, reply: FastifyReply) => {
         const userId = req.user?.id;
+        const language = req.query.language || (req.headers['x-user-language'] as string);
+        const country = req.query.country || (req.headers['x-user-country'] as string);
         if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-        const result = await HomeSectionsService.getMadeForYou(userId);
+        const result = await HomeSectionsService.getMadeForYou(userId, language, country);
         return reply.send(result);
     }
 
-    getTopCountry = async (req: FastifyRequest<{ Querystring: { country?: string } }>, reply: FastifyReply) => {
+    getTopCountry = async (req: FastifyRequest<{ Querystring: { country?: string; language?: string } }>, reply: FastifyReply) => {
         const userId = req.user?.id;
-        const requestedCountry = req.query.country;
+        const requestedCountry = req.query.country || (req.headers['x-user-country'] as string);
+        const requestedLang = req.query.language || (req.headers['x-user-language'] as string);
         if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-        const result = await HomeSectionsService.getTopSongsInCountry(userId, requestedCountry);
+        const result = await HomeSectionsService.getTopSongsInCountry(userId, requestedCountry, requestedLang);
         return reply.send(result);
     }
 
-    getNewReleasesInLanguages = async (req: FastifyRequest, reply: FastifyReply) => {
+    getNewReleasesInLanguages = async (req: FastifyRequest<{ Querystring: { language?: string; country?: string } }>, reply: FastifyReply) => {
         const userId = req.user?.id;
+        const language = req.query.language || (req.headers['x-user-language'] as string);
+        const country = req.query.country || (req.headers['x-user-country'] as string);
         if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-        const result = await HomeSectionsService.getNewReleasesInLanguages(userId);
+        const result = await HomeSectionsService.getNewReleasesInLanguages(userId, language, country);
         return reply.send(result);
     }
 
-    getTrendingNow = async (_req: FastifyRequest, reply: FastifyReply) => {
-        const result = await HomeSectionsService.getTrendingNow();
+    getTrendingNow = async (req: FastifyRequest<{ Querystring: { language?: string; country?: string } }>, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const language = req.query.language || (req.headers['x-user-language'] as string);
+        const country = req.query.country || (req.headers['x-user-country'] as string);
+        const result = await HomeSectionsService.getTrendingNow(userId, language, country);
         return reply.send(result);
     }
 
@@ -52,10 +60,12 @@ export class HomepageController {
         return reply.send(result);
     }
 
-    getPopularArtistsInLanguages = async (req: FastifyRequest, reply: FastifyReply) => {
+    getPopularArtistsInLanguages = async (req: FastifyRequest<{ Querystring: { language?: string; country?: string } }>, reply: FastifyReply) => {
         const userId = req.user?.id;
+        const language = req.query.language || (req.headers['x-user-language'] as string);
+        const country = req.query.country || (req.headers['x-user-country'] as string);
         if (userId) reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-        const result = await HomeSectionsService.getPopularArtistsInLanguages(userId);
+        const result = await HomeSectionsService.getPopularArtistsInLanguages(userId, language, country);
         return reply.send(result);
     }
 

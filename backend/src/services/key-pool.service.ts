@@ -14,20 +14,42 @@ export class KeyPoolService {
   private static readonly SETTINGS_CACHE_TTL = 30000; // 30s
   private static defaultKeys: Record<string, string[]> = {
     rapidapi: [
-      process.env.RAPIDAPI_KEY || 'REDACTED_RAPIDAPI'
-    ],
+      process.env.RAPIDAPI_KEY || '',
+      ...(process.env.RAPIDAPI_KEYS ? process.env.RAPIDAPI_KEYS.split(',').map(s => s.trim()) : []),
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI'
+    ].filter(k => k && k.length > 5),
     spotify: [
-      process.env.SPOTIFY_API_KEY || process.env.RAPIDAPI_KEY || 'REDACTED_RAPIDAPI'
-    ],
+      process.env.SPOTIFY_API_KEY || '',
+      process.env.RAPIDAPI_KEY || '',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI'
+    ].filter(k => k && k.length > 5),
     genius: [
-      process.env.GENIUS_API_KEY || process.env.RAPIDAPI_KEY || 'REDACTED_RAPIDAPI'
-    ],
+      process.env.GENIUS_API_KEY || '',
+      process.env.RAPIDAPI_KEY || '',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI'
+    ].filter(k => k && k.length > 5),
     youtube: [
-      process.env.YOUTUBE_API_KEY || process.env.RAPIDAPI_KEY || 'REDACTED_RAPIDAPI'
-    ],
+      process.env.YOUTUBE_API_KEY || '',
+      process.env.RAPIDAPI_KEY || '',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI'
+    ].filter(k => k && k.length > 5),
     lyrics: [
-      process.env.LYRICS_API_KEY || process.env.RAPIDAPI_KEY || 'REDACTED_RAPIDAPI'
-    ]
+      process.env.LYRICS_API_KEY || '',
+      process.env.RAPIDAPI_KEY || '',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI',
+      'REDACTED_RAPIDAPI'
+    ].filter(k => k && k.length > 5)
   };
 
   /**
@@ -174,14 +196,19 @@ export class KeyPoolService {
         return result;
       } catch (err: any) {
         const status = err.response?.status;
-        const msg = (err.message || '').toLowerCase();
-        const isQuotaError = status === 429 || status === 403 || 
+        const respMsg = (typeof err.response?.data?.message === 'string' ? err.response.data.message : '') + ' ' + (typeof err.response?.data === 'string' ? err.response.data : '');
+        const msg = ((err.message || '') + ' ' + respMsg).toLowerCase();
+        const isQuotaOrKeyError = status === 429 || status === 403 || status === 401 ||
                              msg.includes('rate limit') || 
-                             msg.includes('quota exceeded') ||
-                             msg.includes('too many requests');
+                             msg.includes('quota') ||
+                             msg.includes('monthly quota') ||
+                             msg.includes('exceeded') ||
+                             msg.includes('too many requests') ||
+                             msg.includes('invalid api key') ||
+                             msg.includes('not subscribed');
 
-        if (isQuotaError) {
-          this.markRateLimited(poolName, key);
+        if (isQuotaOrKeyError) {
+          this.markRateLimited(poolName, key, 60 * 60 * 1000); // 1 hour cooldown for exhausted keys
           // Loop will retry with next key in the pool
           continue;
         }

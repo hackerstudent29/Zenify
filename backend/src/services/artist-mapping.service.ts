@@ -249,11 +249,10 @@ export class ArtistMappingService {
         const res = await axios.post(
             'https://integrate.api.nvidia.com/v1/chat/completions',
             {
-                model: "meta/llama-3.1-405b-instruct",
+                model: "nvidia/nemotron-3.5-bolt-e4b",
                 messages: [{ role: "user", content: prompt }],
                 temperature: 0.1,
-                max_tokens: 200,
-                response_format: { type: "json_object" }
+                max_tokens: 300
             },
             {
                 headers: {
