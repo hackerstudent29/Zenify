@@ -419,22 +419,15 @@ export function LiquidBackground({
     window.addEventListener('resize', resize);
     requestAnimationFrame(resize);
 
-    let lastRenderTime = 0;
-    const fpsInterval = 1000 / 30; // 30 FPS caps GPU fillrate for smooth liquid animation without flickering
-
     const render = (now: number) => {
       if (isDestroyed || isPaused || document.hidden) return;
       animationFrameId = requestAnimationFrame(render);
-
-      const delta = now - lastRenderTime;
-      if (delta < fpsInterval) return;
-      lastRenderTime = now - (delta % fpsInterval);
 
       if (canvas.width === 0 || canvas.height === 0) {
         resize();
       }
       
-      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
       accumulatedTime += dt * (speedRef.current ?? 1.0);
 

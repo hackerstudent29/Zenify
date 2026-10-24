@@ -113,6 +113,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const shortcuts = useShortcutStore(state => state.shortcuts);
  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const lastScrollTopRef = React.useRef(0);
 
  // Keyboard Shortcuts
@@ -301,32 +302,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(handle);
   }, [pathname]);
 
-  // Prevent accidental clicks on buttons/links while scrolling on mobile & handle smart header hide/show
+  // Handle scroll detection for dynamic header backdrop blur and smart mobile hide/show
   useEffect(() => {
-    if (!isMobile) {
-      document.body.classList.remove('is-scrolling');
-      setIsHeaderHidden(false);
-      return;
-    }
     const scrollEl = scrollRef.current;
     if (!scrollEl) return;
 
     let scrollTimeout: NodeJS.Timeout;
     const handleScroll = () => {
-      document.body.classList.add('is-scrolling');
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        document.body.classList.remove('is-scrolling');
-      }, 150);
+      if (isMobile) {
+        document.body.classList.add('is-scrolling');
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          document.body.classList.remove('is-scrolling');
+        }, 150);
+      }
 
       const currentScroll = scrollEl.scrollTop;
-      const diff = currentScroll - lastScrollTopRef.current;
-      if (currentScroll <= 15) {
-        setIsHeaderHidden(false);
-      } else if (diff > 6 && currentScroll > 30) {
-        setIsHeaderHidden(true);
-      } else if (diff < -6) {
-        setIsHeaderHidden(false);
+      setIsScrolled(currentScroll > 15);
+
+      if (isMobile) {
+        const diff = currentScroll - lastScrollTopRef.current;
+        if (currentScroll <= 15) {
+          setIsHeaderHidden(false);
+        } else if (diff > 6 && currentScroll > 30) {
+          setIsHeaderHidden(true);
+        } else if (diff < -6) {
+          setIsHeaderHidden(false);
+        }
       }
       lastScrollTopRef.current = currentScroll;
     };
@@ -341,6 +343,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setIsHeaderHidden(false);
+    setIsScrolled(false);
     lastScrollTopRef.current = 0;
   }, [pathname]);
 
@@ -414,9 +417,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     "z-[100] transition-all duration-300 ease-[0.16,1,0.3,1] w-full absolute top-0 left-0 right-0 safe-area-top",
     isMobile 
       ? "bg-[#121214]/95 backdrop-blur-md border-b border-white/5" 
-      : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/"))
-        ? "bg-transparent"
-        : "bg-gradient-to-b from-[#121214]/80 to-transparent",
+      : isScrolled
+        ? "bg-[#121214]/85 backdrop-blur-2xl border-b border-white/10 shadow-lg"
+        : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/"))
+          ? "bg-gradient-to-b from-[#121214]/80 via-[#121214]/40 to-transparent backdrop-blur-[2px]"
+          : "bg-gradient-to-b from-[#121214]/80 to-transparent",
     isMobile && isHeaderHidden && "-translate-y-full opacity-0 pointer-events-none"
     )}
   style={{

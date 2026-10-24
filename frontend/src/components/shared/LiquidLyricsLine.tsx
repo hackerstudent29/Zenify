@@ -238,8 +238,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         )} 
         style={{ 
           transformOrigin: origin, 
-          rowGap: "0.35em",
-          columnGap: "0.32em",
+          rowGap: "0.25em",
+          columnGap: "0.26em",
           wordBreak: "normal", 
           overflowWrap: "normal"
         }}
@@ -420,7 +420,6 @@ function UnifiedWordFill({
       ref={containerRef}
       className="relative inline-block origin-center overflow-visible select-none"
       style={{
-        marginRight: wordIndex < totalWords - 1 ? "0.32em" : "0",
         whiteSpace: "nowrap"
       }}
     >

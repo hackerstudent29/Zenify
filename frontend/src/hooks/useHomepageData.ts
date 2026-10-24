@@ -11,13 +11,39 @@ export function useHomepageData() {
   const localLang = typeof window !== 'undefined' ? (localStorage.getItem('zenify_selected_language') || localStorage.getItem('zenify_selected_lang')) : null;
   const localCountry = typeof window !== 'undefined' ? localStorage.getItem('zenify_selected_country') : null;
 
-  const rawLang = user?.preferences?.languages?.[0] ||
+  const LANG_CODE_TO_NAME: Record<string, string> = {
+    ta: 'Tamil',
+    te: 'Telugu',
+    hi: 'Hindi',
+    ml: 'Malayalam',
+    kn: 'Kannada',
+    en: 'English',
+    pa: 'Punjabi',
+    bn: 'Bengali'
+  };
+
+  const prefLang = user?.preferences?.languages?.[0];
+  const resolvedPrefName = prefLang ? (LANG_CODE_TO_NAME[prefLang.toLowerCase()] || prefLang) : null;
+
+  const rawLang = resolvedPrefName ||
                   (user as any)?.preferences?.selectedLanguageName ||
-                  (user as any)?.preferences?.selectedLanguageCode ||
                   localLang ||
+                  (user as any)?.preferences?.selectedLanguageCode ||
                   'Tamil';
 
-  const userLang = rawLang.trim();
+  const userLang = (LANG_CODE_TO_NAME[rawLang.toLowerCase()] || rawLang).trim();
+
+  // Purge any stale client localStorage if user preferences explicitly specify language
+  useEffect(() => {
+    if (resolvedPrefName && typeof window !== 'undefined') {
+      const currentStored = localStorage.getItem('zenify_selected_language');
+      if (currentStored !== resolvedPrefName) {
+        localStorage.setItem('zenify_selected_language', resolvedPrefName);
+        localStorage.setItem('zenify_selected_lang', resolvedPrefName);
+      }
+    }
+  }, [resolvedPrefName]);
+
   const rawCountry = user?.country?.trim() || localCountry || 'India';
   const userCountry = rawCountry.trim();
 

@@ -964,7 +964,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  <div
  className={cn(
  "flex flex-col relative w-full",
- isFullscreen ? (isMobile ? "px-6 gap-8 max-w-full mx-auto" : "px-10 gap-14 max-w-5xl mx-auto") : (isMobile ? "px-4 items-center gap-8" : "px-8 items-center gap-12")
+ isFullscreen ? (isMobile ? "px-6 gap-5 max-w-full mx-auto" : "px-10 gap-7 max-w-5xl mx-auto") : (isMobile ? "px-4 items-center gap-5" : "px-6 items-center gap-5")
  )}
  >
  {/* Spacer block to push the very first line precisely to the vertical focal zone */}
