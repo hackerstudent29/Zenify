@@ -1,13 +1,3 @@
-@import "@fontsource/outfit/latin-400.css";
-@import "@fontsource/outfit/latin-500.css";
-@import "@fontsource/outfit/latin-600.css";
-@import "@fontsource/outfit/latin-700.css";
-@import "@fontsource/inter/latin-400.css";
-@import "@fontsource/inter/latin-500.css";
-@import "@fontsource/inter/latin-600.css";
-@import "@fontsource/inter/latin-700.css";
-@import "@fontsource/cormorant-garamond/latin-400.css";
-@import "@fontsource/cormorant-garamond/latin-600.css";
 
 @import "tailwindcss";
 
@@ -293,7 +283,6 @@
   }
 }
 
-/* Font CSS variables — Inter loaded via @fontsource/inter in this file.
    These map all font-[family-name:var(--font-*)] usages to Inter. */
 :root {
   --font-inter: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
