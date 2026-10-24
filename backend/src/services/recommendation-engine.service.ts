@@ -1084,6 +1084,6 @@ export class RecommendationEngineService {
     seed: RecommendationSeed,
     size = 25
   ): Promise<ScoredRecommendation[]> {
-    return await this.runPipeline(userId, seed, { limit: size, maxPerArtist: 2 });
+    return await this.runPipeline(userId, seed, { limit: size, maxPerArtist: 2, languageConstraint: seed.language });
   }
 }

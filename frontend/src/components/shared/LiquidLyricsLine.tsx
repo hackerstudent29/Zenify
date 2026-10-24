@@ -213,15 +213,15 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     <div
       data-lyrics-line="true"
       className={cn(
-        "w-full leading-[1.25] px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer",
+        "w-full px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer",
         isFullscreen ? "justify-start text-left" : "justify-center text-center"
       )}
       style={{
         fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
         fontSize,
-        lineHeight: 1.3,
+        lineHeight: 1.5,
         fontWeight: isFullscreen ? 800 : 700,
-        letterSpacing: isFullscreen ? "-0.025em" : "-0.015em",
+        letterSpacing: "normal",
         opacity: targetOpacity,
         filter: targetBlur,
         transform: `${targetScale} ${targetTranslate} translateZ(0)`,
@@ -233,18 +233,15 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     >
       <div 
         className={cn(
-          "relative flex flex-wrap cursor-pointer select-none",
-          origin.includes("left") ? "justify-start text-left" : "justify-center text-center",
-          "line-clamp-2"
+          "relative flex flex-wrap items-baseline cursor-pointer select-none",
+          origin.includes("left") ? "justify-start text-left" : "justify-center text-center"
         )} 
         style={{ 
           transformOrigin: origin, 
-          gap: "0.26em", 
-          wordBreak: "break-word", 
-          overflowWrap: "anywhere",
-          display: "-webkit-box",
-          WebkitBoxOrient: "vertical",
-          WebkitLineClamp: 2
+          rowGap: "0.35em",
+          columnGap: "0.32em",
+          wordBreak: "normal", 
+          overflowWrap: "normal"
         }}
       >
         {wordTokens.map((word, i) => {
@@ -421,8 +418,11 @@ function UnifiedWordFill({
   return (
     <span 
       ref={containerRef}
-      className="relative inline-block origin-center overflow-visible max-w-full break-words"
-      style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
+      className="relative inline-block origin-center overflow-visible select-none"
+      style={{
+        marginRight: wordIndex < totalWords - 1 ? "0.32em" : "0",
+        whiteSpace: "nowrap"
+      }}
     >
       {/* Base Dim Text — Apple style translucent white */}
       <span className={cn("font-bold transition-colors duration-300", isUserScrolling ? "text-white/80" : "text-white/50")}>{word}</span>

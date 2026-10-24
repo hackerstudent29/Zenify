@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { prisma } from '../utils/prisma';
 import { getCacheVal, setCacheVal } from '../utils/cache';
 import { PreferencesService } from './preferences.service';
@@ -275,6 +276,18 @@ export class RecommendationsService {
       const cTitle = norm(cand.title || '');
       if (!cTitle || seenTitles.has(cTitle)) return false;
 
+      // STRICT USER RULE: Language MUST be identical to the song being played
+      if (lang) {
+        const cLang = (cand.language || '').toLowerCase().trim();
+        const targetLang = lang.toLowerCase().trim();
+        if (cLang && cLang !== targetLang && !cLang.includes(targetLang) && !targetLang.includes(cLang)) {
+          return false; // Skip foreign language songs
+        }
+        if (!cand.language) {
+          cand.language = lang;
+        }
+      }
+
       const aName = (cand.artist?.name || cand.artistName || 'Unknown').toLowerCase().trim();
       // USER RULE: Strict diversity cap: Max 2 tracks per artist so we explore songs across different artists
       if ((artistTrackCount[aName] || 0) >= 2) return false;
@@ -292,10 +305,11 @@ export class RecommendationsService {
           id: { not: trackId },
           deletedAt: null,
           audioUrl: { not: '' },
+          ...(lang ? { language: { equals: lang, mode: 'insensitive' as const } } : {}),
           OR: [
-            ...(lang ? [{ language: { equals: lang, mode: 'insensitive' as const } }] : []),
             ...(gen ? [{ genre: { contains: gen, mode: 'insensitive' as const } }] : []),
-            ...(artName ? [{ artist: { name: { not: artName } } }] : [])
+            ...(moodStr ? [{ aura_vibe: { contains: moodStr, mode: 'insensitive' as const } }] : []),
+            { streams: { gte: 0 } }
           ]
         },
         take: limit * 2,
@@ -315,29 +329,89 @@ export class RecommendationsService {
       console.warn('[Recommendations] Local vibe candidates query error:', dbErr.message);
     }
 
-    // 3. Multi-Source External Music Search (YouTube Music) to discover different artists in this vibe
+    // 3. Multi-Source Search #1: JioSaavn (Fast, high-fidelity licensed streams with native language support)
+    if (similar.length < limit) {
+      try {
+        const saavnQueries: string[] = [];
+        if (lang) {
+          saavnQueries.push(`${lang} ${vibeKeywords}`);
+          if (seedTitle) saavnQueries.push(`${lang} ${seedTitle}`);
+          if (artName) saavnQueries.push(`${lang} ${artName} hit songs`);
+        } else {
+          saavnQueries.push(vibeKeywords);
+          if (seedTitle) saavnQueries.push(seedTitle);
+        }
+
+        for (const q of saavnQueries) {
+          if (similar.length >= limit) break;
+          const saavnRes = await axios.get('https://www.jiosaavn.com/api.php', {
+            params: {
+              __call: 'search.getResults',
+              _format: 'json',
+              _marker: '0',
+              api_version: '4',
+              ctx: 'web6dot0',
+              n: 25,
+              q
+            },
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            timeout: 5000
+          }).catch(() => null);
+
+          const results = saavnRes?.data?.results || [];
+          for (const s of results) {
+            if (similar.length >= limit) break;
+            const sLang = (s.language || '').toLowerCase().trim();
+            if (lang && sLang && sLang !== lang.toLowerCase() && !sLang.includes(lang.toLowerCase())) continue;
+
+            const cover = s.image ? s.image.replace('150x150', '500x500') : null;
+            const parsed = {
+              id: `saavn-${s.id}`,
+              title: s.song || s.title,
+              artist: {
+                id: `saavn-artist-${s.primary_artists_id || s.id}`,
+                name: s.primary_artists || s.singers || 'Various Artists',
+                imageUrl: null
+              },
+              artistName: s.primary_artists || s.singers || 'Various Artists',
+              album: {
+                id: `saavn-album-${s.albumid || s.id}`,
+                title: s.album || 'Single',
+                coverUrl: cover
+              },
+              coverUrl: cover,
+              duration: Number(s.duration) || 180,
+              audioUrl: s.media_preview_url || '',
+              language: s.language || lang,
+              type: 'track'
+            };
+            addCandidate(parsed);
+          }
+        }
+      } catch (saavnErr: any) {
+        console.warn('[Recommendations] Saavn vibe search error:', saavnErr.message);
+      }
+    }
+
+    // 4. Multi-Source Search #2: YouTube Music (Expansive artist & vibe catalog)
     if (similar.length < limit) {
       try {
         const { ExternalMetadataService } = await import('./external-metadata.service.js');
         const queriesToTry: string[] = [];
 
-        // Query 1: Language + Vibe hit songs (e.g. "Tamil energetic dance party hit songs")
+        // STRICT LANGUAGE PREFIX: Every search query includes the target language
         if (lang) {
           queriesToTry.push(`${lang} ${vibeKeywords}`);
-        }
-
-        // Query 2: Movie context if available (e.g. "Tamil movie songs like Beast" or "Tamil songs like Master")
-        if (movieName && movieName.toLowerCase() !== seedTitle.toLowerCase()) {
-          queriesToTry.push(`${lang || ''} movie songs like ${movieName}`.trim());
-        }
-
-        // Query 3: Songs similar to title (explores cross-artist musical vibe)
-        if (seedTitle) {
-          queriesToTry.push(`${lang || ''} songs similar to ${seedTitle}`.trim());
-        }
-
-        // Query 4: Fallback vibe search
-        if (queriesToTry.length === 0) {
+          if (movieName && movieName.toLowerCase() !== seedTitle.toLowerCase()) {
+            queriesToTry.push(`${lang} movie songs like ${movieName}`);
+          }
+          if (seedTitle) {
+            queriesToTry.push(`${lang} songs similar to ${seedTitle}`);
+          }
+          queriesToTry.push(`${lang} top songs by various artists`);
+        } else {
           queriesToTry.push(artName ? `songs like ${seedTitle} by ${artName}` : `${vibeKeywords}`);
         }
 
@@ -348,6 +422,7 @@ export class RecommendationsService {
             if (similar.length >= limit) break;
             const parsed = ExternalMetadataService.parseYoutubeVideoToTrack(item);
             if (parsed) {
+              if (lang) (parsed as any).language = lang;
               addCandidate(parsed);
             }
           }
