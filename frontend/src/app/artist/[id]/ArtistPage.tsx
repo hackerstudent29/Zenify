@@ -1,570 +1,303 @@
-import { SEO } from "@/components/shared/SEO";
 "use client";
 
-import { useParams } from "next/navigation";
+import React, { useRef, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import api, { getArtist } from "@/lib/api";
+import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Play, Pause, Disc3, Music2, Heart, Share, BadgeCheck, Plus, X, Search, CheckCircle2, Shuffle } from "lucide-react";
+import { Disc3, Star, Heart } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
-import { audioEngine } from "@/lib/audio-engine";
-import { cn, getMediaUrl, getTrackCover, getArtistProfileImage, formatDisplayTitle, formatArtists } from "@/lib/utils";
-import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { MarqueeText } from "@/components/shared/MarqueeText";
-import { LiquidBackground } from "@/components/shared/LiquidBackground";
+import { useUIStore } from "@/store/ui";
+import { useAuthStore } from "@/store/authStore";
+import { cn, getMediaUrl, formatDisplayTitle, getArtistProfileImage } from "@/lib/utils";
+import { motion } from "framer-motion";
+import { SEO } from "@/components/shared/SEO";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  SwiftUIPlay,
+  SwiftUIPause,
+  SwiftUIShuffle,
+  SwiftUIEllipsis,
+} from "@/components/ui/SwiftUIIcons";
+
+// Subcomponents matching Apple Music structure
 import { ArtistLatestAndTopSongs } from "./components/ArtistLatestAndTopSongs";
-import { DiscographyTabs } from "./components/DiscographyTabs";
+import { EssentialAlbums } from "./components/EssentialAlbums";
+import { ReleaseRowSection } from "./components/ReleaseRowSection";
 import { ArtistPlaylists } from "./components/ArtistPlaylists";
 import { FansAlsoLike } from "./components/FansAlsoLike";
 import { StatsForwardAbout } from "./components/StatsForwardAbout";
-import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useUIStore } from "@/store/ui";
-import { useAuthStore } from "@/store/authStore";
-import { ArrowLeft, MoreHorizontal, Download, Share2, User, Crown, Compass, Info } from "lucide-react";
-import { useRouter } from "next/navigation";
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuSeparator,
- DropdownMenuTrigger,
- DropdownMenuSub,
- DropdownMenuSubTrigger,
- DropdownMenuPortal,
- DropdownMenuSubContent
-} from "@/components/ui/dropdown-menu";
-
-// Animated audio visualizer — 4 bars bouncing
-function Visualizer() {
- return (
- <div className="flex items-end gap-[2px] h-[10px] w-5 justify-center mb-0.5">
- {[0.6, 1.0, 0.4, 0.8].map((initialH, i) => (
- <motion.span
- key={i}
- className="w-[3px] bg-red-500 rounded-full"
- animate={{ scaleY: [initialH, 1.2, initialH * 0.5, 1, initialH] }}
- transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
- style={{ height: 10, transformOrigin: "bottom" }}
- />
- ))}
- </div>
- );
-}
 
 export default function ArtistPage() {
- const params = useParams();
- const router = useRouter();
- const id = params?.id as string;
- const queryClient = useQueryClient();
- const { setTrack, currentTrack, isPlaying, togglePlay, isShuffled, toggleShuffle } = usePlayerStore();
- const { setPlayerMinimized, openDownloadModal, isLyricsOpen, setStickyPageTitle, isFullScreenPlayerOpen } = useUIStore();
+  const params = useParams();
+  const router = useRouter();
+  const id = params?.id as string;
+  const queryClient = useQueryClient();
 
- // Ref on the visible artist name h1 in the hero
- const heroNameRef = useRef<HTMLHeadingElement>(null);
+  const { setTrack, currentTrack, isPlaying, togglePlay, isShuffled, toggleShuffle } = usePlayerStore();
+  const { setPlayerMinimized, setStickyPageTitle } = useUIStore();
+  const { isAuthenticated } = useAuthStore();
+  const heroNameRef = useRef<HTMLHeadingElement>(null);
+  const [isFavorited, setIsFavorited] = useState(false);
 
- const { data: artist, isLoading } = useQuery({
- queryKey: ['artist', id],
- queryFn: async () => {
- const res = await api.get(`/artists/${encodeURIComponent(id)}`);
- return res.data;
- },
- enabled: !!id,
- });
+  const { data: artist, isLoading } = useQuery({
+    queryKey: ['artist', id],
+    queryFn: async () => {
+      const res = await api.get(`/artists/${encodeURIComponent(id)}`);
+      return res.data;
+    },
+    enabled: !!id,
+    staleTime: 1000 * 60 * 10, // 10 minutes cache
+  });
 
-  // IntersectionObserver: when half the text is hidden under the header, it slides up into the top bar
+  // Sticky title sync on scroll
   useEffect(() => {
-  if (!heroNameRef.current) return;
-  const el = heroNameRef.current;
-  const observer = new IntersectionObserver(
-  ([entry]) => {
-  setStickyPageTitle(entry.isIntersecting ? null : (artist?.name ?? null));
-  },
-  { threshold: 0.5, rootMargin: "-30px 0px 0px 0px" }
-  );
-  observer.observe(el);
-  return () => {
-  observer.disconnect();
-  setStickyPageTitle(null);
-  };
+    if (!heroNameRef.current) return;
+    const el = heroNameRef.current;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setStickyPageTitle(entry.isIntersecting ? null : (artist?.name ? formatDisplayTitle(artist.name) : null));
+      },
+      { threshold: 0.2, rootMargin: "-30px 0px 0px 0px" }
+    );
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      setStickyPageTitle(null);
+    };
   }, [artist?.name, setStickyPageTitle]);
 
- const colors = useAlbumColor(artist?.imageUrl || artist?.coverUrl, artist?.aura_color);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh] bg-transparent">
+        <ZenLoading size="md" />
+      </div>
+    );
+  }
 
- const { isAuthenticated } = useAuthStore();
- const { data: likedTrackIds } = useQuery({
- queryKey: ['liked-track-ids'],
- queryFn: async () => {
-  const res = await api.get('tracks/liked');
-  const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
-  return arr.map((t: any) => t.id);
- },
- staleTime: 1000 * 60 * 5,
- enabled: isAuthenticated
- });
+  if (!artist) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 opacity-40 bg-transparent text-white">
+        <Disc3 size={64} strokeWidth={1} />
+        <p className="text-base font-bold tracking-tight">Artist not found</p>
+      </div>
+    );
+  }
 
- const { data: playlists } = useQuery({
- queryKey: ['my-playlists'],
- queryFn: async () => {
- try {
- const res = await api.get('playlists/my');
- const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
- return arr;
- } catch (e) { return []; }
- },
- enabled: isAuthenticated
- });
+  const isArtistActive = artist.topTracks?.some((t: any) => t.id === currentTrack?.id);
+  const bannerUrl = artist.coverUrl || artist.imageUrl || null;
 
- const toggleLike = async (trackId: string, e: React.MouseEvent) => {
- e.stopPropagation();
- try {
- await api.post(`tracks/${trackId}/like`);
- queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
- queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
- } catch (err) {}
- };
+  const handlePlayTopTracks = () => {
+    if (!artist.topTracks?.length) return;
+    if (isArtistActive) {
+      togglePlay();
+    } else {
+      setTrack(artist.topTracks[0], artist.topTracks);
+      setPlayerMinimized(false);
+    }
+  };
 
- const addToPlaylist = async (trackId: string, playlistId: string, e: React.MouseEvent) => {
- e.stopPropagation();
- try {
- await api.post(`playlists/${playlistId}/tracks`, { trackId });
- queryClient.invalidateQueries({ queryKey: ['my-playlists'] });
- } catch (err) {}
- };
+  const handleShufflePlay = () => {
+    if (!artist.topTracks?.length) return;
+    setPlayerMinimized(false);
+    const player = usePlayerStore.getState();
+    if (!player.isShuffled) {
+      player.toggleShuffle();
+    }
+    const randomTrack = artist.topTracks[Math.floor(Math.random() * artist.topTracks.length)];
+    player.setTrack(randomTrack, artist.topTracks);
+  };
 
- const shareTrack = (trackId: string, e: React.MouseEvent) => {
- e.stopPropagation();
- navigator.clipboard.writeText(`${window.location.origin}/track/${trackId}`);
- };
+  const handlePlayTrack = (track: any) => {
+    if (window.getSelection()?.toString()) return;
+    if (currentTrack?.id === track.id) {
+      togglePlay();
+    } else {
+      setTrack(track, artist.topTracks);
+      setPlayerMinimized(false);
+    }
+  };
 
- const API_URL = (import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL) || 'https://zenify-78e257420386.herokuapp.com/api';
- const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
+  const displayName = formatDisplayTitle(artist.name);
 
- // Track-picker state
- const [showTrackPicker, setShowTrackPicker] = useState(false);
- const [trackSearch, setTrackSearch] = useState('');
- const [allTracks, setAllTracks] = useState<any[]>([]);
- const [tracksLoading, setTracksLoading] = useState(false);
- const [assigning, setAssigning] = useState<string | null>(null);
- const [justAssigned, setJustAssigned] = useState<string | null>(null);
+  return (
+    <div className="min-h-screen w-full bg-[#121214] text-white overflow-x-hidden relative">
+      <SEO
+        title={`${displayName} - Music, Albums & Songs on Zenify`}
+        description={artist.bio || `Listen to songs and albums by ${displayName} on Zenify.`}
+      />
 
- const openTrackPicker = async () => {
- setShowTrackPicker(true);
- setTracksLoading(true);
- try {
- const token = localStorage.getItem('token') || sessionStorage.getItem('token');
- const headers: Record<string, string> = {};
- if (token) {
- headers['Authorization'] = `Bearer ${token}`;
- }
+      {/* ── 1. APPLE MUSIC HERO SECTION (Screenshot 2) ────────────────── */}
+      <div className="relative w-full h-[62vh] md:h-[76vh] overflow-hidden select-none">
+        {/* Full-bleed high-res artist photography */}
+        {bannerUrl ? (
+          <img
+            src={getMediaUrl(bannerUrl) || undefined}
+            alt={displayName}
+            className="absolute inset-0 w-full h-full object-cover object-[50%_25%] filter brightness-95"
+            fetchPriority="high"
+            decoding="async"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 to-[#121214]" />
+        )}
 
- const res = await fetch(`${API_URL}/tracks?limit=500`, { headers });
- if (!res.ok) {
- throw new Error(`Failed to fetch tracks: ${res.status} ${res.statusText}`);
- }
+        {/* Ambient top vignette & smooth bottom fade into universal dark charcoal #121214 */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#121214] via-[#121214]/40 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-[#121214] pointer-events-none" />
 
- const data = await res.json();
- // Handle {items: [], total} or {data: []} or plain [] responses
- const tracks = Array.isArray(data)
- ? data
- : Array.isArray(data?.items)
- ? data.items
- : Array.isArray(data?.data)
- ? data.data
- : [];
- setAllTracks(tracks || []);
- } catch (err) {
- console.error('Failed to load tracks:', err);
- }
- setTracksLoading(false);
- };
+        {/* Centered Hero Content: Artist Name & Swift UI Controls */}
+        <div className="absolute inset-0 flex flex-col justify-end items-center text-center px-4 pb-10 md:pb-14 z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 25 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col items-center max-w-4xl w-full"
+          >
+            {/* Bold Centered Artist Title */}
+            <h1
+              ref={heroNameRef}
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-[0_8px_24px_rgba(0,0,0,0.8)] mb-6 select-text"
+            >
+              {displayName}
+            </h1>
 
- const assignTrack = async (trackId: string) => {
- if (!artist) return;
- setAssigning(trackId);
- try {
- await fetch(`${API_URL}/tracks/${trackId}`, {
- method: 'PUT',
- headers: {
- 'Content-Type': 'application/json',
- 'Authorization': `Bearer ${localStorage.getItem('token')}`,
- },
- body: JSON.stringify({ artistName: artist.name }),
- });
- setJustAssigned(trackId);
- setTimeout(() => setJustAssigned(null), 2000);
- queryClient.invalidateQueries({ queryKey: ['artist', id] });
- } catch { }
- setAssigning(null);
- };
+            {/* Swift UI Circular Action Buttons (Play, Shuffle, Star, More) */}
+            <div className="flex items-center justify-center gap-4">
+              {/* Star / Favorite Button */}
+              <button
+                onClick={() => setIsFavorited(!isFavorited)}
+                className={cn(
+                  "w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl",
+                  isFavorited
+                    ? "bg-brand/20 border-brand text-brand"
+                    : "bg-white/10 hover:bg-white/20 border-white/15 text-white/90 hover:text-white"
+                )}
+                title={isFavorited ? "Favorited" : "Favorite Artist"}
+              >
+                <Star
+                  size={20}
+                  className={cn(isFavorited ? "fill-brand text-brand" : "text-white")}
+                  strokeWidth={2}
+                />
+              </button>
 
- if (isLoading) {
- return (
- <div className="flex items-center justify-center min-h-[60vh] bg-transparent">
- <ZenLoading size="md" />
- </div>
- );
- }
+              {/* Primary White Play Circle */}
+              <button
+                onClick={handlePlayTopTracks}
+                className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,0,0,0.6)] cursor-pointer"
+                title={isPlaying && isArtistActive ? "Pause" : "Play"}
+              >
+                {isPlaying && isArtistActive ? (
+                  <SwiftUIPause size={26} fill="black" />
+                ) : (
+                  <SwiftUIPlay size={26} fill="black" className="ml-1" />
+                )}
+              </button>
 
- if (!artist) {
- return (
- <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 opacity-30 bg-transparent">
- <Disc3 size={64} strokeWidth={1} />
- <p className="text-sm font-bold tracking-tight text-white/40">Artist not found</p>
- </div>
- );
- }
+              {/* Glass Shuffle Circle */}
+              <button
+                onClick={handleShufflePlay}
+                className={cn(
+                  "w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl",
+                  isShuffled
+                    ? "bg-brand/20 border-brand text-brand"
+                    : "bg-white/10 hover:bg-white/20 border-white/15 text-white/90 hover:text-white"
+                )}
+                title="Shuffle Artist Songs"
+              >
+                <SwiftUIShuffle size={20} stroke="currentColor" />
+              </button>
 
- const isArtistActive = artist.topTracks?.some((t: any) => t.id === currentTrack?.id);
+              {/* Glass Ellipsis Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white flex items-center justify-center active:scale-95 transition-all shadow-xl"
+                    title="More Options"
+                  >
+                    <SwiftUIEllipsis size={20} fill="currentColor" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="w-48 bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl p-1">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                    }}
+                    className="cursor-pointer text-xs font-semibold py-2"
+                  >
+                    Share Artist
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handlePlayTopTracks}
+                    className="cursor-pointer text-xs font-semibold py-2"
+                  >
+                    Play All Songs
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </motion.div>
+        </div>
+      </div>
 
- const imageUrl = getArtistProfileImage(artist);
+      {/* ── 2. MAIN APPLE MUSIC BODY SECTIONS ─────────────────────────── */}
+      <div className="px-5 sm:px-8 md:px-12 lg:px-16 pt-8 pb-28 max-w-[1600px] mx-auto w-full">
+        {/* Latest Release (Left) & Top Songs > (Right) (Screenshot 3) */}
+        <ArtistLatestAndTopSongs
+          artist={artist}
+          currentTrackId={currentTrack?.id}
+          isPlaying={isPlaying}
+          onPlayTrack={handlePlayTrack}
+        />
 
- const birthDateObj = artist.birthDate ? new Date(artist.birthDate) : null;
- const isValidDate = birthDateObj && !isNaN(birthDateObj.getTime());
+        {/* Essential Albums (Screenshot 3 Bottom) */}
+        <EssentialAlbums
+          albums={artist.essentialAlbums || artist.studioAlbums || artist.albums || []}
+          artistName={displayName}
+        />
 
- const formattedBirthDate = isValidDate
- ? birthDateObj.toLocaleDateString(undefined, {
- year: 'numeric',
- month: 'long',
- day: 'numeric'
- })
- : null;
+        {/* Albums > (Screenshot 4) */}
+        <ReleaseRowSection
+          title="Albums"
+          items={artist.studioAlbums || artist.albums || []}
+          seeAllHref={`/artist/${artist.id}/albums`}
+        />
 
- const age = isValidDate
- ? new Date().getFullYear() - birthDateObj.getFullYear()
- : null;
+        {/* Singles & EPs > (Screenshot 4 Bottom) */}
+        <ReleaseRowSection
+          title="Singles & EPs"
+          items={artist.singlesAndEPs || []}
+          seeAllHref={`/artist/${artist.id}/singles`}
+        />
 
- const filteredTracks = (allTracks || []).filter(track => {
- const query = (trackSearch || "").toLowerCase();
- const titleMatch = track.title?.toLowerCase().includes(query);
- const artistMatch = (track.artist?.name || track.artistName || "").toLowerCase().includes(query);
- return titleMatch || artistMatch;
- });
+        {/* Artist Playlists (Screenshot 5: Apple Music Essentials Style) */}
+        <ArtistPlaylists
+          artistName={displayName}
+          playlists={artist.playlists || []}
+        />
 
- const handlePlayTopTracks = () => {
- if (!artist.topTracks?.length) return;
- if (isArtistActive) {
- togglePlay();
- } else {
- setTrack(artist.topTracks[0], artist.topTracks);
- setPlayerMinimized(false);
- }
- };
+        {/* Compilations > (Screenshot 5 Bottom) */}
+        <ReleaseRowSection
+          title="Compilations"
+          items={artist.compilations || []}
+          seeAllHref={`/artist/${artist.id}/compilations`}
+        />
 
- const handleShufflePlay = () => {
- if (!artist.topTracks?.length) return;
- 
- if (isArtistActive) {
- toggleShuffle();
- return;
- }
- 
- useUIStore.getState().setPlayerMinimized(false);
- const player = usePlayerStore.getState();
- if (!player.isShuffled) {
- player.toggleShuffle();
- }
- const randomTrack = artist.topTracks[Math.floor(Math.random() * artist.topTracks.length)];
- player.setTrack(randomTrack, artist.topTracks);
- };
+        {/* Fans Also Like (Circular Artist Cards) */}
+        <FansAlsoLike
+          currentArtistId={artist.id}
+          initialRelated={artist.relatedArtists}
+        />
 
- const handlePlayTrack = (track: any) => {
- if (window.getSelection()?.toString()) return;
- if (currentTrack?.id === track.id) {
- togglePlay();
- } else {
- setTrack(track, artist.topTracks);
- setPlayerMinimized(false);
- }
- };
-
- const bannerUrl = artist.coverUrl || imageUrl || null;
-return (
- <div className="min-h-screen w-full bg-black overflow-x-hidden text-white relative">
-  {bannerUrl && !isFullScreenPlayerOpen && (
-    <div 
-      className="absolute top-0 left-0 right-0 h-[40vh] md:h-[50vh] overflow-hidden pointer-events-none z-0"
-      style={{
-        maskImage: "linear-gradient(to bottom, black 0%, black 50%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 50%, transparent 100%)",
-      }}
-    >
-      <LiquidBackground coverUrl={bannerUrl} />
+        {/* About Artist Section */}
+        <StatsForwardAbout artist={artist} />
+      </div>
     </div>
-  )}
- 
- <div className="w-full relative z-10">
- <div className="relative h-[55vh] md:h-[70vh] w-full">
- <div className="relative h-full w-full overflow-hidden bg-transparent group/banner">
- {/* Background image with hover effect */}
- {bannerUrl ? (
- <img
- src={getMediaUrl(bannerUrl) || undefined}
- onError={(e) => {
- const el = e.target as HTMLImageElement;
- if (!el.src.includes('proxy-image')) el.src = proxy(bannerUrl || '');
- }}
- className="absolute inset-0 w-full h-full object-cover object-[50%_25%]"
- alt={artist.name ? `Banner for ${artist.name}` : "Artist banner"}
- fetchPriority="high"
- decoding="async"
- />
- ) : (
- <div className="absolute inset-0 bg-black/10" />
- )}
-
- {/* Gradient overlays */}
- <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
- <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
-
- <div className="absolute inset-0 flex flex-col justify-end px-6 pb-12 md:px-12 md:pb-16">
- <motion.div 
- initial={{ opacity: 0, y: 30 }} 
- animate={{ opacity: 1, y: 0 }} 
- transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
- className="text-left w-full min-w-0 overflow-visible z-10 relative"
- >
- <div className="w-full min-w-0">
- <h1 ref={heroNameRef} className="text-4xl md:text-5xl text-white tracking-tighter leading-[1.1] mb-4 drop-shadow-2xl pt-2 pb-1 font-bold">
- {formatDisplayTitle(artist.name)}
- </h1>
- </div>
-
- {artist.role && (
- <p className="text-sm font-bold text-red-500 uppercase tracking-widest mb-4 opacity-90">
- {artist.role}
- </p>
- )}
-
- {/* Action buttons */}
- <div className="flex items-center gap-3">
- <button
- onClick={handlePlayTopTracks}
- className="flex-1 md:flex-initial h-12 px-10 rounded-xl bg-[#1c1c1e] border border-white/5 text-white hover:bg-[#2c2c2e] transition-all flex items-center justify-center gap-2 font-bold text-[15px] active:scale-95"
- >
- {isPlaying && isArtistActive ? (
- <Pause size={18} className="text-red-500" fill="currentColor" />
- ) : (
- <Play size={18} className="text-red-500" fill="currentColor" />
- )}
- {isPlaying && isArtistActive ? 'Pause' : 'Play'}
- </button>
-
- <button 
- onClick={handleShufflePlay}
- className="flex-1 md:flex-initial h-12 px-10 rounded-xl bg-[#1c1c1e] border border-white/5 text-white hover:bg-[#2c2c2e] transition-all flex items-center justify-center gap-2 font-bold text-[15px] active:scale-95"
- >
- <Shuffle size={18} className={isShuffled ? "text-red-500" : "text-white/60"} fill="currentColor" />
- Shuffle
- </button>
- 
- <button 
- onClick={openTrackPicker}
- className="hidden md:flex h-12 px-6 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all items-center gap-2 font-bold text-sm"
- >
- <Plus size={18} className="text-red-500" />
- Add
- </button>
-
- <button className="hidden md:flex w-12 h-12 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all items-center justify-center">
- <Share size={18} />
- </button>
- </div>
- </motion.div>
- </div>
- </div>
- </div>
-  {/* ── MAIN CONTENT ─────────────────────────────────── */}
-  <div className="px-6 md:px-12 mt-12 pb-24 max-w-[1600px] mx-auto w-full">
-    
-    <ArtistLatestAndTopSongs
-      artist={artist}
-      currentTrackId={currentTrack?.id}
-      isPlaying={isPlaying}
-      likedTrackIds={likedTrackIds || []}
-      playlists={playlists || []}
-      onPlayTrack={(track) => handlePlayTrack(track)}
-      onToggleLike={(trackId, e) => toggleLike(trackId, e)}
-    />
-
-    <DiscographyTabs albums={artist.albums || []} />
-    
-    <ArtistPlaylists artistName={artist.name} playlists={artist.playlists || []} />
-
-    <FansAlsoLike currentArtistId={artist.id} initialRelated={artist.relatedArtists} />
-    
-    {/* ── ABOUT FOOTER CARD ─────────────────────────────── */}
-    <section>
-    <div className="flex items-center gap-3 mb-6">
-    <Info size={24} className="text-brand" />
-    <h2 className="text-2xl font-bold text-white tracking-tight">About {formatDisplayTitle(artist.name)}</h2>
-    </div>
-    
-    <div className={cn(
-    "rounded-xl overflow-hidden p-5 md:p-6 transition-all shadow-xl w-full",
-    "bg-white/[0.02] hover:bg-white/[0.04] border border-white/5"
-    )}>
-    <div className="flex flex-col sm:flex-row gap-6 md:gap-8 items-center sm:items-start">
-    {/* Left Col: Avatar + Name */}
-    <div className="shrink-0 flex flex-col items-center gap-3">
-    <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border border-white/10 bg-zinc-800 shadow-2xl">
-    {imageUrl ? (
-    <img
-    src={getMediaUrl(imageUrl)}
-    onError={(e) => {
-    const el = e.target as HTMLImageElement;
-    if (!el.src.includes('proxy-image')) el.src = proxy(imageUrl || '');
-    }}
-    className="w-full h-full object-cover"
-    alt={artist.name ? `Portrait of ${artist.name}` : "Artist portrait"} width={128} height={128} loading="lazy" decoding="async" />
-    ) : (
-    <div className="w-full h-full flex items-center justify-center text-white/20 font-bold text-3xl">
-    {artist.name?.charAt(0).toUpperCase()}
-    </div>
-    )}
-    </div>
-    <div className="text-center">
-    <p className="text-lg font-bold text-white tracking-tight leading-tight">{formatDisplayTitle(artist.name)}</p>
-    {artist.verified && (
-    <div className="flex items-center justify-center gap-1.5 mt-1">
-    <BadgeCheck size={12} className="text-brand" />
-    <span className="text-[10px] font-bold text-brand uppercase tracking-wider">Verified Artist</span>
-    </div>
-    )}
-    </div>
-    </div>
-  
-    {/* Right Col: Bio + Metadata Grid */}
-    <div className="flex-1 w-full min-w-0 flex flex-col justify-center">
-    <p className="text-[13px] md:text-[14px] text-white/70 leading-relaxed mb-6 font-medium">
-    {artist.bio || "No biography recorded for this artist yet."}
-    </p>
-    
-    {(formattedBirthDate || artist.role || artist.trackCount !== undefined) && (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-white/[0.06]">
-    {formattedBirthDate && (
-    <div className="flex flex-col">
-    <p className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-1">Born</p>
-    <p className="text-[13px] font-bold text-white/90">{formattedBirthDate}</p>
-    {age && <p className="text-[10px] text-white/40 mt-0.5 font-medium">{age} years old</p>}
-    </div>
-    )}
-    {artist.role && (
-    <div className="flex flex-col">
-    <p className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-1">Role</p>
-    <p className="text-[13px] font-bold text-white/90">{artist.role}</p>
-    </div>
-    )}
-    <div className="flex flex-col">
-    <p className="text-[9px] font-black uppercase tracking-widest text-white/30 mb-1">Tracks</p>
-    <p className="text-[13px] font-bold text-white/90">{artist.trackCount || 0}</p>
-    </div>
-    </div>
-    )}
-    </div>
-    </div>
-    </div>
-    </section>
-
-  </div>
-  </div>
-
- {/* ── TRACK PICKER MODAL ─────────────────────────────── */}
- <AnimatePresence>
- {showTrackPicker && (
- <>
- <motion.div
- initial={{ opacity: 0 }}
- animate={{ opacity: 1 }}
- exit={{ opacity: 0 }}
- className="fixed inset-0 bg-black/70 z-50 backdrop-blur-sm"
- onClick={() => setShowTrackPicker(false)}
- />
- <motion.div
- initial={{ opacity: 0, scale: 0.95, y: 20 }}
- animate={{ opacity: 1, scale: 1, y: 0 }}
- exit={{ opacity: 0, scale: 0.95, y: 20 }}
- className="fixed inset-x-4 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[540px] z-50 bg-[#111] border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[80vh]"
- >
- <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
- <div>
- <p className="text-white font-semibold text-sm">Add Tracks to {artist.name}</p>
- <p className="text-[10px] text-white/30 mt-0.5">Click a track to assign it to this artist</p>
- </div>
- <button
- onClick={() => setShowTrackPicker(false)}
- className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:bg-white/10 hover:text-white transition-all"
- >
- <X size={14} />
- </button>
- </div>
-
- <div className="px-5 py-3 border-b border-white/[0.06]">
- <div className="relative">
- <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
- <input
- autoFocus
- type="text"
- placeholder="Search tracks or artists..."
- value={trackSearch}
- onChange={(e) => setTrackSearch(e.target.value)}
- className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/25 outline-none focus:border-brand/50 transition-colors"
- />
- </div>
- </div>
-
- <div className="flex-1 overflow-y-auto py-2 px-2">
- {tracksLoading ? (
- <div className="flex items-center justify-center py-12">
- <ZenLoading size="sm" />
- </div>
- ) : filteredTracks.length === 0 ? (
- <div className="flex items-center justify-center py-12 text-white/20 text-sm">No tracks found</div>
- ) : (
- filteredTracks.map((track) => {
- const isCurrentArtist = (track.artist?.name || track.artistName) === artist.name;
- const isJustDone = justAssigned === track.id;
- const isBusy = assigning === track.id;
- const cover = track.coverUrl || track.album?.coverUrl;
- return (
- <button
- key={track.id}
- onClick={() => !isCurrentArtist && assignTrack(track.id)}
- disabled={isBusy || isCurrentArtist}
- className={cn(
- "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left",
- isCurrentArtist ? "opacity-40 cursor-default" : "hover:bg-white/[0.05] active:scale-[0.98] cursor-pointer"
- )}
- >
- <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
- {cover ? <img src={getMediaUrl(cover)} className="w-full h-full object-cover" alt={track.title || "Track artwork"} width={40} height={40} loading="lazy" decoding="async" /> : (
- <div className="w-full h-full flex items-center justify-center">
- <Music2 size={12} className="text-zinc-600" />
- </div>
- )}
- </div>
- <div className="flex-1 min-w-0">
- <p className="text-sm font-normal text-white truncate">{formatDisplayTitle(track.title)}</p>
- <div className="text-[12px] font-medium text-white/50 truncate">
- {formatArtists(track)}
- </div>
- </div>
- <div className="shrink-0">
- {isJustDone ? <CheckCircle2 size={16} className="text-green-400" />
- : isBusy ? <ZenLoading size="sm" />
- : isCurrentArtist ? <span className="text-[9px] text-white/20 font-black uppercase tracking-wider">Added</span>
- : <Plus size={14} className="text-white/20" />}
- </div>
- </button>
- );
- })
- )}
- </div>
- </motion.div>
- </>
- )}
- </AnimatePresence>
- </div>
- );
+  );
 }

@@ -23,6 +23,7 @@ import {
   Sparkles,
  ScrollText,
 } from "lucide-react";
+import { SwiftUIPlay, SwiftUIPause, SwiftUIShuffle, SwiftUIRepeat, SwiftUIForward, SwiftUIBackward, SwiftUIQueue } from "@/components/ui/SwiftUIIcons";
 import { getMediaUrl, cn, cleanTitle, getTrackCover, formatArtists } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -405,7 +406,7 @@ export function PCFullScreenPlayer() {
  )}
  title="Shuffle"
  >
- <Shuffle size={16} strokeWidth={2.5} />
+ <SwiftUIShuffle size={16} stroke="currentColor" />
  </button>
 
  <button
@@ -416,7 +417,7 @@ export function PCFullScreenPlayer() {
  )}
  title={`Repeat: ${repeatMode}`}
  >
- <Repeat size={16} strokeWidth={repeatMode !== 'off' ? 2.5 : 2} />
+ <SwiftUIRepeat size={16} stroke="currentColor" />
  {repeatMode !== "off" && (
  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
  <span className="text-[6px] font-black mt-0.5">
@@ -436,7 +437,7 @@ export function PCFullScreenPlayer() {
  {/* Main Playback Controls */}
  <div className="flex flex-row items-center justify-center gap-1.5 px-2">
  <button onClick={handlePrev} className="w-10 h-10 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
- <SkipBack size={20} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
+ <SwiftUIBackward size={20} fill="currentColor" />
  </button>
 
  <button
@@ -451,7 +452,7 @@ export function PCFullScreenPlayer() {
  </button>
 
  <button onClick={() => handleNext()} className="w-10 h-10 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary">
- <SkipForward size={20} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
+ <SwiftUIForward size={20} fill="currentColor" />
  </button>
  </div>
 
