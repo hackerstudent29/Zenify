@@ -376,6 +376,11 @@ export function GlobalAudio() {
             useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
             playNext(true);
           }).catch((err) => {
+            if (err?.response?.status === 404) {
+              console.warn(`[GlobalAudio/Automator] Track "${current.title}" (${trackId}) no longer exists on server (404). Clearing obsolete player state.`);
+              usePlayerStore.setState({ currentTrack: null, isPlaying: false, queue: [] });
+              return;
+            }
             console.warn("[GlobalAudio/Automator] Refetch audio error:", err);
             useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
             playNext(true);
@@ -873,7 +878,17 @@ export function GlobalAudio() {
             clearInterval(interval);
           }
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          clearInterval(interval);
+          usePlayerStore.setState(state => {
+            if (state.currentTrack?.id === currentTrack.id) {
+              return { currentTrack: null, isPlaying: false };
+            }
+            return {};
+          });
+          return;
+        }
         console.warn("[GlobalAudio] Failed to poll track background update:", err);
       }
     }, 5000);
