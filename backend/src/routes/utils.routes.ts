@@ -1679,18 +1679,21 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
     });
 
-    // Flush all caches (Redis DB + in-memory cache)
-    server.post('/flush-cache', async (request, reply) => {
+    // Flush all caches (Redis DB + in-memory cache) - Protected: Admin Only
+    server.post('/flush-cache', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
+    }, async (request, reply) => {
         try {
             const { flushAllCaches } = await import('../utils/cache.js');
             const result = await flushAllCaches();
-            server.log.info('[Utils] All cache DBs flushed cleanly.');
+            server.log.info('[Utils] All cache DBs flushed cleanly by admin.');
             return reply.send({ success: true, message: 'All cache DBs flushed cleanly.', result });
         } catch (err: any) {
             server.log.error(`flush-cache error: ${err.message}`);
-            return reply.status(500).send({ error: err.message });
+            return reply.status(500).send({ error: 'Failed to flush caches securely.' });
         }
     });
 }
+
 
 
