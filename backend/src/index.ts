@@ -90,8 +90,10 @@ server.register(cors, {
         cb(null, false);
     },
     credentials: true,
-    methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Range', 'baggage', 'sentry-trace'],
+    allowedHeaders: [
+        'Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 
+        'Range', 'baggage', 'sentry-trace', 'x-user-language', 'x-user-country', 'x-admin-key'
+    ],
     exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type'],
 });
 

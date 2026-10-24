@@ -130,4 +130,5 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+.vercel/
 devtools_options.yaml
