@@ -273,12 +273,24 @@ export function cleanTitle(title?: string | null): string {
  * Universal Text Normalization Engine
  * Strictly follows the Zenify formatting protocol.
  */
+export function decodeHtmlEntities(input?: string | null): string {
+  if (!input) return "";
+  return input
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
 export function formatDisplayTitle(input?: string | null): string {
  if (!input) return "";
 
  // 1. Identify and preserve bracketed content containing version/credit keywords.
  // e.g. (feat. artist), (Sped Up), [Instrumental], (Remix), (Lofi Flip)
- let text = input;
+ let text = decodeHtmlEntities(input);
  const bracketRegex = /([\(\[\{][^\)\]\}]*[\)\]\}])/g;
  
  const keepKeywords = [

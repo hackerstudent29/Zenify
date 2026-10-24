@@ -1,27 +1,19 @@
 "use client";
 
 import React, { useState } from "react";
-import { Play, Pause, MoreHorizontal, ChevronRight, Plus, Download, Share2, Disc, RefreshCw, ListPlus } from "lucide-react";
+import { ChevronRight, Play, Pause, MoreHorizontal } from "lucide-react";
 import { cn, getMediaUrl, formatDisplayTitle, getTrackCover } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
-  DropdownMenuSubContent,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { useUIStore } from "@/store/ui";
-import { usePlayerStore } from "@/store/player";
-import api from "@/lib/api";
-import { useRefetchAudio } from "@/hooks/useRefetchAudio";
-import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
-import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
+import { SwiftUIPlay, SwiftUIPause, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 
 interface ArtistLatestAndTopSongsProps {
   artist: any;
@@ -37,231 +29,184 @@ export function ArtistLatestAndTopSongs({
   artist,
   currentTrackId,
   isPlaying,
-  likedTrackIds = [],
-  playlists = [],
   onPlayTrack,
 }: ArtistLatestAndTopSongsProps) {
-  const router = useRouter();
-  const { openDownloadModal } = useUIStore();
-  const [showAllTop, setShowAllTop] = useState(false);
-  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
-  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
-  const { refetchTrackLyrics } = useRefetchLyrics();
-
+  const [showAll, setShowAll] = useState(false);
   const topTracks: any[] = artist?.topTracks || [];
-  if (topTracks.length === 0 && (!artist?.albums || artist.albums.length === 0)) {
-    return null;
-  }
 
-  // Determine latest release: newest album or newest track
-  const latestAlbum = artist?.albums?.[0];
-  const latestTrack = topTracks[0];
-  const latestRelease = latestAlbum || latestTrack;
+  // Latest release resolution
+  const latestRelease = artist?.latestRelease || artist?.albums?.[0] || topTracks[0];
 
-  const latestReleaseTitle = latestRelease ? formatDisplayTitle(latestRelease.title) : "";
-  const latestReleaseCover = latestRelease ? (getMediaUrl(latestRelease.coverUrl || latestRelease.artwork || artist.imageUrl) || "/logo.png") : "/logo.png";
+  const latestTitle = latestRelease ? formatDisplayTitle(latestRelease.title) : "";
+  const latestCover = latestRelease ? (getMediaUrl(latestRelease.coverUrl || latestRelease.artwork || artist.imageUrl) || "/logo.png") : "/logo.png";
   const rawDate = latestRelease?.releaseDate || latestRelease?.createdAt;
-  const latestReleaseDate = rawDate
-    ? new Date(rawDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  const formattedDate = rawDate
+    ? new Date(rawDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
     : "";
-  const isAlbumRelease = !!latestRelease?.isAlbum || (latestRelease?.trackCount && latestRelease.trackCount > 1);
-  const latestReleaseSubtitle = isAlbumRelease
-    ? `Album · ${new Date(rawDate || Date.now()).getFullYear()}`
-    : "1 song · Single";
-  const latestReleaseHref = isAlbumRelease && latestRelease?.id
-    ? `/album/${latestRelease.id}`
-    : latestRelease?.id
-      ? `/track/${latestRelease.id}`
-      : `/artist/${artist.id}`;
+  const songCount = latestRelease?.trackCount || (latestRelease?.isSingle ? 1 : 1);
+  const trackCountText = songCount > 1 ? `${songCount} songs` : "1 song · Single";
 
-  // 6 tracks for 2 columns (3 each) as in Apple Music screenshot 3
-  const displayTracks = showAllTop ? topTracks : topTracks.slice(0, 6);
-  const col1Tracks = displayTracks.slice(0, Math.ceil(displayTracks.length / 2));
-  const col2Tracks = displayTracks.slice(Math.ceil(displayTracks.length / 2));
+  // Top songs: 6 tracks arranged in 2 columns (3 tracks per column)
+  const displayTracks = showAll ? topTracks : topTracks.slice(0, 6);
+  const col1 = displayTracks.slice(0, 3);
+  const col2 = displayTracks.slice(3, 6);
 
-  const renderTrackRow = (track: any, index: number) => {
+  const renderTrackItem = (track: any, idx: number) => {
     const isCurrent = currentTrackId === track.id;
     const isThisPlaying = isCurrent && isPlaying;
     const trackCover = getTrackCover(track);
-    const releaseYear = track.releaseDate || track.createdAt
-      ? new Date(track.releaseDate || track.createdAt).getFullYear()
-      : undefined;
-    const albumName = track.album?.title || track.albumTitle;
-    const subtitle = [albumName, releaseYear].filter(Boolean).join(" · ") || artist.name;
+    const rawYear = track.releaseDate || track.createdAt;
+    const year = rawYear ? new Date(rawYear).getFullYear() : "";
+    const albumName = track.album?.title || track.albumTitle || "";
+    const subtitle = [albumName, year].filter(Boolean).join(" · ") || artist.name;
 
     return (
       <div
-        key={`${track.id || "t"}-${index}`}
+        key={track.id || `track-${idx}`}
         onClick={() => onPlayTrack(track)}
         className={cn(
-          "group flex items-center justify-between gap-3 px-2 py-1.5 rounded-xl transition-all duration-150 cursor-pointer select-none",
+          "group flex items-center justify-between gap-3 p-2 rounded-xl transition-all duration-150 cursor-pointer select-none",
           isCurrent ? "bg-white/[0.08]" : "hover:bg-white/[0.05]"
         )}
       >
-        {/* Left Thumbnail & Titles */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="relative shrink-0 w-11 h-11 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-sm">
-            <img src={trackCover} alt={track.title || "Track artwork"} width={44} height={44} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-            <div className={cn(
-              "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
-              isThisPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            )}>
+          {/* Thumbnail with hover play overlay */}
+          <div className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 bg-zinc-900 border border-white/5 shadow-md">
+            <img
+              src={trackCover}
+              alt={track.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+            <div
+              className={cn(
+                "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
+                isCurrent ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              )}
+            >
               {isThisPlaying ? (
-                <div className="flex items-end gap-[2px] h-3">
-                  {[0.3, 0.7, 0.4].map((d, i) => (
-                    <motion.div
-                      key={i}
-                      animate={{ height: ["30%", "100%", "30%"] }}
-                      transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
-                      className="w-[2px] bg-brand rounded-full"
-                    />
-                  ))}
-                </div>
+                <SwiftUIPause size={16} fill="white" />
               ) : (
-                <Play size={16} className="text-white fill-white ml-0.5" />
+                <SwiftUIPlay size={16} fill="white" className="ml-0.5" />
               )}
             </div>
           </div>
 
-          <div className="flex-1 min-w-0">
-            <p className={cn(
-              "text-[13px] font-normal leading-tight truncate transition-colors",
-              isCurrent ? "text-brand" : "text-white group-hover:text-white"
-            )}>
+          {/* Title and Subtitle */}
+          <div className="flex flex-col min-w-0 flex-1">
+            <p
+              className={cn(
+                "text-[13px] md:text-[14px] font-semibold truncate leading-tight transition-colors",
+                isCurrent ? "text-brand" : "text-white group-hover:text-white"
+              )}
+            >
               {formatDisplayTitle(track.title)}
             </p>
-            <p className="text-[11px] text-white/50 truncate font-normal mt-0.5">
+            <p className="text-[12px] text-white/50 truncate font-normal mt-0.5">
               {subtitle}
             </p>
           </div>
         </div>
 
-        {/* Right Menu Trigger */}
-        <div className="shrink-0 flex items-center opacity-70 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-              >
-                <MoreHorizontal size={16} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuContent align="end" className="w-52 bg-zinc-900/95 border-white/10 backdrop-blur-2xl rounded-2xl p-1.5 z-[1200]">
- <DropdownMenuItem onClick={() => usePlayerStore.getState().addToUserQueue(track)}>
- <ListPlus size={14} className="mr-2 text-brand" /> Add to Queue
- </DropdownMenuItem>
-                {track.album?.id && (
-                  <DropdownMenuItem onClick={() => router.push(`/album/${track.album.id}`)}>
-                    <Disc size={14} className="mr-2 opacity-60" /> Go to Album
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
-                    <Plus size={14} className="mr-2 opacity-60" /> Add to Playlist
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => refetchTrackAudio(track, (msg, type) => useUIStore.getState().showToast(msg, type))}>
-                    <RefreshCw size={14} className={cn("mr-2 opacity-60", isRefetching === track.id && "animate-spin text-brand")} />
-                    <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
-                  </DropdownMenuItem>
-<RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={(msg, type) => useUIStore.getState().showToast(msg, type)} />
-                <DropdownMenuItem onClick={() => openDownloadModal(track)}>
-                  <Download size={14} className="mr-2 opacity-60" /> Download
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem onClick={() => {
-                  if (navigator.clipboard) {
-                    navigator.clipboard.writeText(`${window.location.origin}/track/${track.id}`);
-                  }
-                }}>
-                  <Share2 size={14} className="mr-2 opacity-60" /> Copy Link
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenuPortal>
-          </DropdownMenu>
-        </div>
+        {/* Swift UI Ellipsis Action */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <button
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+              title="More"
+            >
+              <SwiftUIEllipsis size={16} fill="currentColor" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl p-1">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlayTrack(track);
+              }}
+              className="cursor-pointer text-xs font-semibold py-2"
+            >
+              Play Next
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(`${window.location.origin}/track/${track.id}`);
+              }}
+              className="cursor-pointer text-xs font-semibold py-2"
+            >
+              Copy Link
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     );
   };
 
   return (
     <section className="mb-14">
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] xl:grid-cols-[400px_1fr] gap-8 items-start">
-        {/* ── Left Column: Latest Release (Desktop Only, hidden on mobile) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Latest Release (Screenshot 3) */}
         {latestRelease && (
-          <div className="hidden lg:flex flex-col gap-3 shrink-0">
-            <h2 className="text-xl font-bold text-white tracking-tight px-1 font-sans">
+          <div className="lg:col-span-4 flex flex-col">
+            <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight mb-4">
               Latest Release
             </h2>
-            <div
-              onClick={() => router.push(latestReleaseHref)}
-              className="group flex items-center gap-4 p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 transition-all duration-200 cursor-pointer shadow-md"
+            <Link
+              href={latestRelease.id ? `/album/${latestRelease.id}` : "#"}
+              className="group flex flex-col sm:flex-row lg:flex-col gap-4 items-start"
             >
-              <div className="relative shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-zinc-900 border border-white/10 shadow-lg">
+              <div className="relative aspect-square w-44 sm:w-48 md:w-52 lg:w-56 rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 shadow-2xl transition-transform duration-300 group-hover:scale-[1.02] shrink-0">
                 <img
-                  src={latestReleaseCover}
-                  alt={latestReleaseTitle || "Latest release"}
-                  width={128}
-                  height={128}
+                  src={latestCover}
+                  alt={latestTitle}
+                  className="w-full h-full object-cover"
                   loading="lazy"
                   decoding="async"
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                 />
               </div>
-              <div className="flex-1 min-w-0 pr-1">
-                {latestReleaseDate && (
-                  <p className="text-[11px] text-white/50 font-medium mb-1">
-                    {latestReleaseDate}
-                  </p>
+              <div className="flex flex-col justify-center min-w-0 pt-1">
+                {formattedDate && (
+                  <span className="text-[12px] font-medium text-white/50 mb-1">
+                    {formattedDate}
+                  </span>
                 )}
-                <h3 className="text-sm sm:text-base font-bold text-white truncate group-hover:text-white transition-colors mb-1 leading-snug">
-                  {latestReleaseTitle}
-                </h3>
-                <p className="text-xs text-white/40 font-normal">
-                  {latestReleaseSubtitle}
-                </p>
+                <span className="text-[15px] md:text-[16px] font-bold text-white truncate leading-snug group-hover:text-brand transition-colors">
+                  {latestTitle}
+                </span>
+                <span className="text-[13px] text-white/50 font-normal mt-0.5">
+                  {trackCountText}
+                </span>
               </div>
-            </div>
+            </Link>
           </div>
         )}
 
-        {/* ── Right Column (or Full Width on Mobile): Top Songs > ── */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-3 px-1">
+        {/* Right Column: Top Songs > (Screenshot 3) */}
+        <div className={cn(latestRelease ? "lg:col-span-8" : "lg:col-span-12", "flex flex-col")}>
+          <div className="flex items-center justify-between mb-4">
             <button
-              onClick={() => setShowAllTop(!showAllTop)}
-              className="flex items-center gap-1.5 group cursor-pointer text-left outline-none"
+              onClick={() => setShowAll(!showAll)}
+              className="group flex items-center gap-1.5 text-xl md:text-2xl font-bold text-white tracking-tight hover:text-white/80 transition-colors"
             >
-              <h2 className="text-xl font-bold text-white tracking-tight font-sans group-hover:text-white/80 transition-colors">
-                Top Songs
-              </h2>
-              <ChevronRight
-                size={18}
-                className={cn(
-                  "text-white/40 group-hover:text-white transition-transform duration-200",
-                  showAllTop ? "rotate-90" : "rotate-0"
-                )}
-              />
+              <span>Top Songs</span>
+              <ChevronRight size={22} className="text-white/40 group-hover:text-white transition-colors group-hover:translate-x-0.5 duration-200" />
             </button>
-            {topTracks.length > 6 && (
-              <button
-                onClick={() => setShowAllTop(!showAllTop)}
-                className="text-[11px] font-bold text-white/50 hover:text-white transition-colors"
-              >
-                {showAllTop ? "Show Less" : "See All"}
-              </button>
-            )}
           </div>
 
-          {/* Two Sub-columns (3 songs each) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
-            <div className="flex flex-col gap-0.5">
-              {col1Tracks.map((track, i) => renderTrackRow(track, i))}
+          {topTracks.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+              <div className="flex flex-col gap-1">
+                {col1.map((track, idx) => renderTrackItem(track, idx))}
+              </div>
+              <div className="flex flex-col gap-1">
+                {col2.map((track, idx) => renderTrackItem(track, idx + 3))}
+              </div>
             </div>
-            <div className="flex flex-col gap-0.5">
-              {col2Tracks.map((track, i) => renderTrackRow(track, i + col1Tracks.length))}
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-white/40">No songs available for this artist yet.</p>
+          )}
         </div>
       </div>
     </section>

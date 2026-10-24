@@ -3,7 +3,8 @@
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Maximize2, Settings2, Download, Heart, ScrollText } from "lucide-react";
+import { Volume2, VolumeX, Maximize2, Settings2, Download, Heart, ScrollText } from "lucide-react";
+import { SwiftUIPlay, SwiftUIPause, SwiftUIShuffle, SwiftUIRepeat, SwiftUIForward, SwiftUIBackward, SwiftUIQueue } from "@/components/ui/SwiftUIIcons";
 import { cn, getMediaUrl, cleanTitle, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { animate, AnimatePresence, motion } from "framer-motion";
@@ -240,14 +241,14 @@ export function PCPlayerBar() {
  )}
  title={`Shuffle: ${isShuffled ? 'On' : 'Off'}`}
  >
- <Shuffle size={16} strokeWidth={isShuffled ? 3 : 2} />
+ <SwiftUIShuffle size={16} stroke="currentColor" />
  </button>
 
  <button
  onClick={(e) => { e.stopPropagation(); playPrev(); }}
  className={cn("p-1 transition-all active:scale-90", whiteBtn)}
  >
- <SkipBack size={20} fill="currentColor" strokeWidth={0} />
+ <SwiftUIBackward size={18} fill="currentColor" />
  </button>
 
  <button
@@ -255,9 +256,9 @@ export function PCPlayerBar() {
  className={cn("flex items-center justify-center transition-all active:scale-95", activeBtn)}
  >
  {isPlaying ? (
- <Pause size={28} fill="currentColor" strokeWidth={0} />
+ <SwiftUIPause size={24} fill="currentColor" />
  ) : (
- <Play size={28} fill="currentColor" strokeWidth={0} className="ml-1" />
+ <SwiftUIPlay size={24} fill="currentColor" className="ml-0.5" />
  )}
  </button>
 
@@ -265,7 +266,7 @@ export function PCPlayerBar() {
  onClick={(e) => { e.stopPropagation(); playNext(true); }}
  className={cn("p-1 transition-all active:scale-90", whiteBtn)}
  >
- <SkipForward size={20} fill="currentColor" strokeWidth={0} />
+ <SwiftUIForward size={18} fill="currentColor" />
  </button>
 
  <button
@@ -276,7 +277,7 @@ export function PCPlayerBar() {
  )}
  title={`Repeat: ${repeatMode}`}
  >
- <Repeat size={16} strokeWidth={repeatMode !== 'off' ? 3 : 2} />
+ <SwiftUIRepeat size={16} stroke="currentColor" />
  {repeatMode !== 'off' && (
  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
  <span className={cn("text-[7px] font-black mt-0.5", isGlass && "drop-shadow-md")}>
@@ -324,7 +325,7 @@ export function PCPlayerBar() {
  )}
  title="Queue"
  >
- <ListMusic size={18} />
+ <SwiftUIQueue size={18} stroke="currentColor" />
  </button>
 
  <button

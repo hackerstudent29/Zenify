@@ -15,7 +15,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
 import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
-import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget, decodeHtmlEntities } from "@/lib/utils";
 import Link from "next/link";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { useState, useEffect } from "react";
@@ -308,13 +308,13 @@ export default function TrackPage() {
   // Extract movie or album title from title brackets like (From "3 (Tamil)") or (From Jailer)
   const extractMovieFromTitle = (titleStr: string): string | null => {
     if (!titleStr) return null;
-    const match = titleStr.match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i);
+    const match = decodeHtmlEntities(titleStr).match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i);
     return match ? match[1].trim() : null;
   };
 
   const albumReleaseId = track.album?.id || track.albumId || (track as any).collectionId;
   const embeddedMovie = extractMovieFromTitle(track.title);
-  const rawAlbumTitle = (track.album?.title || (track as any).albumTitle || (track as any).collectionName || '').trim();
+  const rawAlbumTitle = decodeHtmlEntities((track.album?.title || (track as any).albumTitle || (track as any).collectionName || '').trim());
   const isSameAsSong = rawAlbumTitle.toLowerCase() === track.title.trim().toLowerCase();
 
   const albumDisplay = embeddedMovie

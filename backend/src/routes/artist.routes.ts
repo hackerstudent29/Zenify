@@ -199,38 +199,12 @@ export async function artistRoutes(server: FastifyInstance) {
 
         if (hasBadBio || hasBadImage || hasBadCover) {
             try {
-                const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
-                const canonical = CANONICAL_ARTISTS[artist.name.toLowerCase()];
-                const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-                const rapidVisuals = (hasBadImage || hasBadCover) ? await ExternalMetadataService.fetchArtistVisualsFromRapidApi(artist.name).catch(() => null) : null;
-                const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(artist.name).catch(() => null);
-
-                const updateData: any = {};
-                if (hasBadBio && (wikiBio || canonical?.bio || adbInfo?.bio)) {
-                    updateData.bio = wikiBio || canonical?.bio || adbInfo?.bio;
-                }
-                if (hasBadImage && (rapidVisuals?.imageUrl || deezerPic || canonical?.imageUrl || adbInfo?.imageUrl)) {
-                    updateData.imageUrl = rapidVisuals?.imageUrl || deezerPic || canonical?.imageUrl || adbInfo?.imageUrl;
-                }
-                if (hasBadCover && (rapidVisuals?.coverUrl || rapidVisuals?.imageUrl || wikiBanner || deezerCover || adbInfo?.coverUrl || deezerPic)) {
-                    updateData.coverUrl = rapidVisuals?.coverUrl || rapidVisuals?.imageUrl || wikiBanner || deezerCover || adbInfo?.coverUrl || deezerPic;
-                }
-                if ((!artist.follower_count || artist.follower_count === 0) && adbInfo?.followers) {
-                    updateData.follower_count = adbInfo?.followers;
-                }
-
-                if (Object.keys(updateData).length > 0) {
-                    const updated = await prisma.artist.update({
-                        where: { id: artist.id },
-                        data: updateData,
-                        include: {
-                            albums: {
-                                take: 20,
-                                orderBy: { releaseDate: 'desc' }
-                            }
-                        }
-                    }).catch(() => null);
-                    if (updated) artist = updated;
+                const { ArtistMetadataService } = await import('../services/artist-metadata.service.js');
+                const visuals = await ArtistMetadataService.fetchArtistVisuals(artist.id, artist.name).catch(() => null);
+                if (visuals) {
+                    if (visuals.coverUrl) artist.coverUrl = visuals.coverUrl;
+                    if (visuals.imageUrl) artist.imageUrl = visuals.imageUrl;
+                    if (visuals.bio && (!artist.bio || artist.bio.length < 30)) artist.bio = visuals.bio;
                 }
             } catch (err: any) {
                 server.log.warn(`[ArtistRoute] Metadata enrichment warn for ${artist.name}: ${err.message}`);
@@ -569,11 +543,29 @@ export async function artistRoutes(server: FastifyInstance) {
             }
         }
 
+        // Categorize releases for Apple Music layout
+        const sortedAlbums = [...finalAlbums].sort((a, b) => {
+            const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+            const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+            return dateB - dateA;
+        });
+
+        const latestRelease = sortedAlbums[0] || null;
+        const studioAlbums = sortedAlbums.filter(a => !a.isSingle && !(a.title || '').toLowerCase().includes('single') && !(a.title || '').toLowerCase().includes('ep'));
+        const singlesAndEPs = sortedAlbums.filter(a => a.isSingle || (a.title || '').toLowerCase().includes('single') || (a.title || '').toLowerCase().includes('ep'));
+        const compilations = sortedAlbums.filter(a => (a.title || '').toLowerCase().includes('soundtrack') || (a.title || '').toLowerCase().includes('compilation') || (a.title || '').toLowerCase().includes('remix') || (a.title || '').toLowerCase().includes('best of') || (a.title || '').toLowerCase().includes('banger'));
+        const essentialAlbums = (studioAlbums.length >= 3 ? studioAlbums : sortedAlbums).slice(0, 6);
+
         return JSON.parse(JSON.stringify({ 
             ...artist, 
             imageUrl: finalImageUrl,
             coverUrl: artist.coverUrl || wikiBanner || deezerCover || finalImageUrl,
             bio: artist.bio || wikiBio,
+            latestRelease,
+            essentialAlbums,
+            studioAlbums,
+            singlesAndEPs,
+            compilations,
             topTracks: finalTopTracks, 
             albums: finalAlbums,
             playlists: artistPlaylists,

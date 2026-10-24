@@ -15,6 +15,7 @@ import {
  ListMusic, Sparkles, ScrollText, PlusCircle, Bookmark,
  Download, Shuffle, Repeat, Repeat1, Layers, RefreshCw
 } from "lucide-react";
+import { SwiftUIPlay, SwiftUIPause, SwiftUIShuffle, SwiftUIRepeat, SwiftUIRepeatOne, SwiftUIForward, SwiftUIBackward } from "@/components/ui/SwiftUIIcons";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { useRouter } from "next/navigation";
 import { cn, getTrackCover, getArtistTarget } from "@/lib/utils";
@@ -729,14 +730,14 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
       )}
       title={`Shuffle: ${isShuffled ? 'On' : 'Off'}`}
     >
-      <Shuffle size={22} strokeWidth={isShuffled ? 2.5 : 2} />
+      <SwiftUIShuffle size={22} stroke="currentColor" />
       {isShuffled && (
         <span className="absolute bottom-1 w-1 h-1 rounded-full bg-brand shadow-[0_0_6px_rgba(225,29,72,0.8)]" />
       )}
     </button>
 
     <button onClick={handlePrev} className="w-12 h-12 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary cursor-pointer">
-      <SkipBack size={32} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
+      <SwiftUIBackward size={28} fill="currentColor" />
     </button>
 
     <button onClick={() => togglePlay()} className={cn("w-18 h-18 sm:w-20 sm:h-20 flex items-center justify-center active:scale-90 transition-transform active:duration-0 duration-150 mobile-btn-primary cursor-pointer", !isPlaying ? "text-brand" : "")}>
@@ -748,7 +749,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     </button>
 
     <button onClick={handleNext} className="w-12 h-12 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary cursor-pointer">
-      <SkipForward size={32} className="mobile-icon-secondary" fill="currentColor" strokeWidth={0} />
+      <SwiftUIForward size={28} fill="currentColor" />
     </button>
 
     <button 
