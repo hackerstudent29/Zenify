@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/models/models.dart';
 import 'providers/library_providers.dart';
 import 'package:go_router/go_router.dart';
 
@@ -44,7 +41,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -58,7 +55,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               shape: BoxShape.circle,
             ),
             child: IconButton(
@@ -186,14 +183,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     width: 64,
                     height: 64,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2), // dashed in react, using solid here for simplicity
+                        color: Colors.white.withValues(alpha: 0.2), // dashed in react, using solid here for simplicity
                         width: 2,
                       ),
                     ),
-                    child: Icon(LucideIcons.plus, color: Colors.white.withOpacity(0.5), size: 28),
+                    child: Icon(LucideIcons.plus, color: Colors.white.withValues(alpha: 0.5), size: 28),
                   ),
                   title: const Text('Create playlist', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                   subtitle: const Text('Curate your own collection', style: TextStyle(color: Color(0xFF71717A), fontSize: 12)),
@@ -221,7 +218,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 ),
                 title: Text(playlist.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: const Text('Playlist', style: TextStyle(color: Color(0xFF71717A), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: Icon(LucideIcons.chevronRight, color: Colors.white.withOpacity(0.2), size: 18),
+                trailing: Icon(LucideIcons.chevronRight, color: Colors.white.withValues(alpha: 0.2), size: 18),
                 onTap: () {},
               ),
             );
@@ -255,9 +252,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFFE11D48).withOpacity(0.1),
+                color: const Color(0xFFE11D48).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE11D48).withOpacity(0.2)),
+                border: Border.all(color: const Color(0xFFE11D48).withValues(alpha: 0.2)),
               ),
               child: const Icon(LucideIcons.lock, color: Color(0xFFE11D48), size: 40),
             ),
@@ -276,7 +273,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               'Sign in to sync your library, create playlists, like your favorite songs, and customize your experience.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 14,
                 height: 1.5,
               ),
@@ -294,7 +291,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                   elevation: 5,
-                  shadowColor: const Color(0xFFE11D48).withOpacity(0.4),
+                  shadowColor: const Color(0xFFE11D48).withValues(alpha: 0.4),
                 ),
                 child: const Text(
                   'Sign In / Sign Up',

@@ -101,12 +101,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -118,10 +118,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Search for anything...',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14),
                     prefixIcon: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      child: Icon(LucideIcons.search, color: Colors.white.withOpacity(0.4), size: 18),
+                      child: Icon(LucideIcons.search, color: Colors.white.withValues(alpha: 0.4), size: 18),
                     ),
                     prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                     suffixIcon: Padding(
@@ -132,7 +132,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           color: Colors.transparent,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(LucideIcons.sparkles, color: const Color(0xFFE11D48).withOpacity(0.5), size: 16),
+                        child: Icon(LucideIcons.sparkles, color: const Color(0xFFE11D48).withValues(alpha: 0.5), size: 16),
                       ),
                     ),
                     suffixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
@@ -186,7 +186,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: (genre["color"] as Color).withOpacity(0.2),
+                      color: (genre["color"] as Color).withValues(alpha: 0.2),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     )
@@ -215,11 +215,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           width: 65,
                           height: 65,
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(8),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
+                                color: Colors.black.withValues(alpha: 0.3),
                                 blurRadius: 10,
                               )
                             ]
@@ -246,7 +246,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return Center(
         child: Text(
           'No results found for "${_searchController.text}"',
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
         ),
       );
     }
@@ -276,8 +276,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.02),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
+              color: Colors.white.withValues(alpha: 0.02),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -288,14 +288,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF18181B),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                     image: imageUrl != null ? DecorationImage(
                       image: CachedNetworkImageProvider(imageUrl),
                       fit: BoxFit.cover,
                     ) : null,
                   ),
                   child: imageUrl == null
-                      ? Icon(LucideIcons.music, color: Colors.white.withOpacity(0.2), size: 20)
+                      ? Icon(LucideIcons.music, color: Colors.white.withValues(alpha: 0.2), size: 20)
                       : null,
                 ),
                 const SizedBox(width: 16),
@@ -317,7 +317,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       Text(
                         subtitle,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                           fontWeight: FontWeight.w600,
                           fontSize: 11,
                         ),
@@ -327,7 +327,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ],
                   ),
                 ),
-                Icon(LucideIcons.moreHorizontal, color: Colors.white.withOpacity(0.4), size: 16),
+                Icon(LucideIcons.moreHorizontal, color: Colors.white.withValues(alpha: 0.4), size: 16),
               ],
             ),
           ),

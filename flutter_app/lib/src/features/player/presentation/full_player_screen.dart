@@ -217,8 +217,8 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                               center: const Alignment(-0.5, -0.5),
                               radius: 1.5,
                               colors: [
-                                _dominantColor.withOpacity(0.55 * widget.percentage),
-                                Colors.black.withOpacity(widget.percentage),
+                                _dominantColor.withValues(alpha: 0.55 * widget.percentage),
+                                Colors.black.withValues(alpha: widget.percentage),
                               ],
                             ),
                           ),
@@ -244,7 +244,7 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                             width: 40,
                             height: 4,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
@@ -450,9 +450,9 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                                         data: SliderThemeData(
                                           trackHeight: 6,
                                           activeTrackColor: const Color(0xFFF43F5E),
-                                          inactiveTrackColor: Colors.white.withOpacity(0.15),
+                                          inactiveTrackColor: Colors.white.withValues(alpha: 0.15),
                                           thumbColor: const Color(0xFFF43F5E),
-                                          overlayColor: const Color(0xFFF43F5E).withOpacity(0.1),
+                                          overlayColor: const Color(0xFFF43F5E).withValues(alpha: 0.1),
                                           thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
                                           overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
                                         ),
@@ -471,11 +471,11 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
                                           children: [
                                             Text(
                                               _formatDuration(currentPos), 
-                                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                                             ),
                                             Text(
                                               '-${_formatDuration(remainingPos > Duration.zero ? remainingPos : Duration.zero)}', 
-                                              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
                                             ),
                                           ],
                                         ),
@@ -601,7 +601,7 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             blurRadius: 30,
             offset: const Offset(0, 15),
           )
@@ -632,12 +632,12 @@ class _FullScreenPlayerState extends ConsumerState<FullScreenPlayer> with Single
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.35),
+        color: Colors.black.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.08), width: 0.8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 0.8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 20,
             offset: const Offset(0, 10),
           )

@@ -230,7 +230,7 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
                           height: 1.4,
                           shadows: isActive ? [
                             Shadow(
-                              color: Colors.black.withOpacity(0.5),
+                              color: Colors.black.withValues(alpha: 0.5),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             )
@@ -288,7 +288,7 @@ class _ActiveLyricLineWidgetState extends State<ActiveLyricLineWidget> {
             return LinearGradient(
               colors: [
                 const Color(0xFFF43F5E), // filled: rose
-                Colors.white.withOpacity(0.4), // unfilled: translucent white
+                Colors.white.withValues(alpha: 0.4), // unfilled: translucent white
               ],
               stops: [
                 progress,

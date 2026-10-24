@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:math' as math;
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -36,7 +35,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Center(
         child: Text(
           '$id settings coming soon...',
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
         ),
       ),
     );
@@ -68,9 +67,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF18181B), // zinc-900
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 4)),
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10, offset: const Offset(0, 4)),
                       ],
                     ),
                     child: Center(
@@ -93,7 +92,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                         Text(
                           email,
-                          style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.3)),
+                          style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.3)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -108,9 +107,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       height: 36,
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
+                        color: Colors.white.withValues(alpha: 0.05),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                       ),
                       child: const Center(
                         child: Icon(LucideIcons.settings, color: Colors.white, size: 15),
@@ -123,9 +122,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF43F5E).withOpacity(0.1), // rose-500/10
+                        color: const Color(0xFFF43F5E).withValues(alpha: 0.1), // rose-500/10
                         shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFFF43F5E).withOpacity(0.2)),
+                        border: Border.all(color: const Color(0xFFF43F5E).withValues(alpha: 0.2)),
                       ),
                       child: const Center(
                         child: Icon(LucideIcons.logOut, color: Color(0xFFF43F5E), size: 15),
@@ -143,26 +142,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 final isDanger = section['isDanger'] as bool;
                 
                 final borderColor = isOpen
-                    ? (isDanger ? const Color(0xFFF43F5E).withOpacity(0.3) : Colors.white.withOpacity(0.1))
-                    : Colors.white.withOpacity(0.05);
+                    ? (isDanger ? const Color(0xFFF43F5E).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1))
+                    : Colors.white.withValues(alpha: 0.05);
                 final bgColor = isOpen
-                    ? (isDanger ? Colors.black : Colors.white.withOpacity(0.05))
-                    : Colors.white.withOpacity(0.02);
+                    ? (isDanger ? Colors.black : Colors.white.withValues(alpha: 0.05))
+                    : Colors.white.withValues(alpha: 0.02);
 
                 final iconBg = isOpen
                     ? (isDanger ? Colors.black : const Color(0xFF18181B)) // zinc-900
-                    : Colors.white.withOpacity(0.08); // white/8
+                    : Colors.white.withValues(alpha: 0.08); // white/8
                 final iconColor = isOpen
                     ? (isDanger ? const Color(0xFFF43F5E) : const Color(0xFFE11D48)) // text-rose-500 or text-brand
-                    : const Color(0xFFE11D48).withOpacity(0.5); // text-brand/50
+                    : const Color(0xFFE11D48).withValues(alpha: 0.5); // text-brand/50
 
                 final iconBorderColor = isOpen && isDanger
-                    ? const Color(0xFFF43F5E).withOpacity(0.2)
+                    ? const Color(0xFFF43F5E).withValues(alpha: 0.2)
                     : Colors.transparent;
 
                 final textColor = isOpen
                     ? (isDanger ? const Color(0xFFF43F5E) : Colors.white)
-                    : Colors.white.withOpacity(0.5);
+                    : Colors.white.withValues(alpha: 0.5);
 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -211,7 +210,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               AnimatedRotation(
                                 turns: isOpen ? 0.5 : 0,
                                 duration: const Duration(milliseconds: 200),
-                                child: Icon(LucideIcons.chevronDown, color: Colors.white.withOpacity(0.2), size: 16),
+                                child: Icon(LucideIcons.chevronDown, color: Colors.white.withValues(alpha: 0.2), size: 16),
                               ),
                             ],
                           ),
@@ -222,7 +221,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         secondChild: Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05))),
+                            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
                           ),
                           child: _buildContent(id),
                         ),
@@ -232,7 +231,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         ),

@@ -233,9 +233,9 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE11D48).withOpacity(0.1),
+                      color: const Color(0xFFE11D48).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE11D48).withOpacity(0.2)),
+                      border: Border.all(color: const Color(0xFFE11D48).withValues(alpha: 0.2)),
                     ),
                     child: const Icon(LucideIcons.fileAudio, color: Color(0xFFE11D48), size: 24),
                   ),
@@ -338,11 +338,11 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.02),
+                color: Colors.white.withValues(alpha: 0.02),
                 borderRadius: BorderRadius.circular(100),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
               ),
-              child: Icon(LucideIcons.music, color: Colors.white.withOpacity(0.15), size: 48),
+              child: Icon(LucideIcons.music, color: Colors.white.withValues(alpha: 0.15), size: 48),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -353,7 +353,7 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
             Text(
               'Scan standard directories or tap Import to select audio files from your phone storage.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13, height: 1.5),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13, height: 1.5),
             ),
           ],
         ),
@@ -373,8 +373,8 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.02),
-            border: Border.all(color: Colors.white.withOpacity(0.04)),
+            color: Colors.white.withValues(alpha: 0.02),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
             borderRadius: BorderRadius.circular(16),
           ),
           child: ListTile(
@@ -384,9 +384,9 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
+                color: Colors.white.withValues(alpha: 0.04),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
               child: const Icon(LucideIcons.fileAudio, color: Colors.white30, size: 20),
             ),
@@ -401,7 +401,7 @@ class _LocalFilesScreenState extends ConsumerState<LocalFilesScreen> {
               style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w500),
             ),
             trailing: IconButton(
-              icon: Icon(LucideIcons.trash2, color: Colors.white.withOpacity(0.2), size: 18),
+              icon: Icon(LucideIcons.trash2, color: Colors.white.withValues(alpha: 0.2), size: 18),
               onPressed: () => _removeFile(index),
             ),
           ),
@@ -435,12 +435,12 @@ class _ActionCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.02),
-          border: Border.all(color: Colors.white.withOpacity(0.05)),
+          color: Colors.white.withValues(alpha: 0.02),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 5),
             )
@@ -452,7 +452,7 @@ class _ActionCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: isLoading
@@ -471,7 +471,7 @@ class _ActionCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               subtitle,
-              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
             ),
           ],
         ),

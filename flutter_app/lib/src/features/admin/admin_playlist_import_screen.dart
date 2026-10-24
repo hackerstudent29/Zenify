@@ -32,9 +32,9 @@ class AdminPlaylistImportScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFE11D48).withOpacity(0.1),
+                color: const Color(0xFFE11D48).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE11D48).withOpacity(0.2)),
+                border: Border.all(color: const Color(0xFFE11D48).withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
@@ -43,7 +43,7 @@ class AdminPlaylistImportScreen extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Batch Intake automatically downloads and ingests metadata from Spotify playlists.',
-                      style: TextStyle(color: const Color(0xFFE11D48).withOpacity(0.8), fontSize: 12),
+                      style: TextStyle(color: const Color(0xFFE11D48).withValues(alpha: 0.8), fontSize: 12),
                     ),
                   ),
                 ],
@@ -59,10 +59,10 @@ class AdminPlaylistImportScreen extends StatelessWidget {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'https://open.spotify.com/playlist/...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
                 prefixIcon: const Icon(LucideIcons.link, color: Colors.white54, size: 18),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
+                fillColor: Colors.white.withValues(alpha: 0.05),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
             ),

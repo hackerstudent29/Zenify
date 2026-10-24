@@ -61,12 +61,12 @@ class PlaylistDetailScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.8),
+                              color: Colors.black.withValues(alpha: 0.8),
                               blurRadius: 50,
                               offset: const Offset(0, 20),
                             )
                           ],
-                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                           image: fullPlaylist.coverUrl != null ? DecorationImage(
                             image: CachedNetworkImageProvider(fullPlaylist.coverUrl!),
                             fit: BoxFit.cover,
@@ -127,15 +127,15 @@ class PlaylistDetailScreen extends ConsumerWidget {
                             ),
                           Text(
                             fullPlaylist.user?.name ?? 'User',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.8)),
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.8)),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                            child: Text('•', style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.4))),
+                            child: Text('•', style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.4))),
                           ),
                           Text(
                             '$trackCount tracks',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white.withOpacity(0.4)),
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white.withValues(alpha: 0.4)),
                           ),
                         ],
                       ),
@@ -158,7 +158,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                                 minimumSize: const Size(0, 48),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
                                 ),
                               ),
                             ),
@@ -177,7 +177,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                                 minimumSize: const Size(0, 48),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(color: Colors.white.withOpacity(0.05)),
+                                  side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
                                 ),
                               ),
                             ),
@@ -189,7 +189,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                             decoration: BoxDecoration(
                               color: const Color(0xFF1C1C1E),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withOpacity(0.05)),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                             ),
                             child: IconButton(
                               icon: const Icon(LucideIcons.trash2, color: Color(0xFFEF4444), size: 20),
@@ -215,7 +215,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                         const SizedBox(height: 16),
                         const Text('This playlist is empty', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        Text('Go find some songs to add to your collection!', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14)),
+                        Text('Go find some songs to add to your collection!', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14)),
                       ],
                     ),
                   ),
@@ -238,13 +238,13 @@ class PlaylistDetailScreen extends ConsumerWidget {
                           child: Center(
                             child: Text(
                               '${index + 1}',
-                              style: TextStyle(color: Colors.white.withOpacity(0.2), fontWeight: FontWeight.bold, fontSize: 14),
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontWeight: FontWeight.bold, fontSize: 14),
                             ),
                           ),
                         ),
-                        title: Text(track.title, style: TextStyle(color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.bold, fontSize: 14)),
-                        subtitle: Text(track.artist?.name ?? 'Unknown Artist', style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w500)),
-                        trailing: Icon(LucideIcons.moreHorizontal, color: Colors.white.withOpacity(0.2), size: 20),
+                        title: Text(track.title, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.bold, fontSize: 14)),
+                        subtitle: Text(track.artist?.name ?? 'Unknown Artist', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12, fontWeight: FontWeight.w500)),
+                        trailing: Icon(LucideIcons.moreHorizontal, color: Colors.white.withValues(alpha: 0.2), size: 20),
                         onTap: () {
                           final handler = ref.read(audioHandlerProvider) as MyAudioHandler;
                           final newQueue = tracks.map((t) => MediaItem(

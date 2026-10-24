@@ -18,7 +18,6 @@ class AppTheme {
       primaryColor: brand,
       colorScheme: const ColorScheme.dark(
         primary: brand,
-        background: background,
         surface: surface,
         secondary: elevated,
       ),

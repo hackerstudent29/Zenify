@@ -189,11 +189,11 @@ export function LiquidBackground({
       18, 18, 20, 255,     18, 18, 20, 255,     18, 18, 20, 255
     ]);
 
-    // 3x3 Signature Crimson & Rose Matrix for authentic Zenify reactive liquid motion on Login & Auth pages
+    // 3x3 Signature Crimson, Vibrant Rose & Dark Obsidian Matrix for authentic Zenify fluid liquid motion on Auth pages
     const brandPixels = new Uint8Array([
-      244, 63, 94, 255,     225, 29, 72, 255,     158, 35, 57, 255,
-      225, 29, 72, 255,     251, 113, 133, 255,   244, 63, 94, 255,
-      158, 35, 57, 255,     244, 63, 94, 255,     225, 29, 72, 255
+      18, 18, 20, 255,      244, 63, 94, 255,    76, 5, 25, 255,
+      225, 29, 72, 255,     14, 14, 16, 255,     251, 113, 133, 255,
+      158, 35, 57, 255,     24, 24, 27, 255,     244, 63, 94, 255
     ]);
 
     const isBrandOrAuth = !coverUrl || coverUrl === '/logo.png' || coverUrl.includes('/logo.png');
