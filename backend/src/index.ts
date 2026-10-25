@@ -29,6 +29,7 @@ dns.setDefaultResultOrder('ipv4first');
 
 const server = fastify({
     trustProxy: true,
+    ignoreTrailingSlash: true,
     logger: {
         level: 'info',
         transport: {
