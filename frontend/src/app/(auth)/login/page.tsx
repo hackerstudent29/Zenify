@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -20,53 +20,73 @@ const SF_FONT =
   '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif';
 
 const viewVariants = {
-  initial: { opacity: 0, x: 28, scale: 0.98, filter: "blur(6px)" },
-  animate: { opacity: 1, x: 0, scale: 1, filter: "blur(0px)", transition: SOFT_SPRING },
-  exit: { opacity: 0, x: -28, scale: 0.98, filter: "blur(6px)", transition: { duration: 0.16 } },
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.32, 0.72, 0, 1] as any } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
 };
+
+/* Static helpers kept OUTSIDE the page component so they are never re-created (re-mounted) on each keystroke/tab switch */
+const MemoBackground = memo(function MemoBackground() {
+  return <DynamicBackground surface="other" coverUrl="/logo.png" />;
+});
+
+function InputIcon({ icon: Icon }: { icon: React.ElementType }) {
+  return <Icon className="pointer-events-none absolute left-3 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-zinc-400" />;
+}
+
+/* CSS-grid collapse: GPU-friendly, interruptible, no JS layout measuring (replaces height:"auto" animations) */
+const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+function Collapse({
+  open,
+  className,
+  hideTop,
+  hideBottom,
+  children,
+}: {
+  open: boolean;
+  className?: string;
+  hideTop?: boolean;
+  hideBottom?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="grid"
+      aria-hidden={!open}
+      {...(!open ? ({ inert: "" } as any) : {})}
+      style={{
+        gridTemplateRows: open ? "1fr" : "0fr",
+        opacity: open ? 1 : 0,
+        marginTop: !open && hideTop ? 0 : undefined,
+        marginBottom: !open && hideBottom ? -hideBottom : undefined,
+        transition: `grid-template-rows 300ms ${EASE}, opacity 200ms ease, margin 300ms ${EASE}`,
+      }}
+    >
+      <div className={cn("-mx-1 min-h-0 overflow-hidden px-1", className)}>{children}</div>
+    </div>
+  );
+}
 
 /* ---------- Small presentational helpers (look only) ---------- */
 function FieldError({ message }: { message?: string }) {
   return (
-    <AnimatePresence initial={false}>
-      {message && (
-        <motion.div
-          key={message}
-          initial={{ opacity: 0, height: 0, y: -4 }}
-          animate={{ opacity: 1, height: "auto", y: 0 }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={SPRING}
-          className="overflow-hidden"
-        >
-          <div className="flex items-center gap-1.5 pt-1.5 text-[11.5px] font-medium text-rose-300">
-            <AlertCircle className="h-3 w-3 shrink-0" />
-            <span>{message}</span>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <Collapse open={!!message} className="pt-1.5">
+      <div className="flex items-center gap-1.5 text-[11.5px] font-medium text-rose-300">
+        <AlertCircle className="h-3 w-3 shrink-0" />
+        <span>{message}</span>
+      </div>
+    </Collapse>
   );
 }
 
 function ErrorBanner({ message }: { message: string }) {
   return (
-    <AnimatePresence initial={false}>
-      {message && (
-        <motion.div
-          key="banner"
-          initial={{ opacity: 0, height: 0, scale: 0.96 }}
-          animate={{ opacity: 1, height: "auto", scale: 1 }}
-          exit={{ opacity: 0, height: 0, scale: 0.96 }}
-          transition={SPRING}
-          className="overflow-hidden"
-        >
-          <div className="flex items-start gap-2.5 rounded-xl border border-brand/40 bg-brand/10 px-3 py-2 text-[12px] font-medium text-rose-200 backdrop-blur-md">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-            <span className="leading-snug">{message}</span>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <Collapse open={!!message} hideTop>
+      <div className="flex items-start gap-2.5 rounded-xl border border-brand/40 bg-brand/10 px-3 py-2 text-[12px] font-medium text-rose-200">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+        <span className="leading-snug">{message}</span>
+      </div>
+    </Collapse>
   );
 }
 
@@ -385,15 +405,11 @@ function AuthPageContent() {
   /* ---------- Apple-style input ---------- */
   const getInputClass = (hasError?: boolean) =>
     cn(
-      "h-10 w-full rounded-xl border bg-black/50 pl-9 pr-4 text-[13px] font-medium text-white backdrop-blur-xl outline-none transition-all placeholder:text-zinc-400",
+      "h-10 w-full rounded-xl border bg-black/50 pl-9 pr-4 text-[13px] font-medium text-white outline-none transition-colors placeholder:text-zinc-400",
       hasError
         ? "border-brand/70 ring-1 ring-brand/40 focus:border-brand focus:ring-brand"
         : "border-white/20 focus:border-brand focus:ring-1 focus:ring-brand/50"
     );
-
-  const InputIcon = ({ icon: Icon }: { icon: React.ElementType }) => (
-    <Icon className="pointer-events-none absolute left-3 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-zinc-400" />
-  );
 
   const switchTab = (tab: "login" | "signup") => {
     setActiveTab(tab);
@@ -421,7 +437,7 @@ function AuthPageContent() {
         className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black antialiased"
       >
         <SEO title="Log In – Zenify" noindex={true} path="/login" />
-        <DynamicBackground surface="other" coverUrl="/logo.png" />
+        <MemoBackground />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/60" />
 
         {/* macOS window */}
@@ -431,11 +447,7 @@ function AuthPageContent() {
           transition={{ type: "spring", stiffness: 220, damping: 24, mass: 1 }}
           className="relative z-10 w-full max-w-[340px] px-5"
         >
-          <motion.div
-            layout
-            transition={SOFT_SPRING}
-            className=""
-          >
+          <motion.div className="">
             <div>
               {/* Header */}
               <div className="mb-3.5 flex flex-col items-center text-center">
@@ -443,57 +455,44 @@ function AuthPageContent() {
                   <ZenifyLogo size={44} animated={false} />
                 </div>
 
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={title}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.18 }}
-                  >
-                    <h1 className="text-[20px] font-bold leading-tight tracking-[-0.02em] text-white">{title}</h1>
-                    <p className="mt-0.5 text-[12.5px] text-zinc-300">{subtitle}</p>
-                  </motion.div>
-                </AnimatePresence>
+                <motion.div
+                  key={title}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <h1 className="text-[20px] font-bold leading-tight tracking-[-0.02em] text-white">{title}</h1>
+                  <p className="mt-0.5 text-[12.5px] text-zinc-300">{subtitle}</p>
+                </motion.div>
               </div>
 
               {/* Segmented control (macOS style) */}
-              <AnimatePresence initial={false}>
-                {!showForgotPassword && !isVerifyingEmail && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={SPRING}
-                    className="overflow-hidden"
-                  >
-                    <div className="relative mb-3.5 flex rounded-[10px] bg-white/[0.08] p-[3px]" role="tablist">
-                      {(["login", "signup"] as const).map((tab) => (
-                        <button
-                          key={tab}
-                          type="button"
-                          role="tab"
-                          aria-selected={activeTab === tab}
-                          onClick={() => switchTab(tab)}
-                          className={cn(
-                            "relative z-10 h-7 flex-1 cursor-pointer rounded-[8px] text-[12.5px] font-semibold transition-colors duration-200",
-                            activeTab === tab ? "text-white" : "text-white/55 hover:text-white/80"
-                          )}
-                        >
-                          {activeTab === tab && (
-                            <motion.span
-                              layoutId="segment-pill"
-                              transition={{ type: "spring", stiffness: 500, damping: 36 }}
-                              className="absolute inset-0 -z-10 rounded-[8px] bg-white/[0.18] shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_0.5px_0_rgba(255,255,255,0.25)]"
-                            />
-                          )}
-                          {tab === "login" ? "Sign In" : "Sign Up"}
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <Collapse open={!showForgotPassword && !isVerifyingEmail} className="pb-3.5">
+                <div className="relative flex rounded-[10px] bg-white/[0.08] p-[3px]" role="tablist">
+                  {(["login", "signup"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === tab}
+                      onClick={() => switchTab(tab)}
+                      className={cn(
+                        "relative z-10 h-7 flex-1 cursor-pointer rounded-[8px] text-[12.5px] font-semibold transition-colors duration-200",
+                        activeTab === tab ? "text-white" : "text-white/55 hover:text-white/80"
+                      )}
+                    >
+                      {activeTab === tab && (
+                        <motion.span
+                          layoutId="segment-pill"
+                          transition={{ type: "spring", stiffness: 500, damping: 36 }}
+                          className="absolute inset-0 -z-10 rounded-[8px] bg-white/[0.18] shadow-[0_2px_8px_rgba(0,0,0,0.3),inset_0_0.5px_0_rgba(255,255,255,0.25)]"
+                        />
+                      )}
+                      {tab === "login" ? "Sign In" : "Sign Up"}
+                    </button>
+                  ))}
+                </div>
+              </Collapse>
 
               {/* Views */}
               <AnimatePresence mode="wait" initial={false}>
@@ -570,54 +569,44 @@ function AuthPageContent() {
                           <FieldError message={fieldErrors.email} />
                         </div>
 
-                        <AnimatePresence initial={false}>
-                          {resetStep === "verify" && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={SPRING}
-                              className="space-y-2.5"
-                            >
-                              <div>
-                                <Label>Code</Label>
-                                <div className="relative">
-                                  <InputIcon icon={KeyRound} />
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={otp}
-                                    onChange={(e) => {
-                                      setOtp(e.target.value);
-                                      clearFieldError("otp");
-                                    }}
-                                    placeholder="000000"
-                                    maxLength={6}
-                                    className={cn(getInputClass(!!fieldErrors.otp), "text-center font-mono tracking-[0.4em]")}
-                                  />
-                                </div>
-                                <FieldError message={fieldErrors.otp} />
-                              </div>
-                              <div>
-                                <Label>New Password</Label>
-                                <div className="relative">
-                                  <InputIcon icon={Lock} />
-                                  <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => {
-                                      setPassword(e.target.value);
-                                      clearFieldError("password");
-                                    }}
-                                    placeholder="••••••••"
-                                    className={getInputClass(!!fieldErrors.password)}
-                                  />
-                                </div>
-                                <FieldError message={fieldErrors.password} />
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                        <Collapse open={resetStep === "verify"} hideTop className="space-y-2.5">
+                          <div>
+                            <Label>Code</Label>
+                            <div className="relative">
+                              <InputIcon icon={KeyRound} />
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={otp}
+                                onChange={(e) => {
+                                  setOtp(e.target.value);
+                                  clearFieldError("otp");
+                                }}
+                                placeholder="000000"
+                                maxLength={6}
+                                className={cn(getInputClass(!!fieldErrors.otp), "text-center font-mono tracking-[0.4em]")}
+                              />
+                            </div>
+                            <FieldError message={fieldErrors.otp} />
+                          </div>
+                          <div>
+                            <Label>New Password</Label>
+                            <div className="relative">
+                              <InputIcon icon={Lock} />
+                              <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => {
+                                  setPassword(e.target.value);
+                                  clearFieldError("password");
+                                }}
+                                placeholder="••••••••"
+                                className={getInputClass(!!fieldErrors.password)}
+                              />
+                            </div>
+                            <FieldError message={fieldErrors.password} />
+                          </div>
+                        </Collapse>
                       </div>
 
                       <ErrorBanner message={error} />
@@ -640,34 +629,23 @@ function AuthPageContent() {
                   ) : (
                     <form onSubmit={handleSubmit} noValidate className="space-y-3">
                       <div className="space-y-2.5">
-                        <AnimatePresence initial={false}>
-                          {activeTab === "signup" && (
-                            <motion.div
-                              key="name"
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={SPRING}
-                              className="overflow-hidden"
-                            >
-                              <Label>Name</Label>
-                              <div className="relative">
-                                <InputIcon icon={User} />
-                                <input
-                                  type="text"
-                                  value={name}
-                                  onChange={(e) => {
-                                    setName(e.target.value);
-                                    clearFieldError("name");
-                                  }}
-                                  placeholder="Your name"
-                                  className={getInputClass(!!fieldErrors.name)}
-                                />
-                              </div>
-                              <FieldError message={fieldErrors.name} />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                        <Collapse open={activeTab === "signup"} hideBottom={10}>
+                          <Label>Name</Label>
+                          <div className="relative">
+                            <InputIcon icon={User} />
+                            <input
+                              type="text"
+                              value={name}
+                              onChange={(e) => {
+                                setName(e.target.value);
+                                clearFieldError("name");
+                              }}
+                              placeholder="Your name"
+                              className={getInputClass(!!fieldErrors.name)}
+                            />
+                          </div>
+                          <FieldError message={fieldErrors.name} />
+                        </Collapse>
 
                         <div>
                           <Label>Email</Label>
@@ -743,71 +721,60 @@ function AuthPageContent() {
                           <FieldError message={fieldErrors.password} />
                         </div>
 
-                        <AnimatePresence initial={false}>
-                          {activeTab === "signup" && (
-                            <motion.div
-                              key="terms"
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={SPRING}
-                              className="overflow-hidden"
-                            >
-                              <label className="group flex cursor-pointer select-none items-center gap-2.5">
-                                <div className="relative flex shrink-0 items-center justify-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={agreedToTerms}
-                                    onChange={(e) => {
-                                      setAgreedToTerms(e.target.checked);
-                                      clearFieldError("terms");
-                                    }}
-                                    className="peer sr-only"
-                                  />
-                                  <motion.div
-                                    animate={{ scale: agreedToTerms ? [1, 1.18, 1] : 1 }}
-                                    transition={{ type: "spring", stiffness: 500, damping: 18 }}
-                                    className={cn(
-                                      "flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border transition-colors duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#fa243c]/60",
-                                      agreedToTerms
-                                        ? "border-[#fa243c] bg-[#fa243c]"
-                                        : "border-white/30 bg-white/[0.06] group-hover:border-white/50"
-                                    )}
-                                  >
-                                    <motion.span
-                                      initial={false}
-                                      animate={{ scale: agreedToTerms ? 1 : 0, opacity: agreedToTerms ? 1 : 0 }}
-                                      transition={{ type: "spring", stiffness: 600, damping: 22 }}
-                                    >
-                                      <Check className="h-3 w-3 text-white" strokeWidth={3.5} />
-                                    </motion.span>
-                                  </motion.div>
-                                </div>
-                                <span className="text-[12.5px] leading-tight text-white/60">
-                                  I agree to the{" "}
-                                  <a
-                                    href="/terms"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-semibold text-brand hover:underline"
-                                  >
-                                    Terms
-                                  </a>{" "}
-                                  &amp;{" "}
-                                  <a
-                                    href="/privacy"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-semibold text-brand hover:underline"
-                                  >
-                                    Privacy Policy
-                                  </a>
-                                </span>
-                              </label>
-                              <FieldError message={fieldErrors.terms} />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                        <Collapse open={activeTab === "signup"} hideTop>
+                          <label className="group flex cursor-pointer select-none items-center gap-2.5">
+                            <div className="relative flex shrink-0 items-center justify-center">
+                              <input
+                                type="checkbox"
+                                checked={agreedToTerms}
+                                onChange={(e) => {
+                                  setAgreedToTerms(e.target.checked);
+                                  clearFieldError("terms");
+                                }}
+                                className="peer sr-only"
+                              />
+                              <motion.div
+                                animate={{ scale: agreedToTerms ? [1, 1.18, 1] : 1 }}
+                                transition={{ type: "spring", stiffness: 500, damping: 18 }}
+                                className={cn(
+                                  "flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border transition-colors duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-[#fa243c]/60",
+                                  agreedToTerms
+                                    ? "border-[#fa243c] bg-[#fa243c]"
+                                    : "border-white/30 bg-white/[0.06] group-hover:border-white/50"
+                                )}
+                              >
+                                <motion.span
+                                  initial={false}
+                                  animate={{ scale: agreedToTerms ? 1 : 0, opacity: agreedToTerms ? 1 : 0 }}
+                                  transition={{ type: "spring", stiffness: 600, damping: 22 }}
+                                >
+                                  <Check className="h-3 w-3 text-white" strokeWidth={3.5} />
+                                </motion.span>
+                              </motion.div>
+                            </div>
+                            <span className="text-[12.5px] leading-tight text-white/60">
+                              I agree to the{" "}
+                              <a
+                                href="/terms"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-brand hover:underline"
+                              >
+                                Terms
+                              </a>{" "}
+                              &amp;{" "}
+                              <a
+                                href="/privacy"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-brand hover:underline"
+                              >
+                                Privacy Policy
+                              </a>
+                            </span>
+                          </label>
+                          <FieldError message={fieldErrors.terms} />
+                        </Collapse>
                       </div>
 
                       <ErrorBanner message={error} />
@@ -830,7 +797,7 @@ function AuthPageContent() {
                           whileHover={{ scale: 1.015 }}
                           whileTap={{ scale: 0.97 }}
                           transition={SPRING}
-                          className="flex h-10 w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border border-white/20 bg-white/10 px-4 text-[13px] font-semibold text-white shadow-md backdrop-blur-md transition-colors hover:bg-white/15 disabled:opacity-60"
+                          className="flex h-10 w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border border-white/20 bg-white/10 px-4 text-[13px] font-semibold text-white shadow-md transition-colors hover:bg-white/15 disabled:opacity-60"
                         >
                           {isGoogleLoading ? (
                             <>
