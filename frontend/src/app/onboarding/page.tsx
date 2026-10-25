@@ -177,7 +177,12 @@ const ArtistBubble = memo(function ArtistBubble({
           height={120}
           loading="lazy"
           decoding="async"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).src = avatar(artist.name); }}
+          onError={(e) => {
+            const img = e.currentTarget;
+            if (img.dataset.fallback) return;
+            img.dataset.fallback = "1";
+            img.src = avatar(artist.name);
+          }}
           className="h-full w-full rounded-full bg-white/10 object-cover"
         />
         <AnimatePresence initial={false}>
@@ -324,15 +329,25 @@ export default function OnboardingPage() {
     if (suggestedKey.current === key) return;
     suggestedKey.current = key;
     let alive = true;
+    let done = false;
     setIsSuggestedLoading(true);
     api
       .get("/preferences/artists/suggested", {
         params: { languages: selectedLanguages.join(","), genres: selectedGenres.join(",") },
       })
-      .then((res) => alive && setSuggested((res.data || []).map(toArtist)))
-      .catch((err) => console.warn("Failed to load suggested artists:", err))
+      .then((res) => {
+        done = true;
+        if (alive) setSuggested((res.data || []).map(toArtist));
+      })
+      .catch((err) => {
+        suggestedKey.current = ""; // lets it retry next time step 3 opens
+        console.warn("Failed to load suggested artists:", err);
+      })
       .finally(() => alive && setIsSuggestedLoading(false));
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      if (!done) suggestedKey.current = ""; // request was cancelled (Strict Mode or step change)
+    };
   }, [step, selectedLanguages, selectedGenres]);
 
   /* ── live artist search: 250ms debounce, cancels older requests ── */
@@ -736,7 +751,20 @@ export default function OnboardingPage() {
                                 transition={POP}
                                 className="relative h-11 w-11 shrink-0 touch-manipulation"
                               >
-                                <img src={a.image} alt="" width={44} height={44} decoding="async" className="h-full w-full rounded-full bg-white/10 object-cover" />
+                                <img
+                                  src={a.image}
+                                  alt=""
+                                  width={44}
+                                  height={44}
+                                  decoding="async"
+                                  onError={(e) => {
+                                    const img = e.currentTarget;
+                                    if (img.dataset.fallback) return;
+                                    img.dataset.fallback = "1";
+                                    img.src = avatar(a.name);
+                                  }}
+                                  className="h-full w-full rounded-full bg-white/10 object-cover"
+                                />
                                 <span className="absolute -right-1 -top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-zinc-800 text-white ring-2 ring-[#121214]">
                                   <X size={10} weight="bold" />
                                 </span>
