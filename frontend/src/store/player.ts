@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { audioEngine } from "@/lib/audio-engine";
+import { audioEngine, DEFAULT_AUDIO_FX, type AudioFxSettings } from "@/lib/audio-engine";
 
 export interface Artist {
   id: string;
@@ -84,16 +84,7 @@ interface PlayerState {
   volume: number;
   currentTime: number;
   duration: number;
-  audioFx: {
-    eq: number[];
-    reverb: string;
-    is8D: boolean;
-    direction8D: "clockwise" | "counter-clockwise";
-    speed8D: number;
-    speed: number;
-    pitch: number;
-    crossfade: number;
-  };
+  audioFx: AudioFxSettings;
 
   // Modern 3-tier queue actions
   setTrack: (track: Track, contextTracks?: Track[], contextName?: string) => void;
@@ -230,16 +221,7 @@ export const usePlayerStore = create<PlayerState>()(
       volume: 1,
       currentTime: 0,
       duration: 0,
-      audioFx: {
-        eq: [0, 0, 0],
-        reverb: "none",
-        is8D: false,
-        direction8D: "clockwise",
-        speed8D: 0.15,
-        speed: 1,
-        pitch: 1,
-        crossfade: 5,
-      },
+      audioFx: { ...DEFAULT_AUDIO_FX, eq: [0, 0, 0] },
 
       setTrack: (track, contextTracks, contextName) => {
         try { audioEngine.resume(); } catch (e) {}
@@ -727,6 +709,14 @@ export const usePlayerStore = create<PlayerState>()(
     {
       name: "player-storage",
       version: 7,
+      merge: (persisted, current) => {
+        const p = (persisted as Partial<PlayerState>) || {};
+        return {
+          ...current,
+          ...p,
+          audioFx: { ...DEFAULT_AUDIO_FX, ...(p.audioFx || {}) },
+        };
+      },
       partialize: (state) => ({
         volume: state.volume,
         repeatMode: state.repeatMode,
