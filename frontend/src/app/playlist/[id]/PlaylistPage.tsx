@@ -147,8 +147,8 @@ export default function PlaylistDetailPage() {
  const [isEditCoverModalOpen, setIsEditCoverModalOpen] = React.useState(false);
 
  const handlePlayPlaylist = () => {
- if (!playlist || playlist.tracks.length === 0) return;
- const tracks = playlist.tracks.map((t: any) => t.track || t);
+ if (!playlist || !playlist.tracks || playlist.tracks.length === 0) return;
+ const tracks = (playlist.tracks || []).map((t: any) => t.track || t);
  // Set queue and play first
  useUIStore.getState().setPlayerMinimized(false);
  setQueue(tracks);
@@ -156,14 +156,14 @@ export default function PlaylistDetailPage() {
  };
 
  const handleShufflePlay = () => {
- if (!playlist || playlist.tracks.length === 0) return;
+ if (!playlist || !playlist.tracks || playlist.tracks.length === 0) return;
  
  if (isPlaylistActive) {
  toggleShuffle();
  return;
  }
  
- const tracks = playlist.tracks.map((t: any) => t.track || t);
+ const tracks = (playlist.tracks || []).map((t: any) => t.track || t);
  useUIStore.getState().setPlayerMinimized(false);
  
  if (!isShuffled) {
@@ -182,7 +182,7 @@ export default function PlaylistDetailPage() {
   const handlePlayTrack = (track: any) => {
     if (window.getSelection()?.toString()) return;
     if (!playlist) return;
-    const tracks = playlist.tracks.map((t: any) => t.track || t);
+    const tracks = (playlist.tracks || []).map((t: any) => t.track || t);
     useUIStore.getState().setPlayerMinimized(false);
     if (isTrackMatch(currentTrack, track)) {
       togglePlay();
@@ -244,14 +244,14 @@ export default function PlaylistDetailPage() {
  <span className="font-sans text-sm font-medium text-white/80">{playlist.user?.username || playlist.user?.name || "User"}</span>
  </div>
  <span>•</span>
- <span>{playlist.tracks.length} tracks</span>
+ <span>{(playlist.tracks || []).length} tracks</span>
  </div>
 
  <div className="flex items-center justify-center sm:justify-start gap-4 flex-wrap">
           {/* Play / Pause pill */}
           <button
             onClick={() => {
-              if (!playlist || playlist.tracks.length === 0) {
+              if (!playlist || !playlist.tracks || playlist.tracks.length === 0) {
                 showToast("This playlist has no tracks yet", "error");
                 return;
               }
@@ -276,7 +276,7 @@ export default function PlaylistDetailPage() {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (!playlist || playlist.tracks.length === 0) {
+              if (!playlist || !playlist.tracks || playlist.tracks.length === 0) {
                 showToast("This playlist has no tracks yet", "error");
                 return;
               }
@@ -328,11 +328,11 @@ export default function PlaylistDetailPage() {
                 </>
               )}
               <DropdownMenuItem onClick={() => {
-                if (!playlist || playlist.tracks.length === 0) {
+                if (!playlist || !playlist.tracks || playlist.tracks.length === 0) {
                   showToast("This playlist has no tracks yet", "error");
                   return;
                 }
-                const tracks = playlist.tracks.map((t: any) => t.track || t);
+                const tracks = (playlist.tracks || []).map((t: any) => t.track || t);
                 usePlayerStore.getState().addToUserQueue(tracks, { contextName: playlist.name });
               }}>
                 <ListPlus size={14} className="mr-2 text-brand" />
@@ -376,7 +376,7 @@ export default function PlaylistDetailPage() {
  {/* ── TRACK LIST ────────────────────────────────────── */}
  <div className="w-full px-4 md:px-10 mt-6">
  <div className="flex flex-col space-y-0.5">
-  {playlist.tracks.map((item, index) => {
+  {(playlist.tracks || []).map((item, index) => {
   const track = item.track || item;
   const isActive = isTrackMatch(currentTrack, track);
   const isTrackPlaying = isActive && isPlaying;
@@ -501,7 +501,7 @@ export default function PlaylistDetailPage() {
  </div>
  );
  })}
- {playlist.tracks.length === 0 && (
+ {(!playlist.tracks || playlist.tracks.length === 0) && (
  <div className="flex flex-col items-center justify-center py-20 text-center">
  <Music size={48} className="text-zinc-700 mb-4 opacity-20" />
  <h3 className="text-lg font-bold text-white mb-2">This playlist is empty</h3>

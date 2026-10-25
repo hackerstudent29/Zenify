@@ -174,7 +174,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     : (isMobile ? "clamp(18px, 4.5vw, 22px)" : "clamp(20px, 2vw, 24px)");
   const origin = isFullscreen ? "left center" : "center center";
 
-  if (isInterlude) {
+  if (isInterlude || (text && text.trim() === '• • •')) {
     return (
       <GapDots
         isCurrent={isCurrent}
@@ -183,6 +183,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         lineEndTime={lineEndTime}
         smoothTimeValue={smoothTimeValue}
         targetOpacity={targetOpacity}
+        isFullscreen={isFullscreen}
       />
     );
   }
@@ -460,7 +461,8 @@ function GapDots({
   lineStartTime,
   lineEndTime,
   smoothTimeValue,
-  targetOpacity
+  targetOpacity,
+  isFullscreen,
 }: {
   isCurrent: boolean;
   isPast: boolean;
@@ -468,6 +470,7 @@ function GapDots({
   lineEndTime: number;
   smoothTimeValue: any;
   targetOpacity: number;
+  isFullscreen?: boolean;
 }) {
   const [progress, setProgress] = React.useState(isPast ? 1 : 0);
 
@@ -481,32 +484,46 @@ function GapDots({
     setProgress(p);
   });
 
-  // 3-dot Apple-style progressive fill: dot 1 (0-33%), dot 2 (33-66%), dot 3 (66-100%)
-  const getDotStyles = (i: number) => {
-    const minP = i * 0.33;
-    const maxP = (i + 1) * 0.33;
-    let localP = 0;
-    if (progress >= maxP) localP = 1;
-    else if (progress <= minP) localP = 0;
-    else localP = (progress - minP) / 0.33;
-
-    const s = 0.75 + localP * 0.55;
-    const o = 0.35 + localP * 0.65;
-    return {
-      "--s": String(s),
-      "--o": String(o),
-    } as React.CSSProperties;
-  };
-
   return (
     <div
-      className="gap-dots flex gap-2.5 items-center w-full justify-center py-3 select-none"
-      style={{ opacity: targetOpacity }}
+      data-lyrics-line="true"
+      className={cn(
+        "flex gap-3 items-center py-4 select-none my-1",
+        isFullscreen ? "justify-start pl-1" : "justify-center w-full"
+      )}
+      style={{
+        opacity: isCurrent ? 1 : Math.max(0.35, targetOpacity),
+        transition: "opacity 300ms ease"
+      }}
     >
-      {[0, 1, 2].map((i) => (
-        <span key={i} style={getDotStyles(i)} />
-      ))}
+      {[0, 1, 2].map((i) => {
+        const minP = i * 0.33;
+        const maxP = (i + 1) * 0.33;
+        let localP = 0;
+        if (isPast) {
+          localP = 1;
+        } else if (isCurrent) {
+          if (progress >= maxP) localP = 1;
+          else if (progress <= minP) localP = 0;
+          else localP = (progress - minP) / 0.33;
+        }
+
+        const scale = isCurrent ? 0.9 + localP * 0.35 : 0.85;
+        const opacity = isPast ? 0.35 : (isCurrent ? 0.35 + localP * 0.65 : 0.25);
+        const glow = isCurrent && localP > 0.3 ? "0 0 14px rgba(255,255,255,0.85), 0 0 4px rgba(255,255,255,0.95)" : "none";
+
+        return (
+          <span
+            key={i}
+            className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-white transition-all duration-150 inline-block shrink-0 shadow-sm"
+            style={{
+              transform: `scale(${scale})`,
+              opacity,
+              boxShadow: glow
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
-
