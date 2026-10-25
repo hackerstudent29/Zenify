@@ -121,6 +121,8 @@ export function SettingsWindow({
   backLabel = "Settings",
   reducedMotion = false,
   scrollKey,
+  isOpen,
+  onClose,
   children,
 }: {
   title: string;
@@ -130,14 +132,22 @@ export function SettingsWindow({
   backLabel?: string;
   reducedMotion?: boolean;
   scrollKey?: string;
+  isOpen?: boolean;
+  onClose?: () => void;
   children: ReactNode;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"window" | "sheet" | null>(null);
-  const [open, setOpen] = useState(true);
+  const [internalOpen, setInternalOpen] = useState(isOpen !== undefined ? isOpen : true);
   const target = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const controls = useDragControls();
+
+  useEffect(() => {
+    if (isOpen !== undefined) {
+      setInternalOpen(isOpen);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -148,16 +158,17 @@ export function SettingsWindow({
   }, []);
 
   useEffect(() => {
+    if (!internalOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, []);
+  }, [internalOpen]);
 
   const close = useCallback((to?: string) => {
     target.current = to ?? null;
-    setOpen(false);
+    setInternalOpen(false);
   }, []);
 
   useEffect(() => {
@@ -175,6 +186,10 @@ export function SettingsWindow({
   }, [scrollKey]);
 
   const finish = () => {
+    if (onClose) {
+      onClose();
+      return;
+    }
     const t = target.current;
     if (t) router.push(t);
     else if (window.history.length > 1) router.back();
@@ -187,12 +202,12 @@ export function SettingsWindow({
   return createPortal(
     <MotionConfig reducedMotion={reducedMotion ? "always" : "user"}>
       <AnimatePresence onExitComplete={finish}>
-        {open && (
-          <div key="settings-root" className="fixed inset-0 z-[900]">
+        {internalOpen && (
+          <div key="settings-root" className="fixed inset-0 z-[9000]">
             {/* Blur + dim backdrop: only opacity animates */}
             <motion.div
               aria-hidden
-              className="absolute inset-0 bg-black/30 backdrop-blur-xl backdrop-saturate-150"
+              className="absolute inset-0 bg-black/50 backdrop-blur-2xl backdrop-saturate-150"
               style={{ willChange: "opacity", transform: "translateZ(0)" }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -204,7 +219,7 @@ export function SettingsWindow({
             <div
               className={cn(
                 "pointer-events-none absolute inset-0 flex",
-                sheet ? "items-end" : "items-center justify-center p-6"
+                sheet ? "items-end" : "items-center justify-center p-4 sm:p-6"
               )}
             >
               <motion.div
@@ -228,16 +243,17 @@ export function SettingsWindow({
                   paddingBottom: sheet ? "env(safe-area-inset-bottom)" : undefined,
                 }}
                 className={cn(
-                  "pointer-events-auto relative flex flex-col overflow-hidden bg-[#1c1c1e]/90 text-white ring-1 ring-white/10",
-                  "shadow-[0_30px_90px_rgba(0,0,0,0.6),0_0_0_0.5px_rgba(255,255,255,0.12)]",
+                  "pointer-events-auto relative flex flex-col overflow-hidden text-white",
+                  "bg-zinc-950/80 border border-white/[0.12] backdrop-blur-3xl backdrop-saturate-200",
+                  "shadow-[0_32px_100px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.18)]",
                   sheet
-                    ? "h-[92dvh] w-full rounded-t-[24px]"
-                    : "h-[min(660px,100%)] w-[min(940px,100%)] rounded-[22px]"
+                    ? "h-[92dvh] w-full rounded-t-[26px]"
+                    : "h-[min(680px,94vh)] w-[min(940px,94vw)] rounded-[24px]"
                 )}
               >
                 {/* Title bar (also the drag handle on mobile) */}
                 <header
-                  className="relative z-10 shrink-0"
+                  className="relative z-10 shrink-0 bg-white/[0.02] backdrop-blur-md"
                   onPointerDown={(e) => sheet && controls.start(e)}
                   style={{ touchAction: sheet ? "none" : undefined }}
                 >
@@ -399,7 +415,7 @@ export function Group({
           {header}
         </h3>
       )}
-      <div className="divide-y divide-white/[0.08] overflow-hidden rounded-[14px] bg-white/[0.06] ring-1 ring-inset ring-white/[0.06]">
+      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-[16px] bg-white/[0.04] backdrop-blur-md ring-1 ring-inset ring-white/[0.08] shadow-sm">
         {children}
       </div>
       {footer && <p className="mt-1.5 px-4 text-[12px] leading-snug text-white/45">{footer}</p>}

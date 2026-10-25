@@ -393,6 +393,23 @@ export class AuthService {
         const { displayName, name, id, userId: _ui, createdAt, updatedAt, ...preferences } = prefData;
         const userName = displayName || name;
 
+        const ALLOWED_PREF_KEYS = new Set([
+            'onboardingCompleted', 'onboardingCompletedAt', 'preferredGenres', 'languages',
+            'favoriteArtists', 'audioQuality', 'crossfade', 'autoplay', 'normalizeVolume',
+            'explicitFilter', 'theme', 'accentColor', 'globalPlayerStyle', 'sidebarStyle',
+            'fullviewReactiveBg', 'trackPageReactiveBg', 'compactMode', 'emailNotifications',
+            'newReleaseAlerts', 'playlistUpdates', 'weeklySummaryEmail', 'privateSession',
+            'listeningActivity', 'surroundingSpeed', 'bottomNavStyle', 'swipeNavigation',
+            'selectedCountryCode', 'selectedCountryName', 'selectedLanguageCode', 'selectedLanguageName'
+        ]);
+
+        const sanitizedPreferences: any = {};
+        for (const [k, v] of Object.entries(preferences)) {
+            if (ALLOWED_PREF_KEYS.has(k)) {
+                sanitizedPreferences[k] = v;
+            }
+        }
+
         try {
             // Update User name if provided
             if (userName) {
@@ -412,13 +429,13 @@ export class AuthService {
             if (user.preferences) {
                 return await (prisma as any).userPreferences.update({
                     where: { userId },
-                    data: preferences
+                    data: sanitizedPreferences
                 });
             } else {
                 return await (prisma as any).userPreferences.create({
                     data: {
                         userId,
-                        ...preferences
+                        ...sanitizedPreferences
                     }
                 });
             }
