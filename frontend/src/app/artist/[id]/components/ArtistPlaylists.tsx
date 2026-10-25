@@ -89,9 +89,9 @@ export function ArtistPlaylists({ artistName, playlists }: ArtistPlaylistsProps)
                   {/* Playlist Details */}
                   <div className="flex flex-col gap-0.5 pt-0.5">
                     <p className="text-[13px] md:text-[14px] font-semibold text-white truncate group-hover:text-brand transition-colors">
-                      {formatDisplayTitle(rawTitle)}
+                      {formatDisplayTitle(rawTitle) || rawTitle || "Playlist"}
                     </p>
-                    <p className="text-[12px] text-white/50 truncate font-normal">
+                    <p className="text-[12px] text-zinc-400 truncate font-normal">
                       {playlist.owner ? `Apple Music ${playlist.owner}` : `Apple Music`}
                     </p>
                   </div>

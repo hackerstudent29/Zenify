@@ -30,7 +30,7 @@ const DEFAULT_SETTINGS: ReactiveBgSettings = {
   fullPlayer: true,
   trackPage: true,
   albumPage: true,
-  artistPage: true,
+  artistPage: false,
   other: true,
 };
 
@@ -106,7 +106,7 @@ export const useReactiveBgStore = create<ReactiveBgState>()(
           fullPlayer: persisted?.player ?? true,
           trackPage: persisted?.track ?? true,
           albumPage: persisted?.album ?? true,
-          artistPage: true,
+          artistPage: false,
           other: persisted?.lyrics ?? true,
         };
         return {

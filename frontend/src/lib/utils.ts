@@ -367,7 +367,7 @@ export function formatDisplayTitle(input?: string | null): string {
  })
  .join(' ');
 
-  return text;
+  return text || (input ? input.trim() : String());
 }
 
 export const PROTECTED_ARTISTS = [

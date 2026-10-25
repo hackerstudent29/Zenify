@@ -7,124 +7,330 @@ import {
   Sparkles,
   Play,
   Pause,
-  Clock,
   Heart,
-  User,
-  Disc,
   ListMusic,
   X,
   History,
   TrendingUp,
-  Compass,
+  ChevronRight,
   ChevronDown,
-  ChevronUp,
-  Globe,
-  Flame,
-  ArrowRight
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { Track, usePlayerStore } from "@/store/player";
+import { usePlayerStore } from "@/store/player";
 import { useDebounce } from "use-debounce";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import Link from "next/link";
 import { cn, getMediaUrl } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { SEO } from "@/components/shared/SEO";
 
-// Spotify & Apple Music Curated Browse Categories
+/* ------------------------------------------------------------------ */
+/*  Tokens                                                             */
+/* ------------------------------------------------------------------ */
+const SPRING = { type: "spring", stiffness: 520, damping: 32, mass: 0.7 } as const;
+const SPRING_SOFT = { type: "spring", stiffness: 340, damping: 34, mass: 0.9 } as const;
+const SF_FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif';
+
+const FALLBACK_TRACK = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=160";
+const FALLBACK_ALBUM = "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=300";
+const FALLBACK_ARTIST = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200";
+
+// Browse categories (tiles)
 const DISCOVER_GENRES = [
-  {
-    name: "Tamil Hits",
-    query: "Tamil",
-    gradient: "from-[#9E2339] to-[#E11D48]",
-    image: "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?q=80&w=300",
-  },
-  {
-    name: "Kollywood",
-    query: "Kollywood",
-    gradient: "from-[#1E3A8A] to-[#3B82F6]",
-    image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=300",
-  },
-  {
-    name: "Top India",
-    query: "India",
-    gradient: "from-[#065F46] to-[#10B981]",
-    image: "https://images.unsplash.com/photo-1459749411177-04218006d396?q=80&w=300",
-  },
-  {
-    name: "Melody & Love",
-    query: "Melody",
-    gradient: "from-[#581C87] to-[#A855F7]",
-    image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=300",
-  },
-  {
-    name: "Hip-Hop",
-    query: "Hip-Hop",
-    gradient: "from-[#9A3412] to-[#F97316]",
-    image: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=300",
-  },
-  {
-    name: "Devotional",
-    query: "Devotional",
-    gradient: "from-[#854D0E] to-[#F59E0B]",
-    image: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=300",
-  },
-  {
-    name: "Acoustic & Chill",
-    query: "Acoustic",
-    gradient: "from-[#0F766E] to-[#14B8A6]",
-    image: "https://images.unsplash.com/photo-1487180144351-b8472da7d491?q=80&w=300",
-  },
-  {
-    name: "Party & EDM",
-    query: "Party",
-    gradient: "from-[#831843] to-[#EC4899]",
-    image: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=300",
-  },
-  {
-    name: "Workout Pulse",
-    query: "Workout",
-    gradient: "from-[#7F1D1D] to-[#EF4444]",
-    image: "https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=300",
-  },
-  {
-    name: "Night Drive",
-    query: "Drive",
-    gradient: "from-[#312E81] to-[#6366F1]",
-    image: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=300",
-  },
-  {
-    name: "Rock & Metal",
-    query: "Rock",
-    gradient: "from-[#1E293B] to-[#475569]",
-    image: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?q=80&w=300",
-  },
-  {
-    name: "Lo-Fi & Study",
-    query: "Lo-Fi",
-    gradient: "from-[#701A75] to-[#D946EF]",
-    image: "https://images.unsplash.com/photo-1518495973542-4542c06a5843?q=80&w=300",
-  },
+  { name: "Tamil Hits", query: "Tamil", gradient: "from-[#9E2339] to-[#E11D48]", image: "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?q=80&w=300" },
+  { name: "Kollywood", query: "Kollywood", gradient: "from-[#1E3A8A] to-[#3B82F6]", image: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=300" },
+  { name: "Top India", query: "India", gradient: "from-[#065F46] to-[#10B981]", image: "https://images.unsplash.com/photo-1459749411177-04218006d396?q=80&w=300" },
+  { name: "Melody & Love", query: "Melody", gradient: "from-[#581C87] to-[#A855F7]", image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=300" },
+  { name: "Hip-Hop", query: "Hip-Hop", gradient: "from-[#9A3412] to-[#F97316]", image: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=300" },
+  { name: "Devotional", query: "Devotional", gradient: "from-[#854D0E] to-[#F59E0B]", image: "https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=300" },
+  { name: "Acoustic & Chill", query: "Acoustic", gradient: "from-[#0F766E] to-[#14B8A6]", image: "https://images.unsplash.com/photo-1487180144351-b8472da7d491?q=80&w=300" },
+  { name: "Party & EDM", query: "Party", gradient: "from-[#831843] to-[#EC4899]", image: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=300" },
+  { name: "Workout Pulse", query: "Workout", gradient: "from-[#7F1D1D] to-[#EF4444]", image: "https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=300" },
+  { name: "Night Drive", query: "Drive", gradient: "from-[#312E81] to-[#6366F1]", image: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=300" },
+  { name: "Rock & Metal", query: "Rock", gradient: "from-[#1E293B] to-[#475569]", image: "https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?q=80&w=300" },
+  { name: "Lo-Fi & Study", query: "Lo-Fi", gradient: "from-[#701A75] to-[#D946EF]", image: "https://images.unsplash.com/photo-1518495973542-4542c06a5843?q=80&w=300" },
 ];
 
-const DEFAULT_LANGUAGES = [
-  "Tamil",
-  "Hindi",
-  "English",
-  "Telugu",
-  "Malayalam",
-  "Punjabi",
-  "Kannada",
-  "Bengali",
-];
+const DEFAULT_LANGUAGES = ["Tamil", "Hindi", "English", "Telugu", "Malayalam", "Punjabi", "Kannada", "Bengali"];
 
 type FilterTab = "all" | "tracks" | "artists" | "albums" | "playlists";
+type RegionalCategory = "all" | "popular" | "new_releases" | "recommended";
 
+const fmtDuration = (d?: number) => {
+  const total = Math.floor(d || 0);
+  return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, "0")}`;
+};
+
+/* ------------------------------------------------------------------ */
+/*  macOS building blocks                                              */
+/* ------------------------------------------------------------------ */
+
+/** macOS segmented control with a spring-sliding selection pill */
+function Segmented<T extends string>({
+  id,
+  value,
+  onChange,
+  options,
+}: {
+  id: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <div className="inline-flex p-[3px] rounded-[9px] bg-white/[0.08] border border-white/[0.06] backdrop-blur-xl shrink-0">
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "relative px-3.5 py-1 text-[13px] font-medium rounded-[7px] outline-none cursor-pointer transition-colors duration-200 whitespace-nowrap",
+              active ? "text-white" : "text-white/60 hover:text-white/90"
+            )}
+          >
+            {active && (
+              <motion.span
+                layoutId={`seg-${id}`}
+                transition={SPRING}
+                className="absolute inset-0 rounded-[7px] bg-white/[0.18] shadow-[0_1px_3px_rgba(0,0,0,0.35),inset_0_0.5px_0_rgba(255,255,255,0.2)]"
+              />
+            )}
+            <span className="relative">{o.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** "Best New Songs >" style shelf header */
+function SectionHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-3 mb-3">
+      <div className="min-w-0">
+        <h2 className="flex items-center gap-0.5 text-[22px] leading-7 font-bold tracking-[-0.02em] text-white">
+          <span className="truncate">{title}</span>
+          <ChevronRight size={20} strokeWidth={2.5} className="text-white/35 shrink-0" />
+        </h2>
+        {subtitle && <p className="text-[13px] text-white/50 mt-0.5">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/** Animated equalizer shown on the artwork of the playing song */
+function Equalizer({ playing }: { playing: boolean }) {
+  return (
+    <div className="flex items-end gap-[2px] h-3.5">
+      {[0, 1, 2, 3].map((i) => (
+        <motion.span
+          key={i}
+          className="w-[3px] rounded-full bg-white"
+          style={{ height: "30%" }}
+          animate={playing ? { height: ["30%", "100%", "45%", "85%", "30%"] } : { height: "30%" }}
+          transition={playing ? { duration: 0.9 + i * 0.15, repeat: Infinity, ease: "easeInOut" } : { duration: 0.2 }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Apple Music style song row: artwork, title/artist, hover heart, duration */
+function SongRow({
+  track,
+  index,
+  isCurrent,
+  isPlaying,
+  liked,
+  onPlay,
+  onLike,
+}: {
+  track: any;
+  index?: number;
+  isCurrent: boolean;
+  isPlaying: boolean;
+  liked: boolean;
+  onPlay: () => void;
+  onLike: (e: React.MouseEvent) => void;
+}) {
+  const active = isCurrent && isPlaying;
+  return (
+    <motion.div
+      whileTap={{ scale: 0.992 }}
+      transition={SPRING}
+      onClick={onPlay}
+      className="group relative flex items-center gap-3 px-2 h-[60px] rounded-lg hover:bg-white/[0.07] cursor-pointer transition-colors after:absolute after:bottom-0 after:left-[64px] after:right-2 after:h-px after:bg-white/[0.07] last:after:hidden hover:after:opacity-0"
+    >
+      {index !== undefined && (
+        <span className="w-5 text-center text-[13px] font-medium text-white/40 tabular-nums">{index + 1}</span>
+      )}
+
+      <div className="relative w-11 h-11 rounded-md overflow-hidden bg-zinc-800 shrink-0 shadow-md ring-1 ring-white/10">
+        <img
+          src={getMediaUrl(track.coverUrl) || FALLBACK_TRACK}
+          alt={track.title || "Track artwork"}
+          width={44}
+          height={44}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover"
+        />
+        <div
+          className={cn(
+            "absolute inset-0 bg-black/45 backdrop-blur-[2px] flex items-center justify-center transition-opacity duration-200",
+            isCurrent ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          )}
+        >
+          {active ? (
+            <>
+              <span className="group-hover:hidden"><Equalizer playing /></span>
+              <Pause size={16} className="hidden group-hover:block text-white fill-current" />
+            </>
+          ) : (
+            <Play size={16} className="text-white fill-current ml-0.5" />
+          )}
+        </div>
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className={cn("text-[15px] leading-5 font-medium truncate", isCurrent ? "text-brand" : "text-white")}>
+          {track.title}
+        </p>
+        <p className="text-[13px] leading-4 text-white/55 truncate">{track.artist?.name || "Unknown Artist"}</p>
+      </div>
+
+      <motion.button
+        whileTap={{ scale: 0.8 }}
+        transition={SPRING}
+        onClick={onLike}
+        className={cn(
+          "p-1.5 rounded-full outline-none cursor-pointer transition-all",
+          liked ? "text-brand" : "text-white/50 hover:text-white opacity-0 group-hover:opacity-100"
+        )}
+        title={liked ? "Unlike" : "Like"}
+      >
+        <Heart size={15} className={cn(liked && "fill-current")} />
+      </motion.button>
+
+      <span className="text-[13px] text-white/45 tabular-nums w-10 text-right">{fmtDuration(track.duration)}</span>
+    </motion.div>
+  );
+}
+
+/** Square artwork card (albums / regional tracks) */
+function ArtCard({
+  cover,
+  title,
+  subtitle,
+  caption,
+  onClick,
+  playable,
+  isPlayingNow,
+  alt,
+}: {
+  cover: string;
+  title: string;
+  subtitle?: string;
+  caption?: string;
+  onClick: () => void;
+  playable?: boolean;
+  isPlayingNow?: boolean;
+  alt: string;
+}) {
+  return (
+    <motion.div
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.97 }}
+      transition={SPRING}
+      onClick={onClick}
+      className="group cursor-pointer min-w-0"
+    >
+      <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-800 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+        <img
+          src={cover}
+          alt={alt}
+          width={180}
+          height={180}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.04]"
+        />
+        {playable && (
+          <div className={cn("absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent transition-opacity duration-200", isPlayingNow ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
+            <div className="absolute left-2.5 bottom-2.5 w-9 h-9 rounded-full bg-white/25 backdrop-blur-xl border border-white/30 flex items-center justify-center text-white shadow-lg">
+              {isPlayingNow ? <Pause size={16} className="fill-current" /> : <Play size={16} className="fill-current ml-0.5" />}
+            </div>
+          </div>
+        )}
+      </div>
+      <p className={cn("mt-2 text-[14px] leading-5 font-medium truncate", isPlayingNow ? "text-brand" : "text-white")}>{title}</p>
+      {subtitle && <p className="text-[13px] leading-4 text-white/55 truncate">{subtitle}</p>}
+      {caption && <p className="text-[11px] leading-4 text-white/35 truncate mt-0.5">{caption}</p>}
+    </motion.div>
+  );
+}
+
+/** Circular artist card */
+function ArtistCard({ artist, onClick }: { artist: any; onClick: () => void }) {
+  return (
+    <motion.div
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.96 }}
+      transition={SPRING}
+      onClick={onClick}
+      className="group flex flex-col items-center text-center cursor-pointer min-w-0"
+    >
+      <div className="w-full max-w-[140px] aspect-square rounded-full overflow-hidden bg-zinc-800 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+        <img
+          src={getMediaUrl(artist.imageUrl) || FALLBACK_ARTIST}
+          alt={artist.name || "Artist portrait"}
+          width={140}
+          height={140}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.05]"
+        />
+      </div>
+      <p className="mt-2 text-[14px] font-medium text-white truncate w-full">{artist.name}</p>
+      <p className="text-[13px] text-white/50">Artist</p>
+    </motion.div>
+  );
+}
+
+/** Pill chip used for recents / trending / languages */
+function Chip({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <motion.button
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.95 }}
+      transition={SPRING}
+      onClick={onClick}
+      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/[0.08] hover:bg-white/[0.14] border border-white/[0.06] text-[13px] font-medium text-white/85 hover:text-white transition-colors cursor-pointer outline-none backdrop-blur-xl"
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page                                                               */
+/* ------------------------------------------------------------------ */
 export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?: boolean } = {}) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -154,7 +360,7 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
     }
     return preferredLang || "en";
   });
-  const [regionalCategory, setRegionalCategory] = useState<"all" | "popular" | "new_releases" | "recommended">("all");
+  const [regionalCategory, setRegionalCategory] = useState<RegionalCategory>("all");
 
   useEffect(() => {
     if (preferredCountry) setSelectedCountry(preferredCountry);
@@ -178,12 +384,7 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
     queryFn: async () => {
       if (!selectedCountry || !selectedLanguage) return null;
       const res = await api.get("/discover/tracks", {
-        params: {
-          country: selectedCountry,
-          language: selectedLanguage,
-          category: regionalCategory,
-          limit: 12
-        }
+        params: { country: selectedCountry, language: selectedLanguage, category: regionalCategory, limit: 12 },
       });
       return res.data;
     },
@@ -333,8 +534,8 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
     staleTime: 1000 * 60 * 10,
   });
 
-  // Live provider search hints autocomplete (250-300ms debounce)
-  const { data: suggestions, isLoading: isSuggestionsLoading } = useQuery({
+  // Live provider search hints autocomplete
+  const { data: suggestions } = useQuery({
     queryKey: ["search-hints", debouncedQuery],
     queryFn: async ({ signal }) => {
       if (!debouncedQuery || debouncedQuery.trim().length < 2) return [];
@@ -346,7 +547,7 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
   });
 
   // Discovery Home data (genres, top charts, trending, country top songs)
-  const { data: homeData, isLoading: isHomeLoading } = useQuery({
+  const { data: homeData } = useQuery({
     queryKey: ["discover-home"],
     queryFn: async () => {
       const res = await api.get("search/home");
@@ -356,31 +557,20 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
     staleTime: 1000 * 60 * 5,
   });
 
-  // Spotify-style Top Result calculation
+  // Top Result calculation
   const topResult = useMemo(() => {
     if (!results) return null;
     const q = debouncedQuery.toLowerCase().trim();
 
-    // Prioritize direct artist match if query is artist name
     if (results.artists?.[0]) {
       const aName = results.artists[0].name.toLowerCase();
       if (aName.includes(q) || q.includes(aName)) {
         return { item: results.artists[0], type: "artist" };
       }
     }
-
-    if (results.tracks?.[0]) {
-      return { item: results.tracks[0], type: "track" };
-    }
-
-    if (results.artists?.[0]) {
-      return { item: results.artists[0], type: "artist" };
-    }
-
-    if (results.albums?.[0]) {
-      return { item: results.albums[0], type: "album" };
-    }
-
+    if (results.tracks?.[0]) return { item: results.tracks[0], type: "track" };
+    if (results.artists?.[0]) return { item: results.artists[0], type: "artist" };
+    if (results.albums?.[0]) return { item: results.albums[0], type: "album" };
     return null;
   }, [results, debouncedQuery]);
 
@@ -421,1004 +611,667 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
     } catch {}
   };
 
+  const playTrack = (track: any, log = true) => {
+    setTrack(track);
+    setPlayerMinimized(false);
+    if (log) logSearchEvent("track", track.id, track.title);
+  };
+
+  const openTopResult = () => {
+    if (!topResult) return;
+    if (topResult.type === "track") playTrack(topResult.item);
+    else if (topResult.type === "artist") router.push(`/artist/${topResult.item.id}`);
+    else if (topResult.type === "album") router.push(`/album/${topResult.item.id}`);
+  };
+
   const userLanguages = homeData?.languages?.length ? homeData.languages : DEFAULT_LANGUAGES;
+  const isLiked = (id: string) => !!likedTrackIds?.includes(id);
+
+  const ShowMore = ({ open, onToggle, count, label = "Show All" }: { open: boolean; onToggle: () => void; count: number; label?: string }) => (
+    <button
+      onClick={onToggle}
+      className="text-[13px] font-medium text-brand hover:opacity-70 transition-opacity cursor-pointer outline-none shrink-0"
+    >
+      {open ? "Show Less" : `${label} (${count})`}
+    </button>
+  );
+
+  const filterOptions: { value: FilterTab; label: string }[] = [
+    { value: "all", label: "Top Results" },
+    { value: "tracks", label: "Songs" },
+    { value: "artists", label: "Artists" },
+    { value: "albums", label: "Albums" },
+    { value: "playlists", label: "Playlists" },
+  ];
+
+  const regionalOptions: { value: RegionalCategory; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "popular", label: "Popular" },
+    { value: "new_releases", label: "New Releases" },
+    { value: "recommended", label: "For You" },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#121214] text-foreground relative selection:bg-brand selection:text-white pt-[calc(64px+env(safe-area-inset-top,0px))] md:pt-[calc(72px+env(safe-area-inset-top,0px))] pb-[calc(80px+64px+env(safe-area-inset-bottom,0px))] md:pb-[calc(90px+env(safe-area-inset-bottom,0px))]">
-      <SEO
-        title={isSearchRoute ? "Search Songs, Artists & Multilingual Lyrics – Zenify" : "Discover Trending Music, New Releases & Top Charts – Zenify"}
-        description={isSearchRoute ? "Search millions of tracks, albums, and artists with instant playback and synchronized lyrics in Tamil, Hindi, and English on Zenify." : "Explore trending tracks, newly released albums, and curated multilingual playlists with real-time synchronized lyrics on Zenify."}
-        path={isSearchRoute ? "/search" : "/discover"}
-      />
-      {/* Subtle Apple Music Ambient Glow */}
-      <div className="absolute top-0 inset-x-0 h-96 bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,rgba(225,29,72,0.12),transparent)] pointer-events-none" />
+    <MotionConfig reducedMotion="user">
+      <div
+        style={{ fontFamily: SF_FONT }}
+        className="min-h-screen bg-[#1c1c1e] text-white relative antialiased selection:bg-brand selection:text-white pt-[calc(64px+env(safe-area-inset-top,0px))] md:pt-[calc(72px+env(safe-area-inset-top,0px))] pb-[calc(80px+64px+env(safe-area-inset-bottom,0px))] md:pb-[calc(110px+env(safe-area-inset-bottom,0px))]"
+      >
+        <SEO
+          title={isSearchRoute ? "Search Songs, Artists & Multilingual Lyrics – Zenify" : "Discover Trending Music, New Releases & Top Charts – Zenify"}
+          description={isSearchRoute ? "Search millions of tracks, albums, and artists with instant playback and synchronized lyrics in Tamil, Hindi, and English on Zenify." : "Explore trending tracks, newly released albums, and curated multilingual playlists with real-time synchronized lyrics on Zenify."}
+          path={isSearchRoute ? "/search" : "/discover"}
+        />
 
-      <div className="max-w-[1340px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-6">
-        
-        {/* ========================================================= */}
-        {/* STICKY SEARCH BAR (Sits right below the fixed header)     */}
-        {/* ========================================================= */}
-        <div className="relative md:sticky md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 bg-[#121214]/95 backdrop-blur-2xl py-2 md:py-3 border-b border-white/5 space-y-2 md:space-y-3">
-          
-          {/* Unified Single Page Heading */}
-          <div className="flex items-center justify-between gap-4 pt-1 md:pt-0">
-            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">
-              <Compass className="text-brand w-6 h-6 sm:w-7 sm:h-7 shrink-0" />
-              <span>{isSearchRoute ? "Search Music & Lyrics" : "Discover"}</span>
-            </h1>
-          </div>
+        {/* Ambient tint, like the artwork wash behind Apple Music's sidebar */}
+        <div className="absolute top-0 inset-x-0 h-[420px] bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,rgba(250,36,60,0.14),transparent)] pointer-events-none" />
 
-          {/* Search Input Container - Apple Music iOS Style on Mobile */}
-          <div className="flex items-center gap-2.5">
-            <div className="relative group rounded-xl md:rounded-2xl transition-all flex-1">
-              <div className="absolute inset-y-0 left-3.5 sm:left-5 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-brand transition-colors">
-                <SearchIcon size={18} className="md:w-5 md:h-5" />
-              </div>
+        <div className="max-w-[1340px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          {/* Large title */}
+          <h1 className="text-[28px] sm:text-[34px] leading-tight font-bold tracking-[-0.03em] text-white pt-3 pb-3">
+            {isSearchRoute ? "Search" : "Browse"}
+          </h1>
 
-              <input
-                ref={inputRef}
-                type="text"
-                role="combobox"
-                aria-autocomplete="list"
-                aria-expanded={isInputFocused && !!suggestions?.length}
-                aria-controls="search-suggestions-listbox"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSelectedSuggestionIndex(-1);
-                }}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => {
-                  setTimeout(() => setIsInputFocused(false), 200);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder={isMobile ? "Artists, Songs, Lyrics, and More" : (placeholderText + (cursorBlink ? "|" : ""))}
-                className="w-full bg-zinc-800/60 md:bg-zinc-900/90 hover:bg-zinc-800/80 md:hover:bg-zinc-900 border border-white/10 focus:border-brand/50 rounded-xl md:rounded-2xl py-2.5 sm:py-4 pl-10 sm:pl-14 pr-10 md:pr-24 text-sm sm:text-lg text-white placeholder:text-zinc-500 outline-none backdrop-blur-xl shadow-md md:shadow-xl transition-all"
-              />
-
-              <div className="absolute inset-y-0 right-2.5 md:right-3 flex items-center gap-1.5 md:gap-2">
-                {query && (
-                  <button
-                    onClick={() => {
-                      setQuery("");
-                      inputRef.current?.focus();
-                    }}
-                    className="p-1 md:p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-                    title="Clear search"
-                  >
-                    <X size={15} className="md:w-[18px] md:h-[18px]" />
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setIsSmartSearching(!isSmartSearching)}
-                  className={cn(
-                    "hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
-                    isSmartSearching
-                      ? "bg-brand/20 border-brand/40 text-brand shadow-[0_0_15px_rgba(225,29,72,0.3)]"
-                      : "bg-white/5 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
-                  )}
-                  title="Toggle AI Semantic Search"
-                >
-                  <Sparkles size={12} className={cn(isSmartSearching && "text-brand animate-pulse")} />
-                  <span>{isSmartSearching ? "AI Active" : "AI Search"}</span>
-                </button>
-              </div>
-
-              {/* Live Suggestions Autocomplete Dropdown */}
-              <AnimatePresence>
-                {isInputFocused && suggestions && suggestions.length > 0 && (
-                  <motion.div
-                    id="search-suggestions-listbox"
-                    role="listbox"
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute left-0 right-0 top-full mt-2 bg-zinc-900/95 border border-white/15 rounded-2xl shadow-2xl backdrop-blur-2xl z-50 overflow-hidden divide-y divide-white/5"
-                  >
-                    {suggestions.slice(0, 6).map((hint: any, idx: number) => (
-                      <div
-                        key={hint.id || idx}
-                        role="option"
-                        aria-selected={selectedSuggestionIndex === idx}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          handleSelectSuggestion(hint.title);
-                        }}
-                        className={cn(
-                          "flex items-center gap-3 px-4 py-3 text-sm text-zinc-300 hover:text-white hover:bg-white/10 cursor-pointer transition-colors",
-                          selectedSuggestionIndex === idx && "bg-brand/20 text-brand font-bold"
-                        )}
-                      >
-                        <SearchIcon size={14} className="text-zinc-500 shrink-0" />
-                        <span className="truncate flex-1">{hint.title}</span>
-                        <ArrowRight size={13} className="text-zinc-600 shrink-0" />
-                      </div>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Apple Music Cancel Button for Mobile */}
-            {isMobile && (isInputFocused || query) && (
-              <button
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setQuery("");
-                  setIsInputFocused(false);
-                  inputRef.current?.blur();
-                }}
-                className="text-sm font-semibold text-brand hover:opacity-80 transition-opacity shrink-0 px-1 py-1"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-
-          {/* Category Filter Pills (When query is active) */}
-          {debouncedQuery && (
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-              {(["all", "tracks", "artists", "albums", "playlists"] as FilterTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setSelectedFilter(tab)}
-                  className={cn(
-                    "px-4 py-1.5 rounded-full text-xs font-semibold capitalize tracking-wide transition-all shrink-0 cursor-pointer",
-                    selectedFilter === tab
-                      ? "bg-brand text-white shadow-md shadow-brand/20 font-bold"
-                      : "bg-zinc-900/90 text-zinc-400 hover:text-white border border-white/5 hover:border-white/15"
-                  )}
-                >
-                  {tab === "all" ? "Top Results" : tab}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ========================================================= */}
-        {/* EMPTY STATE: DISCOVER MODE (When Query is Empty)          */}
-        {/* ========================================================= */}
-        {!debouncedQuery ? (
-          <div className="space-y-10 pt-2">
-            
-            {/* REGIONAL MUSIC DISCOVERY SHELF (Strict Country & Language Filter) */}
-            <div className="space-y-4 p-5 rounded-3xl bg-zinc-950/60 border border-white/10 shadow-xl backdrop-blur-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-brand">
-                    <Globe size={15} className="text-brand" />
-                    <span>Regional Music Discovery</span>
-                    {regionalData?.country && regionalData?.language && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand/10 border border-brand/20 font-mono">
-                        {regionalData.country.code} · {regionalData.language.code}
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-black font-oswald uppercase text-white tracking-wide">
-                    {regionalData?.country && regionalData?.language
-                      ? `Songs from ${regionalData.country.name} in ${regionalData.language.name}`
-                      : "Discover by Country & Language"}
-                  </h2>
-                  <p className="text-xs text-white/50 leading-relaxed font-sans">
-                    Only authentic, verified songs originating from the selected country and sung in the chosen language.
-                  </p>
+          {/* ===== Sticky toolbar: search field + segmented filter ===== */}
+          <div className="relative md:sticky md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2.5 bg-[rgba(28,28,30,0.72)] backdrop-blur-2xl backdrop-saturate-150 border-b border-white/[0.07] space-y-2.5">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 group">
+                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-white/45 group-focus-within:text-white/80 transition-colors">
+                  <SearchIcon size={16} strokeWidth={2.2} />
                 </div>
 
-                <Link
-                  href="/settings"
-                  className="text-[11px] font-bold text-white/40 hover:text-white uppercase tracking-wider transition-colors px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20"
-                >
-                  Change In Settings
-                </Link>
-              </div>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={isInputFocused && !!suggestions?.length}
+                  aria-controls="search-suggestions-listbox"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setSelectedSuggestionIndex(-1);
+                  }}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setTimeout(() => setIsInputFocused(false), 200)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={isMobile ? "Artists, Songs, Lyrics, and More" : placeholderText + (cursorBlink ? "|" : "")}
+                  className="w-full h-10 md:h-11 rounded-[10px] bg-white/[0.09] hover:bg-white/[0.12] focus:bg-white/[0.14] border border-white/[0.06] focus:border-brand/60 focus:ring-4 focus:ring-brand/20 pl-9 pr-24 text-[15px] text-white placeholder:text-white/40 outline-none transition-all duration-200"
+                />
 
-              {/* Category Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
-                {(["all", "popular", "new_releases", "recommended"] as const).map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setRegionalCategory(cat)}
-                    className={cn(
-                      "px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer shrink-0",
-                      regionalCategory === cat
-                        ? "bg-brand text-white shadow-sm shadow-brand/30"
-                        : "bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/5"
-                    )}
-                  >
-                    {cat.replace("_", " ")}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tracks Grid */}
-              {isRegionalLoading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 pt-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="aspect-square rounded-2xl bg-white/5 animate-pulse" />
-                  ))}
-                </div>
-              ) : regionalData?.items && regionalData.items.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 pt-2">
-                  {regionalData.items.slice(0, 12).map((track: any) => {
-                    const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
-                    return (
-                      <div
-                        key={track.id}
+                <div className="absolute inset-y-0 right-2 flex items-center gap-1.5">
+                  <AnimatePresence>
+                    {query && (
+                      <motion.button
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.5, opacity: 0 }}
+                        transition={SPRING}
                         onClick={() => {
-                          setTrack(track);
-                          setPlayerMinimized(false);
+                          setQuery("");
+                          inputRef.current?.focus();
                         }}
-                        className="group p-2.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-brand/30 transition-all flex flex-col cursor-pointer active:scale-95 shadow-sm"
+                        className="w-[18px] h-[18px] rounded-full bg-white/30 hover:bg-white/45 text-[#1c1c1e] flex items-center justify-center cursor-pointer outline-none transition-colors"
+                        title="Clear search"
                       >
-                        <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-900 border border-white/5 mb-2.5 shadow-md">
-                          <img
-                            src={getMediaUrl(track.coverUrl) || "/logo.png"}
-                            alt={track.title || "Track artwork"}
-                            width={160}
-                            height={160}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                          <div
-                            className={cn(
-                              "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
-                              isTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                            )}
-                          >
-                            <div className="w-10 h-10 rounded-full bg-brand text-white flex items-center justify-center shadow-lg transform transition-transform group-hover:scale-110">
-                              {isTrackPlaying ? (
-                                <Pause size={18} className="fill-current" />
-                              ) : (
-                                <Play size={18} className="fill-current ml-0.5" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                        <X size={11} strokeWidth={3} />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
 
-                        <div className="min-w-0 flex-1">
-                          <h4 className={cn(
-                            "text-xs font-bold truncate leading-tight transition-colors",
-                            isTrackPlaying ? "text-brand" : "text-white group-hover:text-brand"
-                          )}>
-                            {track.title}
-                          </h4>
-                          <p className="text-[11px] text-zinc-400 truncate mt-0.5 font-medium">
-                            {track.artist?.name || "Unknown Artist"}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-1.5">
-                            <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-white/5 text-white/50 border border-white/5">
-                              {track.countryCode || selectedCountry}
-                            </span>
-                            <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
-                              {track.languageCode || selectedLanguage}
-                            </span>
-                          </div>
+                  <motion.button
+                    whileTap={{ scale: 0.94 }}
+                    transition={SPRING}
+                    onClick={() => setIsSmartSearching(!isSmartSearching)}
+                    className={cn(
+                      "hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-md text-[12px] font-medium outline-none cursor-pointer transition-colors",
+                      isSmartSearching
+                        ? "bg-brand text-white shadow-[0_0_14px_rgba(250,36,60,0.45)]"
+                        : "bg-white/10 text-white/60 hover:text-white hover:bg-white/15"
+                    )}
+                    title="Toggle AI Semantic Search"
+                  >
+                    <Sparkles size={12} className={cn(isSmartSearching && "animate-pulse")} />
+                    <span>{isSmartSearching ? "AI On" : "AI"}</span>
+                  </motion.button>
+                </div>
+
+                {/* macOS menu style suggestions */}
+                <AnimatePresence>
+                  {isInputFocused && suggestions && suggestions.length > 0 && (
+                    <motion.div
+                      id="search-suggestions-listbox"
+                      role="listbox"
+                      initial={{ opacity: 0, scale: 0.97, y: -6 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.97, y: -6 }}
+                      transition={SPRING}
+                      style={{ transformOrigin: "top center" }}
+                      className="absolute left-0 right-0 top-full mt-2 p-1 rounded-xl bg-[rgba(44,44,46,0.72)] backdrop-blur-2xl backdrop-saturate-150 border border-white/[0.14] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.7)] z-50"
+                    >
+                      {suggestions.slice(0, 6).map((hint: any, idx: number) => (
+                        <div
+                          key={hint.id || idx}
+                          role="option"
+                          aria-selected={selectedSuggestionIndex === idx}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectSuggestion(hint.title);
+                          }}
+                          className={cn(
+                            "flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[14px] cursor-pointer transition-colors",
+                            selectedSuggestionIndex === idx ? "bg-brand text-white" : "text-white/85 hover:bg-brand hover:text-white"
+                          )}
+                        >
+                          <SearchIcon size={13} className="opacity-60 shrink-0" />
+                          <span className="truncate flex-1">{hint.title}</span>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="py-12 px-6 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 text-center space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto text-brand">
-                    <Globe size={20} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                    No verified songs available
-                  </h3>
-                  <p className="text-xs text-white/50 max-w-md mx-auto leading-relaxed">
-                    No verified songs are available for this country and language yet. Try selecting a different country or language combination.
-                  </p>
-                </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {isMobile && (isInputFocused || query) && (
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setQuery("");
+                    setIsInputFocused(false);
+                    inputRef.current?.blur();
+                  }}
+                  className="text-[15px] font-medium text-brand hover:opacity-70 transition-opacity shrink-0"
+                >
+                  Cancel
+                </button>
               )}
             </div>
-            
-            {/* 1. Recent Searches (Clearable) */}
-            {recentSearches.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    <History size={14} className="text-brand" />
-                    <span>Recent Searches</span>
+
+            <AnimatePresence initial={false}>
+              {debouncedQuery && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={SPRING_SOFT}
+                  className="overflow-hidden"
+                >
+                  <div className="overflow-x-auto no-scrollbar">
+                    <Segmented id="filter" value={selectedFilter} onChange={(v) => setSelectedFilter(v as FilterTab)} options={filterOptions} />
                   </div>
-                  <button
-                    onClick={clearRecentSearches}
-                    className="text-[11px] font-semibold text-zinc-500 hover:text-brand transition-colors cursor-pointer"
-                  >
-                    Clear history
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {recentSearches.map((term) => (
-                    <button
-                      key={term}
-                      onClick={() => setQuery(term)}
-                      className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/80 hover:bg-zinc-800 border border-white/5 hover:border-brand/30 text-xs text-zinc-300 hover:text-white transition-all cursor-pointer"
-                    >
-                      <SearchIcon size={12} className="text-zinc-500" />
-                      <span>{term}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 2. Browse by Language Chips (User Languages First, Never Alphabetical) */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
-                <Globe size={14} className="text-brand" />
-                <span>Browse by Language</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {userLanguages.map((lang: string) => (
-                  <button
-                    key={lang}
-                    onClick={() => setQuery(lang)}
-                    className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 hover:border-brand/40 text-xs font-bold uppercase tracking-wider text-white hover:text-brand transition-all cursor-pointer active:scale-95 shadow-sm"
-                  >
-                    {lang}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 3. Trending Searches Chips */}
-            {homeData?.trendingSearches && homeData.trendingSearches.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
-                  <Flame size={14} className="text-brand" />
-                  <span>Trending Searches</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {homeData.trendingSearches.map((term: string) => (
-                    <button
-                      key={term}
-                      onClick={() => setQuery(term)}
-                      className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/60 hover:bg-zinc-800 border border-white/5 hover:border-brand/30 text-xs text-zinc-300 hover:text-white transition-all cursor-pointer"
-                    >
-                      <TrendingUp size={12} className="text-brand" />
-                      <span>{term}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 4. Browse by Genre/Mood 3D Tiles */}
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white">
-                  Browse Categories & Moods
-                </h2>
-                <p className="text-xs text-zinc-400">Explore curated sonic categories and trending sounds</p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-                {DISCOVER_GENRES.map((genre) => (
-                  <div
-                    key={genre.name}
-                    onClick={() => handleSelectGenre(genre.query)}
-                    className={cn(
-                      "relative h-32 sm:h-36 rounded-2xl overflow-hidden p-3.5 cursor-pointer select-none transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl active:scale-95 group",
-                      `bg-gradient-to-br ${genre.gradient}`
-                    )}
-                  >
-                    <span className="relative z-10 text-base sm:text-lg font-black text-white leading-tight uppercase tracking-tight drop-shadow-md">
-                      {genre.name}
-                    </span>
-
-                    <div className="absolute -right-3 -bottom-3 w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shadow-2xl transform rotate-[22deg] group-hover:rotate-[15deg] group-hover:scale-105 transition-transform duration-300 border border-white/20">
-                      <img
-                        src={genre.image}
-                        alt={genre.name}
-                        width={80}
-                        height={80}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 5. Top Songs in [User Country] (Catalog-first) */}
-            {homeData?.trendingTracks && homeData.trendingTracks.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
-                      <TrendingUp size={20} className="text-brand" />
-                      <span>Top Songs in {homeData?.countryName || "Your Country"}</span>
-                    </h2>
-                    <p className="text-xs text-zinc-400">Official real-time catalog charts for your region</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {homeData.trendingTracks.slice(0, 9).map((track: any) => {
-                    const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
-                    const mins = Math.floor((track.duration || 0) / 60);
-                    const secs = (track.duration || 0) % 60;
-                    const durationStr = `${mins}:${secs.toString().padStart(2, "0")}`;
-                    const isLiked = likedTrackIds?.includes(track.id);
-
-                    return (
-                      <div
-                        key={track.id}
-                        onClick={() => {
-                          setTrack(track);
-                          setPlayerMinimized(false);
-                          logSearchEvent("track", track.id, track.title);
-                        }}
-                        className="group flex items-center gap-3 p-2.5 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-white/10 transition-all cursor-pointer"
-                      >
-                        <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 shrink-0 shadow-md">
-                          <img
-                            src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=120"}
-                            alt={track.title || "Track artwork"}
-                            width={48}
-                            height={48}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                          <div
-                            className={cn(
-                              "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
-                              isTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                            )}
-                          >
-                            {isTrackPlaying ? (
-                              <Pause size={18} className="text-brand fill-current" />
-                            ) : (
-                              <Play size={18} className="text-white fill-current ml-0.5" />
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className={cn(
-                              "text-sm font-bold truncate leading-tight",
-                              isTrackPlaying ? "text-brand" : "text-white group-hover:text-white"
-                            )}
-                          >
-                            {track.title}
-                          </p>
-                          <p className="text-xs text-zinc-400 truncate mt-0.5">
-                            {track.artist?.name || "Unknown Artist"}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => toggleLike(track.id, e)}
-                            className={cn(
-                              "p-1.5 rounded-full transition-colors cursor-pointer",
-                              isLiked ? "text-brand" : "text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100"
-                            )}
-                          >
-                            <Heart size={14} className={cn(isLiked && "fill-current")} />
-                          </button>
-                          <span className="text-[11px] text-zinc-500 font-medium tabular-nums mr-1">
-                            {durationStr}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* 6. Trending Albums */}
-            {homeData?.trendingAlbums && homeData.trendingAlbums.length > 0 && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
-                    <Disc size={20} className="text-brand" />
-                    <span>Trending Albums</span>
-                  </h2>
-                  <p className="text-xs text-zinc-400">Popular releases and top streaming projects</p>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {homeData.trendingAlbums.slice(0, 6).map((album: any) => (
-                    <div
-                      key={album.id}
-                      onClick={() => {
-                        setQuery(album.title);
-                        logSearchEvent("album", album.id, album.title);
-                      }}
-                      className="group p-3 rounded-2xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-brand/30 transition-all flex flex-col cursor-pointer"
-                    >
-                      <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10">
-                        <img
-                          src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=300"}
-                          alt={album.title || "Album artwork"}
-                          width={160}
-                          height={160}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <span className="text-sm font-bold text-white group-hover:text-brand transition-colors truncate">
-                        {album.title}
-                      </span>
-                      <span className="text-xs text-zinc-500 truncate mt-0.5">
-                        {album.artist?.name || "Album"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 7. Popular Artists in Your Languages */}
-            {homeData?.artists && homeData.artists.length > 0 && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
-                    <User size={20} className="text-brand" />
-                    <span>Popular Artists</span>
-                  </h2>
-                  <p className="text-xs text-zinc-400">Discover top performing voices and creators in your languages</p>
-                </div>
-
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-                  {homeData.artists.slice(0, 6).map((artist: any) => (
-                    <div
-                      key={artist.id}
-                      onClick={() => {
-                        setQuery(artist.name);
-                        logSearchEvent("artist", artist.id, artist.name);
-                      }}
-                      className="group flex flex-col items-center text-center p-3 rounded-2xl bg-zinc-900/40 hover:bg-zinc-800/60 border border-white/5 hover:border-white/10 transition-all cursor-pointer"
-                    >
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border-2 border-white/10 group-hover:border-brand/40">
-                        <img
-                          src={getMediaUrl(artist.imageUrl) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200"}
-                          alt={artist.name || "Artist portrait"}
-                          width={96}
-                          height={96}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <span className="text-xs sm:text-sm font-bold text-white group-hover:text-brand transition-colors truncate w-full">
-                        {artist.name}
-                      </span>
-                      <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mt-0.5">
-                        Artist
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        ) : (
-          /* ========================================================= */
-          /* LIVE SEARCH RESULTS MODE (When Query is Typed)            */
-          /* ========================================================= */
-          <div className="space-y-10">
-            {isSearchLoading ? (
-              <div className="py-24 text-center space-y-3">
-                <div className="w-8 h-8 mx-auto border-2 border-brand border-t-transparent rounded-full animate-spin" />
-                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">
-                  Searching external catalog...
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* 1. TOP RESULT HERO CARD */}
-                {(selectedFilter === "all" || selectedFilter === "tracks") && topResult && (
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    <div className="lg:col-span-5 space-y-3">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                        Top Result
-                      </h3>
-                      <div
-                        onClick={() => {
-                          if (topResult.type === "track") {
-                            setTrack(topResult.item);
-                            setPlayerMinimized(false);
-                            logSearchEvent("track", topResult.item.id, topResult.item.title);
-                          } else if (topResult.type === "artist") {
-                            router.push(`/artist/${topResult.item.id}`);
-                          } else if (topResult.type === "album") {
-                            router.push(`/album/${topResult.item.id}`);
-                          }
-                        }}
-                        className="group relative p-6 rounded-3xl bg-zinc-900/90 hover:bg-zinc-800/90 border border-white/10 hover:border-brand/40 transition-all duration-300 cursor-pointer shadow-2xl"
-                      >
-                        <div
-                          className={cn(
-                            "overflow-hidden shadow-2xl mb-5 border border-white/10",
-                            topResult.type === "artist" ? "w-24 h-24 rounded-full" : "w-24 h-24 rounded-2xl"
-                          )}
-                        >
-                          <img
-                            src={getMediaUrl(topResult.item.coverUrl || topResult.item.imageUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=200"}
-                            alt={topResult.item.title || topResult.item.name || "Top search result"}
-                            width={96}
-                            height={96}
-                            fetchPriority="high"
-                            decoding="async"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                        </div>
 
-                        <h4 className="text-2xl sm:text-3xl font-black text-white group-hover:text-brand transition-colors truncate">
-                          {topResult.item.title || topResult.item.name}
-                        </h4>
+          {/* ===== Content ===== */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={debouncedQuery ? "results" : "discover"}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+            >
+              {!debouncedQuery ? (
+                /* ================= DISCOVER ================= */
+                <div className="space-y-11 pt-7">
+                  {/* Regional shelf */}
+                  <section>
+                    <SectionHeader
+                      title={
+                        regionalData?.country && regionalData?.language
+                          ? `Songs from ${regionalData.country.name} in ${regionalData.language.name}`
+                          : "Discover by Country & Language"
+                      }
+                      subtitle="Verified songs from the selected country, sung in your chosen language."
+                      action={
+                        <Link href="/settings" className="text-[13px] font-medium text-brand hover:opacity-70 transition-opacity shrink-0 pb-0.5">
+                          Change in Settings
+                        </Link>
+                      }
+                    />
 
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/10 text-zinc-300 border border-white/10">
-                            {topResult.type}
-                          </span>
-                          {topResult.item.artist?.name && (
-                            <span className="text-xs text-zinc-400 truncate">
-                              by <ArtistLinks track={topResult.item} className="inline" linkClassName="text-zinc-300 hover:text-white" />
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Floating Play Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (topResult.type === "track") {
-                              setTrack(topResult.item);
-                              setPlayerMinimized(false);
-                              logSearchEvent("track", topResult.item.id, topResult.item.title);
-                            } else if (topResult.type === "artist") {
-                              router.push(`/artist/${topResult.item.id}`);
-                            } else if (topResult.type === "album") {
-                              router.push(`/album/${topResult.item.id}`);
-                            }
-                          }}
-                          className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-brand hover:bg-brand/90 text-white flex items-center justify-center shadow-xl shadow-brand/30 hover:scale-110 active:scale-95 transition-all cursor-pointer"
-                        >
-                          <Play size={20} className="fill-current ml-0.5" />
-                        </button>
-                      </div>
+                    <div className="overflow-x-auto no-scrollbar mb-4">
+                      <Segmented id="regional" value={regionalCategory} onChange={(v) => setRegionalCategory(v as RegionalCategory)} options={regionalOptions} />
                     </div>
 
-                    {/* Top Matching Songs List */}
-                    {results?.tracks && results.tracks.length > 0 && (
-                      <div className="lg:col-span-7 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                            Songs
-                          </h3>
-                          {results.tracks.length > 5 && (
-                            <button
-                              onClick={() => setShowMoreTracks(!showMoreTracks)}
-                              className="text-xs font-bold text-zinc-400 hover:text-brand transition-colors cursor-pointer"
-                            >
-                              {showMoreTracks ? "Show less" : `Show all (${results.tracks.length})`}
-                            </button>
-                          )}
+                    {isRegionalLoading ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div key={i}>
+                            <div className="aspect-square rounded-xl bg-white/[0.06] animate-pulse" />
+                            <div className="h-3 w-3/4 rounded bg-white/[0.06] animate-pulse mt-2.5" />
+                            <div className="h-3 w-1/2 rounded bg-white/[0.04] animate-pulse mt-1.5" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : regionalData?.items && regionalData.items.length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {regionalData.items.slice(0, 12).map((track: any) => (
+                          <ArtCard
+                            key={track.id}
+                            cover={getMediaUrl(track.coverUrl) || "/logo.png"}
+                            alt={track.title || "Track artwork"}
+                            title={track.title}
+                            subtitle={track.artist?.name || "Unknown Artist"}
+                            caption={`${track.countryCode || selectedCountry} · ${track.languageCode || selectedLanguage}`}
+                            playable
+                            isPlayingNow={currentTrack?.id === track.id && isPlaying}
+                            onClick={() => playTrack(track, false)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-14 px-6 rounded-2xl bg-white/[0.04] border border-white/[0.07] text-center">
+                        <div className="w-12 h-12 rounded-xl bg-white/[0.08] flex items-center justify-center mx-auto text-white/60 mb-3">
+                          <Music size={22} />
                         </div>
-
-                        <div className="space-y-1">
-                          {results.tracks
-                            .slice(0, showMoreTracks ? 24 : 5)
-                            .map((track: any, i: number) => {
-                              const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
-                              const mins = Math.floor((track.duration || 0) / 60);
-                              const secs = (track.duration || 0) % 60;
-                              const durationStr = `${mins}:${secs.toString().padStart(2, "0")}`;
-                              const isLiked = likedTrackIds?.includes(track.id);
-
-                              return (
-                                <div
-                                  key={track.id}
-                                  onClick={() => {
-                                    setTrack(track);
-                                    setPlayerMinimized(false);
-                                    logSearchEvent("track", track.id, track.title);
-                                  }}
-                                  className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-zinc-900/80 border border-transparent hover:border-white/5 transition-all cursor-pointer"
-                                >
-                                  <span className="w-5 text-center text-xs font-bold text-zinc-500 tabular-nums">
-                                    {i + 1}
-                                  </span>
-
-                                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
-                                    <img
-                                      src={getMediaUrl(track.coverUrl) || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=100"}
-                                      alt={track.title || "Track artwork"}
-                                      width={40}
-                                      height={40}
-                                      loading="lazy"
-                                      decoding="async"
-                                      className="w-full h-full object-cover"
-                                    />
-                                    <div
-                                      className={cn(
-                                        "absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity",
-                                        isTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                      )}
-                                    >
-                                      {isTrackPlaying ? (
-                                        <Pause size={14} className="text-brand fill-current" />
-                                      ) : (
-                                        <Play size={14} className="text-white fill-current ml-0.5" />
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="min-w-0 flex-1">
-                                    <p
-                                      className={cn(
-                                        "text-sm font-bold truncate leading-tight",
-                                        isTrackPlaying ? "text-brand" : "text-white group-hover:text-white"
-                                      )}
-                                    >
-                                      {track.title}
-                                    </p>
-                                    <p className="text-xs text-zinc-400 truncate mt-0.5">
-                                      {track.artist?.name || "Unknown Artist"}
-                                    </p>
-                                  </div>
-
-                                  <button
-                                    onClick={(e) => toggleLike(track.id, e)}
-                                    className={cn(
-                                      "p-1.5 rounded-full transition-colors cursor-pointer",
-                                      isLiked ? "text-brand" : "text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100"
-                                    )}
-                                  >
-                                    <Heart size={14} className={cn(isLiked && "fill-current")} />
-                                  </button>
-
-                                  <span className="text-xs text-zinc-500 font-medium tabular-nums w-10 text-right">
-                                    {durationStr}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                        </div>
+                        <h3 className="text-[17px] font-semibold text-white">No Songs Available</h3>
+                        <p className="text-[13px] text-white/50 max-w-md mx-auto mt-1">
+                          There are no verified songs for this country and language yet. Try a different combination in Settings.
+                        </p>
                       </div>
                     )}
-                  </div>
-                )}
+                  </section>
 
-                {/* Collapsed "Other versions" Group (Covers, remixes, acoustic) */}
-                {results?.otherVersions && results.otherVersions.length > 0 && (
-                  <div className="rounded-2xl border border-white/10 bg-zinc-900/40 overflow-hidden">
-                    <button
-                      onClick={() => setShowOtherVersions(!showOtherVersions)}
-                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors cursor-pointer text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white">Other versions & remixes</span>
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/10 text-zinc-400">
-                          {results.otherVersions.length}
-                        </span>
+                  {/* Recent searches */}
+                  {recentSearches.length > 0 && (
+                    <section>
+                      <div className="flex items-end justify-between mb-3">
+                        <h2 className="flex items-center gap-2 text-[22px] leading-7 font-bold tracking-[-0.02em]">
+                          <History size={18} className="text-white/40" />
+                          Recently Searched
+                        </h2>
+                        <button
+                          onClick={clearRecentSearches}
+                          className="text-[13px] font-medium text-brand hover:opacity-70 transition-opacity cursor-pointer pb-0.5"
+                        >
+                          Clear
+                        </button>
                       </div>
-                      {showOtherVersions ? <ChevronUp size={18} className="text-zinc-400" /> : <ChevronDown size={18} className="text-zinc-400" />}
-                    </button>
-
-                    <AnimatePresence>
-                      {showOtherVersions && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="divide-y divide-white/5 border-t border-white/5 px-2 pb-2"
-                        >
-                          {results.otherVersions.map((track: any) => {
-                            const isTrackPlaying = currentTrack?.id === track.id && isPlaying;
-                            return (
-                              <div
-                                key={track.id}
-                                onClick={() => {
-                                  setTrack(track);
-                                  setPlayerMinimized(false);
-                                  logSearchEvent("track", track.id, track.title);
-                                }}
-                                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 cursor-pointer transition-colors"
-                              >
-                                <div className="w-9 h-9 rounded-lg overflow-hidden bg-zinc-800 shrink-0">
-                                  <img
-                                    src={getMediaUrl(track.coverUrl)}
-                                    alt={track.title || "Track artwork"}
-                                    width={36}
-                                    height={36}
-                                    loading="lazy"
-                                    decoding="async"
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-xs font-bold text-white truncate">{track.title}</p>
-                                  <p className="text-[11px] text-zinc-400 truncate">{track.artist?.name}</p>
-                                </div>
-                                <Play size={14} className="text-brand shrink-0" />
-                              </div>
-                            );
-                          })}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-
-                {/* 2. ARTISTS SECTION (Circular Images) */}
-                {(selectedFilter === "all" || selectedFilter === "artists") && results?.artists && results.artists.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                        Artists
-                      </h3>
-                      {results.artists.length > 6 && (
-                        <button
-                          onClick={() => setShowMoreArtists(!showMoreArtists)}
-                          className="text-xs font-bold text-zinc-400 hover:text-brand transition-colors cursor-pointer"
-                        >
-                          {showMoreArtists ? "Show less" : `Show more (${results.artists.length})`}
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {results.artists
-                        .slice(0, showMoreArtists ? 12 : 6)
-                        .map((artist: any) => (
-                          <div
-                            key={artist.id}
-                            onClick={() => {
-                              router.push(`/artist/${artist.id}`);
-                              logSearchEvent("artist", artist.id, artist.name);
-                            }}
-                            className="group flex flex-col items-center text-center p-4 rounded-2xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-brand/30 transition-all cursor-pointer"
-                          >
-                            <div className="w-24 h-24 rounded-full overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10 group-hover:border-brand/40">
-                              <img
-                                src={getMediaUrl(artist.imageUrl) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200"}
-                                alt={artist.name || "Artist portrait"}
-                                width={96}
-                                height={96}
-                                loading="lazy"
-                                decoding="async"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <span className="text-sm font-bold text-white group-hover:text-brand transition-colors truncate w-full">
-                              {artist.name}
-                            </span>
-                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mt-0.5">
-                              Artist
-                            </span>
-                          </div>
+                      <div className="flex flex-wrap gap-2">
+                        {recentSearches.map((term) => (
+                          <Chip key={term} onClick={() => setQuery(term)}>
+                            <SearchIcon size={12} className="text-white/45" />
+                            <span>{term}</span>
+                          </Chip>
                         ))}
-                    </div>
-                  </div>
-                )}
+                      </div>
+                    </section>
+                  )}
 
-                {/* 3. ALBUMS SECTION */}
-                {(selectedFilter === "all" || selectedFilter === "albums") && results?.albums && results.albums.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                        Albums
-                      </h3>
-                      {results.albums.length > 6 && (
-                        <button
-                          onClick={() => setShowMoreAlbums(!showMoreAlbums)}
-                          className="text-xs font-bold text-zinc-400 hover:text-brand transition-colors cursor-pointer"
-                        >
-                          {showMoreAlbums ? "Show less" : `Show more (${results.albums.length})`}
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {results.albums
-                        .slice(0, showMoreAlbums ? 12 : 6)
-                        .map((album: any) => (
-                          <div
-                            key={album.id}
-                            onClick={() => {
-                              router.push(`/album/${album.id}`);
-                              logSearchEvent("album", album.id, album.title);
-                            }}
-                            className="group p-3 rounded-2xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-brand/30 transition-all flex flex-col cursor-pointer"
-                          >
-                            <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10">
-                              <img
-                                src={getMediaUrl(album.coverUrl) || "https://images.unsplash.com/photo-1514525253361-bee8718a74a2?w=300"}
-                                alt={album.title || "Album artwork"}
-                                width={160}
-                                height={160}
-                                loading="lazy"
-                                decoding="async"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <span className="text-sm font-bold text-white group-hover:text-brand transition-colors truncate">
-                              {album.title}
-                            </span>
-                            <span className="text-xs text-zinc-500 truncate mt-0.5">
-                              {album.artist?.name || "Album"}{album.year ? ` • ${album.year}` : ""}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. PLAYLISTS SECTION */}
-                {(selectedFilter === "all" || selectedFilter === "playlists") && results?.playlists && results.playlists.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
-                      Playlists
-                    </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                      {results.playlists.slice(0, 6).map((playlist: any) => (
-                        <Link
-                          key={playlist.id}
-                          href={`/playlist/${playlist.id}`}
-                          className="group p-3 rounded-2xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-white/5 hover:border-brand/30 transition-all flex flex-col"
-                        >
-                          <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-800 shadow-xl mb-3 group-hover:scale-105 transition-transform border border-white/10 flex items-center justify-center">
-                            {playlist.coverUrl ? (
-                              <img
-                                src={getMediaUrl(playlist.coverUrl)}
-                                alt={playlist.name || "Playlist cover"}
-                                width={160}
-                                height={160}
-                                loading="lazy"
-                                decoding="async"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <ListMusic size={32} className="text-zinc-600" />
-                            )}
-                          </div>
-                          <span className="text-sm font-bold text-white group-hover:text-brand transition-colors truncate">
-                            {playlist.name}
-                          </span>
-                          <span className="text-xs text-zinc-500 truncate mt-0.5">
-                            Playlist
-                          </span>
-                        </Link>
+                  {/* Languages */}
+                  <section>
+                    <SectionHeader title="Browse by Language" />
+                    <div className="flex flex-wrap gap-2">
+                      {userLanguages.map((lang: string) => (
+                        <Chip key={lang} onClick={() => setQuery(lang)}>
+                          {lang}
+                        </Chip>
                       ))}
                     </div>
-                  </div>
-                )}
+                  </section>
 
-                {/* No Results Fallback */}
-                {!results?.tracks?.length &&
-                  !results?.artists?.length &&
-                  !results?.albums?.length &&
-                  !results?.playlists?.length && (
-                    <div className="py-20 text-center space-y-2">
-                      <Music size={36} className="mx-auto text-zinc-600" />
-                      <h4 className="text-lg font-bold text-white">
-                        No results found for &ldquo;{debouncedQuery}&rdquo;
-                      </h4>
-                      <p className="text-xs text-zinc-500">
-                        Please check the spelling or try searching for another artist, track, or album.
-                      </p>
-                    </div>
+                  {/* Trending searches */}
+                  {homeData?.trendingSearches && homeData.trendingSearches.length > 0 && (
+                    <section>
+                      <SectionHeader title="Trending Searches" />
+                      <div className="flex flex-wrap gap-2">
+                        {homeData.trendingSearches.map((term: string) => (
+                          <Chip key={term} onClick={() => setQuery(term)}>
+                            <TrendingUp size={12} className="text-brand" />
+                            <span>{term}</span>
+                          </Chip>
+                        ))}
+                      </div>
+                    </section>
                   )}
-              </>
-            )}
-          </div>
-        )}
+
+                  {/* Browse categories */}
+                  <section>
+                    <SectionHeader title="Browse Categories" subtitle="Explore curated sounds and moods." />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+                      {DISCOVER_GENRES.map((genre) => (
+                        <motion.div
+                          key={genre.name}
+                          whileHover={{ scale: 1.03, y: -2 }}
+                          whileTap={{ scale: 0.97 }}
+                          transition={SPRING}
+                          onClick={() => handleSelectGenre(genre.query)}
+                          className={cn(
+                            "group relative h-[120px] sm:h-[132px] rounded-xl overflow-hidden p-3.5 cursor-pointer select-none shadow-[0_8px_24px_-10px_rgba(0,0,0,0.7)] ring-1 ring-white/10",
+                            `bg-gradient-to-br ${genre.gradient}`
+                          )}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.12] to-transparent pointer-events-none" />
+                          <span className="relative z-10 text-[17px] leading-tight font-bold text-white tracking-tight drop-shadow-sm">
+                            {genre.name}
+                          </span>
+                          <div className="absolute -right-3 -bottom-3 w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-lg overflow-hidden shadow-2xl rotate-[22deg] group-hover:rotate-[14deg] group-hover:scale-110 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ring-1 ring-white/25">
+                            <img src={genre.image} alt={genre.name} width={80} height={80} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Top songs */}
+                  {homeData?.trendingTracks && homeData.trendingTracks.length > 0 && (
+                    <section>
+                      <SectionHeader
+                        title={`Top Songs in ${homeData?.countryName || "Your Country"}`}
+                        subtitle="Real-time charts for your region."
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6">
+                        {homeData.trendingTracks.slice(0, 9).map((track: any) => (
+                          <SongRow
+                            key={track.id}
+                            track={track}
+                            isCurrent={currentTrack?.id === track.id}
+                            isPlaying={isPlaying}
+                            liked={isLiked(track.id)}
+                            onLike={(e) => toggleLike(track.id, e)}
+                            onPlay={() => playTrack(track)}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Trending albums */}
+                  {homeData?.trendingAlbums && homeData.trendingAlbums.length > 0 && (
+                    <section>
+                      <SectionHeader title="Trending Albums" subtitle="Popular releases and top projects." />
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {homeData.trendingAlbums.slice(0, 6).map((album: any) => (
+                          <ArtCard
+                            key={album.id}
+                            cover={getMediaUrl(album.coverUrl) || FALLBACK_ALBUM}
+                            alt={album.title || "Album artwork"}
+                            title={album.title}
+                            subtitle={album.artist?.name || "Album"}
+                            onClick={() => {
+                              setQuery(album.title);
+                              logSearchEvent("album", album.id, album.title);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Popular artists */}
+                  {homeData?.artists && homeData.artists.length > 0 && (
+                    <section>
+                      <SectionHeader title="Popular Artists" subtitle="Top voices and creators in your languages." />
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
+                        {homeData.artists.slice(0, 6).map((artist: any) => (
+                          <ArtistCard
+                            key={artist.id}
+                            artist={artist}
+                            onClick={() => {
+                              setQuery(artist.name);
+                              logSearchEvent("artist", artist.id, artist.name);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              ) : (
+                /* ================= RESULTS ================= */
+                <div className="space-y-10 pt-7">
+                  {isSearchLoading ? (
+                    <div className="py-28 text-center space-y-3">
+                      <div className="w-6 h-6 mx-auto border-2 border-white/70 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-[13px] text-white/50">Searching…</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Top result + songs */}
+                      {(selectedFilter === "all" || selectedFilter === "tracks") && topResult && (
+                        <section className="grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-6">
+                          <div className="lg:col-span-5">
+                            <SectionHeader title="Top Result" />
+                            <motion.div
+                              whileHover={{ y: -2 }}
+                              whileTap={{ scale: 0.985 }}
+                              transition={SPRING}
+                              onClick={openTopResult}
+                              className="group relative p-5 rounded-2xl bg-white/[0.06] hover:bg-white/[0.09] border border-white/[0.09] backdrop-blur-xl shadow-[0_16px_40px_-16px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.08)] cursor-pointer transition-colors"
+                            >
+                              <div
+                                className={cn(
+                                  "w-[104px] h-[104px] overflow-hidden mb-4 shadow-[0_12px_30px_-10px_rgba(0,0,0,0.8)] ring-1 ring-white/10",
+                                  topResult.type === "artist" ? "rounded-full" : "rounded-xl"
+                                )}
+                              >
+                                <img
+                                  src={getMediaUrl(topResult.item.coverUrl || topResult.item.imageUrl) || FALLBACK_TRACK}
+                                  alt={topResult.item.title || topResult.item.name || "Top search result"}
+                                  width={104}
+                                  height={104}
+                                  fetchPriority="high"
+                                  decoding="async"
+                                  className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-105"
+                                />
+                              </div>
+
+                              <h4 className="text-[26px] leading-8 font-bold tracking-[-0.02em] text-white truncate pr-14">
+                                {topResult.item.title || topResult.item.name}
+                              </h4>
+
+                              <p className="text-[14px] text-white/55 mt-1 truncate pr-14">
+                                <span className="capitalize">{topResult.type === "track" ? "Song" : topResult.type}</span>
+                                {topResult.item.artist?.name && (
+                                  <>
+                                    {" · "}
+                                    <ArtistLinks track={topResult.item} className="inline" linkClassName="text-white/70 hover:text-white hover:underline" />
+                                  </>
+                                )}
+                              </p>
+
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.88 }}
+                                transition={SPRING}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openTopResult();
+                                }}
+                                className="absolute bottom-5 right-5 w-11 h-11 rounded-full bg-brand text-white flex items-center justify-center shadow-[0_8px_24px_-6px_rgba(250,36,60,0.6)] cursor-pointer outline-none"
+                                title="Play"
+                              >
+                                <Play size={19} className="fill-current ml-0.5" />
+                              </motion.button>
+                            </motion.div>
+                          </div>
+
+                          {results?.tracks && results.tracks.length > 0 && (
+                            <div className="lg:col-span-7">
+                              <SectionHeader
+                                title="Songs"
+                                action={
+                                  results.tracks.length > 5 ? (
+                                    <ShowMore open={showMoreTracks} onToggle={() => setShowMoreTracks(!showMoreTracks)} count={results.tracks.length} />
+                                  ) : undefined
+                                }
+                              />
+                              <motion.div layout transition={SPRING_SOFT}>
+                                {results.tracks.slice(0, showMoreTracks ? 24 : 5).map((track: any, i: number) => (
+                                  <SongRow
+                                    key={track.id}
+                                    track={track}
+                                    index={i}
+                                    isCurrent={currentTrack?.id === track.id}
+                                    isPlaying={isPlaying}
+                                    liked={isLiked(track.id)}
+                                    onLike={(e) => toggleLike(track.id, e)}
+                                    onPlay={() => playTrack(track)}
+                                  />
+                                ))}
+                              </motion.div>
+                            </div>
+                          )}
+                        </section>
+                      )}
+
+                      {/* Other versions: macOS disclosure group */}
+                      {results?.otherVersions && results.otherVersions.length > 0 && (
+                        <div className="rounded-xl bg-white/[0.05] border border-white/[0.08] overflow-hidden">
+                          <button
+                            onClick={() => setShowOtherVersions(!showOtherVersions)}
+                            className="w-full flex items-center gap-2 px-4 py-3 hover:bg-white/[0.05] transition-colors cursor-pointer text-left outline-none"
+                          >
+                            <motion.span animate={{ rotate: showOtherVersions ? 0 : -90 }} transition={SPRING} className="flex text-white/50">
+                              <ChevronDown size={16} strokeWidth={2.5} />
+                            </motion.span>
+                            <span className="text-[15px] font-medium text-white">Other Versions & Remixes</span>
+                            <span className="text-[12px] font-medium px-2 py-0.5 rounded-full bg-white/10 text-white/60">
+                              {results.otherVersions.length}
+                            </span>
+                          </button>
+
+                          <AnimatePresence initial={false}>
+                            {showOtherVersions && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={SPRING_SOFT}
+                                className="overflow-hidden border-t border-white/[0.07]"
+                              >
+                                <div className="p-2">
+                                  {results.otherVersions.map((track: any) => (
+                                    <SongRow
+                                      key={track.id}
+                                      track={track}
+                                      isCurrent={currentTrack?.id === track.id}
+                                      isPlaying={isPlaying}
+                                      liked={isLiked(track.id)}
+                                      onLike={(e) => toggleLike(track.id, e)}
+                                      onPlay={() => playTrack(track)}
+                                    />
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
+                      {/* Artists */}
+                      {(selectedFilter === "all" || selectedFilter === "artists") && results?.artists && results.artists.length > 0 && (
+                        <section>
+                          <SectionHeader
+                            title="Artists"
+                            action={
+                              results.artists.length > 6 ? (
+                                <ShowMore open={showMoreArtists} onToggle={() => setShowMoreArtists(!showMoreArtists)} count={results.artists.length} label="Show More" />
+                              ) : undefined
+                            }
+                          />
+                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
+                            {results.artists.slice(0, showMoreArtists ? 12 : 6).map((artist: any) => (
+                              <ArtistCard
+                                key={artist.id}
+                                artist={artist}
+                                onClick={() => {
+                                  router.push(`/artist/${artist.id}`);
+                                  logSearchEvent("artist", artist.id, artist.name);
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      )}
+
+                      {/* Albums */}
+                      {(selectedFilter === "all" || selectedFilter === "albums") && results?.albums && results.albums.length > 0 && (
+                        <section>
+                          <SectionHeader
+                            title="Albums"
+                            action={
+                              results.albums.length > 6 ? (
+                                <ShowMore open={showMoreAlbums} onToggle={() => setShowMoreAlbums(!showMoreAlbums)} count={results.albums.length} label="Show More" />
+                              ) : undefined
+                            }
+                          />
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            {results.albums.slice(0, showMoreAlbums ? 12 : 6).map((album: any) => (
+                              <ArtCard
+                                key={album.id}
+                                cover={getMediaUrl(album.coverUrl) || FALLBACK_ALBUM}
+                                alt={album.title || "Album artwork"}
+                                title={album.title}
+                                subtitle={`${album.artist?.name || "Album"}${album.year ? ` • ${album.year}` : ""}`}
+                                onClick={() => {
+                                  router.push(`/album/${album.id}`);
+                                  logSearchEvent("album", album.id, album.title);
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      )}
+
+                      {/* Playlists */}
+                      {(selectedFilter === "all" || selectedFilter === "playlists") && results?.playlists && results.playlists.length > 0 && (
+                        <section>
+                          <SectionHeader title="Playlists" />
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            {results.playlists.slice(0, 6).map((playlist: any) => (
+                              <Link key={playlist.id} href={`/playlist/${playlist.id}`} className="group block min-w-0">
+                                <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} transition={SPRING}>
+                                  <div className="aspect-square w-full rounded-xl overflow-hidden bg-white/[0.06] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] ring-1 ring-white/10 flex items-center justify-center">
+                                    {playlist.coverUrl ? (
+                                      <img
+                                        src={getMediaUrl(playlist.coverUrl)}
+                                        alt={playlist.name || "Playlist cover"}
+                                        width={180}
+                                        height={180}
+                                        loading="lazy"
+                                        decoding="async"
+                                        className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.04]"
+                                      />
+                                    ) : (
+                                      <ListMusic size={34} className="text-white/30" />
+                                    )}
+                                  </div>
+                                  <p className="mt-2 text-[14px] leading-5 font-medium text-white truncate">{playlist.name}</p>
+                                  <p className="text-[13px] leading-4 text-white/55">Playlist</p>
+                                </motion.div>
+                              </Link>
+                            ))}
+                          </div>
+                        </section>
+                      )}
+
+                      {/* No results */}
+                      {!results?.tracks?.length &&
+                        !results?.artists?.length &&
+                        !results?.albums?.length &&
+                        !results?.playlists?.length && (
+                          <div className="py-24 text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-white/[0.07] flex items-center justify-center mx-auto text-white/50 mb-4">
+                              <Music size={26} />
+                            </div>
+                            <h4 className="text-[20px] font-semibold tracking-tight text-white">
+                              No Results for &ldquo;{debouncedQuery}&rdquo;
+                            </h4>
+                            <p className="text-[14px] text-white/50 mt-1">Check the spelling or try a new search.</p>
+                          </div>
+                        )}
+                    </>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
-    </div>
+    </MotionConfig>
   );
 }
