@@ -460,6 +460,22 @@ class ZenAudioEngine {
     return this.fx;
   }
 
+  toggleNormalize(enabled: boolean) {
+    if (!this.compressor || !this.context) return;
+    const t = this.context.currentTime;
+    if (enabled) {
+      this.compressor.threshold.setTargetAtTime(-14, t, 0.05);
+      this.compressor.ratio.setTargetAtTime(3, t, 0.05);
+    } else {
+      this.compressor.threshold.setTargetAtTime(0, t, 0.05);
+      this.compressor.ratio.setTargetAtTime(1, t, 0.05);
+    }
+  }
+
+  setCrossfade(durationSeconds: number) {
+    this.applyFx({ crossfade: durationSeconds });
+  }
+
   private applyPlaybackRate() {
     const { speed, pitch } = this.fx;
     const preserve = pitch === 1;

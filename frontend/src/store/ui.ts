@@ -20,6 +20,11 @@ interface UIState {
   isQueueOpen: boolean;
   isLyricsOpen: boolean;
   isNativePlayerOpen: boolean;
+  isSettingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
+  openSettings: () => void;
+  closeSettings: () => void;
+  toggleSettings: () => void;
   reducedMotion: boolean;
   setReducedMotion: (reduced: boolean) => void;
   toast: ToastNotification | null;
@@ -88,6 +93,11 @@ export const useUIStore = create<UIState>((set) => ({
   isQueueOpen: false,
   isLyricsOpen: false,
   isNativePlayerOpen: false,
+  isSettingsOpen: false,
+  setSettingsOpen: (open) => set({ isSettingsOpen: open }),
+  openSettings: () => set({ isSettingsOpen: true }),
+  closeSettings: () => set({ isSettingsOpen: false }),
+  toggleSettings: () => set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
   reducedMotion: getInitialReducedMotion(),
   setReducedMotion: (reduced: boolean) => {
     if (typeof window !== 'undefined') {

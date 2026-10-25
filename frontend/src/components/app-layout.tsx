@@ -31,6 +31,7 @@ const ShortcutHelpModal = React.lazy(() => import("@/components/shared/shortcut-
 const UserOnboardingTour = React.lazy(() => import("@/components/shared/UserOnboardingTour").then(m => ({ default: m.UserOnboardingTour })));
 const CloudSyncSidePopup = React.lazy(() => import("@/components/shared/CloudSyncSidePopup").then(m => ({ default: m.CloudSyncSidePopup })));
 const BatchImportToast = React.lazy(() => import("@/components/shared/batch-import-toast").then(m => ({ default: m.BatchImportToast })));
+const SettingsModal = React.lazy(() => import("@/components/settings/SettingsModal").then(m => ({ default: m.SettingsModal })));
 
 /* ------------------------------------------------------------------ */
 /*  Apple-style tokens                                                 */
@@ -229,7 +230,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  router.push('/search');
  }
  break;
- case 'show_help':
+ case 'open_settings':
+					useUIStore.getState().toggleSettings();
+					break;
+				case 'show_help':
  setIsHelpOpen(true);
  break;
  case 'toggle_audio_fx':
@@ -576,6 +580,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  <React.Suspense fallback={null}>
    <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
    <UserOnboardingTour />
+    <SettingsModal />
  </React.Suspense>
  </div>
  );
