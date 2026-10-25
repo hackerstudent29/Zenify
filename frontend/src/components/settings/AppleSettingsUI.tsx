@@ -137,7 +137,9 @@ export function SettingsWindow({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"window" | "sheet" | null>(null);
+  const [mode, setMode] = useState<"window" | "sheet">(() =>
+    typeof window !== "undefined" && window.innerWidth <= 767 ? "sheet" : "window"
+  );
   const [internalOpen, setInternalOpen] = useState(isOpen !== undefined ? isOpen : true);
   const target = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -152,7 +154,6 @@ export function SettingsWindow({
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
     const apply = () => setMode(mq.matches ? "sheet" : "window");
-    apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
@@ -333,25 +334,17 @@ export function SettingsWindow({
                             type="button"
                             role="tab"
                             aria-selected={active}
-                            data-no-spring
                             onClick={() => nav.onSelect(item.id)}
                             className={cn(
-                              "relative shrink-0 cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-[10px] px-2.5 py-1.5 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/25",
+                              "relative shrink-0 cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-[10px] px-3 py-2 text-[13px] font-semibold outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-white/25",
                               item.desktopOnly ? "hidden md:flex" : "flex",
-                              active ? "text-white" : "text-white/65 hover:text-white"
+                              active
+                                ? "bg-white/[0.14] text-white shadow-sm ring-1 ring-white/10"
+                                : "text-white/60 hover:text-white hover:bg-white/[0.06]"
                             )}
                           >
-                            {active && (
-                              <motion.span
-                                layoutId="settings-nav-pill"
-                                transition={SPRING_PILL}
-                                className="absolute inset-0 rounded-[10px] bg-white/[0.13]"
-                              />
-                            )}
-                            <span className="relative">
-                              <TintIcon icon={item.icon} tint={item.tint} size={24} />
-                            </span>
-                            <span className="relative">{item.label}</span>
+                            <TintIcon icon={item.icon} tint={item.tint} size={24} />
+                            <span>{item.label}</span>
                           </button>
                         );
                       })}
@@ -389,13 +382,13 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <motion.div variants={sectionV} initial="hidden" animate="show">
-      <motion.div variants={itemV} className="mb-5">
-        <h1 className="text-[26px] font-bold leading-tight tracking-[-0.022em] text-white">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-[13px] font-medium text-white/50">{subtitle}</p>}
-      </motion.div>
+    <div className="animate-in fade-in-50 duration-150">
+      <div className="mb-5">
+        <h1 className="text-[24px] font-bold leading-tight tracking-[-0.022em] text-white">{title}</h1>
+        {subtitle && <p className="mt-1 text-[13px] font-medium text-white/50">{subtitle}</p>}
+      </div>
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -409,17 +402,17 @@ export function Group({
   children: ReactNode;
 }) {
   return (
-    <motion.section variants={itemV} className="mb-6">
+    <section className="mb-6">
       {header && (
-        <h3 className="mb-1.5 px-4 text-[11px] font-bold uppercase tracking-[0.07em] text-white/45">
+        <h3 className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.07em] text-white/40">
           {header}
         </h3>
       )}
       <div className="divide-y divide-white/[0.06] overflow-hidden rounded-[16px] bg-white/[0.04] backdrop-blur-md ring-1 ring-inset ring-white/[0.08] shadow-sm">
         {children}
       </div>
-      {footer && <p className="mt-1.5 px-4 text-[12px] leading-snug text-white/45">{footer}</p>}
-    </motion.section>
+      {footer && <p className="mt-2 px-3 text-[12px] leading-snug text-white/40">{footer}</p>}
+    </section>
   );
 }
 

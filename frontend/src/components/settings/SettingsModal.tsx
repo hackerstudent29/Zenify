@@ -128,7 +128,7 @@ export function SettingsModal({
         }
       } catch {}
     }
-  }, [user]);
+  }, [user?.id]);
 
   const handlePreferenceUpdate = async (updatedPrefs: typeof preferences, key: string) => {
     setIsSaving(true);
@@ -148,23 +148,21 @@ export function SettingsModal({
       const { id, userId, createdAt, updatedAt, ...cleanPrefs } = updatedPrefs as any;
       try {
         await api.put("/auth/preferences", cleanPrefs);
-        updateUser({ preferences: updatedPrefs });
         setSaveStatus("saved");
         setLastSavedKey(key);
         setTimeout(() => {
           setSaveStatus("idle");
           setLastSavedKey(null);
-        }, 2000);
+        }, 1500);
       } catch (err) {
         // Fallback gracefully without locking the UI
         console.warn("[Settings] Cloud preference sync deferred:", err);
-        updateUser({ preferences: updatedPrefs });
         setSaveStatus("saved");
         setLastSavedKey(key);
         setTimeout(() => {
           setSaveStatus("idle");
           setLastSavedKey(null);
-        }, 2000);
+        }, 1500);
       } finally {
         setIsSaving(false);
         setSavingKey(null);
