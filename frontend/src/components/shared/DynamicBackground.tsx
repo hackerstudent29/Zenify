@@ -19,12 +19,7 @@ export const DynamicBackground = React.memo(function DynamicBackground({
 }: DynamicBackgroundProps) {
   const isEnabled = useReactiveBgStore((state) => state.reactiveBg[surface]);
   if (!isEnabled) {
-    return (
-      <div 
-        aria-hidden 
-        className="absolute inset-0 z-0 bg-[#121214] pointer-events-none select-none w-full h-full min-h-[100dvh]" 
-      />
-    );
+    return null;
   }
 
   // Track, album, and playlist surfaces use static album color without animation.

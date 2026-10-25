@@ -295,12 +295,25 @@ export class ArtistController {
             const seenAlbumKeys = new Set<string>(validLocalAlbums.map(a => `${(a.title || '').toLowerCase().trim()}:::${a.id}`));
             const enrichedAlbums = [...validLocalAlbums];
 
+            const isAuthenticArtistRelease = (rawArtist: string, targetName: string): boolean => {
+                const a = (rawArtist || '').toLowerCase().trim();
+                const t = (targetName || '').toLowerCase().trim();
+                if (!a || !t) return false;
+                if (a === t || a.includes(t) || t.includes(a)) return true;
+                const tWords = t.split(/\s+/).filter(w => w.length > 2);
+                return tWords.length > 0 && tWords.every(w => a.includes(w));
+            };
+
             for (const col of externalAlbums) {
                 const albTitle = (col.collectionName || '').trim();
+                const albArtist = col.artistName || '';
                 const colId = `itunes-album-${col.collectionId}`;
                 if (!albTitle || seenCollectionIds.has(colId)) continue;
-                seenCollectionIds.add(colId);
 
+                // Strict artist verification: Only albums where this artist is credited belong to this artist
+                if (!isAuthenticArtistRelease(albArtist, artist.name)) continue;
+
+                seenCollectionIds.add(colId);
                 const artwork = col.artworkUrl100 ? col.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
                 const count = col.trackCount || 1;
                 enrichedAlbums.push({
@@ -316,11 +329,20 @@ export class ArtistController {
                 } as any);
             }
 
-            // Also merge regional multi-language albums from JioSaavn (Tamil, Telugu, Hindi, Kannada, Malayalam, etc.)
+            // Also merge regional multi-language albums from JioSaavn with strict verification
             for (const sa of saavnAlbums) {
                 const saTitle = (sa.title || '').trim();
                 const saId = `saavn-album-${sa.id}`;
                 if (!saTitle || seenCollectionIds.has(saId)) continue;
+
+                const saArtistStr = [
+                    sa.subtitle || '',
+                    sa.music || '',
+                    ...(sa.more_info?.artistMap?.primary_artists?.map((x: any) => x.name) || []),
+                    ...(sa.more_info?.artistMap?.artists?.map((x: any) => x.name) || [])
+                ].join(', ');
+
+                if (!isAuthenticArtistRelease(saArtistStr, artist.name)) continue;
                 
                 const dedupKey = `${saTitle.toLowerCase()}:::${sa.language || ''}`;
                 if (seenAlbumKeys.has(dedupKey)) continue;
