@@ -244,7 +244,7 @@ export function Sidebar() {
       style={{ fontFamily: FONT_STACK, WebkitFontSmoothing: "antialiased" }}
       className={cn(
         "relative sticky top-0 left-0 flex flex-col h-screen w-full select-none transition-all duration-700 ease-out border-r border-white/[0.08]",
-        isAlbumPage ? "bg-black/15 backdrop-blur-2xl" : "bg-[#1c1c1e]"
+        isAlbumPage ? "bg-[var(--side)] backdrop-blur-2xl" : "bg-[#1c1c1e]"
       )}
     >
       {/* Apple-style Edge-Attached Sidebar Toggle Button */}
@@ -258,7 +258,7 @@ export function Sidebar() {
         className={cn(
           "absolute right-0 translate-x-1/2 top-[22px] z-50",
           "w-7 h-7 rounded-full",
-          isAlbumPage ? "bg-black/40 backdrop-blur-xl hover:bg-black/60 active:scale-90" : "bg-[#1c1c1e] hover:bg-[#2c2c2e] active:bg-[#38383a]",
+          isAlbumPage ? "bg-[var(--side)] hover:brightness-125 border border-white/20 hover:border-white/35 active:scale-90" : "bg-[#1c1c1e] hover:bg-[#2c2c2e] active:bg-[#38383a]",
           "border border-white/20 hover:border-white/35",
           "shadow-[0_2px_8px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.08)]",
           "flex items-center justify-center text-white/75 hover:text-white",

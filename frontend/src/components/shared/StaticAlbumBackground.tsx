@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
+import { applyArtworkTheme } from "@/lib/theme";
 
 export interface StaticAlbumBackgroundProps {
   coverUrl?: string | null;
@@ -35,6 +36,13 @@ export const StaticAlbumBackground = React.memo(function StaticAlbumBackground({
     const [r1, g1, b1] = parseRgb(c1);
     return { r: r1, g: g1, b: b1 };
   }, [colors]);
+
+  // Synchronize extracted color directly to CSS variables (--page, --side, --album-rgb)
+  useEffect(() => {
+    if (primary && (primary.r !== 20 || primary.g !== 31 || primary.b !== 45)) {
+      applyArtworkTheme(primary.r, primary.g, primary.b);
+    }
+  }, [primary.r, primary.g, primary.b]);
 
   return (
     <div

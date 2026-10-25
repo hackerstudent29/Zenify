@@ -394,7 +394,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  className={cn(
  "flex flex-col absolute left-0 top-0 bottom-0 z-[120] transition-[width,background-color,backdrop-filter] duration-700 ease-out",
  APPLE_EASE,
- isAlbumPage ? "bg-black/25 backdrop-blur-2xl border-r border-white/10" : "bg-[#1c1c1e] border-r border-white/[0.08]"
+ isAlbumPage ? "bg-[var(--side)] backdrop-blur-2xl border-r border-white/10" : "bg-[#1c1c1e] border-r border-white/[0.08]"
  )}
  style={{ width: `${sidebarWidth}px` }}
  >
