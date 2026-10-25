@@ -89,6 +89,18 @@ export function PCFullScreenPlayer() {
     return () => window.removeEventListener("keydown", onKey);
   }, [close, togglePlay, handleNext, handlePrev]);
 
+  /* Prevent overscroll / pull-to-refresh on touch devices */
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    html.classList.add("fullview-player-open");
+    body.classList.add("fullview-player-open");
+    return () => {
+      html.classList.remove("fullview-player-open");
+      body.classList.remove("fullview-player-open");
+    };
+  }, []);
+
   const trackCover = currentTrack ? getTrackCover(currentTrack) : "/logo.png";
   if (!currentTrack) return null;
 

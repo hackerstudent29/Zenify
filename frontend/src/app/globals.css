@@ -889,6 +889,25 @@ input[type="submit"]:active:not(:disabled) {
     overflow-x: hidden !important;
     overscroll-behavior-y: auto !important;
   }
+
+  /* When fullview player is open, strictly prevent pull-to-refresh on mobile */
+  html.fullview-player-open,
+  body.fullview-player-open,
+  html.fullview-player-open body,
+  html.fullview-player-open #root {
+    height: 100% !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    overscroll-behavior-y: none !important;
+    overscroll-behavior-x: none !important;
+  }
+}
+
+/* Universal rule for fullview player to prevent pull-to-refresh */
+html.fullview-player-open,
+body.fullview-player-open {
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
 }
 
 /* Prevent accidental taps while scrolling on touch devices */
