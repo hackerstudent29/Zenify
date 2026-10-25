@@ -20,6 +20,7 @@ import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
 import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { EditPlaylistCoverModal } from "@/components/shared/EditPlaylistCoverModal";
 import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistModal";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { motion } from "framer-motion";
+import { DynamicBackground } from "@/components/shared/DynamicBackground";
 
 interface Playlist {
  id: string;
@@ -201,6 +203,7 @@ export default function PlaylistDetailPage() {
 
  return (
  <div className="min-h-screen w-full bg-transparent overflow-x-hidden text-white relative">
+ <DynamicBackground surface="albumPage" coverUrl={playlist?.coverUrl || firstTrack?.coverUrl} />
  <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
  <div className="relative px-6 pt-4 pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
@@ -432,8 +435,8 @@ export default function PlaylistDetailPage() {
  >
  {formatDisplayTitle(track.title)}
  </div>
- <div className="text-xs font-medium text-white opacity-60 truncate">
- {formatArtists(track)}
+ <div className="text-xs font-medium text-white/60 truncate" onClick={(e) => e.stopPropagation()}>
+ <ArtistLinks track={track} maxArtists={3} linkClassName="text-white/60 hover:text-white hover:underline" />
  </div>
  </div>
 

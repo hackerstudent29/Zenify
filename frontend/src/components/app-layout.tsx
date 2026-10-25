@@ -1,6 +1,6 @@
-import { useReactiveBgStore } from "@/store/reactiveBgStore";
 "use client";
 
+import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { PlayerBar } from "@/components/player-bar";
@@ -32,6 +32,17 @@ const UserOnboardingTour = React.lazy(() => import("@/components/shared/UserOnbo
 const CloudSyncSidePopup = React.lazy(() => import("@/components/shared/CloudSyncSidePopup").then(m => ({ default: m.CloudSyncSidePopup })));
 const BatchImportToast = React.lazy(() => import("@/components/shared/batch-import-toast").then(m => ({ default: m.BatchImportToast })));
 
+/* ------------------------------------------------------------------ */
+/*  Apple-style tokens                                                 */
+/* ------------------------------------------------------------------ */
+const SPRING = { type: "spring", stiffness: 420, damping: 34, mass: 0.6 } as const;
+const SPRING_SOFT = { type: "spring", stiffness: 340, damping: 32, mass: 0.85 } as const;
+// Apple's standard "ease out" curve for CSS transitions (valid Tailwind arbitrary value below)
+const APPLE_EASE = "ease-[cubic-bezier(0.32,0.72,0,1)]";
+const FONT_STACK =
+  '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Inter, system-ui, sans-serif';
+const SIDEBAR_EXPANDED = 260;
+const SIDEBAR_COLLAPSED = 72;
 
 function GlobalToast() {
  const toast = useUIStore(s => s.toast);
@@ -41,15 +52,16 @@ function GlobalToast() {
  <AnimatePresence>
  {toast && (
  <motion.div
- initial={{ opacity: 0, y: 20, scale: 0.95 }}
+ initial={{ opacity: 0, y: 24, scale: 0.94 }}
  animate={{ opacity: 1, y: 0, scale: 1 }}
- exit={{ opacity: 0, y: 20, scale: 0.95 }}
- transition={{ duration: 0.2 }}
+ exit={{ opacity: 0, y: 24, scale: 0.94 }}
+ transition={SPRING}
+ style={{ fontFamily: FONT_STACK }}
  className={cn(
- "fixed bottom-8 right-8 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-2xl border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] min-w-[260px] max-w-[380px] pointer-events-auto",
+ "fixed bottom-8 right-8 z-[9999] flex items-center gap-3 px-4 py-3 rounded-[16px] border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] min-w-[260px] max-w-[380px] pointer-events-auto",
  toast.type === "error"
- ? "bg-zinc-950/95 border-brand/50 text-rose-200 shadow-[0_0_35px_rgba(225,29,72,0.3)]"
- : "bg-zinc-900/90 border-white/10 text-white"
+ ? "bg-[#2c2c2e]/90 border-brand/40 text-rose-200 shadow-[0_0_35px_rgba(225,29,72,0.25)]"
+ : "bg-[#2c2c2e]/85 border-white/10 text-white"
  )}
  >
  <div
@@ -61,19 +73,22 @@ function GlobalToast() {
  {toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}
  </div>
  <div className="flex flex-col min-w-0 flex-1">
- <span className="text-[13px] font-bold tracking-tight text-white leading-tight">
+ <span className="text-[13px] font-semibold tracking-[-0.01em] text-white leading-tight">
  {toast.type === "error" ? "Error" : "Success"}
  </span>
- <span className="text-[12px] opacity-80 font-medium leading-tight truncate">
+ <span className="text-[12px] text-white/70 font-normal leading-tight truncate">
  {toast.msg}
  </span>
  </div>
- <button
+ <motion.button
+ whileHover={{ scale: 1.1 }}
+ whileTap={{ scale: 0.88 }}
+ transition={SPRING}
  onClick={hideToast}
- className="text-white/40 hover:text-white transition-colors p-1"
+ className="text-white/40 hover:text-white transition-colors duration-200 p-1 outline-none"
  >
  <X size={14} />
- </button>
+ </motion.button>
  </motion.div>
  )}
  </AnimatePresence>
@@ -93,13 +108,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const isPlaylistPage = pathname?.startsWith("/playlist/");
  const activeCoverUrl = isMusicContentPage ? (pageCoverUrl || currentTrack?.coverUrl) : (currentTrack?.coverUrl || pageCoverUrl);
 
- const isPlaying = usePlayerStore(state => state.isPlaying);
- const togglePlay = usePlayerStore(state => state.togglePlay);
- const playNext = usePlayerStore(state => state.playNext);
- const playPrev = usePlayerStore(state => state.playPrev);
- const volume = usePlayerStore(state => state.volume);
- const toggleShuffle = usePlayerStore(state => state.toggleShuffle);
- const toggleRepeat = usePlayerStore(state => state.toggleRepeat);
+ // removed unused subscription (isPlaying): it re-rendered the whole layout on every change
+ // removed unused subscription (togglePlay): it re-rendered the whole layout on every change
+ // removed unused subscription (playNext): it re-rendered the whole layout on every change
+ // removed unused subscription (playPrev): it re-rendered the whole layout on every change
+ // removed unused subscription (volume): it re-rendered the whole layout on every change
+ // removed unused subscription (toggleShuffle): it re-rendered the whole layout on every change
+ // removed unused subscription (toggleRepeat): it re-rendered the whole layout on every change
 
  const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
  const isPlayerMinimized = useUIStore(state => state.isPlayerMinimized);
@@ -251,7 +266,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  };
  }, [shortcuts, isHelpOpen, router]);
 
- const { track: trackBg, album: albumBg, playlist: playlistBg } = useReactiveBgStore();
+ // removed unused useReactiveBgStore() subscription: it re-rendered the whole layout on every background update
   const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
   const isOnboardingPage = pathname?.startsWith("/onboarding");
   const isOnboardingIncomplete = Boolean(
@@ -263,9 +278,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace('/onboarding');
     }
   }, [isOnboardingIncomplete, isOnboardingPage, isAuthPage, router]);
+  const isAlbumPage = pathname?.startsWith("/album/");
   const isInfoPage = pathname?.startsWith("/terms") || pathname?.startsWith("/privacy") || pathname?.startsWith("/about") || pathname?.startsWith("/creator");
   const isLyricSyncPage = pathname?.includes("/admin/lyric-sync");
   const hasSidebar = !isMobile && isAuthenticated;
+  // One source of truth for the sidebar width (aside, content padding, header, player footer)
+  const sidebarWidth = isSidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;
 
  // Pause global player automatically when entering Lyric Sync Studio
  React.useEffect(() => {
@@ -348,8 +366,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
  return (
- <div className={cn(
- "flex flex-col w-full bg-[#121214] text-foreground h-[100dvh] overflow-hidden relative z-0"
+ <div
+ style={{ fontFamily: FONT_STACK, WebkitFontSmoothing: "antialiased" }}
+ className={cn(
+ "flex flex-col w-full text-foreground h-[100dvh] overflow-hidden relative z-0 transition-colors duration-700 ease-out",
+ isAlbumPage ? "bg-[var(--page)]" : "bg-[#121214]"
  )}>
   
  <FullScreenPlayer />
@@ -367,16 +388,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  "flex-1 flex flex-row relative overflow-hidden isolate"
  )}
  >
- {/* Sidebar (Desktop) */}
+ {/* Sidebar (Desktop): flat, sticky-left, Apple Music style on every page */}
  {hasSidebar && (
  <aside
  className={cn(
- "flex flex-col absolute left-0 top-0 bottom-0 z-40 transition-[width] duration-400 ease-[0.16,1,0.3,1]",
- (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/")) && !isFullScreenPlayerOpen
- ? "bg-transparent border-none"
- : "bg-[var(--surface)] border-r border-white/5"
+ "flex flex-col absolute left-0 top-0 bottom-0 z-[120] transition-[width,background-color,backdrop-filter] duration-700 ease-out",
+ APPLE_EASE,
+ isAlbumPage ? "bg-black/25 backdrop-blur-2xl border-r border-white/10" : "bg-[#1c1c1e] border-r border-white/[0.08]"
  )}
- style={{ width: isSidebarCollapsed ? '72px' : '250px' }}
+ style={{ width: `${sidebarWidth}px` }}
  >
  <Sidebar />
  </aside>
@@ -385,15 +405,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {/* Content Area */}
  <div 
  className={cn(
- "flex-1 flex flex-col relative overflow-hidden transition-[padding] duration-400 ease-[0.16,1,0.3,1]"
+ "flex-1 flex flex-col relative overflow-hidden transition-[padding] duration-[450ms]",
+ APPLE_EASE
  )}
- style={{ paddingLeft: hasSidebar ? (isSidebarCollapsed ? '72px' : '250px') : 0 }}
+ style={{ paddingLeft: hasSidebar ? `${sidebarWidth}px` : 0 }}
  >
  <AnimatePresence>
  {showHeader && (
     <header 
     className={cn(
-    "z-[100] transition-all duration-300 ease-[0.16,1,0.3,1] w-full absolute top-0 left-0 right-0 safe-area-top",
+    "z-[100] pointer-events-none transition-all duration-300 w-full absolute top-0 left-0 right-0 safe-area-top",
+    APPLE_EASE,
     isMobile 
       ? "bg-[#121214]/95 backdrop-blur-md border-b border-white/5" 
       : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/"))
@@ -403,10 +425,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     )}
   style={{
   height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto",
-  paddingLeft: !isMobile ? (isSidebarCollapsed ? '72px' : '250px') : 0
+  paddingLeft: !isMobile ? `${sidebarWidth}px` : 0
   }}
  >
- <div className={cn("w-full", isMobile ? "h-full" : "h-[var(--header-height)]")}>
+ <div className={cn("w-full pointer-events-auto", isMobile ? "h-full" : "h-[var(--header-height)]")}>
  <TopBar />
  </div>
  </header>
@@ -419,7 +441,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
    style={isMobile ? { paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))', WebkitOverflowScrolling: 'touch' } : { overscrollBehaviorY: 'auto' }}
  >
  <div className={cn(
- "w-full min-h-full transition-transform duration-500 ease-[0.16,1,0.3,1] transform-gpu origin-top-left",
+ "w-full min-h-full transition-transform duration-500 transform-gpu origin-top-left",
+ APPLE_EASE,
  // PC: if minimized, pb-8. If visible, pb-28. Mobile: pb-32.
  (currentTrack && !isLyricSyncPage) 
  ? (isMobile ? "pb-32" : (isPlayerMinimized ? "pb-8" : "pb-28")) 
@@ -433,36 +456,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {!isMobile && <GlobalLyricsSidebar />}
  </div>
 
- {/* Desktop Player — hidden on mobile, visible sm+ only */}
+ {/* Desktop Player: hidden on mobile, visible sm+ only */}
  {!isMobile && isMobile !== null && (
  <footer className={cn(
- "fixed z-[800] transition-[left,transform,opacity] duration-400 ease-[0.16,1,0.3,1]",
+ "fixed z-[800] transition-[left,transform,opacity] duration-[450ms]",
+ APPLE_EASE,
  "right-0 bottom-0 pointer-events-none",
  (!currentTrack || isLyricSyncPage) && "translate-y-full opacity-0"
  )}
- style={{ left: isSidebarCollapsed ? '72px' : '250px' }}
+ style={{ left: `${sidebarWidth}px` }}
  >
  <AnimatePresence>
  {!isFullScreenPlayerOpen && (
  <motion.div 
- initial={{ y: 80, opacity: 0 }}
- animate={isPlayerMinimized ? { y: 80, opacity: 0 } : { y: 0, opacity: 1 }}
- exit={{ y: 80, opacity: 0 }}
- transition={{ type: "spring", stiffness: 400, damping: 34, mass: 0.6 }}
+ initial={{ y: 60, opacity: 0 }}
+ animate={isPlayerMinimized ? { y: 60, opacity: 0 } : { y: 0, opacity: 1 }}
+ exit={{ y: 60, opacity: 0 }}
+ transition={SPRING}
     id="tour-player"
     data-tour="player"
-    className="pointer-events-auto relative max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full h-[72px]"
+    // Pill: fixed 770x66, lifted with mb-8
+    className="pointer-events-auto relative mx-auto w-[770px] max-w-[calc(100%-2rem)] mb-8 rounded-full h-[66px]"
     >
       <div 
         className="absolute inset-0 pointer-events-none rounded-full overflow-hidden backdrop-blur-lg bg-black/10 border border-white/10"
         style={{
-          boxShadow: "0 14px 34px -10px rgba(0,0,0,0.45)"
+          boxShadow: "0 12px 28px -10px rgba(0,0,0,0.45)"
         }}
       >
         <div className="absolute -inset-1">
           <Glass
             className="w-full h-full"
-            radius={36}
+            radius={33}
             blur={12}
             behind="transparent"
             optics={{
@@ -475,7 +500,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             }}
           >
             {/* Dummy element so the bare wrap glass engine measures height */}
-            <div className="w-full h-[80px]" />
+            <div className="w-full h-[74px]" />
           </Glass>
         </div>
       </div>
@@ -489,23 +514,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {/* Restore Trigger when minimized */}
  {isPlayerMinimized && (
  <motion.div
- initial={{ y: 20, opacity: 0 }}
- animate={{ y: 0, opacity: 1 }}
+ initial={{ y: 20, opacity: 0, scale: 0.94 }}
+ animate={{ y: 0, opacity: 1, scale: 1 }}
+ transition={SPRING}
  className="absolute bottom-4 right-8 pointer-events-auto"
  >
- <button
+ <motion.button
+ whileHover={{ scale: 1.04 }}
+ whileTap={{ scale: 0.94 }}
+ transition={SPRING}
  onClick={() => useUIStore.getState().setPlayerMinimized(false)}
- className="flex items-center gap-3 px-5 py-2.5 bg-white/10 border border-white/30 hover:bg-white text-white hover:text-black rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_20px_rgba(255,255,255,0.1)] backdrop-blur-xl transition-all active:scale-95 group"
+ className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 hover:bg-white text-white hover:text-black rounded-full text-[12px] font-semibold tracking-[-0.01em] shadow-[0_0_20px_rgba(255,255,255,0.08)] backdrop-blur-xl transition-colors duration-200 group outline-none"
  >
- <Maximize2 size={14} className="group-hover:rotate-12 transition-transform" />
+ <Maximize2 size={13} className="group-hover:rotate-12 transition-transform duration-300" />
  Restore Player
- </button>
+ </motion.button>
  </motion.div>
  )}
  </footer>
  )}
 
- {/* Mobile Bottom Bar — uses CSS for visibility to avoid hydration gaps */}
+ {/* Mobile Bottom Bar: uses CSS for visibility to avoid hydration gaps */}
  <motion.div 
  className={cn(
  "fixed bottom-0 left-0 right-0 z-[200] flex flex-col pointer-events-none",
@@ -516,7 +545,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  opacity: (isMobile && isFullScreenPlayerOpen) ? 0 : 1,
  scale: (isMobile && isFullScreenPlayerOpen) ? 0.94 : 1,
  }}
- transition={{ type: "spring", stiffness: 400, damping: 34, mass: 0.6 }}
+ transition={SPRING}
  >
  <div className="pointer-events-auto flex flex-col items-stretch">
  {!isInfoPage && (
@@ -525,7 +554,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  </div>
  </motion.div>
 
- {/* Mobile Player — also root level for better z-depth */}
+ {/* Mobile Player: also root level for better z-depth */}
  {!isAuthPage && !isInfoPage && isMobile && (
  <PremiumMobilePlayer hidePlayer={isLyricSyncPage} />
  )}

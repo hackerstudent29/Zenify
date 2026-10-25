@@ -61,12 +61,13 @@
   /* Artwork-driven Apple Music theme tokens */
   --h: 240;
   --s: 5%;
-  --page: hsl(var(--h) var(--s) 18%);
-  --side: hsl(var(--h) calc(var(--s) * 0.65) 16%);
+  --album-rgb: 18, 18, 20;
+  --page: #121214;
+  --side: #1c1c1e;
   --pill: rgba(255, 255, 255, 0.08);
   --line: rgba(255, 255, 255, 0.13);
   --text-1: #ffffff;
-  --text-2: hsl(var(--h) 25% 80%);
+  --text-2: rgba(255, 255, 255, 0.7);
   --text-side: rgba(255, 255, 255, 0.93);
 
   /* Animation Tokens */

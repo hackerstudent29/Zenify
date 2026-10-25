@@ -212,7 +212,9 @@ function SongRow({
         <p className={cn("text-[15px] leading-5 font-medium truncate", isCurrent ? "text-brand" : "text-white")}>
           {track.title}
         </p>
-        <p className="text-[13px] leading-4 text-white/55 truncate">{track.artist?.name || "Unknown Artist"}</p>
+        <div className="text-[13px] leading-4 text-white/55 truncate" onClick={(e) => e.stopPropagation()}>
+          <ArtistLinks track={track} maxArtists={3} linkClassName="text-white/55 hover:text-white hover:underline" />
+        </div>
       </div>
 
       <motion.button

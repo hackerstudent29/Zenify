@@ -547,10 +547,11 @@ export default function TrackPage() {
  )}
  </div>
 
- {/* Name & Subtitle — click to play */}
+ {/* Name & Subtitle — click title to play, click artist to view artist */}
+ <div className="flex-1 text-left min-w-0 flex flex-col justify-center">
  <button
  onClick={handlePlayTrack}
- className="flex-1 text-left min-w-0 flex flex-col justify-center cursor-pointer"
+ className="text-left cursor-pointer"
  >
  <span
  className={cn(
@@ -560,10 +561,11 @@ export default function TrackPage() {
  >
  {formatDisplayTitle(track.title)}
  </span>
- <span className="text-[12px] font-medium text-white/40 truncate mt-0.5 block">
- {formatDisplayTitle(track.artist?.name)}
- </span>
  </button>
+ <div className="text-[12px] font-medium text-white/40 truncate mt-0.5 block" onClick={(e) => e.stopPropagation()}>
+ <ArtistLinks track={track} maxArtists={3} linkClassName="text-white/40 hover:text-white hover:underline" />
+ </div>
+ </div>
 
  {/* Duration */}
  <span className="text-[14px] text-muted tabular-nums shrink-0 mr-3">

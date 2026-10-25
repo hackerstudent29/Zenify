@@ -428,7 +428,7 @@ export function stripHonorifics(name: string): string {
   return clean || name.trim();
 }
 
-export const ARTIST_DELIMITER_REGEX = /\s*(?:&|\band\b|,\s*|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b|\bvs\.?|\bx\b|\/)\s+/i;
+export const ARTIST_DELIMITER_REGEX = /(?:\s*,\s*|\s*[/\\|•·]\s*|\s+(?:&|and|feat\.?|ft\.?|featuring|with|vs\.?|[xX])\s+|\s*&\s*)/i;
 
 /**
  * Splits raw artist strings on common delimiters (&, comma, feat, ft, etc.)

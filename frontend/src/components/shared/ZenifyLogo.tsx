@@ -6,9 +6,31 @@ interface ZenifyLogoProps {
   className?: string;
   size?: number;
   animated?: boolean;
+  markOnly?: boolean;
 }
 
-export const ZenifyLogo = ({ className, size = 32, animated = false }: ZenifyLogoProps) => {
+export const ZenifyLogo = ({ className, size = 32, animated = false, markOnly = false }: ZenifyLogoProps) => {
+  if (markOnly) {
+    return (
+      <div className={cn("flex items-center justify-center pointer-events-none select-none relative shrink-0", className)}>
+        <img 
+          src="/favicon_z_512.png" 
+          alt="Zenify Z Logo" 
+          width={size}
+          height={size}
+          decoding="async"
+          fetchPriority="high"
+          style={{ height: `${size}px`, width: `${size}px`, objectFit: 'contain' }}
+          className={cn(
+            "transition-all duration-500 pointer-events-none object-contain",
+            "drop-shadow-[0_0_24px_rgba(225,29,72,0.7)]",
+            animated && "animate-pulse"
+          )}
+        />
+      </div>
+    );
+  }
+
   // Natural dimensions of public/logo.png are 844 x 256 (~3.296875 aspect ratio)
   const proportionalWidth = Math.round(size * (844 / 256));
 
