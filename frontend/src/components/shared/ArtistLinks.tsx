@@ -234,7 +234,7 @@ export function ArtistLinks({
   const artists = maxArtists && maxArtists > 0 ? allArtists.slice(0, maxArtists) : allArtists;
 
   return (
-    <span className={cn("inline-flex flex-wrap items-center gap-x-1 gap-y-0.5", className)}>
+    <span className={cn("inline", className)}>
       {artists.map((artist, idx) => {
         const isLast = idx === artists.length - 1;
         const separator = idx === artists.length - 2 ? " & " : ", ";
@@ -245,7 +245,7 @@ export function ArtistLinks({
 
         return (
           <React.Fragment key={`${artist.id || artist.name}-${idx}`}>
-            <span className="inline-flex items-baseline whitespace-nowrap">
+            <span className="inline">
               {!isUnknown ? (
                 <Link
                   href={targetHref}
@@ -254,7 +254,7 @@ export function ArtistLinks({
                     if (onClick) onClick(e);
                   }}
                   className={cn(
-                    "hover:underline transition-colors cursor-pointer inline-block",
+                    "hover:underline transition-colors cursor-pointer inline",
                     artist.isMain
                       ? "text-white/90 font-medium hover:text-white"
                       : "text-zinc-400 hover:text-zinc-200",
@@ -266,7 +266,7 @@ export function ArtistLinks({
               ) : (
                 <span
                   className={cn(
-                    "inline-block",
+                    "inline",
                     artist.isMain ? "text-white/90 font-medium" : "text-zinc-400",
                     linkClassName
                   )}

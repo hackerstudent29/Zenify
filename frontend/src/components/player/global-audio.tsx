@@ -316,10 +316,31 @@ export function GlobalAudio() {
 
         console.warn(`[GlobalAudio/Automator] Error detected for "${current.title}" (Attempt ${attemptCount}/3). Resolving alternative stream...`);
 
+        const directBackup = (current as any).previewUrl || (current as any).preview_url;
+
+        // Immediate direct preview stream fallback before network roundtrips
+        if (directBackup && audio.src !== directBackup && !audio.src.includes('direct-backup=true')) {
+          console.log("[GlobalAudio/Automator] Instant local fallback to direct preview stream:", directBackup);
+          const sep = directBackup.includes('?') ? '&' : '?';
+          audio.src = `${directBackup}${sep}direct-backup=true`;
+          audio.load();
+          audio.play().catch((playErr) => {
+            if (playErr?.name === 'AbortError') return;
+            console.warn("[GlobalAudio/Automator] Direct backup play failed, calling refetch-audio:", playErr);
+          });
+          return;
+        }
+
         if (attemptCount <= 2) {
           import('@/lib/api').then(({ default: api }) => {
-            // 1. First attempt: call refetch-audio to resolve fresh verified stream
-            api.post(`/tracks/${trackId}/refetch-audio`).then((res: any) => {
+            // 1. First attempt: call refetch-audio with full track metadata payload
+            api.post(`/tracks/${trackId}/refetch-audio`, {
+              title: current.title,
+              artistName: current.artist?.name || (current as any).artistName || '',
+              albumTitle: current.album?.title,
+              duration: current.duration,
+              previewUrl: directBackup
+            }).then((res: any) => {
               const newUrl = res.data?.audioUrl || res.data?.track?.audioUrl;
               if (newUrl) {
                 const fallbackMediaUrl = getMediaUrl(newUrl, 'audio', {
@@ -348,16 +369,24 @@ export function GlobalAudio() {
                   return;
                 }
               }
-              // If refetch returned no valid stream, advance to next track
+              // If refetch returned no valid stream, try direct backup if not already tried
+              if (directBackup && audio.src !== directBackup) {
+                audio.src = directBackup;
+                audio.load();
+                audio.play().catch(() => playNext(true));
+                return;
+              }
               useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
               playNext(true);
             }).catch((err) => {
-              if (err?.response?.status === 404) {
-                console.warn(`[GlobalAudio/Automator] Track "${current.title}" (${trackId}) no longer exists on server (404). Clearing obsolete player state.`);
-                usePlayerStore.setState({ currentTrack: null, isPlaying: false, queue: [] });
+              console.warn("[GlobalAudio/Automator] Refetch audio error:", err);
+              // Fallback to direct backup if available
+              if (directBackup && audio.src !== directBackup) {
+                audio.src = directBackup;
+                audio.load();
+                audio.play().catch(() => playNext(true));
                 return;
               }
-              console.warn("[GlobalAudio/Automator] Refetch audio error:", err);
               useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
               playNext(true);
             });
@@ -394,11 +423,31 @@ export function GlobalAudio() {
               }
             } else {
               console.warn(`[GlobalAudio] Server returned HTTP ${res.status} (Backend failure, not CORS). Advancing immediately to fallback source...`, testUrl);
+              const directPreview = (usePlayerStore.getState().currentTrack as any)?.previewUrl || (usePlayerStore.getState().currentTrack as any)?.preview_url;
+              if (directPreview && audio.src !== directPreview) {
+                console.log("[GlobalAudio] Server failed, immediately falling back to preview stream:", directPreview);
+                audio.src = directPreview;
+                audio.load();
+                if (isPlaying) {
+                  audio.play().catch(() => triggerRecovery());
+                }
+                return;
+              }
               triggerRecovery();
             }
           })
           .catch(() => {
             console.warn("[GlobalAudio] Probe failed (network or opaque error). Attempting fallback recovery...");
+            const directPreview = (usePlayerStore.getState().currentTrack as any)?.previewUrl || (usePlayerStore.getState().currentTrack as any)?.preview_url;
+            if (directPreview && audio.src !== directPreview) {
+              console.log("[GlobalAudio] Probe error, immediately falling back to preview stream:", directPreview);
+              audio.src = directPreview;
+              audio.load();
+              if (isPlaying) {
+                audio.play().catch(() => triggerRecovery());
+              }
+              return;
+            }
             triggerRecovery();
           });
         return;
@@ -560,13 +609,15 @@ export function GlobalAudio() {
 
       if (!targetSrc || is30sPreviewUrl) {
         const query = `${currentArtist} - ${currentTrack.title}${trackAlbum && !currentTrack.title.toLowerCase().includes(trackAlbum.toLowerCase()) ? ` (${trackAlbum})` : ''}`.trim();
+        const previewCandidate = (currentTrack as any).previewUrl || (currentTrack as any).preview_url || (is30sPreviewUrl ? targetSrc : undefined);
         const streamParams = new URLSearchParams({
           url: query,
           trackId: currentTrack.id || '',
           title: currentTrack.title || '',
           artist: currentArtist || '',
           ...(trackAlbum ? { album: trackAlbum } : {}),
-          ...(trackLang ? { language: trackLang } : {})
+          ...(trackLang ? { language: trackLang } : {}),
+          ...(previewCandidate ? { previewUrl: previewCandidate } : {})
         });
         targetSrc = getMediaUrl(`/api/utils/stream-youtube?${streamParams.toString()}`, 'audio', trackContext);
       }

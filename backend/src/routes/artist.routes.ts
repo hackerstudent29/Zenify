@@ -325,9 +325,10 @@ export async function artistRoutes(server: FastifyInstance) {
                             const localMatch = localTrackMap.get(cleanTitle.toLowerCase());
                             const trackArtist = cleanArtistNames(item.artistName || artist.name);
                             const albumTitle = item.collectionName || 'Single';
+                            const previewParam = item.previewUrl ? `&previewUrl=${encodeURIComponent(item.previewUrl)}` : '';
                             const instantAudioUrl = (localMatch && localMatch.audioUrl && !localMatch.audioUrl.includes('audio-ssl') && !localMatch.audioUrl.includes('mzstatic') && !localMatch.audioUrl.includes('itunes.apple.com'))
                                 ? localMatch.audioUrl
-                                : `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albumTitle)}`;
+                                : `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albumTitle)}${previewParam}&trackId=itunes-${item.trackId}`;
 
                             finalTopTracks.push({
                                 id: localMatch ? localMatch.id : `itunes-${item.trackId}`,

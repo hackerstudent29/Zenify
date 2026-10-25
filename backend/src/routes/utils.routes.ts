@@ -295,9 +295,9 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
     if (videoId) {
         const pipedEndpoints = [
             `https://pipedapi.kavin.rocks/streams/${videoId}`,
-            `https://api.piped.privacydev.net/streams/${videoId}`,
-            `https://pipedapi.tokhmi.xyz/streams/${videoId}`,
-            `https://cf.pipedapi.kavin.rocks/streams/${videoId}`,
+            `https://piped-api.lunar.icu/streams/${videoId}`,
+            `https://api.piped.projectsegfau.lt/streams/${videoId}`,
+            `https://pipedapi.drgns.space/streams/${videoId}`,
             `https://pipedapi.leptons.xyz/streams/${videoId}`
         ];
 
@@ -323,11 +323,12 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
     // Gate 3: Distributed Invidious Instances in parallel race
     if (videoId) {
         const invidiousEndpoints = [
+            `https://inv.nadeko.net/api/v1/videos/${videoId}`,
             `https://invidious.nerdvpn.de/api/v1/videos/${videoId}`,
-            `https://invidious.drgns.space/api/v1/videos/${videoId}`,
             `https://inv.tux.pizza/api/v1/videos/${videoId}`,
-            `https://yewtu.be/api/v1/videos/${videoId}`,
-            `https://invidious.privacydev.net/api/v1/videos/${videoId}`
+            `https://invidious.no-valat.net/api/v1/videos/${videoId}`,
+            `https://invidious.projectsegfau.lt/api/v1/videos/${videoId}`,
+            `https://yt.artemislena.eu/api/v1/videos/${videoId}`
         ];
 
         const fetchInvidious = async (endpoint: string): Promise<string> => {
@@ -964,7 +965,7 @@ export async function utilsRoutes(server: FastifyInstance) {
     });
 
     server.get('/stream-youtube', async (request, reply) => {
-        let { url, title, artist, album, trackId, preview, mode, language } = request.query as {
+        let { url, title, artist, album, trackId, preview, mode, language, previewUrl } = request.query as {
             url?: string;
             title?: string;
             artist?: string;
@@ -973,6 +974,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             preview?: string;
             mode?: string;
             language?: string;
+            previewUrl?: string;
         };
         const isPreviewRequested = preview === 'true' || mode === 'preview';
 
@@ -1168,10 +1170,14 @@ export async function utilsRoutes(server: FastifyInstance) {
             const numericId = cleanId.replace(/[^0-9]/g, '');
             if (numericId) {
                 try {
-                    const itunesRes = await axios.get(`https://itunes.apple.com/lookup?id=${numericId}&entity=song`, { timeout: 3500 }).catch(() => null);
+                    let itunesRes = await axios.get(`https://itunes.apple.com/lookup?id=${numericId}&entity=song&country=IN`, { timeout: 3500 }).catch(() => null);
+                    if (!itunesRes?.data?.results?.length) {
+                        itunesRes = await axios.get(`https://itunes.apple.com/lookup?id=${numericId}&entity=song&country=US`, { timeout: 3500 }).catch(() => null);
+                    }
                     const item = itunesRes?.data?.results?.[0];
                     if (item) {
                         targetUrl = `${item.artistName || ''} - ${item.trackName || ''}`.trim();
+                        if (item.previewUrl && !previewUrl) previewUrl = item.previewUrl;
                         server.log.info(`[stream-youtube] Resolved itunes:${numericId} to full search query: "${targetUrl}"`);
                     }
                 } catch (err: any) {
@@ -1596,6 +1602,38 @@ export async function utilsRoutes(server: FastifyInstance) {
                     }
 
                     // 4. Apple CDN AAC Stream: Absolute guarantee that audio plays rather than returning 502
+                    if (!fallbackAudioUrl && previewUrl && (previewUrl.startsWith('http://') || previewUrl.startsWith('https://'))) {
+                        fallbackAudioUrl = previewUrl;
+                    }
+
+                    if (!fallbackAudioUrl) {
+                        const itunesQueries = [
+                            searchTitle && searchArtist ? `${searchArtist} ${searchTitle}` : null,
+                            searchTitle || null,
+                            cleanCandTitle && cleanCandArtist ? `${cleanCandArtist} ${cleanCandTitle}` : null,
+                            cleanCandTitle || null,
+                            candTitle || null
+                        ].filter(Boolean) as string[];
+
+                        for (const q of itunesQueries) {
+                            for (const country of ['US', 'IN', 'GB']) {
+                                try {
+                                    const itRes = await axios.get('https://itunes.apple.com/search', {
+                                        params: { term: q, media: 'music', entity: 'song', limit: 5, country },
+                                        timeout: 3000
+                                    }).catch(() => null);
+                                    const matched = itRes?.data?.results?.find((r: any) => r.previewUrl);
+                                    if (matched?.previewUrl) {
+                                        fallbackAudioUrl = matched.previewUrl;
+                                        server.log.info(`[stream-youtube] Direct iTunes AAC preview resolved via (${country}): ${fallbackAudioUrl}`);
+                                        break;
+                                    }
+                                } catch {}
+                            }
+                            if (fallbackAudioUrl) break;
+                        }
+                    }
+
                     if (fallbackAudioUrl) {
                         server.log.info(`[stream-youtube] Streaming high-fidelity Apple CDN AAC audio fallback: ${fallbackAudioUrl}`);
                         return await streamProxyUrl(fallbackAudioUrl, request, reply);

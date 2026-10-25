@@ -31,7 +31,6 @@ import { EssentialAlbums } from "./components/EssentialAlbums";
 import { ReleaseRowSection } from "./components/ReleaseRowSection";
 import { ArtistPlaylists } from "./components/ArtistPlaylists";
 import { FansAlsoLike } from "./components/FansAlsoLike";
-import { StatsForwardAbout } from "./components/StatsForwardAbout";
 
 export default function ArtistPage() {
   const params = useParams();
@@ -294,9 +293,6 @@ export default function ArtistPage() {
           currentArtistId={artist.id}
           initialRelated={artist.relatedArtists}
         />
-
-        {/* About Artist Section */}
-        <StatsForwardAbout artist={artist} />
       </div>
     </div>
   );
