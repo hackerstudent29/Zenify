@@ -5,8 +5,6 @@ import { useUIStore } from "@/store/ui";
 import {
   SwiftUIPlay,
   SwiftUIPause,
-  SwiftUIShuffle,
-  SwiftUIRepeat,
   SwiftUIForward,
   SwiftUIBackward,
   SwiftUIQueue,
@@ -23,11 +21,11 @@ import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { applyArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
 
 /* ------------------------------------------------------------------ */
-/*  Motion tokens                                                      */
+/*  Tokens                                                             */
 /* ------------------------------------------------------------------ */
-const SPRING = { type: "spring", stiffness: 520, damping: 30, mass: 0.7 } as const; // buttons, pops
-const SPRING_SOFT = { type: "spring", stiffness: 380, damping: 34, mass: 0.8 } as const; // scrubber expand
-const EASE_OUT = "cubic-bezier(0.32, 0.72, 0, 1)"; // Apple-style ease for CSS transitions
+const SPRING = { type: "spring", stiffness: 520, damping: 30, mass: 0.7 } as const;
+const SPRING_SOFT = { type: "spring", stiffness: 380, damping: 34, mass: 0.8 } as const;
+const EASE_OUT = "cubic-bezier(0.32, 0.72, 0, 1)";
 
 const formatDuration = (s?: number | null) => {
   if (!s || isNaN(s)) return "0:00";
@@ -37,9 +35,29 @@ const formatDuration = (s?: number | null) => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  SF Symbols-style icons (for the ones that weren't SwiftUI icons)   */
+/*  Icons                                                              */
 /* ------------------------------------------------------------------ */
 type IconProps = { size?: number; className?: string };
+
+// Apple-style shuffle: two crossing paths with arrowheads on the right
+const SFShuffle = ({ size = 19, className }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 7h2.6c2 0 3.3.9 4.3 2.4l3.2 5.2c1 1.5 2.3 2.4 4.3 2.4H20" />
+    <path d="M3 17h2.6c2 0 3.3-.9 4.3-2.4l3.2-5.2c1-1.5 2.3-2.4 4.3-2.4H20" />
+    <path d="M17.2 4.4L20.2 7l-3 2.6" />
+    <path d="M17.2 14.4L20.2 17l-3 2.6" />
+  </svg>
+);
+
+// Apple-style repeat: rounded loop with arrowheads top-right and bottom-left
+const SFRepeat = ({ size = 19, className }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M4 11v-1a3 3 0 0 1 3-3h12.2" />
+    <path d="M16.4 4.4L19.4 7l-3 2.6" />
+    <path d="M20 13v1a3 3 0 0 1-3 3H4.8" />
+    <path d="M7.6 14.4L4.6 17l3 2.6" />
+  </svg>
+);
 
 const SFHeart = ({ size = 16, filled, className }: IconProps & { filled?: boolean }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -63,12 +81,12 @@ const SFFx = ({ size = 16, className }: IconProps) => (
 );
 
 const SFExpand = ({ size = 15, className }: IconProps) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
   </svg>
 );
 
-const SFSpeaker = ({ size = 16, level = 1, className }: IconProps & { level?: number }) => (
+const SFSpeaker = ({ size = 17, level = 1, className }: IconProps & { level?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" />
     {level === 0 ? (
@@ -83,7 +101,7 @@ const SFSpeaker = ({ size = 16, level = 1, className }: IconProps & { level?: nu
 );
 
 /* ------------------------------------------------------------------ */
-/*  Spring button: hover grows, press squishes                         */
+/*  Spring button                                                      */
 /* ------------------------------------------------------------------ */
 function SpringButton({ className, ...props }: HTMLMotionProps<"button">) {
   return (
@@ -97,6 +115,81 @@ function SpringButton({ className, ...props }: HTMLMotionProps<"button">) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Marquee: long text rests 5s, glides left to reveal the rest,       */
+/*  holds briefly, glides back, then repeats forever.                  */
+/* ------------------------------------------------------------------ */
+const PAD = 16; // trailing space so the last letters clear the edge fade
+
+function Marquee({
+  children,
+  rest = 5,
+  hold = 1.8,
+  speed = 34, // px per second
+}: {
+  children: React.ReactNode;
+  rest?: number;
+  hold?: number;
+  speed?: number;
+}) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLSpanElement>(null);
+  const [shift, setShift] = useState(0);
+
+  useEffect(() => {
+    const box = boxRef.current;
+    const inner = innerRef.current;
+    if (!box || !inner) return;
+    const measure = () => {
+      const overflow = inner.offsetWidth - PAD - box.clientWidth;
+      setShift(overflow > 0 ? Math.ceil(inner.offsetWidth - box.clientWidth) : 0);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(box);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
+
+  const scroll = Math.max(1.6, shift / speed);
+  const total = rest + scroll + hold + scroll;
+  const overflowing = shift > 0;
+
+  const mask = overflowing
+    ? "linear-gradient(90deg, transparent 0, #000 7px, #000 calc(100% - 14px), transparent 100%)"
+    : undefined;
+
+  return (
+    <div
+      ref={boxRef}
+      className={cn("flex w-full overflow-hidden", overflowing ? "justify-start" : "justify-center")}
+      style={{ maskImage: mask, WebkitMaskImage: mask }}
+    >
+      <motion.span
+        ref={innerRef}
+        className="shrink-0 whitespace-nowrap inline-flex"
+        style={{ paddingRight: PAD, marginRight: -PAD }}
+        animate={overflowing ? { x: [0, 0, -shift, -shift, 0] } : { x: 0 }}
+        transition={
+          overflowing
+            ? {
+                duration: total,
+                repeat: Infinity,
+                times: [0, rest / total, (rest + scroll) / total, (rest + scroll + hold) / total, 1],
+                ease: ["linear", [0.45, 0, 0.25, 1], "linear", [0.45, 0, 0.25, 1]],
+              }
+            : { duration: 0 }
+        }
+      >
+        {children}
+      </motion.span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Player                                                             */
+/* ------------------------------------------------------------------ */
 export function PCPlayerBar() {
   const router = useRouter();
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -131,10 +224,15 @@ export function PCPlayerBar() {
   const [localTime, setLocalTime] = useState(currentTime);
   const lastSeekTime = useRef(0);
 
-  // Apple Music style: hovering/dragging the seekbar expands it and hides the track info
+  // Seekbar: hover or drag expands it and blurs the track info away
   const [isScrubHover, setIsScrubHover] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const scrubExpanded = isScrubHover || isDragging;
+  const [isScrubDrag, setIsScrubDrag] = useState(false);
+  const scrubExpanded = isScrubHover || isScrubDrag;
+
+  // Volume: hover or drag expands a slider pill over the right-hand buttons
+  const [isVolHover, setIsVolHover] = useState(false);
+  const [isVolDrag, setIsVolDrag] = useState(false);
+  const volExpanded = isVolHover || isVolDrag;
 
   useEffect(() => {
     if (Date.now() - lastSeekTime.current > 400) {
@@ -142,17 +240,20 @@ export function PCPlayerBar() {
     }
   }, [currentTime]);
 
-  // Release drag state even if the pointer is released outside the slider
+  // Release drag states even if the pointer lets go outside the slider
   useEffect(() => {
-    if (!isDragging) return;
-    const end = () => setIsDragging(false);
+    if (!isScrubDrag && !isVolDrag) return;
+    const end = () => {
+      setIsScrubDrag(false);
+      setIsVolDrag(false);
+    };
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
     return () => {
       window.removeEventListener("pointerup", end);
       window.removeEventListener("pointercancel", end);
     };
-  }, [isDragging]);
+  }, [isScrubDrag, isVolDrag]);
 
   const performSeek = (targetSec: number) => {
     lastSeekTime.current = Date.now();
@@ -176,7 +277,7 @@ export function PCPlayerBar() {
   const safeMax = duration && duration > 0 ? duration : 1;
   const remaining = Math.max(0, (duration || 0) - localTime);
 
-  // Dynamically extract artwork color and tint theme variables
+  // Dynamically extract artwork color and tint theme variables (site theme only, the player stays glass)
   useEffect(() => {
     if (!currentTrack) return;
     const cover = getTrackCover(currentTrack);
@@ -239,14 +340,19 @@ export function PCPlayerBar() {
     setPlayerMinimized(true);
   };
 
-  const inactiveBtn = "text-white/60 hover:text-white transition-colors";
+  const openFullScreen = () => {
+    setFullScreenPlayerOpen(true);
+    setPlayerMinimized(false);
+  };
+
+  const inactiveBtn = "text-white/65 hover:text-white transition-colors";
   const activeBtn = "text-brand drop-shadow-md";
-  const whiteBtn = "text-white/85 hover:text-white transition-colors";
-  // Apple Music highlights active toggles with a soft rounded plate
+  const whiteBtn = "text-white/90 hover:text-white transition-colors";
+  // Soft rounded plate for the toggles on the right (lyrics / queue / FX)
   const plate = (active: boolean) =>
     cn(
       "rounded-lg transition-[background-color,color] duration-300",
-      active ? "bg-white/[0.14] " + activeBtn : "bg-transparent " + inactiveBtn
+      active ? "bg-white/[0.16] " + activeBtn : "bg-transparent " + inactiveBtn
     );
 
   return (
@@ -255,44 +361,34 @@ export function PCPlayerBar() {
         {currentTrack && (
           <motion.div
             key="pc-player-bar"
-            initial={{ y: 100, opacity: 0, scale: 0.96 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 100, opacity: 0, scale: 0.96 }}
-            transition={{ type: "spring", stiffness: 320, damping: 30, mass: 0.9 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             onClick={handleHidePlayer}
-            style={{ WebkitBackdropFilter: "blur(40px) saturate(180%)" }}
-            className={cn(
-              "player-capsule w-full max-w-[834px] h-[70px] rounded-full mx-auto px-4 md:px-5",
-              "flex items-center justify-between gap-3 relative select-none",
-              // Glassmorphism: translucent fill + heavy blur + saturation boost + hairline border + inner highlight
-              "bg-[rgba(34,34,36,0.50)] backdrop-blur-[40px] backdrop-saturate-[180%]",
-              "border border-white/[0.12]",
-              "shadow-[0_20px_50px_-12px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.18),inset_0_0_0_0.5px_rgba(255,255,255,0.06)]"
-            )}
+            className="w-full h-full px-4 md:px-6 flex items-center justify-between gap-4 relative select-none bg-transparent border-none"
           >
-            {/* Soft top sheen for the glass look */}
-            <div className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-b from-white/[0.10] via-transparent to-transparent" />
 
-            {/* 1. Left Playback Controls: Shuffle, Previous, Play/Pause, Next, Repeat */}
-            <div className="relative flex items-center gap-2.5 md:gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+            {/* 1. Left transport: shuffle, previous, play/pause, next, repeat */}
+            <div className="relative flex items-center gap-3.5 shrink-0" onClick={(e) => e.stopPropagation()}>
               <SpringButton
                 onClick={toggleShuffle}
-                className={cn("p-1.5", plate(isShuffled))}
+                className={cn("p-1.5", isShuffled ? activeBtn : inactiveBtn)}
                 title={`Shuffle: ${isShuffled ? "On" : "Off"}`}
               >
-                <SwiftUIShuffle size={16} stroke="currentColor" />
+                <SFShuffle size={19} />
               </SpringButton>
 
               <SpringButton onClick={playPrev} className={cn("p-1", whiteBtn)} title="Previous">
-                <SwiftUIBackward size={18} fill="currentColor" />
+                <SwiftUIBackward size={22} fill="currentColor" />
               </SpringButton>
 
               <SpringButton
                 onClick={togglePlay}
-                className="p-1 text-white hover:text-white/90"
+                className="p-0.5 text-white hover:text-white/90"
                 title={isPlaying ? "Pause" : "Play"}
               >
-                <span className="relative flex h-6 w-6 items-center justify-center">
+                <span className="relative flex h-9 w-9 items-center justify-center">
                   <AnimatePresence mode="popLayout" initial={false}>
                     <motion.span
                       key={isPlaying ? "pause" : "play"}
@@ -303,9 +399,9 @@ export function PCPlayerBar() {
                       className="absolute flex items-center justify-center"
                     >
                       {isPlaying ? (
-                        <SwiftUIPause size={24} fill="currentColor" />
+                        <SwiftUIPause size={32} fill="currentColor" />
                       ) : (
-                        <SwiftUIPlay size={24} fill="currentColor" className="ml-0.5" />
+                        <SwiftUIPlay size={32} fill="currentColor" className="ml-0.5" />
                       )}
                     </motion.span>
                   </AnimatePresence>
@@ -313,54 +409,53 @@ export function PCPlayerBar() {
               </SpringButton>
 
               <SpringButton onClick={() => playNext(true)} className={cn("p-1", whiteBtn)} title="Next">
-                <SwiftUIForward size={18} fill="currentColor" />
+                <SwiftUIForward size={22} fill="currentColor" />
               </SpringButton>
 
               <SpringButton
                 onClick={toggleRepeat}
-                className={cn("relative p-1.5", plate(repeatMode !== "off"))}
+                className={cn("relative p-1.5", repeatMode !== "off" ? activeBtn : inactiveBtn)}
                 title={`Repeat: ${repeatMode}`}
               >
-                <SwiftUIRepeat size={16} stroke="currentColor" />
+                <SFRepeat size={19} />
                 <AnimatePresence>
-                  {repeatMode !== "off" && (
-                    <motion.div
+                  {(repeatMode === "one" || repeatMode === "two") && (
+                    <motion.span
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0, opacity: 0 }}
                       transition={SPRING}
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none text-[7px] font-black"
                     >
-                      <span className="text-[7px] font-black mt-0.5 text-brand">
-                        {repeatMode === "one" ? "1" : repeatMode === "two" ? "2" : "∞"}
-                      </span>
-                    </motion.div>
+                      {repeatMode === "one" ? "1" : "2"}
+                    </motion.span>
                   )}
                 </AnimatePresence>
               </SpringButton>
             </div>
 
-            {/* 2. Middle: Glass display card with Artwork, Title, Artist & Integrated Scrubber */}
+            {/* 2. Middle: transparent track area (no card). Artwork opens the full player. */}
             <div
-              className="relative flex-1 min-w-0 max-w-[340px] md:max-w-[400px] h-[52px] rounded-xl overflow-hidden cursor-pointer group bg-white/[0.08] hover:bg-white/[0.12] backdrop-blur-xl border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors duration-300"
-              onClick={(e) => {
-                e.stopPropagation();
-                setFullScreenPlayerOpen(true);
-                setPlayerMinimized(false);
-              }}
+              className="relative flex-1 min-w-0 max-w-[400px] md:max-w-[440px] h-[54px]"
+              onClick={(e) => e.stopPropagation()}
             >
-              {/* Track info: blurs + fades away while the seekbar is active */}
+              {/* Track info: blurs away while the seekbar is active */}
               <motion.div
-                className="absolute inset-x-2.5 top-[5px] h-[30px] flex items-center min-w-0"
+                className="absolute inset-x-0 top-[1px] h-[38px] flex items-center gap-2.5 min-w-0"
                 animate={{
                   opacity: scrubExpanded ? 0 : 1,
                   scale: scrubExpanded ? 0.96 : 1,
-                  filter: scrubExpanded ? "blur(8px)" : "blur(0px)",
+                  filter: scrubExpanded ? "blur(10px)" : "blur(0px)",
                 }}
                 transition={{ default: SPRING_SOFT, opacity: { duration: 0.2 }, filter: { duration: 0.25 } }}
                 style={{ pointerEvents: scrubExpanded ? "none" : "auto" }}
               >
-                <div className="h-7 w-7 rounded-md overflow-hidden shrink-0 bg-zinc-800 shadow-md ring-1 ring-white/10">
+                {/* Artwork with the expand affordance on hover */}
+                <button
+                  onClick={openFullScreen}
+                  title="Open full screen player"
+                  className="group/art relative h-9 w-9 shrink-0 rounded-md overflow-hidden bg-zinc-800 shadow-md ring-1 ring-white/10 cursor-pointer outline-none"
+                >
                   <AnimatePresence mode="popLayout" initial={false}>
                     <motion.img
                       key={currentTrack.id}
@@ -370,11 +465,22 @@ export function PCPlayerBar() {
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
-                      className="h-full w-full object-cover"
+                      className="absolute inset-0 h-full w-full object-cover"
                     />
                   </AnimatePresence>
-                </div>
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-200">
+                    <motion.span
+                      className="flex text-white"
+                      initial={false}
+                      whileHover={{ scale: 1.12 }}
+                      transition={SPRING}
+                    >
+                      <SFExpand size={15} />
+                    </motion.span>
+                  </span>
+                </button>
 
+                {/* Title + artist, centered, each gliding when too long */}
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={currentTrack.id}
@@ -382,52 +488,46 @@ export function PCPlayerBar() {
                     animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                     exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
                     transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-                    className="flex flex-col min-w-0 flex-1 overflow-hidden text-center justify-center px-2"
+                    className="flex flex-col min-w-0 flex-1 justify-center text-center gap-[1px]"
                   >
-                    <span
-                      className="text-[13px] md:text-[14px] font-semibold text-white truncate leading-tight tracking-tight hover:underline cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/track/${currentTrack.id}`);
-                      }}
-                    >
-                      {formatDisplayTitle(cleanTitle(currentTrack.title))}
-                    </span>
-                    <span className="text-[11px] md:text-[12px] font-normal text-white/60 truncate leading-none mt-0.5">
-                      <ArtistLinks
-                        track={currentTrack}
-                        maxArtists={2}
-                        linkClassName="hover:underline text-white/60 hover:text-white"
-                      />
-                    </span>
+                    <Marquee>
+                      <span
+                        className="text-[13.5px] font-semibold text-white leading-[18px] tracking-tight hover:underline cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/track/${currentTrack.id}`);
+                        }}
+                      >
+                        {formatDisplayTitle(cleanTitle(currentTrack.title))}
+                      </span>
+                    </Marquee>
+                    <Marquee>
+                      <span className="inline-flex text-[12px] font-normal text-white/60 leading-[16px]">
+                        <ArtistLinks
+                          track={currentTrack}
+                          maxArtists={8}
+                          linkClassName="hover:underline text-white/60 hover:text-white"
+                        />
+                      </span>
+                    </Marquee>
                   </motion.div>
                 </AnimatePresence>
-
-                {/* Spacer keeps the text visually centered against the artwork */}
-                <div className="w-7 shrink-0" />
               </motion.div>
 
-              {/* Seekbar layer: thin at the bottom, grows to cover the whole card on hover/drag */}
+              {/* Seekbar: a thin line under the info, grows to fill the area on hover/drag */}
               <motion.div
-                className="absolute inset-x-0 bottom-0 flex items-center gap-2 px-3 backdrop-blur-2xl"
+                className="absolute inset-x-0 bottom-0 flex items-center"
                 initial={false}
-                animate={{
-                  height: scrubExpanded ? 52 : 20,
-                  backgroundColor: scrubExpanded ? "rgba(18,18,20,0.55)" : "rgba(18,18,20,0)",
-                }}
+                animate={{ height: scrubExpanded ? 54 : 18 }}
                 transition={SPRING_SOFT}
-                onClick={(e) => e.stopPropagation()}
                 onMouseEnter={() => setIsScrubHover(true)}
                 onMouseLeave={() => setIsScrubHover(false)}
-                onPointerDown={() => setIsDragging(true)}
+                onPointerDown={() => setIsScrubDrag(true)}
               >
                 <motion.span
-                  className="font-medium tabular-nums select-none shrink-0 text-right"
-                  animate={{
-                    fontSize: scrubExpanded ? 12 : 9,
-                    width: scrubExpanded ? 36 : 26,
-                    color: scrubExpanded ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.4)",
-                  }}
+                  className="overflow-hidden whitespace-nowrap font-medium tabular-nums select-none text-right text-white/85 text-[12px]"
+                  initial={false}
+                  animate={{ width: scrubExpanded ? 42 : 0, opacity: scrubExpanded ? 1 : 0, paddingRight: scrubExpanded ? 8 : 0 }}
                   transition={SPRING_SOFT}
                 >
                   {formatDuration(localTime)}
@@ -444,34 +544,26 @@ export function PCPlayerBar() {
                   }}
                   onValueCommit={(val) => {
                     performSeek(val[0]);
-                    setIsDragging(false);
+                    setIsScrubDrag(false);
                   }}
                 >
                   <Slider.Track
-                    className="relative grow rounded-full overflow-hidden bg-white/20"
+                    className="relative grow rounded-full overflow-hidden"
                     style={{
-                      height: scrubExpanded ? 10 : 3,
-                      transition: `height 380ms ${EASE_OUT}`,
+                      height: scrubExpanded ? 8 : 2,
+                      background: scrubExpanded ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.14)",
+                      transition: `height 380ms ${EASE_OUT}, background-color 300ms`,
                     }}
                   >
-                    <Slider.Range
-                      className="absolute h-full rounded-full"
-                      style={{
-                        backgroundColor: scrubExpanded ? "#fff" : "rgba(255,255,255,0.9)",
-                        transition: "background-color 300ms",
-                      }}
-                    />
+                    <Slider.Range className="absolute h-full rounded-full bg-white" />
                   </Slider.Track>
                   <Slider.Thumb className="block w-3 h-3 rounded-full opacity-0 outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/70" />
                 </Slider.Root>
 
                 <motion.span
-                  className="font-medium tabular-nums select-none shrink-0 text-left"
-                  animate={{
-                    fontSize: scrubExpanded ? 12 : 9,
-                    width: scrubExpanded ? 40 : 28,
-                    color: scrubExpanded ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.4)",
-                  }}
+                  className="overflow-hidden whitespace-nowrap font-medium tabular-nums select-none text-left text-white/85 text-[12px]"
+                  initial={false}
+                  animate={{ width: scrubExpanded ? 46 : 0, opacity: scrubExpanded ? 1 : 0, paddingLeft: scrubExpanded ? 8 : 0 }}
                   transition={SPRING_SOFT}
                 >
                   -{formatDuration(remaining)}
@@ -479,89 +571,105 @@ export function PCPlayerBar() {
               </motion.div>
             </div>
 
-            {/* 3. Right Action Controls: Like, Studio FX, Lyrics, Queue, Volume, Fullscreen */}
-            <div className="relative flex items-center gap-1.5 md:gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-              {/* Like Button (pops with a spring when liked) */}
-              <SpringButton
-                onClick={() => toggleLikeMutation.mutate()}
-                className={cn("p-1.5", isCurrentTrackLiked ? "text-brand" : inactiveBtn)}
-                title={isCurrentTrackLiked ? "Unlike" : "Like"}
+            {/* 3. Right controls: like, FX, lyrics, queue, and a volume pill that expands over them */}
+            <div className="relative flex items-center gap-2 shrink-0 w-[184px] justify-end" onClick={(e) => e.stopPropagation()}>
+              <motion.div
+                className="flex items-center gap-1.5"
+                animate={{
+                  opacity: volExpanded ? 0 : 1,
+                  scale: volExpanded ? 0.94 : 1,
+                  filter: volExpanded ? "blur(6px)" : "blur(0px)",
+                }}
+                transition={{ default: SPRING_SOFT, opacity: { duration: 0.18 }, filter: { duration: 0.22 } }}
+                style={{ pointerEvents: volExpanded ? "none" : "auto", marginRight: 40 }}
               >
-                <motion.span
-                  key={String(isCurrentTrackLiked)}
-                  initial={{ scale: isCurrentTrackLiked ? 0.5 : 1 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 600, damping: 12 }}
-                  className="flex"
+                {/* Like (pops with a spring when liked) */}
+                <SpringButton
+                  onClick={() => toggleLikeMutation.mutate()}
+                  className={cn("p-1.5", isCurrentTrackLiked ? "text-brand" : inactiveBtn)}
+                  title={isCurrentTrackLiked ? "Unlike" : "Like"}
                 >
-                  <SFHeart size={16} filled={!!isCurrentTrackLiked} />
-                </motion.span>
-              </SpringButton>
+                  <motion.span
+                    key={String(isCurrentTrackLiked)}
+                    initial={{ scale: isCurrentTrackLiked ? 0.5 : 1 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 600, damping: 12 }}
+                    className="flex"
+                  >
+                    <SFHeart size={17} filled={!!isCurrentTrackLiked} />
+                  </motion.span>
+                </SpringButton>
 
-              {/* Studio FX */}
-              <SpringButton
-                id="tour-fx"
-                onClick={() => setAudioFxOpen(!isAudioFxOpen)}
-                className={cn("p-1.5", plate(isAudioFxOpen))}
-                title="Studio FX"
+                <SpringButton
+                  id="tour-fx"
+                  onClick={() => setAudioFxOpen(!isAudioFxOpen)}
+                  className={cn("p-1.5", plate(isAudioFxOpen))}
+                  title="Studio FX"
+                >
+                  <SFFx size={17} />
+                </SpringButton>
+
+                <SpringButton
+                  id="tour-lyrics"
+                  data-tour="lyrics"
+                  onClick={() => setIsLyricsOpen(!isLyricsOpen)}
+                  className={cn("p-1.5", plate(isLyricsOpen))}
+                  title="Lyrics"
+                >
+                  <SFLyrics size={17} />
+                </SpringButton>
+
+                <SpringButton
+                  onClick={() => setIsQueueOpen(!isQueueOpen)}
+                  className={cn("p-1.5", plate(isQueueOpen))}
+                  title="Queue"
+                >
+                  <SwiftUIQueue size={17} stroke="currentColor" />
+                </SpringButton>
+              </motion.div>
+
+              {/* Volume pill: just the speaker at rest, slides open to the left on hover */}
+              <motion.div
+                className="absolute inset-y-0 my-auto right-0 h-9 flex items-center justify-end rounded-full overflow-hidden"
+                initial={false}
+                animate={{
+                  width: volExpanded ? 184 : 36,
+                  backgroundColor: volExpanded ? "rgba(22,22,24,0.55)" : "rgba(22,22,24,0)",
+                }}
+                transition={SPRING_SOFT}
+                onMouseEnter={() => setIsVolHover(true)}
+                onMouseLeave={() => setIsVolHover(false)}
               >
-                <SFFx size={16} />
-              </SpringButton>
+                <motion.div
+                  className="flex-1 min-w-0 pl-4 pr-1.5"
+                  initial={false}
+                  animate={{ opacity: volExpanded ? 1 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ pointerEvents: volExpanded ? "auto" : "none" }}
+                >
+                  <Slider.Root
+                    className="slider-root relative flex items-center select-none touch-none w-full h-6 cursor-pointer"
+                    value={[volume * 100]}
+                    max={100}
+                    step={1}
+                    onValueChange={([val]) => setVolume(val / 100)}
+                    onPointerDown={() => setIsVolDrag(true)}
+                  >
+                    <Slider.Track className="relative grow rounded-full overflow-hidden h-[6px] bg-white/25">
+                      <Slider.Range className="absolute h-full rounded-full bg-white" />
+                    </Slider.Track>
+                    <Slider.Thumb className="block w-3 h-3 rounded-full bg-white shadow-md outline-none" />
+                  </Slider.Root>
+                </motion.div>
 
-              {/* Lyrics */}
-              <SpringButton
-                id="tour-lyrics"
-                data-tour="lyrics"
-                onClick={() => setIsLyricsOpen(!isLyricsOpen)}
-                className={cn("p-1.5", plate(isLyricsOpen))}
-                title="Lyrics"
-              >
-                <SFLyrics size={16} />
-              </SpringButton>
-
-              {/* Queue */}
-              <SpringButton
-                onClick={() => setIsQueueOpen(!isQueueOpen)}
-                className={cn("p-1.5", plate(isQueueOpen))}
-                title="Queue"
-              >
-                <SwiftUIQueue size={16} stroke="currentColor" />
-              </SpringButton>
-
-              {/* Volume Control */}
-              <div className="flex items-center gap-1.5 w-20 md:w-24 group/vol ml-0.5">
                 <SpringButton
                   onClick={() => setVolume(volume === 0 ? 0.8 : 0)}
-                  className={cn("p-0.5", inactiveBtn)}
+                  className={cn("h-9 w-9 shrink-0", inactiveBtn)}
                   title={volume === 0 ? "Unmute" : "Mute"}
                 >
-                  <SFSpeaker size={16} level={volume === 0 ? 0 : volume} />
+                  <SFSpeaker size={18} level={volume === 0 ? 0 : volume} />
                 </SpringButton>
-                <Slider.Root
-                  className="slider-root relative flex items-center select-none touch-none w-full h-4 cursor-pointer"
-                  value={[volume * 100]}
-                  max={100}
-                  step={1}
-                  onValueChange={([val]) => setVolume(val / 100)}
-                >
-                  <Slider.Track
-                    className="bg-white/20 relative grow rounded-full overflow-hidden h-[3px] group-hover/vol:h-[6px]"
-                    style={{ transition: `height 300ms ${EASE_OUT}` }}
-                  >
-                    <Slider.Range className="absolute bg-white/90 group-hover/vol:bg-white rounded-full h-full transition-colors" />
-                  </Slider.Track>
-                  <Slider.Thumb className="block w-2.5 h-2.5 rounded-full opacity-0 outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/70" />
-                </Slider.Root>
-              </div>
-
-              {/* Fullscreen Expand */}
-              <SpringButton
-                onClick={() => setFullScreenPlayerOpen(true)}
-                className={cn("p-1.5", inactiveBtn)}
-                title="Full Screen Player"
-              >
-                <SFExpand size={15} />
-              </SpringButton>
+              </motion.div>
             </div>
           </motion.div>
         )}

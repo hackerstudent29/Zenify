@@ -97,7 +97,7 @@ export default function AlbumPage() {
   });
 
   // Fetch related albums / artists for "You might also like"
-  const { data: relatedArtists } = useQuery({
+  const { data: relatedArtists = [] } = useQuery({
     queryKey: ["artist-related", artistId],
     queryFn: async () => {
       if (!artistId) return [];
@@ -114,7 +114,7 @@ export default function AlbumPage() {
   const coverUrl =
     getMediaUrl(album?.coverUrl) ||
     album?.tracks?.[0]?.coverUrl ||
-    "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=800";
+    "/logo.png";
 
   // Dynamic Apple Music Artwork Tint: compute average RGB and update CSS variables (--h, --s)
   useEffect(() => {
@@ -140,7 +140,7 @@ export default function AlbumPage() {
   const handlePlayAlbum = () => {
     if (isAlbumActive) {
       togglePlay();
-    } else if (album?.tracks?.length > 0) {
+    } else if ((album?.tracks?.length || 0) > 0) {
       setQueue(album.tracks);
       setTrack(album.tracks[0], album.tracks);
       setPlayerMinimized(false);
@@ -148,13 +148,13 @@ export default function AlbumPage() {
   };
 
   const handleShufflePlay = () => {
-    if (album?.tracks?.length > 0) {
+    if ((album?.tracks?.length || 0) > 0) {
       if (isAlbumActive) {
         toggleShuffle();
         return;
       }
       if (!isShuffled) toggleShuffle();
-      const randomIndex = Math.floor(Math.random() * album.tracks.length);
+      const randomIndex = Math.floor(Math.random() * (album?.tracks?.length || 1));
       setTrack(album.tracks[randomIndex], album.tracks);
       setPlayerMinimized(false);
     }
@@ -224,8 +224,8 @@ export default function AlbumPage() {
     year: "numeric",
   });
 
-  const trackCount = album.tracks?.length || 0;
-  const totalSeconds = album.tracks?.reduce((acc: number, t: any) => acc + (t.duration || 0), 0) || 0;
+  const trackCount = album?.tracks?.length || 0;
+  const totalSeconds = album?.tracks?.reduce((acc: number, t: any) => acc + (t.duration || 0), 0) || 0;
   const totalHours = Math.floor(totalSeconds / 3600);
   const totalMins = Math.floor((totalSeconds % 3600) / 60);
   const totalDurationStr =
@@ -322,7 +322,7 @@ export default function AlbumPage() {
               <p className={cn("transition-all duration-300", !showFullDesc && "line-clamp-2")}>
                 {albumDescription}
               </p>
-              {albumDescription.length > 120 && (
+              {(albumDescription?.length || 0) > 120 && (
                 <button
                   onClick={() => setShowFullDesc(!showFullDesc)}
                   className="text-white font-bold text-[13px] uppercase tracking-wider mt-1 hover:underline cursor-pointer"
@@ -392,7 +392,7 @@ export default function AlbumPage() {
                 <DropdownMenuContent className="w-56" align="start">
                   <DropdownMenuItem
                     onClick={() => {
-                      if (!album.tracks || album.tracks.length === 0) {
+                      if (!album?.tracks || album.tracks.length === 0) {
                         showToast("This album has no tracks", "error");
                         return;
                       }
@@ -552,7 +552,7 @@ export default function AlbumPage() {
             })}
           </div>
 
-          {(!album.tracks || album.tracks.length === 0) && (
+          {(!album?.tracks || album.tracks.length === 0) && (
             <div className="py-20 text-center flex flex-col items-center gap-3">
               <Music2 size={36} className="text-white/20" />
               <p className="text-xs font-bold text-white/30 tracking-widest uppercase">Sonic Archive Empty</p>
@@ -583,7 +583,7 @@ export default function AlbumPage() {
         </div>
 
         {/* ── 6. More by this artist ────────────────────────────────────────── */}
-        {otherAlbums.length > 0 && (
+        {(otherAlbums?.length || 0) > 0 && (
           <div className="mb-14">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[20px] font-bold text-white">More by {album.artist?.name || "this artist"}</h3>
@@ -621,14 +621,14 @@ export default function AlbumPage() {
         )}
 
         {/* ── 8. You might also like ─────────────────────────────────────────── */}
-        {relatedArtists.length > 0 && (
+        {(relatedArtists?.length || 0) > 0 && (
           <div className="mb-14">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[20px] font-bold text-white">You might also like</h3>
               <span className="text-sm font-semibold text-brand">See all</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {relatedArtists.slice(0, 6).map((rel: any) => (
+              {(relatedArtists || []).slice(0, 6).map((rel: any) => (
                 <Link
                   key={rel.id}
                   href={`/artist/${rel.id}`}
