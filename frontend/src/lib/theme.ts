@@ -23,26 +23,31 @@ export function themeVars(r: number, g: number, b: number) {
   const l = (max + min) / 2;
   const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
 
-  // Apple Music tuning: Ensure color is prominent, deep, and luxurious on page
-  // Page saturation: clamp between 42% and 68%
-  const pageSatNum = Math.max(42, Math.min(Math.round(s * 100), 68));
-  const pageSat = `${pageSatNum}%`;
-  const pageLightness = "13.5%";
+  // Apple Music exact measured values:
+  // Saturation clamped to max 55%
+  const satNum = Math.round(Math.min(s, 0.55) * 100);
+  const satStr = `${satNum}%`;
 
-  // Apple Music sidebar tuning: subtle frosted glass with reduced color presence and low opacity
-  // Blends 12% of the artwork color into dark neutral #121214 with 82% opacity
-  const rSide = Math.round(18 * 0.88 + r * 0.12);
-  const gSide = Math.round(18 * 0.88 + g * 0.12);
-  const bSide = Math.round(20 * 0.88 + b * 0.12);
-  const sideColor = `rgba(${rSide}, ${gSide}, ${bSide}, 0.82)`;
+  // Page: lightness 13% to 18% (13.5% for deep readable dark mode)
+  const page = `hsl(${h} ${satStr} 13.5%)`;
+
+  // Sidebar: saturation calc(s * 0.65), lightness 16% (measured #172f30 on teal, #29292e on gray)
+  const sideSat = `${Math.round(satNum * 0.65)}%`;
+  const side = `hsl(${h} ${sideSat} 16%)`;
+
+  const text2 = `hsl(${h} 25% 80%)`;
+  const pill = `rgba(255, 255, 255, 0.08)`;
+  const line = `rgba(255, 255, 255, 0.13)`;
 
   return {
     h,
-    s: pageSat,
+    s: satStr,
     rgb: `${r}, ${g}, ${b}`,
-    page: `hsl(${h} ${pageSat} ${pageLightness})`,
-    side: sideColor,
-    text2: `hsl(${h} 25% 80%)`,
+    page,
+    side,
+    pill,
+    line,
+    text2,
   };
 }
 
@@ -55,6 +60,8 @@ export function applyArtworkTheme(r: number, g: number, b: number) {
   root.style.setProperty("--album-rgb", vars.rgb);
   root.style.setProperty("--page", vars.page);
   root.style.setProperty("--side", vars.side);
+  root.style.setProperty("--pill", vars.pill);
+  root.style.setProperty("--line", vars.line);
   root.style.setProperty("--text-2", vars.text2);
 }
 
@@ -66,6 +73,8 @@ export function resetArtworkTheme() {
   root.style.setProperty("--album-rgb", "18, 18, 20");
   root.style.setProperty("--page", "#121214");
   root.style.setProperty("--side", "#1c1c1e");
+  root.style.setProperty("--pill", "rgba(255, 255, 255, 0.08)");
+  root.style.setProperty("--line", "rgba(255, 255, 255, 0.13)");
   root.style.setProperty("--text-2", "rgba(255, 255, 255, 0.7)");
 }
 

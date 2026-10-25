@@ -367,7 +367,8 @@ export async function albumRoutes(server: FastifyInstance) {
                         }
 
                         const trackArtist = cleanArtistNames(t.artistName || artistName);
-                        const instantAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(collection.collectionName)}`;
+                        const previewParam = t.previewUrl ? `&previewUrl=${encodeURIComponent(t.previewUrl)}` : '';
+                        const instantAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(collection.collectionName)}${previewParam}&trackId=itunes-${t.trackId}`;
 
                         return {
                             id: `itunes-${t.trackId}`,

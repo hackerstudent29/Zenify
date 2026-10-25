@@ -1917,6 +1917,60 @@ export class ExternalMetadataService {
              } catch (apifyFallbackErr: any) {
                  console.warn(`[SmartAudio] Apify Spotify fallback error:`, apifyFallbackErr.message);
              }
+
+             // Resilient Multi-Backup Fallback: JioSaavn Clean CDN & Apple iTunes AAC Stream (global)
+             try {
+                 console.log(`[SmartAudio] Attempting multi-tier CDN fallback for: "${artist} - ${title}"`);
+                 const cleanT = title.split('|')[0].replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
+                 const cleanA = artist.replace(/\(.*?\)/g, '').split(/[,&/|]/)[0].trim();
+
+                 // Tier 1: JioSaavn Clean CDN (320kbps)
+                 try {
+                     const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
+                     const cdnResult = await CleanCdnAudioService.resolveAudio({
+                         title: cleanT,
+                         primaryArtist: cleanA,
+                         duration: targetDuration
+                     });
+                     if (cdnResult?.url) {
+                         console.log(`[SmartAudio] Clean CDN fallback resolved for "${title}":`, cdnResult.url);
+                         const cdnFallback = {
+                             url: cdnResult.url,
+                             duration: cdnResult.duration || targetDuration,
+                             sourceType: 'clean_cdn_direct',
+                             watchUrl: directUrl || undefined
+                         };
+                         audioSearchCache.set(cacheKey, { ...cdnFallback, expires: Date.now() + CACHE_TTL });
+                         return cdnFallback;
+                     }
+                 } catch {}
+
+                 // Tier 2: Apple CDN AAC direct stream (worldwide, US & IN storefronts)
+                 const itTerm = cleanA ? `${cleanA} ${cleanT}` : cleanT;
+                 for (const country of ['US', 'IN']) {
+                     try {
+                         const itRes = await axios.get(`https://itunes.apple.com/search`, {
+                             params: { term: itTerm, media: 'music', entity: 'song', limit: 5, country },
+                             timeout: 3500
+                         }).catch(() => null);
+                         const match = itRes?.data?.results?.find((r: any) => r.previewUrl);
+                         if (match?.previewUrl) {
+                             console.log(`[SmartAudio] Apple CDN AAC stream resolved as ultimate fallback for "${title}" (${country}):`, match.previewUrl);
+                             const itFallback = {
+                                 url: match.previewUrl,
+                                 duration: match.trackTimeMillis ? Math.floor(match.trackTimeMillis / 1000) : targetDuration,
+                                 sourceType: 'itunes_direct_preview',
+                                 watchUrl: match.trackViewUrl || directUrl || undefined
+                             };
+                             audioSearchCache.set(cacheKey, { ...itFallback, expires: Date.now() + CACHE_TTL });
+                             return itFallback;
+                         }
+                     } catch {}
+                 }
+             } catch (fallbackCatchErr: any) {
+                 console.warn(`[SmartAudio] Multi-tier fallback error:`, fallbackCatchErr.message);
+             }
+
              throw err;
         }
         })().finally(() => {

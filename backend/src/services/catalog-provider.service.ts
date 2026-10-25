@@ -32,6 +32,7 @@ export interface CatalogTrack {
   artwork: string;
   coverUrl: string;
   audioUrl?: string;
+  previewUrl?: string;
   language?: string;
   genre?: string;
   storefront: string;
@@ -367,7 +368,24 @@ export class ITunesCatalogProvider implements CatalogProvider {
       });
       this.circuit.recordSuccess();
 
-      const results = res.data?.results || [];
+      let results = res.data?.results || [];
+      if (results.length === 0 && (storefront === 'in' || !storefront)) {
+        try {
+          const usRes = await axios.get('https://itunes.apple.com/search', {
+            params: {
+              term: query,
+              country: 'us',
+              media: 'music',
+              limit: Math.min(limit * 2, 50)
+            },
+            timeout: 4500
+          });
+          if (usRes.data?.results?.length) {
+            results = usRes.data.results;
+          }
+        } catch {}
+      }
+
       const tracks: CatalogTrack[] = [];
       const artistsMap = new Map<string, CatalogArtist>();
       const albumsMap = new Map<string, CatalogAlbum>();
@@ -592,7 +610,8 @@ export class ITunesCatalogProvider implements CatalogProvider {
       duration: Math.round((r.trackTimeMillis || 180000) / 1000),
       artwork: coverUrl,
       coverUrl,
-      audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistObj.name} - ${r.trackName}`)}&title=${encodeURIComponent(r.trackName)}&artist=${encodeURIComponent(artistObj.name)}${r.collectionName ? `&album=${encodeURIComponent(r.collectionName)}` : ''}`,
+      previewUrl: r.previewUrl || undefined,
+      audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistObj.name} - ${r.trackName}`)}&title=${encodeURIComponent(r.trackName)}&artist=${encodeURIComponent(artistObj.name)}${r.collectionName ? `&album=${encodeURIComponent(r.collectionName)}` : ''}${r.previewUrl ? `&previewUrl=${encodeURIComponent(r.previewUrl)}` : ''}&trackId=itunes-${r.trackId}`,
       genre: r.primaryGenreName || 'Pop',
       storefront,
       fetchedAt: Date.now(),
