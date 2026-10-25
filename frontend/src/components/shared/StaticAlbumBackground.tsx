@@ -8,6 +8,7 @@ import { applyArtworkTheme } from "@/lib/theme";
 export interface StaticAlbumBackgroundProps {
   coverUrl?: string | null;
   covers?: string[];
+  palette?: any;
   className?: string;
 }
 
@@ -26,10 +27,11 @@ function parseRgb(rgbStr: string): [number, number, number] {
 export const StaticAlbumBackground = React.memo(function StaticAlbumBackground({
   coverUrl,
   covers,
+  palette,
   className,
 }: StaticAlbumBackgroundProps) {
   const activeCover = coverUrl || covers?.[0] || undefined;
-  const colors = useAlbumColor(activeCover);
+  const colors = useAlbumColor(activeCover, palette);
 
   const primary = useMemo(() => {
     const c1 = colors[0] || "rgb(20, 31, 45)";

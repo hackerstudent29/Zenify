@@ -252,27 +252,27 @@ export default function AlbumPage() {
   const otherAlbums = (artistData?.albums || []).filter((a: any) => a.id !== album.id);
 
   return (
-    <div className="min-h-screen w-full bg-[var(--page,#121214)] transition-colors duration-700 ease-out text-white relative pb-32">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[var(--page,#121214)] transition-colors duration-700 ease-out text-white relative pb-32">
       <SEO
         title={`${formatDisplayTitle(album.title)} by ${album.artist?.name || "Artist"} – Zenify`}
         description={albumDescription}
       />
-      <DynamicBackground surface="albumPage" coverUrl={coverUrl} />
+      <DynamicBackground surface="albumPage" coverUrl={coverUrl} palette={album?.palette || album?.tracks?.[0]?.palette} />
 
-      <div className="w-full relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-10 pt-4 md:pt-8">
+      <div className="w-full relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-10 pt-4 md:pt-8 min-w-0 max-w-full overflow-hidden">
         {/* ── 1. Top Header Navigation (Back / Forward) ────────────────── */}
         <div className="flex items-center justify-end w-full mb-4">
           <div className="inline-flex items-center bg-black/30 border border-white/10 rounded-full p-1 gap-1">
             <button
               onClick={() => router.back()}
-              className="p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/10"
+              className="p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/10 cursor-pointer"
               title="Back"
             >
               <ChevronLeft size={18} />
             </button>
             <button
               onClick={() => router.forward()}
-              className="p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/10"
+              className="p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/10 cursor-pointer"
               title="Forward"
             >
               <ChevronRight size={18} />
@@ -281,13 +281,13 @@ export default function AlbumPage() {
         </div>
 
         {/* ── 2. Album Hero Header ────────────────────────────────────────── */}
-        <div className="flex flex-col md:flex-row items-center md:items-start gap-8 lg:gap-10 mb-12">
-          {/* Artwork: 338 square on desktop, rounded with clean shadow */}
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8 lg:gap-10 mb-10 md:mb-12 w-full min-w-0 max-w-full">
+          {/* Artwork: responsive square, never exceeds viewport */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4 }}
-            className="w-[280px] sm:w-[320px] md:w-[338px] h-[280px] sm:h-[320px] md:h-[338px] shrink-0 rounded-lg shadow-2xl overflow-hidden bg-zinc-900 border border-white/10 relative"
+            className="w-[min(280px,80vw)] sm:w-[320px] md:w-[338px] aspect-square shrink-0 rounded-lg shadow-2xl overflow-hidden bg-zinc-900 border border-white/10 relative"
           >
             <img
               src={coverUrl}
@@ -301,14 +301,14 @@ export default function AlbumPage() {
           </motion.div>
 
           {/* Album Information Stack */}
-          <div className="flex flex-col flex-1 min-w-0 w-full text-center md:text-left justify-start">
-            {/* Title: 34px bold, -0.02em tracking */}
-            <h1 className="text-[28px] sm:text-[32px] md:text-[34px] font-bold text-white tracking-[-0.02em] leading-tight mb-1">
+          <div className="flex flex-col flex-1 min-w-0 w-full text-center md:text-left justify-start overflow-hidden">
+            {/* Title: responsive bold, line-clamp and break-words to never overflow */}
+            <h1 className="text-[24px] sm:text-[30px] md:text-[34px] font-bold text-white tracking-[-0.02em] leading-tight mb-1 break-words line-clamp-3 max-w-full">
               {formatDisplayTitle(album.title)}
             </h1>
 
             {/* Artist: Apple Music editorial styling in grey as requested, every artist individually clickable */}
-            <div className="text-[20px] sm:text-[24px] md:text-[28px] lg:text-[32px] font-normal text-zinc-400 mb-2">
+            <div className="text-[17px] sm:text-[22px] md:text-[28px] lg:text-[32px] font-normal text-zinc-400 mb-2 break-words max-w-full">
               <ArtistLinks
                 album={album}
                 showRoles={false}
@@ -317,8 +317,8 @@ export default function AlbumPage() {
               />
             </div>
 
-            {/* Genre and Year: 15px font-semibold */}
-            <div className="text-[15px] font-semibold text-white/60 flex items-center justify-center md:justify-start gap-2 mb-3">
+            {/* Genre and Year: responsive font-semibold */}
+            <div className="text-[14px] sm:text-[15px] font-semibold text-white/60 flex items-center justify-center md:justify-start gap-2 mb-3 flex-wrap max-w-full">
               <span>{album.genre || "Pop"}</span>
               <span>·</span>
               <span>{releaseYear}</span>
@@ -326,8 +326,8 @@ export default function AlbumPage() {
               <span className="text-white/80">Lossless</span>
             </div>
 
-            {/* Description: 17px, line height 22px, color var(--text-2) */}
-            <div className="text-[15px] sm:text-[17px] leading-[22px] text-[var(--text-2)] mb-6 max-w-3xl">
+            {/* Description: responsive, break-words to avoid viewport pushing */}
+            <div className="text-[14px] sm:text-[16px] md:text-[17px] leading-[22px] text-[var(--text-2)] mb-6 max-w-3xl break-words">
               <p className={cn("transition-all duration-300", !showFullDesc && "line-clamp-2")}>
                 {albumDescription}
               </p>
@@ -342,7 +342,7 @@ export default function AlbumPage() {
             </div>
 
             {/* Apple Music Action Controls (Shuffle + Play Pill + More) */}
-            <div className="flex items-center justify-center md:justify-start gap-3.5 flex-wrap">
+            <div className="flex items-center justify-center md:justify-start gap-3 sm:gap-3.5 flex-wrap max-w-full">
               {/* Shuffle button */}
               <motion.button
                 whileTap={{ scale: 0.88 }}
@@ -436,8 +436,8 @@ export default function AlbumPage() {
         </div>
 
         {/* ── 3. Apple Music Tracklist (No redundant label, fluid spring rows) ────────── */}
-        <div className="w-full mb-10 pt-2 border-t border-white/[0.08]">
-          <div className="flex flex-col">
+        <div className="w-full mb-10 pt-2 border-t border-white/[0.08] min-w-0 max-w-full overflow-hidden">
+          <div className="flex flex-col min-w-0 max-w-full">
             {album.tracks?.map((track: any, index: number) => {
               const isActive = isTrackMatch(currentTrack, track);
               const isTrackPlaying = isActive && isPlaying;
@@ -449,10 +449,10 @@ export default function AlbumPage() {
                   whileHover={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
                   whileTap={{ scale: 0.995 }}
                   transition={{ type: "spring", stiffness: 450, damping: 28 }}
-                  className="group relative flex items-center justify-between py-2.5 px-3 md:px-4 rounded-lg cursor-pointer border-b border-white/[0.06] transition-colors"
+                  className="group relative flex items-center justify-between py-2.5 px-2 sm:px-3 md:px-4 rounded-lg cursor-pointer border-b border-white/[0.06] transition-colors w-full min-w-0 max-w-full overflow-hidden"
                 >
                   {/* Left: Index / Visualizer + Title/Artist */}
-                  <div className="flex items-center gap-3.5 min-w-0 flex-1 mr-4">
+                  <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1 mr-2 sm:mr-4 overflow-hidden">
                     {/* Index / Visualizer */}
                     <div className="w-6 flex items-center justify-center shrink-0">
                       {isTrackPlaying ? (
@@ -481,10 +481,10 @@ export default function AlbumPage() {
                     </div>
 
                     {/* Track Title and Artist */}
-                    <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
                       <span
                         className={cn(
-                          "text-[15px] md:text-[16px] truncate leading-snug",
+                          "text-[14px] sm:text-[15px] md:text-[16px] truncate leading-snug",
                           isActive ? "text-brand font-semibold" : "text-white font-medium group-hover:text-white"
                         )}
                       >
@@ -497,7 +497,7 @@ export default function AlbumPage() {
                   </div>
 
                   {/* Right: Duration + More Dropdown */}
-                  <div className="flex items-center gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <span className="text-[14px] md:text-[15px] text-white/50 font-normal tabular-nums select-none">
                       {formatDuration(track.duration)}
                     </span>

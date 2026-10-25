@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef } from "react";
-import { cn, getMediaUrl } from "@/lib/utils";
+import { cn, getMediaUrl, getApiBaseUrl } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * ArtworkMeshBackground — Apple Music style fluid artwork mesh
@@ -186,15 +186,35 @@ function makeLayer(img: HTMLImageElement, crop: (typeof CROPS)[number], tainted:
   return { tile, avg };
 }
 
+const tileCache = new Map<string, Tile>();
+
 async function loadTile(src: string): Promise<Tile> {
+  if (tileCache.has(src)) {
+    return tileCache.get(src)!;
+  }
+
+  let targetSrc = src;
+  if (targetSrc.startsWith("http") && !targetSrc.includes("proxy-image") && !targetSrc.includes("localhost")) {
+    try {
+      const API_BASE = getApiBaseUrl();
+      targetSrc = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(targetSrc)}`;
+    } catch {}
+  }
+
   let img: HTMLImageElement;
   let tainted = false;
   try {
-    img = await loadImage(src, true);
+    img = await loadImage(targetSrc, true);
   } catch {
-    img = await loadImage(src, false); // no CORS headers → still drawable, just can't read pixels
-    tainted = true;
+    try {
+      img = await loadImage(targetSrc, false);
+      tainted = true;
+    } catch {
+      img = await loadImage("/logo.png", false);
+      tainted = true;
+    }
   }
+
   const layers: HTMLCanvasElement[] = [];
   let avg = FALLBACK_BG;
   CROPS.forEach((c, i) => {
@@ -202,7 +222,14 @@ async function loadTile(src: string): Promise<Tile> {
     layers.push(r.tile);
     if (i === 0) avg = r.avg;
   });
-  return { layers, avg };
+
+  const result: Tile = { layers, avg };
+  if (tileCache.size >= 25) {
+    const first = tileCache.keys().next().value;
+    if (first) tileCache.delete(first);
+  }
+  tileCache.set(src, result);
+  return result;
 }
 
 let noiseUrl: string | null = null;

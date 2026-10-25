@@ -23,25 +23,25 @@ export function themeVars(r: number, g: number, b: number) {
   const l = (max + min) / 2;
   const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
 
-  // Apple Music tuning: Ensure color is prominent, deep, and luxurious — rich and clearly visible
+  // Apple Music tuning: Ensure color is prominent, deep, and luxurious on page
   // Page saturation: clamp between 42% and 68%
   const pageSatNum = Math.max(42, Math.min(Math.round(s * 100), 68));
   const pageSat = `${pageSatNum}%`;
-  // Sidebar saturation: rich, high color matching Apple Music sidebar tint
-  const sideSatNum = Math.max(45, Math.min(Math.round(pageSatNum * 0.95), 70));
-  const sideSat = `${sideSatNum}%`;
-
-  // Apple Music dark mode page lightness: 13.5%
   const pageLightness = "13.5%";
-  // Sidebar lightness: 16.5% so the color is clearly, beautifully visible with high saturation
-  const sideLightness = "16.5%";
+
+  // Apple Music sidebar tuning: subtle frosted glass with reduced color presence and low opacity
+  // Blends 12% of the artwork color into dark neutral #121214 with 82% opacity
+  const rSide = Math.round(18 * 0.88 + r * 0.12);
+  const gSide = Math.round(18 * 0.88 + g * 0.12);
+  const bSide = Math.round(20 * 0.88 + b * 0.12);
+  const sideColor = `rgba(${rSide}, ${gSide}, ${bSide}, 0.82)`;
 
   return {
     h,
     s: pageSat,
     rgb: `${r}, ${g}, ${b}`,
     page: `hsl(${h} ${pageSat} ${pageLightness})`,
-    side: `hsl(${h} ${sideSat} ${sideLightness})`,
+    side: sideColor,
     text2: `hsl(${h} 25% 80%)`,
   };
 }
@@ -71,16 +71,41 @@ export function resetArtworkTheme() {
 
 const dominantColorCache = new Map<string, [number, number, number]>();
 
+function getCachedDominantColor(src: string): [number, number, number] | null {
+  if (dominantColorCache.has(src)) return dominantColorCache.get(src)!;
+  if (typeof window !== "undefined") {
+    try {
+      const stored = sessionStorage.getItem(`zenify_dom_${src}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length === 3) {
+          dominantColorCache.set(src, parsed as [number, number, number]);
+          return parsed as [number, number, number];
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+function setCachedDominantColor(src: string, color: [number, number, number]) {
+  dominantColorCache.set(src, color);
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem(`zenify_dom_${src}`, JSON.stringify(color));
+    } catch {}
+  }
+}
+
 /**
- * Extracts dominant vibrant color from an image URL by rendering onto a 64x64 offscreen canvas.
+ * Extracts dominant vibrant color from an image URL by rendering onto a 32x32 offscreen canvas.
  * Filters out pitch black, extreme whites, and neutral greys to ensure the true colorful tone is selected.
  */
 export async function extractArtworkDominantColor(src: string): Promise<[number, number, number] | null> {
   if (!src || typeof window === "undefined") return null;
 
-  if (dominantColorCache.has(src)) {
-    return dominantColorCache.get(src)!;
-  }
+  const cached = getCachedDominantColor(src);
+  if (cached) return cached;
 
   let targetUrl = src;
   if (!targetUrl.startsWith("http") && !targetUrl.startsWith("blob") && !targetUrl.startsWith("data")) {
@@ -104,11 +129,11 @@ export async function extractArtworkDominantColor(src: string): Promise<[number,
 
     img.onload = () => {
       try {
-        const size = 64;
+        const size = 32; // 32x32 is fast and ideal for dominant palette sampling
         const canvas = document.createElement("canvas");
         canvas.width = size;
         canvas.height = size;
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
         if (!ctx) return resolve(null);
         ctx.drawImage(img, 0, 0, size, size);
         const data = ctx.getImageData(0, 0, size, size).data;
@@ -166,7 +191,7 @@ export async function extractArtworkDominantColor(src: string): Promise<[number,
             Math.round(best.sum[1] / best.count),
             Math.round(best.sum[2] / best.count),
           ];
-          dominantColorCache.set(src, result);
+          setCachedDominantColor(src, result);
           return resolve(result);
         }
 
@@ -176,7 +201,7 @@ export async function extractArtworkDominantColor(src: string): Promise<[number,
             Math.round(fallbackSum[1] / fallbackCount),
             Math.round(fallbackSum[2] / fallbackCount),
           ];
-          dominantColorCache.set(src, result);
+          setCachedDominantColor(src, result);
           return resolve(result);
         }
 

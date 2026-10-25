@@ -305,7 +305,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
           >
             {/* Background — transform/opacity only (no blend modes, no CSS blur) */}
             <div className="absolute inset-0 z-0 overflow-hidden bg-[#121214]" style={{ transform: "translateZ(0)" }}>
-              <DynamicBackground surface="fullPlayer" coverUrl={shown.cover} />
+              <DynamicBackground surface="fullPlayer" coverUrl={shown.cover} palette={currentTrack?.palette} />
               <div className="ps-t-soft absolute inset-0 bg-black/25" style={{ opacity: isLyricsOpen ? 1 : 0 }} />
             </div>
 
@@ -356,13 +356,13 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             <div className="relative z-10 min-h-0 flex-1">
               {!isLyricsOpen && (
                 <div
-                  className="absolute inset-0 flex touch-none items-center justify-center px-7"
+                  className="absolute inset-0 flex touch-none items-center justify-center px-4 sm:px-6"
                   onPointerDown={startDrag}
                 >
                   <motion.div
-                    animate={{ scale: isPlaying ? 1 : 0.86 }}
+                    animate={{ scale: isPlaying ? 1 : 0.88 }}
                     transition={{ type: "spring", stiffness: 300, damping: 22, mass: 0.6 }}
-                    style={{ width: "min(100%, max(220px, calc(100dvh - 500px)), 420px)", aspectRatio: "1" }}
+                    style={{ width: "min(calc(100vw - 44px), calc(100% - 12px), 380px)", maxHeight: "100%", aspectRatio: "1" }}
                     onPointerDown={(e) => e.stopPropagation()}
                   >
                     <motion.div
