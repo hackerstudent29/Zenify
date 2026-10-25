@@ -331,7 +331,7 @@ export default function TrackPage() {
  return (
  <div className="min-h-screen w-full text-foreground relative overflow-hidden">
   {/* Apple Music Fluid Flowing Artwork Background */}
-  <DynamicBackground surface="trackPage" coverUrl={coverUrl} />
+  <DynamicBackground surface="trackPage" coverUrl={coverUrl} palette={track?.palette} />
 
   {/* ── Page content ── */}
   <div className="relative z-10 px-4 sm:px-10 lg:px-12">

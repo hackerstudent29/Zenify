@@ -111,8 +111,34 @@ function extractDominantColors(imageData: ImageData, maxColors: number = 3): [nu
  return result;
 }
 
-// In-memory cache
+// In-memory + SessionStorage cache for instant 0ms retrieval
 const colorCache = new Map<string, string[]>();
+
+function getCachedColors(key: string): string[] | null {
+  if (colorCache.has(key)) return colorCache.get(key)!;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = sessionStorage.getItem(`zenify_colors_${key}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length >= 3) {
+          colorCache.set(key, parsed);
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+function setCachedColors(key: string, colors: string[]) {
+  colorCache.set(key, colors);
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem(`zenify_colors_${key}`, JSON.stringify(colors));
+    } catch {}
+  }
+}
 
 function parsePalette(dbPalette?: any): string[] | null {
   if (Array.isArray(dbPalette) && dbPalette.length >= 3) {
@@ -129,11 +155,15 @@ const NEUTRAL_COLORS = [
 
 export function useAlbumColor(coverUrl: string | undefined, dbPalette?: any) {
   const [colors, setColors] = useState<string[]>(() => {
-    if (coverUrl && colorCache.has(coverUrl)) {
-      return colorCache.get(coverUrl)!;
+    if (coverUrl) {
+      const cached = getCachedColors(coverUrl);
+      if (cached) return cached;
     }
     const fromPalette = parsePalette(dbPalette);
-    if (fromPalette) return fromPalette;
+    if (fromPalette) {
+      if (coverUrl) setCachedColors(coverUrl, fromPalette);
+      return fromPalette;
+    }
     return NEUTRAL_COLORS;
   });
   const extractingRef = useRef(false);
@@ -142,88 +172,87 @@ export function useAlbumColor(coverUrl: string | undefined, dbPalette?: any) {
     const fromPalette = parsePalette(dbPalette);
     if (fromPalette) {
       setColors(fromPalette);
-      if (coverUrl) colorCache.set(coverUrl, fromPalette);
+      if (coverUrl) setCachedColors(coverUrl, fromPalette);
       return;
     }
     if (!coverUrl) return;
 
-    // Check cache first
+    // Check fast cache first
     const cacheKey = coverUrl;
-    const cached = colorCache.get(cacheKey);
+    const cached = getCachedColors(cacheKey);
     if (cached) {
       setColors(cached);
       return;
     }
 
- // Prevent duplicate extractions
- if (extractingRef.current) return;
- extractingRef.current = true;
+    // Prevent duplicate extractions
+    if (extractingRef.current) return;
+    extractingRef.current = true;
 
- // Build the image URL
- let targetUrl = coverUrl;
- if (!targetUrl.startsWith('http') && !targetUrl.startsWith('blob') && !targetUrl.startsWith('data')) {
- targetUrl = getMediaUrl(coverUrl) || targetUrl;
- }
+    // Build the image URL
+    let targetUrl = coverUrl;
+    if (!targetUrl.startsWith('http') && !targetUrl.startsWith('blob') && !targetUrl.startsWith('data')) {
+      targetUrl = getMediaUrl(coverUrl) || targetUrl;
+    }
 
-  // Force proxy to bypass Workbox opaque caching completely
-  let imgSrc = targetUrl;
-  if (imgSrc.startsWith('http') && !imgSrc.includes('proxy-image')) {
-    const API_BASE = getApiBaseUrl();
-    imgSrc = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(imgSrc)}`;
-  }
-  
-  // Append a unique cache-buster to bypass Safari/Workbox opaque response limits
-  imgSrc += (imgSrc.includes('?') ? '&' : '?') + `_corsBust=${Date.now()}`;
+    // Route through backend proxy for external images to enable fast CORS & HTTP caching
+    let imgSrc = targetUrl;
+    if (imgSrc.startsWith('http') && !imgSrc.includes('proxy-image')) {
+      try {
+        const API_BASE = getApiBaseUrl();
+        imgSrc = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(imgSrc)}`;
+      } catch {}
+    }
 
- const img = new Image();
- img.crossOrigin = 'Anonymous';
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.decoding = 'async';
 
- img.onload = () => {
- try {
- const canvas = document.createElement('canvas');
- const size = 64;
- canvas.width = size;
- canvas.height = size;
- const ctx = canvas.getContext('2d');
- if (!ctx) {
- extractingRef.current = false;
- return;
- }
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const size = 32; // 32x32 is 4x faster to process and provides optimal dominant tones
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) {
+          extractingRef.current = false;
+          return;
+        }
 
- ctx.drawImage(img, 0, 0, size, size);
- const imageData = ctx.getImageData(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+        const imageData = ctx.getImageData(0, 0, size, size);
 
- // Extract 3 dominant colors (original brightness)
- const dominant = extractDominantColors(imageData, 3);
+        // Extract 3 dominant colors
+        const dominant = extractDominantColors(imageData, 3);
+        const rgbStrings = dominant.map(([r, g, b]) => `rgb(${r},${g},${b})`);
 
- const rgbStrings = dominant.map(([r, g, b]) => `rgb(${r},${g},${b})`);
+        // Pad to 3 if needed
+        while (rgbStrings.length < 3) {
+          rgbStrings.push(rgbStrings[rgbStrings.length - 1] || 'rgb(60,50,80)');
+        }
 
- // Pad to 3 if needed
- while (rgbStrings.length < 3) {
- rgbStrings.push(rgbStrings[rgbStrings.length - 1] || 'rgb(60,50,80)');
- }
+        const final = rgbStrings.slice(0, 3);
+        setCachedColors(cacheKey, final);
+        setColors(final);
+      } catch (err) {
+        console.error('Color extraction failed:', err);
+      } finally {
+        extractingRef.current = false;
+      }
+    };
 
- const final = rgbStrings.slice(0, 3);
- colorCache.set(cacheKey, final);
- setColors(final);
- } catch (err) {
- console.error('Color extraction failed:', err);
- } finally {
- extractingRef.current = false;
- }
- };
+    img.onerror = () => {
+      console.warn('Image load failed for color extraction:', imgSrc);
+      extractingRef.current = false;
+    };
 
- img.onerror = () => {
- console.warn('Image load failed for color extraction:', imgSrc);
- extractingRef.current = false;
- };
+    img.src = imgSrc;
 
- img.src = imgSrc;
-
- return () => {
- extractingRef.current = false;
- };
- }, [coverUrl]);
+    return () => {
+      extractingRef.current = false;
+    };
+  }, [coverUrl, dbPalette]);
 
  return colors;
 }

@@ -133,7 +133,7 @@ export default function ArtistPage() {
       />
 
       {/* ── 1. APPLE MUSIC HERO SECTION (Screenshot 2) ────────────────── */}
-      <div className="relative w-full h-[62vh] md:h-[76vh] overflow-hidden select-none">
+      <div className="relative w-full h-[54vh] min-h-[380px] sm:h-[62vh] md:h-[76vh] overflow-hidden select-none">
         {/* Full-bleed high-res artist photography */}
         {bannerUrl ? (
           <img
@@ -148,32 +148,32 @@ export default function ArtistPage() {
         )}
 
         {/* Ambient top vignette & smooth bottom fade into universal dark charcoal #121214 */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#121214] via-[#121214]/40 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#121214] via-[#121214]/50 to-transparent pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-[#121214] pointer-events-none" />
 
         {/* Centered Hero Content: Artist Name & Swift UI Controls */}
-        <div className="absolute inset-0 flex flex-col justify-end items-center text-center px-4 pb-10 md:pb-14 z-10">
+        <div className="absolute inset-0 flex flex-col justify-end items-center text-center px-4 pb-8 sm:pb-10 md:pb-14 z-10">
           <motion.div
             initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-col items-center max-w-4xl w-full"
+            className="flex flex-col items-center max-w-4xl w-full min-w-0"
           >
             {/* Bold Centered Artist Title */}
             <h1
               ref={heroNameRef}
-              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-[0_8px_24px_rgba(0,0,0,0.8)] mb-6 select-text"
+              className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-[0_8px_24px_rgba(0,0,0,0.8)] mb-4 sm:mb-6 select-text max-w-full px-2 break-words"
             >
               {displayName}
             </h1>
 
             {/* Swift UI Circular Action Buttons (Play, Shuffle, Star, More) */}
-            <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
               {/* Star / Favorite Button */}
               <button
                 onClick={() => setIsFavorited(!isFavorited)}
                 className={cn(
-                  "w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl",
+                  "w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl cursor-pointer",
                   isFavorited
                     ? "bg-brand/20 border-brand text-brand"
                     : "bg-white/10 hover:bg-white/20 border-white/15 text-white/90 hover:text-white"
@@ -181,7 +181,7 @@ export default function ArtistPage() {
                 title={isFavorited ? "Favorited" : "Favorite Artist"}
               >
                 <Star
-                  size={20}
+                  size={18}
                   className={cn(isFavorited ? "fill-brand text-brand" : "text-white")}
                   strokeWidth={2}
                 />
@@ -190,13 +190,13 @@ export default function ArtistPage() {
               {/* Primary White Play Circle */}
               <button
                 onClick={handlePlayTopTracks}
-                className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,0,0,0.6)] cursor-pointer"
+                className="w-13 h-13 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,0,0,0.6)] cursor-pointer"
                 title={isPlaying && isArtistActive ? "Pause" : "Play"}
               >
                 {isPlaying && isArtistActive ? (
-                  <SwiftUIPause size={26} fill="black" />
+                  <SwiftUIPause size={24} fill="black" />
                 ) : (
-                  <SwiftUIPlay size={26} fill="black" className="ml-1" />
+                  <SwiftUIPlay size={24} fill="black" className="ml-1" />
                 )}
               </button>
 
@@ -204,24 +204,24 @@ export default function ArtistPage() {
               <button
                 onClick={handleShufflePlay}
                 className={cn(
-                  "w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl",
+                  "w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl cursor-pointer",
                   isShuffled
                     ? "bg-brand/20 border-brand text-brand"
                     : "bg-white/10 hover:bg-white/20 border-white/15 text-white/90 hover:text-white"
                 )}
                 title="Shuffle Artist Songs"
               >
-                <SwiftUIShuffle size={20} stroke="currentColor" />
+                <SwiftUIShuffle size={18} stroke="currentColor" />
               </button>
 
               {/* Glass Ellipsis Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="w-11 h-11 md:w-12 md:h-12 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white flex items-center justify-center active:scale-95 transition-all shadow-xl"
+                    className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white flex items-center justify-center active:scale-95 transition-all shadow-xl cursor-pointer"
                     title="More Options"
                   >
-                    <SwiftUIEllipsis size={20} fill="currentColor" />
+                    <SwiftUIEllipsis size={18} fill="currentColor" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center" className="w-48 bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl p-1">
@@ -247,7 +247,7 @@ export default function ArtistPage() {
       </div>
 
       {/* ── 2. MAIN APPLE MUSIC BODY SECTIONS ─────────────────────────── */}
-      <div className="relative z-10 px-5 sm:px-8 md:px-12 lg:px-16 pt-8 pb-28 max-w-[1600px] mx-auto w-full text-white">
+      <div className="relative z-10 px-4 sm:px-8 md:px-12 lg:px-16 pt-6 sm:pt-8 pb-28 max-w-[1600px] mx-auto w-full text-white min-w-0 overflow-hidden">
         {/* Latest Release (Left) & Top Songs > (Right) (Screenshot 3) */}
         <ArtistLatestAndTopSongs
           artist={artist}

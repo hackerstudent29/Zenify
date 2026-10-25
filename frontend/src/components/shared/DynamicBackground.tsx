@@ -8,11 +8,13 @@ import { StaticAlbumBackground } from "./StaticAlbumBackground";
 export type DynamicBackgroundProps = ArtworkMeshBackgroundProps & {
   surface: keyof ReactiveBgSettings;
   mode?: "static" | "flow";
+  palette?: any;
 };
 
 export const DynamicBackground = React.memo(function DynamicBackground({
   surface,
   mode,
+  palette,
   ...props
 }: DynamicBackgroundProps) {
   const isEnabled = useReactiveBgStore((state) => state.reactiveBg[surface]);
@@ -30,7 +32,7 @@ export const DynamicBackground = React.memo(function DynamicBackground({
   const isStatic = mode === "static" || (!mode && (surface === "albumPage" || surface === "trackPage" || surface === "other"));
 
   if (isStatic) {
-    return <StaticAlbumBackground coverUrl={props.coverUrl} covers={props.covers} className={props.className} />;
+    return <StaticAlbumBackground coverUrl={props.coverUrl} covers={props.covers} palette={palette} className={props.className} />;
   }
 
   return <ArtworkMeshBackground speed={props.speed ?? 1.6} {...props} />;

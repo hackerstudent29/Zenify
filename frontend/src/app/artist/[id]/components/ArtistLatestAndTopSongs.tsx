@@ -116,7 +116,7 @@ export function ArtistLatestAndTopSongs({
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <button
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0"
               title="More"
             >
               <SwiftUIEllipsis size={16} fill="currentColor" />
@@ -149,18 +149,18 @@ export function ArtistLatestAndTopSongs({
 
   return (
     <section className="mb-14">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 items-start">
         {/* Left Column: Latest Release (Screenshot 3) */}
         {latestRelease && (
-          <div className="lg:col-span-4 flex flex-col">
+          <div className="lg:col-span-4 flex flex-col min-w-0">
             <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight mb-4">
               Latest Release
             </h2>
             <Link
               href={latestRelease.id ? `/album/${latestRelease.id}` : "#"}
-              className="group flex flex-col sm:flex-row lg:flex-col gap-4 items-start"
+              className="group flex flex-row lg:flex-col gap-4 items-start min-w-0"
             >
-              <div className="relative aspect-square w-44 sm:w-48 md:w-52 lg:w-56 rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 shadow-2xl transition-transform duration-300 group-hover:scale-[1.02] shrink-0">
+              <div className="relative aspect-square w-28 sm:w-36 md:w-44 lg:w-56 rounded-2xl overflow-hidden bg-zinc-900 border border-white/10 shadow-2xl transition-transform duration-300 group-hover:scale-[1.02] shrink-0">
                 <img
                   src={latestCover}
                   alt={latestTitle}
