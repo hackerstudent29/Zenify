@@ -706,7 +706,7 @@ export function LyricsView({
           onTouchCancel={onTouchEnd}
         >
           <style dangerouslySetInnerHTML={{ __html: ".scrollbar-none::-webkit-scrollbar{display:none!important}" }} />
-          <div className={cn("relative flex w-full flex-col", isFullscreen ? (isMobile ? "px-[max(14px,env(safe-area-inset-left))] pr-[max(14px,env(safe-area-inset-right))]" : "mx-auto max-w-5xl px-8") : isMobile ? "px-3" : "px-4")}>
+          <div className={cn("relative flex w-full flex-col", isMobile ? "items-center text-center px-[max(14px,env(safe-area-inset-left))] pr-[max(14px,env(safe-area-inset-right))]" : (isFullscreen ? "mx-auto max-w-5xl px-8" : "px-4"))}>
             <div className="w-full shrink-0" style={{ height: topSpacer }} />
 
             {processedLines.map((line: any, idx: number) => {

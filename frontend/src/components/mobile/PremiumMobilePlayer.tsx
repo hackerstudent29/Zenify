@@ -203,6 +203,100 @@ function MorphWrap({
 }
 
 /* ------------------------------------------------------------------ */
+/*  HeaderMorphWrap — Smooth morph from Lyrics Compact Header to Mini  */
+/* ------------------------------------------------------------------ */
+function HeaderMorphWrap({
+  sheetY,
+  miniRef,
+  H,
+  children,
+}: {
+  sheetY: MotionValue<number>;
+  miniRef: React.RefObject<HTMLDivElement>;
+  H: number;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const geo = useRef<{
+    headerLeft: number;
+    headerTop: number;
+    headerSize: number;
+    miniLeft: number;
+    miniTop: number;
+    miniSize: number;
+  } | null>(null);
+
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const s = useMotionValue(1);
+
+  const update = useCallback(() => {
+    const g = geo.current;
+    if (!g || !g.miniSize) return;
+    const v = sheetY.get();
+    const q = Math.min(1, Math.max(0, v / H)); // 0 = open, 1 = closed (docked)
+    if (q <= 0) {
+      x.set(0);
+      y.set(0);
+      s.set(1);
+      return;
+    }
+    const sGeo = 1 + (g.miniSize / g.headerSize - 1) * q;
+    x.set((g.miniLeft - g.headerLeft) * q);
+    y.set((g.miniTop - g.headerTop) * q - v);
+    s.set(sGeo);
+  }, [H, sheetY, x, y, s]);
+
+  useMotionValueEvent(sheetY, "change", update);
+
+  const measure = useCallback(() => {
+    const el = ref.current;
+    const mini = miniRef.current;
+    if (!el || !mini) return;
+    const curX = x.get();
+    const curY = y.get();
+    const curS = s.get();
+    x.set(0);
+    y.set(0);
+    s.set(1);
+    const r = el.getBoundingClientRect();
+    const m = mini.getBoundingClientRect();
+    x.set(curX);
+    y.set(curY);
+    s.set(curS);
+    if (!r.width || !m.width) return;
+    geo.current = {
+      headerLeft: r.left,
+      headerTop: r.top - sheetY.get(),
+      headerSize: r.width,
+      miniLeft: m.left,
+      miniTop: m.top,
+      miniSize: m.width,
+    };
+    update();
+  }, [sheetY, update, x, y, s, miniRef]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure]);
+
+  useEffect(() => {
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
+
+  return (
+    <motion.div
+      ref={ref}
+      className="relative shrink-0"
+      style={{ x, y, scale: s, transformOrigin: "0 0" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Track menu (⋯)                                                     */
 /* ------------------------------------------------------------------ */
 function TrackMenu({ track, onLeave }: { track: any; onLeave: (to: string) => void }) {
@@ -407,7 +501,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     gesture.current = "none";
   };
 
-  /* ── full sheet drag down to close ── */
+  /* ── full sheet drag down to close (works in both Artwork and Lyrics mode) ── */
   const sheetPan = (_: PointerEvent, i: PanInfo) => {
     if (i.offset.y > 0) {
       sheetYRef.current.set(Math.min(H, i.offset.y));
@@ -594,15 +688,19 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                   onPanEnd={sheetPanEnd}
                   className="relative z-30 flex shrink-0 touch-none items-center gap-3 px-6 pb-3"
                 >
-                  <motion.div
-                    layoutId="m-art"
-                    transition={SHEET_SPRING}
-                    style={{ borderRadius: 9 }}
-                    className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden bg-zinc-800 shadow-lg ring-1 ring-white/10"
-                    onClick={() => setIsLyricsOpen(false)}
-                  >
-                    {art}
-                  </motion.div>
+                  <HeaderMorphWrap sheetY={sheetY} miniRef={miniArtRef} H={H}>
+                    <motion.div
+                      layoutId="m-art"
+                      transition={SHEET_SPRING}
+                      style={{ borderRadius: 10 }}
+                      className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden bg-zinc-800 shadow-lg ring-1 ring-white/10"
+                      onClick={() => setIsLyricsOpen(false)}
+                      title="Back to artwork"
+                    >
+                      {art}
+                    </motion.div>
+                  </HeaderMorphWrap>
+
                   <motion.div
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -628,7 +726,14 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
               )}
 
               {/* Middle region: artwork or lyrics view */}
-              <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-6">
+              <motion.div
+                className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-6"
+                onPan={(_e, info) => {
+                  if (!isLyricsOpen && (info.offset.y < -35 || info.velocity.y < -250)) {
+                    setIsLyricsOpen(true);
+                  }
+                }}
+              >
                 {!isLyricsOpen && (
                   <div
                     className="flex items-center justify-center w-full"
@@ -646,6 +751,12 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                       onDragEnd={(_, info) => {
                         if (info.offset.x < -60 || info.velocity.x < -400) handleNext();
                         else if (info.offset.x > 60 || info.velocity.x > 400) handlePrev();
+                      }}
+                      onPan={(_e, info) => {
+                        // Swipe up on the artwork opens lyrics
+                        if (info.offset.y < -35 || info.velocity.y < -250) {
+                          setIsLyricsOpen(true);
+                        }
                       }}
                       onTap={() => setIsLyricsOpen(true)}
                       className="h-full w-full cursor-pointer"
@@ -698,7 +809,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
+              </motion.div>
 
               {/* Bottom block: track info, seekbar, playback actions */}
               <div className="relative z-10 shrink-0 px-6 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] pt-2">
