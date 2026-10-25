@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { MarqueeText } from "../shared/MarqueeText";
+import { ArtistLinks } from "../shared/ArtistLinks";
 
 interface MediaCardProps {
  track: Track;
@@ -265,9 +266,11 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
   </span>
   </div>
   
-  <p className={cn("text-[11px] font-medium tracking-tight font-sans truncate w-full block", isCurrent ? "text-zinc-400" : isArtist ? "text-brand" : "text-white/40")}>
-  {isArtist ? 'Artist' : isPlaylist ? ((track as any).description || (track as any).subtitle || 'Curated Playlist') : formatDisplayTitle(track.artist?.name || 'Unknown Artist')}
-  </p>
+  <div className={cn("text-[11px] font-medium tracking-tight font-sans truncate w-full block", isCurrent ? "text-zinc-400" : isArtist ? "text-brand" : "text-white/40")} onClick={(e) => e.stopPropagation()}>
+  {isArtist ? 'Artist' : isPlaylist ? ((track as any).description || (track as any).subtitle || 'Curated Playlist') : (
+    <ArtistLinks track={track} maxArtists={2} linkClassName="text-white/40 hover:text-white hover:underline" />
+  )}
+  </div>
  </div>
  </div>
 

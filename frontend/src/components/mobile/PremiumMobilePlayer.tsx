@@ -1,796 +1,534 @@
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import {
+  AnimatePresence,
+  motion,
+  MotionConfig,
+  useDragControls,
+  useMotionValue,
+  useTransform,
+} from "framer-motion";
+import { ListPlus, RefreshCw, User, Download } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { useReactiveBgStore } from "@/store/reactiveBgStore";
+import { useAuthStore } from "@/store/authStore";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
 import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
-import { useAuthStore } from "@/store/authStore";
-import { 
- Play, Pause, SkipBack, SkipForward, 
- Heart, MoreVertical, ChevronDown, User, ListPlus,
- ListMusic, Sparkles, ScrollText, PlusCircle, Bookmark,
- Download, Shuffle, Repeat, Repeat1, Layers, RefreshCw
-} from "lucide-react";
-import { SwiftUIPlay, SwiftUIPause, SwiftUIShuffle, SwiftUIRepeat, SwiftUIRepeatOne, SwiftUIForward, SwiftUIBackward } from "@/components/ui/SwiftUIIcons";
+import { SwiftUIForward, SwiftUIBackward, SwiftUIQueue } from "@/components/ui/SwiftUIIcons";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
-import { useRouter } from "next/navigation";
-import { cn, getTrackCover, getArtistTarget } from "@/lib/utils";
-import * as Slider from "@radix-ui/react-slider";
-import { audioEngine } from "@/lib/audio-engine";
-import { MobileScrubber, MiniPlayerProgress } from "./../player/PlayerProgress";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "@/lib/api";
 import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger,
- DropdownMenuSeparator,
- DropdownMenuPortal,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
+import { cn, getTrackCover, getArtistTarget } from "@/lib/utils";
+import { MobileScrubber, MiniPlayerProgress } from "./../player/PlayerProgress";
 import { DynamicBackground } from "../shared/DynamicBackground";
 import { LyricsView } from "../shared/LyricsView";
-import { AnimatedHeartButton } from "@/components/ui/AnimatedHeartButton";
-import { AnimatedShareButton } from "@/components/ui/AnimatedShareButton";
-import { MarqueeText } from "../shared/MarqueeText";
+import {
+  FONT_STACK, SHEET_SPRING, SPRING, SPRING_SOFT,
+  GlassButton, LikeButton, Marquee, PlateButton, PlayPauseButton, PlayerStyles, SpringButton,
+  SFFx, SFLyrics, SFMore, SFRepeat, SFShuffle,
+  useIdle, useTrackLike,
+} from "@/components/player/PlayerKit";
 
-// ------------------------------------------------------------------
-// Image Cache
-// ------------------------------------------------------------------
+/* ------------------------------------------------------------------ */
+/*  Cover loading: swap the shown art only once it's decoded           */
+/*  (no flash of the old image under the new track's animation)        */
+/* ------------------------------------------------------------------ */
 const imageCache = new Set<string>();
-function preloadImage(url: string): void {
- if (!url || imageCache.has(url)) return;
- imageCache.add(url);
- const img = new Image();
- img.src = url;
+
+function useShownCover(track: any) {
+  const cover: string = track ? getTrackCover(track) : "";
+  const [shown, setShown] = useState({ id: track?.id as string | undefined, cover });
+
+  useEffect(() => {
+    if (!track) return;
+    let dead = false;
+    const commit = () => !dead && setShown({ id: track.id, cover });
+    if (!cover || imageCache.has(cover)) {
+      commit();
+      return () => { dead = true; };
+    }
+    const img = new Image();
+    img.src = cover;
+    const ok = () => { imageCache.add(cover); commit(); };
+    if (img.decode) img.decode().then(ok).catch(commit);
+    else { img.onload = ok; img.onerror = commit; }
+    return () => { dead = true; };
+  }, [track?.id, cover]);
+
+  return shown;
 }
 
-// ------------------------------------------------------------------
-// HorizontalSwipeArea
-// ------------------------------------------------------------------
-interface SwipeAreaProps {
- onSwipeLeft: () => void;
- onSwipeRight: () => void;
- children: React.ReactNode;
- className?: string;
- enabled?: boolean;
+/* ------------------------------------------------------------------ */
+/*  Track menu (⋯)                                                     */
+/* ------------------------------------------------------------------ */
+function TrackMenu({ track, onLeave }: { track: any; onLeave: (to: string) => void }) {
+  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
+  const openDownloadModal = useUIStore((s) => s.openDownloadModal);
+  const showToast = (msg: string, type: "success" | "error" = "success") =>
+    useUIStore.getState().showToast(msg, type);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <GlassButton title="More">
+          <SFMore size={18} />
+        </GlassButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuPortal>
+        <DropdownMenuContent
+          align="end"
+          sideOffset={8}
+          className="w-56 bg-zinc-900/90 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]"
+        >
+          <DropdownMenuItem onSelect={() => usePlayerStore.getState().addToUserQueue(track)}>
+            <ListPlus size={18} className="mr-3 opacity-50 text-brand" />
+            <span className="font-medium">Add to Queue</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => refetchTrackAudio(track, showToast)}>
+            <RefreshCw size={18} className={cn("mr-3 opacity-50", isRefetching === track?.id && "animate-spin text-brand")} />
+            <span className="font-medium">{isRefetching === track?.id ? "Refetching…" : "Refetch Audio"}</span>
+          </DropdownMenuItem>
+          <RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
+          <DropdownMenuItem
+            onSelect={() => {
+              const target = getArtistTarget(track);
+              if (target) onLeave(target);
+            }}
+          >
+            <User size={18} className="mr-3 opacity-50" />
+            <span className="font-medium">Go to Artist</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => openDownloadModal(track)}>
+            <Download size={18} className="mr-3 opacity-50" />
+            <span className="font-medium">Download Track</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenuPortal>
+    </DropdownMenu>
+  );
 }
 
-function HorizontalSwipeArea({ onSwipeLeft, onSwipeRight, children, className, enabled = true }: SwipeAreaProps) {
- const startX = useRef(0);
- const startY = useRef(0);
- const isDeterminate = useRef(false);
- const isHorizontal = useRef(false);
-
- const onTouchStart = useCallback((e: React.TouchEvent) => {
- startX.current = e.touches[0].clientX;
- startY.current = e.touches[0].clientY;
- isDeterminate.current = false;
- isHorizontal.current = false;
- }, []);
-
- const onTouchMove = useCallback((e: React.TouchEvent) => {
- if (!enabled) return;
- const dx = e.touches[0].clientX - startX.current;
- const dy = e.touches[0].clientY - startY.current;
- const adx = Math.abs(dx);
- const ady = Math.abs(dy);
-
- if (!isDeterminate.current && (adx > 2 || ady > 2)) {
- isDeterminate.current = true;
- isHorizontal.current = adx > ady;
- }
-
- if (isHorizontal.current) {
- if (e.cancelable) e.preventDefault();
- e.stopPropagation();
- }
- }, [enabled]);
-
- const onTouchEnd = useCallback((e: React.TouchEvent) => {
- if (!enabled || !isDeterminate.current || !isHorizontal.current) return;
- const dx = e.changedTouches[0].clientX - startX.current;
- if (isHorizontal.current) {
- e.stopPropagation();
- if (dx < -30) onSwipeLeft();
- else if (dx > 30) onSwipeRight();
- }
- }, [enabled, onSwipeLeft, onSwipeRight]);
-
- return (
- <div
- className={cn(className, "touch-pan-y")}
- onTouchStart={onTouchStart}
- onTouchMove={onTouchMove}
- onTouchEnd={onTouchEnd}
- onTouchCancel={() => { isDeterminate.current = false; }}
- >
- {children}
- </div>
- );
-}
-
-// ------------------------------------------------------------------
-// Main Component
-// ------------------------------------------------------------------
+/* ------------------------------------------------------------------ */
+/*  Main                                                               */
+/* ------------------------------------------------------------------ */
 export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boolean }) {
-  const { 
-    isFullScreenPlayerOpen, 
-    setFullScreenPlayerOpen, 
-    isQueueOpen, 
-    setIsQueueOpen,
-    setAudioFxOpen,
-    openDownloadModal,
-    isLyricsOpen,
-    setIsLyricsOpen,
-  } = useUIStore();
- 
- const router = useRouter();
- const queryClient = useQueryClient();
- const { user } = useAuthStore();
- const isGlassmorphism = user?.preferences?.globalPlayerStyle !== "classic" && user?.preferences?.globalPlayerStyle !== "solid";
- const showReactiveBg = useReactiveBgStore(state => state.player);
- const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
- const { refetchTrackAudio, isRefetching } = useRefetchAudio();
- const { refetchTrackLyrics } = useRefetchLyrics();
- const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-   useUIStore.getState().showToast(msg, type);
- };
+  const router = useRouter();
 
- const { 
- currentTrack, 
- isPlaying, 
- togglePlay, 
- playNext, 
- playPrev, 
- duration,
- isShuffled,
- toggleShuffle,
- repeatMode,
- toggleRepeat,
- } = usePlayerStore();
+  // Selectors only. Destructuring the whole player store re-rendered this tree on every time tick.
+  const currentTrack = usePlayerStore((s) => s.currentTrack);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const togglePlay = usePlayerStore((s) => s.togglePlay);
+  const playNext = usePlayerStore((s) => s.playNext);
+  const playPrev = usePlayerStore((s) => s.playPrev);
+  const duration = usePlayerStore((s) => s.duration);
+  const isShuffled = usePlayerStore((s) => s.isShuffled);
+  const toggleShuffle = usePlayerStore((s) => s.toggleShuffle);
+  const repeatMode = usePlayerStore((s) => s.repeatMode);
+  const toggleRepeat = usePlayerStore((s) => s.toggleRepeat);
 
- // ── Queries & Mutations ──────────────────────────────────────────────
- const { data: likedTrackIds } = useQuery({
- queryKey: ['liked-track-ids'],
- queryFn: async () => {
- try {
-  const res = await api.get('/tracks/liked');
-  const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
-  return arr.map((t: any) => t.id);
- } catch (e) {
- return [];
- }
- },
- staleTime: 1000 * 60 * 5,
- });
+  const isOpen = useUIStore((s) => s.isFullScreenPlayerOpen);
+  const setOpen = useUIStore((s) => s.setFullScreenPlayerOpen);
+  const isQueueOpen = useUIStore((s) => s.isQueueOpen);
+  const setIsQueueOpen = useUIStore((s) => s.setIsQueueOpen);
+  const isAudioFxOpen = useUIStore((s) => s.isAudioFxOpen);
+  const setAudioFxOpen = useUIStore((s) => s.setAudioFxOpen);
+  const isLyricsOpen = useUIStore((s) => s.isLyricsOpen);
+  const setIsLyricsOpen = useUIStore((s) => s.setIsLyricsOpen);
 
- const toggleLikeMutation = useMutation({
- mutationFn: async (trackId: string) => {
- await api.post(`/tracks/${trackId}/like`);
- },
- onMutate: async (trackId: string) => {
- await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
- const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
- const newLikedIds = previousLikedIds ? (
- previousLikedIds.includes(trackId)
- ? previousLikedIds.filter(id => id !== trackId)
- : [...previousLikedIds, trackId]
- ) : [trackId];
- queryClient.setQueryData(['liked-track-ids'], newLikedIds);
- return { previousLikedIds };
- },
- onError: (err, trackId, context) => {
- if (context?.previousLikedIds) {
- queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
- }
- },
- onSettled: () => {
- queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
- queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
- }
- });
+  const userPrefs = useAuthStore((s: any) => s.user?.preferences?.globalPlayerStyle);
+  const isGlass = userPrefs !== "classic" && userPrefs !== "solid";
 
- const isLiked = likedTrackIds?.includes(currentTrack?.id || "") ?? false;
+  const { liked, toggle: toggleLike } = useTrackLike(currentTrack?.id);
+  const shown = useShownCover(currentTrack);
 
- // ── Local State ──────────────────────────────────────────────────────
- const [stablecover, setStableCover] = useState(getTrackCover(currentTrack));
- const [swipeDirection, setSwipeDirection] = useState(1); // 1 = next, -1 = prev
+  const dirRef = useRef(1); // +1 next, -1 prev
   const [isUserScrollingLyrics, setIsUserScrollingLyrics] = useState(false);
-  const [isIdle, setIsIdle] = useState(false);
-  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const idle = useIdle(isOpen && isLyricsOpen, 4500);
+  const showLyrics = useDeferredValue(isLyricsOpen); // mounts heavy lyrics after the art morph has started
+  const hideSecondary = isLyricsOpen && (idle || isUserScrollingLyrics);
 
- const APPLE_SPRINGS = useMemo(() => ({
- sheet: {
- type: "spring" as const,
- stiffness: 380,
- damping: 34,
- mass: 0.7,
- },
- artworkBounce: {
- type: "spring" as const,
- stiffness: 300,
- damping: 22,
- mass: 0.6,
- },
- controls: {
- type: "spring" as const,
- stiffness: 400,
- damping: 34,
- mass: 0.6,
- },
- }), []);
+  const handleNext = useCallback(() => { dirRef.current = 1; playNext(true); }, [playNext]);
+  const handlePrev = useCallback(() => { dirRef.current = -1; playPrev(); }, [playPrev]);
+  useEffect(() => { dirRef.current = 1; }, [currentTrack?.id]);
 
- const handleNext = useCallback(() => {
- setSwipeDirection(1);
- playNext(true);
- }, [playNext]);
+  // lyrics reset to artwork when the song changes (previous behaviour)
+  useEffect(() => { if (currentTrack?.id) setIsLyricsOpen(false); }, [currentTrack?.id, setIsLyricsOpen]);
 
- const handlePrev = useCallback(() => {
- setSwipeDirection(-1);
- playPrev();
- }, [playPrev]);
+  const leaveTo = useCallback((to: string) => {
+    setOpen(false);
+    setTimeout(() => router.push(to), 60);
+  }, [router, setOpen]);
 
- // ── Image preloading ─────────────────────────────────────────────────
- useEffect(() => {
- if (!currentTrack) return;
- const nextUrl = getTrackCover(currentTrack);
- preloadImage(nextUrl);
- if (imageCache.has(nextUrl)) {
- setStableCover(nextUrl);
- } else {
- const img = new Image();
- img.src = nextUrl;
- img.onload = () => setStableCover(nextUrl);
- img.onerror = () => setStableCover(nextUrl); // fallback
- }
- }, [currentTrack?.id]);
+  /* ── sheet drag (starts only from the grabber/header, so lyrics scroll & sliders never fight it) ── */
+  const dragControls = useDragControls();
+  const draggedRef = useRef(false);
+  const H = useRef(typeof window !== "undefined" ? window.innerHeight : 900).current;
+  const sheetY = useMotionValue(0);
+  const radius = useTransform(sheetY, [0, 140], [0, 32], { clamp: true });
+  const sheetScale = useTransform(sheetY, [0, 420], [1, 0.94], { clamp: true });
+  const startDrag = (e: React.PointerEvent) => dragControls.start(e);
 
- // Reset lyrics mode to album art view when song changes
- useEffect(() => {
-   if (currentTrack?.id) {
-     setIsLyricsOpen(false);
-   }
- }, [currentTrack?.id, setIsLyricsOpen]);
-
- // ── Idle Timer ───────────────────────────────────────────────────────
-  const resetIdleTimer = useCallback(() => {
-  setIsIdle(false);
-  if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-  idleTimerRef.current = setTimeout(() => {
-    setIsIdle(true);
-  }, 5000);
-  }, []);
-
-   useEffect(() => {
-     if (isFullScreenPlayerOpen) {
-       const events = ['touchstart', 'touchmove', 'mousedown', 'click'];
-       const handler = () => resetIdleTimer();
-       events.forEach(e => window.addEventListener(e, handler, { passive: true }));
-       resetIdleTimer();
-       return () => {
-         events.forEach(e => window.removeEventListener(e, handler));
-         if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-       };
-     } else {
-       setIsIdle(false);
-     }
-   }, [isFullScreenPlayerOpen, resetIdleTimer]);
-
-
-
-   const showBottomControls = !isLyricsOpen || (!isIdle && !isUserScrollingLyrics);
+  /* ── mini player gestures ── */
+  const panned = useRef(false);
 
   if (!currentTrack) return null;
 
- return (
-   <>
-     {/* MINI PLAYER VIEW */}
-     {!hidePlayer && (
-       <motion.div
-         key="mini-player"
-         animate={{ 
-           y: isFullScreenPlayerOpen ? 60 : 0,
-           opacity: isFullScreenPlayerOpen ? 0 : 1,
-           scale: isFullScreenPlayerOpen ? 0.94 : 1,
-           pointerEvents: isFullScreenPlayerOpen ? "none" : "auto",
-         }}
-         transition={APPLE_SPRINGS.sheet}
-         drag={!isFullScreenPlayerOpen ? "y" : false}
-         dragConstraints={{ top: 0, bottom: 0 }}
-         dragElastic={{ top: 0.35, bottom: 0 }}
-         onDragEnd={(_, info) => {
-           if (info.offset.y < -25 || info.velocity.y < -200) {
-             setFullScreenPlayerOpen(true);
-           }
-         }}
-         className={cn(
-           "fixed z-[300]",
-           "left-3 right-3 select-none"
-         )}
+  const art = (
+    <AnimatePresence mode="popLayout" initial={false} custom={dirRef.current}>
+      <motion.img
+        key={shown.id}
+        src={shown.cover}
+        alt=""
+        draggable={false}
+        custom={dirRef.current}
+        variants={{
+          enter: (d: number) => ({ opacity: 0, x: d * 56, scale: 1.04 }),
+          center: { opacity: 1, x: 0, scale: 1 },
+          exit: (d: number) => ({ opacity: 0, x: -d * 56, scale: 0.98 }),
+        }}
+        initial="enter"
+        animate="center"
+        exit="exit"
+        transition={{ x: SPRING_SOFT, scale: SPRING_SOFT, opacity: { duration: 0.24 } }}
+        className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+      />
+    </AnimatePresence>
+  );
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <PlayerStyles />
+
+      {/* ───────────── MINI PLAYER ───────────── */}
+      {!hidePlayer && (
+        <motion.div
+          key="mini-player"
+          animate={{ y: isOpen ? 60 : 0, opacity: isOpen ? 0 : 1, scale: isOpen ? 0.94 : 1 }}
+          transition={SHEET_SPRING}
+          onPointerDown={() => { panned.current = false; }}
+          onPanStart={() => { panned.current = false; }}
+          onPan={(_, i) => { if (Math.abs(i.offset.x) > 6 || Math.abs(i.offset.y) > 6) panned.current = true; }}
+          onPanEnd={(_, i) => {
+            const { x, y } = i.offset;
+            if (Math.abs(x) > Math.abs(y)) {
+              if (x < -48) handleNext();
+              else if (x > 48) handlePrev();
+            } else if (y < -24 || i.velocity.y < -300) setOpen(true);
+          }}
+          className="fixed z-[300] left-3 right-3 select-none"
           style={{
             bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
-            height: "62px",
+            height: 62,
+            touchAction: "none",
+            pointerEvents: isOpen ? "none" : "auto",
+            fontFamily: FONT_STACK,
           }}
         >
-          {/* Mini Pod Background */}
           <div
             className={cn(
-              "absolute inset-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] rounded-full transition-colors",
-              isGlassmorphism
-                ? "border border-white/10 bg-white/5 backdrop-blur-xl ring-1 ring-white/5"
-                : "bg-[#1c1c1e] border border-white/10"
+              "absolute inset-0 rounded-full shadow-[0_8px_28px_rgba(0,0,0,0.45)] border border-white/10",
+              isGlass ? "bg-white/[0.07] backdrop-blur-xl" : "bg-[#1c1c1e]"
             )}
-            style={isGlassmorphism ? {
-              WebkitBackdropFilter: "blur(20px)",
-              backdropFilter: "blur(20px)",
-            } : undefined}
+            style={isGlass ? { WebkitBackdropFilter: "blur(22px) saturate(1.6)", backdropFilter: "blur(22px) saturate(1.6)" } : undefined}
           />
+          <MiniPlayerProgress />
 
- <MiniPlayerProgress />
-
- <HorizontalSwipeArea
- enabled={true}
- onSwipeLeft={handleNext}
- onSwipeRight={handlePrev}
- className="relative h-full flex items-center px-4 cursor-pointer"
- >
- {/* Inner flex wrapper handles opening the immersive player when clicking the blank space / center */}
- <div className="flex-1 flex items-center min-w-0 h-full cursor-pointer" onClick={() => setFullScreenPlayerOpen(true)}>
- <div className="w-11 h-11 rounded-[8px] overflow-hidden shadow-lg relative shrink-0 ring-1 ring-white/10 bg-zinc-900">
- <motion.img
- key={currentTrack.id}
- src={stablecover}
- className="w-full h-full object-cover pointer-events-none"
- initial={{ opacity: 0, scale: 0.8 }}
- animate={{ opacity: 1, scale: 1 }}
- exit={{ opacity: 0, scale: 0.8 }}
- transition={APPLE_SPRINGS.sheet}
- />
- </div>
-
- <div className="flex flex-col min-w-0 flex-1 pl-3 items-start justify-center h-full">
- <MarqueeText
- className="text-[13px] font-normal text-white leading-normal cursor-pointer hover:text-[#ff2d55] transition-colors max-w-full "
- >
- <span
- onClick={(e) => {
- e.stopPropagation();
- router.push(`/track/${currentTrack.id}`);
- }}
- >
- {currentTrack.title}
- </span>
- </MarqueeText>
- <MarqueeText className="text-[11px] text-white/40 font-medium mt-0.5 inline-block font-sans max-w-full">
- <motion.span layoutId="track-artist" onClick={e => e.stopPropagation()}>
- <ArtistLinks track={currentTrack} maxArtists={3} />
- </motion.span>
- </MarqueeText>
- </div>
- </div>
-
- <div 
- className="flex items-center gap-1.5 shrink-0 pr-0.5 relative z-50" 
- onPointerDown={(e) => e.stopPropagation()}
- onClick={(e) => e.stopPropagation()}
- >
- <button
- onClick={(e) => { e.stopPropagation(); togglePlay(); }}
- className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-transform"
- >
- {isPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" className="ml-0.5" />}
- </button>
- <button
- onClick={(e) => { e.stopPropagation(); handleNext(); }}
- className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-transform"
- >
- <SkipForward size={22} fill="currentColor" />
- </button>
- </div>
- </HorizontalSwipeArea>
-       </motion.div>
-     )}
-
-     {/* FULL SCREEN PLAYER VIEW */}
-     <AnimatePresence>
-       {isFullScreenPlayerOpen && (
-         <motion.div
-           key="full-player-sheet"
-           initial={{ y: "100%" }}
-           animate={{ y: 0 }}
-           exit={{ y: "100%" }}
-           transition={APPLE_SPRINGS.sheet}
-           drag="y"
-           dragConstraints={{ top: 0, bottom: 0 }}
-           dragElastic={{ top: 0, bottom: 0.6 }}
-           onDragEnd={(_, info) => {
-             if (info.velocity.y > 350 || info.offset.y > 100) {
-               setFullScreenPlayerOpen(false);
-             }
-           }}
-           className="fixed inset-0 z-[1100] bg-[#121214] rounded-t-[28px] sm:rounded-t-none border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col pointer-events-auto select-none"
-           style={{ willChange: "transform" }}
-         >
-           {/* Background */}
-           <div className="absolute inset-0 z-0 overflow-hidden bg-[#121214] isolate" style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}>
-             <DynamicBackground surface="fullPlayer" coverUrl={stablecover} />
-             <motion.div 
-               animate={{ opacity: isLyricsOpen ? 1 : 0 }}
-               transition={{ duration: 0.5 }}
-               className="absolute inset-0 bg-white/15 mix-blend-overlay pointer-events-none z-10"
-               style={{ transform: "translateZ(0)", backfaceVisibility: "hidden" }}
-             />
-           </div>
-
-           {/* Apple Music Drag Grabber Pill */}
-           <div 
-             onClick={() => setFullScreenPlayerOpen(false)} 
-             className="w-full pt-3 pb-2 flex items-center justify-center cursor-grab active:cursor-grabbing z-20 shrink-0"
-           >
-             <div className="w-10 h-1.5 bg-white/35 hover:bg-white/50 rounded-full transition-colors" />
-           </div>
-
-  {/* Top Bar */}
-  <motion.div 
-    initial={{ opacity: 0, y: -20 }}
-    animate={{ 
-      opacity: (!isIdle && (!isLyricsOpen || !isUserScrollingLyrics)) ? 1 : 0, 
-      y: (!isIdle && (!isLyricsOpen || !isUserScrollingLyrics)) ? 0 : -20 
-    }}
-    transition={APPLE_SPRINGS.controls}
-    className="relative z-10 flex items-center px-5 pt-[calc(env(safe-area-inset-top,10px)+4px)] mb-1"
-  >
-    <button onClick={() => setFullScreenPlayerOpen(false)} className="w-10 h-10 flex items-center justify-center text-white active:scale-75 transition-all">
-      <ChevronDown size={32} strokeWidth={2.5} />
-    </button>
-    <div className="absolute left-1/2 -translate-x-1/2 w-[60%] text-center h-10 top-[calc(env(safe-area-inset-top,20px)+24px)] pointer-events-auto">
-      <AnimatePresence mode="wait">
-      {isLyricsOpen ? (
-        <motion.div 
-          key="top-lyrics-info"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-col items-center justify-center w-full h-full"
-        >
-          <MarqueeText 
-            text={currentTrack.title} 
-            className="text-[17px] font-bold leading-tight text-center max-w-full tracking-tight text-white drop-shadow-sm"
-          />
-          <span className="text-[12px] text-white/60 font-medium block truncate max-w-full font-sans tracking-wide">
-            <ArtistLinks track={currentTrack} maxArtists={3} onClick={() => setFullScreenPlayerOpen(false)} />
-          </span>
-        </motion.div>
-      ) : (
-        <motion.div 
-          key="top-now-playing"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.3 }}
-          className="flex flex-row items-center justify-center gap-1.5 h-full"
-        >
-          {isPlaying && (
-            <div className="flex items-end gap-[2px] h-[10px]">
-              {[0.3, 0.7, 0.4, 0.9].map((d, i) => (
-                <motion.div
-                  key={i}
-                  animate={{ height: ["30%", "100%", "30%"] }}
-                  transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
-                  className="w-[2.5px] bg-brand rounded-full origin-bottom"
-                />
-              ))}
+          <div className="relative flex h-full items-center px-3.5">
+            <div
+              className="flex h-full min-w-0 flex-1 items-center cursor-pointer"
+              onClick={() => { if (panned.current) { panned.current = false; return; } setOpen(true); }}
+            >
+              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[8px] bg-zinc-800 shadow-md ring-1 ring-white/10">
+                {art}
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col justify-center pl-3">
+                <Marquee key={`t-${currentTrack.id}`} align="left">
+                  <span className="text-[14px] font-semibold leading-[18px] tracking-[-0.01em] text-white">{currentTrack.title}</span>
+                </Marquee>
+                <Marquee key={`a-${currentTrack.id}`} align="left">
+                  <span className="text-[12.5px] leading-[16px] text-white/55" onClick={(e) => e.stopPropagation()}>
+                    <ArtistLinks track={currentTrack} maxArtists={3} />
+                  </span>
+                </Marquee>
+              </div>
             </div>
-          )}
-          <span className="text-[10px] font-black text-white/40 tracking-[0.2em] uppercase">Now Playing</span>
+
+            <div className="relative z-10 flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+              <PlayPauseButton isPlaying={isPlaying} onToggle={togglePlay} size={28} className="h-10 w-10" />
+              <SpringButton onClick={handleNext} className="h-10 w-10 text-white" title="Next">
+                <SwiftUIForward size={24} fill="currentColor" />
+              </SpringButton>
+            </div>
+          </div>
         </motion.div>
       )}
+
+      {/* ───────────── FULL SCREEN SHEET ───────────── */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            key="full-sheet"
+            initial={{ y: H }}
+            animate={{ y: 0 }}
+            exit={{ y: H }}
+            transition={SHEET_SPRING}
+            drag="y"
+            dragControls={dragControls}
+            dragListener={false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.7 }}
+            dragMomentum={false}
+            onDragStart={() => { draggedRef.current = true; }}
+            onDragEnd={(_, info) => {
+              if (info.velocity.y > 420 || info.offset.y > 140) setOpen(false);
+            }}
+            className="fixed inset-0 z-[1100] flex flex-col overflow-hidden bg-[#121214] select-none"
+            style={{
+              y: sheetY,
+              scale: sheetScale,
+              borderTopLeftRadius: radius,
+              borderTopRightRadius: radius,
+              transformOrigin: "50% 0%",
+              willChange: "transform",
+              fontFamily: FONT_STACK,
+              WebkitFontSmoothing: "antialiased",
+            }}
+          >
+            {/* Background — transform/opacity only (no blend modes, no CSS blur) */}
+            <div className="absolute inset-0 z-0 overflow-hidden bg-[#121214]" style={{ transform: "translateZ(0)" }}>
+              <DynamicBackground surface="fullPlayer" coverUrl={shown.cover} />
+              <div className="ps-t-soft absolute inset-0 bg-black/25" style={{ opacity: isLyricsOpen ? 1 : 0 }} />
+            </div>
+
+            {/* Grabber (drag + tap to close) */}
+            <div
+              className="relative z-20 flex shrink-0 cursor-grab touch-none items-center justify-center pb-3 pt-[calc(env(safe-area-inset-top,0px)+10px)] active:cursor-grabbing"
+              onPointerDown={(e) => { draggedRef.current = false; startDrag(e); }}
+              onClick={() => { if (draggedRef.current) { draggedRef.current = false; return; } setOpen(false); }}
+            >
+              <div className="h-[5px] w-9 rounded-full bg-white/35" />
+            </div>
+
+            {/* Compact header — lyrics mode (artwork morphs here) */}
+            {isLyricsOpen && (
+              <div className="relative z-20 flex shrink-0 touch-none items-center gap-3 px-6 pb-3" onPointerDown={startDrag}>
+                <motion.div
+                  layoutId="m-art"
+                  transition={SHEET_SPRING}
+                  style={{ borderRadius: 9 }}
+                  className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-lg"
+                  onClick={() => setIsLyricsOpen(false)}
+                >
+                  {art}
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...SPRING_SOFT, delay: 0.05 }}
+                  className="min-w-0 flex-1"
+                >
+                  <Marquee key={`ht-${currentTrack.id}`} align="left">
+                    <span className="text-[17px] font-semibold leading-[22px] tracking-[-0.015em] text-white">{currentTrack.title}</span>
+                  </Marquee>
+                  <Marquee key={`ha-${currentTrack.id}`} align="left">
+                    <span className="text-[15px] leading-[20px] text-white/60">
+                      <ArtistLinks track={currentTrack} maxArtists={3} onClick={() => setOpen(false)} />
+                    </span>
+                  </Marquee>
+                </motion.div>
+                <div className="flex shrink-0 items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
+                  <LikeButton circle liked={liked} onToggle={toggleLike} size={16} />
+                  <TrackMenu track={currentTrack} onLeave={leaveTo} />
+                </div>
+              </div>
+            )}
+
+            {/* Middle: artwork or lyrics */}
+            <div className="relative z-10 min-h-0 flex-1">
+              {!isLyricsOpen && (
+                <div
+                  className="absolute inset-0 flex touch-none items-center justify-center px-7"
+                  onPointerDown={startDrag}
+                >
+                  <motion.div
+                    animate={{ scale: isPlaying ? 1 : 0.86 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 22, mass: 0.6 }}
+                    style={{ width: "min(100%, max(220px, calc(100dvh - 500px)), 420px)", aspectRatio: "1" }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <motion.div
+                      drag="x"
+                      dragSnapToOrigin
+                      dragElastic={0.55}
+                      dragMomentum={false}
+                      onDragEnd={(_, info) => {
+                        if (info.offset.x < -70 || info.velocity.x < -450) handleNext();
+                        else if (info.offset.x > 70 || info.velocity.x > 450) handlePrev();
+                      }}
+                      onTap={() => setIsLyricsOpen(true)}
+                      className="h-full w-full cursor-pointer"
+                    >
+                      <motion.div
+                        layoutId="m-art"
+                        transition={SHEET_SPRING}
+                        style={{ borderRadius: 14 }}
+                        className="relative h-full w-full overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-[0_24px_48px_rgba(0,0,0,0.5)]"
+                      >
+                        {art}
+                      </motion.div>
+                    </motion.div>
+                  </motion.div>
+                </div>
+              )}
+
+              <AnimatePresence>
+                {isLyricsOpen && showLyrics && (
+                  <motion.div
+                    key="lyrics"
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ y: SPRING_SOFT, opacity: { duration: 0.28 } }}
+                    className="absolute inset-0 px-1"
+                    style={{
+                      maskImage: "linear-gradient(to bottom, transparent 0, #000 28px, #000 calc(100% - 40px), transparent 100%)",
+                      WebkitMaskImage: "linear-gradient(to bottom, transparent 0, #000 28px, #000 calc(100% - 40px), transparent 100%)",
+                    }}
+                  >
+                    <LyricsView
+                      trackId={currentTrack.id}
+                      title={currentTrack.title}
+                      artist={currentTrack.artist?.name}
+                      rawLyrics={currentTrack.lyrics}
+                      isLyricsOpen={isLyricsOpen}
+                      isMobile={true}
+                      isFullscreen={true}
+                      isIdle={idle}
+                      duration={duration}
+                      transparent={true}
+                      onUserScrollChange={setIsUserScrollingLyrics}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Bottom: meta, scrubber, transport, actions */}
+            <div className="relative z-10 shrink-0 px-7 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] pt-3">
+              {!isLyricsOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={SPRING_SOFT}
+                  className="mb-4 flex items-center gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={currentTrack.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <Marquee align="left">
+                          <span
+                            className="cursor-pointer text-[22px] font-semibold leading-[28px] tracking-[-0.02em] text-white"
+                            onClick={() => leaveTo(`/track/${currentTrack.id}`)}
+                          >
+                            {currentTrack.title}
+                          </span>
+                        </Marquee>
+                        <Marquee align="left">
+                          <span className="text-[18px] leading-[24px] text-white/60">
+                            <ArtistLinks
+                              track={currentTrack}
+                              maxArtists={3}
+                              linkClassName="text-white/60 hover:text-white transition-colors"
+                              onClick={() => setOpen(false)}
+                            />
+                          </span>
+                        </Marquee>
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <LikeButton circle liked={liked} onToggle={toggleLike} size={16} />
+                    <TrackMenu track={currentTrack} onLeave={leaveTo} />
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Scrubber stays put in every state */}
+              <div className="mx-auto w-full max-w-[400px]">
+                <MobileScrubber isLyricsOpen={isLyricsOpen} />
+              </div>
+
+              {/* Transport + actions: fade/slide away while reading lyrics (transform + opacity only) */}
+              <div
+                className={cn("ps-t-soft mx-auto w-full max-w-[400px]", hideSecondary && "ps-hide")}
+                style={{ transform: hideSecondary ? "translate3d(0,22px,0) scale(0.97)" : "translate3d(0,0,0) scale(1)" }}
+              >
+                <div className="mt-4 flex items-center justify-between">
+                  <PlateButton size={42} active={isShuffled} onClick={toggleShuffle} title={`Shuffle: ${isShuffled ? "On" : "Off"}`}>
+                    <SFShuffle size={19} />
+                  </PlateButton>
+
+                  <SpringButton onClick={handlePrev} className="h-14 w-14 text-white" title="Previous">
+                    <SwiftUIBackward size={34} fill="currentColor" />
+                  </SpringButton>
+
+                  <PlayPauseButton isPlaying={isPlaying} onToggle={togglePlay} size={52} className="h-[68px] w-[68px]" />
+
+                  <SpringButton onClick={handleNext} className="h-14 w-14 text-white" title="Next">
+                    <SwiftUIForward size={34} fill="currentColor" />
+                  </SpringButton>
+
+                  <PlateButton size={42} active={repeatMode !== "off"} onClick={toggleRepeat} title={`Repeat: ${repeatMode}`} className="relative">
+                    <SFRepeat size={19} />
+                    <AnimatePresence>
+                      {(repeatMode === "one" || repeatMode === "two") && (
+                        <motion.span
+                          initial={{ scale: 0, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0, opacity: 0 }}
+                          transition={SPRING}
+                          className="pointer-events-none absolute inset-0 flex items-center justify-center text-[7px] font-black"
+                        >
+                          {repeatMode === "one" ? "1" : "2"}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </PlateButton>
+                </div>
+
+                <div className="mx-auto mt-6 flex max-w-[300px] items-center justify-between">
+                  <PlateButton size={44} active={isAudioFxOpen} onClick={() => setAudioFxOpen(!isAudioFxOpen)} title="Studio FX">
+                    <SFFx size={22} />
+                  </PlateButton>
+                  <PlateButton size={44} active={isLyricsOpen} onClick={() => setIsLyricsOpen(!isLyricsOpen)} title="Lyrics">
+                    <SFLyrics size={22} />
+                  </PlateButton>
+                  <PlateButton size={44} active={isQueueOpen} onClick={() => setIsQueueOpen(!isQueueOpen)} title="Queue">
+                    <SwiftUIQueue size={22} stroke="currentColor" />
+                  </PlateButton>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
-    </div>
-  </motion.div>
-
- {/* Central Area: 3D Flipping Card (Art to Lyrics transition) */}
- <div className="flex-1 flex flex-col items-center justify-center px-6 min-h-0 relative z-10 w-full">
- <div
-   className={cn(
-     "w-full h-full flex items-center justify-center transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
-     isLyricsOpen ? "max-h-[70vh] -mt-4" : "max-h-[440px] short:max-h-[300px]"
-   )}
-   style={{ perspective: "1000px", WebkitPerspective: "1000px" }}
- >
- <motion.div
- animate={{ rotateY: isLyricsOpen ? 180 : 0 }}
- transition={{ duration: 0.5, ease: "easeInOut" }}
- style={{ transformStyle: "preserve-3d", WebkitTransformStyle: "preserve-3d" }}
- className="w-full h-full relative flex items-center justify-center"
- >
- {/* Front Side: Album Cover */}
- <motion.div
- style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
- className={cn(
- "absolute inset-0 w-full h-full flex items-center justify-center",
- isLyricsOpen ? "pointer-events-none" : "pointer-events-auto"
- )}
- >
- <motion.div
-  animate={{ 
-    scale: isPlaying ? 1 : 0.84,
-    opacity: isPlaying ? 1 : 0.85 
-  }}
-  transition={APPLE_SPRINGS.artworkBounce}
-  className={cn(
-    "mobile-artwork-container rounded-2xl overflow-hidden cursor-pointer border border-white/10 transition-shadow duration-500",
-    isPlaying 
-      ? "shadow-[0_24px_60px_rgba(0,0,0,0.8),0_0_50px_rgba(225,29,72,0.2)]" 
-      : "shadow-[0_12px_30px_rgba(0,0,0,0.5)]"
-  )}
-  onClick={isLyricsOpen ? undefined : () => setIsLyricsOpen(true)}
-  >
- <HorizontalSwipeArea
- enabled={true}
- onSwipeLeft={handleNext}
- onSwipeRight={handlePrev}
- className="w-full h-full"
- >
- <AnimatePresence mode="popLayout" initial={false}>
- <motion.img
- key={currentTrack.id}
- src={stablecover}
- className="w-full h-full object-cover pointer-events-none"
- initial={{ opacity: 0, x: swipeDirection > 0 ? 300 : -300 }}
- animate={{ opacity: 1, x: 0 }}
- exit={{ opacity: 0, x: swipeDirection > 0 ? -300 : 300 }}
- transition={APPLE_SPRINGS.sheet}
- />
- </AnimatePresence>
- </HorizontalSwipeArea>
- </motion.div>
- </motion.div>
-
- {/* Back Side: Lyrics */}
- <motion.div
- style={{ 
- backfaceVisibility: "hidden", 
- WebkitBackfaceVisibility: "hidden",
- rotateY: 180 
- }}
- className={cn(
- "absolute inset-0 w-full flex items-center justify-center",
- isLyricsOpen ? "pointer-events-auto h-full" : "pointer-events-none h-full"
- )}
- onClick={(e) => e.stopPropagation()}
- >
- <div className={cn("w-full h-full transition-all duration-700", isIdle ? "scale-105" : "scale-100")}>
- <LyricsView
- trackId={currentTrack.id}
- title={currentTrack.title}
- artist={currentTrack.artist?.name}
- rawLyrics={currentTrack.lyrics}
- isLyricsOpen={isLyricsOpen}
- isMobile={true}
- isFullscreen={true}
- isIdle={isIdle}
- duration={duration}
- transparent={true}
- onUserScrollChange={setIsUserScrollingLyrics}
- />
- </div>
- </motion.div>
- </motion.div>
- </div>
- </div>
-
- {/* Player Controls - Fades in/out and slides down on manual scroll */}
-   <motion.div
-   initial={{ opacity: 0, y: 30 }}
-   animate={{ 
-     opacity: showBottomControls ? 1 : 0, 
-     y: showBottomControls ? 0 : 100,
-     pointerEvents: showBottomControls ? "auto" : "none"
-   }}
-   transition={APPLE_SPRINGS.controls}
-   className={cn(
-     "w-full flex flex-col px-6 z-10 shrink-0 transition-all duration-700 ease-[cubic-bezier(0.3,0,0,1)]",
-    isLyricsOpen ? "absolute bottom-0 pb-[calc(env(safe-area-inset-bottom,20px)+16px)] bg-gradient-to-t from-black/80 to-transparent" : "pb-[calc(env(safe-area-inset-bottom,20px)+32px)] relative"
-  )}
-  >
-  {/* Meta */}
-  <div
-    className={cn(
-      "flex flex-col w-full px-1 mobile-controls-meta text-left transition-all duration-500 ease-[cubic-bezier(0.3,0,0,1)] overflow-hidden",
-      (isIdle || isLyricsOpen) 
-        ? "opacity-0 pointer-events-none max-h-0 mt-0 mb-0 scale-95" 
-        : "opacity-100 max-h-[150px] mt-6 mb-4"
-    )}
-  >
-  <div className="flex flex-row items-center justify-between w-full">
-  <MarqueeText
-  text={currentTrack.title}
-  className={cn(
-  "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all text-left",
-  (currentTrack?.title || "").length > 25 ? "text-[20px] leading-none" : "text-[24px] leading-none"
-  )}
-  >
-  <AnimatePresence mode="wait">
-  <motion.span
-  key={`mobile-track-title-${currentTrack.id}`}
-  initial={{ opacity: 0, y: 10 }}
-  animate={{ opacity: 1, y: 0 }}
-  exit={{ opacity: 0, y: -10 }}
-  transition={{ duration: 0.2 }}
-  onClick={() => {
-  setFullScreenPlayerOpen(false);
-  setTimeout(() => router.push(`/track/${currentTrack.id}`), 50);
-  }}
-  className="inline-block font-bold"
-  >
-  {currentTrack.title}
-  </motion.span>
-  </AnimatePresence>
-  </MarqueeText>
-  <DropdownMenu>
-   <DropdownMenuTrigger asChild>
-   <motion.button 
-     whileTap={{ scale: 0.7, rotate: 90 }}
-     whileHover={{ scale: 1.15 }}
-     transition={{ type: "spring", stiffness: 400, damping: 17 }}
-     className="w-10 h-10 flex items-center justify-end text-white/70 hover:text-white shrink-0 outline-none"
-   >
-     <MoreVertical size={24} />
-   </motion.button>
-   </DropdownMenuTrigger>
-  <DropdownMenuPortal>
-  <DropdownMenuContent align="end" className="w-56 bg-zinc-900/95 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]">
- <DropdownMenuItem onSelect={() => {
- if (currentTrack) {
-   usePlayerStore.getState().addToUserQueue(currentTrack);
- }
- }}>
- <ListPlus size={18} className="mr-3 opacity-40 text-brand" />
- <span className="font-bold">Add to Queue</span>
- </DropdownMenuItem>
-  <DropdownMenuItem onSelect={() => refetchTrackAudio(currentTrack, showToast)}>
-    <RefreshCw size={18} className={cn("mr-3 opacity-40", isRefetching === currentTrack?.id && "animate-spin text-brand")} />
-    <span className="font-bold">{isRefetching === currentTrack?.id ? "Refetching..." : "Refetch Audio"}</span>
-  </DropdownMenuItem>
-  <RefetchLyricsSubMenu track={currentTrack} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
-  <DropdownMenuItem onSelect={() => {
-  const target = getArtistTarget(currentTrack);
-  if (target) {
-    setFullScreenPlayerOpen(false);
-    setTimeout(() => router.push(target), 50);
-  }
-  }}>
-  <User size={18} className="mr-3 opacity-40" />
-  <span className="font-bold">Go to Artist</span>
-  </DropdownMenuItem>
-  <DropdownMenuItem onSelect={() => {
-  openDownloadModal(currentTrack);
-  }}>
-  <Download size={18} className="mr-3 opacity-40" />
-  <span className="font-bold">Download Track</span>
-  </DropdownMenuItem>
-  </DropdownMenuContent>
-  </DropdownMenuPortal>
-  </DropdownMenu>
-  </div>
-  <MarqueeText className="w-full mt-1 text-left">
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={`mobile-track-artist-${currentTrack.id}`}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.2 }}
-        className="text-zinc-400 text-[15px] font-normal inline-block font-sans"
-      >
-        <ArtistLinks track={currentTrack} maxArtists={3} linkClassName="text-zinc-400 text-[15px] font-normal font-sans hover:underline hover:text-white transition-colors" onClick={() => setFullScreenPlayerOpen(false)} />
-      </motion.div>
-    </AnimatePresence>
-  </MarqueeText>
-  </div>
-
-  {/* Seekbar / Scrubber — ALWAYS visible (even when idle) */}
-  <div className="w-full max-w-[360px] mx-auto px-1 transition-all duration-500 ease-[cubic-bezier(0.3,0,0,1)]">
-    <MobileScrubber isLyricsOpen={isLyricsOpen} />
-  </div>
-
-  {/* Playback Controls */}
-  <motion.div
-    animate={{
-      height: isIdle ? 0 : "auto",
-      opacity: isIdle ? 0 : 1,
-      marginBottom: isIdle ? 0 : (isLyricsOpen ? 16 : 32),
-      pointerEvents: isIdle ? "none" : "auto"
-    }}
-    transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
-    className={cn(
-      "flex items-center justify-between px-2 w-full max-w-[360px] mx-auto text-white mobile-controls-playback overflow-hidden",
-      isLyricsOpen && "scale-90"
-    )}
-  >
-    <button 
-      onClick={(e) => { e.stopPropagation(); toggleShuffle(); }}
-      className={cn(
-        "w-12 h-12 flex items-center justify-center relative active:scale-75 transition-all duration-150 cursor-pointer",
-        isShuffled ? "text-brand opacity-100" : "text-white/40 hover:text-white/80"
-      )}
-      title={`Shuffle: ${isShuffled ? 'On' : 'Off'}`}
-    >
-      <SwiftUIShuffle size={22} stroke="currentColor" />
-      {isShuffled && (
-        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-brand shadow-[0_0_6px_rgba(225,29,72,0.8)]" />
-      )}
-    </button>
-
-    <button onClick={handlePrev} className="w-12 h-12 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary cursor-pointer">
-      <SwiftUIBackward size={28} fill="currentColor" />
-    </button>
-
-    <button onClick={() => togglePlay()} className={cn("w-18 h-18 sm:w-20 sm:h-20 flex items-center justify-center active:scale-90 transition-transform active:duration-0 duration-150 mobile-btn-primary cursor-pointer", !isPlaying ? "text-brand" : "")}>
-      {isPlaying ? (
-        <Pause size={48} className="mobile-icon-primary" fill="currentColor" strokeWidth={0} />
-      ) : (
-        <Play size={48} className="mobile-icon-primary ml-1.5" fill="currentColor" strokeWidth={0} />
-      )}
-    </button>
-
-    <button onClick={handleNext} className="w-12 h-12 flex items-center justify-center active:scale-75 transition-transform active:duration-0 duration-150 mobile-btn-secondary cursor-pointer">
-      <SwiftUIForward size={28} fill="currentColor" />
-    </button>
-
-    <button 
-      onClick={(e) => { e.stopPropagation(); toggleRepeat(); }}
-      className={cn(
-        "w-12 h-12 flex items-center justify-center relative active:scale-75 transition-all duration-150 cursor-pointer",
-        repeatMode !== 'off' ? "text-brand opacity-100" : "text-white/40 hover:text-white/80"
-      )}
-      title={`Repeat: ${repeatMode}`}
-    >
-      {repeatMode === 'one' ? (
-        <Repeat1 size={22} strokeWidth={2.5} />
-      ) : (
-        <Repeat size={22} strokeWidth={repeatMode === 'all' ? 2.5 : 2} />
-      )}
-      {repeatMode !== 'off' && (
-        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-brand shadow-[0_0_6px_rgba(225,29,72,0.8)]" />
-      )}
-    </button>
-  </motion.div>
-
-  {/* Actions Bar */}
-  <motion.div
-    animate={{
-      height: isIdle ? 0 : "auto",
-      opacity: isIdle ? 0 : 1,
-      pointerEvents: isIdle ? "none" : "auto"
-    }}
-    transition={{ duration: 0.5, ease: [0.3, 0, 0, 1] }}
-    className="flex items-center justify-between px-2 w-full max-w-[340px] mx-auto overflow-hidden"
-  >
-  <AnimatedHeartButton
-    isLiked={isLiked}
-    size={24}
-    onToggleLike={() => toggleLikeMutation.mutate(currentTrack.id)}
-  />
-  <button onClick={() => setIsLyricsOpen(!isLyricsOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isLyricsOpen ? "text-brand opacity-100" : "text-white")}>
-  <ScrollText size={26} />
-  </button>
-  <button onClick={() => setAudioFxOpen(true)} className="w-11 h-11 flex items-center justify-center text-white"><Sparkles size={24} /></button>
-  <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={cn("w-11 h-11 flex items-center justify-center transition-all", isQueueOpen ? "text-brand opacity-100" : "text-white")}>
-  <ListMusic size={26} />
-  </button>
-  </motion.div>
-  </motion.div>
- </motion.div>
- )}
- </AnimatePresence>
- </>
- );
+    </MotionConfig>
+  );
 }
+
+export default PremiumMobilePlayer;

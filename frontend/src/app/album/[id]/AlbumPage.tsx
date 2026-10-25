@@ -116,7 +116,7 @@ export default function AlbumPage() {
     album?.tracks?.[0]?.coverUrl ||
     "/logo.png";
 
-  // Dynamic Apple Music Artwork Tint: compute average RGB and update CSS variables (--h, --s)
+  // Dynamic Apple Music Artwork Tint: compute dominant RGB and update CSS variables (--h, --s, --page, --side)
   useEffect(() => {
     if (!coverUrl) return;
     extractArtworkAverageColor(coverUrl).then((rgb) => {
@@ -216,13 +216,26 @@ export default function AlbumPage() {
     );
   }
 
-  const releaseDateObj = album.releaseDate ? new Date(album.releaseDate) : new Date(album.createdAt);
-  const releaseYear = releaseDateObj.getFullYear();
-  const formattedReleaseDate = releaseDateObj.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const rawDate = album.releaseDate || album.year || album.createdAt;
+  let releaseYear = "2026";
+  let formattedReleaseDate = "2026";
+  if (rawDate) {
+    const d = new Date(rawDate);
+    if (!isNaN(d.getTime())) {
+      releaseYear = String(d.getFullYear());
+      formattedReleaseDate = d.toLocaleDateString(undefined, {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    } else {
+      const match = String(rawDate).match(/\d{4}/);
+      if (match) {
+        releaseYear = match[0];
+        formattedReleaseDate = match[0];
+      }
+    }
+  }
 
   const trackCount = album?.tracks?.length || 0;
   const totalSeconds = album?.tracks?.reduce((acc: number, t: any) => acc + (t.duration || 0), 0) || 0;
@@ -239,7 +252,7 @@ export default function AlbumPage() {
   const otherAlbums = (artistData?.albums || []).filter((a: any) => a.id !== album.id);
 
   return (
-    <div className="min-h-screen w-full bg-[var(--page)] transition-colors duration-600 text-white relative pb-32">
+    <div className="min-h-screen w-full bg-[var(--page,#121214)] transition-colors duration-700 ease-out text-white relative pb-32">
       <SEO
         title={`${formatDisplayTitle(album.title)} by ${album.artist?.name || "Artist"} – Zenify`}
         description={albumDescription}
@@ -294,18 +307,14 @@ export default function AlbumPage() {
               {formatDisplayTitle(album.title)}
             </h1>
 
-            {/* Artist: 32px regular */}
-            <div className="text-[24px] sm:text-[28px] md:text-[32px] font-normal text-white/90 mb-2">
-              {album.artistId ? (
-                <Link
-                  href={`/artist/${album.artistId}`}
-                  className="hover:underline transition-colors"
-                >
-                  {formatDisplayTitle(album.artist?.name)}
-                </Link>
-              ) : (
-                <span>{formatDisplayTitle(album.artist?.name)}</span>
-              )}
+            {/* Artist: Apple Music editorial styling in grey as requested, every artist individually clickable */}
+            <div className="text-[20px] sm:text-[24px] md:text-[28px] lg:text-[32px] font-normal text-zinc-400 mb-2">
+              <ArtistLinks
+                album={album}
+                showRoles={false}
+                className="text-zinc-400 font-normal"
+                linkClassName="text-zinc-400 hover:text-white hover:underline transition-colors font-normal"
+              />
             </div>
 
             {/* Genre and Year: 15px font-semibold */}
@@ -332,34 +341,12 @@ export default function AlbumPage() {
               )}
             </div>
 
-            {/* Play Pill and Actions */}
-            <div className="flex items-center justify-center md:justify-start gap-4 flex-wrap">
-              {/* Play Pill: 163 × 45, white background with dark page color label */}
-              <button
-                onClick={() => {
-                  if (trackCount === 0) {
-                    showToast("This album has no tracks", "error");
-                    return;
-                  }
-                  handlePlayAlbum();
-                }}
-                className="w-[163px] h-[45px] rounded-full bg-white text-zinc-950 hover:bg-white/90 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 font-semibold text-[17px] cursor-pointer"
-              >
-                {isAlbumCurrentlyPlaying ? (
-                  <>
-                    <Pause size={18} fill="currentColor" />
-                    <span>Pause</span>
-                  </>
-                ) : (
-                  <>
-                    <Play size={18} fill="currentColor" className="ml-0.5" />
-                    <span>Play</span>
-                  </>
-                )}
-              </button>
-
+            {/* Apple Music Action Controls (Shuffle + Play Pill + More) */}
+            <div className="flex items-center justify-center md:justify-start gap-3.5 flex-wrap">
               {/* Shuffle button */}
-              <button
+              <motion.button
+                whileTap={{ scale: 0.88 }}
+                transition={{ type: "spring", stiffness: 450, damping: 24 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (trackCount === 0) {
@@ -369,25 +356,53 @@ export default function AlbumPage() {
                   handleShufflePlay();
                 }}
                 className={cn(
-                  "w-[45px] h-[45px] rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer",
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all cursor-pointer",
                   isShuffled
-                    ? "bg-brand text-white shadow-[0_0_15px_rgba(225,29,72,0.4)]"
+                    ? "bg-brand text-white shadow-lg"
                     : "bg-white/10 hover:bg-white/20 text-white/90 border border-white/10"
                 )}
                 title="Shuffle"
               >
                 <Shuffle size={18} />
-              </button>
+              </motion.button>
+
+              {/* Play Pill: White pill with black text and icon */}
+              <motion.button
+                whileTap={{ scale: 0.94 }}
+                transition={{ type: "spring", stiffness: 450, damping: 24 }}
+                onClick={() => {
+                  if (trackCount === 0) {
+                    showToast("This album has no tracks", "error");
+                    return;
+                  }
+                  handlePlayAlbum();
+                }}
+                className="h-10 px-7 rounded-full bg-white text-zinc-950 hover:bg-white/90 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 font-semibold text-[15px] cursor-pointer"
+              >
+                {isAlbumCurrentlyPlaying ? (
+                  <>
+                    <Pause size={16} fill="currentColor" />
+                    <span>Pause</span>
+                  </>
+                ) : (
+                  <>
+                    <Play size={16} fill="currentColor" className="ml-0.5" />
+                    <span>Play</span>
+                  </>
+                )}
+              </motion.button>
 
               {/* More options menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button
-                    className="w-[45px] h-[45px] rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 border border-white/10 active:scale-90 transition-all cursor-pointer"
+                  <motion.button
+                    whileTap={{ scale: 0.88 }}
+                    transition={{ type: "spring", stiffness: 450, damping: 24 }}
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 border border-white/10 transition-all cursor-pointer"
                     title="More options"
                   >
-                    <MoreHorizontal size={20} />
-                  </button>
+                    <MoreHorizontal size={18} />
+                  </motion.button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="start">
                   <DropdownMenuItem
@@ -420,22 +435,24 @@ export default function AlbumPage() {
           </div>
         </div>
 
-        {/* ── 3. Track List Section ────────────────────────────────────────── */}
-        <div className="w-full mb-10">
-          <h2 className="text-[20px] font-bold text-white mb-2 tracking-tight">Track list</h2>
-          <div className="flex flex-col divide-y divide-[var(--line)] border-t border-[var(--line)]">
+        {/* ── 3. Apple Music Tracklist (No redundant label, fluid spring rows) ────────── */}
+        <div className="w-full mb-10 pt-2 border-t border-white/[0.08]">
+          <div className="flex flex-col">
             {album.tracks?.map((track: any, index: number) => {
               const isActive = isTrackMatch(currentTrack, track);
               const isTrackPlaying = isActive && isPlaying;
 
               return (
-                <div
+                <motion.div
                   key={`${track.id}-${index}`}
                   onClick={() => handlePlayTrack(track)}
-                  className="album-track-row group flex items-center justify-between px-3 md:px-4 cursor-pointer"
+                  whileHover={{ backgroundColor: "rgba(255, 255, 255, 0.05)" }}
+                  whileTap={{ scale: 0.995 }}
+                  transition={{ type: "spring", stiffness: 450, damping: 28 }}
+                  className="group relative flex items-center justify-between py-2.5 px-3 md:px-4 rounded-lg cursor-pointer border-b border-white/[0.06] transition-colors"
                 >
-                  {/* Left: Index / Equalizer + Title/Artist */}
-                  <div className="flex items-center gap-4 min-w-0 flex-1 mr-4">
+                  {/* Left: Index / Visualizer + Title/Artist */}
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1 mr-4">
                     {/* Index / Visualizer */}
                     <div className="w-6 flex items-center justify-center shrink-0">
                       {isTrackPlaying ? (
@@ -457,7 +474,7 @@ export default function AlbumPage() {
                       ) : isActive ? (
                         <div className="w-2.5 h-2.5 rounded-full bg-brand animate-pulse" />
                       ) : (
-                        <span className="text-[15px] font-medium text-white/40 group-hover:text-white/80">
+                        <span className="text-[14px] font-medium text-white/40 group-hover:text-white/80 tabular-nums">
                           {index + 1}
                         </span>
                       )}
@@ -467,13 +484,13 @@ export default function AlbumPage() {
                     <div className="flex flex-col min-w-0 flex-1">
                       <span
                         className={cn(
-                          "text-[16px] md:text-[17px] truncate leading-snug",
+                          "text-[15px] md:text-[16px] truncate leading-snug",
                           isActive ? "text-brand font-semibold" : "text-white font-medium group-hover:text-white"
                         )}
                       >
                         {formatDisplayTitle(track.title)}
                       </span>
-                      <span className="text-[14px] md:text-[15px] text-[var(--text-2)] truncate font-normal leading-tight">
+                      <span className="text-[13px] text-white/40 truncate font-normal leading-tight">
                         <ArtistLinks track={track} maxArtists={2} />
                       </span>
                     </div>
@@ -547,7 +564,7 @@ export default function AlbumPage() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
@@ -561,13 +578,13 @@ export default function AlbumPage() {
         </div>
 
         {/* ── 4. Album Details ─────────────────────────────────────────────── */}
-        <div className="mb-14 pt-2 text-[14px] text-white/60 space-y-1">
-          <p className="font-semibold text-white/80">{formattedReleaseDate}</p>
+        <div className="mb-14 pt-2 text-[13px] text-white/50 space-y-1">
+          <p className="font-semibold text-white/70">{formattedReleaseDate}</p>
           <p>
-            {trackCount} songs, {totalDurationStr}
+            {trackCount} {trackCount === 1 ? "song" : "songs"}, {totalDurationStr}
           </p>
-          <p className="text-white/40 text-[13px] pt-1">
-            ℗ {releaseYear} Zenify Entertainment India Pvt. Ltd.
+          <p className="text-white/40 text-[12px] pt-1">
+            ℗ {releaseYear} {album.artist?.name || "Zenify"}
           </p>
           <div className="pt-2">
             <a
@@ -587,9 +604,9 @@ export default function AlbumPage() {
           <div className="mb-14">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[20px] font-bold text-white">More by {album.artist?.name || "this artist"}</h3>
-              {album.artistId && (
+              {(album.artistId || getArtistTarget(album)) && (
                 <Link
-                  href={`/artist/${album.artistId}`}
+                  href={album.artistId ? `/artist/${album.artistId}` : (getArtistTarget(album) || "#")}
                   className="text-sm font-semibold text-brand hover:underline"
                 >
                   See all

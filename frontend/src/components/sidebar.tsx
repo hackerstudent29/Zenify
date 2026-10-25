@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
   HouseIcon,
   CompassIcon,
@@ -28,6 +28,33 @@ import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { ZenifyLogo } from "./shared/ZenifyLogo";
 
+/* ------------------------------------------------------------------ */
+/* Apple-style motion tokens                                           */
+/* ------------------------------------------------------------------ */
+const SPRING = { type: "spring", stiffness: 420, damping: 34, mass: 0.8 } as const;
+const SPRING_SOFT = { type: "spring", stiffness: 300, damping: 32, mass: 0.9 } as const;
+const APPLE_RED = "#fa233b";
+const FONT_STACK =
+  '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Inter, system-ui, sans-serif';
+
+type IconHandle = { startAnimation: () => void; stopAnimation: () => void } | null;
+
+function ActivePill() {
+  // Shared element: slides between items with a spring when the route changes
+  return (
+    <motion.span
+      layoutId="sidebar-active-pill"
+      transition={SPRING}
+      className="absolute inset-0 rounded-[8px] bg-white/[0.1]"
+    />
+  );
+}
+
+
+
+/* ------------------------------------------------------------------ */
+/* Link item                                                           */
+/* ------------------------------------------------------------------ */
 interface AnimatedSidebarLinkProps {
   href: string;
   icon: any;
@@ -51,38 +78,49 @@ function AnimatedSidebarLink({
   className,
   iconClassName
 }: AnimatedSidebarLinkProps) {
-  const iconRef = useRef<{ startAnimation: () => void; stopAnimation: () => void } | null>(null);
+  const iconRef = useRef<IconHandle>(null);
 
   return (
-    <Link
-      id={id}
-      data-tour={dataTour}
-      href={href}
-      onClick={(e) => e.stopPropagation()}
-      onMouseEnter={() => iconRef.current?.startAnimation?.()}
-      onMouseLeave={() => iconRef.current?.stopAnimation?.()}
-      className={cn(
-        "sidebar-item group",
-        isActive && "active",
-        isSidebarCollapsed && "justify-center px-0 h-12",
-        className
-      )}
-      title={isSidebarCollapsed ? label : ""}
-    >
-      <Icon
-        ref={iconRef}
-        size={isSidebarCollapsed ? 20 : 18}
-        className={cn("sidebar-icon shrink-0", iconClassName)}
-      />
-      {!isSidebarCollapsed && (
-        <span className="whitespace-nowrap font-medium">
-          {label}
-        </span>
-      )}
-    </Link>
+    <motion.div whileTap={{ scale: 0.97 }} transition={SPRING}>
+      <Link
+        id={id}
+        data-tour={dataTour}
+        href={href}
+        onClick={(e) => e.stopPropagation()}
+        onMouseEnter={() => iconRef.current?.startAnimation?.()}
+        onMouseLeave={() => iconRef.current?.stopAnimation?.()}
+        title={isSidebarCollapsed ? label : undefined}
+        className={cn(
+          "group relative flex items-center h-9 rounded-[8px] text-[15px] tracking-[-0.01em] outline-none",
+          "transition-colors duration-200 ease-out",
+          "focus-visible:ring-2 focus-visible:ring-white/30",
+          isActive ? "text-white" : "text-white/90 hover:bg-white/[0.06]",
+          isSidebarCollapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
+          className
+        )}
+      >
+        {isActive && <ActivePill />}
+        <Icon
+          ref={iconRef}
+          size={20}
+          style={isActive ? { color: APPLE_RED } : undefined}
+          className={cn(
+            "relative z-10 shrink-0 transition-colors duration-200",
+            !isActive && "text-white/60 group-hover:text-white/90",
+            iconClassName
+          )}
+        />
+        {!isSidebarCollapsed && (
+          <span className="relative z-10 whitespace-nowrap font-medium">{label}</span>
+        )}
+      </Link>
+    </motion.div>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Button item                                                         */
+/* ------------------------------------------------------------------ */
 interface AnimatedSidebarButtonProps {
   icon: any;
   label?: string;
@@ -104,65 +142,70 @@ function AnimatedSidebarButton({
   className,
   iconClassName
 }: AnimatedSidebarButtonProps) {
-  const iconRef = useRef<{ startAnimation: () => void; stopAnimation: () => void } | null>(null);
+  const iconRef = useRef<IconHandle>(null);
 
   return (
-    <button
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      transition={SPRING}
       onClick={onClick}
       onMouseEnter={() => iconRef.current?.startAnimation?.()}
       onMouseLeave={() => iconRef.current?.stopAnimation?.()}
+      title={isSidebarCollapsed ? title || label : undefined}
       className={cn(
-        "sidebar-item group",
-        isActive && "active",
-        isSidebarCollapsed && "justify-center px-0 h-12",
+        "group relative flex items-center w-full h-9 rounded-[8px] text-[15px] font-medium tracking-[-0.01em] outline-none",
+        "transition-colors duration-200 ease-out hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/30",
+        isActive ? "text-white" : "text-white/90",
+        isSidebarCollapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
         className
       )}
-      title={isSidebarCollapsed ? (title || label) : ""}
     >
       <Icon
         ref={iconRef}
-        size={isSidebarCollapsed ? 20 : 18}
-        className={cn("sidebar-icon shrink-0", iconClassName)}
+        size={20}
+        className={cn("shrink-0 text-white/60 group-hover:text-white/90 transition-colors duration-200", iconClassName)}
       />
-      {!isSidebarCollapsed && label && (
-        <span className="whitespace-nowrap">
-          {label}
-        </span>
-      )}
-    </button>
+      {!isSidebarCollapsed && label && <span className="whitespace-nowrap">{label}</span>}
+    </motion.button>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Sidebar                                                             */
+/* ------------------------------------------------------------------ */
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeTab = searchParams.get('tab');
+  const activeTab = searchParams.get("tab");
   const { logout, user, isAuthenticated } = useAuthStore();
-  const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
-  const setSidebarCollapsed = useUIStore(state => state.setSidebarCollapsed);
-  const currentTrack = usePlayerStore(state => state.currentTrack);
+  const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
+  const setSidebarCollapsed = useUIStore((state) => state.setSidebarCollapsed);
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Collapsible states for library and playlists dropdown
   const [libExpanded, setLibExpanded] = useState(true);
   const [playlistsExpanded, setPlaylistsExpanded] = useState(true);
 
-  const isAdmin = user?.role === 'ADMIN';
+  // Hooks must run before any early return
+  const playlistsIconRef = useRef<IconHandle>(null);
+  const plusIconRef = useRef<IconHandle>(null);
+
+  const isAdmin = user?.role === "ADMIN";
 
   const { data: playlists } = useQuery({
-    queryKey: ['my-playlists'],
+    queryKey: ["my-playlists"],
     queryFn: async () => {
       try {
-        const res = await api.get('playlists/my');
-        const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
-        return arr;
-      } catch (e) { return []; }
+        const res = await api.get("playlists/my");
+        return Array.isArray(res.data) ? res.data : res.data?.items || [];
+      } catch (e) {
+        return [];
+      }
     },
     enabled: !!isAuthenticated
   });
 
-  // Recent playlists: sorted by last updated / created descending, top 3
   const recentPlaylists = (Array.isArray(playlists) ? playlists : [])
     .slice()
     .sort((a: any, b: any) => {
@@ -178,339 +221,338 @@ export function Sidebar() {
     api.post("auth/logout").catch(() => {});
   };
 
-  if (pathname === '/login' || pathname === '/register' || !isAuthenticated) return null;
+  if (pathname === "/login" || pathname === "/register" || !isAuthenticated) return null;
 
-  const playlistsIconRef = useRef<{ startAnimation: () => void; stopAnimation: () => void } | null>(null);
-  const plusIconRef = useRef<{ startAnimation: () => void; stopAnimation: () => void } | null>(null);
-
-  // Dedicated top navigation items: Home and Discover (Search moved into Discover)
   const topNavItems = [
-    { 
-      label: "Home", 
-      icon: HouseIcon, 
-      href: "/", 
-      isActive: pathname === "/" 
-    },
-    { 
-      label: "Discover", 
-      icon: CompassIcon, 
-      href: "/discover", 
-      isActive: pathname === "/discover" || pathname === "/search" 
-    },
+    { label: "Home", icon: HouseIcon, href: "/", isActive: pathname === "/" },
+    { label: "Discover", icon: CompassIcon, href: "/discover", isActive: pathname === "/discover" || pathname === "/search" }
   ];
 
   const toggleSidebar = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      setSidebarCollapsed(!isSidebarCollapsed);
-    }
+    if (e.target === e.currentTarget) setSidebarCollapsed(!isSidebarCollapsed);
   };
 
-  // Brightness constraint: ONLY bright/radiant on track, album, playlist pages where reactive background is rendered
-  const isTrackPage = pathname?.startsWith("/track/");
-  const isAlbumPage = pathname?.startsWith("/album/");
-  const isPlaylistPage = pathname?.startsWith("/playlist/");
-  const isMediaPage = isTrackPage || isAlbumPage || isPlaylistPage;
-  const showGlassSidebar = isMediaPage;
+  const playlistsActive =
+    (pathname.startsWith("/library") && activeTab === "playlists") || pathname.startsWith("/playlist/");
+  const isAlbumPage = pathname.startsWith("/album/");
 
   return (
     <div
       id="tour-sidebar"
       data-tour="sidebar"
-      className={cn(
-        "flex flex-col h-full w-full select-none relative overflow-hidden",
-        showGlassSidebar && "sidebar-glass-reactive",
-        showGlassSidebar
-          ? "my-3 ml-3 mr-1.5 h-[calc(100vh-24px)] rounded-2xl glass-panel isolate border border-white/10 backdrop-blur-2xl bg-zinc-950/40 shadow-2xl"
-          : cn(
-              "h-full border-r border-white/5",
-              isMediaPage ? "bg-transparent" : "bg-[#0A0A0C]"
-            )
-      )}
       onClick={toggleSidebar}
+      style={{ fontFamily: FONT_STACK, WebkitFontSmoothing: "antialiased" }}
+      className={cn(
+        "relative sticky top-0 left-0 flex flex-col h-screen w-full select-none transition-all duration-700 ease-out border-r border-white/[0.08]",
+        isAlbumPage ? "bg-black/15 backdrop-blur-2xl" : "bg-[#1c1c1e]"
+      )}
     >
-      {/* Logo area */}
+      {/* Apple-style Edge-Attached Sidebar Toggle Button */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setSidebarCollapsed(!isSidebarCollapsed);
+        }}
+        className={cn(
+          "absolute right-0 translate-x-1/2 top-[22px] z-50",
+          "w-7 h-7 rounded-full",
+          isAlbumPage ? "bg-black/40 backdrop-blur-xl hover:bg-black/60 active:scale-90" : "bg-[#1c1c1e] hover:bg-[#2c2c2e] active:bg-[#38383a]",
+          "border border-white/20 hover:border-white/35",
+          "shadow-[0_2px_8px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.08)]",
+          "flex items-center justify-center text-white/75 hover:text-white",
+          "transition-all duration-200 ease-out active:scale-90 cursor-pointer outline-none",
+          "focus-visible:ring-2 focus-visible:ring-white/40"
+        )}
+        title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        <motion.div
+          animate={{ rotate: isSidebarCollapsed ? 0 : 180 }}
+          transition={SPRING}
+          className="flex items-center justify-center pointer-events-none"
+        >
+          <ChevronRight size={13} strokeWidth={2.5} />
+        </motion.div>
+      </button>
+
+      {/* Logo Area */}
       <div
         className={cn(
-          "px-6 h-[72px] flex items-center group cursor-pointer border-b border-white/5 overflow-hidden shrink-0",
-          isSidebarCollapsed ? "justify-center px-0" : ""
+          "flex items-center shrink-0 h-[72px] border-b border-white/[0.08] transition-all duration-300 relative",
+          isSidebarCollapsed ? "justify-center px-0" : "justify-start px-5"
         )}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (isSidebarCollapsed) {
-            setSidebarCollapsed(false);
-          } else {
-            router.push('/');
-          }
-        }}
       >
-        <ZenifyLogo size={isSidebarCollapsed ? 28 : 46} />
+        <motion.div
+          layout="position"
+          transition={SPRING}
+          className="flex items-center cursor-pointer select-none"
+          onClick={(e) => {
+            e.stopPropagation();
+            router.push("/");
+          }}
+          title="Zenify Home"
+        >
+          {isSidebarCollapsed ? (
+            <ZenifyLogo markOnly size={32} />
+          ) : (
+            <ZenifyLogo size={42} />
+          )}
+        </motion.div>
       </div>
 
-      <div 
-        className={cn(
-          "flex-1 overflow-y-auto space-y-6 no-scrollbar",
-          isSidebarCollapsed ? "px-1.5 py-3" : "px-3 py-6"
-        )} 
-        style={{ paddingBottom: currentTrack ? "calc(90px + 2rem)" : "2.5rem" }}
+      {/* Scrollable nav */}
+      <div
+        className={cn("flex-1 overflow-y-auto no-scrollbar", isSidebarCollapsed ? "px-2" : "px-3")}
+        style={{ paddingBottom: currentTrack ? "calc(90px + 1rem)" : "1rem" }}
         onClick={toggleSidebar}
       >
-        {/* ========================================================= */}
-        {/* TOP NAV: Home, Discover                                   */}
-        {/* ========================================================= */}
-        <div id="tour-sidebar-nav" data-tour="sidebar-nav">
-          <div className="space-y-1">
-            {topNavItems.map((item) => (
-              <AnimatedSidebarLink
-                key={item.label}
-                href={item.href}
-                icon={item.icon}
-                label={item.label}
-                isActive={item.isActive}
-                isSidebarCollapsed={isSidebarCollapsed}
-              />
-            ))}
-          </div>
+        {/* Top nav */}
+        <div id="tour-sidebar-nav" data-tour="sidebar-nav" className="space-y-0.5">
+          {topNavItems.map((item) => (
+            <AnimatedSidebarLink
+              key={item.label}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              isActive={item.isActive}
+              isSidebarCollapsed={isSidebarCollapsed}
+            />
+          ))}
         </div>
 
-        {/* ========================================================= */}
-        {/* YOUR LIBRARY                                              */}
-        {/* ========================================================= */}
-        <div id="tour-sidebar-library" data-tour="sidebar-library">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!isSidebarCollapsed) setLibExpanded(!libExpanded);
-            }}
-            className={cn(
-              "sidebar-section-title flex items-center justify-between w-full group py-1 cursor-pointer hover:text-zinc-300 transition-colors mb-1.5",
-              isSidebarCollapsed && "justify-center"
-            )}
-          >
-            {!isSidebarCollapsed && (
-              <span className="text-[11px] font-bold uppercase tracking-wider">
-                Your Library
-              </span>
-            )}
-            {!isSidebarCollapsed && (
-              libExpanded 
-                ? <ChevronDown size={14} className="sidebar-icon" /> 
-                : <ChevronRight size={14} className="sidebar-icon" />
-            )}
-          </button>
-
-          <div className={cn(
-            "space-y-0.5 transition-all duration-300",
-            isSidebarCollapsed ? "flex flex-col gap-1 items-center" : (libExpanded ? "h-auto opacity-100" : "h-0 opacity-0 pointer-events-none overflow-hidden")
-          )}>
-            {/* 1. Playlists (with last 3 playlists dropdown) */}
-            <div className="w-full">
-              <div
-                onMouseEnter={() => playlistsIconRef.current?.startAnimation?.()}
-                onMouseLeave={() => playlistsIconRef.current?.stopAnimation?.()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isSidebarCollapsed) {
-                    router.push("/library?tab=playlists");
-                  } else {
-                    setPlaylistsExpanded(!playlistsExpanded);
-                  }
-                }}
-                className={cn(
-                  "sidebar-item text-[15px] w-full justify-between group cursor-pointer",
-                  ((pathname.startsWith("/library") && activeTab === "playlists") || pathname.startsWith("/playlist/")) && "active",
-                  isSidebarCollapsed && "justify-center px-0 h-12"
-                )}
-                title={isSidebarCollapsed ? "Playlists" : ""}
+        {/* Library */}
+        <div id="tour-sidebar-library" data-tour="sidebar-library" className="mt-5">
+          {!isSidebarCollapsed ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setLibExpanded(!libExpanded);
+              }}
+              className="group flex items-center gap-1 w-full px-2.5 h-7 mb-1 text-[13px] font-semibold tracking-[-0.005em] text-white/50 hover:text-white/80 transition-colors duration-200 outline-none"
+            >
+              <span>Library</span>
+              <motion.span
+                animate={{ rotate: libExpanded ? 90 : 0 }}
+                transition={SPRING}
+                className="flex opacity-0 group-hover:opacity-100 transition-opacity duration-200"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <MusicIcon ref={playlistsIconRef} size={isSidebarCollapsed ? 20 : 18} className="sidebar-icon shrink-0" />
+                <ChevronRight size={13} strokeWidth={2.5} />
+              </motion.span>
+            </button>
+          ) : (
+            <div className="mx-2 mb-2 h-px bg-white/[0.08]" />
+          )}
+
+          <AnimatePresence initial={false}>
+            {(libExpanded || isSidebarCollapsed) && (
+              <motion.div
+                key="library-items"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={SPRING_SOFT}
+                className={cn("overflow-hidden", isSidebarCollapsed ? "space-y-1" : "space-y-0.5")}
+              >
+                {/* Playlists */}
+                <div className="w-full">
+                  <motion.div
+                    whileTap={{ scale: 0.97 }}
+                    transition={SPRING}
+                    role="button"
+                    tabIndex={0}
+                    onMouseEnter={() => playlistsIconRef.current?.startAnimation?.()}
+                    onMouseLeave={() => playlistsIconRef.current?.stopAnimation?.()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isSidebarCollapsed) router.push("/library?tab=playlists");
+                      else setPlaylistsExpanded(!playlistsExpanded);
+                    }}
+                    title={isSidebarCollapsed ? "Playlists" : undefined}
+                    className={cn(
+                      "group relative flex items-center h-9 rounded-[8px] text-[15px] cursor-pointer outline-none",
+                      "transition-colors duration-200 hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/30",
+                      playlistsActive ? "text-white" : "text-white/90",
+                      isSidebarCollapsed ? "justify-center px-0" : "justify-between px-2.5"
+                    )}
+                  >
+                    {playlistsActive && <ActivePill />}
+                    <div className="relative z-10 flex items-center gap-2.5 min-w-0">
+                      <MusicIcon
+                        ref={playlistsIconRef}
+                        size={20}
+                        style={playlistsActive ? { color: APPLE_RED } : undefined}
+                        className={cn(
+                          "shrink-0 transition-colors duration-200",
+                          !playlistsActive && "text-white/60 group-hover:text-white/90"
+                        )}
+                      />
+                      {!isSidebarCollapsed && <span className="whitespace-nowrap font-medium">Playlists</span>}
+                    </div>
+
+                    {!isSidebarCollapsed && (
+                      <div className="relative z-10 flex items-center gap-0.5">
+                        <motion.button
+                          whileTap={{ scale: 0.88 }}
+                          transition={SPRING}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsCreateModalOpen(true);
+                          }}
+                          onMouseEnter={() => plusIconRef.current?.startAnimation?.()}
+                          onMouseLeave={() => plusIconRef.current?.stopAnimation?.()}
+                          className="flex items-center justify-center w-6 h-6 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors duration-200 outline-none"
+                          title="New Playlist"
+                        >
+                          <PlusIcon ref={plusIconRef} size={14} />
+                        </motion.button>
+                        <motion.span
+                          animate={{ rotate: playlistsExpanded ? 90 : 0 }}
+                          transition={SPRING}
+                          className="flex w-5 h-6 items-center justify-center text-white/40"
+                        >
+                          <ChevronRight size={13} strokeWidth={2.5} />
+                        </motion.span>
+                      </div>
+                    )}
+                  </motion.div>
+
+                  {/* Recent playlists */}
                   {!isSidebarCollapsed && (
-                    <span className="whitespace-nowrap font-semibold">Playlists</span>
+                    <AnimatePresence initial={false}>
+                      {playlistsExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={SPRING_SOFT}
+                          className="overflow-hidden pl-[30px] space-y-0.5 pt-0.5 pb-1"
+                        >
+                          {recentPlaylists.map((p: any) => {
+                            const isPActive = pathname === `/playlist/${p.id}`;
+                            return (
+                              <Link
+                                key={p.id}
+                                href={`/playlist/${p.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                title={p.name}
+                                className={cn(
+                                  "block h-8 leading-8 px-2.5 rounded-[8px] text-[14px] truncate transition-colors duration-200 outline-none",
+                                  isPActive
+                                    ? "bg-white/[0.1] text-white font-medium"
+                                    : "text-white/70 hover:text-white hover:bg-white/[0.06]"
+                                )}
+                              >
+                                {p.name}
+                              </Link>
+                            );
+                          })}
+
+                          {recentPlaylists.length === 0 && (
+                            <div className="px-2.5 h-8 leading-8 text-[13px] text-white/40">No playlists yet</div>
+                          )}
+
+                          {Array.isArray(playlists) && playlists.length > 3 && (
+                            <Link
+                              href="/library?tab=playlists"
+                              onClick={(e) => e.stopPropagation()}
+                              className="block px-2.5 h-8 leading-8 text-[13px] font-medium text-white/50 hover:text-white transition-colors duration-200"
+                            >
+                              Show all {playlists.length}
+                            </Link>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   )}
                 </div>
 
-                {!isSidebarCollapsed && (
-                  <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsCreateModalOpen(true);
-                      }}
-                      onMouseEnter={() => plusIconRef.current?.startAnimation?.()}
-                      onMouseLeave={() => plusIconRef.current?.stopAnimation?.()}
-                      className="p-1 hover:text-brand transition-colors rounded hover:bg-white/10"
-                      title="Create Playlist"
-                    >
-                      <PlusIcon ref={plusIconRef} size={14} className="sidebar-icon" />
-                    </button>
-                    <div className="p-0.5">
-                      {playlistsExpanded 
-                        ? <ChevronDown size={14} className="sidebar-icon" /> 
-                        : <ChevronRight size={14} className="sidebar-icon" />}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Dropdown with last 3 playlists (created or modified) */}
-              {!isSidebarCollapsed && (
-                <AnimatePresence>
-                  {playlistsExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                      className="overflow-hidden pl-7 pr-1 space-y-0.5 pt-0.5 pb-1"
-                    >
-                      {recentPlaylists.map((p: any) => {
-                        const isPActive = pathname === `/playlist/${p.id}`;
-                        return (
-                          <Link
-                            key={p.id}
-                            href={`/playlist/${p.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className={cn(
-                              "flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] text-zinc-400 hover:text-white hover:bg-white/[0.04] transition-all truncate group",
-                              isPActive && "text-brand bg-brand/10 font-medium"
-                            )}
-                            title={p.name}
-                          >
-                            <div className="w-1.5 h-1.5 rounded-full bg-white/20 group-hover:bg-brand transition-colors shrink-0" />
-                            <span className="truncate">{p.name}</span>
-                          </Link>
-                        );
-                      })}
-
-                      {recentPlaylists.length === 0 && (
-                        <div className="px-3 py-1.5 text-[11px] text-zinc-500 italic">
-                          No playlists yet
-                        </div>
-                      )}
-
-                      {Array.isArray(playlists) && playlists.length > 3 && (
-                        <Link
-                          href="/library?tab=playlists"
-                          onClick={(e) => e.stopPropagation()}
-                          className="block px-3 py-1 text-[11px] font-bold text-zinc-500 hover:text-brand uppercase tracking-wider transition-colors"
-                        >
-                          View all ({playlists.length}) →
-                        </Link>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              )}
-            </div>
-
-            {/* 2. Liked Songs */}
-            <AnimatedSidebarLink
-              href="/library?tab=liked"
-              icon={HeartIcon}
-              label="Liked Songs"
-              isActive={pathname.startsWith("/library") && activeTab === "liked"}
-              isSidebarCollapsed={isSidebarCollapsed}
-              className="text-[15px]"
-            />
-
-            {/* 3. Artists */}
-            <AnimatedSidebarLink
-              href="/library?tab=artists"
-              icon={MicIcon}
-              label="Artists"
-              isActive={pathname.startsWith("/library") && activeTab === "artists"}
-              isSidebarCollapsed={isSidebarCollapsed}
-              className="text-[15px]"
-            />
-
-            {/* 4. Albums */}
-            <AnimatedSidebarLink
-              href="/library?tab=albums"
-              icon={Disc3Icon}
-              label="Albums"
-              isActive={activeTab === "albums" || pathname.startsWith('/album/')}
-              isSidebarCollapsed={isSidebarCollapsed}
-              className="text-[15px]"
-            />
-
-            {/* 5. Recently Played */}
-            <AnimatedSidebarLink
-              href="/section/recently-played"
-              icon={ClockIcon}
-              label="Recently Played"
-              isActive={pathname.includes("recently-played") || pathname === "/history"}
-              isSidebarCollapsed={isSidebarCollapsed}
-              className="text-[15px]"
-            />
-
-            {/* 6. Device */}
-            <AnimatedSidebarLink
-              id="tour-device-music"
-              dataTour="device-music"
-              href="/local-library"
-              icon={HardDriveIcon}
-              label="Device"
-              isActive={pathname.startsWith("/local-library")}
-              isSidebarCollapsed={isSidebarCollapsed}
-              className="text-[15px]"
-            />
-          </div>
-        </div>
-
-        {/* ========================================================= */}
-        {/* BOTTOM SECTION: Admin Console, Settings, Logout           */}
-        {/* (All in the same unified scrollable container)            */}
-        {/* ========================================================= */}
-        <div className={cn("pt-4 border-t border-white/5 space-y-1", isSidebarCollapsed ? "pt-2" : "pt-4")}>
-          {/* Admin Console for Admin Users in the correct dedicated spot */}
-          {isAdmin && (
-            <AnimatedSidebarLink
-              href="/admin"
-              icon={ShieldIcon}
-              label="Admin Console"
-              isActive={pathname.startsWith("/admin")}
-              isSidebarCollapsed={isSidebarCollapsed}
-              className={cn(
-                "text-[14px]",
-                pathname.startsWith("/admin") 
-                  ? "active text-brand font-bold" 
-                  : "text-zinc-400 hover:text-brand"
-              )}
-              iconClassName={pathname.startsWith("/admin") ? "text-brand" : "text-zinc-400 group-hover:text-brand transition-colors"}
-            />
-          )}
-
-          {/* Settings */}
-          <AnimatedSidebarLink
-            href="/settings"
-            icon={SettingsIcon}
-            label="Settings"
-            isActive={pathname.startsWith("/settings")}
-            isSidebarCollapsed={isSidebarCollapsed}
-            className="text-[14px]"
-          />
-
-          {/* Logout */}
-          <AnimatedSidebarButton
-            onClick={(e) => { e.stopPropagation(); handleLogout(); }}
-            icon={LogOutIcon}
-            label="Logout"
-            isSidebarCollapsed={isSidebarCollapsed}
-            className="w-full text-zinc-500 hover:text-[#EF4444] cursor-pointer mt-1 text-[14px]"
-          />
-
-          {!isSidebarCollapsed && (
-            <div className="px-4 pt-4 text-[10px] text-zinc-600 font-medium uppercase tracking-[0.2em]">
-              <span className="font-zenify not-italic">zenify</span> v2.5.3
-            </div>
-          )}
+                <AnimatedSidebarLink
+                  href="/library?tab=liked"
+                  icon={HeartIcon}
+                  label="Liked Songs"
+                  isActive={pathname.startsWith("/library") && activeTab === "liked"}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                />
+                <AnimatedSidebarLink
+                  href="/library?tab=artists"
+                  icon={MicIcon}
+                  label="Artists"
+                  isActive={pathname.startsWith("/library") && activeTab === "artists"}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                />
+                <AnimatedSidebarLink
+                  href="/library?tab=albums"
+                  icon={Disc3Icon}
+                  label="Albums"
+                  isActive={activeTab === "albums" || pathname.startsWith("/album/")}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                />
+                <AnimatedSidebarLink
+                  href="/section/recently-played"
+                  icon={ClockIcon}
+                  label="Recently Played"
+                  isActive={pathname.includes("recently-played") || pathname === "/history"}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                />
+                <AnimatedSidebarLink
+                  id="tour-device-music"
+                  dataTour="device-music"
+                  href="/local-library"
+                  icon={HardDriveIcon}
+                  label="Device"
+                  isActive={pathname.startsWith("/local-library")}
+                  isSidebarCollapsed={isSidebarCollapsed}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
-      <CreatePlaylistModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-      />
+      {/* Pinned footer: Admin, Settings, Logout */}
+      <div
+        className={cn(
+          "shrink-0 border-t border-white/[0.08] space-y-0.5 py-2",
+          isSidebarCollapsed ? "px-2" : "px-3"
+        )}
+        style={{ marginBottom: currentTrack ? 90 : 0 }}
+      >
+        {isAdmin && (
+          <AnimatedSidebarLink
+            href="/admin"
+            icon={ShieldIcon}
+            label="Admin Console"
+            isActive={pathname.startsWith("/admin")}
+            isSidebarCollapsed={isSidebarCollapsed}
+          />
+        )}
+        <AnimatedSidebarLink
+          href="/settings"
+          icon={SettingsIcon}
+          label="Settings"
+          isActive={pathname.startsWith("/settings")}
+          isSidebarCollapsed={isSidebarCollapsed}
+        />
+        <AnimatedSidebarButton
+          onClick={(e) => {
+            e.stopPropagation();
+            handleLogout();
+          }}
+          icon={LogOutIcon}
+          label="Logout"
+          isSidebarCollapsed={isSidebarCollapsed}
+          className="hover:!text-[#fa233b]"
+        />
+        {!isSidebarCollapsed && (
+          <div className="px-2.5 pt-2 text-[11px] text-white/30 font-medium">
+            <span className="font-zenify not-italic">zenify</span> v2.5.3
+          </div>
+        )}
+      </div>
+
+      <CreatePlaylistModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
     </div>
   );
 }

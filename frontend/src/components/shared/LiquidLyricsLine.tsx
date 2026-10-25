@@ -176,15 +176,31 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   if (isInterlude || (text && text.trim() === '• • •')) {
     return (
-      <GapDots
-        isCurrent={isCurrent}
-        isPast={isPast}
-        lineStartTime={lineStartTime}
-        lineEndTime={lineEndTime}
-        smoothTimeValue={smoothTimeValue}
-        targetOpacity={targetOpacity}
-        isFullscreen={isFullscreen}
-      />
+      <div
+        data-lyrics-line="true"
+        className={cn(
+          "w-full flex items-center py-2 select-none transition-opacity duration-500 ease-out",
+          isFullscreen ? "justify-start pl-1" : "justify-center"
+        )}
+        style={{
+          opacity: isCurrent ? 1 : Math.max(0.2, targetOpacity * 0.4),
+        }}
+      >
+        <div className="flex gap-2.5 items-center">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className={cn(
+                "rounded-full transition-all duration-500 inline-block shrink-0",
+                isCurrent
+                  ? "w-2.5 h-2.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.85)] animate-pulse"
+                  : "w-2 h-2 bg-white/40"
+              )}
+              style={isCurrent ? { animationDelay: `${i * 0.22}s` } : undefined}
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -455,75 +471,3 @@ function UnifiedWordFill({
   );
 }
 
-function GapDots({
-  isCurrent,
-  isPast,
-  lineStartTime,
-  lineEndTime,
-  smoothTimeValue,
-  targetOpacity,
-  isFullscreen,
-}: {
-  isCurrent: boolean;
-  isPast: boolean;
-  lineStartTime: number;
-  lineEndTime: number;
-  smoothTimeValue: any;
-  targetOpacity: number;
-  isFullscreen?: boolean;
-}) {
-  const [progress, setProgress] = React.useState(isPast ? 1 : 0);
-
-  useMotionValueEvent(smoothTimeValue, "change", (t: number) => {
-    if (!isCurrent) {
-      setProgress(isPast ? 1 : 0);
-      return;
-    }
-    const dur = Math.max(0.5, lineEndTime - lineStartTime);
-    const p = Math.max(0, Math.min(1, (t - lineStartTime) / dur));
-    setProgress(p);
-  });
-
-  return (
-    <div
-      data-lyrics-line="true"
-      className={cn(
-        "flex gap-3 items-center py-4 select-none my-1",
-        isFullscreen ? "justify-start pl-1" : "justify-center w-full"
-      )}
-      style={{
-        opacity: isCurrent ? 1 : Math.max(0.35, targetOpacity),
-        transition: "opacity 300ms ease"
-      }}
-    >
-      {[0, 1, 2].map((i) => {
-        const minP = i * 0.33;
-        const maxP = (i + 1) * 0.33;
-        let localP = 0;
-        if (isPast) {
-          localP = 1;
-        } else if (isCurrent) {
-          if (progress >= maxP) localP = 1;
-          else if (progress <= minP) localP = 0;
-          else localP = (progress - minP) / 0.33;
-        }
-
-        const scale = isCurrent ? 0.9 + localP * 0.35 : 0.85;
-        const opacity = isPast ? 0.35 : (isCurrent ? 0.35 + localP * 0.65 : 0.25);
-        const glow = isCurrent && localP > 0.3 ? "0 0 14px rgba(255,255,255,0.85), 0 0 4px rgba(255,255,255,0.95)" : "none";
-
-        return (
-          <span
-            key={i}
-            className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-white transition-all duration-150 inline-block shrink-0 shadow-sm"
-            style={{
-              transform: `scale(${scale})`,
-              opacity,
-              boxShadow: glow
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
