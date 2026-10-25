@@ -920,14 +920,18 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
               >
                 {!isLyricsOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={SPRING_SOFT}
-                    className={cn(
-                      "ps-t-soft mb-3 flex items-center gap-3",
-                      hideMeta ? "ps-hide" : "pointer-events-auto"
-                    )}
-                    style={{ transform: hideMeta ? "translate3d(0,10px,0)" : "translate3d(0,0,0)" }}
+                    animate={{
+                      height: idle ? 0 : "auto",
+                      opacity: idle ? 0 : 1,
+                      marginBottom: idle ? 0 : 12,
+                    }}
+                    transition={{
+                      height: { type: "spring", stiffness: 300, damping: 30 },
+                      opacity: { duration: 0.25 },
+                      marginBottom: { type: "spring", stiffness: 300, damping: 30 },
+                    }}
+                    className="overflow-hidden flex items-center gap-3"
+                    style={{ pointerEvents: idle ? "none" : "auto" }}
                   >
                     <div className="min-w-0 flex-1">
                       <AnimatePresence mode="wait" initial={false}>
@@ -966,30 +970,40 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                   </motion.div>
                 )}
 
-                {/* Scrubber / Progress */}
-                <div
-                  className={cn(
-                    "ps-t-soft mx-auto w-full max-w-[420px]",
-                    hideScrubber ? "ps-hide" : "pointer-events-auto"
-                  )}
-                  style={{ transform: hideScrubber ? "translate3d(0,14px,0)" : "translate3d(0,0,0)" }}
+                {/* Scrubber / Progress — moves up in normal mode; completely hides in lyrics mode when idle */}
+                <motion.div
+                  animate={{
+                    height: (isLyricsOpen && idle) ? 0 : "auto",
+                    opacity: (isLyricsOpen && idle) ? 0 : 1,
+                    marginTop: (isLyricsOpen && idle) ? 0 : (idle ? 4 : 0),
+                  }}
+                  transition={{
+                    height: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.25 },
+                    marginTop: { type: "spring", stiffness: 300, damping: 30 },
+                  }}
+                  className="mx-auto w-full max-w-[420px] overflow-hidden"
+                  style={{ pointerEvents: (isLyricsOpen && idle) ? "none" : "auto" }}
                 >
                   <MobileScrubber isLyricsOpen={isLyricsOpen} />
-                </div>
+                </motion.div>
 
-                {/* Transport Buttons */}
-                <div
-                  className={cn(
-                    "ps-t-soft mx-auto w-full max-w-[420px]",
-                    hideTransport ? "ps-hide" : "pointer-events-auto"
-                  )}
-                  style={{
-                    transform: hideTransport
-                      ? "translate3d(0,22px,0) scale(0.97)"
-                      : "translate3d(0,0,0) scale(1)",
+                {/* Transport Buttons — collapses when idle */}
+                <motion.div
+                  animate={{
+                    height: hideTransport ? 0 : "auto",
+                    opacity: hideTransport ? 0 : 1,
+                    marginTop: hideTransport ? 0 : 12,
                   }}
+                  transition={{
+                    height: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.25 },
+                    marginTop: { type: "spring", stiffness: 300, damping: 30 },
+                  }}
+                  className="mx-auto w-full max-w-[420px] overflow-hidden"
+                  style={{ pointerEvents: hideTransport ? "none" : "auto" }}
                 >
-                  <div className="mt-3 flex items-center justify-between">
+                  <div className="flex items-center justify-between">
                     <PlateButton
                       size={42}
                       active={isShuffled}
@@ -998,17 +1012,17 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                     >
                       <SFShuffle size={19} />
                     </PlateButton>
-                    <SpringButton onClick={handlePrev} className="h-14 w-14 text-white" title="Previous">
-                      <SwiftUIBackward size={34} fill="currentColor" />
+                    <SpringButton onClick={handlePrev} className="h-12 w-12 text-white" title="Previous">
+                      <SwiftUIBackward size={30} fill="currentColor" />
                     </SpringButton>
                     <PlayPauseButton
                       isPlaying={isPlaying}
                       onToggle={togglePlay}
-                      size={52}
-                      className="h-[68px] w-[68px]"
+                      size={42}
+                      className="h-14 w-14"
                     />
-                    <SpringButton onClick={handleNext} className="h-14 w-14 text-white" title="Next">
-                      <SwiftUIForward size={34} fill="currentColor" />
+                    <SpringButton onClick={handleNext} className="h-12 w-12 text-white" title="Next">
+                      <SwiftUIForward size={30} fill="currentColor" />
                     </SpringButton>
                     <PlateButton
                       size={42}
@@ -1061,7 +1075,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                       <SwiftUIQueue size={22} stroke="currentColor" />
                     </PlateButton>
                   </div>
-                </div>
+                </motion.div>
               </div>
             </motion.div>
           )}

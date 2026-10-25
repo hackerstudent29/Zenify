@@ -171,7 +171,7 @@ export function PCFullScreenPlayer() {
                     transition={{ layout: SHEET_SPRING }}
                     style={{
                       borderRadius: 12,
-                      width: isLyricsOpen ? "clamp(230px, 40vh, 400px)" : "clamp(290px, 54vh, 560px)",
+                      width: isLyricsOpen ? "clamp(230px, 40vh, 400px)" : "clamp(230px, 42vh, 420px)",
                       aspectRatio: "1",
                     }}
                     className="relative overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-[0_28px_60px_rgba(0,0,0,0.55)]"
@@ -204,12 +204,22 @@ export function PCFullScreenPlayer() {
                 </motion.div>
               </div>
 
-              {/* Title / artist */}
+              {/* Title / artist — collapses smoothly when idle so seekbar glides up */}
               <motion.div
-                layout="position"
-                transition={{ layout: SHEET_SPRING }}
-                className={cn("ps-t-soft mt-9 text-center", fade)}
-                style={{ transform: idle ? "translate3d(0,-14px,0)" : "translate3d(0,0,0)" }}
+                layout
+                animate={{
+                  height: idle ? 0 : "auto",
+                  opacity: idle ? 0 : 1,
+                  marginTop: idle ? 0 : (isLyricsOpen ? 24 : 32),
+                }}
+                transition={{
+                  height: { type: "spring", stiffness: 300, damping: 30 },
+                  opacity: { duration: 0.25 },
+                  marginTop: { type: "spring", stiffness: 300, damping: 30 },
+                  layout: SHEET_SPRING,
+                }}
+                className="overflow-hidden text-center"
+                style={{ pointerEvents: idle ? "none" : "auto" }}
               >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
@@ -241,18 +251,42 @@ export function PCFullScreenPlayer() {
                 </AnimatePresence>
               </motion.div>
 
-              {/* Scrubber */}
-              <motion.div layout="position" transition={{ layout: SHEET_SPRING }} className="mx-auto mt-6 w-full max-w-[400px]">
+              {/* Scrubber — glides up right below artwork when idle */}
+              <motion.div
+                layout
+                animate={{
+                  marginTop: idle ? (isLyricsOpen ? 12 : 16) : 24,
+                }}
+                transition={{
+                  layout: SHEET_SPRING,
+                  marginTop: { type: "spring", stiffness: 300, damping: 30 },
+                }}
+                className="mx-auto w-full max-w-[400px]"
+              >
                 <PCFullScreenScrubber isLyricsOpen={isLyricsOpen} />
               </motion.div>
 
-              {/* Controls — same layout & icons as the PC player bar */}
-              <motion.div layout="position" transition={{ layout: SHEET_SPRING }} className="mx-auto mt-5 w-full max-w-[460px]">
-                <div
-                  className={cn("ps-t-soft grid h-14 w-full grid-cols-[1fr_auto_1fr] items-center", fade)}
-                  style={{ transform: idle ? "translate3d(0,14px,0)" : "translate3d(0,0,0)" }}
-                >
-                  <div className="flex items-center justify-end gap-1">
+              {/* Controls — re-ordered with heart on the left and play/pause perfectly centered */}
+              <motion.div
+                layout
+                animate={{
+                  height: idle ? 0 : "auto",
+                  opacity: idle ? 0 : 1,
+                  marginTop: idle ? 0 : 20,
+                }}
+                transition={{
+                  height: { type: "spring", stiffness: 300, damping: 30 },
+                  opacity: { duration: 0.22 },
+                  marginTop: { type: "spring", stiffness: 300, damping: 30 },
+                  layout: SHEET_SPRING,
+                }}
+                className="mx-auto w-full max-w-[460px] overflow-hidden"
+                style={{ pointerEvents: idle ? "none" : "auto" }}
+              >
+                <div className="grid h-14 w-full grid-cols-[1fr_auto_1fr] items-center">
+                  {/* Left: Like (Heart), Shuffle, Repeat */}
+                  <div className="flex items-center justify-end gap-1.5">
+                    <LikeButton liked={liked} onToggle={toggleLike} size={18} className="h-9 w-9 !p-0" />
                     <PlateButton size={36} active={isShuffled} onClick={toggleShuffle} title={`Shuffle: ${isShuffled ? "On" : "Off"}`}>
                       <SFShuffle size={17} />
                     </PlateButton>
@@ -274,18 +308,19 @@ export function PCFullScreenPlayer() {
                     </PlateButton>
                   </div>
 
-                  <div className="flex items-center justify-center gap-3 px-3">
+                  {/* Center: Prev, Play/Pause, Next */}
+                  <div className="flex items-center justify-center gap-3 px-4">
                     <SpringButton onClick={handlePrev} className="p-1 text-white/90 transition-colors hover:text-white" title="Previous">
-                      <SwiftUIBackward size={28} fill="currentColor" />
+                      <SwiftUIBackward size={26} fill="currentColor" />
                     </SpringButton>
-                    <PlayPauseButton isPlaying={isPlaying} onToggle={togglePlay} size={40} />
+                    <PlayPauseButton isPlaying={isPlaying} onToggle={togglePlay} size={36} />
                     <SpringButton onClick={handleNext} className="p-1 text-white/90 transition-colors hover:text-white" title="Next">
-                      <SwiftUIForward size={28} fill="currentColor" />
+                      <SwiftUIForward size={26} fill="currentColor" />
                     </SpringButton>
                   </div>
 
-                  <div className="flex items-center justify-start gap-1">
-                    <LikeButton liked={liked} onToggle={toggleLike} size={18} className="h-9 w-9 !p-0" />
+                  {/* Right: Studio FX, Lyrics, Queue */}
+                  <div className="flex items-center justify-start gap-1.5">
                     <PlateButton size={36} active={isAudioFxOpen} onClick={() => setAudioFxOpen(!isAudioFxOpen)} title="Studio FX">
                       <SFFx size={18} />
                     </PlateButton>
@@ -300,8 +335,22 @@ export function PCFullScreenPlayer() {
               </motion.div>
 
               {/* Lossless badge */}
-              <motion.div layout="position" transition={{ layout: SHEET_SPRING }} className="mt-3 flex justify-center">
-                <div className={cn("ps-t-soft flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5", fade)} style={{ opacity: idle ? 0 : 0.3 }}>
+              <motion.div
+                layout
+                animate={{
+                  height: idle ? 0 : "auto",
+                  opacity: idle ? 0 : 0.3,
+                  marginTop: idle ? 0 : 12,
+                }}
+                transition={{
+                  height: { type: "spring", stiffness: 300, damping: 30 },
+                  opacity: { duration: 0.2 },
+                  marginTop: { type: "spring", stiffness: 300, damping: 30 },
+                  layout: SHEET_SPRING,
+                }}
+                className="flex justify-center overflow-hidden"
+              >
+                <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5">
                   <div className="flex items-center gap-[1px]">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="h-1.5 w-[1px] rounded-full bg-white" />
