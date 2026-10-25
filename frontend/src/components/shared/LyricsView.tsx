@@ -10,7 +10,6 @@ import { LiquidLyricsLine } from "./LiquidLyricsLine";
 import { transliterateLineRuleBased, transliterateTextRuleBased } from '@/lib/indic-transliterator';
 import { audioEngine } from "@/lib/audio-engine";
 import { usePlayerStore } from "@/store/player";
-import { splitLyricLine } from "@/lib/lyrics-timeline";
 
 interface LyricsViewProps {
  trackId: string;
@@ -326,30 +325,8 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }).filter((line: any) => line.text.length > 0)
     .sort((a: any, b: any) => a.time - b.time);
 
-    // 1. Split lines with splitLyricLine: strictly max 60 chars (desktop) or 44 chars (mobile)
-    const maxChars = isMobile ? 44 : 60;
-    const splitLines: any[] = [];
-    for (let i = 0; i < baseLines.length; i++) {
-      const line = baseLines[i];
-      const nextStart = baseLines[i + 1]?.time ?? (duration || line.time + 4.5);
-      const parts = splitLyricLine(
-        { text: line.text, start: line.time, end: line.endTime },
-        nextStart,
-        maxChars
-      );
-      if (parts.length > 1) {
-        for (const p of parts) {
-          splitLines.push({
-            ...line,
-            text: p.text,
-            time: p.start,
-            endTime: p.end,
-          });
-        }
-      } else {
-        splitLines.push(line);
-      }
-    }
+    // Preserve complete authentic lyric lines without artificial fragmentation or cutting down lyrics
+    const splitLines = baseLines;
 
     // 2. Insert virtual interlude lines (triple dots) for intro, breaks (> 3.2s), and outro
     const result: any[] = [];

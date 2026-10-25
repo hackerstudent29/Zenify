@@ -170,8 +170,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   // PC: Classic Apple Music restored from yesterday's commit (clamp(34px, 4vw, 52px) on fullscreen, 24px on sidebar)
   // Mobile: Increased font size per user request (clamp(26px, 6.5vw, 36px) on fullscreen, clamp(22px, 5.5vw, 28px) on mobile view)
   const fontSize = isFullscreen 
-    ? (isMobile ? "clamp(23px, 5.8vw, 27px)" : "clamp(34px, 4vw, 52px)") 
-    : (isMobile ? "clamp(20px, 5vw, 24px)" : "24px");
+    ? (isMobile ? "clamp(20px, 5.2vw, 25px)" : "clamp(26px, 3.2vw, 42px)") 
+    : (isMobile ? "clamp(18px, 4.5vw, 22px)" : "clamp(20px, 2vw, 24px)");
   const origin = isFullscreen ? "left center" : "center center";
 
   if (isInterlude) {

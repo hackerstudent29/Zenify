@@ -58,11 +58,11 @@ export function EssentialAlbums({ albums, artistName }: EssentialAlbumsProps) {
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 pt-1">
                     <p className="text-[14px] md:text-[15px] font-semibold text-white truncate leading-tight group-hover:text-brand transition-colors">
-                      {formatDisplayTitle(album.title)}
+                      {formatDisplayTitle(album.title || album.name) || album.title || album.name || "Untitled Album"}
                     </p>
-                    <p className="text-[12px] text-white/50 line-clamp-2 leading-snug font-normal">
+                    <p className="text-[12px] text-white/60 line-clamp-2 leading-snug font-normal">
                       {synopsis}
                     </p>
                   </div>

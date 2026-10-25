@@ -118,9 +118,9 @@ export function FansAlsoLike({ currentArtistId, initialRelated }: FansAlsoLikePr
                 )}
               </div>
               <p className="text-[14px] md:text-[15px] font-bold text-white tracking-tight truncate w-full group-hover:underline decoration-white/30 underline-offset-4 pointer-events-none">
-                {formatDisplayTitle(artist.name)}
+                {formatDisplayTitle(artist.name) || artist.name || "Artist"}
               </p>
-              <p className="text-[12px] text-white/40 font-medium mt-1 uppercase tracking-wider pointer-events-none">
+              <p className="text-[12px] text-zinc-400 font-medium mt-1 uppercase tracking-wider pointer-events-none">
                 Artist
               </p>
             </Link>

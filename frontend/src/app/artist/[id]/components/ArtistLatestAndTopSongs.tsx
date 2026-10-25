@@ -37,7 +37,9 @@ export function ArtistLatestAndTopSongs({
   // Latest release resolution
   const latestRelease = artist?.latestRelease || artist?.albums?.[0] || topTracks[0];
 
-  const latestTitle = latestRelease ? formatDisplayTitle(latestRelease.title) : "";
+  const latestTitle = latestRelease
+    ? (formatDisplayTitle(latestRelease.title || latestRelease.name) || latestRelease.title || latestRelease.name || "Latest Release")
+    : "";
   const latestCover = latestRelease ? (getMediaUrl(latestRelease.coverUrl || latestRelease.artwork || artist.imageUrl) || "/logo.png") : "/logo.png";
   const rawDate = latestRelease?.releaseDate || latestRelease?.createdAt;
   const formattedDate = rawDate
@@ -59,6 +61,7 @@ export function ArtistLatestAndTopSongs({
     const year = rawYear ? new Date(rawYear).getFullYear() : "";
     const albumName = track.album?.title || track.albumTitle || "";
     const subtitle = [albumName, year].filter(Boolean).join(" · ") || artist.name;
+    const trackDisplayName = formatDisplayTitle(track.title || track.name) || track.title || track.name || `Track ${idx + 1}`;
 
     return (
       <div
@@ -74,7 +77,7 @@ export function ArtistLatestAndTopSongs({
           <div className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 bg-zinc-900 border border-white/5 shadow-md">
             <img
               src={trackCover}
-              alt={track.title}
+              alt={trackDisplayName}
               className="w-full h-full object-cover"
               loading="lazy"
               decoding="async"
@@ -101,9 +104,9 @@ export function ArtistLatestAndTopSongs({
                 isCurrent ? "text-brand" : "text-white group-hover:text-white"
               )}
             >
-              {formatDisplayTitle(track.title)}
+              {trackDisplayName}
             </p>
-            <p className="text-[12px] text-white/50 truncate font-normal mt-0.5">
+            <p className="text-[12px] text-zinc-400 truncate font-normal mt-0.5">
               {subtitle}
             </p>
           </div>

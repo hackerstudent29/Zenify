@@ -64,12 +64,12 @@ export function ReleaseRowSection({ title, items, seeAllHref }: ReleaseRowSectio
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-col gap-0.5">
-                    <p className="text-[13px] md:text-[14px] font-semibold text-white truncate group-hover:text-brand transition-colors">
-                      {formatDisplayTitle(item.title)}
+                  <div className="flex flex-col gap-0.5 pt-1">
+                    <p className="text-[14px] font-semibold text-white truncate group-hover:text-brand transition-colors">
+                      {formatDisplayTitle(item.title || item.name) || item.title || item.name || "Untitled"}
                     </p>
-                    <p className="text-[12px] text-white/50 truncate font-normal">
-                      {year}
+                    <p className="text-[12px] text-white/60 truncate font-normal">
+                      {year || (item.isSingle ? "Single" : "Album")}
                     </p>
                   </div>
                 </div>
