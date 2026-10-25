@@ -4,12 +4,15 @@ import React from "react";
 import { motion, useMotionValueEvent } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface LiquidLyricsLineProps {
+export const LyricsStyles = () => null;
+
+export interface LiquidLyricsLineProps {
   text: string;
   isCurrent: boolean;
-  isPast: boolean;
-  isUpcoming: boolean;
-  distFromActive: number;
+  isPast?: boolean;
+  isUpcoming?: boolean;
+  distFromActive?: number;
+  dist?: number;
   lineStartTime: number;
   lineEndTime: number;
   smoothTimeValue: any;
@@ -19,16 +22,22 @@ interface LiquidLyricsLineProps {
   isInterlude?: boolean;
   isUnsynced?: boolean;
   isRightAligned?: boolean;
-  words?: Array<{ word: string, time: number, endTime?: number }>;
+  words?: Array<{ word: string; time: number; endTime?: number }>;
   isUserScrolling?: boolean;
+  rowRef?: (el: HTMLDivElement | null) => void;
+  y?: any;
+  inWindow?: boolean;
+  onClick?: () => void;
 }
 
 export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: LiquidLyricsLineProps) {
   const { 
-    isCurrent, isPast, distFromActive, isFullscreen, isMobile, 
+    isCurrent, isPast, isFullscreen, isMobile, 
     isInterlude, isRightAligned, text, isUserScrolling, isUnsynced,
-    words, lineStartTime, lineEndTime, smoothTimeValue
+    words, lineStartTime, lineEndTime, smoothTimeValue,
+    rowRef, onClick, y
   } = props;
+  const distFromActive = props.distFromActive ?? (props.dist !== undefined ? Math.abs(props.dist) : 0);
 
   let targetOpacity: number;
   let targetBlur = "blur(0px)";
@@ -201,6 +210,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   if (isInterlude || (text && isInstrumentalLineText(text))) {
     return (
       <div
+        ref={rowRef}
+        onClick={onClick}
         data-lyrics-line="true"
         className={cn(
           "w-full flex items-center py-2 select-none transition-opacity duration-500 ease-out",
@@ -243,6 +254,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   return (
     <div
+      ref={rowRef}
+      onClick={onClick}
       data-lyrics-line="true"
       className={cn(
         "w-full px-4 flex transition-[transform,opacity,filter] duration-[600ms] ease-[cubic-bezier(0.25,1,0.5,1)] transform-gpu group cursor-pointer lyric-line",
