@@ -498,7 +498,7 @@ export class DeepgramLyricsService {
                 syncedTokens.push({
                     time: 0,
                     endTime: rawTokens[0].time,
-                    text: '♪ [Instrumental Intro] ♪',
+                    text: '• • •',
                     type: 'instrumental',
                     words: [],
                 });
@@ -515,7 +515,7 @@ export class DeepgramLyricsService {
                         syncedTokens.push({
                             time: current.endTime,
                             endTime: next.time,
-                            text: '♪ [Instrumental Interlude] ♪',
+                            text: '• • •',
                             type: 'instrumental',
                             words: [],
                         });
@@ -529,7 +529,7 @@ export class DeepgramLyricsService {
                 syncedTokens.push({
                     time: last.endTime,
                     endTime: Math.round(trackDuration * 100) / 100,
-                    text: '♪ [Instrumental Outro] ♪',
+                    text: '• • •',
                     type: 'instrumental',
                     words: [],
                 });
@@ -1137,7 +1137,7 @@ export class DeepgramLyricsService {
                     syncedTokens.push({
                         time: 0,
                         endTime: rawTokens[0].time,
-                        text: '♪ [Instrumental Intro] ♪',
+                        text: '• • •',
                         type: 'instrumental',
                         words: [],
                     });
@@ -1154,7 +1154,7 @@ export class DeepgramLyricsService {
                             syncedTokens.push({
                                 time: current.endTime,
                                 endTime: next.time,
-                                text: '♪ [Instrumental Interlude] ♪',
+                                text: '• • •',
                                 type: 'instrumental',
                                 words: [],
                             });
@@ -1168,7 +1168,7 @@ export class DeepgramLyricsService {
                     syncedTokens.push({
                         time: last.endTime,
                         endTime: Math.round(options.duration * 100) / 100,
-                        text: '♪ [Instrumental Outro] ♪',
+                        text: '• • •',
                         type: 'instrumental',
                         words: [],
                     });

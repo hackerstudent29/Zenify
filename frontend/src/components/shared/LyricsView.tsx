@@ -32,13 +32,45 @@ interface LyricsViewProps {
  onClose?: () => void;
 }
 
+export function isInstrumentalMarker(text: string): boolean {
+  if (!text) return false;
+  const s = text.trim();
+  if (s === "• • •" || s === "...") return true;
+  // Strip outer notes (♪, ♫, ♬), brackets, parens, asterisks, hyphens, colons
+  const stripped = s
+    .replace(/^[♪♫♬\s*#\-_–—\[\(]+/g, "")
+    .replace(/[♪♫♬\s*#\-_–—\]\)]+$/g, "")
+    .trim()
+    .toLowerCase();
+
+  if (!stripped || stripped === "• • •" || stripped === "...") return true;
+
+  if (
+    /^(instrumental(\s+(interlude|intro|outro|break|solo|music))?|musical\s+interlude|interlude|guitar\s+solo|flute\s+solo|violin\s+solo|bgm|music(\s+break)?|intro|outro|solo)(\s*-\s*[^\]]+)?$/i.test(stripped)
+  ) {
+    return true;
+  }
+
+  // If the line has ♪, [, ( and contains "instrumental" or "interlude" anywhere inside
+  if (/[♪♫\[\(]/.test(s) && /(instrumental|interlude)/i.test(s)) {
+    return true;
+  }
+
+  // Pure musical note strings like "♪ ♪ ♪"
+  if (/^[♪♫♬\s*#\-_–—\.\•]+$/.test(s)) {
+    return true;
+  }
+
+  return false;
+}
+
 export function cleanLyricText(text: string): string {
   if (!text) return "";
   const trimmed = text.trim();
   if (trimmed === "• • •") return "• • •";
   
-  // Convert explicit instrumental and musical bridge markers to 3 dots
-  if (/^(\[|\()?\s*(instrumental|music|solo|interlude|guitar solo|bgm|musical interlude)\s*(\]|\))?$/i.test(trimmed)) {
+  // Convert explicit instrumental, interlude, and musical markers to 3 dots
+  if (isInstrumentalMarker(trimmed)) {
     return "• • •";
   }
 
@@ -316,11 +348,14 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
     if (!activeData || !Array.isArray(activeData)) return [];
     const baseLines = activeData.map((line: any) => {
-      const cleanedText = cleanLyricText(line.text);
+      const isInter = isInstrumentalMarker(line.text) || line.isInstrumental || line.isInterlude || line.type === 'instrumental';
+      const cleanedText = isInter ? '• • •' : cleanLyricText(line.text);
       return {
         ...line,
         time: parseFloat(line.time || 0),
-        text: cleanedText
+        text: cleanedText,
+        isInterlude: isInter,
+        isInstrumental: isInter
       };
     }).filter((line: any) => line.text.length > 0)
     .sort((a: any, b: any) => a.time - b.time);

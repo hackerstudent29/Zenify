@@ -174,7 +174,31 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     : (isMobile ? "clamp(18px, 4.5vw, 22px)" : "clamp(20px, 2vw, 24px)");
   const origin = isFullscreen ? "left center" : "center center";
 
-  if (isInterlude || (text && text.trim() === '• • •')) {
+  const isInstrumentalLineText = (t: string): boolean => {
+    if (!t) return false;
+    const s = t.trim();
+    if (s === "• • •" || s === "...") return true;
+    const stripped = s
+      .replace(/^[♪♫♬\s*#\-_–—\[\(]+/g, "")
+      .replace(/[♪♫♬\s*#\-_–—\]\)]+$/g, "")
+      .trim()
+      .toLowerCase();
+    if (!stripped || stripped === "• • •" || stripped === "...") return true;
+    if (
+      /^(instrumental(\s+(interlude|intro|outro|break|solo|music))?|musical\s+interlude|interlude|guitar\s+solo|flute\s+solo|violin\s+solo|bgm|music(\s+break)?|intro|outro|solo)(\s*-\s*[^\]]+)?$/i.test(stripped)
+    ) {
+      return true;
+    }
+    if (/[♪♫\[\(]/.test(s) && /(instrumental|interlude)/i.test(s)) {
+      return true;
+    }
+    if (/^[♪♫♬\s*#\-_–—\.\•]+$/.test(s)) {
+      return true;
+    }
+    return false;
+  };
+
+  if (isInterlude || (text && isInstrumentalLineText(text))) {
     return (
       <div
         data-lyrics-line="true"
@@ -193,7 +217,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
               className={cn(
                 "rounded-full transition-all duration-500 inline-block shrink-0",
                 isCurrent
-                  ? "w-2.5 h-2.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.85)] animate-pulse"
+                  ? "w-2.5 h-2.5 bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)] animate-pulse"
                   : "w-2 h-2 bg-white/40"
               )}
               style={isCurrent ? { animationDelay: `${i * 0.22}s` } : undefined}
