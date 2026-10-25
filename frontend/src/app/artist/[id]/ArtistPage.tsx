@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DynamicBackground } from "@/components/shared/DynamicBackground";
 import {
   SwiftUIPlay,
   SwiftUIPause,
@@ -131,6 +132,7 @@ export default function ArtistPage() {
         title={`${displayName} - Music, Albums & Songs on Zenify`}
         description={artist.bio || `Listen to songs and albums by ${displayName} on Zenify.`}
       />
+      <DynamicBackground surface="artistPage" coverUrl={bannerUrl} />
 
       {/* ── 1. APPLE MUSIC HERO SECTION (Screenshot 2) ────────────────── */}
       <div className="relative w-full h-[62vh] md:h-[76vh] overflow-hidden select-none">

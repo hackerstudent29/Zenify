@@ -119,10 +119,28 @@ export async function trackRoutes(server: FastifyInstance) {
         const { AudioResolverService } = await import('../services/audio-resolver.service.js');
         const { youtubeStreamCache } = await import('./utils.routes.js');
 
-        const track = await prisma.track.findUnique({
-            where: { id },
-            include: { artist: true, album: true }
-        });
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        let track = isUuid
+            ? await prisma.track.findUnique({ where: { id }, include: { artist: true, album: true } })
+            : await prisma.track.findFirst({
+                where: { OR: [{ youtubeId: id }, { id }] },
+                include: { artist: true, album: true }
+              });
+
+        if (!track) {
+            const body = (req.body || {}) as any;
+            if (body.title) {
+                const cleanTitle = body.title.trim();
+                const cleanArtist = (body.artistName || body.artist || '').trim();
+                track = await prisma.track.findFirst({
+                    where: {
+                        title: { equals: cleanTitle, mode: 'insensitive' },
+                        ...(cleanArtist ? { artist: { name: { equals: cleanArtist, mode: 'insensitive' } } } : {})
+                    },
+                    include: { artist: true, album: true }
+                });
+            }
+        }
 
         if (!track) {
             return reply.status(404).send({ error: 'Track not found in database' });
@@ -216,10 +234,28 @@ export async function trackRoutes(server: FastifyInstance) {
         const { AIAudioAlignerService } = await import('../services/ai-audio-aligner.service.js');
         const { enqueueRomanization } = await import('../queues/romanization.queue.js');
 
-        const track = await prisma.track.findUnique({
-            where: { id },
-            include: { artist: true, album: true }
-        });
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        let track = isUuid
+            ? await prisma.track.findUnique({ where: { id }, include: { artist: true, album: true } })
+            : await prisma.track.findFirst({
+                where: { OR: [{ youtubeId: id }, { id }] },
+                include: { artist: true, album: true }
+              });
+
+        if (!track) {
+            const body = (req.body || {}) as any;
+            if (body.title) {
+                const cleanTitle = body.title.trim();
+                const cleanArtist = (body.artistName || body.artist || '').trim();
+                track = await prisma.track.findFirst({
+                    where: {
+                        title: { equals: cleanTitle, mode: 'insensitive' },
+                        ...(cleanArtist ? { artist: { name: { equals: cleanArtist, mode: 'insensitive' } } } : {})
+                    },
+                    include: { artist: true, album: true }
+                });
+            }
+        }
 
         if (!track) {
             return reply.status(404).send({ error: 'Track not found in database' });

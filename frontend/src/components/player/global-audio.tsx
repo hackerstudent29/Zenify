@@ -4,11 +4,12 @@ import { useEffect, useRef } from "react";
 import { usePlayerStore, extractTrackVibeParams } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { audioEngine } from "@/lib/audio-engine";
-import { getMediaUrl, getTrackCover } from "@/lib/utils";
+import { getMediaUrl, getTrackCover, getApiBaseUrl } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
 
 export function GlobalAudio() {
+  const polledTrackIds = useRef<Set<string>>(new Set());
   const currentTrack = usePlayerStore(state => state.currentTrack);
   const isPlaying = usePlayerStore(state => state.isPlaying);
   const volume = usePlayerStore(state => state.volume);
@@ -301,19 +302,105 @@ export function GlobalAudio() {
         return;
       }
 
-      // Fallback: If audio failed while crossOrigin was active, retry without crossOrigin
-      if (audio.crossOrigin && audio.src && !audio.src.includes('no-cors-retry=true')) {
-        console.warn("[GlobalAudio] CORS blockage detected, retrying direct playback without crossOrigin...", audio.src);
-        audio.removeAttribute('crossOrigin');
-        const sep = audio.src.includes('?') ? '&' : '?';
-        audio.src = `${audio.src}${sep}no-cors-retry=true`;
-        audio.load();
-        if (isPlaying) {
-          audio.play().catch(err => {
-            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-            console.warn("[GlobalAudio] Fallback play failed:", err);
-          });
+      const triggerRecovery = () => {
+        const current = usePlayerStore.getState().currentTrack;
+        if (!current) {
+          setIsPlaying(false);
+          return;
         }
+
+        // Track failure count to prevent infinite recovery loops
+        const trackId = current.id;
+        const attemptCount = (audioRecoveryAttempts.current[trackId] || 0) + 1;
+        audioRecoveryAttempts.current[trackId] = attemptCount;
+
+        console.warn(`[GlobalAudio/Automator] Error detected for "${current.title}" (Attempt ${attemptCount}/3). Resolving alternative stream...`);
+
+        if (attemptCount <= 2) {
+          import('@/lib/api').then(({ default: api }) => {
+            // 1. First attempt: call refetch-audio to resolve fresh verified stream
+            api.post(`/tracks/${trackId}/refetch-audio`).then((res: any) => {
+              const newUrl = res.data?.audioUrl || res.data?.track?.audioUrl;
+              if (newUrl) {
+                const fallbackMediaUrl = getMediaUrl(newUrl, 'audio', {
+                  id: current.id,
+                  title: current.title,
+                  artist: current.artist?.name || (current as any).artistName || '',
+                  language: (current as any).language
+                });
+                if (fallbackMediaUrl) {
+                  console.log("[GlobalAudio/Automator] Auto-recovered audio stream:", fallbackMediaUrl);
+                  usePlayerStore.setState(state => ({
+                    currentTrack: state.currentTrack ? { ...state.currentTrack, audioUrl: fallbackMediaUrl } : null
+                  }));
+                  const sep = fallbackMediaUrl.includes('?') ? '&' : '?';
+                  audio.src = `${fallbackMediaUrl}${sep}auto-recovered=true&t=${Date.now()}`;
+                  audio.load();
+                  audio.play().catch((playErr) => {
+                    if (playErr?.name === 'AbortError') return;
+                    console.warn("[GlobalAudio/Automator] Secondary playback attempt failed:", playErr);
+                    // Advance to next song if recovery stream also fails to play
+                    setTimeout(() => {
+                      useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
+                      playNext(true);
+                    }, 300);
+                  });
+                  return;
+                }
+              }
+              // If refetch returned no valid stream, advance to next track
+              useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
+              playNext(true);
+            }).catch((err) => {
+              if (err?.response?.status === 404) {
+                console.warn(`[GlobalAudio/Automator] Track "${current.title}" (${trackId}) no longer exists on server (404). Clearing obsolete player state.`);
+                usePlayerStore.setState({ currentTrack: null, isPlaying: false, queue: [] });
+                return;
+              }
+              console.warn("[GlobalAudio/Automator] Refetch audio error:", err);
+              useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
+              playNext(true);
+            });
+          }).catch(() => {
+            playNext(true);
+          });
+        } else {
+          // Attempt limit exceeded: smoothly advance to next song in queue
+          console.warn(`[GlobalAudio/Automator] Audio recovery exhausted for "${current.title}". Advancing to next track.`);
+          useUIStore.getState().showToast(`Audio unavailable for "${current.title}". Playing next song.`, 'error');
+          playNext(true);
+        }
+      };
+
+      // Probe audio source before diagnosing CORS:
+      // A 502/500/404 is a backend/source failure, NOT CORS.
+      // Retrying without crossOrigin only applies when status is 200/206.
+      if (audio.crossOrigin && audio.src && !audio.src.includes('no-cors-retry=true')) {
+        const testUrl = audio.src;
+        fetch(testUrl, { method: 'GET', headers: { Range: 'bytes=0-1' } })
+          .then((res) => {
+            if (res.status === 200 || res.status === 206) {
+              console.warn("[GlobalAudio] Verified media status 200/206, retrying direct playback without crossOrigin...", testUrl);
+              audio.removeAttribute('crossOrigin');
+              const sep = testUrl.includes('?') ? '&' : '?';
+              audio.src = `${testUrl}${sep}no-cors-retry=true`;
+              audio.load();
+              if (isPlaying) {
+                audio.play().catch(err => {
+                  if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+                  console.warn("[GlobalAudio] Fallback play failed:", err);
+                  triggerRecovery();
+                });
+              }
+            } else {
+              console.warn(`[GlobalAudio] Server returned HTTP ${res.status} (Backend failure, not CORS). Advancing immediately to fallback source...`, testUrl);
+              triggerRecovery();
+            }
+          })
+          .catch(() => {
+            console.warn("[GlobalAudio] Probe failed (network or opaque error). Attempting fallback recovery...");
+            triggerRecovery();
+          });
         return;
       }
 
@@ -323,73 +410,7 @@ export function GlobalAudio() {
         src: audio.src
       });
 
-      const current = usePlayerStore.getState().currentTrack;
-      if (!current) {
-        setIsPlaying(false);
-        return;
-      }
-
-      // Track failure count to prevent infinite recovery loops
-      const trackId = current.id;
-      const attemptCount = (audioRecoveryAttempts.current[trackId] || 0) + 1;
-      audioRecoveryAttempts.current[trackId] = attemptCount;
-
-      console.warn(`[GlobalAudio/Automator] Error detected for "${current.title}" (Attempt ${attemptCount}/3). Resolving alternative stream...`);
-
-      if (attemptCount <= 2) {
-        import('@/lib/api').then(({ default: api }) => {
-          // 1. First attempt: call refetch-audio to resolve fresh verified stream
-          api.post(`/tracks/${trackId}/refetch-audio`).then((res: any) => {
-            const newUrl = res.data?.audioUrl || res.data?.track?.audioUrl;
-            if (newUrl) {
-              const fallbackMediaUrl = getMediaUrl(newUrl, 'audio', {
-                id: current.id,
-                title: current.title,
-                artist: current.artist?.name || (current as any).artistName || '',
-                language: (current as any).language
-              });
-              if (fallbackMediaUrl) {
-                console.log("[GlobalAudio/Automator] Auto-recovered audio stream:", fallbackMediaUrl);
-                usePlayerStore.setState(state => ({
-                  currentTrack: state.currentTrack ? { ...state.currentTrack, audioUrl: fallbackMediaUrl } : null
-                }));
-                const sep = fallbackMediaUrl.includes('?') ? '&' : '?';
-                audio.src = `${fallbackMediaUrl}${sep}auto-recovered=true&t=${Date.now()}`;
-                audio.load();
-                audio.play().catch((playErr) => {
-                  if (playErr?.name === 'AbortError') return;
-                  console.warn("[GlobalAudio/Automator] Secondary playback attempt failed:", playErr);
-                  // Advance to next song if recovery stream also fails to play
-                  setTimeout(() => {
-                    useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
-                    playNext(true);
-                  }, 300);
-                });
-                return;
-              }
-            }
-            // If refetch returned no valid stream, advance to next track
-            useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
-            playNext(true);
-          }).catch((err) => {
-            if (err?.response?.status === 404) {
-              console.warn(`[GlobalAudio/Automator] Track "${current.title}" (${trackId}) no longer exists on server (404). Clearing obsolete player state.`);
-              usePlayerStore.setState({ currentTrack: null, isPlaying: false, queue: [] });
-              return;
-            }
-            console.warn("[GlobalAudio/Automator] Refetch audio error:", err);
-            useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
-            playNext(true);
-          });
-        }).catch(() => {
-          playNext(true);
-        });
-      } else {
-        // Attempt limit exceeded: smoothly advance to next song in queue
-        console.warn(`[GlobalAudio/Automator] Audio recovery exhausted for "${current.title}". Advancing to next track.`);
-        useUIStore.getState().showToast(`Audio unavailable for "${current.title}". Playing next song.`, 'error');
-        playNext(true);
-      }
+      triggerRecovery();
     };
 
     const handleSeeked = () => {
@@ -550,7 +571,7 @@ export function GlobalAudio() {
         targetSrc = getMediaUrl(`/api/utils/stream-youtube?${streamParams.toString()}`, 'audio', trackContext);
       }
 
-      const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://zenify-78e257420386.herokuapp.com/api').replace(/\/api$/, '');
+      const BACKEND_BASE = getApiBaseUrl().replace(/\/api$/, '');
 
       if (targetSrc && targetSrc.includes('/stream-youtube')) {
         try {
@@ -752,7 +773,7 @@ export function GlobalAudio() {
 
     const localTick = setInterval(() => {
       accumulatedSecondsRef.current += 1;
-      if (accumulatedSecondsRef.current >= 10) {
+      if (accumulatedSecondsRef.current >= 30) {
         const toSend = accumulatedSecondsRef.current;
         accumulatedSecondsRef.current = 0;
         flushHeartbeat(trackId, toSend);
@@ -772,6 +793,8 @@ export function GlobalAudio() {
   // Poll Background Import Swap
   useEffect(() => {
     if (!currentTrack || !currentTrack.id) return;
+    if (polledTrackIds.current.has(currentTrack.id)) return;
+    polledTrackIds.current.add(currentTrack.id);
 
     const isLocalTrack = (currentTrack as any).isLocal || 
       currentTrack.id.startsWith('local-') || 

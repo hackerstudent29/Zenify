@@ -145,6 +145,7 @@ model Artist {
   aura_vibe        String?
   albums           Album[]
   tracks           Track[]
+  aliases          ArtistAlias[]
 
   @@index([name])
 }
@@ -504,4 +505,20 @@ model LyricEnrichmentJob {
 
   @@index([status, nextRetryAt])
   @@index([trackId])
+}
+
+model ArtistAlias {
+  id              String   @id @default(uuid())
+  aliasNormalized String   @unique @map("alias_normalized")
+  artistId        String?  @map("artist_id")
+  source          String   // 'manual' | 'strip_title' | 'catalog' | 'llm'
+  confidence      Float
+  status          String   @default("ok") // 'ok' | 'needs_review'
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  artist          Artist?  @relation(fields: [artistId], references: [id], onDelete: SetNull)
+
+  @@map("artist_aliases")
+  @@index([aliasNormalized])
+  @@index([artistId])
 }
