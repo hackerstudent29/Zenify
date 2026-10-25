@@ -58,6 +58,17 @@
   --header-height: 64px;
   --player-height: 68px;
 
+  /* Artwork-driven Apple Music theme tokens */
+  --h: 240;
+  --s: 5%;
+  --page: hsl(var(--h) var(--s) 18%);
+  --side: hsl(var(--h) calc(var(--s) * 0.65) 16%);
+  --pill: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.13);
+  --text-1: #ffffff;
+  --text-2: hsl(var(--h) 25% 80%);
+  --text-side: rgba(255, 255, 255, 0.93);
+
   /* Animation Tokens */
   --duration-normal: 0.3s;
   --duration-slow: 0.5s;
@@ -211,6 +222,24 @@
   background: rgba(17, 17, 18, 0.7);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.player-capsule {
+  background: var(--side);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  transition: background-color 600ms ease, border-color 600ms ease;
+}
+
+.album-track-row {
+  height: 57.5px;
+  border-bottom: 1px solid var(--line);
+  transition: background-color 120ms ease-out;
+}
+.album-track-row:hover {
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .text-gradient {
@@ -1005,7 +1034,6 @@ input[type="submit"]:active:not(:disabled) {
     filter    var(--spring-smooth-d) var(--spring-smooth) var(--stag, 0s),
     color 300ms ease-out var(--stag, 0s);
   overflow-wrap: anywhere; text-wrap: balance;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
   will-change: transform, opacity;
 }
 .ly-line[data-active="true"] { transform: scale(1); color: transparent;

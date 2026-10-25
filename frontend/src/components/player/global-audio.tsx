@@ -929,7 +929,7 @@ export function GlobalAudio() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [currentTrack?.id, currentTrack?.audioUrl, !!currentTrack?.synced_lyrics, queryClient]);
+  }, [currentTrack?.id, queryClient]);
 
   return null;
 }
