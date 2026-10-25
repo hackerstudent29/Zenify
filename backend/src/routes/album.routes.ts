@@ -367,8 +367,7 @@ export async function albumRoutes(server: FastifyInstance) {
                         }
 
                         const trackArtist = cleanArtistNames(t.artistName || artistName);
-                        const previewParam = t.previewUrl ? `&previewUrl=${encodeURIComponent(t.previewUrl)}` : '';
-                        const instantAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(collection.collectionName)}${previewParam}&trackId=itunes-${t.trackId}`;
+                        const instantAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(collection.collectionName)}&trackId=itunes-${t.trackId}`;
 
                         return {
                             id: `itunes-${t.trackId}`,
@@ -377,7 +376,6 @@ export async function albumRoutes(server: FastifyInstance) {
                             trackNumber: t.trackNumber || (idx + 1),
                             coverUrl: artwork,
                             audioUrl: instantAudioUrl,
-                            previewUrl: t.previewUrl || undefined,
                             artistId: dbArtist?.id || `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
                             artist: {
                                 id: dbArtist?.id || `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,

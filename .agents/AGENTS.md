@@ -5,17 +5,17 @@ This document outlines standard architectural rules, debugging patterns, and cod
 
 ---
 
-## 1. Fast Audio Preview Resolution (iTunes CDN Priority)
+## 1. Strict Ban on 30-Second iTunes Preview Audio & Full-Song Resolution Priority
 
-### Problem
-YouTube scraper metadata often returns cluttered titles like:
-`"DARBAR (Tamil) - Tharam Maara Single (Lyric Video) | Rajinikanth | AR Murugadoss | Anirudh"`
-If raw title/artist strings are passed directly to external lookup APIs (like iTunes), queries fail or fall back to slow real-time stdout streaming.
-
-### Prevention & Solution Rules
-- **Title Cleaning**: Always strip bracketed text (`(Lyric Video)`, `[Official Video]`, etc.) and split on `|` delimiters to extract the pure song title before searching external APIs.
-- **iTunes Query Order**: In `ExternalMetadataService.fetchAudio`, ensure `cleanTitle` is placed at the top of `queriesToTry` so exact title matching succeeds even when movie/channel names contaminate artist metadata.
-- **Cache Invalidation for Fallback URLs**: In `fetchAudio`, bypass `audioSearchCache` if the cached URL is a fallback `/stream-youtube` link during preview requests, ensuring the system can upgrade to an iTunes AAC preview stream when available.
+### Policy & Architectural Rule
+Playing 30-second audio snippets is strictly unacceptable in Zenify. Users must receive full-length, high-quality audio at all times.
+- **Strict Ban on iTunes Previews**: Never play, stream, or return 30-second preview audio snippets (`mzstatic.com`, `audio-ssl.itunes.apple.com`, or `apple.com/preview`) anywhere in the app—neither for primary playback nor as a fallback.
+- **Resolution Priority Order**:
+  1. **JioSaavn Clean CDN (Pristine 320kbps Akamai CDN full song)**: Resolved instantly via `CleanCdnAudioService.resolveAudio`. Covers regional (Tamil, Telugu, Hindi, Malayalam, Punjabi) and international releases.
+  2. **yt-dlp Stream Proxy**: Real-time YouTube full-audio extraction via `/stream-youtube` with direct URL resolution (`-g`) for HTTP 206 seeking.
+  3. **RapidAPI Spotify / Music Downloader**: Full track MP3 resolution via active `RAPIDAPI_KEY` (`spotify81.p.rapidapi.com`, `spotify-downloader9.p.rapidapi.com`).
+  4. **Cloudflare R2 Persistent Storage**: Ingested full tracks in Cloudflare R2 bucket (`pub-2e8a5f55356644999b77124c45ef0753.r2.dev`).
+- **Frontend Safeguards**: In `global-audio.tsx`, reject any source containing `mzstatic` or `audio-ssl`. When a playback error occurs, trigger `/tracks/:id/refetch-audio` for full song recovery instead of falling back to preview URLs.
 
 ---
 
