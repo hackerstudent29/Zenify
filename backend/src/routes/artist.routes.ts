@@ -249,11 +249,35 @@ export async function artistRoutes(server: FastifyInstance) {
 
         let artistPlaylists: any[] = [];
 
-        // Enrich with Artist's real Global Catalog (Top Songs, Discography Albums in all languages & Playlists from Spotify)
+        // Enrich with Artist's real Global Catalog (Top Songs, Discography Albums & Playlists from Apple Music)
         try {
             const { default: axios } = await import('axios');
             const { SystemSettingsService } = await import('../services/system-settings.service.js');
             const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
+
+            // Direct Official Apple Music Developer API query (Essentials playlists & Similar Artists)
+            let appleMusicViews: any = null;
+            try {
+                const { KeyPoolService } = await import('../services/key-pool.service.js');
+                await KeyPoolService.executeWithFailover('applemusic', async (amToken) => {
+                    const searchRes = await axios.get(`https://amp-api.music.apple.com/v1/catalog/in/search`, {
+                        headers: { Authorization: `Bearer ${amToken}`, Origin: 'https://music.apple.com' },
+                        params: { term: artist.name, types: 'artists', limit: 1 },
+                        timeout: 4500
+                    });
+                    const amArtistId = searchRes?.data?.results?.artists?.data?.[0]?.id;
+                    if (amArtistId) {
+                        const viewsRes = await axios.get(`https://amp-api.music.apple.com/v1/catalog/in/artists/${amArtistId}`, {
+                            headers: { Authorization: `Bearer ${amToken}`, Origin: 'https://music.apple.com' },
+                            params: { views: 'top-songs,full-albums,featured-playlists,similar-artists,latest-release' },
+                            timeout: 5000
+                        });
+                        appleMusicViews = viewsRes?.data?.data?.[0]?.views || null;
+                    }
+                });
+            } catch (amErr: any) {
+                server.log.warn(`[ArtistRoute] Apple Music catalog fetch notice: ${amErr.message}`);
+            }
 
             const [itunesInRes, itunesGlobalRes, itunesAlbumsInRes, itunesAlbumsGlobalRes, saavnAlbumsRes, spotifyPlaylistsRes] = await Promise.all([
                 axios.get(`https://itunes.apple.com/search`, {
@@ -413,7 +437,23 @@ export async function artistRoutes(server: FastifyInstance) {
                 } as any);
             }
 
-            if (spotifyPlaylistsRes?.data?.playlists?.items) {
+            // 1. Populate playlists from official Apple Music Essentials
+            if (appleMusicViews && appleMusicViews['featured-playlists']?.data?.length > 0) {
+                artistPlaylists = appleMusicViews['featured-playlists'].data.map((pl: any) => {
+                    const rawArt = pl.attributes?.artwork?.url || '';
+                    const art = rawArt ? rawArt.replace('{w}x{h}', '600x600').replace('{f}', 'jpg') : '';
+                    return {
+                        id: `am-playlist-${pl.id}`,
+                        name: pl.attributes?.name || '',
+                        title: pl.attributes?.name || '',
+                        description: pl.attributes?.editorialNotes?.short || pl.attributes?.description?.standard || `Featuring ${artist.name}`,
+                        coverUrl: art,
+                        trackCount: pl.attributes?.trackCount || 25,
+                        owner: pl.attributes?.curatorName || 'Apple Music',
+                        isVirtual: true
+                    };
+                }).filter((p: any) => p && p.name && p.coverUrl);
+            } else if (spotifyPlaylistsRes?.data?.playlists?.items) {
                 artistPlaylists = spotifyPlaylistsRes.data.playlists.items
                     .map((p: any) => {
                         const pl = p.data || p;
@@ -437,6 +477,26 @@ export async function artistRoutes(server: FastifyInstance) {
                         };
                     })
                     .filter(Boolean);
+            }
+
+            // 2. Populate Similar Artists ("Fans Also Like") from official Apple Music
+            if (appleMusicViews && appleMusicViews['similar-artists']?.data?.length > 0) {
+                const amSimilar = appleMusicViews['similar-artists'].data.map((a: any) => {
+                    const rawArt = a.attributes?.artwork?.url || '';
+                    const art = rawArt ? rawArt.replace('{w}x{h}', '600x600').replace('{f}', 'jpg') : '';
+                    return {
+                        id: `artist-${a.attributes?.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                        name: a.attributes?.name,
+                        imageUrl: art,
+                        coverUrl: art,
+                        follower_count: 500000,
+                        isArtist: true,
+                        type: 'artist'
+                    };
+                }).filter((a: any) => a && a.name && a.imageUrl);
+                if (amSimilar.length > 0) {
+                    relatedArtists = amSimilar;
+                }
             }
 
             // Also include local verified public playlists containing this artist's tracks

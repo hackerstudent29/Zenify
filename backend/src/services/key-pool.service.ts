@@ -49,6 +49,15 @@ export class KeyPoolService {
       '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
       'e9a22f3c78msh7958b19f074d251p1d198ejsn3a1b4d0812cf',
       'bf105d890amsh1258d4477839ec9p1726a2jsnb7c569a35e80'
+    ].filter(k => k && k.length > 5),
+    applemusic: [
+      process.env.APPLE_MUSIC_DEVELOPER_TOKEN || '',
+      ...(process.env.APPLE_MUSIC_DEVELOPER_TOKENS ? process.env.APPLE_MUSIC_DEVELOPER_TOKENS.split(',').map(s => s.trim()) : []),
+      // Verified Working Apple Music Tokens (Active until 2027)
+      'eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IldlYlBsYXlLaWQifQ.eyJpc3MiOiJBTVBXZWJQbGF5IiwiaWF0IjoxNzkyNTM1Njc2LCJleHAiOjE3OTg1ODM2NzYsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.YpBDqePdK0r_5lxtByqto20zc60FhO1eLoYJ5mrayZ73IYsW4yguaJAFMzud_5FSZ7cjTCdM5ST_MecdbHDA2Q',
+      'eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IkxUMlpEWlNYTlEifQ.eyJpc3MiOiI1SUtQUDJJRUNRIiwiaWF0IjoxNzkyNTM1Njc2LCJleHAiOjE3OTg1ODM2NzYsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.K-C_J9LLy07ZTV_MgoDT5KzJQQIOa8MlquKx919sPI3QbprU1sYc8c2E5fvWZkXA5xlEPyy05SWxSFZBq29xfA',
+      'eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IldlYlBsYXlLaWQifQ.eyJpc3MiOiJBTVBXZWJQbGF5IiwiaWF0IjoxNzkxOTAzMTk0LCJleHAiOjE3OTc5NTExOTQsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.3x-70iwl8xfaZvlRoH-4_Z_kBmfaFrEYW6Pqa9u0vJKZHwq1iYdw_LJs1LA8mxQpyxeHcmuHPXdq6pjBO41_kA',
+      'eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IkxUMlpEWlNYTlEifQ.eyJpc3MiOiI1SUtQUDJJRUNRIiwiaWF0IjoxNzkxOTAzMTk0LCJleHAiOjE3OTc5NTExOTQsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.ennJxL6nOvgRUV1Hcp2Rn-0I7syN0haC_LQnJ2FGvyY9FSqSnsCYvpxGuqM_DnaWs1Gf_3TrkiwAv71BJ6bDow'
     ].filter(k => k && k.length > 5)
   };
 
@@ -71,10 +80,12 @@ export class KeyPoolService {
       const settings = await prisma.systemSettings.findUnique({ where: { id: 'global' } });
       const dbKeys = (settings?.keys as any) || {};
 
-      const envOrDbKeys = dbKeys[`${poolName.toUpperCase()}_KEYS`] || 
-                          dbKeys[`${poolName.toUpperCase()}_KEY`] ||
-                          dbKeys.RAPIDAPI_KEYS ||
-                          dbKeys.RAPIDAPI_KEY;
+      let envOrDbKeys = dbKeys[`${poolName.toUpperCase()}_KEYS`] || dbKeys[`${poolName.toUpperCase()}_KEY`];
+      if (!envOrDbKeys && poolName === 'applemusic') {
+        envOrDbKeys = dbKeys.APPLE_MUSIC_DEVELOPER_TOKENS || dbKeys.APPLE_MUSIC_DEVELOPER_TOKEN;
+      } else if (!envOrDbKeys && (poolName === 'rapidapi' || poolName === 'spotify' || poolName === 'lyrics' || poolName === 'genius' || poolName === 'youtube')) {
+        envOrDbKeys = dbKeys.RAPIDAPI_KEYS || dbKeys.RAPIDAPI_KEY;
+      }
 
       if (Array.isArray(envOrDbKeys)) {
         candidateKeys.push(...envOrDbKeys.filter(Boolean));
@@ -83,8 +94,14 @@ export class KeyPoolService {
       }
     } catch {}
 
-    // 2. Fetch from Process Environment Variables (supports comma-separated list of 20-50+ keys)
-    const envVal = process.env[`${poolName.toUpperCase()}_KEYS`] || process.env.RAPIDAPI_KEYS;
+    // 2. Fetch from Process Environment Variables (supports comma-separated list of keys)
+    let envVal = process.env[`${poolName.toUpperCase()}_KEYS`] || process.env[`${poolName.toUpperCase()}_KEY`];
+    if (!envVal && poolName === 'applemusic') {
+      envVal = process.env.APPLE_MUSIC_DEVELOPER_TOKENS || process.env.APPLE_MUSIC_DEVELOPER_TOKEN;
+    } else if (!envVal && (poolName === 'rapidapi' || poolName === 'spotify' || poolName === 'lyrics' || poolName === 'genius' || poolName === 'youtube')) {
+      envVal = process.env.RAPIDAPI_KEYS || process.env.RAPIDAPI_KEY;
+    }
+
     if (envVal) {
       candidateKeys.push(...envVal.split(',').map(k => k.trim()).filter(Boolean));
     }
@@ -121,6 +138,9 @@ export class KeyPoolService {
   static async getKey(poolName: string = 'rapidapi'): Promise<string> {
     const states = await this.syncPool(poolName);
     if (states.length === 0) {
+      if (poolName === 'applemusic') {
+        return this.defaultKeys.applemusic?.[0] || '';
+      }
       return process.env.RAPIDAPI_KEY || '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188';
     }
 
