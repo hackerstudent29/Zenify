@@ -17,6 +17,7 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import { SwiftUIPlay, SwiftUIPause } from "@/components/ui/SwiftUIIcons";
+import { usePlayerPrefs } from "@/store/playerPrefs";
 
 /* ------------------------------------------------------------------ */
 /*  Tokens                                                             */
@@ -356,15 +357,16 @@ export function Marquee({
   }, [distance, rest, speed]);
 
   const overflowing = distance > 0;
+  // fade only the RIGHT edge — a left fade at rest was hiding the first letter
   const mask = overflowing
-    ? "linear-gradient(90deg, transparent 0, #000 7px, #000 calc(100% - 14px), transparent 100%)"
+    ? "linear-gradient(90deg, #000 0, #000 calc(100% - 16px), transparent 100%)"
     : undefined;
 
   return (
     <div
       ref={boxRef}
       className={cn("flex w-full overflow-hidden", overflowing || align === "left" ? "justify-start" : "justify-center", className)}
-      style={{ maskImage: mask, WebkitMaskImage: mask }}
+      style={{ maskImage: mask, WebkitMaskImage: mask, paddingBlock: 3, marginBlock: -3 }}
     >
       <span ref={trackRef} className="inline-flex shrink-0 whitespace-nowrap" style={{ willChange: overflowing ? "transform" : undefined }}>
         <span ref={copyRef} className="inline-flex shrink-0">{children}</span>
@@ -468,4 +470,10 @@ export function useTrackLike(trackId?: string) {
 
   const liked = !!trackId && !!likedTrackIds?.includes(trackId);
   return { liked, toggle: () => trackId && mutation.mutate(trackId) };
+}
+
+/** Idle detector that respects Settings → "Hide details when idle". */
+export function useAutoHideIdle(enabled: boolean, ms = 5000) {
+  const pref = usePlayerPrefs((s) => s.autoHideDetails);
+  return useIdle(enabled && pref, ms);
 }

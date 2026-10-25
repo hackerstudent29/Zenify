@@ -53,6 +53,8 @@ export function cleanLyricText(text: string): string {
 
 /** how many lines around the active one get a real staggered spring (the rest jump silently off-screen) */
 const WINDOW = 9;
+/** start moving this many seconds early so the spring settles right when the next line begins */
+const LEAD = 0.12;
 /** spring for the line-follow motion */
 const FOLLOW = { type: "spring" as const, stiffness: 165, damping: 23, mass: 1, restDelta: 0.15 };
 
@@ -340,6 +342,7 @@ export function LyricsView({
   const userScrolledRef = React.useRef(false);
   const idleTimer = React.useRef<any>(null);
   const guardUntil = React.useRef(0);
+  const intentUntil = React.useRef(0); // only wheel / touch can start manual mode
 
   const markProg = () => {
     progRef.current = true;
@@ -398,6 +401,7 @@ export function LyricsView({
     ysRef.current.forEach((y) => { y.stop(); y.set(-c); });
     manualRef.current = false;
     userScrolledRef.current = false;
+    intentUntil.current = 0;
     setIsUserScrolling(false);
     goTo(activeRef.current);
   }, [goTo]);
@@ -444,6 +448,7 @@ export function LyricsView({
     const onWheel = (e: WheelEvent) => {
       e.stopPropagation();
       if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      intentUntil.current = performance.now() + 1500;
       if (!manualRef.current) {
         e.preventDefault();
         enterManual(false);
@@ -459,12 +464,21 @@ export function LyricsView({
 
   const onScroll = () => {
     if (progRef.current) return;
-    if (!manualRef.current) { enterManual(false); }
+    if (!manualRef.current) {
+      // not caused by the user (scroll anchoring, resize…) → quietly put it back
+      if (performance.now() > intentUntil.current) {
+        const el = containerRef.current;
+        if (el && el.scrollTop !== 0) { markProg(); el.scrollTop = 0; }
+        return;
+      }
+      enterManual(false);
+    }
     userScrolledRef.current = true;
     setIsUserScrolling(true);
     restartIdle();
   };
   const onTouchStart = () => {
+    intentUntil.current = performance.now() + 60_000;
     userScrolledRef.current = false;
     if (!manualRef.current) enterManual(true);
     if (idleTimer.current) clearTimeout(idleTimer.current);
@@ -505,9 +519,10 @@ export function LyricsView({
 
       const lines = linesRef.current;
       if (!lines.length || lines[0].isUnsynced) return;
+      const tt = t + LEAD;
       let n = activeRef.current;
-      while (n + 1 < lines.length && t >= lines[n + 1].time) n++;
-      while (n >= 0 && t < lines[n].time) n--;
+      while (n + 1 < lines.length && tt >= lines[n + 1].time) n++;
+      while (n >= 0 && tt < lines[n].time) n--;
       if (n !== activeRef.current) {
         activeRef.current = n;
         setActiveIndex(n);
@@ -630,7 +645,7 @@ export function LyricsView({
   const showOffset = !isUnsyncedSet && data?.source !== "QUICKLRC";
   const toolbar = (
     <LyricsToolbar
-      placement={isMobile ? "bottom" : "top-right"}
+      placement="top-right"
       canTranslate={canTranslate}
       isRomanized={isRomanized}
       romanizedLabel={romanizedLabel}
@@ -639,7 +654,7 @@ export function LyricsView({
       offsetMs={lyricsOffsetMs}
       onOffset={handleOffsetChange}
       onClose={!isMobile ? onClose : undefined}
-      hidden={(isMobile && (isUserScrolling || !!isIdle)) || (!isMobile && !!isIdle)}
+      hidden={isUserScrolling || !!isIdle}
     />
   );
 
@@ -684,14 +699,14 @@ export function LyricsView({
         <div
           ref={containerRef}
           className="relative z-10 h-full w-full select-none overflow-y-auto scrollbar-none"
-          style={{ msOverflowStyle: "none", scrollbarWidth: "none", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
+          style={{ msOverflowStyle: "none", scrollbarWidth: "none", overscrollBehavior: "contain", overflowAnchor: "none", WebkitOverflowScrolling: "touch" }}
           onScroll={onScroll}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           onTouchCancel={onTouchEnd}
         >
           <style dangerouslySetInnerHTML={{ __html: ".scrollbar-none::-webkit-scrollbar{display:none!important}" }} />
-          <div className={cn("relative flex w-full flex-col", isFullscreen ? (isMobile ? "px-4" : "mx-auto max-w-5xl px-8") : isMobile ? "px-3" : "px-4")}>
+          <div className={cn("relative flex w-full flex-col", isFullscreen ? (isMobile ? "px-[max(14px,env(safe-area-inset-left))] pr-[max(14px,env(safe-area-inset-right))]" : "mx-auto max-w-5xl px-8") : isMobile ? "px-3" : "px-4")}>
             <div className="w-full shrink-0" style={{ height: topSpacer }} />
 
             {processedLines.map((line: any, idx: number) => {
@@ -750,7 +765,7 @@ export function LyricsView({
       </div>
 
       {toolbar}
-      <LyricsSyncPill show={isUserScrolling} onSync={handleSync} />
+      <LyricsSyncPill show={isUserScrolling} onSync={handleSync} position={isMobile ? "top" : "bottom"} />
     </div>
   );
 }

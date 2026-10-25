@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef } from "react";
-import { cn, getMediaUrl, getApiBaseUrl } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * ArtworkMeshBackground — Apple Music style fluid artwork mesh
@@ -186,35 +186,15 @@ function makeLayer(img: HTMLImageElement, crop: (typeof CROPS)[number], tainted:
   return { tile, avg };
 }
 
-const tileCache = new Map<string, Tile>();
-
 async function loadTile(src: string): Promise<Tile> {
-  if (tileCache.has(src)) {
-    return tileCache.get(src)!;
-  }
-
-  let targetSrc = src;
-  if (targetSrc.startsWith("http") && !targetSrc.includes("proxy-image") && !targetSrc.includes("localhost")) {
-    try {
-      const API_BASE = getApiBaseUrl();
-      targetSrc = `${API_BASE}/utils/proxy-image?url=${encodeURIComponent(targetSrc)}`;
-    } catch {}
-  }
-
   let img: HTMLImageElement;
   let tainted = false;
   try {
-    img = await loadImage(targetSrc, true);
+    img = await loadImage(src, true);
   } catch {
-    try {
-      img = await loadImage(targetSrc, false);
-      tainted = true;
-    } catch {
-      img = await loadImage("/logo.png", false);
-      tainted = true;
-    }
+    img = await loadImage(src, false); // no CORS headers → still drawable, just can't read pixels
+    tainted = true;
   }
-
   const layers: HTMLCanvasElement[] = [];
   let avg = FALLBACK_BG;
   CROPS.forEach((c, i) => {
@@ -222,14 +202,17 @@ async function loadTile(src: string): Promise<Tile> {
     layers.push(r.tile);
     if (i === 0) avg = r.avg;
   });
+  return { layers, avg };
+}
 
-  const result: Tile = { layers, avg };
-  if (tileCache.size >= 25) {
-    const first = tileCache.keys().next().value;
-    if (first) tileCache.delete(first);
-  }
-  tileCache.set(src, result);
-  return result;
+const tileCache = new Map<string, Tile>();
+async function getTile(src: string): Promise<Tile> {
+  const hit = tileCache.get(src);
+  if (hit) return hit;
+  const t = await loadTile(src);
+  tileCache.set(src, t);
+  if (tileCache.size > 6) tileCache.delete(tileCache.keys().next().value as string);
+  return t;
 }
 
 let noiseUrl: string | null = null;
@@ -425,7 +408,12 @@ export const ArtworkMeshBackground = React.memo(function ArtworkMeshBackground({
 
     const halt = () => { if (raf) { cancelAnimationFrame(raf); raf = 0; } };
     const wake = () => {
-      if (raf || !canRun()) return;
+      if (!canRun()) {
+        const s = st.current;
+        if (s.cur) { s.fade = 1; s.prev = null; render(); }
+        return;
+      }
+      if (raf) return;
       last = performance.now(); gSum = gN = 0;
       raf = requestAnimationFrame(frame);
     };
@@ -441,7 +429,7 @@ export const ArtworkMeshBackground = React.memo(function ArtworkMeshBackground({
     const io = new IntersectionObserver(([e]) => {
       visible = e?.isIntersecting ?? true;
       visible ? wake() : halt();
-    });
+    }, { rootMargin: "120px" });
     io.observe(wrap);
 
     const onVis = () => (document.hidden ? halt() : wake());
@@ -491,15 +479,22 @@ export const ArtworkMeshBackground = React.memo(function ArtworkMeshBackground({
   /* ── load + crossfade when the cover changes ── */
   useEffect(() => {
     let dead = false;
-    const apply = (tile: Tile) => {
+    const apply = (tile: Tile, instant = false) => {
       if (dead) return;
       const s = st.current;
-      s.prev = s.cur; s.cur = tile; s.fade = 0; // always fade in (from base colour on first load)
+      if (s.cur === tile) return;
+      s.prev = instant ? null : s.cur;
+      s.cur = tile;
+      s.fade = instant ? 1 : 0;
       wakeRef.current();
     };
-    loadTile(src).then(apply).catch(() => {
-      if (src !== "/logo.png") loadTile("/logo.png").then(apply).catch(() => {});
-    });
+    const cached = tileCache.get(src);
+    if (cached) apply(cached, !st.current.cur); // remount (reopen) → mesh is there on the first frame
+    else {
+      getTile(src).then((t) => apply(t)).catch(() => {
+        if (src !== "/logo.png") getTile("/logo.png").then((t) => apply(t)).catch(() => {});
+      });
+    }
     return () => { dead = true; };
   }, [src]);
 

@@ -19,7 +19,7 @@ import {
   type Transition,
 } from "framer-motion";
 import * as Slider from "@radix-ui/react-slider";
-import { X, ChevronLeft, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
+import { X, ChevronLeft, Loader2, Check } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -30,35 +30,29 @@ import {
 import { cn } from "@/lib/utils";
 
 /* ==========================================================================
-   Spring physics. Only transform + opacity are ever animated (GPU, no reflow)
+   Motion. Only transform + opacity are animated (compositor only, no reflow).
+   No filter/blur animation, no backdrop-filter on anything that moves.
    ========================================================================== */
-const SPRING_WINDOW: Transition = { type: "spring", stiffness: 340, damping: 30, mass: 0.9 };
-const SPRING_SHEET: Transition = { type: "spring", stiffness: 320, damping: 34, mass: 0.9 };
-const SPRING_SOFT: Transition = { type: "spring", stiffness: 300, damping: 28, mass: 0.8 };
-const SPRING_PILL: Transition = { type: "spring", stiffness: 520, damping: 38, mass: 0.7 };
+const SPRING_WINDOW: Transition = { type: "spring", stiffness: 380, damping: 32, mass: 0.85 };
+const SPRING_SHEET: Transition = { type: "spring", stiffness: 340, damping: 36, mass: 0.9 };
+const SPRING_CONTENT: Transition = { type: "spring", stiffness: 420, damping: 36, mass: 0.7 };
+const SPRING_PILL: Transition = { type: "spring", stiffness: 560, damping: 40, mass: 0.7 };
 const SPRING_KNOB: Transition = { type: "spring", stiffness: 700, damping: 35, mass: 0.6 };
+const EXIT_EASE = [0.4, 0, 1, 1] as const;
 
 const windowV: Variants = {
-  initial: { opacity: 0, scale: 0.92, y: 18 },
+  initial: { opacity: 0, scale: 0.96, y: 12 },
   animate: { opacity: 1, scale: 1, y: 0, transition: SPRING_WINDOW },
-  exit: { opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.18, ease: [0.4, 0, 1, 1] } },
+  exit: { opacity: 0, scale: 0.98, y: 6, transition: { duration: 0.16, ease: EXIT_EASE } },
 };
 const sheetV: Variants = {
   initial: { y: "100%" },
   animate: { y: 0, transition: SPRING_SHEET },
-  exit: { y: "100%", transition: { duration: 0.26, ease: [0.4, 0, 0.9, 0.4] } },
-};
-const sectionV: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.045, delayChildren: 0.02 } },
-};
-const itemV: Variants = {
-  hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0, transition: SPRING_SOFT },
+  exit: { y: "100%", transition: { duration: 0.24, ease: [0.4, 0, 0.9, 0.4] } },
 };
 
 /* ==========================================================================
-   Apple system colors for icon tiles
+   Kept for API compatibility with other screens that import them
    ========================================================================== */
 export const TINT = {
   blue: "#0a84ff",
@@ -84,13 +78,8 @@ export function TintIcon({
   return (
     <span
       aria-hidden
-      className="flex shrink-0 items-center justify-center text-white shadow-[inset_0_0.5px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.3)]"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: Math.round(size * 0.26),
-        background: `linear-gradient(180deg, color-mix(in srgb, ${tint}, white 20%), ${tint})`,
-      }}
+      className="flex shrink-0 items-center justify-center text-white"
+      style={{ width: size, height: size, borderRadius: Math.round(size * 0.26), background: tint }}
     >
       <Icon size={Math.round(size * 0.55)} strokeWidth={2.2} />
     </span>
@@ -98,16 +87,15 @@ export function TintIcon({
 }
 
 /* ==========================================================================
-   Floating window / sheet shell
-   - Desktop: centered floating window with spring scale-in
-   - Mobile : bottom sheet with spring slide-up + drag-to-dismiss
-   - Blurs and dims everything behind it (one static blur layer, only opacity animates)
+   Window shell
+   - Desktop: centered window, spring scale-in, tabs in the title bar
+   - Mobile : bottom sheet, spring slide-up, drag the handle to dismiss
    ========================================================================== */
 export type NavItem = {
   id: string;
   label: string;
   icon: ElementType;
-  tint: string;
+  tint?: string;
   desktopOnly?: boolean;
 };
 
@@ -116,7 +104,6 @@ type Status = "idle" | "saving" | "saved" | "error";
 export function SettingsWindow({
   title,
   nav,
-  status = "idle",
   backHref,
   backLabel = "Settings",
   reducedMotion = false,
@@ -127,6 +114,7 @@ export function SettingsWindow({
 }: {
   title: string;
   nav?: { items: readonly NavItem[]; active: string; onSelect: (id: string) => void };
+  /** @deprecated kept so existing callers still compile; saving feedback now lives on each Row */
   status?: Status;
   backHref?: string;
   backLabel?: string;
@@ -137,33 +125,37 @@ export function SettingsWindow({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"window" | "sheet">(() =>
-    typeof window !== "undefined" && window.innerWidth <= 767 ? "sheet" : "window"
-  );
+  // null until the client has measured, so SSR/hydration can never mismatch or flash the wrong layout
+  const [mode, setMode] = useState<"window" | "sheet" | null>(null);
   const [internalOpen, setInternalOpen] = useState(isOpen !== undefined ? isOpen : true);
   const target = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const controls = useDragControls();
 
   useEffect(() => {
-    if (isOpen !== undefined) {
-      setInternalOpen(isOpen);
-    }
+    if (isOpen !== undefined) setInternalOpen(isOpen);
   }, [isOpen]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
     const apply = () => setMode(mq.matches ? "sheet" : "window");
+    apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
 
+  // Lock page scroll without the page jumping sideways when the scrollbar disappears
   useEffect(() => {
     if (!internalOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    const prevPadding = body.style.paddingRight;
+    const scrollbar = window.innerWidth - document.documentElement.clientWidth;
+    body.style.overflow = "hidden";
+    if (scrollbar > 0) body.style.paddingRight = `${scrollbar}px`;
     return () => {
-      document.body.style.overflow = prev;
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPadding;
     };
   }, [internalOpen]);
 
@@ -182,10 +174,6 @@ export function SettingsWindow({
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
-  }, [scrollKey]);
-
   const finish = () => {
     if (onClose) {
       onClose();
@@ -199,28 +187,28 @@ export function SettingsWindow({
 
   if (!mode) return null;
   const sheet = mode === "sheet";
+  const sideW = backHref ? 88 : 40;
 
   return createPortal(
     <MotionConfig reducedMotion={reducedMotion ? "always" : "user"}>
       <AnimatePresence onExitComplete={finish}>
         {internalOpen && (
           <div key="settings-root" className="fixed inset-0 z-[9000]">
-            {/* Blur + dim backdrop: match search scrim glass */}
+            {/* One static blur layer. Only its opacity animates. */}
             <motion.div
               aria-hidden
-              className="absolute inset-0 bg-black/60 backdrop-blur-xl backdrop-saturate-150"
-              style={{ willChange: "opacity", transform: "translateZ(0)" }}
+              className="absolute inset-0 bg-black/45 backdrop-blur-lg"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+              transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
               onPointerDown={() => close()}
             />
 
             <div
               className={cn(
                 "pointer-events-none absolute inset-0 flex",
-                sheet ? "items-end" : "items-center justify-center p-3 sm:p-5"
+                sheet ? "items-end" : "items-center justify-center p-4"
               )}
             >
               <motion.div
@@ -239,33 +227,34 @@ export function SettingsWindow({
                 onDragEnd={(_, info) => {
                   if (info.offset.y > 120 || info.velocity.y > 600) close();
                 }}
-                style={{
-                  willChange: "transform",
-                  paddingBottom: sheet ? "env(safe-area-inset-bottom)" : undefined,
-                }}
+                style={{ paddingBottom: sheet ? "env(safe-area-inset-bottom)" : undefined }}
                 className={cn(
                   "pointer-events-auto relative flex flex-col overflow-hidden text-white",
-                  "bg-zinc-900/85 border border-white/[0.12] backdrop-blur-3xl backdrop-saturate-180",
-                  "shadow-[0_28px_90px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.18)]",
+                  // Solid-ish surface: no backdrop-filter on the moving element, so it can never flicker
+                  "bg-[#232326] border border-white/[0.09]",
+                  "shadow-[0_30px_80px_rgba(0,0,0,0.6)]",
                   sheet
-                    ? "h-[92dvh] w-full rounded-t-[26px]"
-                    : "h-[min(660px,92vh)] w-[min(900px,94vw)] rounded-[22px]"
+                    ? "h-[92dvh] w-full rounded-t-[24px]"
+                    : "h-[min(620px,90vh)] w-[min(760px,94vw)] rounded-[20px]"
                 )}
               >
-                {/* Title bar (also the drag handle on mobile) */}
-                <header
-                  className="relative z-10 shrink-0 bg-white/[0.02] backdrop-blur-md"
-                  onPointerDown={(e) => sheet && controls.start(e)}
-                  style={{ touchAction: sheet ? "none" : undefined }}
-                >
-                  {sheet && <div className="mx-auto mt-2 h-[5px] w-9 rounded-full bg-white/25" />}
-                  <div className="flex h-12 items-center justify-between px-3 md:px-4">
-                    <div className="flex w-24 items-center">
+                {/* Title bar: tabs live here */}
+                <header className="relative z-10 shrink-0">
+                  {sheet && (
+                    <div
+                      onPointerDown={(e) => controls.start(e)}
+                      style={{ touchAction: "none" }}
+                      className="flex h-6 cursor-grab items-center justify-center"
+                    >
+                      <span className="h-[5px] w-9 rounded-full bg-white/25" />
+                    </div>
+                  )}
+
+                  <div className={cn("flex items-center gap-2 px-3", sheet ? "h-12" : "h-16")}>
+                    <div className="flex shrink-0 items-center" style={{ width: sideW }}>
                       {backHref && (
                         <button
                           type="button"
-                          data-no-spring
-                          onPointerDown={(e) => e.stopPropagation()}
                           onClick={() => close(backHref)}
                           className="flex h-8 cursor-pointer items-center rounded-full pl-1 pr-2 text-[13px] font-medium text-brand outline-none transition-opacity hover:opacity-70 focus-visible:ring-2 focus-visible:ring-white/30"
                         >
@@ -275,88 +264,88 @@ export function SettingsWindow({
                       )}
                     </div>
 
-                    <h2 className="text-[14px] font-bold tracking-tight text-white">{title}</h2>
+                    {/* Top navigation: segmented tabs with a spring-sliding pill */}
+                    <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto" onPointerDown={(e) => e.stopPropagation()}>
+                      {nav ? (
+                        <div
+                          role="tablist"
+                          aria-label={title}
+                          className="mx-auto flex w-max items-center gap-0.5 rounded-full bg-white/[0.06] p-[3px]"
+                        >
+                          {nav.items.map((item) => {
+                            const active = nav.active === item.id;
+                            const Icon = item.icon;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                role="tab"
+                                aria-selected={active}
+                                onClick={(e) => {
+                                  nav.onSelect(item.id);
+                                  e.currentTarget.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+                                }}
+                                className={cn(
+                                  "relative z-10 h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-[13px] font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/30",
+                                  item.desktopOnly ? "hidden md:flex" : "flex",
+                                  active ? "text-white" : "text-white/55 hover:text-white/85"
+                                )}
+                              >
+                                {active && (
+                                  <motion.span
+                                    layoutId="settings-tab-pill"
+                                    transition={SPRING_PILL}
+                                    className="absolute inset-0 -z-10 rounded-full bg-white/[0.16]"
+                                  />
+                                )}
+                                <Icon size={15} strokeWidth={2} />
+                                <span>{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <h2 className="text-center text-[14px] font-semibold tracking-tight text-white">{title}</h2>
+                      )}
+                    </div>
 
-                    <div className="flex w-24 items-center justify-end gap-2">
-                      <AnimatePresence initial={false} mode="popLayout">
-                        {status !== "idle" && (
-                          <motion.span
-                            key={status}
-                            initial={{ opacity: 0, scale: 0.85 }}
-                            animate={{ opacity: 1, scale: 1, transition: SPRING_SOFT }}
-                            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
-                            className={cn(
-                              "flex items-center gap-1 text-[11px] font-semibold",
-                              status === "saving" && "text-white/55",
-                              status === "saved" && "text-[#30d158]",
-                              status === "error" && "text-[#ff453a]"
-                            )}
-                          >
-                            {status === "saving" && <Loader2 size={13} className="animate-spin" />}
-                            {status === "saved" && <CheckCircle size={13} />}
-                            {status === "error" && <AlertTriangle size={13} />}
-                            <span className="hidden sm:inline">
-                              {status === "saving" ? "Saving" : status === "saved" ? "Saved" : "Failed"}
-                            </span>
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-
+                    <div className="flex shrink-0 items-center justify-end" style={{ width: sideW }}>
                       <motion.button
                         type="button"
-                        data-no-spring
                         aria-label="Close"
-                        whileTap={{ scale: 0.86 }}
+                        whileTap={{ scale: 0.88 }}
                         transition={SPRING_KNOB}
-                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={() => close()}
-                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white/[0.12] text-white/70 outline-none transition-colors hover:bg-white/20 hover:text-white focus-visible:ring-2 focus-visible:ring-white/30"
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-white/[0.1] text-white/70 outline-none transition-colors hover:bg-white/[0.18] hover:text-white focus-visible:ring-2 focus-visible:ring-white/30"
                       >
-                        <X size={14} strokeWidth={2.8} />
+                        <X size={14} strokeWidth={2.6} />
                       </motion.button>
                     </div>
                   </div>
-                  <div className="h-px bg-white/[0.08]" />
+                  <div className="h-px bg-white/[0.07]" />
                 </header>
 
-                <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-                  {nav && (
-                    <nav
-                      role="tablist"
-                      aria-label={title}
-                      className="no-scrollbar flex shrink-0 gap-1 overflow-x-auto border-b border-white/[0.08] px-3 py-2 md:w-[224px] md:flex-col md:overflow-x-visible md:overflow-y-auto md:border-b-0 md:border-r md:px-3 md:py-3"
+                {/* Content: fixed size window, so switching tabs never resizes or jumps */}
+                <div
+                  ref={scrollRef}
+                  className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-10 pt-6 [scrollbar-gutter:stable] md:px-8"
+                  style={{ WebkitOverflowScrolling: "touch" }}
+                >
+                  <div className="mx-auto w-full max-w-[560px]">
+                    <AnimatePresence
+                      mode="wait"
+                      initial={false}
+                      onExitComplete={() => scrollRef.current?.scrollTo({ top: 0 })}
                     >
-                      {nav.items.map((item) => {
-                        const active = nav.active === item.id;
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            role="tab"
-                            aria-selected={active}
-                            onClick={() => nav.onSelect(item.id)}
-                            className={cn(
-                              "relative shrink-0 cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-[10px] px-3 py-2 text-[13px] font-semibold outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-white/25",
-                              item.desktopOnly ? "hidden md:flex" : "flex",
-                              active
-                                ? "bg-white/[0.14] text-white shadow-sm ring-1 ring-white/10"
-                                : "text-white/60 hover:text-white hover:bg-white/[0.06]"
-                            )}
-                          >
-                            <TintIcon icon={item.icon} tint={item.tint} size={24} />
-                            <span>{item.label}</span>
-                          </button>
-                        );
-                      })}
-                    </nav>
-                  )}
-
-                  <div
-                    ref={scrollRef}
-                    className="min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-10 pt-5 md:px-8 md:pt-7"
-                    style={{ WebkitOverflowScrolling: "touch" }}
-                  >
-                    <div className="mx-auto w-full max-w-[640px]">{children}</div>
+                      <motion.div
+                        key={scrollKey ?? "content"}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0, transition: SPRING_CONTENT }}
+                        exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                      >
+                        {children}
+                      </motion.div>
+                    </AnimatePresence>
                   </div>
                 </div>
               </motion.div>
@@ -370,7 +359,7 @@ export function SettingsWindow({
 }
 
 /* ==========================================================================
-   Content building blocks
+   Content building blocks (flat, minimal)
    ========================================================================== */
 export function Section({
   title,
@@ -382,10 +371,10 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <div className="animate-in fade-in-50 duration-150">
-      <div className="mb-5">
-        <h1 className="text-[24px] font-bold leading-tight tracking-[-0.022em] text-white">{title}</h1>
-        {subtitle && <p className="mt-1 text-[13px] font-medium text-white/50">{subtitle}</p>}
+    <div>
+      <div className="mb-6">
+        <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.02em] text-white">{title}</h1>
+        {subtitle && <p className="mt-1 text-[13px] text-white/45">{subtitle}</p>}
       </div>
       {children}
     </div>
@@ -402,16 +391,12 @@ export function Group({
   children: ReactNode;
 }) {
   return (
-    <section className="mb-6">
-      {header && (
-        <h3 className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.07em] text-white/40">
-          {header}
-        </h3>
-      )}
-      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-[16px] bg-white/[0.04] backdrop-blur-md ring-1 ring-inset ring-white/[0.08] shadow-sm">
+    <section className="mb-7">
+      {header && <h3 className="mb-2 px-1 text-[12px] font-medium text-white/40">{header}</h3>}
+      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-[14px] bg-white/[0.04]">
         {children}
       </div>
-      {footer && <p className="mt-2 px-3 text-[12px] leading-snug text-white/40">{footer}</p>}
+      {footer && <p className="mt-2 px-1 text-[12px] leading-snug text-white/35">{footer}</p>}
     </section>
   );
 }
@@ -419,8 +404,7 @@ export function Group({
 export function Row({
   label,
   description,
-  icon,
-  tint,
+  icon: Icon,
   badge,
   isSaving,
   isSaved,
@@ -430,6 +414,7 @@ export function Row({
   label: string;
   description?: ReactNode;
   icon?: ElementType;
+  /** @deprecated kept for compatibility, ignored in the minimal design */
   tint?: string;
   badge?: string;
   isSaving?: boolean;
@@ -438,51 +423,37 @@ export function Row({
   children?: ReactNode;
 }) {
   return (
-    <div className={cn("group flex min-h-[54px] items-center gap-3 px-4 py-2.5", className)}>
-      {icon && <TintIcon icon={icon} tint={tint} />}
+    <div className={cn("group flex min-h-[52px] items-center gap-4 px-4 py-3", className)}>
+      {Icon && <Icon size={16} strokeWidth={2} className="shrink-0 text-white/45" />}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13.5px] font-semibold leading-tight tracking-[-0.005em] text-white">
-            {label}
-          </span>
+          <span className="text-[14px] font-medium leading-tight text-white">{label}</span>
           {badge && (
-            <span className="rounded-full bg-brand/15 px-1.5 py-px text-[10px] font-bold text-brand">
+            <span className="rounded-full bg-white/[0.08] px-1.5 py-px text-[10px] font-medium text-white/60">
               {badge}
             </span>
           )}
         </div>
-        {description && (
-          <p className="mt-0.5 text-[12px] font-medium leading-snug text-white/50">{description}</p>
-        )}
+        {description && <p className="mt-0.5 text-[12.5px] leading-snug text-white/45">{description}</p>}
       </div>
-      <div className="flex shrink-0 items-center gap-2.5">
-        {/* Fixed-size status slot: never causes layout shift */}
-        <span className="flex h-4 w-4 items-center justify-center">
-          <AnimatePresence initial={false} mode="wait">
-            {isSaving && (
-              <motion.span
-                key="s"
-                initial={{ opacity: 0, scale: 0.6 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.6 }}
-                transition={{ duration: 0.12 }}
-                className="text-white/50"
-              >
-                <Loader2 size={14} className="animate-spin" />
-              </motion.span>
+      <div className="flex shrink-0 items-center gap-3">
+        {/* Fixed-size slot, both icons stacked and cross-faded with CSS: no layout shift, no mount/unmount flicker */}
+        <span className="relative flex h-4 w-4 items-center justify-center" aria-hidden>
+          <Loader2
+            size={14}
+            className={cn(
+              "absolute text-white/45 transition-opacity duration-150",
+              isSaving ? "animate-spin opacity-100" : "opacity-0"
             )}
-            {!isSaving && isSaved && (
-              <motion.span
-                key="ok"
-                initial={{ opacity: 0, scale: 0.4 }}
-                animate={{ opacity: 1, scale: 1, transition: SPRING_KNOB }}
-                exit={{ opacity: 0, scale: 0.6, transition: { duration: 0.12 } }}
-                className="text-[#30d158]"
-              >
-                <CheckCircle size={14} />
-              </motion.span>
+          />
+          <Check
+            size={14}
+            strokeWidth={2.6}
+            className={cn(
+              "absolute text-[#30d158] transition-opacity duration-200",
+              !isSaving && isSaved ? "opacity-100" : "opacity-0"
             )}
-          </AnimatePresence>
+          />
         </span>
         {children}
       </div>
@@ -512,7 +483,6 @@ export function Toggle({
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      data-no-spring
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       onPointerDown={() => setPressed(true)}
@@ -520,15 +490,15 @@ export function Toggle({
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       className={cn(
-        "relative h-[26px] w-[44px] shrink-0 cursor-pointer rounded-full outline-none transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-white/40 disabled:cursor-not-allowed disabled:opacity-40",
-        checked ? "bg-[#30d158]" : "bg-white/[0.22]"
+        "relative h-[26px] w-[44px] shrink-0 cursor-pointer rounded-full outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/40 disabled:cursor-not-allowed disabled:opacity-40",
+        checked ? "bg-[#30d158]" : "bg-white/[0.2]"
       )}
     >
       <motion.span
         initial={false}
         animate={{ width: w, x: checked ? 44 - 4 - w : 0 }}
         transition={SPRING_KNOB}
-        className="absolute left-[2px] top-[2px] h-[22px] rounded-full bg-white shadow-[0_2px_5px_rgba(0,0,0,0.35)]"
+        className="absolute left-[2px] top-[2px] h-[22px] rounded-full bg-white shadow-[0_2px_5px_rgba(0,0,0,0.3)]"
       />
     </button>
   );
@@ -547,15 +517,15 @@ export function PopUp({
 }) {
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger className="h-7 w-auto min-w-[112px] gap-1.5 rounded-[8px] border-0 bg-white/10 px-2.5 text-[12.5px] font-semibold text-white shadow-none transition-colors hover:bg-white/[0.16] focus:ring-2 focus:ring-white/25">
+      <SelectTrigger className="h-8 w-auto min-w-[120px] gap-1.5 rounded-[9px] border-0 bg-white/[0.08] px-3 text-[13px] font-medium text-white shadow-none transition-colors hover:bg-white/[0.13] focus:ring-2 focus:ring-white/25">
         <SelectValue />
       </SelectTrigger>
-      <SelectContent className="z-[10000] rounded-xl border border-white/10 bg-[#2a2a2c]/95 text-white shadow-2xl backdrop-blur-xl">
+      <SelectContent className="z-[10000] rounded-xl border border-white/10 bg-[#2a2a2d] text-white shadow-2xl">
         {options.map((o) => (
           <SelectItem
             key={o.value}
             value={o.value}
-            className="rounded-lg text-[12.5px] font-medium focus:bg-white/10 focus:text-white"
+            className="rounded-lg text-[13px] font-medium focus:bg-white/10 focus:text-white"
           >
             {o.label}
           </SelectItem>
@@ -585,12 +555,12 @@ export function AppleSlider({
       max={max}
       onValueChange={([v]) => onValueChange(v)}
     >
-      <Slider.Track className="relative h-[4px] grow rounded-full bg-white/[0.18]">
+      <Slider.Track className="relative h-[4px] grow rounded-full bg-white/[0.16]">
         <Slider.Range className="absolute h-full rounded-full bg-brand" />
       </Slider.Track>
       <Slider.Thumb
         aria-label="Value"
-        className="block h-[18px] w-[18px] rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.5)] outline-none transition-transform duration-300 [transition-timing-function:var(--spring-snappy)] focus-visible:ring-2 focus-visible:ring-white/40 active:scale-125"
+        className="block h-[18px] w-[18px] rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.4)] outline-none transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-white/40 active:scale-110"
       />
     </Slider.Root>
   );
@@ -606,7 +576,7 @@ export function AppButton({
       type="button"
       {...props}
       className={cn(
-        "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-[8px] bg-white/10 px-3 text-[12px] font-semibold text-white/85 outline-none transition-colors hover:bg-white/[0.16] hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-40",
+        "inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[9px] bg-white/[0.08] px-3 text-[13px] font-medium text-white/85 outline-none transition-[background-color,color,transform] duration-150 hover:bg-white/[0.14] hover:text-white focus-visible:ring-2 focus-visible:ring-white/30 active:scale-[0.97] disabled:opacity-40",
         className
       )}
     >
@@ -617,7 +587,7 @@ export function AppButton({
 
 export function KeyCap({ children }: { children: ReactNode }) {
   return (
-    <kbd className="min-w-[26px] rounded-[6px] bg-white/10 px-2 py-1 text-center font-sans text-[11px] font-semibold text-white/90 ring-1 ring-inset ring-white/10">
+    <kbd className="min-w-[26px] rounded-[6px] bg-white/[0.08] px-2 py-1 text-center font-sans text-[11px] font-medium text-white/85">
       {children}
     </kbd>
   );

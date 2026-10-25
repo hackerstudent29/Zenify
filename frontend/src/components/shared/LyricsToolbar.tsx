@@ -18,7 +18,7 @@ const SFArrowDown = () => (<Svg size={14}><path d="M12 5v14M6 13l6 6 6-6" /></Sv
 const fmt = (ms: number) => `${ms > 0 ? "+" : ""}${(ms / 1000).toFixed(1)}s`;
 
 export interface LyricsToolbarProps {
-  /** bottom-centre on phones, top-right on PC / sidebar */
+  /** where the capsule floats (it is opaque, so lyrics are hidden behind it) */
   placement: "bottom" | "top-right";
   canTranslate: boolean;
   isRomanized: boolean;
@@ -34,7 +34,7 @@ export interface LyricsToolbarProps {
 /**
  * One frosted capsule instead of three loose pills:
  *   [ Original | Tanglish ] · [ ⏱ ]  (⏱ expands into  − +0.3s +  and folds back by itself)
- * No backdrop-filter on purpose — it would re-blur every frame while lyrics move underneath.
+ * Solid fill (no backdrop-filter): nothing shows through it, and nothing re-blurs while lyrics move.
  */
 export function LyricsToolbar(p: LyricsToolbarProps) {
   const uid = useId();
@@ -77,7 +77,7 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
             layout
             transition={{ layout: SPRING_SOFT }}
             style={{ borderRadius: 999 }}
-            className="flex items-center gap-1 border border-white/10 bg-black/40 p-[3px] shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+            className="flex items-center gap-1 border border-white/[0.12] bg-[#1d1d20] p-[3px] shadow-[0_10px_30px_rgba(0,0,0,0.55)]"
           >
             {/* Language */}
             {p.canTranslate && (
@@ -170,16 +170,16 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
 }
 
 /** "Back to now" pill — appears while the user is browsing lyrics manually. */
-export function LyricsSyncPill({ show, onSync }: { show: boolean; onSync: () => void }) {
+export function LyricsSyncPill({ show, onSync, position = "bottom" }: { show: boolean; onSync: () => void; position?: "top" | "bottom" }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-3 z-40 flex justify-center">
+    <div className={cn("pointer-events-none absolute inset-x-0 z-40 flex justify-center", position === "top" ? "top-2" : "bottom-3")}>
       <AnimatePresence>
         {show && (
           <motion.button
             type="button"
-            initial={{ opacity: 0, y: 18, scale: 0.88 }}
+            initial={{ opacity: 0, y: position === "top" ? -18 : 18, scale: 0.88 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.92 }}
+            exit={{ opacity: 0, y: position === "top" ? -12 : 12, scale: 0.92 }}
             transition={{ y: SPRING, scale: SPRING, opacity: { duration: 0.18 } }}
             whileTap={{ scale: 0.93 }}
             onPointerDown={(e) => e.stopPropagation()}

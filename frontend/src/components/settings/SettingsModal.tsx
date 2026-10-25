@@ -8,6 +8,7 @@ import { audioEngine } from "@/lib/audio-engine";
 import { useShortcutStore } from "@/store/shortcuts";
 import { useUIStore } from "@/store/ui";
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
+import { usePlayerPrefs } from "@/store/playerPrefs";
 import { applyAccentColor } from "@/lib/accent-colors";
 import {
   Volume2,
@@ -84,6 +85,8 @@ export function SettingsModal({
   const setReducedMotion = useUIStore((s) => s.setReducedMotion);
   const showToast = useUIStore((s) => s.showToast);
   const reactiveBgStore = useReactiveBgStore();
+  const autoHideDetails = usePlayerPrefs((s) => s.autoHideDetails);
+  const setAutoHideDetails = usePlayerPrefs((s) => s.setAutoHideDetails);
   const [activeSection, setActiveSection] = useState<SectionId>("audio");
 
   const [preferences, setPreferences] = useState({
@@ -324,6 +327,16 @@ export function SettingsModal({
             </Row>
             <Row label="Keep Playing" icon={Repeat} tint={TINT.green} description="Keep playing similar songs when your music ends" {...pref("autoplay")}>
               <Toggle label="Keep Playing" checked={preferences.autoplay} onCheckedChange={(v) => handleToggle("autoplay", v)} disabled={isSaving} />
+            </Row>
+            <Row label="Hide Details When Idle" icon={EyeOff} tint={TINT.purple} description="After 5 seconds without touching the player, hide controls to keep artwork, lyrics and progress visible">
+              <Toggle
+                label="Hide Details When Idle"
+                checked={autoHideDetails}
+                onCheckedChange={(v) => {
+                  setAutoHideDetails(v);
+                  showToast(v ? "Idle auto-hide enabled" : "Idle auto-hide disabled");
+                }}
+              />
             </Row>
           </Group>
         </Section>
