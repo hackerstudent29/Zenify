@@ -68,67 +68,73 @@ const SEED_ARTISTS_BY_GENRE: Record<string, string[]> = {
   'Indie / Alternative': ['Arctic Monkeys', 'The Neighbourhood', 'Lana Del Rey', 'Cigarettes After Sex', 'Pradeep Kumar']
 };
 
+import { KeyPoolService } from './key-pool.service.js';
+
+function isMultiArtist(name: string, query: string): boolean {
+  const qLower = query.toLowerCase();
+  const lower = name.toLowerCase();
+  const delimiters = [
+    ' & ', ' and ', ' feat ', ' feat. ', ' ft ', ' ft. ',
+    ' featuring ', ' x ', ' vs ', ' with ', ' / ', ', '
+  ];
+  for (const d of delimiters) {
+    if (lower.includes(d) && !qLower.includes(d.trim())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function normalizeArtistName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/^the\s+/, '')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export class PreferencesService {
   private static imageCache = new Map<string, string>();
 
   /**
-   * Resolve an image for an artist using Deezer / Spotify / iTunes / DB with memory caching
+   * Resolve an artist portrait image from Apple Music Official Developer API or Deezer
    */
   static async resolveArtistImage(artistName: string): Promise<string> {
     const key = artistName.toLowerCase().trim();
-    if (this.imageCache.has(key)) {
-      return this.imageCache.get(key)!;
-    }
+    if (this.imageCache.has(key)) return this.imageCache.get(key)!;
 
-    // 1. Check local DB Artist table
+    // 1. Primary: Apple Music Developer API
     try {
-      const dbArtist = await prisma.artist.findFirst({
-        where: { name: { equals: artistName, mode: 'insensitive' } },
-        select: { imageUrl: true, coverUrl: true }
+      await KeyPoolService.executeWithFailover('applemusic', async (amToken) => {
+        const searchRes = await axios.get('https://amp-api.music.apple.com/v1/catalog/in/search', {
+          headers: { Authorization: `Bearer ${amToken}`, Origin: 'https://music.apple.com' },
+          params: { term: artistName, types: 'artists', limit: 3 },
+          timeout: 4500
+        });
+        const items = searchRes.data.results?.artists?.data || [];
+        const normTarget = normalizeArtistName(artistName);
+        const match = items.find((a: any) => normalizeArtistName(a.attributes?.name || '') === normTarget && a.attributes?.artwork?.url) || items[0];
+        const rawArt = match?.attributes?.artwork?.url;
+        if (rawArt) {
+          const url = rawArt.replace('{w}x{h}', '600x600').replace('{f}', 'jpg');
+          this.imageCache.set(key, url);
+        }
       });
-      if (dbArtist?.imageUrl || dbArtist?.coverUrl) {
-        const url = (dbArtist.imageUrl || dbArtist.coverUrl)!;
-        this.imageCache.set(key, url);
-        return url;
-      }
+      if (this.imageCache.has(key)) return this.imageCache.get(key)!;
     } catch {}
 
-    // 2. Fast Deezer lookup (Free, zero auth) - Filter for real pictures and sort by fan count
+    // 2. Fallback: Deezer artist portrait (strictly filter out generic placeholders)
     try {
-      const normName = artistName.replace(/\s+/g, '').toLowerCase();
-      const dzRes = await axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}`, {
+      const dzRes = await axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}&limit=5`, {
         timeout: 3500
       });
       const validCandidates = (dzRes.data?.data || []).filter((a: any) => {
-        const aNorm = (a.name || '').replace(/\s+/g, '').toLowerCase();
-        const pic = a.picture_big || a.picture_medium || '';
-        const hasRealPic = pic && !pic.includes('artist//');
-        return (aNorm.includes(normName) || normName.includes(aNorm)) && hasRealPic;
-      });
-      validCandidates.sort((a: any, b: any) => (b.nb_fan || 0) - (a.nb_fan || 0));
-      const match = validCandidates[0] || (dzRes.data?.data || []).find((a: any) => {
         const pic = a.picture_big || a.picture_medium || '';
         return pic && !pic.includes('artist//');
       });
-
-      if (match?.picture_xl || match?.picture_big || match?.picture_medium) {
-        const url = match.picture_xl || match.picture_big || match.picture_medium;
-        this.imageCache.set(key, url);
-        return url;
-      }
-    } catch {}
-
-    // 3. iTunes fallback
-    try {
-      const songRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=song&limit=5`, {
-        timeout: 3000
-      });
-      const songs = songRes.data?.results || [];
-      const matchSong = songs.find((s: any) => 
-        (s.artistName || '').toLowerCase().includes(artistName.toLowerCase())
-      ) || songs[0];
-      if (matchSong?.artworkUrl100) {
-        const url = matchSong.artworkUrl100.replace('100x100bb', '600x600bb');
+      if (validCandidates[0]) {
+        const url = validCandidates[0].picture_xl || validCandidates[0].picture_big || validCandidates[0].picture_medium;
         this.imageCache.set(key, url);
         return url;
       }
@@ -140,96 +146,139 @@ export class PreferencesService {
   }
 
   /**
-   * Search artists across local database and external music APIs (Spotify / Deezer / iTunes)
+   * Search artists across Apple Music Official Developer API with multi-artist filtering and deduplication
    */
   static async searchArtists(query: string, limit: number = 10): Promise<ArtistSummary[]> {
     if (!query || query.trim().length === 0) return [];
     const cleanQ = query.trim();
     const results: ArtistSummary[] = [];
-    const seenNames = new Set<string>();
+    const seenNorm = new Set<string>();
 
-    // 1. Search DB Artist table
+    // 1. Primary: Apple Music Official Catalog API
     try {
-      const dbMatches = await prisma.artist.findMany({
-        where: {
-          name: { contains: cleanQ, mode: 'insensitive' }
-        },
-        orderBy: { monthlyListeners: 'desc' },
-        take: limit,
-        select: { id: true, name: true, imageUrl: true, coverUrl: true }
-      });
+      await KeyPoolService.executeWithFailover('applemusic', async (amToken) => {
+        const storefronts = ['in', 'us'];
+        for (const sf of storefronts) {
+          if (results.length >= limit) break;
+          const searchRes = await axios.get(`https://amp-api.music.apple.com/v1/catalog/${sf}/search`, {
+            headers: { Authorization: `Bearer ${amToken}`, Origin: 'https://music.apple.com' },
+            params: { term: cleanQ, types: 'artists', limit: Math.max(15, limit * 2) },
+            timeout: 5000
+          });
+          const items = searchRes.data.results?.artists?.data || [];
+          for (const item of items) {
+            const name = item.attributes?.name;
+            if (!name || isMultiArtist(name, cleanQ)) continue;
+            const norm = normalizeArtistName(name);
+            if (seenNorm.has(norm)) continue;
 
-      for (const a of dbMatches) {
-        seenNames.add(a.name.toLowerCase());
-        results.push({
-          id: a.id,
-          name: a.name,
-          image: a.imageUrl || a.coverUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(a.name)}&background=18181b&color=e11d48&size=300`,
-          source: 'local'
-        });
-      }
-    } catch (err: any) {
-      console.warn('[PreferencesService] DB artist search failed:', err.message);
+            const rawArt = item.attributes?.artwork?.url;
+            if (!rawArt) continue; // Require authentic official artwork
+
+            seenNorm.add(norm);
+            results.push({
+              id: `am-${item.id}`,
+              name,
+              image: rawArt.replace('{w}x{h}', '600x600').replace('{f}', 'jpg'),
+              source: 'apple_music'
+            });
+            if (results.length >= limit) break;
+          }
+        }
+      });
+    } catch (amErr: any) {
+      console.warn('[PreferencesService] Apple Music search failed:', amErr.message);
     }
 
-    // 2. Query Spotify RapidAPI if key is available
+    // 2. Fallback: Free Deezer Artist Search (filter out combined artist strings)
+    if (results.length < limit) {
+      try {
+        const dzRes = await axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(cleanQ)}&limit=15`, {
+          timeout: 4000
+        });
+        const items = dzRes.data?.data || [];
+        for (const item of items) {
+          if (!item.name || isMultiArtist(item.name, cleanQ)) continue;
+          const norm = normalizeArtistName(item.name);
+          if (seenNorm.has(norm)) continue;
+          const pic = item.picture_big || item.picture_medium || item.picture;
+          if (!pic || pic.includes('artist//')) continue;
+
+          seenNorm.add(norm);
+          results.push({
+            id: `dz-${item.id}`,
+            name: item.name,
+            image: pic,
+            source: 'deezer'
+          });
+          if (results.length >= limit) break;
+        }
+      } catch (dzErr: any) {
+        console.warn('[PreferencesService] Deezer search fallback failed:', dzErr.message);
+      }
+    }
+
+    // 3. Fallback: Spotify RapidAPI if available
     if (results.length < limit) {
       try {
         const spotifyKey = await SystemSettingsService.getSpotifyApiKey();
         if (spotifyKey) {
           const sRes = await axios.get('https://spotify23.p.rapidapi.com/search/', {
-            params: { q: cleanQ, type: 'artists', limit: 8 },
+            params: { q: cleanQ, type: 'artists', limit: 10 },
             headers: { 'x-rapidapi-key': spotifyKey, 'x-rapidapi-host': 'spotify23.p.rapidapi.com' },
             timeout: 4000
           });
-
           const items = sRes.data?.artists?.items || sRes.data?.results || [];
           for (const item of items) {
             const artistData = item.data || item;
             const name = artistData.profile?.name || artistData.name;
-            if (name && !seenNames.has(name.toLowerCase())) {
-              seenNames.add(name.toLowerCase());
-              const avatar = artistData.visuals?.avatarImage?.sources?.[0]?.url ||
-                             artistData.images?.[0]?.url ||
-                             `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=18181b&color=e11d48&size=300`;
+            if (!name || isMultiArtist(name, cleanQ)) continue;
+            const norm = normalizeArtistName(name);
+            if (seenNorm.has(norm)) continue;
+            const avatar = artistData.visuals?.avatarImage?.sources?.[0]?.url || artistData.images?.[0]?.url;
+            if (!avatar) continue;
 
-              results.push({
-                id: `sp-${artistData.id || name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-                name,
-                image: avatar,
-                source: 'spotify'
-              });
-              if (results.length >= limit) break;
-            }
-          }
-        }
-      } catch (e: any) {
-        // Spotify failed, continue to Deezer fallback
-      }
-    }
-
-    // 3. Free Deezer Artist Search Fallback
-    if (results.length < limit) {
-      try {
-        const dzRes = await axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(cleanQ)}&limit=10`, {
-          timeout: 4000
-        });
-        const items = dzRes.data?.data || [];
-        for (const item of items) {
-          if (item.name && !seenNames.has(item.name.toLowerCase())) {
-            seenNames.add(item.name.toLowerCase());
+            seenNorm.add(norm);
             results.push({
-              id: `dz-${item.id}`,
-              name: item.name,
-              image: item.picture_big || item.picture_medium || item.picture || '',
-              source: 'deezer'
+              id: `sp-${artistData.id || norm.replace(/\s+/g, '-')}`,
+              name,
+              image: avatar,
+              source: 'spotify'
             });
             if (results.length >= limit) break;
           }
         }
-      } catch (dzErr: any) {
-        console.warn('[PreferencesService] Deezer search fallback failed:', dzErr.message);
-      }
+      } catch {}
+    }
+
+    // 4. Fallback: Local database artists (strictly clean single artists with real images)
+    if (results.length < limit) {
+      try {
+        const dbMatches = await prisma.artist.findMany({
+          where: {
+            name: { contains: cleanQ, mode: 'insensitive' }
+          },
+          orderBy: { monthlyListeners: 'desc' },
+          take: limit * 2,
+          select: { id: true, name: true, imageUrl: true, coverUrl: true }
+        });
+        for (const a of dbMatches) {
+          if (!a.name || isMultiArtist(a.name, cleanQ)) continue;
+          const norm = normalizeArtistName(a.name);
+          if (seenNorm.has(norm)) continue;
+          const pic = a.imageUrl || a.coverUrl;
+          if (!pic || pic.includes('ui-avatars.com')) continue;
+
+          seenNorm.add(norm);
+          results.push({
+            id: a.id,
+            name: a.name,
+            image: pic,
+            source: 'local'
+          });
+          if (results.length >= limit) break;
+        }
+      } catch {}
     }
 
     return results.slice(0, limit);
