@@ -12,12 +12,14 @@ const api = axios.create({
   withCredentials: true, // Important for cookies
 });
 
-// Debug Logger
+// Debug Logger (Dev only)
 api.interceptors.request.use((config) => {
   if (config.baseURL?.endsWith('/') && config.url?.startsWith('/')) {
     config.url = config.url.substring(1);
   }
-  console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+  if (import.meta.env.DEV) {
+    console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+  }
   return config;
 });
 

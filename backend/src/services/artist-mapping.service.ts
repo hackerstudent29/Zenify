@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { prisma } from '../utils/prisma';
 import { normalizeArtistName as localNormalize } from '../utils/artist';
+import { generateObject } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { z } from 'zod';
 
 interface ArtistMatchResult {
     match: boolean;
@@ -16,263 +19,304 @@ export interface ResolvedArtist {
     featuredNames?: string[];
 }
 
+const KNOWN_HONORIFICS = [
+    'thenisai thendral',
+    'isaignani',
+    'isai puyal',
+    'padmashri',
+    'padma shri',
+    'padma bhushan',
+    'padma vibhushan',
+    'dr.',
+    'dr ',
+    'maestro',
+    'sir',
+    'kalaimamani',
+    'mellisae mannar',
+    'isai murasu',
+    'nadhaswara chakravarthi',
+    'isai arasi'
+];
+
+export function stripHonorifics(name: string): string {
+    let cleaned = name;
+    for (const h of KNOWN_HONORIFICS) {
+        const reg = new RegExp(`\\b${h.replace('.', '\\.')}\\b`, 'gi');
+        cleaned = cleaned.replace(reg, '');
+    }
+    return cleaned.replace(/\s+/g, ' ').trim();
+}
+
+function normalizeKey(str: string): string {
+    return str
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 export class ArtistMappingService {
     private static cache = new Map<string, ArtistMatchResult>();
     private static resolveLocks = new Map<string, Promise<ResolvedArtist>>();
     private static NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
 
     /**
-     * Resolves an artist name to an existing Artist ID or provides a normalized new name.
+     * Resolves an artist name using Section D 5-step canonicalization pipeline:
+     * 1. Normalize (lowercase, strip diacritics and punctuation).
+     * 2. Alias table lookup (artist_aliases).
+     * 3. Strip known honorific/epithet list (e.g. "Thenisai Thendral Deva" -> "Deva") and retry.
+     * 4. Catalog search (iTunes Search API musicArtist) plus fuzzy match.
+     * 5. LLM fallback using Vercel AI SDK generateObject (NVIDIA NIM). Confidence >= 0.85 accepts, else 'needs_review'.
      */
-    static async resolveArtist(rawName: string): Promise<ResolvedArtist> {
-        // Pre-clean: Remove record label names and common YouTube channel junk
+    static async resolveArtist(rawName: string, trackContext?: { album?: string; title?: string }): Promise<ResolvedArtist> {
         let cleaned = rawName
-            .replace(/\b(sonymusicsouth|sony music south|sony music|t-series|think music|aditya music|saregama|zee music company|lahari music|speed records|tips official|ypyp|yt music)\b/gi, "")
-            .replace(/\s*-\s*Topic\s*$/i, "")
-            .replace(/\s*Topic\s*$/i, "")
-            .replace(/\bOfficial\b/gi, "")
-            .replace(/\bMusic Video\b/gi, "")
+            .replace(/\b(sonymusicsouth|sony music south|sony music|t-series|think music|aditya music|saregama|zee music company|lahari music|speed records|tips official|ypyp|yt music)\b/gi, '')
+            .replace(/\s*-\s*Topic\s*$/i, '')
+            .replace(/\s*Topic\s*$/i, '')
+            .replace(/\bOfficial\b/gi, '')
+            .replace(/\bMusic Video\b/gi, '')
             .trim();
 
-        if (!cleaned) cleaned = "Various Artists";
+        if (!cleaned) cleaned = 'Various Artists';
 
         const normalizedInput = localNormalize(cleaned);
-        const cacheKey = normalizedInput.toLowerCase().trim();
+        const normKey = normalizeKey(normalizedInput);
 
-        if (this.cache.has(cacheKey)) {
-            console.log(`[ArtistMapping] Cache hit for "${normalizedInput}"`);
-            const cached = this.cache.get(cacheKey)!;
+        if (this.cache.has(normKey)) {
+            const cached = this.cache.get(normKey)!;
             return { id: cached.artistId, name: cached.suggestedName, featuredNames: cached.featuredArtists };
         }
 
-        // Apply mutex lock for concurrent requests resolving the exact same artist spelling
-        if (this.resolveLocks.has(cacheKey)) {
-            console.log(`[ArtistMapping] Waiting for active lock to resolve: ${cacheKey}`);
-            return await this.resolveLocks.get(cacheKey)!;
+        if (this.resolveLocks.has(normKey)) {
+            return await this.resolveLocks.get(normKey)!;
         }
 
         let lockResolver!: (result: ResolvedArtist) => void;
-        this.resolveLocks.set(cacheKey, new Promise(resolve => lockResolver = resolve));
+        this.resolveLocks.set(normKey, new Promise((resolve) => (lockResolver = resolve)));
 
         try {
-            const result = await this._resolveArtistInternal(normalizedInput, cacheKey);
+            const result = await this._pipelineResolve(normalizedInput, normKey, trackContext);
             lockResolver(result);
             return result;
         } catch (err) {
             lockResolver({ name: normalizedInput });
             throw err;
         } finally {
-            this.resolveLocks.delete(cacheKey);
+            this.resolveLocks.delete(normKey);
         }
     }
 
-    private static getLevenshteinDistance(a: string, b: string): number {
-        const matrix: number[][] = [];
+    private static async _pipelineResolve(
+        rawName: string,
+        normKey: string,
+        trackContext?: { album?: string; title?: string }
+    ): Promise<ResolvedArtist> {
+        // STEP 1 & 2: Normalize and Alias Table Lookup
+        try {
+            const aliasEntry = await (prisma as any).artistAlias.findUnique({
+                where: { aliasNormalized: normKey },
+                include: { artist: true },
+            });
 
-        for (let i = 0; i <= b.length; i++) {
-            matrix[i] = [i];
-        }
-
-        for (let j = 0; j <= a.length; j++) {
-            matrix[0][j] = j;
-        }
-
-        for (let i = 1; i <= b.length; i++) {
-            for (let j = 1; j <= a.length; j++) {
-                if (b.charAt(i - 1) === a.charAt(j - 1)) {
-                    matrix[i][j] = matrix[i - 1][j - 1];
-                } else {
-                    matrix[i][j] = Math.min(
-                        matrix[i - 1][j - 1] + 1, // substitution
-                        matrix[i][j - 1] + 1,     // insertion
-                        matrix[i - 1][j] + 1      // deletion
-                    );
-                }
+            if (aliasEntry && aliasEntry.artist && aliasEntry.status === 'ok') {
+                this.cache.set(normKey, {
+                    match: true,
+                    artistId: aliasEntry.artist.id,
+                    suggestedName: aliasEntry.artist.name,
+                    featuredArtists: [],
+                    confidence: aliasEntry.confidence,
+                });
+                return { id: aliasEntry.artist.id, name: aliasEntry.artist.name };
             }
+        } catch (err: any) {
+            console.warn('[ArtistMapping] Alias table lookup failed or not yet seeded:', err.message);
         }
 
-        return matrix[b.length][a.length];
-    }
-
-    private static async _resolveArtistInternal(normalizedInput: string, cacheKey: string): Promise<ResolvedArtist> {
-
-        console.log(`[ArtistMapping] Resolving "${normalizedInput}" using AI...`);
-
-        // 1. Check exact match first (Case-Insensitive)
+        // Exact DB Match Check
         const exactMatch = await prisma.artist.findFirst({
             where: {
-                name: {
-                    equals: normalizedInput,
-                    mode: 'insensitive' // Prevents "gengee" vs "GenGee" creating duplicates
-                }
-            }
+                name: { equals: rawName, mode: 'insensitive' },
+            },
         });
 
         if (exactMatch) {
-            console.log(`[ArtistMapping] Exact/Case-Insensitive match found in DB for "${normalizedInput}"`);
-            this.cache.set(cacheKey, { match: true, artistId: exactMatch.id, suggestedName: exactMatch.name, featuredArtists: [], confidence: 1 });
+            this.cache.set(normKey, {
+                match: true,
+                artistId: exactMatch.id,
+                suggestedName: exactMatch.name,
+                featuredArtists: [],
+                confidence: 1.0,
+            });
+            await this._saveAlias(normKey, exactMatch.id, 'exact_db', 1.0, 'ok');
             return { id: exactMatch.id, name: exactMatch.name };
         }
 
-        // Fetch up to 2000 existing artists to perform Levenshtein and substring checks locally
-        const existingArtists = await prisma.artist.findMany({
-            select: { id: true, name: true },
-            take: 2000,
-            orderBy: { totalStreams: 'desc' }
-        });
+        // STEP 3: Strip Known Honorific/Epithet List and Retry
+        const stripped = stripHonorifics(rawName);
+        if (stripped && stripped.toLowerCase() !== rawName.toLowerCase()) {
+            const strippedKey = normalizeKey(stripped);
 
-        // 1.5. Levenshtein check to resolve spelling typos (e.g. "Sai Abhyankkar" vs "Sai Abhyankar")
-        let bestFuzzyMatch: { id: string; name: string } | null = null;
-        let minDistance = Infinity;
-
-        const cleanString = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const cleanInput = cleanString(normalizedInput);
-
-        for (const existing of existingArtists) {
-            const cleanExisting = cleanString(existing.name);
-            if (cleanExisting === cleanInput) {
-                // Alphanumeric case-insensitive match (e.g., periods/spaces stripped)
-                bestFuzzyMatch = existing;
-                minDistance = 0;
-                break;
-            }
-
-            const distance = this.getLevenshteinDistance(cleanInput, cleanExisting);
-            const maxLength = Math.max(cleanInput.length, cleanExisting.length);
-            const maxAllowedDistance = maxLength <= 5 ? 1 : 2;
-
-            if (distance <= maxAllowedDistance && distance < minDistance) {
-                minDistance = distance;
-                bestFuzzyMatch = existing;
-            }
-        }
-
-        if (bestFuzzyMatch && minDistance <= 2) {
-            console.log(`[ArtistMapping] Levenshtein similarity match found: "${normalizedInput}" mapped to existing "${bestFuzzyMatch.name}" (distance: ${minDistance})`);
-            this.cache.set(cacheKey, {
-                match: true,
-                artistId: bestFuzzyMatch.id,
-                suggestedName: bestFuzzyMatch.name,
-                featuredArtists: [],
-                confidence: 0.95 - (minDistance * 0.05)
-            });
-            return { id: bestFuzzyMatch.id, name: bestFuzzyMatch.name };
-        }
-
-        // 2. Fuzzy/Substring Fallback Match (Before AI)
-        // If the new name is a substring of an existing name, or vice versa (e.g. "Anirudh" and "Anirudh Ravichander")
-        for (const existing of existingArtists) {
-            const existingNameLower = existing.name.toLowerCase();
-            const newNameLower = normalizedInput.toLowerCase();
-            
-            // If one is a direct substring of the other (with a reasonable length to avoid false positives)
-            if (
-                (existingNameLower.includes(newNameLower) && newNameLower.length >= 4) ||
-                (newNameLower.includes(existingNameLower) && existingNameLower.length >= 4)
-            ) {
-                console.log(`[ArtistMapping] Substring match found: "${normalizedInput}" matched with existing "${existing.name}"`);
-                // Use the longer, more descriptive name for the DB if we matched
-                const bestName = existing.name.length >= normalizedInput.length ? existing.name : normalizedInput;
-                this.cache.set(cacheKey, { match: true, artistId: existing.id, suggestedName: bestName, featuredArtists: [], confidence: 0.9 });
-                return { id: existing.id, name: bestName };
-            }
-        }
-
-        const artistListStr = existingArtists.map(a => `${a.name} (id:${a.id})`).join(', ');
-
-        try {
-            const matchResult = await this.queryNvidiaAI(normalizedInput, artistListStr);
-            
-            // If AI tries to return a slightly differently cased existing name, enforce case-matching
-            if (!matchResult.artistId) {
-                const aiCaseMatch = await prisma.artist.findFirst({
-                    where: { name: { equals: matchResult.suggestedName, mode: 'insensitive' } }
+            // Check if stripped matches alias table
+            try {
+                const strippedAlias = await (prisma as any).artistAlias.findUnique({
+                    where: { aliasNormalized: strippedKey },
+                    include: { artist: true },
                 });
-                if (aiCaseMatch) {
-                    matchResult.artistId = aiCaseMatch.id;
-                    matchResult.suggestedName = aiCaseMatch.name;
-                    matchResult.match = true;
+                if (strippedAlias && strippedAlias.artist) {
+                    await this._saveAlias(normKey, strippedAlias.artist.id, 'strip_title', 0.95, 'ok');
+                    return { id: strippedAlias.artist.id, name: strippedAlias.artist.name };
+                }
+            } catch {}
+
+            // Check if stripped matches an existing DB artist
+            const strippedMatch = await prisma.artist.findFirst({
+                where: { name: { equals: stripped, mode: 'insensitive' } },
+            });
+
+            if (strippedMatch) {
+                console.log(`[ArtistMapping] Honorific stripped: "${rawName}" -> "${strippedMatch.name}"`);
+                await this._saveAlias(normKey, strippedMatch.id, 'strip_title', 0.95, 'ok');
+                this.cache.set(normKey, {
+                    match: true,
+                    artistId: strippedMatch.id,
+                    suggestedName: strippedMatch.name,
+                    featuredArtists: [],
+                    confidence: 0.95,
+                });
+                return { id: strippedMatch.id, name: strippedMatch.name };
+            }
+        }
+
+        // STEP 4: Catalog Search (iTunes Search API musicArtist) + Token Subset Matching
+        const catalogQuery = stripped || rawName;
+        try {
+            const itunesRes = await axios.get(
+                `https://itunes.apple.com/search?term=${encodeURIComponent(catalogQuery)}&entity=musicArtist&limit=5`,
+                { timeout: 4000 }
+            );
+            const candidates = itunesRes.data?.results || [];
+            for (const cand of candidates) {
+                const candName = cand.artistName;
+                if (!candName) continue;
+
+                const candKey = normalizeKey(candName);
+                const queryTokens = normKey.split(' ');
+                const candTokens = candKey.split(' ');
+
+                // Accept when candidate tokens are a subset of credited name
+                const isSubset = candTokens.every((tok) => queryTokens.includes(tok));
+                if (isSubset || candKey === stripped.toLowerCase()) {
+                    // Check if existing in DB or create/update
+                    let artist = await prisma.artist.findFirst({
+                        where: { name: { equals: candName, mode: 'insensitive' } },
+                    });
+
+                    if (!artist) {
+                        artist = await prisma.artist.create({
+                            data: {
+                                name: candName,
+                                bio: `Artist verified via Catalog Search (${cand.primaryGenreName || 'Music'})`,
+                            },
+                        });
+                    }
+
+                    console.log(`[ArtistMapping] Catalog matched: "${rawName}" -> "${artist.name}"`);
+                    await this._saveAlias(normKey, artist.id, 'catalog', 0.9, 'ok');
+                    this.cache.set(normKey, {
+                        match: true,
+                        artistId: artist.id,
+                        suggestedName: artist.name,
+                        featuredArtists: [],
+                        confidence: 0.9,
+                    });
+                    return { id: artist.id, name: artist.name };
                 }
             }
-
-            this.cache.set(cacheKey, matchResult);
-
-            if (matchResult.match && matchResult.artistId) {
-                console.log(`[ArtistMapping] AI matched "${normalizedInput}" -> Existing: "${matchResult.suggestedName}" (${matchResult.confidence * 100}%)`);
-                return { id: matchResult.artistId, name: matchResult.suggestedName, featuredNames: matchResult.featuredArtists };
-            } else {
-                console.log(`[ArtistMapping] AI suggested new artist: "${matchResult.suggestedName}"`);
-                return { name: matchResult.suggestedName, featuredNames: matchResult.featuredArtists };
-            }
-        } catch (err: any) {
-            console.error(`[ArtistMapping] AI resolving failed:`, err.message);
-            // Fallback to local normalization
-            return { name: normalizedInput };
+        } catch (catErr: any) {
+            console.warn('[ArtistMapping] Catalog lookup error:', catErr.message);
         }
+
+        // STEP 5: LLM Fallback (Vercel AI SDK generateObject + NVIDIA NIM)
+        if (this.NVIDIA_API_KEY) {
+            try {
+                const existingArtists = await prisma.artist.findMany({
+                    select: { id: true, name: true },
+                    take: 50,
+                    orderBy: { totalStreams: 'desc' },
+                });
+
+                const nim = createOpenAI({
+                    baseURL: 'https://integrate.api.nvidia.com/v1',
+                    apiKey: this.NVIDIA_API_KEY,
+                });
+
+                const ctx = trackContext ? `Track: "${trackContext.title || ''}", Album: "${trackContext.album || ''}"` : '';
+
+                const { object } = await generateObject({
+                    model: nim('meta/llama-3.1-70b-instruct'),
+                    schema: z.object({
+                        artistId: z.string().nullable(),
+                        canonicalName: z.string().nullable(),
+                        confidence: z.number().min(0).max(1),
+                    }),
+                    prompt:
+                        `Credited name: "${rawName}"\n` +
+                        `Song context: ${ctx}\n` +
+                        `Candidates: ${JSON.stringify(existingArtists.map((a) => ({ id: a.id, name: a.name })))}\n` +
+                        `Credited names may include honorific titles or epithets (e.g. "Thenisai Thendral Deva" is the music director "Deva"). ` +
+                        `Pick the candidate that is the same person, or specify their real canonical name. Never guess.`,
+                });
+
+                if (object.confidence >= 0.85 && (object.artistId || object.canonicalName)) {
+                    let artistId = object.artistId;
+                    let canonicalName = object.canonicalName || rawName;
+
+                    if (!artistId && object.canonicalName) {
+                        const matched = await prisma.artist.findFirst({
+                            where: { name: { equals: object.canonicalName, mode: 'insensitive' } },
+                        });
+                        if (matched) {
+                            artistId = matched.id;
+                            canonicalName = matched.name;
+                        }
+                    }
+
+                    if (artistId) {
+                        console.log(`[ArtistMapping] LLM matched with high confidence (${object.confidence}): "${rawName}" -> "${canonicalName}"`);
+                        await this._saveAlias(normKey, artistId, 'llm', object.confidence, 'ok');
+                        return { id: artistId, name: canonicalName };
+                    }
+                } else if (object.confidence < 0.85) {
+                    console.log(`[ArtistMapping] LLM low confidence (${object.confidence}) for "${rawName}". Flagging for Admin Review.`);
+                    await this._saveAlias(normKey, null, 'llm', object.confidence, 'needs_review');
+                }
+            } catch (llmErr: any) {
+                console.warn('[ArtistMapping] LLM fallback error:', llmErr.message);
+            }
+        }
+
+        // Final Default: Use normalized stripped name or raw name
+        const displayName = stripped || rawName;
+        return { name: displayName };
     }
 
-    /**
-     * Use NVIDIA AI to match artist names.
-     */
-    private static async queryNvidiaAI(newName: string, existingList: string): Promise<ArtistMatchResult> {
-        if (!this.NVIDIA_API_KEY) {
-            throw new Error("NVIDIA_API_KEY not configured");
-        }
-
-        const prompt = `
-        Task: Intelligent Artist Name Mapping and Deduplication.
-        Incoming Name: "${newName}"
-        
-        Existing Artists: [${existingList}]
-        
-        Instructions:
-        1. Compare the Incoming Name against the Existing Artists.
-        2. MANDATORY DEDUPLICATION: Treat variations of the same name as the EXACT SAME artist. For example:
-           - "Anirudh" and "Anirudh Ravichander" are the same artist.
-           - "The Weeknd" and "Weeknd" are the same artist.
-           - "A.R. Rahman" and "AR Rahman" are the same artist.
-           If the incoming name is a variation of an existing artist, you MUST return that existing artist's ID and name!
-        3. MANDATORY: If the incoming name contains multiple distinct artists (e.g., "A & B", "A, B & C", "A feat. B"), identify the PRIMARY artist and list all OTHER distinct artists as "featuredArtists".
-        4. PRIMARY ARTIST is usually the first name mentioned.
-        5. Clean names of junk like " - Topic", "YouTube", "Official", etc.
-        6. Respond ONLY in JSON:
-        {
-          "match": boolean, // true if primary artist matches an existing artist
-          "artistId": string | null, // The ID of the existing artist, if found
-          "suggestedName": "Primary Artist Name Only",
-          "featuredArtists": ["Featured Artist 1", "Featured Artist 2"],
-          "confidence": number // 0.0 to 1.0
-        }
-        `;
-
-
-        const res = await axios.post(
-            'https://integrate.api.nvidia.com/v1/chat/completions',
-            {
-                model: "nvidia/nemotron-3.5-bolt-e4b",
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.1,
-                max_tokens: 300
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${this.NVIDIA_API_KEY}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-
+    private static async _saveAlias(
+        aliasNormalized: string,
+        artistId: string | null,
+        source: string,
+        confidence: number,
+        status: 'ok' | 'needs_review'
+    ): Promise<void> {
         try {
-            const content = JSON.parse(res.data.choices[0].message.content);
-            return {
-                match: !!content.match,
-                artistId: content.artistId || undefined,
-                suggestedName: content.suggestedName || newName,
-                featuredArtists: content.featuredArtists || [],
-                confidence: content.confidence || 0
-            };
-        } catch (err) {
-            throw new Error("Failed to parse AI response as JSON");
+            await (prisma as any).artistAlias.upsert({
+                where: { aliasNormalized },
+                update: { artistId, source, confidence, status },
+                create: { aliasNormalized, artistId, source, confidence, status },
+            });
+        } catch (err: any) {
+            console.warn(`[ArtistMapping] Could not save alias "${aliasNormalized}":`, err.message);
         }
     }
 }

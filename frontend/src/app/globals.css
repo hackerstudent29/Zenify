@@ -860,3 +860,184 @@ input[type="submit"]:active:not(:disabled) {
   transform: scale(0.96) !important;
   transition: transform 0.07s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
+
+/* ── Apple-Style Typography & Font Scale ─────────────────────────────────── */
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+             "Inter", "Segoe UI", Roboto, system-ui, sans-serif;
+  --text-1: rgba(255,255,255,.96);
+  --text-2: rgba(255,255,255,.62);
+  --text-3: rgba(255,255,255,.45);
+
+  /* Fallback spring tokens */
+  --spring-snappy: cubic-bezier(.2, .9, .3, 1.08);   --spring-snappy-d: 430ms;
+  --spring-smooth: cubic-bezier(.22, 1, .36, 1);     --spring-smooth-d: 530ms;
+  --spring-bouncy: cubic-bezier(.3, 1.4, .5, 1);     --spring-bouncy-d: 860ms;
+  --spring-gentle: cubic-bezier(.25, 1, .4, 1);      --spring-gentle-d: 730ms;
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    /* stiffness 420, damping 32: buttons, toggles, presses */
+    --spring-snappy: linear(0, 0.0217, 0.0774, 0.1547, 0.2442, 0.3387, 0.4328, 0.5228, 0.6061, 0.6814, 0.7477, 0.8051, 0.8538, 0.8942, 0.9272, 0.9536, 0.9742, 0.9898, 1.0013, 1.0094, 1.0148, 1.0179, 1.0194, 1.0197, 1.0191, 1.0179, 1.0163, 1.0145, 1.0126, 1.0107, 1.009, 1.0074, 1.006, 1.0047, 1.0036, 1.0027, 1.0019, 1.0013, 1.0008, 1.0004, 1);
+    /* stiffness 170, damping 26: menus, overlays, lyrics line changes */
+    --spring-smooth: linear(0, 0.0134, 0.0477, 0.0961, 0.1532, 0.215, 0.2786, 0.3419, 0.4033, 0.4619, 0.5169, 0.5681, 0.6153, 0.6584, 0.6976, 0.733, 0.7648, 0.7932, 0.8186, 0.8411, 0.8611, 0.8788, 0.8944, 0.908, 0.9201, 0.9306, 0.9398, 0.9479, 0.9549, 0.961, 0.9663, 0.9709, 0.9749, 0.9784, 0.9814, 0.984, 0.9862, 0.9881, 0.9898, 0.9913, 1);
+    /* stiffness 260, damping 16: playful pops (like button, add to playlist) */
+    --spring-bouncy: linear(0, 0.0535, 0.1872, 0.3642, 0.5539, 0.7333, 0.8874, 1.008, 1.0925, 1.1431, 1.1644, 1.1628, 1.1452, 1.1181, 1.0869, 1.056, 1.0285, 1.0061, 0.9896, 0.979, 0.9736, 0.9725, 0.9744, 0.9784, 0.9834, 0.9887, 0.9935, 0.9976, 1.0007, 1.0029, 1.0041, 1.0046, 1.0044, 1.0039, 1.0031, 1.0022, 1.0014, 1.0007, 1.0001, 0.9996, 1);
+    /* stiffness 120, damping 22: large surfaces, full-view player, sheets */
+    --spring-gentle: linear(0, 0.0175, 0.0616, 0.1219, 0.1912, 0.2642, 0.3374, 0.4082, 0.4751, 0.5372, 0.594, 0.6454, 0.6916, 0.7326, 0.7689, 0.8009, 0.8288, 0.8532, 0.8743, 0.8926, 0.9084, 0.922, 0.9337, 0.9437, 0.9523, 0.9596, 0.9658, 0.9711, 0.9756, 0.9794, 0.9826, 0.9854, 0.9877, 0.9897, 0.9913, 0.9927, 0.9939, 0.9949, 0.9957, 0.9964, 1);
+  }
+}
+
+.t-hero     { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 700; letter-spacing: -0.022em; line-height: 1.05; }
+.t-section  { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.02em; }
+.t-song     { font-size: .9375rem; font-weight: 600; letter-spacing: -0.01em; color: var(--text-1); }
+.t-artist   { font-size: .8125rem; font-weight: 500; color: var(--text-2); }
+.t-album    { font-size: .8125rem; font-weight: 400; color: var(--text-3); }
+.t-nav      { font-size: .9375rem; font-weight: 500; }
+.t-nav[aria-current="page"] { font-weight: 600; }
+.t-caption  { font-size: .75rem; font-weight: 400; color: var(--text-3); }
+.t-time     { font-size: .6875rem; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.t-player-title  { font-size: .875rem; font-weight: 600; }
+.t-player-artist { font-size: .75rem; font-weight: 500; color: var(--text-2); }
+.t-full-title    { font-size: clamp(1.25rem, 3vw, 1.75rem); font-weight: 700; letter-spacing: -0.015em; }
+.t-full-artist   { font-size: clamp(1rem, 2.2vw, 1.25rem); font-weight: 500; color: var(--text-2); }
+
+/* Glass Panel: small static panels only */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Pressable: buttons, icons, cards. Interruptible: release mid-press reverses smoothly */
+.press {
+  transition: transform var(--spring-snappy-d) var(--spring-snappy), opacity 120ms ease-out;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.press:active { transform: scale(.94); transition-duration: 90ms; }
+@media (hover: hover) { .press:hover { opacity: .85; } }
+
+/* Cards that rise on hover: transform only, shadow on a pseudo-element's opacity */
+.lift { position: relative; transition: transform var(--spring-smooth-d) var(--spring-smooth); }
+.lift::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 14px 30px rgba(0,0,0,.35); opacity: 0; transition: opacity 160ms ease-out; }
+@media (hover: hover) {
+  .lift:hover { transform: translate3d(0, -3px, 0) scale(1.015); }
+  .lift:hover::after { opacity: 1; }
+}
+
+/* Rows (songs, queue, menus): hover is instant, no delay, color only */
+.row { transition: background-color 90ms ease-out; touch-action: manipulation; content-visibility: auto; contain-intrinsic-size: auto 56px; }
+@media (hover: hover) { .row:hover { background: rgba(255,255,255,.08); } }
+
+/* Menus and popovers */
+.pop-in { transform-origin: top right; animation: pop-in var(--spring-smooth-d) var(--spring-smooth) both; }
+@keyframes pop-in { from { opacity: 0; transform: translate3d(0, -6px, 0) scale(.94); } }
+
+/* Heart / like pop */
+.like-pop { animation: like-pop var(--spring-bouncy-d) var(--spring-bouncy) both; }
+@keyframes like-pop { from { transform: scale(.6); } }
+
+/* Spotlight-Style Floating Search */
+.sp-scrim {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; justify-content: center; align-items: flex-start;
+  padding-top: max(14vh, calc(env(safe-area-inset-top) + 12px));
+  background: rgba(0,0,0,.35);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
+  animation: sp-fade 160ms ease-out;
+}
+.sp-panel {
+  width: min(640px, calc(100vw - 24px));
+  border-radius: 18px; overflow: hidden;
+  background: rgba(30,30,34,.72);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: 0 24px 80px rgba(0,0,0,.5);
+  animation: sp-pop var(--spring-smooth-d) var(--spring-smooth) both;
+}
+.sp-input-row { display: flex; align-items: center; gap: 12px; padding: 14px 18px; color: var(--text-2); }
+.sp-input { flex: 1; background: none; border: 0; outline: 0; color: var(--text-1); font-size: 1.0625rem; font-weight: 500; }
+.sp-results { max-height: min(60dvh, 480px); overflow-y: auto; overscroll-behavior: contain;
+  border-top: 1px solid rgba(255,255,255,.08); padding: 6px; }
+.sp-results li { border-radius: 10px; }
+.sp-results li[data-sel="true"] { background: rgba(255,255,255,.1); }
+@keyframes sp-fade { from { opacity: 0 } }
+@keyframes sp-pop { from { opacity: 0; transform: translate3d(0, -10px, 0) scale(.96) } }
+@media (max-width: 640px) {
+  .sp-scrim { padding-top: calc(env(safe-area-inset-top) + 8px);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .sp-panel { width: calc(100vw - 16px); border-radius: 16px; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sp-scrim { background: rgba(0,0,0,.7); } .sp-panel { background: #1e1e22; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sp-scrim { backdrop-filter: none; background: rgba(0,0,0,.7); } .sp-panel { backdrop-filter: none; background: #1e1e22; }
+}
+
+/* Apple Music Spring Lyrics */
+@property --p { syntax: "<number>"; inherits: false; initial-value: 0; }
+@keyframes ly-fill { from { --p: 0 } to { --p: 1 } }
+@keyframes ly-dot  { from { transform: scale(.6); opacity: .3 } to { transform: scale(1); opacity: 1 } }
+
+.ly-viewport {
+  height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10%, #000 82%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 10%, #000 82%, transparent 100%);
+}
+.ly-viewport::-webkit-scrollbar { display: none; }
+.ly-list { position: relative; padding: 28vh 20px 0; }
+
+.ly-line {
+  min-width: 0; margin: 0 0 .9rem; padding: .15rem .25rem; cursor: pointer;
+  font-size: clamp(1.5rem, 4.2vw, 2.75rem); font-weight: 700; line-height: 1.2; letter-spacing: -0.02em;
+  color: rgba(255,255,255,.34);
+  transform: scale(.94); transform-origin: left center;
+  transition:
+    transform var(--spring-smooth-d) var(--spring-smooth) var(--stag, 0s),
+    opacity   var(--spring-smooth-d) var(--spring-smooth) var(--stag, 0s),
+    filter    var(--spring-smooth-d) var(--spring-smooth) var(--stag, 0s),
+    color 300ms ease-out var(--stag, 0s);
+  overflow-wrap: anywhere; text-wrap: balance;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  will-change: transform, opacity;
+}
+.ly-line[data-active="true"] { transform: scale(1); color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255,255,255,.18)); transition-delay: 0s; }
+.ly-line[data-d="1"] { filter: blur(.5px); }
+.ly-line[data-d="2"] { filter: blur(1px);   opacity: .8; }
+.ly-line[data-d="3"] { filter: blur(1.6px); opacity: .65; }
+.ly-line[data-d="4"], .ly-line[data-d="5"] { filter: blur(2px); opacity: .5; }
+.ly-line[data-d="0"] { filter: drop-shadow(0 0 10px rgba(255,255,255,.18)); }
+@media (hover: hover) { .ly-line:hover { color: rgba(255,255,255,.6); } }
+
+.ly-w {
+  --p: 0;
+  color: transparent;
+  background-image: linear-gradient(90deg,
+    #fff calc(var(--p) * 130% - 30%),
+    rgba(255,255,255,.34) calc(var(--p) * 130%));
+  -webkit-background-clip: text; background-clip: text;
+  animation: ly-fill var(--d) linear var(--dl) both;
+}
+.ly-paused .ly-w, .ly-paused .ly-dot { animation-play-state: paused; }
+
+.ly-gap { display: flex; gap: 10px; align-items: center; height: 2.4rem; padding-left: .5rem; }
+.ly-dot { width: 12px; height: 12px; border-radius: 9999px; background: #fff;
+  animation: ly-dot var(--d) var(--spring-smooth) var(--dl) both; }
+.ly-dot-off { animation: none; opacity: .3; transform: scale(.6); }
+
+.ly-low .ly-line { filter: none !important; transition: opacity 250ms ease, color 250ms ease; will-change: auto; }
+.ly-low { -webkit-mask-image: none; mask-image: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ly-w { animation: none; background-image: none; color: #fff; }
+  .press, .lift, .pop-in, .like-pop, .sp-panel { animation: none !important; transition-duration: 1ms !important; }
+}
+@media (max-width: 640px) { .ly-list { padding-inline: 14px; } .ly-line { margin-bottom: .7rem; } }
+

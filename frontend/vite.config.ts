@@ -74,6 +74,9 @@ export default defineConfig({
   define: {
     'process.env': 'import.meta.env',
   },
+  esbuild: {
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+  },
   build: {
     rollupOptions: {
       onwarn(warning, warn) {

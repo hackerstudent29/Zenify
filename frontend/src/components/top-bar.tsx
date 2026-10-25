@@ -1,985 +1,348 @@
 "use client";
 
+import React, { useState } from "react";
 import {
- Search,
- Bell,
- User as UserIcon,
- ChevronLeft,
- ChevronRight,
- Play,
- Pause,
- SkipBack,
- SkipForward,
- Sparkles,
- MoreHorizontal,
- Heart,
- Plus,
- Download,
- Settings,
- Info,
- Disc,
- ListMusic,
- Share2,
- LogOut,
- HardDrive,
- CreditCard,
- LogIn,
- FileText,
- Shield,
- Mic,
+  Bell,
+  User as UserIcon,
+  ChevronLeft,
+  Settings,
+  Info,
+  LogOut,
+  HardDrive,
+  LogIn,
+  FileText,
+  Shield,
+  Sparkles,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
-import { usePlayerStore } from "@/store/player";
 import { useNotificationStore } from "@/store/notificationStore";
-import AnimatedList from "@/components/shared/AnimatedList";
-import { GlobalSearchModal } from "@/components/shared/GlobalSearchModal";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
-import { InlinePlaylistCreator } from "@/components/pc/PCMediaCard";
+import { HeaderSearchButton } from "@/components/shared/SpotlightSearch";
 import { useRouter, usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
-import { cn, getMediaUrl, getTrackCover } from "@/lib/utils";
-import { useDebounce } from "use-debounce";
-import api from "@/lib/api";
-import { ArtistPortrait } from "./shared/ArtistPortrait";
-import { ArtistLinks } from "@/components/shared/ArtistLinks";
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuTrigger,
- DropdownMenuPortal,
- DropdownMenuSub,
- DropdownMenuSubTrigger,
- DropdownMenuSubContent,
- DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { getMediaUrl } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ZenifyLogo } from "./shared/ZenifyLogo";
 
 export function TopBar() {
- const isMobile = useIsMobile();
- const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
- const stickyPageTitle = useUIStore(state => state.stickyPageTitle);
- const { user, logout } = useAuthStore();
- const currentTrack = usePlayerStore(state => state.currentTrack);
- const isPlaying = usePlayerStore(state => state.isPlaying);
- const togglePlay = usePlayerStore(state => state.togglePlay);
- const playNext = usePlayerStore(state => state.playNext);
- const playPrev = usePlayerStore(state => state.playPrev);
- const router = useRouter();
- const pathname = usePathname();
- const [searchFocused, setSearchFocused] = useState(false);
- const [query, setQuery] = useState("");
- const [debouncedQuery] = useDebounce(query, 150);
- const [searchResults, setSearchResults] = useState<any>(null);
- const [activeFilter, setActiveFilter] = useState("all");
- const [isMenuOpen, setIsMenuOpen] = useState(false);
- const [isSearching, setIsSearching] = useState(false);
- const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const stickyPageTitle = useUIStore((state) => state.stickyPageTitle);
+  const { user, logout } = useAuthStore();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  // Typing animation for search placeholder
-  const [placeholderText, setPlaceholderText] = useState("");
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [charIndex, setCharIndex] = useState(0);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [cursorBlink, setCursorBlink] = useState(true);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
-  const placeholders = [
-    "Search for songs, artists, or albums",
-    "What do you want to listen to?",
-    "Search 'Anirudh' or 'The Weeknd'",
-    "Type a track, genre, or mood",
-    "Search the zenify neural archives",
-    "Find your next favorite track",
-    "Search 'Starboy' or 'Blinding Lights'"
-  ];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCursorBlink((b) => !b);
-    }, 530);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const currentWord = placeholders[placeholderIndex];
-    let timer: NodeJS.Timeout;
-
-    if (isDeleting) {
-      if (charIndex > 0) {
-        timer = setTimeout(() => {
-          setPlaceholderText(currentWord.substring(0, charIndex - 1));
-          setCharIndex((prev) => prev - 1);
-        }, 20); // Fast deleting speed (20ms per character)
-      } else {
-        setIsDeleting(false);
-        setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
-      }
-    } else {
-      if (charIndex < currentWord.length) {
-        timer = setTimeout(() => {
-          setPlaceholderText(currentWord.substring(0, charIndex + 1));
-          setCharIndex((prev) => prev + 1);
-        }, 30); // Fast typing speed (30ms per character)
-      } else {
-        timer = setTimeout(() => {
-          setIsDeleting(true);
-        }, 3000); // 3 seconds hold time when fully typed
-      }
-    }
-
-    return () => clearTimeout(timer);
-  }, [charIndex, isDeleting, placeholderIndex]);
-
- // Favorites state (React Query for instant optimistic updates)
- const queryClient = useQueryClient();
- const { data: likedTrackIds = [] } = useQuery({
- queryKey: ['liked-track-ids'],
- queryFn: async () => {
-  const res = await api.get('tracks/liked');
-  const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
-  return arr.map((t: any) => t.id);
- },
- staleTime: 1000 * 60 * 5,
- enabled: !!user,
- });
-
- const toggleLikeMutation = useMutation({
- mutationFn: async (trackId: string) => {
- await api.post(`/tracks/${trackId}/like`);
- },
- onMutate: async (trackId: string) => {
- await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
- const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
- const newLikedIds = previousLikedIds ? (
- previousLikedIds.includes(trackId)
- ? previousLikedIds.filter(id => id !== trackId)
- : [...previousLikedIds, trackId]
- ) : [trackId];
- queryClient.setQueryData(['liked-track-ids'], newLikedIds);
- return { previousLikedIds };
- },
- onError: (err, trackId, context) => {
- if (context?.previousLikedIds) {
- queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
- }
- },
- onSettled: () => {
- queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
- queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
- }
- });
-
- const [playlists, setPlaylists] = useState<any[]>([]);
- const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-
- const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
- setToast({ msg, type });
- setTimeout(() => setToast(null), 2500);
- };
-
- useEffect(() => {
- if (user) {
- api.get("playlists/my")
- .then((res) => {
-   const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
-   setPlaylists(arr);
- })
- .catch(() => { });
- }
- }, [user]);
-
- const toggleFavorite = (e: React.MouseEvent, trackId: string) => {
- e.preventDefault();
- e.stopPropagation();
- toggleLikeMutation.mutate(trackId);
- };
-
- const addToPlaylist = async (playlistId: string, trackId: string) => {
- try {
- await api.post(`/playlists/${playlistId}/tracks`, { trackId });
- showToast("Added to playlist!", "success");
- } catch (err: any) {
- showToast(err.response?.data?.message || "Failed to add to playlist", "error");
- }
- };
-
- useEffect(() => {
- const fetchResults = async () => {
- if (!debouncedQuery) {
- setSearchResults(null);
- setIsSearching(false);
- return;
- }
- setIsSearching(true);
- try {
- const res = await api.get("search", {
- params: { q: debouncedQuery, limit: 15 },
- });
- const data = res.data;
- setSearchResults(data);
- } catch (e) {
- setSearchResults({
- tracks: [],
- artists: [],
- albums: [],
- playlists: [],
- });
- console.error(e);
- } finally {
- setIsSearching(false);
- }
- };
- fetchResults();
- }, [debouncedQuery]);
-
- return (
- <div className="h-full px-4 md:px-6 flex items-center justify-between gap-6 relative pt-[env(safe-area-inset-top,0px)]">
- {/* Invisible backdrop for easy dismissal */}
- <AnimatePresence>
- {searchFocused && (
- <motion.div
- initial={{ opacity: 0 }}
- animate={{ opacity: 1 }}
- exit={{ opacity: 0 }}
- onClick={() => setSearchFocused(false)}
- className="fixed inset-0 z-40"
- />
- )}
- </AnimatePresence>
-
-  <div className="flex items-center gap-4 shrink-0">
- {/* Mobile Left Section */}
- {isMobile && (
- pathname === "/" ? (
- <div className="flex items-center gap-2 group cursor-pointer shrink-0" onClick={() => router.push('/')}>
- <ZenifyLogo size={48} />
- </div>
- ) : (
- <button
- onClick={() => router.back()}
- className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 text-muted hover:text-foreground active:scale-95 transition-all"
- >
- <ChevronLeft size={20} />
- </button>
- )
- )}
-
-
-
- {/* Sticky Artist Title OR Mini Player - animated swap on scroll */}
- <AnimatePresence mode="wait">
- {stickyPageTitle ? (
- <motion.div
- key="sticky-title"
- initial={{ opacity: 0, y: 24 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: 24 }}
- transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
- className="flex items-center shrink-0"
- >
- <span className="text-[14px] md:text-base font-bold font-sans text-white tracking-tight truncate max-w-[240px] drop-shadow-md glass-panel px-4 py-1.5 rounded-full">
- {stickyPageTitle}
- </span>
- </motion.div>
- ) : null}
- </AnimatePresence>
- </div>
-
- {/* Search Section - Only on Desktop, Mobile has its own tab */}
- {/* Search Section - Hidden on mobile screen widths, visible sm+ */}
- {pathname !== '/search' && pathname !== '/discover' && (
- <div
- id="tour-search"
- data-tour="search"
- className={cn(
- "relative group flex-1 max-w-[480px] mr-auto hidden sm:block",
- searchFocused && "z-[9998]",
- )}
- >
- <div
- className="absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors z-10 text-brand"
- >
- <motion.div
- animate={{ 
-   rotate: searchFocused ? [0, -10, 10, -5, 5, 0] : 0,
-   scale: searchFocused ? [1, 1.2, 1] : 1
- }}
- transition={{ duration: 0.5, ease: "easeInOut" }}
- >
-  <Search 
-    size={16} 
-    className="drop-shadow-sm" 
-    style={{
-      strokeDasharray: searchFocused ? 100 : 'none',
-      strokeDashoffset: searchFocused ? 0 : 100,
-      transition: searchFocused ? 'stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1)' : 'none'
-    }}
-  />
- </motion.div>
- </div>
- <input
- type="text"
- placeholder={placeholderText + (cursorBlink ? "|" : "")}
- value={query}
- onFocus={() => setSearchFocused(true)}
- className="w-full glass-panel transition-all border border-white/20 hover:border-white/30 focus:border-white/50 focus:shadow-[0_0_15px_rgba(255,255,255,0.15)] focus:bg-white/10 rounded-full py-2 pl-12 pr-4 text-[13px] outline-none text-white placeholder:text-white/60 font-sans"
- onChange={(e) => setQuery(e.target.value)}
- />
-
- {/* Instant Search Results Dropdown */}
- <AnimatePresence>
- {searchFocused && query && (
- <motion.div
- initial={{ opacity: 0, scale: 0.98, y: -10 }}
- animate={{ opacity: 1, scale: 1, y: 0 }}
- exit={{ opacity: 0, scale: 0.98, y: -10 }}
- transition={{ duration: 0.1, ease: "easeOut" }}
- className="absolute top-[calc(100%+12px)] left-0 w-full rounded-2xl z-[9998] overflow-hidden flex flex-col max-h-[80vh] bg-[#0e0f14]/95 backdrop-blur-3xl border border-white/10 shadow-[0_24px_70px_rgba(0,0,0,0.85)] ring-1 ring-white/5 search-container"
- onMouseDown={(e) => e.preventDefault()} // Prevent input blur when clicking inside
- >
- {/* Filter Bar */}
- <div className="flex gap-2 p-4 pt-3 border-b border-white/5 bg-[#0e0f14]/60 backdrop-blur-md no-scrollbar overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth flex-shrink-0">
- {["all", "songs", "artists", "albums", "playlists"].map((f) => (
- <button
- key={f}
- onClick={(e) => { e.stopPropagation(); setActiveFilter(f); }}
- className={cn(
- "px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all",
- activeFilter === f
- ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.4)]"
- : "bg-white/5 text-muted hover:bg-white/10 hover:text-white",
- )}
- >
- {f}
- </button>
- ))}
- </div>
-
- <div className="flex-1 overflow-y-auto overflow-x-visible max-h-[60vh] custom-scrollbar">
- {isSearching ? (
- <div className="flex flex-col items-center justify-center py-20 gap-4">
- <div className="w-10 h-10 border-4 border-brand/20 border-t-brand rounded-full animate-spin" />
- <p className="text-xs text-muted font-bold tracking-widest uppercase animate-pulse">Searching...</p>
- </div>
- ) : searchResults ? (
- <>
-  {(() => {
-    let itemsToRender: any[] = [];
-    if (activeFilter === "songs") {
-      itemsToRender = searchResults.tracks || [];
-    } else if (activeFilter === "artists") {
-      itemsToRender = (searchResults.artists || []).map((a: any) => ({ ...a, isArtist: true }));
-    } else if (activeFilter === "albums") {
-      itemsToRender = (searchResults.albums || []).map((ab: any) => ({ ...ab, isAlbum: true }));
-    } else if (activeFilter === "playlists") {
-      itemsToRender = (searchResults.playlists || []).map((p: any) => ({ ...p, isPlaylist: true }));
-    } else {
-      // "all": Smart balanced showcase (Artists & Albums prominently featured at top!)
-      const artists = (searchResults.artists || []).map((a: any) => ({ ...a, isArtist: true }));
-      const albums = (searchResults.albums || []).map((ab: any) => ({ ...ab, isAlbum: true }));
-      const tracks = searchResults.tracks || [];
-      const playlists = (searchResults.playlists || []).map((p: any) => ({ ...p, isPlaylist: true }));
-
-      itemsToRender = [
-        ...artists.slice(0, 2),
-        ...albums.slice(0, 2),
-        ...tracks.slice(0, 8),
-        ...artists.slice(2),
-        ...albums.slice(2),
-        ...tracks.slice(8),
-        ...playlists
-      ];
-    }
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   return (
-  <div className="flex flex-col gap-1 p-2 pb-4">
-  {itemsToRender.map((item: any, index: number) => {
-  const isSelected = false;
-  if (item.isArtist) {
-  return (
-  <div
- key={item.id}
- className="group/artist flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0 hover:bg-white/[0.04] rounded-xl"
- >
- <div 
- onMouseDown={(e) => {
- e.preventDefault();
- router.push(`/artist/${item.id}`);
- setSearchFocused(false);
- setQuery("");
- }}
- className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-sm cursor-pointer hover:shadow-md transition-all hover:scale-105"
- >
- <ArtistPortrait 
- imageUrl={item.imageUrl}
- name={item.name}
- className="w-full h-full"
- size={100}
- />
- </div>
- <div className="flex-1 flex flex-col min-w-0 justify-center">
- <div 
- onMouseDown={(e) => {
- e.preventDefault();
- router.push(`/artist/${item.id}`);
- setSearchFocused(false);
- setQuery("");
- }}
- className="font-bold text-[13px] text-white/90 hover:text-white hover:underline cursor-pointer transition-colors w-fit truncate"
- >
- {item.name}
- </div>
- <div className="text-[10px] font-bold text-white/40 uppercase tracking-widest opacity-60">
- Artist
- </div>
- </div>
-  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/artist:opacity-100 transition-opacity ml-2">
-  <AnimatedDropdown
-  onOpenChange={setIsMenuOpen}
-  align="end"
-  contentClassName="z-[9999]"
-  onCloseAutoFocus={(e) => e.preventDefault()}
-  onInteractOutside={(e) => {
-  const isSearchContainer = (e.target as Element).closest(".search-container");
-  if (isSearchContainer) { e.preventDefault(); }
-  }}
-  trigger={
-  <button className="p-2 text-muted hover:text-foreground transition-colors outline-none bg-transparent">
-  <MoreHorizontal size={14} />
-  </button>
-  }
-  items={[
-  {
-  id: 'go-artist',
-  icon: <UserIcon size={14} className="opacity-70" />,
-  label: "Go to Artist",
-  onClick: () => { router.push(`/artist/${item.id}`); setSearchFocused(false); setQuery(""); }
-  },
-  {
-  id: 'share',
-  icon: <Share2 size={14} className="opacity-70" />,
-  label: "Copy Link",
-  onClick: () => { navigator.clipboard.writeText(`${window.location.origin}/artist/${item.id}`); }
-  }
-  ]}
-  />
-  </div>
- </div>
-  );
-  }
-
-  if (item.isAlbum || item.isPlaylist) {
-  return (
-  <div
- key={item.id}
- className="group/meta flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0 hover:bg-white/[0.04] rounded-xl"
- >
- <div 
- onMouseDown={(e) => {
- e.preventDefault();
- router.push(`/${item.isAlbum ? "album" : "playlist"}/${item.id}`);
- setSearchFocused(false);
- setQuery("");
- }}
- className="w-10 h-10 rounded-md bg-zinc-800 overflow-hidden shrink-0 border border-white/5 shadow-sm cursor-pointer hover:shadow-md transition-all hover:scale-105 relative"
- >
- <img
- src={getMediaUrl(item.coverUrl) || `/logo.png`}
- className="w-full h-full object-cover" alt={item.title || item.name || "Cover artwork"} width={40} height={40} loading="lazy" decoding="async"
- />
- </div>
- <div className="flex-1 min-w-0 flex flex-col justify-center">
- <div 
- onMouseDown={(e) => {
- e.preventDefault();
- router.push(`/${item.isAlbum ? "album" : "playlist"}/${item.id}`);
- setSearchFocused(false);
- setQuery("");
- }}
- className="text-[14px] font-sans font-bold truncate text-white/90 hover:text-white hover:underline cursor-pointer transition-colors w-fit"
- >
- {item.title || item.name}
- </div>
- <div className="text-[10px] text-white/50 truncate lowercase tracking-tight">
- {item.isAlbum ? "Album" : "Playlist"} •{" "}
- <ArtistLinks
-   track={item}
-   onClick={() => setSearchFocused(false)}
-   className="text-[10px] text-white/50 inline"
-   linkClassName="hover:text-brand hover:underline cursor-pointer"
- />
- </div>
- </div>
-  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/meta:opacity-100 transition-opacity ml-2">
-  <AnimatedDropdown
-  onOpenChange={setIsMenuOpen}
-  align="end"
-  contentClassName="z-[9999]"
-  onCloseAutoFocus={(e) => e.preventDefault()}
-  onInteractOutside={(e) => {
-  const isSearchContainer = (e.target as Element).closest(".search-container");
-  if (isSearchContainer) { e.preventDefault(); }
-  }}
-  trigger={
-  <button className="p-2 text-muted hover:text-foreground transition-colors outline-none bg-transparent">
-  <MoreHorizontal size={14} />
-  </button>
-  }
-  items={[
-  {
-  id: 'go-page',
-  icon: item.isAlbum ? <Disc size={14} className="opacity-70" /> : <ListMusic size={14} className="opacity-70" />,
-  label: `Go to ${item.isAlbum ? "Album" : "Playlist"}`,
-  onClick: () => { router.push(`/${item.isAlbum ? "album" : "playlist"}/${item.id}`); setSearchFocused(false); setQuery(""); }
-  },
-  {
-  id: 'share',
-  icon: <Share2 size={14} className="opacity-70" />,
-  label: "Copy Link",
-  onClick: () => { navigator.clipboard.writeText(`${window.location.origin}/${item.isAlbum ? "album" : "playlist"}/${item.id}`); }
-  }
-  ]}
-  />
-  </div>
- </div>
-  );
-  }
-
-  return (
-  <div
- key={item.id}
- className="group/item flex items-center gap-3 p-2 px-3 transition-colors border-b border-white/5 last:border-0 hover:bg-white/[0.04] rounded-xl"
- >
- <div 
- onMouseDown={async (e) => {
- e.preventDefault();
- const { setTrack } = usePlayerStore.getState();
- 
- // If it's an external/Spotify shell track, resolve through import-instant
- let playableTrack = item;
- if (item.isSpotify || !item.audioUrl || item.audioUrl.startsWith('spotify:')) {
-   try {
-     const payload = {
-       title: item.title,
-       artistName: item.artist?.name || item.artistName || 'Unknown Artist',
-       albumTitle: item.album?.title || item.collectionName,
-       coverUrl: item.coverUrl,
-       duration: item.duration || 180,
-       audioUrl: item.audioUrl
-     };
-     const res = await api.post('/tracks/import-instant', payload);
-     if (res.data) {
-       playableTrack = { ...item, ...res.data };
-     }
-   } catch (err) {
-     console.error('Failed to resolve track via import-instant:', err);
-   }
- }
- 
- setTrack(playableTrack);
- useUIStore.getState().setPlayerMinimized(false);
- useUIStore.getState().setFullScreenPlayerOpen(true);
- setSearchFocused(false);
- }}
- className="w-10 h-10 rounded-md bg-zinc-800 overflow-hidden shrink-0 shadow-sm border border-white/5 cursor-pointer relative hover:scale-105 transition-all group/cover"
- >
- <img
- src={getTrackCover(item)}
- className="w-full h-full object-cover" alt={item.title || "Track artwork"} width={40} height={40} loading="lazy" decoding="async"
- />
- <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
- <Play size={16} className="text-white fill-current ml-0.5" />
- </div>
- </div>
- <div className="flex-1 min-w-0 flex flex-col justify-center">
- <div 
- onMouseDown={(e) => {
- e.preventDefault();
- router.push(`/track/${item.id}`);
- setSearchFocused(false);
- }}
- className="text-[14px] font-sans font-bold truncate text-white/90 hover:text-white hover:underline cursor-pointer transition-colors w-fit"
- >
- {item.title}
- </div>
- <div className="text-[10px] text-white/50 truncate leading-relaxed">
- <ArtistLinks
-   track={item}
-   onClick={() => setSearchFocused(false)}
-   className="text-[10px] text-white/50 inline"
-   linkClassName="hover:text-brand hover:underline cursor-pointer"
- />
-  • {item.genre || 'Song'}
- </div>
- </div>
-
- <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover/item:opacity-100 transition-opacity">
- <button
- className="p-2 outline-none bg-transparent"
- onMouseDown={(e) => {
- e.preventDefault();
- e.stopPropagation();
- toggleFavorite(e as any, item.id);
- }}
- >
- <motion.div
- whileTap={{ scale: 0.7 }}
- animate={{ scale: likedTrackIds.includes(item.id) ? [1, 1.4, 1] : 1 }}
- transition={{ duration: 0.35, ease: "easeOut" }}
- className={cn(
- likedTrackIds.includes(item.id)
- ? "text-brand"
- : "text-muted hover:text-brand"
- )}
- >
- <Heart
- size={14}
- className={cn(likedTrackIds.includes(item.id) && "fill-current")}
- />
- </motion.div>
- </button>
-
- <AnimatedDropdown
- onOpenChange={setIsMenuOpen}
- align="end"
- contentClassName="z-[9999]"
- onCloseAutoFocus={(e) => e.preventDefault()}
- onInteractOutside={(e) => {
- const isSearchContainer = (
- e.target as Element
- ).closest(".search-container");
- if (isSearchContainer) {
- e.preventDefault();
- }
- }}
- trigger={
- <button className="p-2 text-muted hover:text-foreground transition-colors outline-none bg-transparent">
- <MoreHorizontal size={14} />
- </button>
- }
- items={[
- {
- id: 'favorite',
- icon: <Heart size={14} className={likedTrackIds.includes(item.id) ? "fill-current text-[#EF4444]" : "opacity-70"} />,
- label: likedTrackIds.includes(item.id) ? "Liked" : "Add to Favorites",
- onClick: (e) => toggleFavorite(e as any, item.id)
- },
- {
- id: 'playlist',
- icon: <Plus size={14} className="opacity-70" />,
- label: "Add to Playlist",
- subMenu: [
-  ...(Array.isArray(playlists) ? playlists : []).map((p: any) => ({
-  id: `playlist-${p.id}`,
-  label: p.name,
-  onClick: () => addToPlaylist(p.id, item.id)
-  })),
-  {
-  id: 'create-inline',
-  isSeparator: (playlists?.length || 0) > 0
-  },
-  {
-  id: 'create-inline-content',
-  content: <InlinePlaylistCreator trackId={item.id} onSuccess={() => showToast("Created & Added!", "success")} />
-  }
-  ].filter(item => !(item as any).isSeparator || ((item as any).isSeparator && (playlists?.length || 0) > 0))
- },
- { id: 'sep1', isSeparator: true },
- ...(user?.role === 'ADMIN' ? [{
- id: 'sync-lyrics',
- icon: <Mic size={14} className="opacity-70 text-violet-400" />,
- label: "Sync Lyrics",
- className: "text-violet-400 focus:text-violet-300",
- onClick: () => {
- router.push(`/admin/lyric-sync?trackId=${item.id}`);
- setSearchFocused(false);
- setQuery("");
- }
- }] : []),
- {
- id: 'download',
- icon: <Download size={14} className="opacity-70" />,
- label: "Download Track",
- onClick: () => window.open(item.audioUrl, "_blank")
- }
- ]}
- />
- </div>
- </div>
-  );
-  })}
-  </div>
-  );
-  })()}
-
- {((activeFilter === "all" &&
- !searchResults.tracks?.length &&
- !searchResults.artists?.length &&
- !searchResults.albums?.length &&
- !searchResults.playlists?.length) ||
- (activeFilter === "songs" && !searchResults.tracks?.length) ||
- (activeFilter === "artists" && !searchResults.artists?.length) ||
- (activeFilter === "albums" && !searchResults.albums?.length) ||
- (activeFilter === "playlists" && !searchResults.playlists?.length)) && (
- <div className="p-6 text-center bg-white/[0.02] m-3 rounded-2xl border border-white/5">
- <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
- <Search size={20} className="text-white/20" />
- </div>
- <h3 className="text-[13px] font-bold text-white mb-1">
- No results found
- </h3>
- <p className="text-[11px] text-muted max-w-[180px] mx-auto">
- We couldn't find any results for "{query}"
- </p>
- </div>
- )}
- </>
- ) : query ? (
- <div className="flex flex-col items-center justify-center py-8 gap-3 grayscale opacity-30 text-center px-8">
- <Search size={24} className="text-muted" strokeWidth={1.5} />
- <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">Thinking...</p>
- <p className="text-[11px] text-muted/50 mt-1 font-medium">Querying the <span className="font-zenify">zenify</span> neural archives for "{query}"</p>
- </div>
- ) : (
- <div className="flex flex-col items-center justify-center py-8 gap-3 grayscale opacity-40">
- <Search size={32} className="text-muted" />
- <p className="text-[11px] font-black uppercase tracking-widest text-muted">Type to search</p>
- </div>
- )}
- </div>
- </motion.div>
- )}
- </AnimatePresence>
- </div>
- )}
-
- {/* User Controls with About & Pricing integrated */}
- <div className="flex flex-1 justify-end items-center gap-2 md:gap-4 shrink-0">
-   <button 
-     onClick={() => setIsGlobalSearchOpen(true)}
-     className="flex items-center justify-center w-10 h-10 md:w-8 md:h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-brand active:scale-95 transition-all shadow-md backdrop-blur-md outline-none cursor-pointer shrink-0"
-     title="Global Search"
-   >
-     <Search size={18} className="text-brand" />
-   </button>
-
-  {isMobile ? (
-    <AnimatedDropdown
-      align="end"
-      contentClassName="w-56 mt-2 z-[9999] bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl"
-      trigger={
-        <button className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none">
-          {user?.avatarUrl ? (
-            <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt={user.name ? `${user.name} profile` : "User profile"} width={40} height={40} loading="lazy" decoding="async" />
-          ) : (
-            <UserIcon size={16} className="text-zinc-400" />
-          )}
-          {useNotificationStore.getState().unreadCount > 0 && (
-            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
-          )}
-        </button>
-      }
-      items={user ? [
-        { id: 'profile', label: 'Profile', icon: <UserIcon size={16} />, onClick: () => router.push('/profile') },
-        { id: 'notifications', label: 'Notifications', icon: (
-          <div className="relative">
-            <Bell size={16} />
-            {useNotificationStore.getState().unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
-            )}
-          </div>
-        ), onClick: () => router.push('/notifications') },
-        { id: 'settings', label: 'Settings', icon: <Settings size={16} />, onClick: () => router.push('/settings') },
-        { id: 'about-creator', label: 'About Creator', icon: <Info size={16} />, onClick: () => router.push('/about') },
-        { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push('/about-zenify') },
-        { id: 'terms', label: 'Terms of Service', icon: <FileText size={16} />, onClick: () => router.push('/terms') },
-        { id: 'privacy', label: 'Privacy Policy', icon: <Shield size={16} />, onClick: () => router.push('/privacy') },
-        { id: 'upgrade-pro', label: 'Upgrade Pro', icon: <Sparkles size={16} className="text-brand" />, onClick: () => router.push('/pricing') },
-        { id: 'divider-logout', isSeparator: true },
-        { 
-          id: 'logout', 
-          label: 'Log Out', 
-          icon: <LogOut size={16} className="text-red-400" />, 
-          className: "text-red-400 hover:text-red-400 hover:bg-red-500/10", 
-          onClick: () => {
-            logout();
-            router.push('/login');
-          } 
-        }
-      ] : [
-        { id: 'about-creator', label: 'About Creator', icon: <Info size={16} />, onClick: () => router.push('/about') },
-        { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push('/about-zenify') },
-        { id: 'terms', label: 'Terms of Service', icon: <FileText size={16} />, onClick: () => router.push('/terms') },
-        { id: 'privacy', label: 'Privacy Policy', icon: <Shield size={16} />, onClick: () => router.push('/privacy') },
-        { id: 'divider-login', isSeparator: true },
-        { id: 'login', label: 'Log In', icon: <LogIn size={16} className="text-brand" />, className: "text-brand font-bold", onClick: () => router.push('/login') }
-      ]}
-    />
-  ) : (
-    <>
-      {/* Local Device Music Quick Button */}
-      <button 
-        onClick={() => router.push('/local-library')}
-        className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white active:scale-95 transition-all shadow-sm"
-        title="Local Device Music"
-      >
-        <HardDrive size={16} />
-      </button>
-
-      {!user && (
-        <button 
-          onClick={() => router.push('/login')}
-          className="h-9 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-        >
-          <LogIn size={13} className="text-brand" />
-          <span>Log In</span>
-        </button>
-      )}
-
-      <AnimatedDropdown
-        align="end"
-        glass={true}
-        contentClassName="w-64 mt-2 z-[9999]"
-        trigger={
-          <button 
-            id="tour-profile"
-            data-tour="profile"
-            className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none cursor-pointer"
-          >
-            {user?.avatarUrl ? (
-              <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
-            ) : (
-              <UserIcon size={16} className="text-zinc-400" />
-            )}
-            {useNotificationStore.getState().unreadCount > 0 && (
-              <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
-            )}
-          </button>
-        }
-        header={
-          user && (
-            <div className="p-1 pointer-events-none select-none">
-              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-white/5 border border-white/10 pointer-events-none w-full">
-                <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                  {user?.avatarUrl ? (
-                    <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt={user.name ? `${user.name} avatar` : "User avatar"} width={36} height={36} loading="lazy" decoding="async" />
-                  ) : (
-                    <span className="text-xs font-normal text-zinc-300 uppercase">
-                      {user?.name?.[0] || user?.username?.[0] || user?.email?.[0] || '?'}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-normal text-white truncate max-w-[110px]">
-                      {user?.name || user?.username || 'User'}
-                    </span>
-                    {user?.role === 'ADMIN' ? (
-                      <span className="text-[9px] font-normal bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider ">
-                        Admin
-                      </span>
-                    ) : user?.role === 'PRO' || user?.role === 'PREMIUM' ? (
-                      <span className="text-[9px] font-normal bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider ">
-                        PRO
-                      </span>
-                    ) : (
-                      <span className="text-[9px] font-normal bg-white/5 text-zinc-400 border border-white/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider ">
-                        Free
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-zinc-400 font-normal truncate max-w-[130px]">
-                    {user?.email}
-                  </span>
-                </div>
-              </div>
-              <div className="h-[1px] bg-white/[0.08] mt-2.5 mx-1" />
+    <div className="h-full px-4 md:px-6 flex items-center justify-between gap-6 relative pt-[env(safe-area-inset-top,0px)]">
+      {/* Left side: Navigation / Logo + Spotlight Search + Sticky Title */}
+      <div className="flex items-center gap-3 shrink-0">
+        {/* Mobile Left Section */}
+        {isMobile &&
+          (pathname === "/" ? (
+            <div
+              className="flex items-center gap-2 group cursor-pointer shrink-0"
+              onClick={() => router.push("/")}
+            >
+              <ZenifyLogo size={48} />
             </div>
-          )
-        }
-        items={user ? [
-          { id: 'profile', label: 'Profile', icon: <UserIcon size={14} />, onClick: () => router.push('/profile') },
-          { 
-            id: 'notifications', 
-            label: 'Notifications', 
-            icon: (
-              <div className="relative font-sans">
-                <Bell size={14} />
-                {useNotificationStore.getState().unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-brand rounded-full border border-black" />
+          ) : (
+            <button
+              onClick={() => router.back()}
+              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 text-muted hover:text-foreground active:scale-95 transition-all"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          ))}
+
+        {/* Section K: Single Spotlight Search button on the left of header */}
+        <HeaderSearchButton />
+
+        {/* Sticky Title swap on scroll */}
+        <AnimatePresence mode="wait">
+          {stickyPageTitle ? (
+            <motion.div
+              key="sticky-title"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="flex items-center shrink-0"
+            >
+              <span className="text-[14px] md:text-base font-bold font-sans text-white tracking-tight truncate max-w-[240px] drop-shadow-md glass-panel px-4 py-1.5 rounded-full">
+                {stickyPageTitle}
+              </span>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      {/* Right side: User Controls with About & Pricing integrated */}
+      <div className="flex flex-1 justify-end items-center gap-2 md:gap-4 shrink-0">
+        {isMobile ? (
+          <AnimatedDropdown
+            align="end"
+            contentClassName="w-56 mt-2 z-[9999] bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl"
+            trigger={
+              <button className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none">
+                {user?.avatarUrl ? (
+                  <img
+                    src={getMediaUrl(user.avatarUrl)}
+                    className="w-full h-full object-cover"
+                    alt={user.name ? `${user.name} profile` : "User profile"}
+                    width={40}
+                    height={40}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <UserIcon size={16} className="text-zinc-400" />
                 )}
-              </div>
-            ), 
-            onClick: () => router.push('/notifications') 
-          },
-          { id: 'settings', label: 'Settings', icon: <Settings size={14} />, onClick: () => router.push('/settings') },
-          { id: 'about-creator', label: 'About Creator', icon: <Info size={14} />, onClick: () => router.push('/about') },
-          { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push('/about-zenify') },
-          { id: 'terms', label: 'Terms of Service', icon: <FileText size={14} />, onClick: () => router.push('/terms') },
-          { id: 'privacy', label: 'Privacy Policy', icon: <Shield size={14} />, onClick: () => router.push('/privacy') },
-          { id: 'upgrade-pro', label: 'Upgrade Pro', icon: <Sparkles size={14} className="text-brand" />, className: "text-brand hover:text-brand bg-brand/5 hover:bg-brand/10", onClick: () => router.push('/pricing') },
-          { id: 'divider-logout', isSeparator: true },
-          { 
-            id: 'logout', 
-            label: 'Log Out', 
-            icon: <LogOut size={14} className="text-red-400" />, 
-            className: "text-red-400 hover:text-red-400 hover:bg-red-500/10", 
-            onClick: () => {
-              logout();
-              router.push('/login');
-            } 
-          }
-        ] : [
-          { id: 'about-creator', label: 'About Creator', icon: <Info size={14} />, onClick: () => router.push('/about') },
-          { id: 'about-zenify', label: 'About Zenify', icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push('/about-zenify') },
-          { id: 'terms', label: 'Terms of Service', icon: <FileText size={14} />, onClick: () => router.push('/terms') },
-          { id: 'privacy', label: 'Privacy Policy', icon: <Shield size={14} />, onClick: () => router.push('/privacy') },
-          { id: 'divider-login', isSeparator: true },
-          { 
-            id: 'login', 
-            label: 'Log In', 
-            icon: <LogIn size={14} className="text-brand" />, 
-            className: "text-brand hover:text-brand font-bold", 
-            onClick: () => router.push('/login') 
-          }
-        ]}
-      />
-   </>
-  )}
- </div>
+                {useNotificationStore.getState().unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
+                )}
+              </button>
+            }
+            items={
+              user
+                ? [
+                    { id: "profile", label: "Profile", icon: <UserIcon size={16} />, onClick: () => router.push("/profile") },
+                    {
+                      id: "notifications",
+                      label: "Notifications",
+                      icon: (
+                        <div className="relative">
+                          <Bell size={16} />
+                          {useNotificationStore.getState().unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
+                          )}
+                        </div>
+                      ),
+                      onClick: () => router.push("/notifications"),
+                    },
+                    { id: "settings", label: "Settings", icon: <Settings size={16} />, onClick: () => router.push("/settings") },
+                    { id: "about-creator", label: "About Creator", icon: <Info size={16} />, onClick: () => router.push("/about") },
+                    { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push("/about-zenify") },
+                    { id: "terms", label: "Terms of Service", icon: <FileText size={16} />, onClick: () => router.push("/terms") },
+                    { id: "privacy", label: "Privacy Policy", icon: <Shield size={16} />, onClick: () => router.push("/privacy") },
+                    { id: "upgrade-pro", label: "Upgrade Pro", icon: <Sparkles size={16} className="text-brand" />, onClick: () => router.push("/pricing") },
+                    { id: "divider-logout", isSeparator: true },
+                    {
+                      id: "logout",
+                      label: "Log Out",
+                      icon: <LogOut size={16} className="text-red-400" />,
+                      className: "text-red-400 hover:text-red-400 hover:bg-red-500/10",
+                      onClick: () => {
+                        logout();
+                        router.push("/login");
+                      },
+                    },
+                  ]
+                : [
+                    { id: "about-creator", label: "About Creator", icon: <Info size={16} />, onClick: () => router.push("/about") },
+                    { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push("/about-zenify") },
+                    { id: "terms", label: "Terms of Service", icon: <FileText size={16} />, onClick: () => router.push("/terms") },
+                    { id: "privacy", label: "Privacy Policy", icon: <Shield size={16} />, onClick: () => router.push("/privacy") },
+                    { id: "divider-login", isSeparator: true },
+                    { id: "login", label: "Log In", icon: <LogIn size={16} className="text-brand" />, className: "text-brand font-bold", onClick: () => router.push("/login") },
+                  ]
+            }
+          />
+        ) : (
+          <>
+            {/* Local Device Music Quick Button */}
+            <button
+              onClick={() => router.push("/local-library")}
+              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white active:scale-95 transition-all shadow-sm cursor-pointer"
+              title="Local Device Music"
+            >
+              <HardDrive size={16} />
+            </button>
 
- <GlobalSearchModal isOpen={isGlobalSearchOpen} onClose={() => setIsGlobalSearchOpen(false)} />
+            {!user && (
+              <button
+                onClick={() => router.push("/login")}
+                className="h-10 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <LogIn size={13} className="text-brand" />
+                <span>Log In</span>
+              </button>
+            )}
 
- {/* Toast System */}
- <AnimatePresence>
- {toast && (
- <motion.div
- initial={{ opacity: 0, x: 50, scale: 0.95 }}
- animate={{ opacity: 1, x: 0, scale: 1 }}
- exit={{ opacity: 0, x: 20, scale: 0.95 }}
- className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[9999] min-w-[280px] ${toast.type === 'error'
- ? 'bg-zinc-950/95 border-brand/50 text-rose-200 shadow-[0_0_35px_rgba(225,29,72,0.3)]'
- : 'bg-zinc-950/95 border-emerald-500/30 text-emerald-300 shadow-[0_0_35px_rgba(16,185,129,0.2)]'
- }`}
- >
- <div className={`p-2 rounded-full ${toast.type === 'error' ? 'bg-brand/20 text-brand' : 'bg-emerald-500/20 text-emerald-400'}`}>
- {toast.type === 'success' ? (
- <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
- ) : (
- <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
- )}
- </div>
- <div className="flex flex-col">
- <span className="text-[14px] font-bold tracking-tight text-white">{toast.type === 'success' ? 'Success' : 'Error'}</span>
- <span className="text-[12px] opacity-80 font-medium">{toast.msg}</span>
- </div>
- </motion.div>
- )}
- </AnimatePresence>
- </div>
- );
+            <AnimatedDropdown
+              align="end"
+              glass={true}
+              contentClassName="w-64 mt-2 z-[9999]"
+              trigger={
+                <button
+                  id="tour-profile"
+                  data-tour="profile"
+                  className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none cursor-pointer"
+                >
+                  {user?.avatarUrl ? (
+                    <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
+                  ) : (
+                    <UserIcon size={16} className="text-zinc-400" />
+                  )}
+                  {useNotificationStore.getState().unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
+                  )}
+                </button>
+              }
+              header={
+                user && (
+                  <div className="p-1 pointer-events-none select-none">
+                    <div className="flex items-center gap-3 p-2.5 rounded-lg bg-white/5 border border-white/10 pointer-events-none w-full">
+                      <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
+                        {user?.avatarUrl ? (
+                          <img
+                            src={getMediaUrl(user.avatarUrl)}
+                            className="w-full h-full object-cover"
+                            alt={user.name ? `${user.name} avatar` : "User avatar"}
+                            width={36}
+                            height={36}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <span className="text-xs font-normal text-zinc-300 uppercase">
+                            {user?.name?.[0] || user?.username?.[0] || user?.email?.[0] || "?"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-normal text-white truncate max-w-[110px]">
+                            {user?.name || user?.username || "User"}
+                          </span>
+                          {user?.role === "ADMIN" ? (
+                            <span className="text-[9px] font-normal bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                              Admin
+                            </span>
+                          ) : user?.role === "PRO" || user?.role === "PREMIUM" ? (
+                            <span className="text-[9px] font-normal bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                              PRO
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-normal bg-white/5 text-zinc-400 border border-white/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                              Free
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-zinc-400 font-normal truncate max-w-[130px]">
+                          {user?.email}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-[1px] bg-white/[0.08] mt-2.5 mx-1" />
+                  </div>
+                )
+              }
+              items={
+                user
+                  ? [
+                      { id: "profile", label: "Profile", icon: <UserIcon size={14} />, onClick: () => router.push("/profile") },
+                      {
+                        id: "notifications",
+                        label: "Notifications",
+                        icon: (
+                          <div className="relative font-sans">
+                            <Bell size={14} />
+                            {useNotificationStore.getState().unreadCount > 0 && (
+                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-brand rounded-full border border-black" />
+                            )}
+                          </div>
+                        ),
+                        onClick: () => router.push("/notifications"),
+                      },
+                      { id: "settings", label: "Settings", icon: <Settings size={14} />, onClick: () => router.push("/settings") },
+                      { id: "about-creator", label: "About Creator", icon: <Info size={14} />, onClick: () => router.push("/about") },
+                      { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push("/about-zenify") },
+                      { id: "terms", label: "Terms of Service", icon: <FileText size={14} />, onClick: () => router.push("/terms") },
+                      { id: "privacy", label: "Privacy Policy", icon: <Shield size={14} />, onClick: () => router.push("/privacy") },
+                      {
+                        id: "upgrade-pro",
+                        label: "Upgrade Pro",
+                        icon: <Sparkles size={14} className="text-brand" />,
+                        className: "text-brand hover:text-brand bg-brand/5 hover:bg-brand/10",
+                        onClick: () => router.push("/pricing"),
+                      },
+                      { id: "divider-logout", isSeparator: true },
+                      {
+                        id: "logout",
+                        label: "Log Out",
+                        icon: <LogOut size={14} className="text-red-400" />,
+                        className: "text-red-400 hover:text-red-400 hover:bg-red-500/10",
+                        onClick: () => {
+                          logout();
+                          router.push("/login");
+                        },
+                      },
+                    ]
+                  : [
+                      { id: "about-creator", label: "About Creator", icon: <Info size={14} />, onClick: () => router.push("/about") },
+                      { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push("/about-zenify") },
+                      { id: "terms", label: "Terms of Service", icon: <FileText size={14} />, onClick: () => router.push("/terms") },
+                      { id: "privacy", label: "Privacy Policy", icon: <Shield size={14} />, onClick: () => router.push("/privacy") },
+                      { id: "divider-login", isSeparator: true },
+                      {
+                        id: "login",
+                        label: "Log In",
+                        icon: <LogIn size={14} className="text-brand" />,
+                        className: "text-brand hover:text-brand font-bold",
+                        onClick: () => router.push("/login"),
+                      },
+                    ]
+              }
+            />
+          </>
+        )}
+      </div>
+
+      {/* Toast System */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, x: 50, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 20, scale: 0.95 }}
+            className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[9999] min-w-[280px] ${
+              toast.type === "error"
+                ? "bg-zinc-950/95 border-brand/50 text-rose-200 shadow-[0_0_35px_rgba(225,29,72,0.3)]"
+                : "bg-zinc-950/95 border-emerald-500/30 text-emerald-300 shadow-[0_0_35px_rgba(16,185,129,0.2)]"
+            }`}
+          >
+            <div
+              className={`p-2 rounded-full ${
+                toast.type === "error" ? "bg-brand/20 text-brand" : "bg-emerald-500/20 text-emerald-400"
+              }`}
+            >
+              {toast.type === "success" ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              )}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[14px] font-bold tracking-tight text-white">
+                {toast.type === "success" ? "Success" : "Error"}
+              </span>
+              <span className="text-[12px] opacity-80 font-medium">{toast.msg}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }

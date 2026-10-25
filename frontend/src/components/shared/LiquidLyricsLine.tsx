@@ -224,15 +224,21 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     >
       <div 
         className={cn(
-          "relative flex flex-wrap items-baseline cursor-pointer select-none",
+          "relative flex flex-wrap items-baseline cursor-pointer select-none min-w-0 max-w-full",
           origin.includes("left") ? "justify-start text-left" : "justify-center text-center"
         )} 
         style={{ 
           transformOrigin: origin, 
           rowGap: "0.04em",
           columnGap: "0.24em",
-          wordBreak: "normal", 
-          overflowWrap: "normal"
+          wordBreak: "break-word", 
+          overflowWrap: "anywhere",
+          textWrap: "balance" as any,
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: 2,
+          overflow: "hidden",
+          maxHeight: "2.8em"
         }}
       >
         {wordTokens.map((word, i) => {
