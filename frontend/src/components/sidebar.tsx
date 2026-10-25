@@ -113,17 +113,27 @@ function NavLink({
   dataTour?: string;
   onClick?: (e: React.MouseEvent) => void;
 }) {
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        id={id}
+        data-tour={dataTour}
+        onClick={onClick}
+        title={collapsed ? label : undefined}
+        className={cn(ROW, "text-left cursor-pointer", active ? "bg-white/[0.1] text-white" : "text-white/90 hover:bg-white/[0.06]")}
+      >
+        <RowIcon icon={icon} active={active} />
+        <Label collapsed={collapsed}>{label}</Label>
+      </button>
+    );
+  }
+
   return (
     <Link
       id={id}
       data-tour={dataTour}
       href={href}
-      onClick={(e) => {
-        if (onClick) {
-          e.preventDefault();
-          onClick(e);
-        }
-      }}
       title={collapsed ? label : undefined}
       className={cn(ROW, active ? "bg-white/[0.1] text-white" : "text-white/90 hover:bg-white/[0.06]")}
     >
@@ -444,10 +454,10 @@ export function Sidebar() {
                 />
               )}
               <NavLink
-                href="/settings"
+                href="#"
                 icon={Settings}
                 label="Settings"
-                active={pathname.startsWith("/settings") || useUIStore((s) => s.isSettingsOpen)}
+                active={useUIStore((s) => s.isSettingsOpen)}
                 collapsed={collapsed}
                 onClick={() => useUIStore.getState().openSettings()}
               />

@@ -236,6 +236,13 @@ export function SettingsModal({
       showToast(`Accent color set to ${value.charAt(0).toUpperCase() + value.slice(1)}`);
     }
 
+    if (key === "audioQuality") {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("zenify_audio_quality", value);
+      }
+      showToast(`Streaming fidelity set to ${value === "lossless" ? "Best (320kbps)" : value === "high" ? "High" : "Basic"}`);
+    }
+
     handlePreferenceUpdate(next, key);
   };
 

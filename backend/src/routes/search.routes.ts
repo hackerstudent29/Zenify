@@ -28,6 +28,38 @@ const COUNTRY_MAP: Record<string, string> = {
 /**
  * Calculates accurate relevance score for music search ranking
  */
+/**
+ * Calculates Levenshtein string similarity ratio between 0.0 and 1.0
+ */
+function stringSimilarity(s1: string, s2: string): number {
+  if (s1 === s2) return 1.0;
+  if (!s1 || !s2) return 0;
+  const l1 = s1.length;
+  const l2 = s2.length;
+  const maxLen = Math.max(l1, l2);
+  if (maxLen === 0) return 1.0;
+  if (Math.abs(l1 - l2) / maxLen > 0.5) return 0;
+
+  const row: number[] = [];
+  for (let j = 0; j <= l2; j++) row[j] = j;
+
+  for (let i = 1; i <= l1; i++) {
+    let prev = i;
+    for (let j = 1; j <= l2; j++) {
+      let val: number;
+      if (s1.charAt(i - 1) === s2.charAt(j - 1)) {
+        val = row[j - 1];
+      } else {
+        val = Math.min(row[j - 1] + 1, prev + 1, row[j] + 1);
+      }
+      row[j - 1] = prev;
+      prev = val;
+    }
+    row[l2] = prev;
+  }
+  return (maxLen - row[l2]) / maxLen;
+}
+
 function scoreItem(
   targetName: string,
   query: string,
@@ -63,11 +95,33 @@ function scoreItem(
   } else if (qWords.some(qw => qw.length > 2 && tWords.some(tw => tw.startsWith(qw) || qw.startsWith(tw)))) {
     score += 40;  // Partial token overlap
   } else {
-    // If target does not match query at all, strict rejection for artist, album, playlist
-    if (type === 'artist' || type === 'album' || type === 'playlist') {
-      return 0;
+    // Check fuzzy similarity across tokens & full string (catches transliteration/typos like tiruchitrambalam vs thiruchitrambalam)
+    let maxFuzzy = 0;
+    for (const qw of qWords) {
+      for (const tw of tWords) {
+        if (qw.length >= 3 && tw.length >= 3) {
+          const sim = stringSimilarity(qw, tw);
+          if (sim > maxFuzzy) maxFuzzy = sim;
+        }
+      }
     }
-    score += 10;
+    const overallSim = stringSimilarity(t, q);
+    if (overallSim > maxFuzzy) maxFuzzy = overallSim;
+
+    if (maxFuzzy >= 0.75) {
+      score += Math.round(150 * maxFuzzy); // Highly confident fuzzy match
+    } else if (maxFuzzy >= 0.6) {
+      score += Math.round(90 * maxFuzzy);
+    } else if (!isLocal) {
+      // Catalog provider returned this item specifically for this query (e.g. Apple Music / JioSaavn search engine match)
+      score += 45;
+    } else {
+      // If target does not match query at all in local DB, strict rejection for artist, album, playlist
+      if (type === 'artist' || type === 'album' || type === 'playlist') {
+        return 0;
+      }
+      score += 10;
+    }
   }
 
   // Sequel & Part Number Strict Verification (e.g. Jailer 1 vs Jailer 2)
