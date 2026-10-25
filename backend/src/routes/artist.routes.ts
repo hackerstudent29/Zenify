@@ -202,9 +202,22 @@ export async function artistRoutes(server: FastifyInstance) {
                 const { ArtistMetadataService } = await import('../services/artist-metadata.service.js');
                 const visuals = await ArtistMetadataService.fetchArtistVisuals(artist.id, artist.name).catch(() => null);
                 if (visuals) {
-                    if (visuals.coverUrl) artist.coverUrl = visuals.coverUrl;
-                    if (visuals.imageUrl) artist.imageUrl = visuals.imageUrl;
-                    if (visuals.bio && (!artist.bio || artist.bio.length < 30)) artist.bio = visuals.bio;
+                    const updateData: any = {};
+                    if (visuals.coverUrl && visuals.coverUrl !== artist.coverUrl) {
+                        artist.coverUrl = visuals.coverUrl;
+                        updateData.coverUrl = visuals.coverUrl;
+                    }
+                    if (visuals.imageUrl && visuals.imageUrl !== artist.imageUrl) {
+                        artist.imageUrl = visuals.imageUrl;
+                        updateData.imageUrl = visuals.imageUrl;
+                    }
+                    if (visuals.bio && (!artist.bio || artist.bio.length < 30)) {
+                        artist.bio = visuals.bio;
+                        updateData.bio = visuals.bio;
+                    }
+                    if (Object.keys(updateData).length > 0 && artist.id) {
+                        prisma.artist.update({ where: { id: artist.id }, data: updateData }).catch(() => null);
+                    }
                 }
             } catch (err: any) {
                 server.log.warn(`[ArtistRoute] Metadata enrichment warn for ${artist.name}: ${err.message}`);
