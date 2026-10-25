@@ -69,7 +69,9 @@ export function ReleaseRowSection({ title, items, seeAllHref }: ReleaseRowSectio
                       {formatDisplayTitle(item.title || item.name) || item.title || item.name || "Untitled"}
                     </p>
                     <p className="text-[12px] text-white/60 truncate font-normal">
-                      {year || (item.isSingle ? "Single" : "Album")}
+                      {title === "Appears On" && item.artistName
+                        ? item.artistName
+                        : (year || (item.isSingle ? "Single" : "Album"))}
                     </p>
                   </div>
                 </div>

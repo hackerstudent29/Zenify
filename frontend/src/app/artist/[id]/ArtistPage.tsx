@@ -255,11 +255,13 @@ export default function ArtistPage() {
           onPlayTrack={handlePlayTrack}
         />
 
-        {/* Essential Albums (Screenshot 3 Bottom) */}
-        <EssentialAlbums
-          albums={artist.essentialAlbums || artist.studioAlbums || artist.albums || []}
-          artistName={displayName}
-        />
+        {/* Essential Albums (Apple Music style: only when artist has dedicated studio albums) */}
+        {artist.essentialAlbums && artist.essentialAlbums.length > 0 && (
+          <EssentialAlbums
+            albums={artist.essentialAlbums}
+            artistName={displayName}
+          />
+        )}
 
         {/* Albums > (Screenshot 4) */}
         <ReleaseRowSection
@@ -281,12 +283,14 @@ export default function ArtistPage() {
           playlists={artist.playlists || []}
         />
 
-        {/* Compilations > (Screenshot 5 Bottom) */}
-        <ReleaseRowSection
-          title="Compilations"
-          items={artist.compilations || []}
-          seeAllHref={`/artist/${artist.id}/compilations`}
-        />
+        {/* Appears On > (Screenshot 5: Genuine collaborations, remixes & features) */}
+        {((artist.appearsOn && artist.appearsOn.length > 0) || (artist.compilations && artist.compilations.length > 0)) && (
+          <ReleaseRowSection
+            title="Appears On"
+            items={artist.appearsOn && artist.appearsOn.length > 0 ? artist.appearsOn : artist.compilations}
+            seeAllHref={`/artist/${artist.id}/appears-on`}
+          />
+        )}
 
         {/* Fans Also Like (Circular Artist Cards) */}
         <FansAlsoLike
