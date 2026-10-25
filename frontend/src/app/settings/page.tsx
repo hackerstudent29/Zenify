@@ -1,780 +1,472 @@
-import { SEO } from "@/components/shared/SEO";
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
+import { SEO } from "@/components/shared/SEO";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
-import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-import { Switch } from "@/components/ui/switch";
-import {
- Select,
- SelectContent,
- SelectItem,
- SelectTrigger,
- SelectValue
-} from "@/components/ui/select";
-import * as Slider from "@radix-ui/react-slider";
 import { usePlayerStore } from "@/store/player";
 import { audioEngine } from "@/lib/audio-engine";
-import {
- Volume2,
- Play,
- Palette,
- Bell,
- Shield,
- Music,
- Cpu,
- Zap,
- Globe,
- CheckCircle,
- AlertTriangle,
- Loader2,
- ChevronRight,
- Radio,
- EyeOff,
- Activity,
- Mail,
- Layers,
- Shuffle,
- Repeat,
- Keyboard,
- RotateCcw,
-  Waves,
-  Disc3,
-  ListMusic,
-  Maximize2,
-  ScrollText,
-  Sparkles,
-  User,
-} from "lucide-react";
 import { useShortcutStore } from "@/store/shortcuts";
 import { useUIStore } from "@/store/ui";
-import { useIsMobile } from "@/hooks/useIsMobile";
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
+import {
+  Volume2,
+  Play,
+  Palette,
+  Bell,
+  Shield,
+  Music,
+  Cpu,
+  Zap,
+  Globe,
+  Radio,
+  EyeOff,
+  Activity,
+  Mail,
+  Shuffle,
+  Repeat,
+  Keyboard,
+  RotateCcw,
+  Waves,
+  Disc3,
+  Maximize2,
+  ScrollText,
+  User,
+} from "lucide-react";
+import {
+  SettingsWindow,
+  Section,
+  Group,
+  Row,
+  Toggle,
+  PopUp,
+  AppleSlider,
+  AppButton,
+  KeyCap,
+  TINT,
+  type NavItem,
+} from "@/components/settings/AppleSettingsUI";
 
 // ─── Types ────────────────────────────────────────────────
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const NAV_SECTIONS = [
- { id: "audio", label: "Audio", icon: Volume2 },
- { id: "playback", label: "Playback", icon: Play },
- { id: "aesthetics", label: "Aesthetics", icon: Palette },
- { id: "notifications", label: "Notifications", icon: Bell },
- { id: "privacy", label: "Privacy", icon: Shield },
- { id: "shortcuts", label: "Shortcuts", icon: Keyboard, desktopOnly: true },
+  { id: "audio", label: "Audio", icon: Volume2, tint: TINT.pink },
+  { id: "playback", label: "Playback", icon: Play, tint: TINT.green },
+  { id: "aesthetics", label: "Aesthetics", icon: Palette, tint: TINT.purple },
+  { id: "notifications", label: "Notifications", icon: Bell, tint: TINT.red },
+  { id: "privacy", label: "Privacy", icon: Shield, tint: TINT.blue },
+  { id: "shortcuts", label: "Shortcuts", icon: Keyboard, tint: TINT.gray, desktopOnly: true },
+] as const satisfies readonly NavItem[];
+
+type SectionId = (typeof NAV_SECTIONS)[number]["id"];
+
+const REACTIVE_SURFACES = [
+  { key: "fullPlayer", label: "Full View Player", icon: Maximize2, tint: TINT.indigo, desc: "Display fluid mesh canvas in the full screen player", name: "Full Player" },
+  { key: "trackPage", label: "Track Detail Page", icon: Music, tint: TINT.pink, desc: "Display fluid mesh canvas on track detail views", name: "Track Page" },
+  { key: "albumPage", label: "Album Page", icon: Disc3, tint: TINT.orange, desc: "Display fluid mesh canvas on album views", name: "Album Page" },
+  { key: "artistPage", label: "Artist Page", icon: User, tint: TINT.teal, desc: "Display fluid mesh canvas on artist header views", name: "Artist Page" },
+  { key: "other", label: "Other Panels & Lyrics", icon: ScrollText, tint: TINT.purple, desc: "Display fluid mesh canvas behind sidebar lyrics & other surfaces", name: "Other Panels" },
 ] as const;
-
-type SectionId = typeof NAV_SECTIONS[number]["id"];
-
-// ─── Sub-components ───────────────────────────────────────
-function SettingRow({
- label,
- description,
- icon: Icon,
- children,
- badge,
- isSaving,
- isSaved,
-}: {
- label: string;
- description?: string;
- icon?: React.ElementType;
- children: React.ReactNode;
- badge?: string;
- isSaving?: boolean;
- isSaved?: boolean;
-}) {
- return (
- <div className="group flex items-center justify-between py-4 md:py-5 px-4 md:px-6 rounded-2xl md:rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/5 mb-1">
-      <SEO title="Settings – Zenify" noindex={true} path="/settings" />
- <div className="flex-1 flex items-center gap-3 md:gap-5 min-w-0 pr-3">
- {Icon && (
- <div className="shrink-0 w-9 h-9 md:w-11 md:h-11 flex items-center justify-center text-white/40 group-hover:text-brand transition-all duration-300">
- <Icon size={18} />
- </div>
- )}
- <div className="flex-1 min-w-0">
- <div className="flex items-center gap-2 md:gap-3 font-sans flex-wrap">
- <span className="text-[13px] md:text-sm font-bold text-white/90 group-hover:text-white transition-colors">{label}</span>
- {badge && (
- <span className="shrink-0 text-[10px] font-bold tracking-tight text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
- {badge}
- </span>
- )}
- </div>
- {description && (
- <p className="text-[11px] md:text-xs text-zinc-500 font-medium mt-0.5 leading-relaxed font-sans whitespace-normal">{description}</p>
- )}
- </div>
- </div>
- <div className="shrink-0 ml-3 md:ml-6 flex items-center gap-4">
- <AnimatePresence mode="wait">
- {isSaving && (
- <motion.div
- initial={{ opacity: 0, x: 5 }}
- animate={{ opacity: 1, x: 0 }}
- exit={{ opacity: 0, x: -5 }}
- className="text-[10px] font-bold tracking-wide text-zinc-500 flex items-center gap-1.5"
- >
- <Loader2 size={12} className="animate-spin" />
- Saving
- </motion.div>
- )}
- {isSaved && (
- <motion.div
- initial={{ opacity: 0, scale: 0.8 }}
- animate={{ opacity: 1, scale: 1 }}
- exit={{ opacity: 0, scale: 0.8 }}
- className="text-[10px] font-bold tracking-wide text-emerald-500 flex items-center gap-1.5"
- >
- <CheckCircle size={12} />
- Saved
- </motion.div>
- )}
- </AnimatePresence>
- {children}
- </div>
- </div>
- );
-}
-
-function SectionCard({
- id,
- title,
- subtitle,
- icon: Icon,
- children,
-}: {
- id: string;
- title: string;
- subtitle: string;
- icon: React.ElementType;
- children: React.ReactNode;
-}) {
- return (
- <motion.div
- id={id}
- initial={{ opacity: 0, scale: 0.98 }}
- whileInView={{ opacity: 1, scale: 1 }}
- viewport={{ once: true }}
- transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
- className="rounded-[3rem] border border-white/[0.04] bg-white/[0.01] backdrop-blur-xl overflow-hidden mb-12 shadow-2xl"
- >
- {/* Card body */}
- <div className="px-5 sm:px-10 py-8 sm:py-12">
- {children}
- </div>
- </motion.div>
- );
-}
-
-function StyledSelect({
- value,
- onValueChange,
- disabled,
- options,
-}: {
- value: string;
- onValueChange: (v: string) => void;
- disabled: boolean;
- options: { value: string; label: string }[];
-}) {
- return (
- <Select value={value} onValueChange={onValueChange} disabled={disabled}>
- <SelectTrigger className="w-[148px] h-8 bg-white/[0.06] border-white/10 text-white/80 text-[12px] font-semibold rounded-xl hover:bg-white/10 transition-colors focus:ring-brand/30 focus:ring-1 font-sans">
- <SelectValue />
- </SelectTrigger>
- <SelectContent className="bg-[#111113] border-white/10 text-white/80 rounded-xl font-sans">
- {options.map(o => (
- <SelectItem key={o.value} value={o.value} className="text-[12px] font-semibold rounded-lg focus:bg-zinc-900/10 focus:text-brand">
- {o.label}
- </SelectItem>
- ))}
- </SelectContent>
- </Select>
- );
-}
 
 // ─── Main Page ────────────────────────────────────────────
 export default function SettingsPage() {
- const { user, updateUser } = useAuthStore();
- const isMobile = useIsMobile();
- const audioFx = usePlayerStore(state => state.audioFx);
- const setFx = usePlayerStore(state => state.setFx);
- const reducedMotion = useUIStore(s => s.reducedMotion);
- const setReducedMotion = useUIStore(s => s.setReducedMotion);
- const showToast = useUIStore(s => s.showToast);
+  const { user, updateUser } = useAuthStore();
+  const audioFx = usePlayerStore((state) => state.audioFx);
+  const setFx = usePlayerStore((state) => state.setFx);
+  const reducedMotion = useUIStore((s) => s.reducedMotion);
+  const setReducedMotion = useUIStore((s) => s.setReducedMotion);
+  const showToast = useUIStore((s) => s.showToast);
   const reactiveBgStore = useReactiveBgStore();
- const [activeSection, setActiveSection] = useState<SectionId>("audio");
- const [preferences, setPreferences] = useState({
- audioQuality: "high",
- crossfade: false,
- autoplay: true,
- normalizeVolume: true,
- explicitFilter: false,
- theme: "dark",
- accentColor: "rose",
- compactMode: false,
- emailNotifications: false,
- newReleaseAlerts: false,
- playlistUpdates: false,
- weeklySummaryEmail: false,
- privateSession: false,
- listeningActivity: true,
- sidebarStyle: "glassmorphism",
- globalPlayerStyle: "glassmorphism",
- fullviewReactiveBg: true,
- trackPageReactiveBg: true,
- surroundingSpeed: 3,
- bottomNavStyle: "normal" as "normal" | "glasso",
- swipeNavigation: true,
- });
- const [isSaving, setIsSaving] = useState(false);
- const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
- const [savingKey, setSavingKey] = useState<string | null>(null);
- const [lastSavedKey, setLastSavedKey] = useState<string | null>(null);
- const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [activeSection, setActiveSection] = useState<SectionId>("audio");
+  const [preferences, setPreferences] = useState({
+    audioQuality: "high",
+    crossfade: false,
+    autoplay: true,
+    normalizeVolume: true,
+    explicitFilter: false,
+    theme: "dark",
+    accentColor: "rose",
+    compactMode: false,
+    emailNotifications: false,
+    newReleaseAlerts: false,
+    playlistUpdates: false,
+    weeklySummaryEmail: false,
+    privateSession: false,
+    listeningActivity: true,
+    sidebarStyle: "glassmorphism",
+    globalPlayerStyle: "glassmorphism",
+    fullviewReactiveBg: true,
+    trackPageReactiveBg: true,
+    surroundingSpeed: 3,
+    bottomNavStyle: "normal" as "normal" | "glasso",
+    swipeNavigation: true,
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [lastSavedKey, setLastSavedKey] = useState<string | null>(null);
 
- useEffect(() => {
- if (user?.preferences) {
- setPreferences(prev => ({ ...prev, ...user.preferences }));
- }
- }, [user]);
+  useEffect(() => {
+    if (user?.preferences) {
+      setPreferences((prev) => ({ ...prev, ...user.preferences }));
+    }
+  }, [user]);
 
- // Intersection observer removed: sections are conditionally rendered so scrolling observation is unnecessary.
-
- const handlePreferenceUpdate = async (updatedPrefs: typeof preferences, key: string) => {
- setIsSaving(true);
- setSaveStatus("saving");
- setSavingKey(key);
- setLastSavedKey(null);
- const { id, userId, createdAt, updatedAt, ...cleanPrefs } = updatedPrefs as any;
- try {
- await api.put("/auth/preferences", cleanPrefs);
- updateUser({ preferences: updatedPrefs });
- setSaveStatus("saved");
- setLastSavedKey(key);
- setTimeout(() => {
- setSaveStatus("idle");
- setLastSavedKey(null);
- }, 2000);
- } catch {
- setSaveStatus("error");
- setTimeout(() => setSaveStatus("idle"), 3000);
- } finally {
- setIsSaving(false);
- setSavingKey(null);
- }
- };
-
- const handleToggle = (key: string, value: boolean) => {
-  const next = { ...preferences, [key]: value };
-  setPreferences(next);
-
-  if (key === "crossfade") {
-   setFx({ crossfade: value ? 4 : 0 });
-   if (typeof window !== "undefined") {
-    localStorage.setItem("zenify_crossfade", String(value));
-   }
-  }
-  if (key === "autoplay") {
-   if (typeof window !== "undefined") {
-    localStorage.setItem("zenify_autoplay", String(value));
-   }
-  }
-
-  const toastMap: Record<string, (v: boolean) => string> = {
-   crossfade: (v) => v ? "Smooth Swaps enabled — Crossfading songs" : "Smooth Swaps disabled",
-   autoplay: (v) => v ? "Keep Playing enabled — Plays similar tracks when queue ends" : "Keep Playing disabled",
-   emailNotifications: (v) => v ? "Email Notifications enabled" : "Email Notifications disabled",
-   weeklySummaryEmail: (v) => v ? "Weekly Summary Email enabled" : "Weekly Summary Email disabled",
-   newReleaseAlerts: (v) => v ? "New Music alerts enabled for followed artists" : "New Music alerts disabled",
-   playlistUpdates: (v) => v ? "Playlist News alerts enabled" : "Playlist News alerts disabled",
-   normalizeVolume: (v) => v ? "Same Volume enabled across all tracks" : "Volume normalization disabled",
-   explicitFilter: (v) => v ? "Explicit filter enabled — Bad words hidden" : "Explicit filter disabled",
-   fullviewReactiveBg: (v) => v ? "Full Player reactive mesh enabled" : "Full Player reactive mesh disabled",
-   trackPageReactiveBg: (v) => v ? "Track Page reactive mesh enabled" : "Track Page reactive mesh disabled",
-   listeningActivity: (v) => v ? "Listening activity visible on profile" : "Listening activity hidden",
+  const handlePreferenceUpdate = async (updatedPrefs: typeof preferences, key: string) => {
+    setIsSaving(true);
+    setSaveStatus("saving");
+    setSavingKey(key);
+    setLastSavedKey(null);
+    const { id, userId, createdAt, updatedAt, ...cleanPrefs } = updatedPrefs as any;
+    try {
+      await api.put("/auth/preferences", cleanPrefs);
+      updateUser({ preferences: updatedPrefs });
+      setSaveStatus("saved");
+      setLastSavedKey(key);
+      setTimeout(() => {
+        setSaveStatus("idle");
+        setLastSavedKey(null);
+      }, 2000);
+    } catch {
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    } finally {
+      setIsSaving(false);
+      setSavingKey(null);
+    }
   };
 
-  if (toastMap[key]) {
-   showToast(toastMap[key](value));
-  }
+  const handleToggle = (key: string, value: boolean) => {
+    const next = { ...preferences, [key]: value };
+    setPreferences(next);
 
-  handlePreferenceUpdate(next, key);
- };
+    if (key === "crossfade") {
+      setFx({ crossfade: value ? 4 : 0 });
+      if (typeof window !== "undefined") {
+        localStorage.setItem("zenify_crossfade", String(value));
+      }
+    }
+    if (key === "autoplay") {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("zenify_autoplay", String(value));
+      }
+    }
 
- const handleSelect = (key: string, value: string) => {
- const next = { ...preferences, [key]: value };
- setPreferences(next);
- handlePreferenceUpdate(next, key);
- };
+    const toastMap: Record<string, (v: boolean) => string> = {
+      crossfade: (v) => (v ? "Smooth Swaps enabled — Crossfading songs" : "Smooth Swaps disabled"),
+      autoplay: (v) => (v ? "Keep Playing enabled — Plays similar tracks when queue ends" : "Keep Playing disabled"),
+      emailNotifications: (v) => (v ? "Email Notifications enabled" : "Email Notifications disabled"),
+      weeklySummaryEmail: (v) => (v ? "Weekly Summary Email enabled" : "Weekly Summary Email disabled"),
+      newReleaseAlerts: (v) => (v ? "New Music alerts enabled for followed artists" : "New Music alerts disabled"),
+      playlistUpdates: (v) => (v ? "Playlist News alerts enabled" : "Playlist News alerts disabled"),
+      normalizeVolume: (v) => (v ? "Same Volume enabled across all tracks" : "Volume normalization disabled"),
+      explicitFilter: (v) => (v ? "Explicit filter enabled — Bad words hidden" : "Explicit filter disabled"),
+      fullviewReactiveBg: (v) => (v ? "Full Player reactive mesh enabled" : "Full Player reactive mesh disabled"),
+      trackPageReactiveBg: (v) => (v ? "Track Page reactive mesh enabled" : "Track Page reactive mesh disabled"),
+      listeningActivity: (v) => (v ? "Listening activity visible on profile" : "Listening activity hidden"),
+    };
 
- const selectSection = (id: SectionId) => {
- setActiveSection(id);
- // Instant switch without scrolling since the DOM completely replaces the content block
- };
+    if (toastMap[key]) {
+      showToast(toastMap[key](value));
+    }
 
- return (
- <div className="w-full relative font-sans pt-4 md:pt-0">
- {/* ── FLOATING DOCK HEADER ────────────────── */}
- <div className="relative md:sticky md:top-0 z-30 w-full pt-2 md:pt-[calc(var(--header-height)+1rem)] pb-4 px-3 md:px-6 pointer-events-none flex justify-center">
- <motion.nav
- initial={{ y: -20, opacity: 0 }}
- animate={{ y: 0, opacity: 1 }}
- className="flex items-center gap-1 p-1.5 rounded-3xl md:rounded-full bg-zinc-900/80 border border-white/10 backdrop-blur-md shadow-xl pointer-events-auto overflow-x-auto no-scrollbar max-w-full w-full md:w-auto"
- >
- {/* Compact Title/Logo for Dock */}
- <div className="px-4 py-1.5 mr-1 border-r border-white/5 hidden md:flex items-center shrink-0">
- <span className="text-[10px] font-bold tracking-tight text-white font-sans leading-none pt-[1px]">Settings</span>
- </div>
+    handlePreferenceUpdate(next, key);
+  };
 
- <div className="flex items-center gap-1 w-max px-2 md:px-0">
- {NAV_SECTIONS.map(({ id, label, icon: Icon }) => {
- const isActive = activeSection === id;
- const isChanging = isActive && saveStatus !== "idle";
- return (
- <button
- key={id}
- onClick={() => selectSection(id)}
- className={cn(
- "group relative flex items-center justify-center gap-2 px-3 py-2 md:px-4 rounded-full transition-all duration-200 text-[11px] font-bold tracking-tight shrink-0",
- (id as any) === 'shortcuts' ? "hidden md:flex" : "flex",
- isActive
- ? "bg-white/10 text-white"
- : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5",
- isChanging && saveStatus === "saved" && "bg-emerald-500/10 border border-emerald-500/20"
- )}
- >
- <span className="relative z-10 flex items-center gap-2">
- <motion.div layout transition={{ duration: 0.3 }}>
- <Icon size={15} className={cn(isActive && !isChanging ? "text-white" : "")} />
- </motion.div>
+  const handleSelect = (key: string, value: string) => {
+    const next = { ...preferences, [key]: value };
+    setPreferences(next);
+    handlePreferenceUpdate(next, key);
+  };
 
- <span className="inline-block">
- <AnimatePresence mode="popLayout" initial={false}>
- {isChanging ? (
- <motion.span
- key="status"
- initial={{ opacity: 0, x: 10 }}
- animate={{ opacity: 1, x: 0 }}
- exit={{ opacity: 0, x: -10 }}
- transition={{ duration: 0.2 }}
- className={cn(
- "flex items-center gap-1.5 text-[10px] font-bold tracking-wide leading-none",
- saveStatus === "saving" && "text-brand",
- saveStatus === "saved" && "text-emerald-400",
- saveStatus === "error" && "text-red-400"
- )}
- >
- {saveStatus === "saving" && <Loader2 size={10} className="animate-spin shrink-0" />}
- {saveStatus === "saved" && <CheckCircle size={10} className="shrink-0" />}
- {saveStatus === "error" && <AlertTriangle size={10} className="shrink-0" />}
- {saveStatus === "saving" ? "Saving..." : saveStatus.charAt(0).toUpperCase() + saveStatus.slice(1)}
- </motion.span>
- ) : (
- <motion.span
- key="label"
- initial={{ opacity: 0, x: -10 }}
- animate={{ opacity: 1, x: 0 }}
- exit={{ opacity: 0, x: 10 }}
- transition={{ duration: 0.2 }}
- className="leading-none"
- >
- {label}
- </motion.span>
- )}
- </AnimatePresence>
- </span>
- </span>
- </button>
- );
- })}
- </div>
- </motion.nav>
- </div>
+  // Small helper so every preference row wires up identically
+  const pref = (key: keyof typeof preferences) => ({
+    isSaving: savingKey === key,
+    isSaved: lastSavedKey === key,
+  });
 
- <div className="w-full px-6 md:px-12 pt-4 pb-12">
- <AnimatePresence mode="wait">
- {/* ── AUDIO ─── */}
- {activeSection === "audio" && (
- <SectionCard key="audio" id="audio" icon={Volume2} title="Audio" subtitle="Quality and playback gain management">
- <SettingRow label="Streaming Fidelity" icon={Cpu} description="Balance between bandwidth and audio clarity" isSaving={savingKey === "audioQuality"} isSaved={lastSavedKey === "audioQuality"}>
- <StyledSelect
- value={preferences.audioQuality}
- onValueChange={v => handleSelect("audioQuality", v)}
- disabled={isSaving}
- options={[
- { value: "low", label: "Basic" },
- { value: "high", label: "High" },
- { value: "lossless", label: "Best" },
- ]}
- />
- </SettingRow>
- <SettingRow label="Same Volume" icon={Zap} description="Keep the same volume for all songs" isSaving={savingKey === "normalizeVolume"} isSaved={lastSavedKey === "normalizeVolume"}>
- <Switch
- checked={preferences.normalizeVolume}
- onCheckedChange={v => handleToggle("normalizeVolume", v)}
- disabled={isSaving}
- />
- </SettingRow>
- <SettingRow label="Hide Bad Words" icon={EyeOff} description="Don't show songs with bad language" isSaving={savingKey === "explicitFilter"} isSaved={lastSavedKey === "explicitFilter"}>
- <Switch
- checked={preferences.explicitFilter}
- onCheckedChange={v => handleToggle("explicitFilter", v)}
- disabled={isSaving}
- />
- </SettingRow>
- <SettingRow label="8D Rotation Speed" icon={Waves} description="Adjust the 3D spatial rotation speed of the sound stage">
- <div className="flex items-center gap-3 w-[160px]" style={{ touchAction: 'none' }}>
- <Slider.Root
- className="relative flex items-center select-none h-6 cursor-pointer flex-grow"
- value={[audioFx.speed8D * 1000]}
- max={500}
- min={20}
- onValueChange={([val]) => {
- const newFreq = val / 1000;
- audioEngine.resume();
- audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D, newFreq);
- setFx({ speed8D: newFreq });
- }}
- >
- <Slider.Track className="bg-white/10 relative grow rounded-full h-[4px]">
- <Slider.Range className="absolute bg-brand h-full rounded-full" />
- </Slider.Track>
- <Slider.Thumb className="block w-4 h-4 bg-white rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.5)] focus:outline-none active:scale-125 transition-transform" />
- </Slider.Root>
- <span className="text-[11px] font-mono font-bold text-white/50 w-8 text-right tabular-nums">
- {(audioFx.speed8D * 100 / 0.15).toFixed(0)}%
- </span>
- </div>
- </SettingRow>
- </SectionCard>
- )}
-
- {/* ── PLAYBACK ─── */}
- {activeSection === "playback" && (
- <SectionCard key="playback" id="playback" icon={Play} title="Playback" subtitle="How your music plays">
- <SettingRow label="Smooth Swaps" icon={Music} description="Mix the end of one song into the next" badge="Beta" isSaving={savingKey === "crossfade"} isSaved={lastSavedKey === "crossfade"}>
- <Switch
- checked={preferences.crossfade}
- onCheckedChange={v => handleToggle("crossfade", v)}
- disabled={isSaving}
- />
- </SettingRow>
- <SettingRow label="Keep Playing" icon={Repeat} description="Keep playing similar songs when your music ends" isSaving={savingKey === "autoplay"} isSaved={lastSavedKey === "autoplay"}>
- <Switch
- checked={preferences.autoplay}
- onCheckedChange={v => handleToggle("autoplay", v)}
- disabled={isSaving}
- />
- </SettingRow>
- </SectionCard>
- )}
-
- {/* ── AESTHETICS ─── */}
- {activeSection === "aesthetics" && (
- <SectionCard key="aesthetics" id="aesthetics" icon={Palette} title="Aesthetics" subtitle="How the app looks">
- <SettingRow label="Main Color" icon={Zap} description="Change the main color of the app" isSaving={savingKey === "accentColor"} isSaved={lastSavedKey === "accentColor"}>
- <StyledSelect
- value={preferences.accentColor}
- onValueChange={v => handleSelect("accentColor", v)}
- disabled={isSaving}
- options={[
- { value: "rose", label: "Rose (Default)" },
- { value: "white", label: "White" },
- { value: "violet", label: "Violet" },
- { value: "cyan", label: "Cyan" },
- { value: "emerald", label: "Emerald" },
- { value: "amber", label: "Amber" },
- { value: "sunset", label: "Sunset (Gradient)" },
- { value: "ocean", label: "Ocean (Gradient)" },
- { value: "aurora", label: "Aurora (Gradient)" },
- { value: "neon", label: "Neon (Gradient)" },
- { value: "gold", label: "Gold (Gradient)" },
- { value: "midnight", label: "Midnight (Gradient)" },
- ]}
- />
- </SettingRow>
-
-
- 
-      {/* ── Subheader: Default reactive background ── */}
-      <div className="pt-6 pb-2 px-4 md:px-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Waves size={16} className="text-brand" />
-          <h3 className="text-[13px] md:text-sm font-bold text-white tracking-wide uppercase font-sans">
-            Reactive Canvas Background
-          </h3>
-        </div>
-        <p className="text-[11px] md:text-xs text-zinc-500 font-medium">
-          Choose which surfaces render the Apple Music style fluid mesh background. Disabling stops canvas and rAF execution completely.
-        </p>
-      </div>
-
-      <SettingRow
-        label="Full View Player"
-        icon={Maximize2}
-        description="Display fluid mesh canvas in the full screen player"
+  return (
+    <>
+      <SEO title="Settings – Zenify" noindex={true} path="/settings" />
+      <SettingsWindow
+        title="Settings"
+        nav={{
+          items: NAV_SECTIONS,
+          active: activeSection,
+          onSelect: (id) => setActiveSection(id as SectionId),
+        }}
+        status={saveStatus}
+        reducedMotion={reducedMotion}
+        scrollKey={activeSection}
       >
-        <Switch
-          checked={reactiveBgStore.reactiveBg.fullPlayer}
-          onCheckedChange={v => {
-            reactiveBgStore.setSurface('fullPlayer', v);
-            showToast(v ? "Full Player reactive background enabled" : "Full Player reactive background disabled");
-          }}
-        />
-      </SettingRow>
+        {/* ── AUDIO ─── */}
+        {activeSection === "audio" && (
+          <Section key="audio" title="Audio" subtitle="Quality and playback gain management">
+            <Group>
+              <Row label="Streaming Fidelity" icon={Cpu} tint={TINT.blue} description="Balance between bandwidth and audio clarity" {...pref("audioQuality")}>
+                <PopUp
+                  value={preferences.audioQuality}
+                  onValueChange={(v) => handleSelect("audioQuality", v)}
+                  disabled={isSaving}
+                  options={[
+                    { value: "low", label: "Basic" },
+                    { value: "high", label: "High" },
+                    { value: "lossless", label: "Best" },
+                  ]}
+                />
+              </Row>
+              <Row label="Same Volume" icon={Zap} tint={TINT.orange} description="Keep the same volume for all songs" {...pref("normalizeVolume")}>
+                <Toggle label="Same Volume" checked={preferences.normalizeVolume} onCheckedChange={(v) => handleToggle("normalizeVolume", v)} disabled={isSaving} />
+              </Row>
+              <Row label="Hide Bad Words" icon={EyeOff} tint={TINT.gray} description="Don't show songs with bad language" {...pref("explicitFilter")}>
+                <Toggle label="Hide Bad Words" checked={preferences.explicitFilter} onCheckedChange={(v) => handleToggle("explicitFilter", v)} disabled={isSaving} />
+              </Row>
+            </Group>
 
-      <SettingRow
-        label="Track Detail Page"
-        icon={Music}
-        description="Display fluid mesh canvas on track detail views"
-      >
-        <Switch
-          checked={reactiveBgStore.reactiveBg.trackPage}
-          onCheckedChange={v => {
-            reactiveBgStore.setSurface('trackPage', v);
-            showToast(v ? "Track Page reactive background enabled" : "Track Page reactive background disabled");
-          }}
-        />
-      </SettingRow>
+            <Group header="Spatial Audio" footer="Adjust the 3D spatial rotation speed of the sound stage.">
+              <Row label="8D Rotation Speed" icon={Waves} tint={TINT.purple} description="Spatial rotation speed">
+                <div className="flex w-[120px] items-center gap-3 sm:w-[170px]">
+                  <AppleSlider
+                    value={audioFx.speed8D * 1000}
+                    min={20}
+                    max={500}
+                    onValueChange={(val) => {
+                      const newFreq = val / 1000;
+                      audioEngine.resume();
+                      audioEngine.toggle8D(audioFx.is8D, audioFx.direction8D, newFreq);
+                      setFx({ speed8D: newFreq });
+                    }}
+                  />
+                  <span className="t-mono w-9 text-right text-[11px] font-semibold text-white/55">
+                    {((audioFx.speed8D * 100) / 0.15).toFixed(0)}%
+                  </span>
+                </div>
+              </Row>
+            </Group>
+          </Section>
+        )}
 
-      <SettingRow
-        label="Album Page"
-        icon={Disc3}
-        description="Display fluid mesh canvas on album views"
-      >
-        <Switch
-          checked={reactiveBgStore.reactiveBg.albumPage}
-          onCheckedChange={v => {
-            reactiveBgStore.setSurface('albumPage', v);
-            showToast(v ? "Album Page reactive background enabled" : "Album Page reactive background disabled");
-          }}
-        />
-      </SettingRow>
+        {/* ── PLAYBACK ─── */}
+        {activeSection === "playback" && (
+          <Section key="playback" title="Playback" subtitle="How your music plays">
+            <Group>
+              <Row label="Smooth Swaps" icon={Music} tint={TINT.pink} badge="Beta" description="Mix the end of one song into the next" {...pref("crossfade")}>
+                <Toggle label="Smooth Swaps" checked={preferences.crossfade} onCheckedChange={(v) => handleToggle("crossfade", v)} disabled={isSaving} />
+              </Row>
+              <Row label="Keep Playing" icon={Repeat} tint={TINT.green} description="Keep playing similar songs when your music ends" {...pref("autoplay")}>
+                <Toggle label="Keep Playing" checked={preferences.autoplay} onCheckedChange={(v) => handleToggle("autoplay", v)} disabled={isSaving} />
+              </Row>
+            </Group>
+          </Section>
+        )}
 
-      <SettingRow
-        label="Artist Page"
-        icon={User}
-        description="Display fluid mesh canvas on artist header views"
-      >
-        <Switch
-          checked={reactiveBgStore.reactiveBg.artistPage}
-          onCheckedChange={v => {
-            reactiveBgStore.setSurface('artistPage', v);
-            showToast(v ? "Artist Page reactive background enabled" : "Artist Page reactive background disabled");
-          }}
-        />
-      </SettingRow>
+        {/* ── AESTHETICS ─── */}
+        {activeSection === "aesthetics" && (
+          <Section key="aesthetics" title="Aesthetics" subtitle="How the app looks">
+            <Group>
+              <Row label="Main Color" icon={Zap} tint={TINT.orange} description="Change the main color of the app" {...pref("accentColor")}>
+                <PopUp
+                  value={preferences.accentColor}
+                  onValueChange={(v) => handleSelect("accentColor", v)}
+                  disabled={isSaving}
+                  options={[
+                    { value: "rose", label: "Rose (Default)" },
+                    { value: "white", label: "White" },
+                    { value: "violet", label: "Violet" },
+                    { value: "cyan", label: "Cyan" },
+                    { value: "emerald", label: "Emerald" },
+                    { value: "amber", label: "Amber" },
+                    { value: "sunset", label: "Sunset (Gradient)" },
+                    { value: "ocean", label: "Ocean (Gradient)" },
+                    { value: "aurora", label: "Aurora (Gradient)" },
+                    { value: "neon", label: "Neon (Gradient)" },
+                    { value: "gold", label: "Gold (Gradient)" },
+                    { value: "midnight", label: "Midnight (Gradient)" },
+                  ]}
+                />
+              </Row>
+            </Group>
 
-      <SettingRow
-        label="Other Panels & Lyrics"
-        icon={ScrollText}
-        description="Display fluid mesh canvas behind sidebar lyrics & other surfaces"
-      >
-        <Switch
-          checked={reactiveBgStore.reactiveBg.other}
-          onCheckedChange={v => {
-            reactiveBgStore.setSurface('other', v);
-            showToast(v ? "Other Panels reactive background enabled" : "Other Panels reactive background disabled");
-          }}
-        />
-      </SettingRow>
- <SettingRow label="Less Motion" icon={Shuffle} description="Reduce moving parts for better speed">
-  <Switch
-   checked={reducedMotion}
-   onCheckedChange={v => {
-    setReducedMotion(v);
-    showToast(v ? "Less Motion enabled — Animations reduced" : "Less Motion disabled — Full animations restored");
-   }}
-  />
- </SettingRow>
- </SectionCard>
- )}
+            <Group
+              header="Reactive Canvas Background"
+              footer="Choose which surfaces render the Apple Music style fluid mesh background. Disabling stops canvas and rAF execution completely."
+            >
+              {REACTIVE_SURFACES.map((s) => (
+                <Row key={s.key} label={s.label} icon={s.icon} tint={s.tint} description={s.desc}>
+                  <Toggle
+                    label={s.label}
+                    checked={(reactiveBgStore.reactiveBg as any)[s.key]}
+                    onCheckedChange={(v) => {
+                      reactiveBgStore.setSurface(s.key as any, v);
+                      showToast(v ? `${s.name} reactive background enabled` : `${s.name} reactive background disabled`);
+                    }}
+                  />
+                </Row>
+              ))}
+            </Group>
 
- {/* ── NOTIFICATIONS ─── */}
- {activeSection === "notifications" && (
- <SectionCard key="notifications" id="notifications" icon={Bell} title="Notifications" subtitle="Alerts and updates">
-  <SettingRow label="Email Notifications" icon={Mail} description="Get general email updates" isSaving={savingKey === "emailNotifications"} isSaved={lastSavedKey === "emailNotifications"}>
-  <Switch
-  checked={preferences.emailNotifications}
-  onCheckedChange={v => handleToggle("emailNotifications", v)}
-  disabled={isSaving}
-  />
-  </SettingRow>
-  <SettingRow label="Weekly Summary Email" icon={Mail} description="Get a weekly email about your activity" isSaving={savingKey === "weeklySummaryEmail"} isSaved={lastSavedKey === "weeklySummaryEmail"}>
-  <Switch
-  checked={!!preferences.weeklySummaryEmail}
-  onCheckedChange={v => handleToggle("weeklySummaryEmail", v)}
-  disabled={isSaving}
-  />
-  </SettingRow>
-  <SettingRow label="New Music" icon={Radio} description="Alert me when artists I follow drop new songs" isSaving={savingKey === "newReleaseAlerts"} isSaved={lastSavedKey === "newReleaseAlerts"}>
-  <Switch
-  checked={preferences.newReleaseAlerts}
-  onCheckedChange={v => handleToggle("newReleaseAlerts", v)}
-  disabled={isSaving}
-  />
-  </SettingRow>
- <SettingRow label="Playlist News" icon={Globe} description="Alert me when my playlists are updated" isSaving={savingKey === "playlistUpdates"} isSaved={lastSavedKey === "playlistUpdates"}>
- <Switch
- checked={preferences.playlistUpdates}
- onCheckedChange={v => handleToggle("playlistUpdates", v)}
- disabled={isSaving}
- />
- </SettingRow>
- </SectionCard>
- )}
+            <Group>
+              <Row label="Less Motion" icon={Shuffle} tint={TINT.teal} description="Reduce moving parts for better speed">
+                <Toggle
+                  label="Less Motion"
+                  checked={reducedMotion}
+                  onCheckedChange={(v) => {
+                    setReducedMotion(v);
+                    showToast(v ? "Less Motion enabled — Animations reduced" : "Less Motion disabled — Full animations restored");
+                  }}
+                />
+              </Row>
+            </Group>
+          </Section>
+        )}
 
- {/* ── PRIVACY ─── */}
- {activeSection === "privacy" && (
- <SectionCard key="privacy" id="privacy" icon={Shield} title="Privacy" subtitle="Your safety and sharing">
- <SettingRow label="Show Activity" icon={Activity} description="Display what you're playing on your profile" isSaving={savingKey === "listeningActivity"} isSaved={lastSavedKey === "listeningActivity"}>
- <Switch
- checked={preferences.listeningActivity}
- onCheckedChange={v => handleToggle("listeningActivity", v)}
- disabled={isSaving}
- />
- </SettingRow>
- </SectionCard>
- )}
+        {/* ── NOTIFICATIONS ─── */}
+        {activeSection === "notifications" && (
+          <Section key="notifications" title="Notifications" subtitle="Alerts and updates">
+            <Group header="Email">
+              <Row label="Email Notifications" icon={Mail} tint={TINT.blue} description="Get general email updates" {...pref("emailNotifications")}>
+                <Toggle label="Email Notifications" checked={preferences.emailNotifications} onCheckedChange={(v) => handleToggle("emailNotifications", v)} disabled={isSaving} />
+              </Row>
+              <Row label="Weekly Summary Email" icon={Mail} tint={TINT.indigo} description="Get a weekly email about your activity" {...pref("weeklySummaryEmail")}>
+                <Toggle label="Weekly Summary Email" checked={!!preferences.weeklySummaryEmail} onCheckedChange={(v) => handleToggle("weeklySummaryEmail", v)} disabled={isSaving} />
+              </Row>
+            </Group>
+            <Group header="Alerts">
+              <Row label="New Music" icon={Radio} tint={TINT.pink} description="Alert me when artists I follow drop new songs" {...pref("newReleaseAlerts")}>
+                <Toggle label="New Music" checked={preferences.newReleaseAlerts} onCheckedChange={(v) => handleToggle("newReleaseAlerts", v)} disabled={isSaving} />
+              </Row>
+              <Row label="Playlist News" icon={Globe} tint={TINT.teal} description="Alert me when my playlists are updated" {...pref("playlistUpdates")}>
+                <Toggle label="Playlist News" checked={preferences.playlistUpdates} onCheckedChange={(v) => handleToggle("playlistUpdates", v)} disabled={isSaving} />
+              </Row>
+            </Group>
+          </Section>
+        )}
 
- {/* ── SHORTCUTS ─── */}
- {activeSection === "shortcuts" && (
- <div className="hidden md:block">
- <ShortcutSettingsSection />
- </div>
- )}
- </AnimatePresence>
- </div>
- </div>
- );
+        {/* ── PRIVACY ─── */}
+        {activeSection === "privacy" && (
+          <Section key="privacy" title="Privacy" subtitle="Your safety and sharing">
+            <Group>
+              <Row label="Show Activity" icon={Activity} tint={TINT.blue} description="Display what you're playing on your profile" {...pref("listeningActivity")}>
+                <Toggle label="Show Activity" checked={preferences.listeningActivity} onCheckedChange={(v) => handleToggle("listeningActivity", v)} disabled={isSaving} />
+              </Row>
+            </Group>
+          </Section>
+        )}
+
+        {/* ── SHORTCUTS ─── */}
+        {activeSection === "shortcuts" && (
+          <div className="hidden md:block">
+            <ShortcutSettingsSection />
+          </div>
+        )}
+      </SettingsWindow>
+    </>
+  );
 }
 
 function ShortcutSettingsSection() {
- const { shortcuts, setShortcut, resetShortcut, resetAll } = useShortcutStore();
- const [recordingAction, setRecordingAction] = useState<string | null>(null);
- const [error, setError] = useState<string | null>(null);
+  const { shortcuts, setShortcut, resetShortcut, resetAll } = useShortcutStore();
+  const [recordingAction, setRecordingAction] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
- useEffect(() => {
- if (!recordingAction) return;
+  // Tells the floating window not to close on Escape while recording a key
+  useEffect(() => {
+    if (recordingAction) document.body.dataset.recordingShortcut = "1";
+    return () => {
+      delete document.body.dataset.recordingShortcut;
+    };
+  }, [recordingAction]);
 
- const handleKeyDown = (e: KeyboardEvent) => {
- e.preventDefault();
+  useEffect(() => {
+    if (!recordingAction) return;
 
- // Don't record single modifier keys
- if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
- if (e.key === 'Escape') {
- setRecordingAction(null);
- return;
- }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
 
- const pressed = [];
- if (e.ctrlKey) pressed.push('Ctrl');
- if (e.metaKey) pressed.push('Meta');
- if (e.shiftKey) pressed.push('Shift');
- if (e.altKey) pressed.push('Alt');
+      // Don't record single modifier keys
+      if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+      if (e.key === "Escape") {
+        setRecordingAction(null);
+        return;
+      }
 
- // Exclude modifier keys themselves from being the main key
- if (!['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) {
- // Use e.code directly without slicing 'Key' prefix
- pressed.push(e.code);
- }
- const combo = pressed.join('+');
+      const pressed = [];
+      if (e.ctrlKey) pressed.push("Ctrl");
+      if (e.metaKey) pressed.push("Meta");
+      if (e.shiftKey) pressed.push("Shift");
+      if (e.altKey) pressed.push("Alt");
 
- // Conflict detection
- const conflict = shortcuts.find(s => s.key === combo && s.action !== recordingAction);
- if (conflict) {
- setError(`Already assigned to ${conflict.label}`);
- setTimeout(() => setError(null), 2000);
- return;
- }
+      // Exclude modifier keys themselves from being the main key
+      if (!["ControlLeft", "ControlRight", "ShiftLeft", "ShiftRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight"].includes(e.code)) {
+        // Use e.code directly without slicing 'Key' prefix
+        pressed.push(e.code);
+      }
+      const combo = pressed.join("+");
 
- setShortcut(recordingAction, combo);
- setRecordingAction(null);
- };
+      // Conflict detection
+      const conflict = shortcuts.find((s) => s.key === combo && s.action !== recordingAction);
+      if (conflict) {
+        setError(`Already assigned to ${conflict.label}`);
+        setTimeout(() => setError(null), 2000);
+        return;
+      }
 
- window.addEventListener('keydown', handleKeyDown);
- return () => window.removeEventListener('keydown', handleKeyDown);
- }, [recordingAction, shortcuts, setShortcut]);
+      setShortcut(recordingAction, combo);
+      setRecordingAction(null);
+    };
 
- const categories = ['Playback', 'Seeking', 'Volume', 'Interface'] as const;
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [recordingAction, shortcuts, setShortcut]);
 
- return (
- <SectionCard id="shortcuts" icon={Keyboard} title="Keyboard Shortcuts" subtitle="Personalize your workflow">
- <div className="flex justify-end mb-8">
- <button
- onClick={resetAll}
- className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/30 text-xs font-bold text-white/40 hover:text-white transition-all"
- >
- <RotateCcw size={14} />
- Reset All to Defaults
- </button>
- </div>
+  const categories = ["Playback", "Seeking", "Volume", "Interface"] as const;
 
- <div className="space-y-12">
- {categories.map(cat => {
- const uniqueShortcuts = Array.from(new Map(shortcuts.map(s => [s.action, s])).values());
- const catShortcuts = uniqueShortcuts.filter(s => s.category === cat);
- if (catShortcuts.length === 0) return null;
+  return (
+    <Section title="Keyboard Shortcuts" subtitle="Personalize your workflow">
+      <div className="-mt-2 mb-4 flex justify-end">
+        <AppButton onClick={resetAll}>
+          <RotateCcw size={13} strokeWidth={2.4} />
+          Reset All to Defaults
+        </AppButton>
+      </div>
 
- return (
- <div key={cat} className="space-y-4">
- <h3 className="text-[10px] tracking-widest font-bold text-white/40 px-4 border-l-2 border-white/20">{cat}</h3>
- <div className="space-y-1">
- {catShortcuts.map(s => (
- <div key={s.action} className="group flex items-center justify-between py-4 px-6 rounded-3xl hover:bg-white/[0.04] transition-all duration-300 border border-transparent hover:border-white/10">
- <div className="min-w-0">
- <span className="text-sm font-bold text-white/60 group-hover:text-white transition-colors">{s.label}</span>
- </div>
+      {categories.map((cat) => {
+        const uniqueShortcuts = Array.from(new Map(shortcuts.map((s) => [s.action, s])).values());
+        const catShortcuts = uniqueShortcuts.filter((s) => s.category === cat);
+        if (catShortcuts.length === 0) return null;
 
- <div className="flex items-center gap-4">
- {recordingAction === s.action ? (
- <div className="flex items-center gap-3 animate-pulse bg-white/10 px-4 py-2 rounded-xl border border-white/20">
- <span className="text-[10px] font-bold tracking-tight text-white/40">Press any key...</span>
- {error && <span className="text-[10px] font-bold tracking-tight text-red-500">{error}</span>}
- </div>
- ) : (
- <div className="flex gap-1.5">
- {s.key.split('+').map(k => {
- const cleanKey = k
- .replace('Key', '')
- .replace('Digit', '')
- .replace('Arrow', '');
- return (
- <kbd key={k} className="px-2.5 py-1.5 rounded-xl bg-zinc-800 border-b-2 border-zinc-950 text-[10px] font-bold text-white min-w-[32px] text-center shadow-lg">
- {cleanKey}
- </kbd>
- );
- })}
- </div>
- )}
+        return (
+          <Group key={cat} header={cat}>
+            {catShortcuts.map((s) => (
+              <Row key={s.action} label={s.label}>
+                {recordingAction === s.action ? (
+                  <div className="flex animate-pulse items-center gap-2 rounded-[8px] bg-white/10 px-3 py-1 ring-1 ring-inset ring-white/15">
+                    <span className="text-[11px] font-semibold text-white/60">Press any key…</span>
+                    {error && <span className="text-[11px] font-semibold text-[#ff453a]">{error}</span>}
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    {s.key.split("+").map((k) => {
+                      const cleanKey = k.replace("Key", "").replace("Digit", "").replace("Arrow", "");
+                      return <KeyCap key={k}>{cleanKey}</KeyCap>;
+                    })}
+                  </div>
+                )}
 
- <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
- <button
- onClick={() => setRecordingAction(s.action)}
- className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[10px] font-bold tracking-tight text-white/40 hover:text-white transition-all border border-white/10"
- >
- {recordingAction === s.action ? 'Cancel' : 'Edit'}
- </button>
- <button
- onClick={() => resetShortcut(s.action)}
- className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all border border-white/10"
- title="Reset to default"
- >
- <RotateCcw size={14} />
- </button>
- </div>
- </div>
- </div>
- ))}
- </div>
- </div>
- );
- })}
- </div>
- </SectionCard>
- );
+                <div className="flex items-center gap-1.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                  <AppButton onClick={() => setRecordingAction(recordingAction === s.action ? null : s.action)}>
+                    {recordingAction === s.action ? "Cancel" : "Edit"}
+                  </AppButton>
+                  <AppButton onClick={() => resetShortcut(s.action)} title="Reset to default" aria-label="Reset to default" className="w-7 px-0 justify-center">
+                    <RotateCcw size={13} strokeWidth={2.4} />
+                  </AppButton>
+                </div>
+              </Row>
+            ))}
+          </Group>
+        );
+      })}
+    </Section>
+  );
 }
