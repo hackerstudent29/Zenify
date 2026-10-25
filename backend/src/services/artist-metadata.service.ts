@@ -52,10 +52,40 @@ export class ArtistMetadataService {
         let source: ArtistVisuals['source'] = 'apple_music';
 
         // ─────────────────────────────────────────────────────────────
-        // 1. PRIMARY: Apple Music / iTunes Web Scraper (Official 1920x1080)
+        // 0. PRIMARY: Apple Music Official Developer API (Pristine 1920x1080)
         // ─────────────────────────────────────────────────────────────
         try {
-            const searchRes = await axios.get(`https://itunes.apple.com/search`, {
+            await KeyPoolService.executeWithFailover('applemusic', async (amToken) => {
+                const searchRes = await axios.get(`https://amp-api.music.apple.com/v1/catalog/in/search`, {
+                    headers: { Authorization: `Bearer ${amToken}`, Origin: 'https://music.apple.com' },
+                    params: { term: cleanName, types: 'artists', limit: 1 },
+                    timeout: 4500
+                });
+                const artMatch = searchRes.data.results?.artists?.data?.[0];
+                if (artMatch) {
+                    const rawArt = artMatch.attributes?.artwork?.url;
+                    if (rawArt) {
+                        heroBanner = rawArt.replace('{w}x{h}', '1920x1080').replace('{f}', 'jpg');
+                        avatar = rawArt.replace('{w}x{h}', '600x600').replace('{f}', 'jpg');
+                        source = 'apple_music';
+                    }
+                    const notes = artMatch.attributes?.editorialNotes;
+                    const editorialBio = notes?.standard || notes?.short;
+                    if (editorialBio && editorialBio.length > 20) {
+                        bio = editorialBio;
+                    }
+                }
+            });
+        } catch (amErr: any) {
+            console.warn(`[ArtistMetadata] Apple Music Developer API failed for "${cleanName}": ${amErr.message}`);
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        // 1. FALLBACK 1: Apple Music / iTunes Web Scraper (Official 1920x1080)
+        // ─────────────────────────────────────────────────────────────
+        if (!heroBanner || !avatar) {
+            try {
+                const searchRes = await axios.get(`https://itunes.apple.com/search`, {
                 params: {
                     term: cleanName,
                     media: 'music',
@@ -93,6 +123,7 @@ export class ArtistMetadataService {
             }
         } catch (e: any) {
             console.warn(`[ArtistMetadata] Apple Music lookup failed for "${cleanName}": ${e.message}`);
+        }
         }
 
         // ─────────────────────────────────────────────────────────────

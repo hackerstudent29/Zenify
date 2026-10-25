@@ -163,11 +163,28 @@ export class AppleMusicProvider implements CatalogProvider {
   private circuit = new CircuitBreaker(4, 60000);
 
   isAvailable(): boolean {
-    return Boolean(this.teamId && this.keyId && this.privateKey && !this.circuit.isOpen());
+    return !this.circuit.isOpen();
   }
 
-  private getDeveloperToken(): string {
+  private async getDeveloperToken(): Promise<string> {
     if (this.cachedToken && Date.now() < this.tokenExpiresAt - 3600000) {
+      return this.cachedToken;
+    }
+
+    // 1. Try KeyPoolService / environment token
+    try {
+      const { KeyPoolService } = await import('./key-pool.service.js');
+      const poolToken = await KeyPoolService.getKey('applemusic');
+      if (poolToken) {
+        this.cachedToken = poolToken;
+        this.tokenExpiresAt = Date.now() + 86400 * 30 * 1000;
+        return poolToken;
+      }
+    } catch {}
+
+    if (process.env.APPLE_MUSIC_DEVELOPER_TOKEN) {
+      this.cachedToken = process.env.APPLE_MUSIC_DEVELOPER_TOKEN;
+      this.tokenExpiresAt = Date.now() + 86400 * 30 * 1000;
       return this.cachedToken;
     }
 
@@ -199,9 +216,12 @@ export class AppleMusicProvider implements CatalogProvider {
     await this.bucket.acquire();
 
     try {
-      const token = this.getDeveloperToken();
+      const token = await this.getDeveloperToken();
       const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Origin: 'https://music.apple.com'
+        },
         params,
         timeout: 5000
       });

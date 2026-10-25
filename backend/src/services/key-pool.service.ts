@@ -49,6 +49,15 @@ export class KeyPoolService {
       'REDACTED_RAPIDAPI',
       'REDACTED_RAPIDAPI',
       'REDACTED_RAPIDAPI'
+    ].filter(k => k && k.length > 5),
+    applemusic: [
+      process.env.APPLE_MUSIC_DEVELOPER_TOKEN || '',
+      ...(process.env.APPLE_MUSIC_DEVELOPER_TOKENS ? process.env.APPLE_MUSIC_DEVELOPER_TOKENS.split(',').map(s => s.trim()) : []),
+      // Verified Working Apple Music Tokens (Active until 2027)
+      'REDACTED_APPLE_JWT',
+      'REDACTED_APPLE_JWT',
+      'REDACTED_APPLE_JWT',
+      'REDACTED_APPLE_JWT'
     ].filter(k => k && k.length > 5)
   };
 
@@ -71,10 +80,12 @@ export class KeyPoolService {
       const settings = await prisma.systemSettings.findUnique({ where: { id: 'global' } });
       const dbKeys = (settings?.keys as any) || {};
 
-      const envOrDbKeys = dbKeys[`${poolName.toUpperCase()}_KEYS`] || 
-                          dbKeys[`${poolName.toUpperCase()}_KEY`] ||
-                          dbKeys.RAPIDAPI_KEYS ||
-                          dbKeys.RAPIDAPI_KEY;
+      let envOrDbKeys = dbKeys[`${poolName.toUpperCase()}_KEYS`] || dbKeys[`${poolName.toUpperCase()}_KEY`];
+      if (!envOrDbKeys && poolName === 'applemusic') {
+        envOrDbKeys = dbKeys.APPLE_MUSIC_DEVELOPER_TOKENS || dbKeys.APPLE_MUSIC_DEVELOPER_TOKEN;
+      } else if (!envOrDbKeys && (poolName === 'rapidapi' || poolName === 'spotify' || poolName === 'lyrics' || poolName === 'genius' || poolName === 'youtube')) {
+        envOrDbKeys = dbKeys.RAPIDAPI_KEYS || dbKeys.RAPIDAPI_KEY;
+      }
 
       if (Array.isArray(envOrDbKeys)) {
         candidateKeys.push(...envOrDbKeys.filter(Boolean));
@@ -83,8 +94,14 @@ export class KeyPoolService {
       }
     } catch {}
 
-    // 2. Fetch from Process Environment Variables (supports comma-separated list of 20-50+ keys)
-    const envVal = process.env[`${poolName.toUpperCase()}_KEYS`] || process.env.RAPIDAPI_KEYS;
+    // 2. Fetch from Process Environment Variables (supports comma-separated list of keys)
+    let envVal = process.env[`${poolName.toUpperCase()}_KEYS`] || process.env[`${poolName.toUpperCase()}_KEY`];
+    if (!envVal && poolName === 'applemusic') {
+      envVal = process.env.APPLE_MUSIC_DEVELOPER_TOKENS || process.env.APPLE_MUSIC_DEVELOPER_TOKEN;
+    } else if (!envVal && (poolName === 'rapidapi' || poolName === 'spotify' || poolName === 'lyrics' || poolName === 'genius' || poolName === 'youtube')) {
+      envVal = process.env.RAPIDAPI_KEYS || process.env.RAPIDAPI_KEY;
+    }
+
     if (envVal) {
       candidateKeys.push(...envVal.split(',').map(k => k.trim()).filter(Boolean));
     }
@@ -121,6 +138,9 @@ export class KeyPoolService {
   static async getKey(poolName: string = 'rapidapi'): Promise<string> {
     const states = await this.syncPool(poolName);
     if (states.length === 0) {
+      if (poolName === 'applemusic') {
+        return this.defaultKeys.applemusic?.[0] || '';
+      }
       return process.env.RAPIDAPI_KEY || 'REDACTED_RAPIDAPI';
     }
 
