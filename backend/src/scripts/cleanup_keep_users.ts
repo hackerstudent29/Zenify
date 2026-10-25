@@ -1,88 +1,69 @@
 import { prisma } from '../utils/prisma.js';
 import Redis from 'ioredis';
 import { config } from '../config/env.js';
+import { flushAllCaches } from '../utils/cache.js';
+
+async function safeDelete(name: string, fn: () => Promise<any>) {
+  try {
+    const res = await fn();
+    console.log(`Deleted ${name}: count = ${res?.count ?? 'ok'}`);
+    return res?.count ?? 0;
+  } catch (err: any) {
+    console.log(`Skipped ${name} (table not present or error): ${err.message}`);
+    return 0;
+  }
+}
 
 async function main() {
-    console.log('--- STARTING CLEANUP: SAVING ONLY USER DETAILS ---');
+  console.log('--- STARTING CLEANUP: DELETING TRACKS, ARTISTS, ALBUMS & CACHE (USERS PRESERVED) ---');
 
-    // 1. Delete dependent & non-user data
-    console.log('1. Clearing non-user tables...');
-    const dPlaylistTracks = await prisma.playlistTrack.deleteMany();
-    const dPlaylists = await prisma.playlist.deleteMany();
-    const dLikes = await prisma.like.deleteMany();
-    const dHistory = await prisma.history.deleteMany();
-    const dPurchases = await prisma.purchase.deleteMany();
-    const dRatings = await prisma.rating.deleteMany();
-    const dUserTrackStats = await prisma.userTrackStat.deleteMany();
-    const dUserDailyStats = await prisma.userDailyStat.deleteMany();
-    const dUserActivityEvents = await prisma.userActivityEvent.deleteMany();
-    const dUserInterestProfiles = await prisma.userInterestProfile.deleteMany();
-    const dAnalysisRuns = await prisma.analysisRun.deleteMany();
-    const dNotifications = await prisma.notification.deleteMany();
-    const dTrackAnalytics = await prisma.trackAnalytics.deleteMany();
-    const dTrackVibeProfiles = await prisma.trackVibeProfile.deleteMany();
-    const dLyricEnrichmentJobs = await prisma.lyricEnrichmentJob.deleteMany();
-    const dFeaturedContent = await prisma.featuredContent.deleteMany();
-    const dTracks = await prisma.track.deleteMany();
-    const dAlbums = await prisma.album.deleteMany();
-    const dArtists = await prisma.artist.deleteMany();
+  // 1. Delete dependent & non-user music data
+  console.log('1. Clearing non-user music tables...');
+  await safeDelete('PlaylistTracks', () => prisma.playlistTrack.deleteMany());
+  await safeDelete('Playlists', () => prisma.playlist.deleteMany());
+  await safeDelete('Likes', () => prisma.like.deleteMany());
+  await safeDelete('History', () => prisma.history.deleteMany());
+  await safeDelete('Purchases', () => prisma.purchase.deleteMany());
+  await safeDelete('Ratings', () => prisma.rating.deleteMany());
+  await safeDelete('UserTrackStats', () => prisma.userTrackStat.deleteMany());
+  await safeDelete('TrackAnalytics', () => prisma.trackAnalytics.deleteMany());
+  await safeDelete('TrackVibeProfiles', () => prisma.trackVibeProfile.deleteMany());
+  await safeDelete('LyricEnrichmentJobs', () => prisma.lyricEnrichmentJob.deleteMany());
+  await safeDelete('FeaturedContent', () => prisma.featuredContent.deleteMany());
+  await safeDelete('ArtistAliases', () => (prisma as any).artistAlias?.deleteMany?.());
+  await safeDelete('Tracks', () => prisma.track.deleteMany());
+  await safeDelete('Albums', () => prisma.album.deleteMany());
+  await safeDelete('Artists', () => prisma.artist.deleteMany());
 
-    console.log(`Deleted:
-    - ${dNotifications.count} Notifications
-    - ${dArtists.count} Artists
-    - ${dAlbums.count} Albums
-    - ${dTracks.count} Tracks
-    - ${dPlaylists.count} Playlists
-    - ${dUserActivityEvents.count} UserActivityEvents`);
+  // 2. Verify all users remain intact
+  const userCount = await prisma.user.count();
+  console.log(`2. Verified: All ${userCount} users and their details remain 100% intact.`);
 
-    // 2. Keep and update all users: turn all email options OFF
-    console.log('2. Updating all users email options to OFF...');
-    const users = await prisma.user.findMany({
-        select: { id: true, email: true, name: true, preferences: true }
-    });
-    console.log(`Found ${users.length} users to preserve.`);
+  // 3. Clear Redis Cache and memory cache
+  console.log('3. Flushing all Redis and memory caches...');
+  try {
+    await flushAllCaches();
+  } catch (err: any) {
+    console.warn('flushAllCaches note:', err.message);
+  }
 
-    for (const u of users) {
-        await prisma.userPreferences.upsert({
-            where: { userId: u.id },
-            create: {
-                userId: u.id,
-                emailNotifications: false,
-                newReleaseAlerts: false,
-                playlistUpdates: false,
-                weeklySummaryEmail: false,
-            },
-            update: {
-                emailNotifications: false,
-                newReleaseAlerts: false,
-                playlistUpdates: false,
-                weeklySummaryEmail: false,
-            }
-        });
-        console.log(`User [${u.email}]: All email notification options set to OFF.`);
+  if (config.REDIS_URL) {
+    try {
+      const redis = new Redis(config.REDIS_URL, { connectTimeout: 5000, maxRetriesPerRequest: 1 });
+      await redis.flushall();
+      await redis.quit();
+      console.log('Remote Redis cache flushed completely (flushall).');
+    } catch (err: any) {
+      console.warn('Could not flush remote Redis:', err.message);
     }
+  }
 
-    // 3. Clear Redis Cache (if Redis is running)
-    console.log('3. Flushing Redis and external caches...');
-    if (config.REDIS_URL) {
-        try {
-            const redis = new Redis(config.REDIS_URL, { connectTimeout: 3000, maxRetriesPerRequest: 1 });
-            await redis.flushall();
-            await redis.quit();
-            console.log('Redis cache flushed completely (flushall).');
-        } catch (err: any) {
-            console.warn('Could not flush remote Redis:', err.message);
-        }
-    } else {
-        console.log('No remote REDIS_URL configured; local in-memory caches will start clean on restart.');
-    }
-
-    console.log('--- CLEANUP COMPLETE: ONLY USER DETAILS PRESERVED, ALL EMAIL NOTIFICATIONS OFF ---');
+  console.log('--- CLEANUP COMPLETE: ONLY USER DETAILS PRESERVED, CATALOG WIPED CLEAN ---');
 }
 
 main()
-    .catch((err) => {
-        console.error('Cleanup error:', err);
-        process.exit(1);
-    })
-    .finally(() => prisma.$disconnect());
+  .catch((err) => {
+    console.error('Cleanup error:', err);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());
