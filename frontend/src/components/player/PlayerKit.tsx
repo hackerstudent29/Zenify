@@ -40,7 +40,7 @@ export const panelMotion = {
 /* ------------------------------------------------------------------ */
 /*  CSS spring easing (compositor-driven)                              */
 /* ------------------------------------------------------------------ */
-function springCurve(zeta: number, settleMs: number, points = 56) {
+export function springCurve(zeta: number, settleMs: number, points = 56) {
   const w = 4.6 / (zeta * (settleMs / 1000));
   const wd = w * Math.sqrt(1 - zeta * zeta);
   const out: string[] = [];

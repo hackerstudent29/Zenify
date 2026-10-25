@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AnimatePresence,
+  LayoutGroup,
   motion,
+  motionValue,
   MotionConfig,
   useDragControls,
   useMotionValue,
+  useMotionValueEvent,
   useTransform,
+  type MotionValue,
 } from "framer-motion";
 import { ListPlus, RefreshCw, User, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -64,6 +68,54 @@ function useShownCover(track: any) {
   }, [track?.id, cover]);
 
   return shown;
+}
+
+/* ------------------------------------------------------------------ */
+/*  MorphWrap: the mini-player artwork physically grows into the big   */
+/*  artwork. Its position/scale are derived from the sheet's own       */
+/*  y motion value, so it follows opening, closing AND finger-drag.    */
+/* ------------------------------------------------------------------ */
+function MorphWrap({
+  sheetY, miniRef, H, style, children, onPointerDown,
+}: {
+  sheetY: MotionValue<number>;
+  miniRef: React.RefObject<HTMLDivElement>;
+  H: number;
+  style: React.CSSProperties;
+  children: React.ReactNode;
+  onPointerDown?: React.PointerEventHandler;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const geo = useRef<{ dx: number; dy: number; sr: number } | null>(null);
+  const x = useMotionValue(0), y = useMotionValue(0), s = useMotionValue(1);
+
+  const update = useCallback((v: number) => {
+    const g = geo.current;
+    if (!g) return;
+    const q = Math.min(1, Math.max(0, v / H)); // 1 = fully closed, 0 = fully open
+    x.set(g.dx * q);
+    y.set(g.dy * q - v);
+    s.set(1 + (g.sr - 1) * q);
+  }, [H, x, y, s]);
+
+  useMotionValueEvent(sheetY, "change", update);
+
+  useLayoutEffect(() => {
+    const el = ref.current, mini = miniRef.current;
+    if (!el || !mini) return;
+    const r = el.getBoundingClientRect();
+    const m = mini.getBoundingClientRect();
+    if (!r.width || !m.width) return;
+    geo.current = { dx: m.left - r.left, dy: m.top - (r.top - sheetY.get()), sr: m.width / r.width };
+    update(sheetY.get());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <motion.div ref={ref} style={{ ...style, x, y, scale: s, transformOrigin: "0 0" }} onPointerDown={onPointerDown}>
+      {children}
+    </motion.div>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -172,9 +224,15 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const dragControls = useDragControls();
   const draggedRef = useRef(false);
   const H = useRef(typeof window !== "undefined" ? window.innerHeight : 900).current;
-  const sheetY = useMotionValue(0);
+  // fresh motion value (starting closed) + fresh shared-layout namespace for every open
+  const sessionRef = useRef(0);
+  const wasOpen = useRef(false);
+  if (isOpen && !wasOpen.current) sessionRef.current++;
+  wasOpen.current = isOpen;
+  const session = sessionRef.current;
+  const sheetY = useMemo(() => motionValue(H), [session, H]);
   const radius = useTransform(sheetY, [0, 140], [0, 32], { clamp: true });
-  const sheetScale = useTransform(sheetY, [0, 420], [1, 0.94], { clamp: true });
+  const miniArtRef = useRef<HTMLDivElement>(null);
   const startDrag = (e: React.PointerEvent) => dragControls.start(e);
 
   /* ── mini player gestures ── */
@@ -213,7 +271,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         <motion.div
           key="mini-player"
           animate={{ y: isOpen ? 60 : 0, opacity: isOpen ? 0 : 1, scale: isOpen ? 0.94 : 1 }}
-          transition={SHEET_SPRING}
+          transition={{ y: SHEET_SPRING, scale: SHEET_SPRING, opacity: { duration: isOpen ? 0.16 : 0.28, delay: isOpen ? 0.04 : 0.12 } }}
           onPointerDown={() => { panned.current = false; }}
           onPanStart={() => { panned.current = false; }}
           onPan={(_, i) => { if (Math.abs(i.offset.x) > 6 || Math.abs(i.offset.y) > 6) panned.current = true; }}
@@ -247,7 +305,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
               className="flex h-full min-w-0 flex-1 items-center cursor-pointer"
               onClick={() => { if (panned.current) { panned.current = false; return; } setOpen(true); }}
             >
-              <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[8px] bg-zinc-800 shadow-md ring-1 ring-white/10">
+              <div ref={miniArtRef} className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[8px] bg-zinc-800 shadow-md ring-1 ring-white/10">
                 {art}
               </div>
               <div className="flex min-w-0 flex-1 flex-col justify-center pl-3">
@@ -273,11 +331,11 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
       )}
 
       {/* ───────────── FULL SCREEN SHEET ───────────── */}
+      <LayoutGroup id={`m-${session}`}>
       <AnimatePresence>
         {isOpen && (
           <motion.div
             key="full-sheet"
-            initial={{ y: H }}
             animate={{ y: 0 }}
             exit={{ y: H }}
             transition={SHEET_SPRING}
@@ -291,23 +349,22 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             onDragEnd={(_, info) => {
               if (info.velocity.y > 420 || info.offset.y > 140) setOpen(false);
             }}
-            className="fixed inset-0 z-[1100] flex flex-col overflow-hidden bg-[#121214] select-none"
+            className="fixed inset-0 z-[1100] flex flex-col select-none"
             style={{
               y: sheetY,
-              scale: sheetScale,
-              borderTopLeftRadius: radius,
-              borderTopRightRadius: radius,
-              transformOrigin: "50% 0%",
               willChange: "transform",
               fontFamily: FONT_STACK,
               WebkitFontSmoothing: "antialiased",
             }}
           >
             {/* Background — transform/opacity only (no blend modes, no CSS blur) */}
-            <div className="absolute inset-0 z-0 overflow-hidden bg-[#121214]" style={{ transform: "translateZ(0)" }}>
-              <DynamicBackground surface="fullPlayer" coverUrl={shown.cover} palette={currentTrack?.palette} />
+            <motion.div
+              className="absolute inset-0 z-0 overflow-hidden bg-[#121214]"
+              style={{ transform: "translateZ(0)", borderTopLeftRadius: radius, borderTopRightRadius: radius }}
+            >
+              <DynamicBackground surface="fullPlayer" coverUrl={shown.cover} />
               <div className="ps-t-soft absolute inset-0 bg-black/25" style={{ opacity: isLyricsOpen ? 1 : 0 }} />
-            </div>
+            </motion.div>
 
             {/* Grabber (drag + tap to close) */}
             <div
@@ -356,37 +413,44 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             <div className="relative z-10 min-h-0 flex-1">
               {!isLyricsOpen && (
                 <div
-                  className="absolute inset-0 flex touch-none items-center justify-center px-4 sm:px-6"
+                  className="absolute inset-0 flex touch-none items-center justify-center px-7"
                   onPointerDown={startDrag}
                 >
-                  <motion.div
-                    animate={{ scale: isPlaying ? 1 : 0.88 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 22, mass: 0.6 }}
-                    style={{ width: "min(calc(100vw - 44px), calc(100% - 12px), 380px)", maxHeight: "100%", aspectRatio: "1" }}
+                  <MorphWrap
+                    sheetY={sheetY}
+                    miniRef={miniArtRef}
+                    H={H}
+                    style={{ width: "min(100%, max(220px, calc(100dvh - 500px)), 420px)", aspectRatio: "1" }}
                     onPointerDown={(e) => e.stopPropagation()}
                   >
                     <motion.div
-                      drag="x"
-                      dragSnapToOrigin
-                      dragElastic={0.55}
-                      dragMomentum={false}
-                      onDragEnd={(_, info) => {
-                        if (info.offset.x < -70 || info.velocity.x < -450) handleNext();
-                        else if (info.offset.x > 70 || info.velocity.x > 450) handlePrev();
-                      }}
-                      onTap={() => setIsLyricsOpen(true)}
-                      className="h-full w-full cursor-pointer"
+                      animate={{ scale: isPlaying ? 1 : 0.86 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 22, mass: 0.6 }}
+                      className="h-full w-full"
                     >
                       <motion.div
-                        layoutId="m-art"
-                        transition={SHEET_SPRING}
-                        style={{ borderRadius: 14 }}
-                        className="relative h-full w-full overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-[0_24px_48px_rgba(0,0,0,0.5)]"
+                        drag="x"
+                        dragSnapToOrigin
+                        dragElastic={0.55}
+                        dragMomentum={false}
+                        onDragEnd={(_, info) => {
+                          if (info.offset.x < -70 || info.velocity.x < -450) handleNext();
+                          else if (info.offset.x > 70 || info.velocity.x > 450) handlePrev();
+                        }}
+                        onTap={() => setIsLyricsOpen(true)}
+                        className="h-full w-full cursor-pointer"
                       >
-                        {art}
+                        <motion.div
+                          layoutId="m-art"
+                          transition={SHEET_SPRING}
+                          style={{ borderRadius: 14 }}
+                          className="relative h-full w-full overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-[0_24px_48px_rgba(0,0,0,0.5)]"
+                        >
+                          {art}
+                        </motion.div>
                       </motion.div>
                     </motion.div>
-                  </motion.div>
+                  </MorphWrap>
                 </div>
               )}
 
@@ -399,10 +463,6 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                     exit={{ opacity: 0, y: 8 }}
                     transition={{ y: SPRING_SOFT, opacity: { duration: 0.28 } }}
                     className="absolute inset-0 px-1"
-                    style={{
-                      maskImage: "linear-gradient(to bottom, transparent 0, #000 28px, #000 calc(100% - 40px), transparent 100%)",
-                      WebkitMaskImage: "linear-gradient(to bottom, transparent 0, #000 28px, #000 calc(100% - 40px), transparent 100%)",
-                    }}
                   >
                     <LyricsView
                       trackId={currentTrack.id}
@@ -527,8 +587,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
           </motion.div>
         )}
       </AnimatePresence>
+      </LayoutGroup>
     </MotionConfig>
   );
 }
-
-export default PremiumMobilePlayer;

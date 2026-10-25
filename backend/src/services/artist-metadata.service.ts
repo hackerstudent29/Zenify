@@ -17,11 +17,11 @@ export class ArtistMetadataService {
      * with fallbacks to RapidAPI Spotify, JioSaavn, and Deezer.
      * Automatically persists results into PostgreSQL database.
      */
-    static async fetchArtistVisuals(artistId: string, artistName: string): Promise<ArtistVisuals | null> {
+    static async fetchArtistVisuals(artistId: string, artistName: string, forceRefresh: boolean = true): Promise<ArtistVisuals | null> {
         const cleanName = cleanArtistNames(artistName).trim();
         if (!cleanName || isFakeOrNumericArtistName(cleanName)) return null;
 
-        // Check if artist already has high-res images in database
+        // Check if artist already has high-res images in database (only if not forcing fresh fetch)
         const existing = await prisma.artist.findUnique({
             where: { id: artistId },
             select: { id: true, name: true, imageUrl: true, coverUrl: true, bio: true }
@@ -37,7 +37,7 @@ export class ArtistMetadataService {
             !existing.imageUrl.includes('logo.png') && 
             !existing.imageUrl.includes('ui-avatars.com');
 
-        if (hasValidCover && hasValidImage) {
+        if (!forceRefresh && hasValidCover && hasValidImage) {
             return {
                 coverUrl: existing.coverUrl,
                 imageUrl: existing.imageUrl,

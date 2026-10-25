@@ -1,149 +1,99 @@
 "use client";
 
 import React from "react";
-import { motion, useMotionValue, animate, AnimatePresence } from "framer-motion";
+import { animate, motionValue, useMotionValue, motion } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { ScrollText, Minus, Plus, Timer, Music2, X } from "lucide-react";
-import { LiquidLyricsLine } from "./LiquidLyricsLine";
-import { transliterateLineRuleBased, transliterateTextRuleBased } from '@/lib/indic-transliterator';
+import { ScrollText, Music2 } from "lucide-react";
+import { LiquidLyricsLine, LyricsStyles } from "./LiquidLyricsLine";
+import { LyricsToolbar, LyricsSyncPill } from "./LyricsToolbar";
+import { transliterateLineRuleBased, transliterateTextRuleBased } from "@/lib/indic-transliterator";
 import { audioEngine } from "@/lib/audio-engine";
 import { usePlayerStore } from "@/store/player";
 
 interface LyricsViewProps {
- trackId: string;
- title: string;
- artist: string;
- isLyricsOpen: boolean;
- rawLyrics?: string;
- isMobile?: boolean;
- isIdle?: boolean;
- duration?: number;
- /** When true, renders in the fullscreen split-screen panel (wider, larger fonts) */
- isFullscreen?: boolean;
- /** When true, removes the black card background so lyrics float over the aurora */
- transparent?: boolean;
- /** Album art URL for blurred atmospheric backdrop (Apple Music style) */
- albumArt?: string;
- /** Callback when user manual scroll starts/stops */
- onUserScrollChange?: (scrolling: boolean) => void;
- /** Close callback for split-screen and fullview headers */
- onClose?: () => void;
-}
-
-export function isInstrumentalMarker(text: string): boolean {
-  if (!text) return false;
-  const s = text.trim();
-  if (s === "• • •" || s === "...") return true;
-  // Strip outer notes (♪, ♫, ♬), brackets, parens, asterisks, hyphens, colons
-  const stripped = s
-    .replace(/^[♪♫♬\s*#\-_–—\[\(]+/g, "")
-    .replace(/[♪♫♬\s*#\-_–—\]\)]+$/g, "")
-    .trim()
-    .toLowerCase();
-
-  if (!stripped || stripped === "• • •" || stripped === "...") return true;
-
-  if (
-    /^(instrumental(\s+(interlude|intro|outro|break|solo|music))?|musical\s+interlude|interlude|guitar\s+solo|flute\s+solo|violin\s+solo|bgm|music(\s+break)?|intro|outro|solo)(\s*-\s*[^\]]+)?$/i.test(stripped)
-  ) {
-    return true;
-  }
-
-  // If the line has ♪, [, ( and contains "instrumental" or "interlude" anywhere inside
-  if (/[♪♫\[\(]/.test(s) && /(instrumental|interlude)/i.test(s)) {
-    return true;
-  }
-
-  // Pure musical note strings like "♪ ♪ ♪"
-  if (/^[♪♫♬\s*#\-_–—\.\•]+$/.test(s)) {
-    return true;
-  }
-
-  return false;
+  trackId: string;
+  title: string;
+  artist: string;
+  isLyricsOpen: boolean;
+  rawLyrics?: string;
+  isMobile?: boolean;
+  isIdle?: boolean;
+  duration?: number;
+  isFullscreen?: boolean;
+  transparent?: boolean;
+  albumArt?: string;
+  onUserScrollChange?: (scrolling: boolean) => void;
+  onClose?: () => void;
 }
 
 export function cleanLyricText(text: string): string {
   if (!text) return "";
   const trimmed = text.trim();
   if (trimmed === "• • •") return "• • •";
-  
-  // Convert explicit instrumental, interlude, and musical markers to 3 dots
-  if (isInstrumentalMarker(trimmed)) {
-    return "• • •";
-  }
-
-  // Catch common Genius/Musixmatch garbage lines
+  if (/^(\[|\()?\s*(instrumental|music|solo|interlude|guitar solo|bgm|musical interlude)\s*(\]|\))?$/i.test(trimmed)) return "• • •";
   if (/Português|Türkçe|Español|Việt|Italiano|Français|Deutsch/i.test(text)) return "";
-  if (/^\d+$/.test(trimmed)) return ""; // raw numbers like "107"
+  if (/^\d+$/.test(trimmed)) return "";
   if (trimmed.toLowerCase() === "lyrics") return "";
-  if (text.toLowerCase().includes("lyrics") && text.length < 60) {
-    if (text.toLowerCase().endsWith("lyrics")) return "";
-  }
+  if (text.toLowerCase().includes("lyrics") && text.length < 60 && text.toLowerCase().endsWith("lyrics")) return "";
 
   return text
     .replace(/<[^>]+>/g, " ")
     .replace(/\[\d{1,2}:\d{2}[^\]]*\]/g, " ")
-    // 1. Remove artist tags or bracketed section names like [Chorus] (unless instrumental)
     .replace(/\[\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|spoken)[^\]]*\]/gi, "")
-    // 2. Remove parenthesized tags like (Chorus), (Male), (Spoken)
     .replace(/\(\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|spoken)([^)]*?)\)/gi, "")
-    // 3. Remove prefixes/colons like "Male:", "Chorus:", "View:", "Singer:" at the start of the line
     .replace(/^\s*(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain|singer)\s*:\s*/gi, "")
-    // 4. Remove standalone metadata keywords
     .replace(/\b(chorus|verse|intro|outro|bridge|male|female|view|vocal|hook|pre-chorus|refrain)\b/gi, "")
-    // 5. Cleanup remaining empty/whitespace parentheses
     .replace(/\(\s*\)/g, "")
-    // 6. Ensure space after punctuation glued to words
     .replace(/([,;:!?])([A-Za-z0-9\u0B80-\u0D7F])/g, "$1 $2")
-    // 7. Clean extra spaces
     .replace(/\s+/g, " ")
     .trim();
 }
 
+/** how many lines around the active one get a real staggered spring (the rest jump silently off-screen) */
+const WINDOW = 9;
+/** spring for the line-follow motion */
+const FOLLOW = { type: "spring" as const, stiffness: 165, damping: 23, mass: 1, restDelta: 0.15 };
 
-
-export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration, isFullscreen, transparent, albumArt, onUserScrollChange, onClose }: LyricsViewProps) {
+export function LyricsView({
+  trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration,
+  isFullscreen, transparent, onUserScrollChange, onClose,
+}: LyricsViewProps) {
   const queryClient = useQueryClient();
   const [refetchInterval, setRefetchInterval] = React.useState<number | false>(5000);
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['lyrics', trackId, title, artist],
+  /* ───────────────────────── data ───────────────────────── */
+  const { data, isLoading } = useQuery({
+    queryKey: ["lyrics", trackId, title, artist],
     queryFn: async () => {
-      if (!title) return { syncedTokens: [], source: undefined as string | undefined, status: 'not_found' as const };
+      if (!title) return { syncedTokens: [], source: undefined as string | undefined, status: "not_found" as const };
       try {
-        const res = await api.post(`metadata/sync-lyrics`, {
-          trackId, title, artist, rawLyrics, duration
-        });
-        return { 
-          status: (res.data?.status || 'available') as string,
+        const res = await api.post(`metadata/sync-lyrics`, { trackId, title, artist, rawLyrics, duration });
+        return {
+          status: (res.data?.status || "available") as string,
           message: res.data?.message as string | undefined,
-          syncedTokens: res.data?.syncedTokens || [], 
+          syncedTokens: res.data?.syncedTokens || [],
           source: res.data?.source as string | undefined,
           romanizedLyrics: res.data?.romanizedLyrics as string | undefined,
           romanizedSyncedLyrics: res.data?.romanizedSyncedLyrics as any[] | undefined,
           romanizedLang: res.data?.romanizedLang as string | undefined,
         };
       } catch (err: any) {
-        if (err.response?.status === 404) return { syncedTokens: [], source: undefined, status: 'not_found' as const };
-        return { syncedTokens: [], source: undefined, status: 'failed' as const };
+        if (err.response?.status === 404) return { syncedTokens: [], source: undefined, status: "not_found" as const };
+        return { syncedTokens: [], source: undefined, status: "failed" as const };
       }
     },
     enabled: isLyricsOpen && !!title,
     staleTime: 10000,
-    refetchInterval: refetchInterval,
+    refetchInterval,
   });
 
-  const currentTrack = usePlayerStore(state => state.currentTrack);
+  const currentTrack = usePlayerStore((s) => s.currentTrack);
 
   const [isRomanized, setIsRomanized] = React.useState<boolean>(() => {
     if (typeof window === "undefined") return false;
-    try {
-      return localStorage.getItem("zenify_lyrics_lang_mode") === "romanized";
-    } catch {
-      return false;
-    }
+    try { return localStorage.getItem("zenify_lyrics_lang_mode") === "romanized"; } catch { return false; }
   });
 
   const romanizedSynced = data?.romanizedSyncedLyrics || currentTrack?.romanizedSyncedLyrics;
@@ -169,21 +119,11 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
 
   const handleModeChange = (romanized: boolean) => {
     setIsRomanized(romanized);
-    try {
-      localStorage.setItem("zenify_lyrics_lang_mode", romanized ? "romanized" : "original");
-    } catch {}
-
-    // Call background worker to persist transliteration or connect Deepgram if not already stored
+    try { localStorage.setItem("zenify_lyrics_lang_mode", romanized ? "romanized" : "original"); } catch {}
     if (romanized && trackId && !hasRomanized) {
-      api.post('metadata/romanize-track', { trackId })
-        .then(res => {
-          if (res.data?.success) {
-            queryClient.invalidateQueries({ queryKey: ['lyrics', trackId, title, artist] });
-          }
-        })
-        .catch(err => {
-          console.warn("[LyricsView] Background romanization notice:", err.message);
-        });
+      api.post("metadata/romanize-track", { trackId })
+        .then((res) => { if (res.data?.success) queryClient.invalidateQueries({ queryKey: ["lyrics", trackId, title, artist] }); })
+        .catch((err) => console.warn("[LyricsView] Background romanization notice:", err.message));
     }
   };
 
@@ -197,8 +137,6 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     if (lang.includes("bn") || lang.includes("bengali")) return "Benglish";
     if (lang.includes("pa") || lang.includes("punjabi")) return "Punjabi";
     if (lang.includes("gu") || lang.includes("gujarati")) return "Gujlish";
-
-    // Detect from actual characters if romanizedLang not set
     const sample = [rawLyrics || "", ...(data?.syncedTokens?.map((t: any) => t.text) || []), title || ""].join(" ");
     for (const ch of sample) {
       const code = ch.charCodeAt(0);
@@ -214,23 +152,16 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     return "Tanglish";
   }, [romanizedLang, rawLyrics, data?.syncedTokens, title]);
 
-    React.useEffect(() => {
+  React.useEffect(() => {
     const hasSync = Boolean(data?.syncedTokens && data.syncedTokens.length > 0);
     const hasRom = Boolean(data?.romanizedLyrics || (data?.romanizedSyncedLyrics && data.romanizedSyncedLyrics.length > 0));
-    if (data?.status === 'processing') {
-      setRefetchInterval(2500); // Actively poll while background worker synchronizes
-    } else if (hasSync && hasRom) {
-      setRefetchInterval(false);
-    } else if (hasSync && !hasRom) {
-      setRefetchInterval(3000);
-    } else if (data?.status === 'not_found' || data?.status === 'failed') {
-      setRefetchInterval(false);
-    } else {
-      setRefetchInterval(4000);
-    }
+    if (data?.status === "processing") setRefetchInterval(2500);
+    else if (hasSync && hasRom) setRefetchInterval(false);
+    else if (hasSync && !hasRom) setRefetchInterval(3000);
+    else if (data?.status === "not_found" || data?.status === "failed") setRefetchInterval(false);
+    else setRefetchInterval(4000);
   }, [data]);
 
-  // Synchronize incoming background lyrics/romanization into active player store immediately
   React.useEffect(() => {
     if (data?.syncedTokens?.length || data?.romanizedSyncedLyrics?.length || data?.romanizedLyrics) {
       const store = usePlayerStore.getState() as any;
@@ -246,970 +177,580 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
     }
   }, [data, trackId]);
 
-  // Listen to background track enrich events for zero-refresh screen updates
   React.useEffect(() => {
-    const handleTrackUpdated = (e: any) => {
-      const detail = e.detail;
-      if (detail && detail.id === trackId) {
-        queryClient.invalidateQueries({ queryKey: ['lyrics-sync', trackId] });
-      }
+    const handler = (e: any) => {
+      if (e.detail && e.detail.id === trackId) queryClient.invalidateQueries({ queryKey: ["lyrics-sync", trackId] });
     };
-    window.addEventListener('zenify:track-updated', handleTrackUpdated);
-    return () => window.removeEventListener('zenify:track-updated', handleTrackUpdated);
+    window.addEventListener("zenify:track-updated", handler);
+    return () => window.removeEventListener("zenify:track-updated", handler);
   }, [trackId, queryClient]);
 
-  // Guaranteed synced romanization: STRICTLY anchored to baseSynced timestamps so Tanglish/English timing is 100% identical!
+  // Romanized text is always anchored to the original timestamps so both languages stay in sync
   const activeData = React.useMemo(() => {
-    const baseSynced = (data?.syncedTokens && data.syncedTokens.length > 0)
+    const baseSynced = data?.syncedTokens && data.syncedTokens.length > 0
       ? data.syncedTokens
-      : (Array.isArray(currentTrack?.synced_lyrics) ? currentTrack.synced_lyrics : []);
+      : Array.isArray(currentTrack?.synced_lyrics) ? currentTrack.synced_lyrics : [];
+    if (!isRomanized) return baseSynced;
 
-    if (!isRomanized) {
-      return baseSynced;
-    }
-
-    // When Romanized/Tanglish is active, use baseSynced as the absolute master clock:
-    // Every single line and syllable preserves its exact time, endTime, and word timestamps!
     if (baseSynced.length > 0) {
-      const romLines = (typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0)
-        ? romanizedPlain.split("\n").map(l => l.trim()).filter(Boolean)
+      const romLines = typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0
+        ? romanizedPlain.split("\n").map((l) => l.trim()).filter(Boolean)
         : null;
-
-      const hasPrecomputedSynced = Array.isArray(romanizedSynced) && romanizedSynced.length > 0;
-
+      const hasPre = Array.isArray(romanizedSynced) && romanizedSynced.length > 0;
       return baseSynced.map((token: any, idx: number) => {
-        const precomputedToken = hasPrecomputedSynced ? romanizedSynced[idx] : null;
-        const text = precomputedToken?.text || (romLines && romLines[idx]) || transliterateLineRuleBased(token.text || "");
-
-        // Word-level syllable timestamps strictly preserved from baseSynced
-        const words = token.words?.map((w: any, wIdx: number) => ({
-          ...w, // Preserves time, endTime!
-          word: (precomputedToken?.words && precomputedToken.words[wIdx]?.word) || transliterateLineRuleBased(w.word || "")
+        const pre = hasPre ? romanizedSynced[idx] : null;
+        const text = pre?.text || (romLines && romLines[idx]) || transliterateLineRuleBased(token.text || "");
+        const words = token.words?.map((w: any, wi: number) => ({
+          ...w,
+          word: (pre?.words && pre.words[wi]?.word) || transliterateLineRuleBased(w.word || ""),
         }));
-
-        return {
-          ...token, // Preserves time, endTime, isInterlude!
-          text,
-          words: words || token.words
-        };
+        return { ...token, text, words: words || token.words };
       });
     }
-
-    if (Array.isArray(romanizedSynced) && romanizedSynced.length > 0) {
-      return romanizedSynced;
-    }
-
+    if (Array.isArray(romanizedSynced) && romanizedSynced.length > 0) return romanizedSynced;
     return [];
   }, [isRomanized, romanizedSynced, romanizedPlain, data?.syncedTokens, currentTrack?.synced_lyrics]);
 
   const activePlainLyrics = React.useMemo(() => {
     if (!isRomanized) return rawLyrics;
-    if (typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0) {
-      return romanizedPlain;
-    }
-    if (rawLyrics && rawLyrics.trim().length > 0) {
-      return transliterateTextRuleBased(rawLyrics);
-    }
+    if (typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0) return romanizedPlain;
+    if (rawLyrics && rawLyrics.trim().length > 0) return transliterateTextRuleBased(rawLyrics);
     return rawLyrics;
   }, [isRomanized, romanizedPlain, rawLyrics]);
 
   const processedLines = React.useMemo(() => {
-    // If explicitly marked as instrumental
-    if (data?.source === 'INSTRUMENTAL' || activePlainLyrics?.trim().toLowerCase() === 'instrumental') {
-      return [{ time: 0, text: '• • •', isInstrumental: true }];
+    if (data?.source === "INSTRUMENTAL" || activePlainLyrics?.trim().toLowerCase() === "instrumental") {
+      return [{ time: 0, text: "• • •", isInstrumental: true }] as any[];
     }
 
-    // Fallback if no synced lyrics but raw plain text lyrics exist
-    if ((!activeData || activeData.length === 0) && activePlainLyrics && activePlainLyrics.trim() !== '') {
-      const rawLines = activePlainLyrics.split('\n')
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0);
-
-      const expandedLines: string[] = [];
+    if ((!activeData || activeData.length === 0) && activePlainLyrics && activePlainLyrics.trim() !== "") {
+      const rawLines = activePlainLyrics.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+      const expanded: string[] = [];
       for (const line of rawLines) {
-        const words = line.split(/\s+/);
-        if (words.length > 8 || line.length > 50) {
-          const mid = Math.ceil(words.length / 2);
-          expandedLines.push(words.slice(0, mid).join(' '));
-          expandedLines.push(words.slice(mid).join(' '));
-        } else {
-          expandedLines.push(line);
-        }
+        const ws = line.split(/\s+/);
+        if (ws.length > 8 || line.length > 50) {
+          const mid = Math.ceil(ws.length / 2);
+          expanded.push(ws.slice(0, mid).join(" "), ws.slice(mid).join(" "));
+        } else expanded.push(line);
       }
-
-      return expandedLines
-        .map((line: string) => ({
-          time: -999999,
-          text: cleanLyricText(line),
-          isUnsynced: true
-        }))
-        .filter((line: any) => line.text.length > 0);
+      return expanded
+        .map((line) => ({ time: -999999, text: cleanLyricText(line), isUnsynced: true }))
+        .filter((l) => l.text.length > 0) as any[];
     }
 
     if (!activeData || !Array.isArray(activeData)) return [];
-    const baseLines = activeData.map((line: any) => {
-      const isInter = isInstrumentalMarker(line.text) || line.isInstrumental || line.isInterlude || line.type === 'instrumental';
-      const cleanedText = isInter ? '• • •' : cleanLyricText(line.text);
-      return {
-        ...line,
-        time: parseFloat(line.time || 0),
-        text: cleanedText,
-        isInterlude: isInter,
-        isInstrumental: isInter
-      };
-    }).filter((line: any) => line.text.length > 0)
-    .sort((a: any, b: any) => a.time - b.time);
+    const base = activeData
+      .map((line: any) => ({ ...line, time: parseFloat(line.time || 0), text: cleanLyricText(line.text) }))
+      .filter((l: any) => l.text.length > 0)
+      .sort((a: any, b: any) => a.time - b.time);
 
-    // Preserve complete authentic lyric lines without artificial fragmentation or cutting down lyrics
-    const splitLines = baseLines;
-
-    // 2. Insert virtual interlude lines (triple dots) for intro, breaks (> 3.2s), and outro
     const result: any[] = [];
     const trackDur = duration || usePlayerStore.getState().duration || 0;
 
-    // Intro instrumental interlude
-    if (splitLines.length > 0 && splitLines[0].time > 3.2 && splitLines[0].text !== '• • •') {
-      result.push({
-        time: 0,
-        endTime: Math.max(0.5, splitLines[0].time - 0.3),
-        text: "• • •",
-        isInterlude: true
-      });
+    if (base.length > 0 && base[0].time > 3.2 && base[0].text !== "• • •") {
+      result.push({ time: 0, endTime: Math.max(0.5, base[0].time - 0.3), text: "• • •", isInterlude: true });
     }
-
-    for (let i = 0; i < splitLines.length; i++) {
-      const currentLine = splitLines[i];
-      if (currentLine.text === '• • •') {
-        currentLine.isInterlude = true;
-      }
-      result.push(currentLine);
-      
-      const nextLine = splitLines[i + 1];
-      if (nextLine) {
-        // Calculate the actual silence duration between the end of this line and start of next
-        const wordCount = currentLine.text ? currentLine.text.trim().split(/\s+/).length : 0;
-        const estimatedDuration = Math.min(Math.max(2.0, wordCount * 0.55), Math.max(0.5, nextLine.time - currentLine.time)); 
-        const lineEndTime = currentLine.endTime ? currentLine.endTime : (currentLine.time + estimatedDuration);
-        
-        const actualSilence = nextLine.time - lineEndTime;
-        
-        // Show 3 dots if there is a musical break >= 3.2 seconds
-        if (actualSilence >= 3.2 && nextLine.text !== '• • •') {
-          result.push({
-            time: lineEndTime + 0.3,
-            endTime: Math.max(lineEndTime + 0.8, nextLine.time - 0.2),
-            text: "• • •",
-            isInterlude: true
-          });
+    for (let i = 0; i < base.length; i++) {
+      const cur = base[i];
+      if (cur.text === "• • •") cur.isInterlude = true;
+      result.push(cur);
+      const next = base[i + 1];
+      if (next) {
+        const wc = cur.text ? cur.text.trim().split(/\s+/).length : 0;
+        const est = Math.min(Math.max(2.0, wc * 0.55), Math.max(0.5, next.time - cur.time));
+        const end = cur.endTime ? cur.endTime : cur.time + est;
+        if (next.time - end >= 3.2 && next.text !== "• • •") {
+          result.push({ time: end + 0.3, endTime: Math.max(end + 0.8, next.time - 0.2), text: "• • •", isInterlude: true });
         }
       }
     }
-
-    // Outro instrumental interlude
     if (result.length > 0 && trackDur > 0) {
-      const lastLine = result[result.length - 1];
-      const lastWordCount = lastLine.text ? lastLine.text.trim().split(/\s+/).length : 0;
-      const lastLineEnd = lastLine.endTime || (lastLine.time + Math.max(2.5, lastWordCount * 0.6));
-      if (trackDur - lastLineEnd >= 4.5 && lastLine.text !== '• • •') {
-        result.push({
-          time: lastLineEnd + 0.5,
-          endTime: trackDur - 0.5,
-          text: "• • •",
-          isInterlude: true
-        });
+      const lastL = result[result.length - 1];
+      const wc = lastL.text ? lastL.text.trim().split(/\s+/).length : 0;
+      const lastEnd = lastL.endTime || lastL.time + Math.max(2.5, wc * 0.6);
+      if (trackDur - lastEnd >= 4.5 && lastL.text !== "• • •") {
+        result.push({ time: lastEnd + 0.5, endTime: trackDur - 0.5, text: "• • •", isInterlude: true });
       }
     }
-
     return result;
   }, [activeData, activePlainLyrics, duration, data?.source]);
 
- // 60fps RAF smoothTime rendering & active index calculation (unified single RAF loop)
+  const isUnsyncedSet = !!processedLines[0]?.isUnsynced;
+
+  /* ───────────────────────── clock ───────────────────────── */
+  const lyricsOffsetMs = currentTrack?.lyricsOffset || 0;
+  const offsetRef = React.useRef(lyricsOffsetMs / 1000);
+  React.useEffect(() => { offsetRef.current = lyricsOffsetMs / 1000; }, [lyricsOffsetMs]);
+
   const initialTime = React.useMemo(() => {
     const audio = audioEngine.getActiveAudioElement();
-    const t = (audio && Number.isFinite(audio.currentTime)) 
-      ? audio.currentTime 
-      : usePlayerStore.getState().currentTime;
+    const t = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : usePlayerStore.getState().currentTime;
     return Math.max(0, t + (currentTrack?.lyricsOffset || 0) / 1000);
-  }, [currentTrack?.lyricsOffset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackId]);
   const smoothTimeValue = useMotionValue(initialTime);
   const isSeekingRef = React.useRef(false);
 
-  const setLyricsOffsetStore = usePlayerStore(state => state.setLyricsOffset);
-  const lyricsOffsetMs = currentTrack?.lyricsOffset || 0;
-  const offsetRef = React.useRef(lyricsOffsetMs / 1000);
-  const debounceTimerRef = React.useRef<any>(null);
-  
-  React.useEffect(() => {
-    offsetRef.current = lyricsOffsetMs / 1000;
-  }, [lyricsOffsetMs]);
-
+  const setLyricsOffsetStore = usePlayerStore((s) => s.setLyricsOffset);
+  const offsetDebounce = React.useRef<any>(null);
   const handleOffsetChange = React.useCallback((deltaMs: number) => {
     if (!trackId) return;
-    const newOffset = deltaMs === 0 ? 0 : lyricsOffsetMs + deltaMs;
-    setLyricsOffsetStore(newOffset);
-    
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      api.post(`tracks/${trackId}/lyrics-offset`, { offset: newOffset }).catch(console.error);
+    const next = deltaMs === 0 ? 0 : lyricsOffsetMs + deltaMs;
+    setLyricsOffsetStore(next);
+    if (offsetDebounce.current) clearTimeout(offsetDebounce.current);
+    offsetDebounce.current = setTimeout(() => {
+      api.post(`tracks/${trackId}/lyrics-offset`, { offset: next }).catch(console.error);
     }, 500);
   }, [trackId, lyricsOffsetMs, setLyricsOffsetStore]);
 
+  /* ───────────────────────── scroll engine ─────────────────────────
+   * Auto mode: native scrollTop stays 0; every line has its own spring-driven translateY,
+   * with a small delay that grows with distance below the active line → Apple's waterfall.
+   * Manual mode (user wheel/touch): transforms are folded into the real scrollTop so nothing jumps.
+   * Only transforms move during playback — no layout, no scrollTop writes.
+   * ─────────────────────────────────────────────────────────── */
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const rowEls = React.useRef<(HTMLDivElement | null)[]>([]);
+  const geo = React.useRef({ tops: [] as number[], hs: [] as number[], clientH: 360 });
+  const ys = React.useMemo(() => processedLines.map(() => motionValue(0)), [processedLines]);
+  const ysRef = React.useRef(ys);
+  ysRef.current = ys;
+
+  const linesRef = React.useRef<any[]>(processedLines);
+  linesRef.current = processedLines;
+
   const [activeIndex, setActiveIndex] = React.useState(() => {
     const audio = audioEngine.getActiveAudioElement();
-    const t = (audio && Number.isFinite(audio.currentTime)) 
-      ? audio.currentTime 
-      : usePlayerStore.getState().currentTime;
-    const targetT = Math.max(0, t + (currentTrack?.lyricsOffset || 0) / 1000);
-    if (processedLines && processedLines.length > 0) {
-      let idx = 0;
-      for (let i = 0; i < processedLines.length; i++) {
-        if (targetT >= processedLines[i].time) idx = i;
-        else break;
-      }
-      return idx;
-    }
-    return 0;
+    const t = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : usePlayerStore.getState().currentTime;
+    const tt = Math.max(0, t + (currentTrack?.lyricsOffset || 0) / 1000);
+    let idx = -1;
+    for (let i = 0; i < processedLines.length; i++) { if (tt >= processedLines[i].time) idx = i; else break; }
+    return idx;
   });
-  const processedLinesRef = React.useRef<any[]>([]);
-  
-  React.useEffect(() => {
-    processedLinesRef.current = processedLines;
-  }, [processedLines]);
+  const activeRef = React.useRef(activeIndex);
 
-  React.useEffect(() => {
-    let rafId: number;
-    let lastRealTime = performance.now();
-
-    const tick = () => {
-      if (isSeekingRef.current) {
-        lastRealTime = performance.now();
-        rafId = requestAnimationFrame(tick);
-        return;
-      }
-      const now = performance.now();
-      const dt = (now - lastRealTime) / 1000;
-      lastRealTime = now;
-
-      let currentT: number;
-      const audio = audioEngine.getActiveAudioElement();
-      const isPlaying = usePlayerStore.getState().isPlaying;
-
-      if (audio && !audio.paused) {
-        const actualTime = Math.max(0, audio.currentTime + offsetRef.current);
-        const currentSmooth = smoothTimeValue.get();
-        const drift = Math.abs(currentSmooth - actualTime);
-        if (drift > 0.5) {
-          smoothTimeValue.set(actualTime);
-        } else {
-          // Silky-smooth exponential lerp to eliminate 250ms HTML5 audio clock jitter
-          const lerped = currentSmooth + (actualTime - currentSmooth) * Math.min(1, dt * 10);
-          smoothTimeValue.set(lerped);
-        }
-        currentT = smoothTimeValue.get();
-      } else if (isPlaying) {
-        const storeTime = Math.max(0, usePlayerStore.getState().currentTime + offsetRef.current);
-        const currentSmooth = smoothTimeValue.get();
-        const drift = Math.abs(currentSmooth - storeTime);
-        if (drift > 0.5) {
-          smoothTimeValue.set(storeTime);
-        } else {
-          const lerped = currentSmooth + (storeTime - currentSmooth) * Math.min(1, dt * 10);
-          smoothTimeValue.set(lerped);
-        }
-        currentT = smoothTimeValue.get();
-      } else {
-        currentT = Math.max(0, usePlayerStore.getState().currentTime + offsetRef.current);
-        smoothTimeValue.set(currentT);
-      }
-
-      // Calculate active line index in the same RAF tick
-      const lines = processedLinesRef.current;
-      if (lines && lines.length > 0) {
-        let newIndex = -1;
-        for (let i = 0; i < lines.length; i++) {
-          if (currentT >= lines[i].time) newIndex = i;
-          else break;
-        }
-        setActiveIndex(prevIndex => (prevIndex !== newIndex ? newIndex : prevIndex));
-      }
-
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [smoothTimeValue, trackId]);
-
- const containerRef = React.useRef<HTMLDivElement>(null);
- const [containerHeight, setContainerHeight] = React.useState(360);
-
-  React.useEffect(() => {
-    if (containerRef.current) {
-      setContainerHeight(containerRef.current.clientHeight);
-    }
-  }, [isLyricsOpen, isLoading, data]);
-
- React.useEffect(() => {
- const handleResize = () => {
- if (containerRef.current) {
- setContainerHeight(containerRef.current.clientHeight);
- }
- };
- window.addEventListener('resize', handleResize);
- return () => window.removeEventListener('resize', handleResize);
- }, []);
+  const [containerHeight, setContainerHeight] = React.useState(360);
+  const ratio = isFullscreen ? 0.38 : isMobile ? (isIdle ? 0.42 : 0.3) : 0.35;
+  const ratioRef = React.useRef(ratio);
+  ratioRef.current = ratio;
 
   const [isUserScrolling, setIsUserScrolling] = React.useState(false);
-  const scrollTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  const isFirstScroll = React.useRef(true);
-  const activeLineRef = React.useRef<HTMLDivElement>(null);
-  
-  // Track explicit user intent (wheel or touch) to prevent passive mouse hover/move from triggering unblur
-  const userScrollIntentRef = React.useRef(false);
+  const manualRef = React.useRef(false);
+  const progRef = React.useRef(false);
+  const userScrolledRef = React.useRef(false);
+  const idleTimer = React.useRef<any>(null);
+  const guardUntil = React.useRef(0);
 
-  React.useEffect(() => {
-    if (onUserScrollChange) {
-      onUserScrollChange(isUserScrolling);
+  const markProg = () => {
+    progRef.current = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => { progRef.current = false; }));
+  };
+
+  const measure = React.useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const g = geo.current;
+    g.clientH = el.clientHeight || 360;
+    g.tops = rowEls.current.map((r) => (r ? r.offsetTop : 0));
+    g.hs = rowEls.current.map((r) => (r ? r.offsetHeight : 0));
+  }, []);
+
+  const targetFor = (i: number) => {
+    const g = geo.current;
+    return (g.tops[i] ?? 0) + (g.hs[i] ?? 0) / 2 - g.clientH * ratioRef.current;
+  };
+
+  const goTo = React.useCallback((i: number, instant = false) => {
+    if (manualRef.current) return;
+    const arr = ysRef.current;
+    if (!arr.length) return;
+    const idx = Math.max(0, Math.min(arr.length - 1, i));
+    const S = targetFor(idx);
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    for (let k = 0; k < arr.length; k++) {
+      const d = k - idx;
+      const y = arr[k];
+      if (instant || reduce || Math.abs(d) > WINDOW) { y.stop(); y.set(-S); continue; }
+      animate(y, -S, { ...FOLLOW, delay: d > 0 ? Math.min(d, 5) * 0.04 : 0 });
     }
-  }, [isUserScrolling, onUserScrollChange]);
+  }, []);
 
-  React.useEffect(() => {
-    isFirstScroll.current = true;
+  const enterManual = React.useCallback((silent: boolean) => {
+    const el = containerRef.current;
+    if (!el || manualRef.current) return;
+    const arr = ysRef.current;
+    const act = Math.max(0, activeRef.current);
+    const yAct = arr[act]?.get() ?? 0;
+    markProg();
+    el.scrollTop = Math.max(0, el.scrollTop - yAct);
+    arr.forEach((y) => { y.stop(); y.set(0); });
+    manualRef.current = true;
+    if (!silent) setIsUserScrolling(true);
+  }, []);
+
+  const exitManual = React.useCallback(() => {
+    const el = containerRef.current;
+    if (!el || !manualRef.current) return;
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    const c = el.scrollTop;
+    markProg();
+    el.scrollTop = 0;
+    ysRef.current.forEach((y) => { y.stop(); y.set(-c); });
+    manualRef.current = false;
+    userScrolledRef.current = false;
     setIsUserScrolling(false);
-    userScrollIntentRef.current = false;
-    if (containerRef.current) {
-      containerRef.current.scrollTop = 0;
-    }
-  }, [trackId, isLyricsOpen, isFullscreen]);
+    goTo(activeRef.current);
+  }, [goTo]);
 
-  const triggerUserScroll = React.useCallback(() => {
-    if (isProgrammaticScroll.current) return;
-    
-    // Stop any ongoing programmatic animation if user forces scroll
-    if (scrollAnimRef.current) {
-      scrollAnimRef.current.stop();
-    }
-    
-    setIsUserScrolling(true);
-    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    scrollTimeoutRef.current = setTimeout(() => {
-      setIsUserScrolling(false);
-      userScrollIntentRef.current = false;
-    }, 4000);
-  }, []);
+  const restartIdle = React.useCallback(() => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => exitManual(), 4000);
+  }, [exitManual]);
 
-  // User manual scroll detection — only fires on actual scroll activity
-  const handleScroll = () => {
-    if (isProgrammaticScroll.current) return;
-    // Only activate user scrolling mode if the user explicitly used wheel or touch drag
-    if (userScrollIntentRef.current) {
-      triggerUserScroll();
-    }
-  };
+  React.useEffect(() => { onUserScrollChange?.(isUserScrolling); }, [isUserScrolling, onUserScrollChange]);
 
-  // Explicit user wheel interaction
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    if (isProgrammaticScroll.current) return;
-    userScrollIntentRef.current = true;
-    triggerUserScroll();
-  };
+  // geometry
+  React.useLayoutEffect(() => {
+    measure();
+    goTo(activeRef.current, true);
+  }, [processedLines, isFullscreen, isMobile, containerHeight, measure, goTo]);
 
-  // Explicit user touch interaction
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    if (isProgrammaticScroll.current) return;
-    userScrollIntentRef.current = true;
-    triggerUserScroll();
-  };
-  
-  const isProgrammaticScroll = React.useRef(false);
-
-  // Cleanup timeout on unmount
-  React.useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    };
-  }, []);
-
-  const scrollAnimRef = React.useRef<any>(null);
+  React.useEffect(() => { goTo(activeRef.current); }, [ratio, goTo]);
 
   React.useEffect(() => {
     const el = containerRef.current;
-    const activeEl = activeLineRef.current;
+    if (!el) return;
+    const sync = () => setContainerHeight(el.clientHeight);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    document.fonts?.ready?.then(() => { measure(); goTo(activeRef.current, true); });
+    return () => ro.disconnect();
+  }, [isLoading, processedLines.length, measure, goTo]);
 
-    // Skip programmatic scroll if lyrics are unsynced
-    const isUnsynced = processedLinesRef.current?.[0]?.isUnsynced;
-    if (isUnsynced) return;
-
-    if (el && activeEl && !isUserScrolling) {
-      const isSidebar = !isFullscreen && !isMobile;
-      const clientH = el.clientHeight || 360;
-      
-      let centerRatio = 0.5;
-      if (isFullscreen) centerRatio = 0.38;
-      else if (isSidebar) centerRatio = 0.35;
-      else if (isMobile) centerRatio = isIdle ? 0.45 : 0.35;
-
-      const containerCenter = clientH * centerRatio;
-      const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
-      const maxScroll = el.scrollHeight - el.clientHeight;
-      const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
-
-      const diff = Math.abs(el.scrollTop - finalScrollTop);
-      if (isFirstScroll.current) {
-        isProgrammaticScroll.current = true;
-        el.scrollTop = finalScrollTop;
-        setTimeout(() => { isProgrammaticScroll.current = false; }, 250);
-        isFirstScroll.current = false;
-      } else if (diff >= 1.5) {
-        isProgrammaticScroll.current = true;
-        if (scrollAnimRef.current) scrollAnimRef.current.stop();
-        
-        // Dynamically scale scroll duration based on line time gap (prevents scroll lag on fast lyrics)
-        const currentLineTime = processedLinesRef.current?.[activeIndex]?.time || 0;
-        const nextLineTime = processedLinesRef.current?.[activeIndex + 1]?.time;
-        let scrollDuration = 500; // ms
-        if (nextLineTime && Number.isFinite(nextLineTime)) {
-          const gap = nextLineTime - currentLineTime;
-          if (gap > 0) {
-            scrollDuration = Math.min(500, Math.max(200, gap * 580));
-          }
-        }
-
-        // Apple Music fluid kinetic scroll: creamy tracking without spring bounce or snapping
-        const animDuration = Math.min(0.55, Math.max(0.28, scrollDuration / 1000));
-        scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-          duration: animDuration,
-          ease: [0.22, 1, 0.36, 1],
-          onUpdate: (v) => { if (el) el.scrollTop = v; },
-          onComplete: () => {
-            setTimeout(() => { isProgrammaticScroll.current = false; }, 200);
-          }
-        });
-      }
-    }
-  }, [activeIndex, isUserScrolling, containerHeight, trackId, isLyricsOpen, isFullscreen, isMobile, isIdle, isLoading, data]);
-
-  // Guard flag & timer to prevent mobile ghost-clicks and accidental seeking on underlying lyric lines
-  const isSyncingRef = React.useRef(false);
-  const syncGuardTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  const touchStartYRef = React.useRef<number | null>(null);
-  const touchMovedRef = React.useRef(false);
-
+  // reset on track / mode change
   React.useEffect(() => {
-    return () => {
-      if (syncGuardTimerRef.current) clearTimeout(syncGuardTimerRef.current);
-    };
-  }, []);
+    manualRef.current = false;
+    userScrolledRef.current = false;
+    setIsUserScrolling(false);
+    if (containerRef.current) { markProg(); containerRef.current.scrollTop = 0; }
+    goTo(activeRef.current, true);
+  }, [trackId, isLyricsOpen, isFullscreen, goTo]);
 
-  const handleSyncToSong = React.useCallback((e?: React.SyntheticEvent) => {
-    if (e) {
+  // wheel (non-passive so the first notch can hand over from transforms to real scroll)
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
       e.stopPropagation();
-      e.preventDefault();
-    }
-    
-    // Prevent double execution and block clicks on underlying lyrics lines for 1000ms
-    isSyncingRef.current = true;
-    if (syncGuardTimerRef.current) clearTimeout(syncGuardTimerRef.current);
-    syncGuardTimerRef.current = setTimeout(() => {
-      isSyncingRef.current = false;
-    }, 1000);
+      if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      if (!manualRef.current) {
+        e.preventDefault();
+        enterManual(false);
+        el.scrollTop += e.deltaY;
+      }
+      userScrolledRef.current = true;
+      setIsUserScrolling(true);
+      restartIdle();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [enterManual, restartIdle, isLoading, processedLines.length]);
 
-    userScrollIntentRef.current = false;
-    isFirstScroll.current = false;
-    isProgrammaticScroll.current = true;
-    if (scrollAnimRef.current) scrollAnimRef.current.stop();
+  const onScroll = () => {
+    if (progRef.current) return;
+    if (!manualRef.current) { enterManual(false); }
+    userScrolledRef.current = true;
+    setIsUserScrolling(true);
+    restartIdle();
+  };
+  const onTouchStart = () => {
+    userScrolledRef.current = false;
+    if (!manualRef.current) enterManual(true);
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+  };
+  const onTouchEnd = () => {
+    if (!userScrolledRef.current) setTimeout(() => { if (!userScrolledRef.current) exitManual(); }, 160);
+    else restartIdle();
+  };
 
-    const el = containerRef.current;
-    const activeEl = activeLineRef.current;
-    if (el && activeEl) {
-      const isSidebar = !isFullscreen && !isMobile;
-      const clientH = el.clientHeight || 360;
-      let centerRatio = 0.5;
-      if (isFullscreen) centerRatio = 0.38;
-      else if (isSidebar) centerRatio = 0.35;
-      else if (isMobile) centerRatio = isIdle ? 0.45 : 0.35;
+  React.useEffect(() => () => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    if (offsetDebounce.current) clearTimeout(offsetDebounce.current);
+  }, []);
 
-      const containerCenter = clientH * centerRatio;
-      const targetScrollTop = activeEl.offsetTop - containerCenter + (activeEl.clientHeight / 2);
-      const maxScroll = el.scrollHeight - el.clientHeight;
-      const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
+  /* RAF: clock smoothing + active-line tracking */
+  React.useEffect(() => {
+    let raf = 0;
+    let lastReal = performance.now();
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      if (document.hidden) { lastReal = performance.now(); return; }
+      if (isSeekingRef.current) { lastReal = performance.now(); return; }
+      const now = performance.now();
+      const dt = (now - lastReal) / 1000;
+      lastReal = now;
 
-      scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-        type: "spring",
-        stiffness: 140,
-        damping: 24,
-        mass: 0.8,
-        onUpdate: (v) => { if (el) el.scrollTop = v; },
-        onComplete: () => {
-          setTimeout(() => { isProgrammaticScroll.current = false; }, 300);
-        }
+      const audio = audioEngine.getActiveAudioElement();
+      const playing = usePlayerStore.getState().isPlaying;
+      const cur = smoothTimeValue.get();
+      let t: number;
+      if ((audio && !audio.paused) || playing) {
+        const real = Math.max(0, ((audio && !audio.paused) ? audio.currentTime : usePlayerStore.getState().currentTime) + offsetRef.current);
+        t = Math.abs(cur - real) > 0.5 ? real : cur + (real - cur) * Math.min(1, dt * 10);
+      } else {
+        t = Math.max(0, usePlayerStore.getState().currentTime + offsetRef.current);
+      }
+      smoothTimeValue.set(t);
+
+      const lines = linesRef.current;
+      if (!lines.length || lines[0].isUnsynced) return;
+      let n = activeRef.current;
+      while (n + 1 < lines.length && t >= lines[n + 1].time) n++;
+      while (n >= 0 && t < lines[n].time) n--;
+      if (n !== activeRef.current) {
+        activeRef.current = n;
+        setActiveIndex(n);
+        goTo(n);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [smoothTimeValue, trackId, goTo]);
+
+  /* tap a line → seek */
+  const handleLineClick = (idx: number, line: any) => {
+    if (performance.now() < guardUntil.current) return;
+    if (line.isInterlude || line.isUnsynced) return;
+    const audio = audioEngine.getActiveAudioElement();
+    if (!audio) return;
+
+    isSeekingRef.current = true;
+    const trackDuration = audio.duration && Number.isFinite(audio.duration) && audio.duration > 0
+      ? audio.duration
+      : duration || usePlayerStore.getState().duration || 9999;
+    let maxSeek = Math.max(0, trackDuration - 1.2);
+    try {
+      if (audio.seekable && audio.seekable.length > 0) {
+        const end = audio.seekable.end(audio.seekable.length - 1);
+        if (end > 1) maxSeek = Math.min(maxSeek, end - 0.5);
+      }
+    } catch {}
+    const target = Math.max(0, Math.min(line.time - offsetRef.current - 0.15, maxSeek));
+
+    activeRef.current = idx;
+    setActiveIndex(idx);
+    smoothTimeValue.set(line.time);
+    try { audio.currentTime = target; } catch (err) { console.warn("[LyricsView] Seek error:", err); }
+
+    const { setCurrentTime, setIsPlaying } = usePlayerStore.getState();
+    setCurrentTime(target);
+    setIsPlaying(true);
+    audioEngine.resume();
+    if (audio.paused) {
+      audio.play().catch((err) => {
+        if (err?.name === "AbortError" || err?.message?.includes("interrupted")) return;
+        console.warn("[LyricsView] audio.play() after seek failed:", err);
       });
     }
+    audioEngine.setVolume(usePlayerStore.getState().volume ?? 1);
 
-    setIsUserScrolling(false);
-  }, [isFullscreen, isMobile, isIdle]);
+    if (manualRef.current) exitManual(); else goTo(idx);
 
+    const done = () => { isSeekingRef.current = false; };
+    audio.addEventListener("seeked", done, { once: true });
+    setTimeout(done, 600);
+  };
 
+  const handleSync = () => {
+    guardUntil.current = performance.now() + 700;
+    exitManual();
+  };
+
+  /* ───────────────────────── loading / empty states ───────────────────────── */
   const [showLoading, setShowLoading] = React.useState(false);
-  
   React.useEffect(() => {
-    const hasLyricsInMemory = Boolean(
+    const has = Boolean(
       (data?.syncedTokens && data.syncedTokens.length > 0) ||
       (currentTrack?.synced_lyrics && currentTrack.synced_lyrics.length > 0) ||
-      (data as any)?.plainLyrics ||
-      rawLyrics ||
-      processedLines.length > 0
+      (data as any)?.plainLyrics || rawLyrics || processedLines.length > 0
     );
-    if (isLoading && !hasLyricsInMemory) {
+    if (isLoading && !has) {
       setShowLoading(true);
-      const timer = setTimeout(() => setShowLoading(false), 2000);
-      return () => clearTimeout(timer);
-    } else {
-      setShowLoading(false);
+      const t = setTimeout(() => setShowLoading(false), 2000);
+      return () => clearTimeout(t);
     }
+    setShowLoading(false);
   }, [isLoading, trackId, data, currentTrack?.synced_lyrics, rawLyrics, processedLines.length]);
 
   if (showLoading) {
     return (
-      <div className="h-full w-full flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-white/10 border-t-white/80 rounded-full animate-spin" />
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-white/10 border-t-white/80" />
       </div>
     );
   }
 
-  const isInstrumental = data?.source === 'INSTRUMENTAL' || 
-    (activeData.length === 1 && (activeData[0].text === '• • •' || activeData[0].text?.toLowerCase() === 'instrumental')) ||
-    (processedLines.length === 1 && (processedLines[0].text === '• • •' || processedLines[0].isInstrumental)) ||
-    (activePlainLyrics?.trim().toLowerCase() === 'instrumental');
+  const isInstrumental =
+    data?.source === "INSTRUMENTAL" ||
+    (processedLines.length === 1 && (processedLines[0].text === "• • •" || processedLines[0].isInstrumental)) ||
+    activePlainLyrics?.trim().toLowerCase() === "instrumental";
 
   if (isInstrumental) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center text-center p-6 select-none animate-fadeIn">
-        <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/50 mb-3 backdrop-blur-md shadow-lg">
+      <div className="flex h-full w-full select-none flex-col items-center justify-center p-6 text-center">
+        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/5">
           <Music2 size={24} className="text-white/70" />
         </div>
-        <p className="text-sm font-bold tracking-widest uppercase text-white/70 font-brand">Instrumental</p>
-        <p className="text-xs text-white/40 mt-1">This track contains no vocal lyrics</p>
+        <p className="text-[13px] font-semibold tracking-[0.18em] text-white/70 uppercase">Instrumental</p>
+        <p className="mt-1 text-xs text-white/40">This track contains no vocal lyrics</p>
       </div>
     );
   }
 
   if (processedLines.length === 0) {
-    if (data?.status === 'processing' || (isLoading && !data)) {
+    if (data?.status === "processing" || (isLoading && !data)) {
       return (
-        <div className="h-full w-full flex flex-col items-center justify-center p-6 text-center select-none animate-fadeIn">
-          <div className="w-10 h-10 rounded-full border-2 border-brand border-t-transparent animate-spin mb-4" />
-          <p className="text-sm font-bold tracking-widest uppercase text-white/80 font-brand">Synchronizing Lyrics</p>
-          <p className="text-xs text-white/40 mt-1 max-w-xs">{data?.message || 'Searching line-by-line timing...'}</p>
+        <div className="flex h-full w-full select-none flex-col items-center justify-center p-6 text-center">
+          <div className="mb-4 h-9 w-9 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+          <p className="text-[13px] font-semibold tracking-[0.18em] text-white/80 uppercase">Synchronizing Lyrics</p>
+          <p className="mt-1 max-w-xs text-xs text-white/40">{data?.message || "Searching line-by-line timing…"}</p>
         </div>
       );
     }
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center opacity-50 select-none">
-        <ScrollText size={48} className="mb-4 text-white/40" />
+      <div className="flex h-full w-full select-none flex-col items-center justify-center opacity-60">
+        <ScrollText size={44} className="mb-4 text-white/40" />
         <p className="text-sm font-medium text-white/70">No lyrics available for this recording</p>
       </div>
     );
   }
 
-  const isUnsynced = processedLines && processedLines[0]?.isUnsynced;
-  const showUnmasked = isUnsynced;
+  /* ───────────────────────── chrome ───────────────────────── */
+  const showOffset = !isUnsyncedSet && data?.source !== "QUICKLRC";
+  const toolbar = (
+    <LyricsToolbar
+      placement={isMobile ? "bottom" : "top-right"}
+      canTranslate={canTranslate}
+      isRomanized={isRomanized}
+      romanizedLabel={romanizedLabel}
+      onModeChange={handleModeChange}
+      showOffset={showOffset}
+      offsetMs={lyricsOffsetMs}
+      onOffset={handleOffsetChange}
+      onClose={!isMobile ? onClose : undefined}
+      hidden={(isMobile && (isUserScrolling || !!isIdle)) || (!isMobile && !!isIdle)}
+    />
+  );
 
-  // Elevated Top Header Controls Bar (Minimal round pill style, compact language option, compact offset & close X)
-  const renderTopControls = () => {
-    const showSyncOffset = processedLines.length > 0 && !isUnsynced && data?.source !== 'QUICKLRC';
-    if (!canTranslate && !showSyncOffset && !onClose) return null;
+  const shell = cn("relative flex h-full w-full flex-col overflow-hidden", (transparent || isFullscreen) ? "bg-transparent" : "glass-panel");
 
+  if (isUnsyncedSet) {
     return (
-      <div 
-        onClick={(e) => e.stopPropagation()}
-        className="shrink-0 w-full px-4 py-2 flex items-center justify-between gap-3 z-40 bg-transparent border-none relative select-none"
-      >
-        {/* Language Changing Button (OG vs EN) Minimal Compact Style */}
-        {canTranslate ? (
-          <div className="flex items-center gap-0.5 p-0.5 rounded-full bg-zinc-900/60 hover:bg-zinc-900/90 backdrop-blur-xl border border-white/10 select-none transition-all">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleModeChange(false);
-              }}
-              className={cn(
-                "px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition-all cursor-pointer",
-                !isRomanized ? "bg-brand text-white shadow-sm font-black" : "text-white/60 hover:text-white"
-              )}
-            >
-              OG
-            </button>
-            <span className="text-white/20 text-[9px] font-light select-none">/</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleModeChange(true);
-              }}
-              className={cn(
-                "px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase transition-all cursor-pointer",
-                isRomanized ? "bg-brand text-white shadow-sm font-black" : "text-white/60 hover:text-white"
-              )}
-            >
-              {romanizedLabel || "EN"}
-            </button>
-          </div>
-        ) : <div />}
-
-        {/* Right side: Sync ±0.5s Offset Component & Close X Component with minimal footprint */}
-        <div className="flex items-center gap-3 select-none">
-          {showSyncOffset && (
-            <div className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-zinc-900/60 hover:bg-zinc-900/90 backdrop-blur-xl border border-white/10 text-white/70 transition-all">
-              <button
-                type="button"
-                onClick={() => handleOffsetChange(-500)}
-                className="p-0.5 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-                title="Delay lyrics (-0.5s)"
-              >
-                <Minus size={11} />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleOffsetChange(0)}
-                className={cn(
-                  "text-[9px] font-bold px-1 py-0.5 rounded w-9 text-center cursor-pointer transition-colors",
-                  lyricsOffsetMs !== 0 ? "text-brand font-black" : "text-white/60"
-                )}
-                title="Reset offset"
-              >
-                {(lyricsOffsetMs / 1000).toFixed(1)}s
-              </button>
-              <button
-                type="button"
-                onClick={() => handleOffsetChange(500)}
-                className="p-0.5 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-                title="Advance lyrics (+0.5s)"
-              >
-                <Plus size={11} />
-              </button>
-            </div>
-          )}
-
-          {onClose && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="w-7 h-7 rounded-full bg-zinc-900/60 hover:bg-zinc-800 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all cursor-pointer active:scale-90"
-              title="Close lyrics"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Unsynced (plain text) lyrics: render as a normal, fully-visible scrollable block
-  // so the user can read and scroll naturally — no programmatic centering needed.
-  if (isUnsynced) {
-    return (
-      <div
-        className={cn(
-          "w-full h-full flex flex-col relative overflow-hidden transition-all duration-500",
-          (transparent || isFullscreen) ? "bg-transparent border-none shadow-none" : "glass-panel"
-        )}
-      >
-        {renderTopControls()}
+      <div className={shell}>
+        <LyricsStyles />
         <div
-          ref={containerRef}
-          className={cn("flex-1 min-h-0 w-full overflow-y-auto scrollbar-none select-text relative z-10", isMobile ? "p-4" : "p-6")}
-          style={{ msOverflowStyle: "none", scrollbarWidth: "none" }}
-          onScroll={handleScroll}
-          onWheel={handleWheel}
-          onTouchMove={handleTouchMove}
+          className={cn("relative z-10 h-full min-h-0 w-full select-text overflow-y-auto scrollbar-none", isMobile ? "p-4" : "p-6")}
+          style={{ msOverflowStyle: "none", scrollbarWidth: "none", overscrollBehavior: "contain" }}
         >
-          <div className={cn("flex flex-col gap-8 pb-24", isFullscreen ? "max-w-5xl mx-auto" : "")}>
-            {processedLines.map((line: any, idx: number) => (
+          <div className={cn("flex flex-col gap-8 pb-28", isFullscreen ? "mx-auto max-w-5xl" : "")}>
+            {processedLines.map((line: any, i: number) => (
               <p
-                key={`${trackId}-unsynced-${idx}`}
-                className={cn(
-                  "text-white/80 text-center leading-[1.65] font-semibold tracking-normal",
-                  isMobile ? "text-[20px]" : (isFullscreen ? "text-[28px]" : "text-[22px]")
-                )}
+                key={`${trackId}-u-${i}`}
+                className={cn("text-center font-semibold leading-[1.6] text-white/85", isMobile ? "text-[20px]" : isFullscreen ? "text-[28px]" : "text-[22px]")}
               >
                 {line.text}
               </p>
             ))}
           </div>
         </div>
+        {toolbar}
       </div>
     );
   }
 
- return (
- <div 
- className={cn(
- "w-full h-full flex flex-col relative overflow-hidden transition-all duration-500",
- (transparent || isFullscreen) ? "bg-transparent border-none shadow-none" : "glass-panel"
- )}
- >
- {renderTopControls()}
+  const topSpacer = Math.round(containerHeight * ratio);
 
- <div 
-   className="flex-1 min-h-0 w-full relative overflow-hidden"
-   style={{
-     WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 86%, transparent 100%)',
-     maskImage: 'linear-gradient(to bottom, transparent 0%, black 12%, black 86%, transparent 100%)'
-   }}
- >
- {/* Scroll Container */}
- <div 
- ref={containerRef} 
- className={cn("h-full w-full overflow-y-auto scrollbar-none select-none relative z-10", isMobile ? "p-2" : "p-6")}
-  style={{
-    msOverflowStyle: "none",
-    scrollbarWidth: "none",
-    willChange: 'transform',
-    transform: 'translateZ(0)',
-    WebkitOverflowScrolling: "touch",
-  }}
-  onScroll={handleScroll}
-  onWheel={handleWheel}
-  onTouchMove={handleTouchMove}
- >
- <style dangerouslySetInnerHTML={{__html: `
- .scrollbar-none::-webkit-scrollbar {
- display: none !important;
- }
- `}} />
-
- <div
- className={cn(
- "flex flex-col relative w-full",
- isFullscreen ? (isMobile ? "px-6 gap-5 max-w-full mx-auto" : "px-10 gap-7 max-w-5xl mx-auto") : (isMobile ? "px-4 items-center gap-5" : "px-6 items-center gap-5")
- )}
- >
- {/* Spacer block to push the very first line precisely to the vertical focal zone */}
-  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "28vh" : (isFullscreen ? "38vh" : "40vh") }} />
-
- {processedLines.map((line: any, idx: number) => {
- const isCurrent = idx === activeIndex;
- const isPast = idx < activeIndex;
- const isUpcoming = idx > activeIndex;
- const dist = idx - activeIndex;
-
-  // Calculate line end time (strictly bounded to next line's start time to prevent double-line filling)
-  const nextLineTime = processedLines[idx + 1]?.time;
-  const rawEndTime = line.endTime && line.endTime > line.time 
-    ? line.endTime 
-    : (nextLineTime && nextLineTime > line.time ? nextLineTime : line.time + 3.5);
-  const lineEndTime = Math.max(line.time + 0.8, rawEndTime);
-
- return (
- <div
- key={`${trackId}-${idx}`}
- ref={(isCurrent || (activeIndex === -1 && idx === 0)) ? activeLineRef : null}
- className={cn(
- "w-full flex items-center shrink-0",
- isFullscreen 
- ? (line.isInterlude ? "justify-center" : "justify-start")
- : "justify-center"
- )}
- >
- <div
- className={cn(
- "inline-block max-w-full transition-opacity select-none",
- line.isInterlude || line.isUnsynced ? "cursor-default pointer-events-none" : "cursor-pointer hover:opacity-95"
- )}
- onTouchStart={() => {
-   if (isSyncingRef.current) return;
-   touchMovedRef.current = false;
- }}
-  onTouchMove={(e) => {
-   if (touchStartYRef.current !== null && Math.abs(e.touches[0].clientY - touchStartYRef.current) > 10) {
-     touchMovedRef.current = true;
-   }
- }}
- onClick={(e) => {
-   e.stopPropagation();
-   e.preventDefault();
-   if (touchMovedRef.current) return;
-   if (isSyncingRef.current) return;
-   if (line.isInterlude || line.isUnsynced) return;
-   const audio = audioEngine.getActiveAudioElement();
-   if (audio) {
-     isSeekingRef.current = true;
-     const trackDuration = (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0)
-       ? audio.duration
-       : (duration || usePlayerStore.getState().duration || 9999);
-
-     // Safeguard seeking within playable/seekable boundaries to prevent browser ended/error loop back to 00:00
-     let maxSeek = Math.max(0, trackDuration - 1.2);
-     try {
-       if (audio.seekable && audio.seekable.length > 0) {
-         const seekableEnd = audio.seekable.end(audio.seekable.length - 1);
-         if (seekableEnd > 1) {
-           maxSeek = Math.min(maxSeek, seekableEnd - 0.5);
-         }
-       }
-     } catch {}
-
-     const targetAudioTime = Math.max(0, Math.min(line.time - offsetRef.current - 0.15, maxSeek));
-     
-     setActiveIndex(idx);
-     smoothTimeValue.set(line.time);
-
-     try {
-       audio.currentTime = targetAudioTime;
-     } catch (seekErr) {
-       console.warn("[LyricsView] Seek error:", seekErr);
-     }
-
-     const { setCurrentTime, setIsPlaying } = usePlayerStore.getState();
-     setCurrentTime(targetAudioTime);
-     setIsPlaying(true);
-     setIsUserScrolling(false);
-
-     audioEngine.resume();
-     if (audio.paused) {
-       audio.play().catch(err => {
-         if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-         console.warn("[LyricsView] audio.play() after seek failed:", err);
-       });
-     }
-     const targetVol = usePlayerStore.getState().volume ?? 1;
-     audioEngine.setVolume(targetVol);
-
-     // Smoothly and immediately glide the lyrics view directly to the clicked line
-     const el = containerRef.current;
-     const clickedEl = e.currentTarget.parentElement;
-     if (el && clickedEl) {
-       const clientH = el.clientHeight || 360;
-       let centerRatio = 0.5;
-       if (isFullscreen) centerRatio = 0.38;
-       else if (isMobile) centerRatio = 0.35;
-       else centerRatio = 0.35;
-
-       const containerCenter = clientH * centerRatio;
-       const targetScrollTop = clickedEl.offsetTop - containerCenter + (clickedEl.clientHeight / 2);
-       const maxScroll = el.scrollHeight - el.clientHeight;
-       const finalScrollTop = Math.max(0, Math.min(maxScroll, targetScrollTop));
-
-       isProgrammaticScroll.current = true;
-       if (scrollAnimRef.current) scrollAnimRef.current.stop();
-       scrollAnimRef.current = animate(el.scrollTop, finalScrollTop, {
-         duration: 0.52,
-         ease: [0.22, 1, 0.36, 1],
-         onUpdate: (v) => { if (el) el.scrollTop = v; },
-         onComplete: () => {
-           setTimeout(() => { isProgrammaticScroll.current = false; }, 150);
-         }
-       });
-     }
-
-     const onSeeked = () => {
-       isSeekingRef.current = false;
-       audio.removeEventListener('seeked', onSeeked);
-     };
-     audio.addEventListener('seeked', onSeeked, { once: true });
-     setTimeout(() => {
-       isSeekingRef.current = false;
-     }, 600);
-   }
- }}
- >
- <LiquidLyricsLine
- text={line.text}
- isCurrent={isCurrent}
- isPast={isPast}
- isUpcoming={isUpcoming}
- distFromActive={dist}
- smoothTimeValue={smoothTimeValue}
- lineStartTime={line.time}
- lineEndTime={lineEndTime}
- isFullscreen={isFullscreen}
- isMobile={isMobile}
- isIdle={isIdle}
- isInterlude={line.isInterlude || line.text === '• • •' || line.isInstrumental}
- isUnsynced={line.isUnsynced}
- words={line.words}
- isUserScrolling={isUserScrolling}
- />
- </div>
- </div>
- );
- })}
-
-  {/* Spacer block to push the very last line precisely to the vertical focal zone */}
-  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "32vh" : (isFullscreen ? "62vh" : "40vh") }} />
-
-  {/* Outro / Credits Section */}
-  <div className="w-full flex flex-col items-center justify-center gap-4 mt-10 mb-10 opacity-40 hover:opacity-80 transition-opacity">
- <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shadow-xl">
- {/* Zenify Logo (Audio Lines) */}
- <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
- <rect x="3" y="10" width="3" height="4" rx="1.5" fill="currentColor" />
- <rect x="8" y="6" width="3" height="12" rx="1.5" fill="currentColor" />
- <rect x="13" y="3" width="3" height="18" rx="1.5" fill="currentColor" />
- <rect x="18" y="8" width="3" height="8" rx="1.5" fill="currentColor" />
- </svg>
- </div>
- <div className="text-center text-xs text-white/50 space-y-1">
- <p className="font-semibold text-white/80">{title}</p>
- <p>Written & Performed by {artist}</p>
- <p className="text-[10px] uppercase tracking-widest mt-2 pt-2 border-t border-white/10">Provided by <span className="font-zenify">zenify</span> Lyrics Engine</p>
- </div>
- </div>
-
- {/* Spacer block to allow the very last line to reach the vertical center of the viewport without clipping */}
-  <div className="w-full shrink-0 pointer-events-none" style={{ height: isMobile ? "50vh" : (isFullscreen ? "50vh" : "60vh") }} />
-
- </div>
- </div>
- </div>
-
- {/* Floating Glass Pill "Sync Now" button at the right side bottom in all screens */}
- <AnimatePresence>
-   {isUserScrolling && (
-     <motion.button
-        type="button"
-        initial={{ opacity: 0, scale: 0.85, y: isMobile ? -16 : 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.85, y: isMobile ? -16 : 16 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          isSyncingRef.current = true;
+  return (
+    <div className={shell}>
+      <LyricsStyles />
+      <div
+        className="relative h-full min-h-0 w-full flex-1 overflow-hidden"
+        style={{
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 0, #000 9%, #000 84%, transparent 100%)",
+          maskImage: "linear-gradient(to bottom, transparent 0, #000 9%, #000 84%, transparent 100%)",
         }}
-        onTouchStart={(e) => {
-          e.stopPropagation();
-          isSyncingRef.current = true;
-        }}
-        onTouchEnd={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          handleSyncToSong(e);
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          handleSyncToSong(e);
-        }}
-        className={cn(
-          "flex items-center gap-2.5 px-4 py-2 rounded-full bg-zinc-950/95 hover:bg-black backdrop-blur-2xl border border-white/30 text-brand shadow-2xl transition-all active:scale-95 cursor-pointer select-none group min-h-[42px]",
-          isMobile 
-            ? "fixed top-14 right-4 landscape:top-4 landscape:right-4 z-[200]" 
-            : "fixed sm:absolute bottom-3 right-4 sm:bottom-4 sm:right-6 z-[100]"
-        )}
       >
-        <ScrollText size={15} className="text-brand shrink-0 group-hover:scale-110 transition-transform pointer-events-none" />
-        <span className="text-xs font-bold uppercase tracking-wider text-white pointer-events-none">Sync Now</span>
-      </motion.button>
-   )}
- </AnimatePresence>
+        <div
+          ref={containerRef}
+          className="relative z-10 h-full w-full select-none overflow-y-auto scrollbar-none"
+          style={{ msOverflowStyle: "none", scrollbarWidth: "none", overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
+          onScroll={onScroll}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={onTouchEnd}
+        >
+          <style dangerouslySetInnerHTML={{ __html: ".scrollbar-none::-webkit-scrollbar{display:none!important}" }} />
+          <div className={cn("relative flex w-full flex-col", isFullscreen ? (isMobile ? "px-4" : "mx-auto max-w-5xl px-8") : isMobile ? "px-3" : "px-4")}>
+            <div className="w-full shrink-0" style={{ height: topSpacer }} />
 
- </div>
- );
+            {processedLines.map((line: any, idx: number) => {
+              const dist = idx - activeIndex;
+              const next = processedLines[idx + 1]?.time;
+              const rawEnd = line.endTime && line.endTime > line.time ? line.endTime : next && next > line.time ? next : line.time + 3.5;
+              const end = Math.max(line.time + 0.8, rawEnd);
+              return (
+                <LiquidLyricsLine
+                  key={`${trackId}-${idx}`}
+                  rowRef={(el) => { rowEls.current[idx] = el; }}
+                  y={ys[idx]}
+                  smoothTimeValue={smoothTimeValue}
+                  text={line.text}
+                  isCurrent={idx === activeIndex}
+                  isPast={idx < activeIndex}
+                  dist={Math.max(-4, Math.min(5, dist))}
+                  lineStartTime={line.time}
+                  lineEndTime={end}
+                  words={line.words}
+                  isFullscreen={isFullscreen}
+                  isMobile={isMobile}
+                  isInterlude={line.isInterlude || line.text === "• • •" || line.isInstrumental}
+                  isUserScrolling={isUserScrolling}
+                  inWindow={Math.abs(dist) <= WINDOW}
+                  onClick={() => handleLineClick(idx, line)}
+                />
+              );
+            })}
+
+            {/* credits */}
+            <motion.div
+              style={{ y: ys[ys.length - 1] }}
+              className="mt-16 flex w-full flex-col items-center gap-3 pb-6 opacity-40"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="10" width="3" height="4" rx="1.5" fill="currentColor" />
+                  <rect x="8" y="6" width="3" height="12" rx="1.5" fill="currentColor" />
+                  <rect x="13" y="3" width="3" height="18" rx="1.5" fill="currentColor" />
+                  <rect x="18" y="8" width="3" height="8" rx="1.5" fill="currentColor" />
+                </svg>
+              </div>
+              <div className="space-y-1 text-center text-xs text-white/55">
+                <p className="font-semibold text-white/80">{title}</p>
+                <p>Written & Performed by {artist}</p>
+                <p className="mt-2 border-t border-white/10 pt-2 text-[10px] tracking-widest uppercase">
+                  Provided by <span className="font-zenify">zenify</span> Lyrics Engine
+                </p>
+              </div>
+            </motion.div>
+
+            <div className="w-full shrink-0" style={{ height: Math.round(containerHeight * 0.62) }} />
+          </div>
+        </div>
+      </div>
+
+      {toolbar}
+      <LyricsSyncPill show={isUserScrolling} onSync={handleSync} />
+    </div>
+  );
 }
