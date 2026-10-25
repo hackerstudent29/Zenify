@@ -449,12 +449,40 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  animate={isPlayerMinimized ? { y: 80, opacity: 0 } : { y: 0, opacity: 1 }}
  exit={{ y: 80, opacity: 0 }}
  transition={{ type: "spring", stiffness: 400, damping: 34, mass: 0.6 }}
-  id="tour-player"
-  data-tour="player"
-  className="pointer-events-auto relative max-w-[834px] mx-auto w-[calc(100%-2rem)] mb-6 rounded-full h-[70px] flex items-center justify-center"
-  >
-    <PlayerBar />
-  </motion.div>
+    id="tour-player"
+    data-tour="player"
+    className="pointer-events-auto relative max-w-4xl mx-auto w-[calc(100%-3rem)] mb-6 rounded-full h-[72px]"
+    >
+      <div 
+        className="absolute inset-0 pointer-events-none rounded-full overflow-hidden backdrop-blur-lg bg-black/10 border border-white/10"
+        style={{
+          boxShadow: "0 14px 34px -10px rgba(0,0,0,0.45)"
+        }}
+      >
+        <div className="absolute -inset-1">
+          <Glass
+            className="w-full h-full"
+            radius={36}
+            blur={12}
+            behind="transparent"
+            optics={{
+              chroma: 0.1,
+              domeDepth: 40,
+              edgeHighlight: 0,
+              glow: 0.12,
+              tint: 0.05,
+              frost: 12
+            }}
+          >
+            {/* Dummy element so the bare wrap glass engine measures height */}
+            <div className="w-full h-[80px]" />
+          </Glass>
+        </div>
+      </div>
+      <div className="relative z-10 w-full h-full flex items-center justify-center pointer-events-auto">
+        <PlayerBar />
+      </div>
+    </motion.div>
  )}
  </AnimatePresence>
 
