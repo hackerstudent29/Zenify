@@ -146,42 +146,8 @@ export async function trackRoutes(server: FastifyInstance) {
             const body = (req.body || {}) as any;
             const titleToUse = (body.title || '').trim();
             const artistToUse = (body.artistName || body.artist || '').trim();
-            const previewUrlToUse = body.previewUrl || body.preview_url;
 
-            // 1. If client provided previewUrl directly, return it as verified audioUrl
-            if (previewUrlToUse && (previewUrlToUse.startsWith('http://') || previewUrlToUse.startsWith('https://'))) {
-                return reply.send({
-                    success: true,
-                    audioUrl: previewUrlToUse,
-                    track: { id, title: titleToUse, artist: { name: artistToUse }, audioUrl: previewUrlToUse }
-                });
-            }
-
-            // 2. Direct iTunes ID resolution (US & IN)
-            const cleanNumericId = id.replace(/[^0-9]/g, '');
-            if (id.startsWith('itunes-') && cleanNumericId) {
-                try {
-                    const { default: axios } = await import('axios');
-                    for (const country of ['US', 'IN']) {
-                        const itRes = await axios.get(`https://itunes.apple.com/lookup?id=${cleanNumericId}&entity=song&country=${country}`, { timeout: 3500 }).catch(() => null);
-                        const itSong = itRes?.data?.results?.[0];
-                        if (itSong?.previewUrl) {
-                            return reply.send({
-                                success: true,
-                                audioUrl: itSong.previewUrl,
-                                track: {
-                                    id,
-                                    title: itSong.trackName || titleToUse,
-                                    artist: { name: itSong.artistName || artistToUse },
-                                    audioUrl: itSong.previewUrl
-                                }
-                            });
-                        }
-                    }
-                } catch {}
-            }
-
-            // 3. Clean CDN 320kbps (JioSaavn)
+            // 1. Clean CDN 320kbps (JioSaavn) Full Song Priority
             if (titleToUse) {
                 try {
                     const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
@@ -190,7 +156,7 @@ export async function trackRoutes(server: FastifyInstance) {
                         primaryArtist: artistToUse,
                         duration: body.duration
                     });
-                    if (cdnRes?.url) {
+                    if (cdnRes?.url && !cdnRes.url.includes('audio-ssl') && !cdnRes.url.includes('mzstatic') && !cdnRes.url.includes('itunes.apple.com')) {
                         return reply.send({
                             success: true,
                             audioUrl: cdnRes.url,
@@ -200,24 +166,28 @@ export async function trackRoutes(server: FastifyInstance) {
                 } catch {}
             }
 
-            // 4. iTunes Search across US & IN
+            // 2. Full YouTube / R2 Stream Intake
             if (titleToUse) {
                 try {
-                    const { default: axios } = await import('axios');
-                    const itTerm = artistToUse ? `${artistToUse} ${titleToUse}` : titleToUse;
-                    for (const country of ['US', 'IN']) {
-                        const itRes = await axios.get(`https://itunes.apple.com/search?term=${encodeURIComponent(itTerm)}&media=music&entity=song&limit=5&country=${country}`, { timeout: 3500 }).catch(() => null);
-                        const match = itRes?.data?.results?.find((r: any) => r.previewUrl);
-                        if (match?.previewUrl) {
-                            return reply.send({
-                                success: true,
-                                audioUrl: match.previewUrl,
-                                track: { id, title: titleToUse, artist: { name: artistToUse }, audioUrl: match.previewUrl }
-                            });
-                        }
+                    const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+                    const fullResult = await ExternalMetadataService.fetchAudio(titleToUse, artistToUse, undefined, undefined, { preview: false, bypassCache: true });
+                    if (fullResult?.url && !fullResult.url.includes('audio-ssl') && !fullResult.url.includes('mzstatic') && !fullResult.url.includes('itunes.apple.com')) {
+                        return reply.send({
+                            success: true,
+                            audioUrl: fullResult.url,
+                            track: { id, title: titleToUse, artist: { name: artistToUse }, audioUrl: fullResult.url }
+                        });
                     }
                 } catch {}
             }
+
+            // 3. Fallback to /stream-youtube proxy
+            const fallbackStreamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistToUse} - ${titleToUse}`)}&title=${encodeURIComponent(titleToUse)}&artist=${encodeURIComponent(artistToUse)}&trackId=${encodeURIComponent(id)}`;
+            return reply.send({
+                success: true,
+                audioUrl: fallbackStreamUrl,
+                track: { id, title: titleToUse, artist: { name: artistToUse }, audioUrl: fallbackStreamUrl }
+            });
 
             // 5. Fallback: stream-youtube URL
             if (titleToUse) {

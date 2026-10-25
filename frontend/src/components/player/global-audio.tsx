@@ -314,35 +314,21 @@ export function GlobalAudio() {
         const attemptCount = (audioRecoveryAttempts.current[trackId] || 0) + 1;
         audioRecoveryAttempts.current[trackId] = attemptCount;
 
-        console.warn(`[GlobalAudio/Automator] Error detected for "${current.title}" (Attempt ${attemptCount}/3). Resolving alternative stream...`);
-
-        const directBackup = (current as any).previewUrl || (current as any).preview_url;
-
-        // Immediate direct preview stream fallback before network roundtrips
-        if (directBackup && audio.src !== directBackup && !audio.src.includes('direct-backup=true')) {
-          console.log("[GlobalAudio/Automator] Instant local fallback to direct preview stream:", directBackup);
-          const sep = directBackup.includes('?') ? '&' : '?';
-          audio.src = `${directBackup}${sep}direct-backup=true`;
-          audio.load();
-          audio.play().catch((playErr) => {
-            if (playErr?.name === 'AbortError') return;
-            console.warn("[GlobalAudio/Automator] Direct backup play failed, calling refetch-audio:", playErr);
-          });
-          return;
-        }
+        console.warn(`[GlobalAudio/Automator] Error detected for "${current.title}" (Attempt ${attemptCount}/3). Resolving full stream...`);
 
         if (attemptCount <= 2) {
           import('@/lib/api').then(({ default: api }) => {
-            // 1. First attempt: call refetch-audio with full track metadata payload
+            // Call refetch-audio with full track metadata payload to resolve full 320k / YouTube stream
             api.post(`/tracks/${trackId}/refetch-audio`, {
               title: current.title,
               artistName: current.artist?.name || (current as any).artistName || '',
               albumTitle: current.album?.title,
               duration: current.duration,
-              previewUrl: directBackup
             }).then((res: any) => {
               const newUrl = res.data?.audioUrl || res.data?.track?.audioUrl;
-              if (newUrl) {
+              // Ensure we never play an iTunes 30s preview snippet
+              const is30sPreview = newUrl && (newUrl.includes('audio-ssl') || newUrl.includes('mzstatic') || newUrl.includes('itunes.apple.com'));
+              if (newUrl && !is30sPreview) {
                 const fallbackMediaUrl = getMediaUrl(newUrl, 'audio', {
                   id: current.id,
                   title: current.title,
@@ -350,7 +336,7 @@ export function GlobalAudio() {
                   language: (current as any).language
                 });
                 if (fallbackMediaUrl) {
-                  console.log("[GlobalAudio/Automator] Auto-recovered audio stream:", fallbackMediaUrl);
+                  console.log("[GlobalAudio/Automator] Auto-recovered full audio stream:", fallbackMediaUrl);
                   usePlayerStore.setState(state => ({
                     currentTrack: state.currentTrack ? { ...state.currentTrack, audioUrl: fallbackMediaUrl } : null
                   }));
@@ -360,7 +346,6 @@ export function GlobalAudio() {
                   audio.play().catch((playErr) => {
                     if (playErr?.name === 'AbortError') return;
                     console.warn("[GlobalAudio/Automator] Secondary playback attempt failed:", playErr);
-                    // Advance to next song if recovery stream also fails to play
                     setTimeout(() => {
                       useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
                       playNext(true);
@@ -369,24 +354,10 @@ export function GlobalAudio() {
                   return;
                 }
               }
-              // If refetch returned no valid stream, try direct backup if not already tried
-              if (directBackup && audio.src !== directBackup) {
-                audio.src = directBackup;
-                audio.load();
-                audio.play().catch(() => playNext(true));
-                return;
-              }
               useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
               playNext(true);
             }).catch((err) => {
               console.warn("[GlobalAudio/Automator] Refetch audio error:", err);
-              // Fallback to direct backup if available
-              if (directBackup && audio.src !== directBackup) {
-                audio.src = directBackup;
-                audio.load();
-                audio.play().catch(() => playNext(true));
-                return;
-              }
               useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
               playNext(true);
             });
@@ -402,8 +373,6 @@ export function GlobalAudio() {
       };
 
       // Probe audio source before diagnosing CORS:
-      // A 502/500/404 is a backend/source failure, NOT CORS.
-      // Retrying without crossOrigin only applies when status is 200/206.
       if (audio.crossOrigin && audio.src && !audio.src.includes('no-cors-retry=true')) {
         const testUrl = audio.src;
         fetch(testUrl, { method: 'GET', headers: { Range: 'bytes=0-1' } })
@@ -422,17 +391,7 @@ export function GlobalAudio() {
                 });
               }
             } else {
-              console.warn(`[GlobalAudio] Server returned HTTP ${res.status} (Backend failure, not CORS). Advancing immediately to fallback source...`, testUrl);
-              const directPreview = (usePlayerStore.getState().currentTrack as any)?.previewUrl || (usePlayerStore.getState().currentTrack as any)?.preview_url;
-              if (directPreview && audio.src !== directPreview) {
-                console.log("[GlobalAudio] Server failed, immediately falling back to preview stream:", directPreview);
-                audio.src = directPreview;
-                audio.load();
-                if (isPlaying) {
-                  audio.play().catch(() => triggerRecovery());
-                }
-                return;
-              }
+              console.warn(`[GlobalAudio] Server returned HTTP ${res.status}. Triggering full stream recovery...`, testUrl);
               triggerRecovery();
             }
           })
@@ -609,15 +568,13 @@ export function GlobalAudio() {
 
       if (!targetSrc || is30sPreviewUrl) {
         const query = `${currentArtist} - ${currentTrack.title}${trackAlbum && !currentTrack.title.toLowerCase().includes(trackAlbum.toLowerCase()) ? ` (${trackAlbum})` : ''}`.trim();
-        const previewCandidate = (currentTrack as any).previewUrl || (currentTrack as any).preview_url || (is30sPreviewUrl ? targetSrc : undefined);
         const streamParams = new URLSearchParams({
           url: query,
           trackId: currentTrack.id || '',
           title: currentTrack.title || '',
           artist: currentArtist || '',
           ...(trackAlbum ? { album: trackAlbum } : {}),
-          ...(trackLang ? { language: trackLang } : {}),
-          ...(previewCandidate ? { previewUrl: previewCandidate } : {})
+          ...(trackLang ? { language: trackLang } : {})
         });
         targetSrc = getMediaUrl(`/api/utils/stream-youtube?${streamParams.toString()}`, 'audio', trackContext);
       }

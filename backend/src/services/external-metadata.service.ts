@@ -1945,25 +1945,26 @@ export class ExternalMetadataService {
                      }
                  } catch {}
 
-                 // Tier 2: Apple CDN AAC direct stream (worldwide, US & IN storefronts)
-                 const itTerm = cleanA ? `${cleanA} ${cleanT}` : cleanT;
-                 for (const country of ['US', 'IN']) {
+                 // Tier 2: RapidAPI Spotify Downloader (full MP3 song)
+                 const rapidApiKey = process.env.RAPIDAPI_KEY || (process.env.RAPIDAPI_KEYS ? process.env.RAPIDAPI_KEYS.split(',')[0].trim() : null);
+                 if (rapidApiKey) {
+                     const queryForRapid = cleanA ? `${cleanA} - ${cleanT}` : cleanT;
                      try {
-                         const itRes = await axios.get(`https://itunes.apple.com/search`, {
-                             params: { term: itTerm, media: 'music', entity: 'song', limit: 5, country },
-                             timeout: 3500
+                         const rapidRes = await axios.get('https://spotify81.p.rapidapi.com/download_track', {
+                             params: { q: queryForRapid, onlyLinks: 'true' },
+                             headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                             timeout: 10000
                          }).catch(() => null);
-                         const match = itRes?.data?.results?.find((r: any) => r.previewUrl);
-                         if (match?.previewUrl) {
-                             console.log(`[SmartAudio] Apple CDN AAC stream resolved as ultimate fallback for "${title}" (${country}):`, match.previewUrl);
-                             const itFallback = {
-                                 url: match.previewUrl,
-                                 duration: match.trackTimeMillis ? Math.floor(match.trackTimeMillis / 1000) : targetDuration,
-                                 sourceType: 'itunes_direct_preview',
-                                 watchUrl: match.trackViewUrl || directUrl || undefined
+                         if (rapidRes?.data?.url && !rapidRes.data.url.includes('audio-ssl') && !rapidRes.data.url.includes('mzstatic') && !rapidRes.data.url.includes('itunes.apple.com')) {
+                             console.log(`[SmartAudio] RapidAPI full audio resolved for "${title}":`, rapidRes.data.url);
+                             const rapidFallback = {
+                                 url: rapidRes.data.url,
+                                 duration: targetDuration,
+                                 sourceType: 'rapidapi_direct',
+                                 watchUrl: directUrl || undefined
                              };
-                             audioSearchCache.set(cacheKey, { ...itFallback, expires: Date.now() + CACHE_TTL });
-                             return itFallback;
+                             audioSearchCache.set(cacheKey, { ...rapidFallback, expires: Date.now() + CACHE_TTL });
+                             return rapidFallback;
                          }
                      } catch {}
                  }
