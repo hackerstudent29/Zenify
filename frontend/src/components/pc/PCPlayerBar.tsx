@@ -183,28 +183,29 @@ function Marquee({
   }, [distance, rest, speed]);
 
   const overflowing = distance > 0;
+  // Fade ONLY right edge when overflowing. Never fade left edge so the first letter is never clipped or hidden.
   const mask = overflowing
-    ? "linear-gradient(90deg, transparent 0, #000 7px, #000 calc(100% - 14px), transparent 100%)"
+    ? "linear-gradient(90deg, #000 0, #000 calc(100% - 14px), transparent 100%)"
     : undefined;
 
   return (
     <div
       ref={boxRef}
-      className={cn("flex w-full overflow-hidden", overflowing ? "justify-start" : "justify-center")}
+      className="flex w-full overflow-hidden justify-start text-left pl-0.5"
       style={{ maskImage: mask, WebkitMaskImage: mask }}
     >
       <span
         ref={trackRef}
-        className="inline-flex shrink-0 whitespace-nowrap"
+        className="inline-flex shrink-0 whitespace-nowrap text-left"
         style={{ willChange: overflowing ? "transform" : undefined }}
       >
-        <span ref={copyRef} className="inline-flex shrink-0">
+        <span ref={copyRef} className="inline-flex shrink-0 text-left">
           {children}
         </span>
         {overflowing && (
           <>
             <span className="shrink-0" style={{ width: GAP }} />
-            <span aria-hidden className="inline-flex shrink-0">
+            <span aria-hidden className="inline-flex shrink-0 text-left">
               {children}
             </span>
           </>
@@ -586,7 +587,7 @@ export function PCPlayerBar() {
                       </span>
                     </motion.button>
 
-                    <div className="flex flex-col min-w-0 flex-1 justify-center text-center gap-0">
+                    <div className="flex flex-col min-w-0 flex-1 justify-center text-left items-start pl-0.5 gap-0">
                       <Marquee>
                         <span
                           className="text-[14px] font-semibold text-white leading-[17px] tracking-[-0.01em] hover:underline cursor-pointer"

@@ -4,22 +4,20 @@ import { PreferencesController } from '../controllers/preferences.controller';
 export async function preferencesRoutes(server: FastifyInstance) {
   const controller = new PreferencesController();
 
-  // 1. User's own preferences (handles both / and empty path with or without trailing slash)
-  ['', '/'].forEach((urlPath) => {
-    server.get(urlPath, {
-      preHandler: [server.authenticate],
-      handler: controller.getPreferences.bind(controller)
-    });
+  // 1. User's own preferences (handles both / and empty path with ignoreTrailingSlash: true)
+  server.get('/', {
+    preHandler: [server.authenticate],
+    handler: controller.getPreferences.bind(controller)
+  });
 
-    server.put(urlPath, {
-      preHandler: [server.authenticate],
-      handler: controller.updatePreferences.bind(controller)
-    });
+  server.put('/', {
+    preHandler: [server.authenticate],
+    handler: controller.updatePreferences.bind(controller)
+  });
 
-    server.post(urlPath, {
-      preHandler: [server.authenticate],
-      handler: controller.updatePreferences.bind(controller)
-    });
+  server.post('/', {
+    preHandler: [server.authenticate],
+    handler: controller.updatePreferences.bind(controller)
   });
 
   // 2. Metadata (languages with native names, ISO 3166 countries, genres)

@@ -218,7 +218,7 @@ export function PCFullScreenPlayer() {
                   marginTop: { type: "spring", stiffness: 300, damping: 30 },
                   layout: SHEET_SPRING,
                 }}
-                className="overflow-hidden text-center"
+                className="overflow-hidden text-left pl-1"
                 style={{ pointerEvents: idle ? "none" : "auto" }}
               >
                 <AnimatePresence mode="wait" initial={false}>
@@ -229,7 +229,7 @@ export function PCFullScreenPlayer() {
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Marquee>
+                    <Marquee align="left">
                       <span
                         className="cursor-pointer text-[26px] font-semibold leading-[32px] tracking-[-0.022em] text-white hover:underline"
                         onClick={() => { close(); router.push(`/track/${currentTrack.id}`); }}
@@ -237,7 +237,7 @@ export function PCFullScreenPlayer() {
                         {cleanTitle(currentTrack.title)}
                       </span>
                     </Marquee>
-                    <Marquee>
+                    <Marquee align="left">
                       <span className="text-[17px] leading-[24px] text-white/60">
                         <ArtistLinks
                           track={currentTrack}
