@@ -1097,7 +1097,7 @@ export function LyricsView({ trackId, title, artist, isLyricsOpen, rawLyrics, is
  isFullscreen={isFullscreen}
  isMobile={isMobile}
  isIdle={isIdle}
- isInterlude={line.isInterlude}
+ isInterlude={line.isInterlude || line.text === '• • •' || line.isInstrumental}
  isUnsynced={line.isUnsynced}
  words={line.words}
  isUserScrolling={isUserScrolling}

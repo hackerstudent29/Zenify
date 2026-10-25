@@ -614,7 +614,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   text={currentTrack.title}
   className={cn(
   "font-bold text-white tracking-tight flex-1 py-0.5 cursor-pointer hover:text-[#ff2d55] transition-all text-left",
-  currentTrack.title.length > 25 ? "text-[20px] leading-none" : "text-[24px] leading-none"
+  (currentTrack?.title || "").length > 25 ? "text-[20px] leading-none" : "text-[24px] leading-none"
   )}
   >
   <AnimatePresence mode="wait">
