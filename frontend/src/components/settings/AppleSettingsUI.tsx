@@ -197,7 +197,8 @@ export function SettingsWindow({
             {/* One static blur layer. Only its opacity animates. */}
             <motion.div
               aria-hidden
-              className="absolute inset-0 bg-black/45 backdrop-blur-lg"
+              className="absolute inset-0 bg-black/80 backdrop-blur-2xl"
+              style={{ WebkitBackdropFilter: "blur(24px)" }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -227,19 +228,21 @@ export function SettingsWindow({
                 onDragEnd={(_, info) => {
                   if (info.offset.y > 120 || info.velocity.y > 600) close();
                 }}
-                style={{ paddingBottom: sheet ? "env(safe-area-inset-bottom)" : undefined }}
+                style={{
+                  WebkitBackdropFilter: "blur(32px)",
+                  paddingBottom: sheet ? "env(safe-area-inset-bottom)" : undefined,
+                }}
                 className={cn(
                   "pointer-events-auto relative flex flex-col overflow-hidden text-white",
-                  // Solid-ish surface: no backdrop-filter on the moving element, so it can never flicker
-                  "bg-[#232326] border border-white/[0.09]",
-                  "shadow-[0_30px_80px_rgba(0,0,0,0.6)]",
+                  "bg-zinc-900/90 backdrop-blur-2xl border border-white/10",
+                  "shadow-[0_30px_90px_rgba(0,0,0,0.75)]",
                   sheet
-                    ? "h-[92dvh] w-full rounded-t-[24px]"
-                    : "h-[min(620px,90vh)] w-[min(760px,94vw)] rounded-[20px]"
+                    ? "h-[92dvh] w-full rounded-t-[28px]"
+                    : "h-[min(620px,90vh)] w-[min(760px,94vw)] rounded-[24px]"
                 )}
               >
                 {/* Title bar: tabs live here */}
-                <header className="relative z-10 shrink-0">
+                <header className="relative z-10 shrink-0 bg-zinc-900/60 backdrop-blur-xl border-b border-white/10">
                   {sheet && (
                     <div
                       onPointerDown={(e) => controls.start(e)}
@@ -270,7 +273,7 @@ export function SettingsWindow({
                         <div
                           role="tablist"
                           aria-label={title}
-                          className="mx-auto flex w-max items-center gap-0.5 rounded-full bg-white/[0.06] p-[3px]"
+                          className="mx-auto flex w-max items-center gap-1 rounded-full bg-black/40 border border-white/10 p-[3px] backdrop-blur-md"
                         >
                           {nav.items.map((item) => {
                             const active = nav.active === item.id;
@@ -282,7 +285,7 @@ export function SettingsWindow({
                                 role="tab"
                                 aria-selected={active}
                                 onClick={(e) => {
-                                  nav.onSelect(item.id);
+                                   nav.onSelect(item.id);
                                   e.currentTarget.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
                                 }}
                                 className={cn(
@@ -295,7 +298,7 @@ export function SettingsWindow({
                                   <motion.span
                                     layoutId="settings-tab-pill"
                                     transition={SPRING_PILL}
-                                    className="absolute inset-0 -z-10 rounded-full bg-white/[0.16]"
+                                    className="absolute inset-0 -z-10 rounded-full bg-white/[0.16] border border-white/10 shadow-sm"
                                   />
                                 )}
                                 <Icon size={15} strokeWidth={2} />
@@ -322,7 +325,6 @@ export function SettingsWindow({
                       </motion.button>
                     </div>
                   </div>
-                  <div className="h-px bg-white/[0.07]" />
                 </header>
 
                 {/* Content: fixed size window, so switching tabs never resizes or jumps */}
@@ -393,7 +395,7 @@ export function Group({
   return (
     <section className="mb-7">
       {header && <h3 className="mb-2 px-1 text-[12px] font-medium text-white/40">{header}</h3>}
-      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-[14px] bg-white/[0.04]">
+      <div className="divide-y divide-white/[0.06] overflow-hidden rounded-[16px] bg-white/[0.04] border border-white/[0.06] backdrop-blur-sm">
         {children}
       </div>
       {footer && <p className="mt-2 px-1 text-[12px] leading-snug text-white/35">{footer}</p>}

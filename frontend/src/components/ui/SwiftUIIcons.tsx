@@ -19,7 +19,7 @@ export function SwiftUIPlay({ size = 20, className = "", fill = "currentColor", 
       className={className}
       {...props}
     >
-      <path d="M7.05 4.437C6.015 3.805 4.67 4.55 4.67 5.764v12.472c0 1.214 1.345 1.96 2.38 1.327l10.825-6.236c1.077-.621 1.077-2.173 0-2.794L7.05 4.437z" />
+      <path d="M7 4.75v14.5c0 .85.92 1.38 1.66.95l12-7.25c.74-.46.74-1.54 0-1.99l-12-7.25c-.74-.43-1.66.1-1.66.95z" />
     </svg>
   );
 }
@@ -37,7 +37,8 @@ export function SwiftUIPause({ size = 20, className = "", fill = "currentColor",
       className={className}
       {...props}
     >
-      <path d="M5.75 4.5A1.75 1.75 0 0 0 4 6.25v11.5c0 .966.784 1.75 1.75 1.75h2.5A1.75 1.75 0 0 0 10 17.75V6.25A1.75 1.75 0 0 0 8.25 4.5h-2.5zm8.5 0A1.75 1.75 0 0 0 12.5 6.25v11.5c0 .966.784 1.75 1.75 1.75h2.5a1.75 1.75 0 0 0 1.75-1.75V6.25A1.75 1.75 0 0 0 16.75 4.5h-2.5z" />
+      <rect x="6" y="4.5" width="3.75" height="15" rx="1.5" />
+      <rect x="14.25" y="4.5" width="3.75" height="15" rx="1.5" />
     </svg>
   );
 }
