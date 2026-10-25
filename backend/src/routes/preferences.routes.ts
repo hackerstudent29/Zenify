@@ -15,6 +15,11 @@ export async function preferencesRoutes(server: FastifyInstance) {
     handler: controller.updatePreferences.bind(controller)
   });
 
+  server.post('/', {
+    preHandler: [server.authenticate],
+    handler: controller.updatePreferences.bind(controller)
+  });
+
   // 2. Metadata (languages with native names, ISO 3166 countries, genres)
   server.get('/metadata', {
     handler: controller.getMetadata.bind(controller)

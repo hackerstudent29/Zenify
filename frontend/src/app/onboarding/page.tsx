@@ -303,7 +303,12 @@ export default function OnboardingPage() {
         age: ageNum
       };
 
-      await api.put('/preferences', payload);
+      try {
+        await api.put('/preferences', payload);
+      } catch (putErr) {
+        // Fallback to POST if preflight/CORS restricts PUT method
+        await api.post('/preferences', payload);
+      }
 
       updateUser({
         country: selectedCountry,
@@ -486,10 +491,13 @@ export default function OnboardingPage() {
                   {isCountryDropdownOpen && (
                     <div className="absolute z-50 left-0 right-0 mt-2 bg-[#18181B] border border-white/15 rounded-2xl shadow-2xl p-2 space-y-2 max-h-56 overflow-hidden flex flex-col">
                       <input
+                        id="onboarding-country-search"
+                        name="countrySearch"
                         type="text"
                         value={countrySearch}
                         onChange={e => setCountrySearch(e.target.value)}
                         placeholder="Search country..."
+                        aria-label="Search country"
                         className="w-full h-9 px-3 bg-zinc-900 border border-white/10 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-brand"
                         autoFocus
                       />
@@ -631,13 +639,16 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-3">
-                <label className="text-xs font-bold font-oswald uppercase tracking-wider text-zinc-400 block">
+                <label htmlFor="onboarding-age" className="text-xs font-bold font-oswald uppercase tracking-wider text-zinc-400 block">
                   Your Age (Years)
                 </label>
                 <input
+                  id="onboarding-age"
+                  name="age"
                   type="number"
                   min="13"
                   max="100"
+                  aria-label="Your Age (Years)"
                   value={age}
                   onChange={e => setAge(e.target.value)}
                   className="w-32 h-14 mx-auto text-center font-oswald font-black text-3xl bg-zinc-900 border border-white/10 rounded-2xl text-white focus:outline-none focus:border-brand transition-colors"

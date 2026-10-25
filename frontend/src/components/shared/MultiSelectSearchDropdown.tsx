@@ -207,7 +207,7 @@ export function MultiSelectSearchDropdown({
     <div ref={containerRef} className={cn("space-y-3 w-full", className)} id={`${idPrefix}-wrapper`}>
       {/* Header with Title and Limits Counter */}
       <div className="flex items-center justify-between">
-        <label className="text-xs font-bold font-oswald uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+        <label htmlFor={`${idPrefix}-search-input`} className="text-xs font-bold font-oswald uppercase tracking-wider text-zinc-300 flex items-center gap-2 cursor-pointer">
           {typeIcon}
           <span>{title}</span>
         </label>
@@ -274,6 +274,9 @@ export function MultiSelectSearchDropdown({
         <div className="relative flex items-center">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4 pointer-events-none" />
           <input
+            id={`${idPrefix}-search-input`}
+            name={`${idPrefix}-search`}
+            aria-label={`Search ${title}`}
             ref={searchInputRef}
             type="text"
             value={query}
