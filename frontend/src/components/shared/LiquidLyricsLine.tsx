@@ -234,11 +234,9 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
           wordBreak: "break-word", 
           overflowWrap: "anywhere",
           textWrap: "balance" as any,
-          display: "-webkit-box",
-          WebkitBoxOrient: "vertical",
-          WebkitLineClamp: 2,
-          overflow: "hidden",
-          maxHeight: "2.8em"
+          display: "flex",
+          flexWrap: "wrap",
+          overflow: "visible"
         }}
       >
         {wordTokens.map((word, i) => {
