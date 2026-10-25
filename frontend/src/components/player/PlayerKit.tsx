@@ -365,11 +365,11 @@ export function Marquee({
   return (
     <div
       ref={boxRef}
-      className={cn("flex w-full overflow-hidden", overflowing || align === "left" ? "justify-start" : "justify-center", className)}
+      className={cn("flex w-full overflow-hidden", overflowing || align === "left" ? "justify-start text-left" : "justify-center", className)}
       style={{ maskImage: mask, WebkitMaskImage: mask, paddingBlock: 3, marginBlock: -3 }}
     >
-      <span ref={trackRef} className="inline-flex shrink-0 whitespace-nowrap" style={{ willChange: overflowing ? "transform" : undefined }}>
-        <span ref={copyRef} className="inline-flex shrink-0">{children}</span>
+      <span ref={trackRef} className="inline-flex shrink-0 whitespace-nowrap text-left" style={{ willChange: overflowing ? "transform" : undefined }}>
+        <span ref={copyRef} className="inline-flex shrink-0 text-left">{children}</span>
         {overflowing && (
           <>
             <span className="shrink-0" style={{ width: GAP }} />

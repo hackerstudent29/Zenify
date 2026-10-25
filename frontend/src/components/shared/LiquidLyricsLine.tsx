@@ -145,8 +145,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     onClick,
   } = props;
 
-  // Center alignment: on mobile, lyrics are always centered
-  const left = !isMobile && !!isFullscreen && !isInterlude;
+  // Lyrics are always left aligned on the left side
+  const left = !isInterlude;
   const reduce = prefersReduce();
   const dp = depthFor(dist, isCurrent, !!isUserScrolling, !!isUnsynced, reduce, !!isMobile);
   const delay = !isCurrent && dist > 0 && !isUserScrolling ? Math.min(dist, 5) * 36 : 0;
@@ -298,7 +298,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         }}
       >
         {interlude ? (
-          <div className="flex items-center justify-center gap-[0.65em] py-[0.35em]">
+          <div className="flex items-center justify-start gap-[0.65em] py-[0.35em] pl-1">
             {[0, 1, 2].map((i) => (
               <span
                 key={i}

@@ -672,7 +672,7 @@ export function LyricsView({
             {processedLines.map((line: any, i: number) => (
               <p
                 key={`${trackId}-u-${i}`}
-                className={cn("text-center font-semibold leading-[1.6] text-white/85", isMobile ? "text-[20px]" : isFullscreen ? "text-[28px]" : "text-[22px]")}
+                className={cn("text-left font-semibold leading-[1.6] text-white/85", isMobile ? "text-[20px]" : isFullscreen ? "text-[28px]" : "text-[22px]")}
               >
                 {line.text}
               </p>
@@ -706,7 +706,7 @@ export function LyricsView({
           onTouchCancel={onTouchEnd}
         >
           <style dangerouslySetInnerHTML={{ __html: ".scrollbar-none::-webkit-scrollbar{display:none!important}" }} />
-          <div className={cn("relative flex w-full flex-col", isMobile ? "items-center text-center px-[max(14px,env(safe-area-inset-left))] pr-[max(14px,env(safe-area-inset-right))]" : (isFullscreen ? "mx-auto max-w-5xl px-8" : "px-4"))}>
+          <div className={cn("relative flex w-full flex-col items-start text-left", isFullscreen ? "mx-auto max-w-5xl px-8" : isMobile ? "px-4" : "px-6")}>
             <div className="w-full shrink-0" style={{ height: topSpacer }} />
 
             {processedLines.map((line: any, idx: number) => {
