@@ -38,8 +38,8 @@ const SYSTEMS: SystemCard[] = [
     name: "StudioFX Audio Store",
     tag: "Zustand Store",
     category: "audio",
-    desc: "Persistent state manager preserving user audio profiles, equalizer band gains, spatializer toggles, and room sizes in localStorage across browser sessions.",
-    path: "frontend/src/store/audio-fx-store.ts",
+    desc: "Persistent state manager preserving user audio profiles, equalizer band gains, spatializer toggles, and room sizes in localStorage via the core player store.",
+    path: "frontend/src/store/player.ts",
     icon: "💾"
   },
   {
@@ -329,9 +329,9 @@ export default function StructureExplorerPage() {
                     </div>
 
                     {/* store/ */}
-                    <div className="py-0.5 px-2 rounded hover:bg-white/5 cursor-pointer flex justify-between items-center text-zinc-300 font-medium" onClick={() => setSearch("audio-fx-store")}>
-                      <span className="flex items-center gap-1.5"><FileCode size={12} className="text-purple-400" /> store/audio-fx-store.ts</span>
-                      <span className="text-[9px] px-1 py-0.2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded">Store</span>
+                    <div className="py-0.5 px-2 rounded hover:bg-white/5 cursor-pointer flex justify-between items-center text-zinc-300 font-medium" onClick={() => setSearch("player.ts")}>
+                      <span className="flex items-center gap-1.5"><FileCode size={12} className="text-purple-400" /> store/player.ts</span>
+                      <span className="text-[9px] px-1 py-0.2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded">FX State</span>
                     </div>
 
                   </div>

@@ -642,12 +642,11 @@
                 </div>
                 <div id="f-store" class="folder-children">
                   <div class="file-row" onclick="highlightEngine('studiofxstore')">
-                    <span>audio-fx-store.ts</span>
-                    <span class="file-badge badge-store">StudioFX State</span>
+                    <span>player.ts</span>
+                    <span class="file-badge badge-store">StudioFX State & Player</span>
                   </div>
-                  <div class="file-row"><span>player.ts</span></div>
                   <div class="file-row"><span>ui.ts</span></div>
-                  <div class="file-row"><span>auth.ts</span></div>
+                  <div class="file-row"><span>authStore.ts</span></div>
                 </div>
 
               </div>
@@ -703,15 +702,15 @@
               <div class="engine-icon-wrap">💾</div>
               <div class="engine-title-group">
                 <span class="engine-tag">Zustand Store</span>
-                <h3>StudioFX Audio Store</h3>
+                <h3>StudioFX Audio State</h3>
               </div>
             </div>
             <p class="engine-desc">
-              Persistent state manager preserving user audio profiles, equalizer band gains, spatializer toggles, and room sizes in localStorage across browser sessions.
+              Persistent state manager preserving user audio profiles, equalizer band gains, spatializer toggles, and room sizes in localStorage via the central player store.
             </p>
             <div class="path-box">
-              <span>frontend/src/store/audio-fx-store.ts</span>
-              <button class="copy-btn" onclick="copyPath('frontend/src/store/audio-fx-store.ts')">Copy</button>
+              <span>frontend/src/store/player.ts</span>
+              <button class="copy-btn" onclick="copyPath('frontend/src/store/player.ts')">Copy</button>
             </div>
           </div>
 
