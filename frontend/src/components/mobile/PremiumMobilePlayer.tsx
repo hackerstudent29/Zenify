@@ -457,6 +457,66 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     return () => c.stop();
   }, [isOpen, sheetY]);
 
+  // Strictly prevent mobile browser pull-to-refresh while fullview player is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+
+    html.classList.add("fullview-player-open");
+    body.classList.add("fullview-player-open");
+
+    const prevHtmlOverscroll = html.style.overscrollBehaviorY;
+    const prevBodyOverscroll = body.style.overscrollBehaviorY;
+    html.style.overscrollBehaviorY = "none";
+    body.style.overscrollBehaviorY = "none";
+
+    let touchStartY = 0;
+    let touchStartX = 0;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        touchStartY = e.touches[0].clientY;
+        touchStartX = e.touches[0].clientX;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const touchY = e.touches[0].clientY;
+      const touchX = e.touches[0].clientX;
+      const deltaY = touchY - touchStartY;
+      const deltaX = touchX - touchStartX;
+
+      // Downward pull gesture
+      if (deltaY > 0 && Math.abs(deltaY) > Math.abs(deltaX)) {
+        const target = e.target as HTMLElement | null;
+        const scrollable = target?.closest?.(".overflow-y-auto, .overflow-auto") as HTMLElement | null;
+        if (scrollable && scrollable.scrollTop > 0) {
+          // Allow normal internal scrolling inside lyrics when not at top
+          return;
+        }
+        // At the top of lyrics or anywhere else on the sheet: cancel pull-to-refresh!
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+      }
+    };
+
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+
+    return () => {
+      html.classList.remove("fullview-player-open");
+      body.classList.remove("fullview-player-open");
+      html.style.overscrollBehaviorY = prevHtmlOverscroll;
+      body.style.overscrollBehaviorY = prevBodyOverscroll;
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+    };
+  }, [isOpen]);
+
   /* ── mini player gestures: swipe up opens sheet; swipe horizontal skips ── */
   const miniX = useMotionValue(0);
   const gesture = useRef<"none" | "x" | "y">("none");
@@ -519,6 +579,52 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     } else {
       animate(sy, 0, SHEET_SPRING);
     }
+  };
+
+  /* ── artwork gestures in full view: drag down to close, swipe up to open lyrics, horizontal swipe to switch song ── */
+  const artX = useMotionValue(0);
+  const artPanGesture = useRef<"none" | "x" | "y">("none");
+
+  const onArtPanStart = () => {
+    artPanGesture.current = "none";
+  };
+
+  const onArtPan = (_: PointerEvent, info: PanInfo) => {
+    if (isLyricsOpen) return;
+    if (artPanGesture.current === "none") {
+      if (Math.hypot(info.offset.x, info.offset.y) < 6) return;
+      artPanGesture.current = Math.abs(info.offset.x) > Math.abs(info.offset.y) ? "x" : "y";
+    }
+
+    if (artPanGesture.current === "x") {
+      artX.set(info.offset.x * 0.7);
+    } else if (artPanGesture.current === "y") {
+      if (info.offset.y > 0) {
+        // Dragging down moves the sheet down smoothly towards the mini player
+        sheetYRef.current.set(Math.min(H, info.offset.y));
+      }
+    }
+  };
+
+  const onArtPanEnd = (_: PointerEvent, info: PanInfo) => {
+    if (isLyricsOpen) return;
+    if (artPanGesture.current === "x") {
+      if (info.offset.x < -60 || info.velocity.x < -400) {
+        handleNext();
+      } else if (info.offset.x > 60 || info.velocity.x > 400) {
+        handlePrev();
+      }
+      animate(artX, 0, SPRING_SOFT);
+    } else if (artPanGesture.current === "y") {
+      if (info.offset.y > 0) {
+        // Dragged down -> close sheet if past threshold or fast flick, else spring back
+        sheetPanEnd(_, info);
+      } else if (info.offset.y < -35 || info.velocity.y < -250) {
+        // Swiped up -> open lyrics
+        setIsLyricsOpen(true);
+      }
+    }
+    artPanGesture.current = "none";
   };
 
   /* Idle auto-hide flags */
@@ -651,12 +757,15 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
               key="full-sheet"
               exit={{ y: H }}
               transition={SHEET_SPRING}
-              className="fixed inset-0 z-[1100] flex select-none flex-col"
+              className="fixed inset-0 z-[1100] flex select-none flex-col overscroll-none"
               style={{
                 y: sheetY,
                 willChange: "transform",
                 fontFamily: FONT_STACK,
                 WebkitFontSmoothing: "antialiased",
+                overscrollBehavior: "none",
+                overscrollBehaviorY: "none",
+                touchAction: isLyricsOpen ? "pan-y" : "none",
               }}
             >
               {/* Dynamic fluid mesh background */}
@@ -728,11 +837,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
               {/* Middle region: artwork or lyrics view */}
               <motion.div
                 className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-6"
-                onPan={(_e, info) => {
-                  if (!isLyricsOpen && (info.offset.y < -35 || info.velocity.y < -250)) {
-                    setIsLyricsOpen(true);
-                  }
-                }}
+                style={{ touchAction: isLyricsOpen ? "pan-y" : "none", overscrollBehavior: "none" }}
+                onPanStart={!isLyricsOpen ? onArtPanStart : undefined}
+                onPan={!isLyricsOpen ? onArtPan : undefined}
+                onPanEnd={!isLyricsOpen ? onArtPanEnd : undefined}
               >
                 {!isLyricsOpen && (
                   <div
@@ -740,26 +848,20 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                     style={{
                       width: "min(100%, max(240px, calc(100dvh - 460px)), 420px)",
                       aspectRatio: "1",
+                      touchAction: "none",
                     }}
                   >
                     <motion.div
-                      drag="x"
-                      dragDirectionLock
-                      dragSnapToOrigin
-                      dragElastic={0.4}
-                      dragMomentum={false}
-                      onDragEnd={(_, info) => {
-                        if (info.offset.x < -60 || info.velocity.x < -400) handleNext();
-                        else if (info.offset.x > 60 || info.velocity.x > 400) handlePrev();
-                      }}
-                      onPan={(_e, info) => {
-                        // Swipe up on the artwork opens lyrics
-                        if (info.offset.y < -35 || info.velocity.y < -250) {
+                      onPanStart={onArtPanStart}
+                      onPan={onArtPan}
+                      onPanEnd={onArtPanEnd}
+                      onTap={() => {
+                        if (artPanGesture.current === "none") {
                           setIsLyricsOpen(true);
                         }
                       }}
-                      onTap={() => setIsLyricsOpen(true)}
-                      className="h-full w-full cursor-pointer"
+                      style={{ x: artX, touchAction: "none" }}
+                      className="h-full w-full cursor-pointer touch-none"
                     >
                       <MorphWrap sheetY={sheetY} miniRef={miniArtRef} H={H} paused={!isPlaying}>
                         <motion.div
@@ -812,7 +914,10 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
               </motion.div>
 
               {/* Bottom block: track info, seekbar, playback actions */}
-              <div className="relative z-10 shrink-0 px-6 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] pt-2">
+              <div
+                className="relative z-10 shrink-0 px-6 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] pt-2"
+                style={{ touchAction: isLyricsOpen ? "pan-y" : "none" }}
+              >
                 {!isLyricsOpen && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
