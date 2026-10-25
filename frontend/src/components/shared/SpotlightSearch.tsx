@@ -1,9 +1,9 @@
 "use client";
-import React, { useDeferredValue, useEffect, useRef, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/Icon";
 import api from "@/lib/api";
-import { getMediaUrl, getTrackCover } from "@/lib/utils";
+import { getMediaUrl, getTrackCover, cn } from "@/lib/utils";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useNavigate } from "react-router-dom";
@@ -60,10 +60,28 @@ interface SearchItem {
   raw: any;
 }
 
+type FilterType = "all" | "track" | "artist" | "album";
+
+const FILTER_TABS: { id: FilterType; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "track", label: "Songs" },
+  { id: "artist", label: "Artists" },
+  { id: "album", label: "Albums" },
+];
+
 export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState("");
   const dq = useDeferredValue(q);
-  const [items, setItems] = useState<SearchItem[]>([]);
+  const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [resultsData, setResultsData] = useState<{
+    tracks: SearchItem[];
+    artists: SearchItem[];
+    albums: SearchItem[];
+  }>({
+    tracks: [],
+    artists: [],
+    albums: [],
+  });
   const [sel, setSel] = useState(0);
   const [loading, setLoading] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -80,7 +98,7 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     if (!dq.trim()) {
-      setItems([]);
+      setResultsData({ tracks: [], artists: [], albums: [] });
       setLoading(false);
       return;
     }
@@ -90,15 +108,17 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
     const id = setTimeout(async () => {
       try {
         const res = await api.get("search", {
-          params: { q: dq.trim(), limit: 12 },
+          params: { q: dq.trim(), limit: 30 },
           signal: ctl.signal,
         });
         const data = res.data;
-        const mapped: SearchItem[] = [];
+        const mappedTracks: SearchItem[] = [];
+        const mappedArtists: SearchItem[] = [];
+        const mappedAlbums: SearchItem[] = [];
 
         if (Array.isArray(data?.tracks)) {
-          data.tracks.slice(0, 6).forEach((t: any) => {
-            mapped.push({
+          data.tracks.forEach((t: any) => {
+            mappedTracks.push({
               id: `track-${t.id}`,
               type: "track",
               title: t.title,
@@ -108,32 +128,43 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
             });
           });
         }
+
         if (Array.isArray(data?.artists)) {
-          data.artists.slice(0, 3).forEach((a: any) => {
-            mapped.push({
+          data.artists.forEach((a: any) => {
+            mappedArtists.push({
               id: `artist-${a.id}`,
               type: "artist",
               title: a.name,
-              subtitle: "Artist",
+              subtitle: a.trackCount ? `${a.trackCount} Songs` : "Artist",
               coverUrl: a.imageUrl || a.coverUrl,
               raw: a,
             });
           });
         }
+
         if (Array.isArray(data?.albums)) {
-          data.albums.slice(0, 3).forEach((al: any) => {
-            mapped.push({
+          data.albums.forEach((al: any) => {
+            const artistName = al.artist?.name || "Album";
+            const year = al.releaseDate ? String(al.releaseDate).slice(0, 4) : "";
+            const tracksInfo = al.trackCount ? `${al.trackCount} Tracks` : "";
+            const meta = [artistName, year, tracksInfo].filter(Boolean).join(" • ");
+
+            mappedAlbums.push({
               id: `album-${al.id}`,
               type: "album",
               title: al.title,
-              subtitle: al.artist?.name || "Album",
+              subtitle: meta,
               coverUrl: al.coverUrl,
               raw: al,
             });
           });
         }
 
-        setItems(mapped);
+        setResultsData({
+          tracks: mappedTracks,
+          artists: mappedArtists,
+          albums: mappedAlbums,
+        });
         setSel(0);
       } catch (err: any) {
         if (err.name !== "CanceledError" && err.name !== "AbortError") {
@@ -149,6 +180,43 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
       ctl.abort();
     };
   }, [dq]);
+
+  const filteredItems = useMemo(() => {
+    if (activeFilter === "track") return resultsData.tracks;
+    if (activeFilter === "artist") return resultsData.artists;
+    if (activeFilter === "album") return resultsData.albums;
+
+    // "all": curated overview with artists, top tracks, and albums
+    const combined: SearchItem[] = [];
+    if (resultsData.artists.length > 0) {
+      combined.push(...resultsData.artists.slice(0, 3));
+    }
+    if (resultsData.albums.length > 0) {
+      combined.push(...resultsData.albums.slice(0, 3));
+    }
+    if (resultsData.tracks.length > 0) {
+      combined.push(...resultsData.tracks.slice(0, 8));
+    }
+    // Append remaining albums/tracks if space permits
+    if (resultsData.albums.length > 3) {
+      combined.push(...resultsData.albums.slice(3, 8));
+    }
+    if (resultsData.tracks.length > 8) {
+      combined.push(...resultsData.tracks.slice(8, 16));
+    }
+
+    return combined;
+  }, [activeFilter, resultsData]);
+
+  const tabCounts = useMemo(
+    () => ({
+      all: resultsData.tracks.length + resultsData.artists.length + resultsData.albums.length,
+      track: resultsData.tracks.length,
+      artist: resultsData.artists.length,
+      album: resultsData.albums.length,
+    }),
+    [resultsData]
+  );
 
   const selectItem = (item: SearchItem) => {
     if (item.type === "track") {
@@ -170,14 +238,14 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
       onClose();
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSel((s) => Math.min(s + 1, items.length - 1));
+      setSel((s) => Math.min(s + 1, filteredItems.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSel((s) => Math.max(s - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (items[sel]) {
-        selectItem(items[sel]);
+      if (filteredItems[sel]) {
+        selectItem(filteredItems[sel]);
       }
     }
   };
@@ -206,9 +274,47 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        {items.length > 0 && (
+        {/* Filter Tabs Bar (All, Songs, Artists, Albums) */}
+        {dq.trim().length > 0 && (
+          <div className="flex items-center gap-1.5 px-4 py-2 border-b border-white/[0.08] bg-white/[0.02] text-xs">
+            {FILTER_TABS.map((tab) => {
+              const count = tabCounts[tab.id];
+              const active = activeFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveFilter(tab.id);
+                    setSel(0);
+                  }}
+                  className={cn(
+                    "px-3 py-1 rounded-full font-semibold transition-all flex items-center gap-1.5 cursor-pointer outline-none text-[11px]",
+                    active
+                      ? "bg-brand text-white shadow-sm ring-1 ring-brand/50"
+                      : "text-zinc-400 hover:text-white hover:bg-white/10"
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  {count > 0 && (
+                    <span
+                      className={cn(
+                        "text-[10px] px-1.5 py-0.2 rounded-full",
+                        active ? "bg-black/30 text-white" : "bg-white/10 text-zinc-400"
+                      )}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {filteredItems.length > 0 && (
           <ul className="sp-results divide-y divide-white/5">
-            {items.map((it, i) => (
+            {filteredItems.map((it, i) => (
               <li
                 key={it.id}
                 data-sel={i === sel}
@@ -216,24 +322,44 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
                 onClick={() => selectItem(it)}
                 className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-xl transition-colors duration-100"
               >
-                <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-800 shrink-0 border border-white/5">
+                {/* Round avatar for artists, rounded-xl cover for tracks & albums */}
+                <div
+                  className={cn(
+                    "overflow-hidden bg-zinc-800 shrink-0 border border-white/10 flex items-center justify-center",
+                    it.type === "artist"
+                      ? "w-11 h-11 rounded-full ring-2 ring-brand/40 shadow-sm"
+                      : "w-11 h-11 rounded-xl"
+                  )}
+                >
                   <img
-                    src={getMediaUrl(it.coverUrl) || "/logo.png"}
+                    src={getMediaUrl(it.coverUrl) || (it.type === "artist" ? "/logo.png" : "/logo.png")}
                     alt={it.title}
                     className="w-full h-full object-cover"
                     loading="lazy"
                     decoding="async"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/logo.png";
+                    }}
                   />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white/95 truncate">
                     {it.title}
                   </p>
-                  <p className="text-xs text-white/50 truncate">
-                    <span className="uppercase text-[10px] tracking-wider text-brand font-bold mr-1.5">
-                      {it.type}
+                  <p className="text-xs text-white/50 truncate flex items-center mt-0.5">
+                    <span
+                      className={cn(
+                        "uppercase text-[9px] tracking-wider font-bold mr-1.5 px-1.5 py-0.2 rounded",
+                        it.type === "artist"
+                          ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                          : it.type === "album"
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                          : "bg-brand/20 text-brand border border-brand/30"
+                      )}
+                    >
+                      {it.type === "track" ? "Song" : it.type}
                     </span>
-                    {it.subtitle}
+                    <span className="truncate">{it.subtitle}</span>
                   </p>
                 </div>
                 <Icon
@@ -246,9 +372,9 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
           </ul>
         )}
 
-        {dq.trim() && !loading && items.length === 0 && (
+        {dq.trim() && !loading && filteredItems.length === 0 && (
           <div className="p-8 text-center text-zinc-500 text-xs uppercase tracking-wider font-semibold">
-            No matching results found for "{dq}"
+            No matching results found in {activeFilter === "all" ? "catalog" : activeFilter + "s"} for "{dq}"
           </div>
         )}
       </div>

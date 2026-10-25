@@ -204,22 +204,22 @@ export function SettingsWindow({
       <AnimatePresence onExitComplete={finish}>
         {internalOpen && (
           <div key="settings-root" className="fixed inset-0 z-[9000]">
-            {/* Blur + dim backdrop: only opacity animates */}
+            {/* Blur + dim backdrop: match search scrim glass */}
             <motion.div
               aria-hidden
-              className="absolute inset-0 bg-black/50 backdrop-blur-2xl backdrop-saturate-150"
+              className="absolute inset-0 bg-black/60 backdrop-blur-xl backdrop-saturate-150"
               style={{ willChange: "opacity", transform: "translateZ(0)" }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+              transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
               onPointerDown={() => close()}
             />
 
             <div
               className={cn(
                 "pointer-events-none absolute inset-0 flex",
-                sheet ? "items-end" : "items-center justify-center p-4 sm:p-6"
+                sheet ? "items-end" : "items-center justify-center p-3 sm:p-5"
               )}
             >
               <motion.div
@@ -244,11 +244,11 @@ export function SettingsWindow({
                 }}
                 className={cn(
                   "pointer-events-auto relative flex flex-col overflow-hidden text-white",
-                  "bg-zinc-950/80 border border-white/[0.12] backdrop-blur-3xl backdrop-saturate-200",
-                  "shadow-[0_32px_100px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.18)]",
+                  "bg-zinc-900/85 border border-white/[0.12] backdrop-blur-3xl backdrop-saturate-180",
+                  "shadow-[0_28px_90px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.18)]",
                   sheet
                     ? "h-[92dvh] w-full rounded-t-[26px]"
-                    : "h-[min(680px,94vh)] w-[min(940px,94vw)] rounded-[24px]"
+                    : "h-[min(660px,92vh)] w-[min(900px,94vw)] rounded-[22px]"
                 )}
               >
                 {/* Title bar (also the drag handle on mobile) */}
