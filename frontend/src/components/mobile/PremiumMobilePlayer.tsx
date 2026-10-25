@@ -1,17 +1,12 @@
 "use client";
 
-import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState,
+} from "react";
 import {
-  AnimatePresence,
-  LayoutGroup,
-  motion,
-  motionValue,
-  MotionConfig,
-  useDragControls,
-  useMotionValue,
-  useMotionValueEvent,
-  useTransform,
-  type MotionValue,
+  AnimatePresence, LayoutGroup, MotionConfig, animate, motion, motionValue,
+  useDragControls, useMotionValue, useMotionValueEvent, useTransform,
+  type MotionValue, type PanInfo,
 } from "framer-motion";
 import { ListPlus, RefreshCw, User, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -24,11 +19,7 @@ import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { SwiftUIForward, SwiftUIBackward, SwiftUIQueue } from "@/components/ui/SwiftUIIcons";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuPortal,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { cn, getTrackCover, getArtistTarget } from "@/lib/utils";
 import { MobileScrubber, MiniPlayerProgress } from "./../player/PlayerProgress";
@@ -38,27 +29,22 @@ import {
   FONT_STACK, SHEET_SPRING, SPRING, SPRING_SOFT,
   GlassButton, LikeButton, Marquee, PlateButton, PlayPauseButton, PlayerStyles, SpringButton,
   SFFx, SFLyrics, SFMore, SFRepeat, SFShuffle,
-  useIdle, useTrackLike,
+  useAutoHideIdle, useTrackLike,
 } from "@/components/player/PlayerKit";
 
 /* ------------------------------------------------------------------ */
-/*  Cover loading: swap the shown art only once it's decoded           */
-/*  (no flash of the old image under the new track's animation)        */
+/*  Cover: swap only once decoded                                      */
 /* ------------------------------------------------------------------ */
 const imageCache = new Set<string>();
 
 function useShownCover(track: any) {
   const cover: string = track ? getTrackCover(track) : "";
   const [shown, setShown] = useState({ id: track?.id as string | undefined, cover });
-
   useEffect(() => {
     if (!track) return;
     let dead = false;
     const commit = () => !dead && setShown({ id: track.id, cover });
-    if (!cover || imageCache.has(cover)) {
-      commit();
-      return () => { dead = true; };
-    }
+    if (!cover || imageCache.has(cover)) { commit(); return () => { dead = true; }; }
     const img = new Image();
     img.src = cover;
     const ok = () => { imageCache.add(cover); commit(); };
@@ -66,53 +52,92 @@ function useShownCover(track: any) {
     else { img.onload = ok; img.onerror = commit; }
     return () => { dead = true; };
   }, [track?.id, cover]);
-
   return shown;
 }
 
 /* ------------------------------------------------------------------ */
-/*  MorphWrap: the mini-player artwork physically grows into the big   */
-/*  artwork. Its position/scale are derived from the sheet's own       */
-/*  y motion value, so it follows opening, closing AND finger-drag.    */
+/*  MorphWrap — pixel-exact artwork travel between mini player & sheet */
+/*                                                                      */
+/*  Position, size, corner radius and the "paused" shrink are all       */
+/*  computed from ONE number: the sheet's y motion value. So opening,   */
+/*  closing and dragging with a finger share the exact same path, and   */
+/*  at rest the artwork lands on the mini artwork's real on-screen rect */
+/*  (measured live, not assumed).                                       */
 /* ------------------------------------------------------------------ */
+const PAUSED = 0.86;
+const BIG_R = 14;
+const MINI_R = 8;
+
 function MorphWrap({
-  sheetY, miniRef, H, style, children, onPointerDown,
+  sheetY, miniRef, H, paused, children,
 }: {
   sheetY: MotionValue<number>;
   miniRef: React.RefObject<HTMLDivElement>;
   H: number;
-  style: React.CSSProperties;
+  paused: boolean;
   children: React.ReactNode;
-  onPointerDown?: React.PointerEventHandler;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const geo = useRef<{ dx: number; dy: number; sr: number } | null>(null);
-  const x = useMotionValue(0), y = useMotionValue(0), s = useMotionValue(1);
+  const fin = useRef<{ left: number; top: number; w: number } | null>(null);
+  const x = useMotionValue(0), y = useMotionValue(0), s = useMotionValue(1), radius = useMotionValue(BIG_R);
+  const pause = useMotionValue(paused ? PAUSED : 1);
 
-  const update = useCallback((v: number) => {
-    const g = geo.current;
-    if (!g) return;
-    const q = Math.min(1, Math.max(0, v / H)); // 1 = fully closed, 0 = fully open
-    x.set(g.dx * q);
-    y.set(g.dy * q - v);
-    s.set(1 + (g.sr - 1) * q);
-  }, [H, x, y, s]);
+  const update = useCallback(() => {
+    const f = fin.current;
+    if (!f) return;
+    const v = sheetY.get();
+    const q = Math.min(1, Math.max(0, v / H)); // 0 = open, 1 = docked in the mini player
+    const k0 = pause.get();
+    const m = miniRef.current?.getBoundingClientRect();
+
+    if (!m || !m.width) {                      // no mini player → only the paused shrink; artwork rides with the sheet
+      const sh = (f.w - f.w * k0) / 2;
+      x.set(sh); y.set(sh); s.set(k0); radius.set(BIG_R / k0);
+      return;
+    }
+    const sGeo = 1 + (m.width / f.w - 1) * q;
+    const k = 1 - (1 - k0) * (1 - q);          // paused shrink fades out as it docks
+    const sT = sGeo * k;
+    const centre = (f.w * sGeo - f.w * sT) / 2; // shrink around the centre, not the corner
+    x.set((m.left - f.left) * q + centre);
+    y.set((m.top - f.top) * q + centre - v);   // − v cancels the sheet's own translate
+    s.set(sT);
+    radius.set((BIG_R + (MINI_R - BIG_R) * q) / sT);
+  }, [H, sheetY, miniRef, pause, x, y, s, radius]);
 
   useMotionValueEvent(sheetY, "change", update);
+  useMotionValueEvent(pause, "change", update);
 
-  useLayoutEffect(() => {
-    const el = ref.current, mini = miniRef.current;
-    if (!el || !mini) return;
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    x.set(0); y.set(0); s.set(1);
     const r = el.getBoundingClientRect();
-    const m = mini.getBoundingClientRect();
-    if (!r.width || !m.width) return;
-    geo.current = { dx: m.left - r.left, dy: m.top - (r.top - sheetY.get()), sr: m.width / r.width };
-    update(sheetY.get());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!r.width) return;
+    fin.current = { left: r.left, top: r.top - sheetY.get(), w: r.width };
+    update();
+  }, [sheetY, update, x, y, s]);
+
+  useLayoutEffect(() => { measure(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
+
+  useEffect(() => {
+    const c = animate(pause, paused ? PAUSED : 1, { type: "spring", stiffness: 300, damping: 22, mass: 0.6 });
+    return () => c.stop();
+  }, [paused, pause]);
 
   return (
-    <motion.div ref={ref} style={{ ...style, x, y, scale: s, transformOrigin: "0 0" }} onPointerDown={onPointerDown}>
+    <motion.div
+      ref={ref}
+      className="h-full w-full bg-zinc-800"
+      style={{
+        x, y, scale: s, borderRadius: radius, overflow: "hidden", transformOrigin: "0 0",
+        boxShadow: "0 0 0 1px rgba(255,255,255,0.1), 0 24px 48px rgba(0,0,0,0.5)",
+      }}
+    >
       {children}
     </motion.div>
   );
@@ -125,43 +150,28 @@ function TrackMenu({ track, onLeave }: { track: any; onLeave: (to: string) => vo
   const { refetchTrackAudio, isRefetching } = useRefetchAudio();
   const { refetchTrackLyrics } = useRefetchLyrics();
   const openDownloadModal = useUIStore((s) => s.openDownloadModal);
-  const showToast = (msg: string, type: "success" | "error" = "success") =>
-    useUIStore.getState().showToast(msg, type);
+  const showToast = (msg: string, type: "success" | "error" = "success") => useUIStore.getState().showToast(msg, type);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <GlassButton title="More">
-          <SFMore size={18} />
-        </GlassButton>
+        <GlassButton title="More"><SFMore size={18} /></GlassButton>
       </DropdownMenuTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuContent
-          align="end"
-          sideOffset={8}
-          className="w-56 bg-zinc-900/90 border-white/10 backdrop-blur-xl rounded-2xl p-2 z-[1200]"
-        >
+        <DropdownMenuContent align="end" sideOffset={8} className="z-[1200] w-56 rounded-2xl border-white/10 bg-zinc-900/90 p-2 backdrop-blur-xl">
           <DropdownMenuItem onSelect={() => usePlayerStore.getState().addToUserQueue(track)}>
-            <ListPlus size={18} className="mr-3 opacity-50 text-brand" />
-            <span className="font-medium">Add to Queue</span>
+            <ListPlus size={18} className="mr-3 text-brand opacity-50" /><span className="font-medium">Add to Queue</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => refetchTrackAudio(track, showToast)}>
             <RefreshCw size={18} className={cn("mr-3 opacity-50", isRefetching === track?.id && "animate-spin text-brand")} />
             <span className="font-medium">{isRefetching === track?.id ? "Refetching…" : "Refetch Audio"}</span>
           </DropdownMenuItem>
           <RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
-          <DropdownMenuItem
-            onSelect={() => {
-              const target = getArtistTarget(track);
-              if (target) onLeave(target);
-            }}
-          >
-            <User size={18} className="mr-3 opacity-50" />
-            <span className="font-medium">Go to Artist</span>
+          <DropdownMenuItem onSelect={() => { const t = getArtistTarget(track); if (t) onLeave(t); }}>
+            <User size={18} className="mr-3 opacity-50" /><span className="font-medium">Go to Artist</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => openDownloadModal(track)}>
-            <Download size={18} className="mr-3 opacity-50" />
-            <span className="font-medium">Download Track</span>
+            <Download size={18} className="mr-3 opacity-50" /><span className="font-medium">Download Track</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenuPortal>
@@ -169,13 +179,23 @@ function TrackMenu({ track, onLeave }: { track: any; onLeave: (to: string) => vo
   );
 }
 
+const slide = {
+  enter: (d: number) => ({ opacity: 0, x: d * 56, scale: 1.04 }),
+  center: { opacity: 1, x: 0, scale: 1 },
+  exit: (d: number) => ({ opacity: 0, x: -d * 56, scale: 0.98 }),
+};
+const textSlide = {
+  enter: (d: number) => ({ opacity: 0, x: d * 28 }),
+  center: { opacity: 1, x: 0 },
+  exit: (d: number) => ({ opacity: 0, x: -d * 28 }),
+};
+
 /* ------------------------------------------------------------------ */
 /*  Main                                                               */
 /* ------------------------------------------------------------------ */
 export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boolean }) {
   const router = useRouter();
 
-  // Selectors only. Destructuring the whole player store re-rendered this tree on every time tick.
   const currentTrack = usePlayerStore((s) => s.currentTrack);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const togglePlay = usePlayerStore((s) => s.togglePlay);
@@ -196,47 +216,95 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const isLyricsOpen = useUIStore((s) => s.isLyricsOpen);
   const setIsLyricsOpen = useUIStore((s) => s.setIsLyricsOpen);
 
-  const userPrefs = useAuthStore((s: any) => s.user?.preferences?.globalPlayerStyle);
-  const isGlass = userPrefs !== "classic" && userPrefs !== "solid";
+  const stylePref = useAuthStore((s: any) => s.user?.preferences?.globalPlayerStyle);
+  const isGlass = stylePref !== "classic" && stylePref !== "solid";
 
   const { liked, toggle: toggleLike } = useTrackLike(currentTrack?.id);
   const shown = useShownCover(currentTrack);
 
-  const dirRef = useRef(1); // +1 next, -1 prev
+  const dirRef = useRef(1);
   const [isUserScrollingLyrics, setIsUserScrollingLyrics] = useState(false);
-  const idle = useIdle(isOpen && isLyricsOpen, 4500);
-  const showLyrics = useDeferredValue(isLyricsOpen); // mounts heavy lyrics after the art morph has started
-  const hideSecondary = isLyricsOpen && (idle || isUserScrollingLyrics);
+  const idle = useAutoHideIdle(isOpen, 5000);           // Settings → "Hide details when idle"
+  const showLyrics = useDeferredValue(isLyricsOpen);
 
   const handleNext = useCallback(() => { dirRef.current = 1; playNext(true); }, [playNext]);
   const handlePrev = useCallback(() => { dirRef.current = -1; playPrev(); }, [playPrev]);
   useEffect(() => { dirRef.current = 1; }, [currentTrack?.id]);
-
-  // lyrics reset to artwork when the song changes (previous behaviour)
   useEffect(() => { if (currentTrack?.id) setIsLyricsOpen(false); }, [currentTrack?.id, setIsLyricsOpen]);
 
-  const leaveTo = useCallback((to: string) => {
-    setOpen(false);
-    setTimeout(() => router.push(to), 60);
-  }, [router, setOpen]);
+  const leaveTo = useCallback((to: string) => { setOpen(false); setTimeout(() => router.push(to), 60); }, [router, setOpen]);
 
-  /* ── sheet drag (starts only from the grabber/header, so lyrics scroll & sliders never fight it) ── */
+  /* What stays on screen when the player is left alone for 5s:
+       artwork view → artwork + seekbar + times
+       lyrics view  → header (art, title, buttons) + zoomed lyrics, no seekbar            */
+  const hideMeta = idle;
+  const hideScrubber = isLyricsOpen && idle;
+  const hideTransport = idle || (isLyricsOpen && isUserScrollingLyrics);
+
+  /* ── sheet ── */
   const dragControls = useDragControls();
   const draggedRef = useRef(false);
   const H = useRef(typeof window !== "undefined" ? window.innerHeight : 900).current;
-  // fresh motion value (starting closed) + fresh shared-layout namespace for every open
   const sessionRef = useRef(0);
   const wasOpen = useRef(false);
   if (isOpen && !wasOpen.current) sessionRef.current++;
   wasOpen.current = isOpen;
   const session = sessionRef.current;
-  const sheetY = useMemo(() => motionValue(H), [session, H]);
+  const sheetY = useMemo(() => motionValue(H), [session, H]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sheetYRef = useRef(sheetY); sheetYRef.current = sheetY;
   const radius = useTransform(sheetY, [0, 140], [0, 32], { clamp: true });
+  const dragOpen = useRef(false);
   const miniArtRef = useRef<HTMLDivElement>(null);
   const startDrag = (e: React.PointerEvent) => dragControls.start(e);
 
-  /* ── mini player gestures ── */
+  // opening by tap / programmatically → spring up (a finger-drag drives sheetY itself)
+  useEffect(() => {
+    if (!isOpen || dragOpen.current) return;
+    const c = animate(sheetY, 0, SHEET_SPRING);
+    return () => c.stop();
+  }, [isOpen, sheetY]);
+
+  // measure the bottom block so the artwork centres in the space above it
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [bottomH, setBottomH] = useState(310);
+  useEffect(() => {
+    const el = bottomRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBottomH(el.offsetHeight));
+    ro.observe(el);
+    setBottomH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, [isOpen, isLyricsOpen]);
+
+  /* ── mini player gestures: swipe up opens (sheet follows the finger), swipe sideways skips ── */
+  const miniX = useMotionValue(0);
+  const gesture = useRef<"none" | "x" | "y">("none");
   const panned = useRef(false);
+
+  const miniPanStart = () => { gesture.current = "none"; panned.current = false; };
+  const miniPan = (_: PointerEvent, i: PanInfo) => {
+    if (gesture.current === "none") {
+      if (Math.hypot(i.offset.x, i.offset.y) < 6) return;
+      gesture.current = Math.abs(i.offset.x) > Math.abs(i.offset.y) ? "x" : "y";
+      panned.current = true;
+      if (gesture.current === "y" && i.offset.y < 0 && !isOpen) { dragOpen.current = true; setOpen(true); }
+    }
+    if (gesture.current === "x") miniX.set(i.offset.x * 0.8);
+    else if (dragOpen.current) sheetYRef.current.set(Math.max(0, Math.min(H, H + i.offset.y)));
+  };
+  const miniPanEnd = (_: PointerEvent, i: PanInfo) => {
+    if (gesture.current === "x") {
+      if (i.offset.x < -56 || i.velocity.x < -500) handleNext();
+      else if (i.offset.x > 56 || i.velocity.x > 500) handlePrev();
+      animate(miniX, 0, SPRING_SOFT);
+    } else if (dragOpen.current) {
+      dragOpen.current = false;
+      const sy = sheetYRef.current;
+      if (i.velocity.y < -280 || -i.offset.y > H * 0.2) animate(sy, 0, { ...SHEET_SPRING, velocity: i.velocity.y });
+      else animate(sy, H, SHEET_SPRING).then(() => setOpen(false));
+    }
+    gesture.current = "none";
+  };
 
   if (!currentTrack) return null;
 
@@ -248,19 +316,17 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         alt=""
         draggable={false}
         custom={dirRef.current}
-        variants={{
-          enter: (d: number) => ({ opacity: 0, x: d * 56, scale: 1.04 }),
-          center: { opacity: 1, x: 0, scale: 1 },
-          exit: (d: number) => ({ opacity: 0, x: -d * 56, scale: 0.98 }),
-        }}
+        variants={slide}
         initial="enter"
         animate="center"
         exit="exit"
         transition={{ x: SPRING_SOFT, scale: SPRING_SOFT, opacity: { duration: 0.24 } }}
-        className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
       />
     </AnimatePresence>
   );
+
+  const artistGrey = "text-zinc-400 hover:text-zinc-400";
 
   return (
     <MotionConfig reducedMotion="user">
@@ -270,19 +336,12 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
       {!hidePlayer && (
         <motion.div
           key="mini-player"
-          animate={{ y: isOpen ? 60 : 0, opacity: isOpen ? 0 : 1, scale: isOpen ? 0.94 : 1 }}
-          transition={{ y: SHEET_SPRING, scale: SHEET_SPRING, opacity: { duration: isOpen ? 0.16 : 0.28, delay: isOpen ? 0.04 : 0.12 } }}
-          onPointerDown={() => { panned.current = false; }}
-          onPanStart={() => { panned.current = false; }}
-          onPan={(_, i) => { if (Math.abs(i.offset.x) > 6 || Math.abs(i.offset.y) > 6) panned.current = true; }}
-          onPanEnd={(_, i) => {
-            const { x, y } = i.offset;
-            if (Math.abs(x) > Math.abs(y)) {
-              if (x < -48) handleNext();
-              else if (x > 48) handlePrev();
-            } else if (y < -24 || i.velocity.y < -300) setOpen(true);
-          }}
-          className="fixed z-[300] left-3 right-3 select-none"
+          animate={{ opacity: isOpen ? 0 : 1 }}
+          transition={{ opacity: { duration: isOpen ? 0.12 : 0.2, delay: isOpen ? 0.03 : 0.16 } }}
+          onPanStart={miniPanStart}
+          onPan={miniPan}
+          onPanEnd={miniPanEnd}
+          className="fixed left-3 right-3 z-[300] select-none"
           style={{
             bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
             height: 62,
@@ -293,7 +352,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         >
           <div
             className={cn(
-              "absolute inset-0 rounded-full shadow-[0_8px_28px_rgba(0,0,0,0.45)] border border-white/10",
+              "absolute inset-0 rounded-full border border-white/10 shadow-[0_8px_28px_rgba(0,0,0,0.45)]",
               isGlass ? "bg-white/[0.07] backdrop-blur-xl" : "bg-[#1c1c1e]"
             )}
             style={isGlass ? { WebkitBackdropFilter: "blur(22px) saturate(1.6)", backdropFilter: "blur(22px) saturate(1.6)" } : undefined}
@@ -301,26 +360,45 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
           <MiniPlayerProgress />
 
           <div className="relative flex h-full items-center px-3.5">
-            <div
-              className="flex h-full min-w-0 flex-1 items-center cursor-pointer"
+            <motion.div
+              style={{ x: miniX }}
+              className="flex h-full min-w-0 flex-1 cursor-pointer items-center"
               onClick={() => { if (panned.current) { panned.current = false; return; } setOpen(true); }}
             >
-              <div ref={miniArtRef} className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[8px] bg-zinc-800 shadow-md ring-1 ring-white/10">
+              <div
+                ref={miniArtRef}
+                className="relative h-11 w-11 shrink-0 overflow-hidden bg-zinc-800 shadow-md ring-1 ring-white/10"
+                style={{ borderRadius: MINI_R }}
+              >
                 {art}
               </div>
-              <div className="flex min-w-0 flex-1 flex-col justify-center pl-3">
-                <Marquee key={`t-${currentTrack.id}`} align="left">
-                  <span className="text-[14px] font-semibold leading-[18px] tracking-[-0.01em] text-white">{currentTrack.title}</span>
-                </Marquee>
-                <Marquee key={`a-${currentTrack.id}`} align="left">
-                  <span className="text-[12.5px] leading-[16px] text-white/55" onClick={(e) => e.stopPropagation()}>
-                    <ArtistLinks track={currentTrack} maxArtists={3} />
-                  </span>
-                </Marquee>
-              </div>
-            </div>
 
-            <div className="relative z-10 flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+              <div className="relative ml-3 h-full min-w-0 flex-1">
+                <AnimatePresence mode="popLayout" initial={false} custom={dirRef.current}>
+                  <motion.div
+                    key={currentTrack.id}
+                    custom={dirRef.current}
+                    variants={textSlide}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ x: SPRING_SOFT, opacity: { duration: 0.2 } }}
+                    className="absolute inset-0 flex min-w-0 flex-col justify-center"
+                  >
+                    <Marquee align="left">
+                      <span className="pl-px text-[14px] font-semibold leading-[18px] tracking-[-0.01em] text-white">{currentTrack.title}</span>
+                    </Marquee>
+                    <Marquee align="left">
+                      <span className="pl-px text-[12.5px] leading-[16px] text-zinc-400" onClick={(e) => e.stopPropagation()}>
+                        <ArtistLinks track={currentTrack} maxArtists={3} linkClassName={artistGrey} />
+                      </span>
+                    </Marquee>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </motion.div>
+
+            <div className="relative z-10 flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()} onPointerDownCapture={(e) => e.stopPropagation()}>
               <PlayPauseButton isPlaying={isPlaying} onToggle={togglePlay} size={28} className="h-10 w-10" />
               <SpringButton onClick={handleNext} className="h-10 w-10 text-white" title="Next">
                 <SwiftUIForward size={24} fill="currentColor" />
@@ -332,104 +410,83 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
       {/* ───────────── FULL SCREEN SHEET ───────────── */}
       <LayoutGroup id={`m-${session}`}>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            key="full-sheet"
-            animate={{ y: 0 }}
-            exit={{ y: H }}
-            transition={SHEET_SPRING}
-            drag="y"
-            dragControls={dragControls}
-            dragListener={false}
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.7 }}
-            dragMomentum={false}
-            onDragStart={() => { draggedRef.current = true; }}
-            onDragEnd={(_, info) => {
-              if (info.velocity.y > 420 || info.offset.y > 140) setOpen(false);
-            }}
-            className="fixed inset-0 z-[1100] flex flex-col select-none"
-            style={{
-              y: sheetY,
-              willChange: "transform",
-              fontFamily: FONT_STACK,
-              WebkitFontSmoothing: "antialiased",
-            }}
-          >
-            {/* Background — transform/opacity only (no blend modes, no CSS blur) */}
+        <AnimatePresence>
+          {isOpen && (
             <motion.div
-              className="absolute inset-0 z-0 overflow-hidden bg-[#121214]"
-              style={{ transform: "translateZ(0)", borderTopLeftRadius: radius, borderTopRightRadius: radius }}
+              key="full-sheet"
+              exit={{ y: H }}
+              transition={SHEET_SPRING}
+              drag="y"
+              dragControls={dragControls}
+              dragListener={false}
+              dragDirectionLock
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.7 }}
+              dragMomentum={false}
+              onDragStart={() => { draggedRef.current = true; }}
+              onDragEnd={(_, info) => { if (info.velocity.y > 420 || info.offset.y > 140) setOpen(false); }}
+              className="fixed inset-0 z-[1100] flex select-none flex-col"
+              style={{ y: sheetY, willChange: "transform", fontFamily: FONT_STACK, WebkitFontSmoothing: "antialiased" }}
             >
-              <DynamicBackground surface="fullPlayer" coverUrl={shown.cover} />
-              <div className="ps-t-soft absolute inset-0 bg-black/25" style={{ opacity: isLyricsOpen ? 1 : 0 }} />
-            </motion.div>
+              {/* Background */}
+              <motion.div
+                className="absolute inset-0 z-0 overflow-hidden bg-[#121214]"
+                style={{ borderTopLeftRadius: radius, borderTopRightRadius: radius }}
+              >
+                <DynamicBackground key={session} surface="fullPlayer" coverUrl={shown.cover} />
+                <div className="ps-t-soft absolute inset-0 bg-black/25" style={{ opacity: isLyricsOpen ? 1 : 0 }} />
+              </motion.div>
 
-            {/* Grabber (drag + tap to close) */}
-            <div
-              className="relative z-20 flex shrink-0 cursor-grab touch-none items-center justify-center pb-3 pt-[calc(env(safe-area-inset-top,0px)+10px)] active:cursor-grabbing"
-              onPointerDown={(e) => { draggedRef.current = false; startDrag(e); }}
-              onClick={() => { if (draggedRef.current) { draggedRef.current = false; return; } setOpen(false); }}
-            >
-              <div className="h-[5px] w-9 rounded-full bg-white/35" />
-            </div>
-
-            {/* Compact header — lyrics mode (artwork morphs here) */}
-            {isLyricsOpen && (
-              <div className="relative z-20 flex shrink-0 touch-none items-center gap-3 px-6 pb-3" onPointerDown={startDrag}>
-                <motion.div
-                  layoutId="m-art"
-                  transition={SHEET_SPRING}
-                  style={{ borderRadius: 9 }}
-                  className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-lg"
-                  onClick={() => setIsLyricsOpen(false)}
-                >
-                  {art}
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ ...SPRING_SOFT, delay: 0.05 }}
-                  className="min-w-0 flex-1"
-                >
-                  <Marquee key={`ht-${currentTrack.id}`} align="left">
-                    <span className="text-[17px] font-semibold leading-[22px] tracking-[-0.015em] text-white">{currentTrack.title}</span>
-                  </Marquee>
-                  <Marquee key={`ha-${currentTrack.id}`} align="left">
-                    <span className="text-[15px] leading-[20px] text-white/60">
-                      <ArtistLinks track={currentTrack} maxArtists={3} onClick={() => setOpen(false)} />
-                    </span>
-                  </Marquee>
-                </motion.div>
-                <div className="flex shrink-0 items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
-                  <LikeButton circle liked={liked} onToggle={toggleLike} size={16} />
-                  <TrackMenu track={currentTrack} onLeave={leaveTo} />
-                </div>
+              {/* Grabber */}
+              <div
+                className="relative z-30 flex shrink-0 cursor-grab touch-none items-center justify-center pb-3 pt-[calc(env(safe-area-inset-top,0px)+10px)] active:cursor-grabbing"
+                onPointerDown={(e) => { draggedRef.current = false; startDrag(e); }}
+                onClick={() => { if (draggedRef.current) { draggedRef.current = false; return; } setOpen(false); }}
+              >
+                <div className="h-[5px] w-9 rounded-full bg-white/35" />
               </div>
-            )}
 
-            {/* Middle: artwork or lyrics */}
-            <div className="relative z-10 min-h-0 flex-1">
-              {!isLyricsOpen && (
-                <div
-                  className="absolute inset-0 flex touch-none items-center justify-center px-7"
-                  onPointerDown={startDrag}
-                >
-                  <MorphWrap
-                    sheetY={sheetY}
-                    miniRef={miniArtRef}
-                    H={H}
-                    style={{ width: "min(100%, max(220px, calc(100dvh - 500px)), 420px)", aspectRatio: "1" }}
-                    onPointerDown={(e) => e.stopPropagation()}
+              {/* Compact header (lyrics view) — stays visible when idle */}
+              {isLyricsOpen && (
+                <div className="relative z-30 flex shrink-0 touch-none items-center gap-3 px-5 pb-3" onPointerDown={startDrag}>
+                  <motion.div
+                    layoutId="m-art"
+                    transition={SHEET_SPRING}
+                    style={{ borderRadius: 9 }}
+                    className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden bg-zinc-800 shadow-lg ring-1 ring-white/10"
+                    onClick={() => setIsLyricsOpen(false)}
                   >
-                    <motion.div
-                      animate={{ scale: isPlaying ? 1 : 0.86 }}
-                      transition={{ type: "spring", stiffness: 300, damping: 22, mass: 0.6 }}
-                      className="h-full w-full"
-                    >
+                    {art}
+                  </motion.div>
+                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ ...SPRING_SOFT, delay: 0.05 }} className="min-w-0 flex-1">
+                    <Marquee key={`ht-${currentTrack.id}`} align="left">
+                      <span className="pl-px text-[17px] font-semibold leading-[22px] tracking-[-0.015em] text-white">{currentTrack.title}</span>
+                    </Marquee>
+                    <Marquee key={`ha-${currentTrack.id}`} align="left">
+                      <span className="pl-px text-[15px] leading-[20px] text-white/60">
+                        <ArtistLinks track={currentTrack} maxArtists={3} onClick={() => setOpen(false)} />
+                      </span>
+                    </Marquee>
+                  </motion.div>
+                  <div className="flex shrink-0 items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
+                    <LikeButton circle liked={liked} onToggle={toggleLike} size={16} />
+                    <TrackMenu track={currentTrack} onLeave={leaveTo} />
+                  </div>
+                </div>
+              )}
+
+              {/* Middle region: artwork, or lyrics running all the way down behind the controls */}
+              <div className="relative z-10 min-h-0 flex-1">
+                {!isLyricsOpen && (
+                  <div
+                    className="absolute inset-x-0 top-0 flex touch-none items-center justify-center px-5"
+                    style={{ bottom: bottomH }}
+                    onPointerDown={startDrag}
+                  >
+                    <div style={{ width: `min(100%, max(240px, calc(100dvh - ${bottomH + 100}px)), 560px)`, aspectRatio: "1" }}>
                       <motion.div
                         drag="x"
+                        dragDirectionLock
                         dragSnapToOrigin
                         dragElastic={0.55}
                         dragMomentum={false}
@@ -440,153 +497,172 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                         onTap={() => setIsLyricsOpen(true)}
                         className="h-full w-full cursor-pointer"
                       >
-                        <motion.div
-                          layoutId="m-art"
-                          transition={SHEET_SPRING}
-                          style={{ borderRadius: 14 }}
-                          className="relative h-full w-full overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-[0_24px_48px_rgba(0,0,0,0.5)]"
-                        >
-                          {art}
-                        </motion.div>
+                        <MorphWrap sheetY={sheetY} miniRef={miniArtRef} H={H} paused={!isPlaying}>
+                          <motion.div
+                            layoutId="m-art"
+                            transition={SHEET_SPRING}
+                            style={{ borderRadius: BIG_R }}
+                            className="relative h-full w-full overflow-hidden"
+                          >
+                            {art}
+                          </motion.div>
+                        </MorphWrap>
                       </motion.div>
-                    </motion.div>
-                  </MorphWrap>
-                </div>
-              )}
+                    </div>
+                  </div>
+                )}
 
-              <AnimatePresence>
-                {isLyricsOpen && showLyrics && (
+                <AnimatePresence>
+                  {isLyricsOpen && showLyrics && (
+                    <motion.div
+                      key="lyrics"
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      transition={{ y: SPRING_SOFT, opacity: { duration: 0.28 } }}
+                      className="absolute inset-0"
+                    >
+                      {/* idle → lyrics zoom into the space the seekbar & buttons leave */}
+                      <div
+                        className="ps-t-soft h-full w-full"
+                        style={{ transform: idle ? "scale(1.05)" : "scale(1)", transformOrigin: "50% 38%" }}
+                      >
+                        <LyricsView
+                          trackId={currentTrack.id}
+                          title={currentTrack.title}
+                          artist={currentTrack.artist?.name}
+                          rawLyrics={currentTrack.lyrics}
+                          isLyricsOpen={isLyricsOpen}
+                          isMobile={true}
+                          isFullscreen={true}
+                          isIdle={idle}
+                          duration={duration}
+                          transparent={true}
+                          onUserScrollChange={setIsUserScrollingLyrics}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Bottom block (overlays the lyrics view) */}
+              <div
+                ref={bottomRef}
+                className="absolute inset-x-0 bottom-0 z-20 px-5 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] pt-5"
+                style={{ pointerEvents: "none" }}
+              >
+                <div
+                  className="ps-t-soft pointer-events-none absolute inset-0 -z-10"
+                  style={{
+                    opacity: isLyricsOpen && !hideScrubber ? 1 : 0,
+                    background: "linear-gradient(to top, rgba(10,10,12,0.78) 52%, rgba(10,10,12,0))",
+                  }}
+                />
+
+                {!isLyricsOpen && (
                   <motion.div
-                    key="lyrics"
-                    initial={{ opacity: 0, y: 16 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    transition={{ y: SPRING_SOFT, opacity: { duration: 0.28 } }}
-                    className="absolute inset-0 px-1"
+                    transition={SPRING_SOFT}
+                    className={cn("ps-t-soft mb-4 flex items-center gap-3", hideMeta ? "ps-hide" : "pointer-events-auto")}
+                    style={{ transform: hideMeta ? "translate3d(0,10px,0)" : "translate3d(0,0,0)" }}
                   >
-                    <LyricsView
-                      trackId={currentTrack.id}
-                      title={currentTrack.title}
-                      artist={currentTrack.artist?.name}
-                      rawLyrics={currentTrack.lyrics}
-                      isLyricsOpen={isLyricsOpen}
-                      isMobile={true}
-                      isFullscreen={true}
-                      isIdle={idle}
-                      duration={duration}
-                      transparent={true}
-                      onUserScrollChange={setIsUserScrollingLyrics}
-                    />
+                    <div className="min-w-0 flex-1">
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.div
+                          key={currentTrack.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <Marquee align="left">
+                            <span
+                              className="cursor-pointer pl-px text-[23px] font-semibold leading-[29px] tracking-[-0.02em] text-white"
+                              onClick={() => leaveTo(`/track/${currentTrack.id}`)}
+                            >
+                              {currentTrack.title}
+                            </span>
+                          </Marquee>
+                          <Marquee align="left">
+                            <span className="pl-px text-[19px] leading-[25px] text-white/60">
+                              <ArtistLinks
+                                track={currentTrack}
+                                maxArtists={3}
+                                linkClassName="text-white/60 hover:text-white transition-colors"
+                                onClick={() => setOpen(false)}
+                              />
+                            </span>
+                          </Marquee>
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <LikeButton circle liked={liked} onToggle={toggleLike} size={16} />
+                      <TrackMenu track={currentTrack} onLeave={leaveTo} />
+                    </div>
                   </motion.div>
                 )}
-              </AnimatePresence>
-            </div>
 
-            {/* Bottom: meta, scrubber, transport, actions */}
-            <div className="relative z-10 shrink-0 px-7 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] pt-3">
-              {!isLyricsOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={SPRING_SOFT}
-                  className="mb-4 flex items-center gap-3"
+                {/* Seekbar + times */}
+                <div
+                  className={cn("ps-t-soft mx-auto w-full max-w-[420px]", hideScrubber ? "ps-hide" : "pointer-events-auto")}
+                  style={{ transform: hideScrubber ? "translate3d(0,14px,0)" : "translate3d(0,0,0)" }}
                 >
-                  <div className="min-w-0 flex-1">
-                    <AnimatePresence mode="wait" initial={false}>
-                      <motion.div
-                        key={currentTrack.id}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <Marquee align="left">
-                          <span
-                            className="cursor-pointer text-[22px] font-semibold leading-[28px] tracking-[-0.02em] text-white"
-                            onClick={() => leaveTo(`/track/${currentTrack.id}`)}
+                  <MobileScrubber isLyricsOpen={isLyricsOpen} />
+                </div>
+
+                {/* Transport + actions */}
+                <div
+                  className={cn("ps-t-soft mx-auto w-full max-w-[420px]", hideTransport ? "ps-hide" : "pointer-events-auto")}
+                  style={{ transform: hideTransport ? "translate3d(0,22px,0) scale(0.97)" : "translate3d(0,0,0) scale(1)" }}
+                >
+                  <div className="mt-4 flex items-center justify-between">
+                    <PlateButton size={42} active={isShuffled} onClick={toggleShuffle} title={`Shuffle: ${isShuffled ? "On" : "Off"}`}>
+                      <SFShuffle size={19} />
+                    </PlateButton>
+                    <SpringButton onClick={handlePrev} className="h-14 w-14 text-white" title="Previous">
+                      <SwiftUIBackward size={34} fill="currentColor" />
+                    </SpringButton>
+                    <PlayPauseButton isPlaying={isPlaying} onToggle={togglePlay} size={52} className="h-[68px] w-[68px]" />
+                    <SpringButton onClick={handleNext} className="h-14 w-14 text-white" title="Next">
+                      <SwiftUIForward size={34} fill="currentColor" />
+                    </SpringButton>
+                    <PlateButton size={42} active={repeatMode !== "off"} onClick={toggleRepeat} title={`Repeat: ${repeatMode}`} className="relative">
+                      <SFRepeat size={19} />
+                      <AnimatePresence>
+                        {(repeatMode === "one" || repeatMode === "two") && (
+                          <motion.span
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            transition={SPRING}
+                            className="pointer-events-none absolute inset-0 flex items-center justify-center text-[7px] font-black"
                           >
-                            {currentTrack.title}
-                          </span>
-                        </Marquee>
-                        <Marquee align="left">
-                          <span className="text-[18px] leading-[24px] text-white/60">
-                            <ArtistLinks
-                              track={currentTrack}
-                              maxArtists={3}
-                              linkClassName="text-white/60 hover:text-white transition-colors"
-                              onClick={() => setOpen(false)}
-                            />
-                          </span>
-                        </Marquee>
-                      </motion.div>
-                    </AnimatePresence>
+                            {repeatMode === "one" ? "1" : "2"}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </PlateButton>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <LikeButton circle liked={liked} onToggle={toggleLike} size={16} />
-                    <TrackMenu track={currentTrack} onLeave={leaveTo} />
+
+                  <div className="mx-auto mt-6 flex max-w-[300px] items-center justify-between">
+                    <PlateButton size={44} active={isAudioFxOpen} onClick={() => setAudioFxOpen(!isAudioFxOpen)} title="Studio FX">
+                      <SFFx size={22} />
+                    </PlateButton>
+                    <PlateButton size={44} active={isLyricsOpen} onClick={() => setIsLyricsOpen(!isLyricsOpen)} title="Lyrics">
+                      <SFLyrics size={22} />
+                    </PlateButton>
+                    <PlateButton size={44} active={isQueueOpen} onClick={() => setIsQueueOpen(!isQueueOpen)} title="Queue">
+                      <SwiftUIQueue size={22} stroke="currentColor" />
+                    </PlateButton>
                   </div>
-                </motion.div>
-              )}
-
-              {/* Scrubber stays put in every state */}
-              <div className="mx-auto w-full max-w-[400px]">
-                <MobileScrubber isLyricsOpen={isLyricsOpen} />
-              </div>
-
-              {/* Transport + actions: fade/slide away while reading lyrics (transform + opacity only) */}
-              <div
-                className={cn("ps-t-soft mx-auto w-full max-w-[400px]", hideSecondary && "ps-hide")}
-                style={{ transform: hideSecondary ? "translate3d(0,22px,0) scale(0.97)" : "translate3d(0,0,0) scale(1)" }}
-              >
-                <div className="mt-4 flex items-center justify-between">
-                  <PlateButton size={42} active={isShuffled} onClick={toggleShuffle} title={`Shuffle: ${isShuffled ? "On" : "Off"}`}>
-                    <SFShuffle size={19} />
-                  </PlateButton>
-
-                  <SpringButton onClick={handlePrev} className="h-14 w-14 text-white" title="Previous">
-                    <SwiftUIBackward size={34} fill="currentColor" />
-                  </SpringButton>
-
-                  <PlayPauseButton isPlaying={isPlaying} onToggle={togglePlay} size={52} className="h-[68px] w-[68px]" />
-
-                  <SpringButton onClick={handleNext} className="h-14 w-14 text-white" title="Next">
-                    <SwiftUIForward size={34} fill="currentColor" />
-                  </SpringButton>
-
-                  <PlateButton size={42} active={repeatMode !== "off"} onClick={toggleRepeat} title={`Repeat: ${repeatMode}`} className="relative">
-                    <SFRepeat size={19} />
-                    <AnimatePresence>
-                      {(repeatMode === "one" || repeatMode === "two") && (
-                        <motion.span
-                          initial={{ scale: 0, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0, opacity: 0 }}
-                          transition={SPRING}
-                          className="pointer-events-none absolute inset-0 flex items-center justify-center text-[7px] font-black"
-                        >
-                          {repeatMode === "one" ? "1" : "2"}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </PlateButton>
-                </div>
-
-                <div className="mx-auto mt-6 flex max-w-[300px] items-center justify-between">
-                  <PlateButton size={44} active={isAudioFxOpen} onClick={() => setAudioFxOpen(!isAudioFxOpen)} title="Studio FX">
-                    <SFFx size={22} />
-                  </PlateButton>
-                  <PlateButton size={44} active={isLyricsOpen} onClick={() => setIsLyricsOpen(!isLyricsOpen)} title="Lyrics">
-                    <SFLyrics size={22} />
-                  </PlateButton>
-                  <PlateButton size={44} active={isQueueOpen} onClick={() => setIsQueueOpen(!isQueueOpen)} title="Queue">
-                    <SwiftUIQueue size={22} stroke="currentColor" />
-                  </PlateButton>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </LayoutGroup>
     </MotionConfig>
   );

@@ -17,10 +17,10 @@ import {
   FONT_STACK, SHEET_SPRING, SPRING, SPRING_SOFT,
   GlassButton, LikeButton, Marquee, PlateButton, PlayPauseButton, PlayerStyles, SpringButton,
   SFClose, SFFx, SFLyrics, SFMinimize, SFRepeat, SFShuffle,
-  useIdle, useTrackLike,
+  useAutoHideIdle, useTrackLike,
 } from "@/components/player/PlayerKit";
 
-const PANEL_W = 440;
+const PANEL_W = 520;
 const LEFT_GUTTER = 72;
 
 export function PCFullScreenPlayer() {
@@ -49,7 +49,7 @@ export function PCFullScreenPlayer() {
   const { liked, toggle: toggleLike } = useTrackLike(currentTrack?.id);
 
   const close = useCallback(() => setFullScreenPlayerOpen(false), [setFullScreenPlayerOpen]);
-  const idle = useIdle(true, 5000);
+  const idle = useAutoHideIdle(true, 5000); // honours Settings → "Hide details when idle"
   const showLyrics = useDeferredValue(isLyricsOpen);
 
   const dirRef = useRef(1);
@@ -159,7 +159,7 @@ export function PCFullScreenPlayer() {
                     transition={{ layout: SHEET_SPRING }}
                     style={{
                       borderRadius: 12,
-                      width: isLyricsOpen ? "clamp(200px, 34vh, 330px)" : "clamp(240px, 42vh, 400px)",
+                      width: isLyricsOpen ? "clamp(230px, 40vh, 400px)" : "clamp(290px, 54vh, 560px)",
                       aspectRatio: "1",
                     }}
                     className="relative overflow-hidden bg-zinc-800 ring-1 ring-white/10 shadow-[0_28px_60px_rgba(0,0,0,0.55)]"
@@ -196,7 +196,7 @@ export function PCFullScreenPlayer() {
               <motion.div
                 layout="position"
                 transition={{ layout: SHEET_SPRING }}
-                className={cn("ps-t-soft mt-8 text-center", fade)}
+                className={cn("ps-t-soft mt-9 text-center", fade)}
                 style={{ transform: idle ? "translate3d(0,-14px,0)" : "translate3d(0,0,0)" }}
               >
                 <AnimatePresence mode="wait" initial={false}>
