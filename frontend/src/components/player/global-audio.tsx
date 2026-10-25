@@ -66,19 +66,15 @@ export function GlobalAudio() {
     };
   }, []);
 
-  // FX & Volume Sync
+  // Volume Sync
   useEffect(() => {
-    audioEngine.resume(); // Ensure context is active on track change
     audioEngine.setVolume(volume);
-    const eq = audioFx?.eq || [0, 0, 0];
-    audioEngine.setEq(0, eq[0] ?? 0);
-    audioEngine.setEq(1, eq[1] ?? 0);
-    audioEngine.setEq(2, eq[2] ?? 0);
-    audioEngine.toggle8D(audioFx?.is8D || false, audioFx?.direction8D || "clockwise", audioFx?.speed8D || 0.15);
-    audioEngine.setPlaybackSpeed(audioFx?.speed || 1, audioFx?.pitch === 1);
-    audioEngine.setReverb(audioFx?.reverb || "none");
-    audioEngine.setReverbMix(audioFx?.reverb === 'none' || !audioFx?.reverb ? 0 : 0.6);
-  }, [volume, audioFx, currentTrack?.id]);
+  }, [volume, currentTrack?.id]);
+
+  // FX Sync
+  useEffect(() => {
+    audioEngine.applyFx(audioFx);
+  }, [audioFx, currentTrack?.id]);
 
   // Handle Events
   useEffect(() => {
@@ -250,18 +246,8 @@ export function GlobalAudio() {
     };
 
     const applyFx = () => {
-      const currentFx = audioFxRef.current;
-      const currentVol = volumeRef.current;
-      audioEngine.resume();
-      audioEngine.setVolume(currentVol);
-      const eq = currentFx?.eq || [0, 0, 0];
-      audioEngine.setEq(0, eq[0] ?? 0);
-      audioEngine.setEq(1, eq[1] ?? 0);
-      audioEngine.setEq(2, eq[2] ?? 0);
-      audioEngine.toggle8D(currentFx?.is8D || false, currentFx?.direction8D || "clockwise", currentFx?.speed8D || 0.15);
-      audioEngine.setPlaybackSpeed(currentFx?.speed || 1, currentFx?.pitch === 1);
-      audioEngine.setReverb(currentFx?.reverb || "none");
-      audioEngine.setReverbMix(currentFx?.reverb === 'none' || !currentFx?.reverb ? 0 : 0.6);
+      audioEngine.setVolume(volumeRef.current);
+      audioEngine.applyFx(audioFxRef.current);
     };
 
     const handleEnded = () => {
