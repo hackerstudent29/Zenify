@@ -203,6 +203,34 @@ export async function trackRoutes(server: FastifyInstance) {
         }
 
         try {
+            // 1. Clean CDN 320kbps (JioSaavn) Full Song Priority (Akamai edge direct streaming)
+            try {
+                const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
+                const cdnRes = await CleanCdnAudioService.resolveAudio({
+                    title: track.title,
+                    primaryArtist: track.artist?.name || '',
+                    album: track.album?.title,
+                    duration: track.duration,
+                    language: track.language || undefined
+                });
+                if (cdnRes?.url && !cdnRes.url.includes('audio-ssl') && !cdnRes.url.includes('mzstatic') && !cdnRes.url.includes('itunes.apple.com')) {
+                    await prisma.track.update({
+                        where: { id: track.id },
+                        data: {
+                            audioUrl: cdnRes.url,
+                            audioResolutionScore: 100
+                        }
+                    }).catch(() => {});
+                    return reply.send({
+                        success: true,
+                        audioUrl: cdnRes.url,
+                        track: { ...track, audioUrl: cdnRes.url }
+                    });
+                }
+            } catch (cdnErr) {
+                console.warn('[RefetchAudio] Clean CDN resolution attempt:', cdnErr);
+            }
+
             // Force re-resolution bypassing cached videoId
             const resolution = await AudioResolverService.resolveBestAudioSource({
                 id: track.id,

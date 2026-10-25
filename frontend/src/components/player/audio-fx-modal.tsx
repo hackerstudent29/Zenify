@@ -1213,7 +1213,6 @@ function ChainTab({ fx, live, commit }: TabProps) {
           values={order}
           onReorder={(o) => {
             setOrder(o);
-            live({ chain: o });
           }}
           className="relative rounded-2xl bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ring-1 ring-inset ring-white/[0.07]"
         >
