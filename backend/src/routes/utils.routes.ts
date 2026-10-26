@@ -1241,6 +1241,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const cdnResult = await CleanCdnAudioService.resolveAudio({
                     title: cleanCandTitle,
                     primaryArtist: cleanCandArtist,
+                    album: candAlbum,
                     duration: localTrack?.duration,
                     language: resolvedSongLang
                 });
@@ -1420,6 +1421,11 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
 
         // 5. Fallback: Live spawn piping with Rule 3 Container Header Integrity
+        if (Date.now() < localYtBlockCooldownUntil) {
+            server.log.warn(`[stream-youtube] Local IP in active circuit breaker cooldown. Skipping yt-dlp spawn.`);
+            return reply.status(503).send({ error: 'Audio stream temporarily unavailable.' });
+        }
+
         try {
             const { spawn } = await import('child_process');
             const ytBin = getYtBin();
@@ -1429,12 +1435,7 @@ export async function utilsRoutes(server: FastifyInstance) {
 
             const clientStrategies = [
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_music'],
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_vr'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=tv_embedded'],
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=web_embedded'],
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android'],
-                ['--force-ipv4'],
-                ['--force-ipv6'],
             ];
 
             let spawned = false;
@@ -1445,8 +1446,8 @@ export async function utilsRoutes(server: FastifyInstance) {
                     '--js-runtimes', 'node',
                     ...cookiesArgs,
                     ...clientArgs,
-                    '--socket-timeout', '15',
-                    '--extractor-retries', '2',
+                    '--socket-timeout', '6',
+                    '--extractor-retries', '1',
                     '--no-check-certificates',
                     '--no-warnings',
                     '--no-playlist',

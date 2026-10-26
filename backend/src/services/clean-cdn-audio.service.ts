@@ -198,7 +198,9 @@ export class CleanCdnAudioService {
                 // Protocol Check 1: Hard Reject Terms (instrumentals, covers, guitar, piano, karaoke, etc.)
                 let hasRejectTerm = false;
                 for (const term of CDN_HARD_REJECT_TERMS) {
-                    if (candTitleLower.includes(term) || candAlbum.includes(term) || candDesc.includes(term)) {
+                    // If target requested title/album explicitly contains this term, allow it (e.g., official instrumental/acoustic tracks)
+                    const isTargetRequestingTerm = rawTitle.toLowerCase().includes(term) || (opts.album && opts.album.toLowerCase().includes(term));
+                    if (!isTargetRequestingTerm && (candTitleLower.includes(term) || candAlbum.includes(term) || candDesc.includes(term))) {
                         hasRejectTerm = true;
                         break;
                     }
