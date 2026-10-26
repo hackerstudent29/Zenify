@@ -937,7 +937,7 @@ export class DeepgramLyricsService {
      * Uses Deepgram Nova-3/Nova-2 STT to generate plain lyrics, word-level timestamps, and synced LRC.
      */
     static async generateLyricsFromSong(
-        audioUrl: string,
+        audioSource: string | Buffer,
         options: {
             songLang?: string;
             tryVocals?: boolean;
@@ -946,7 +946,7 @@ export class DeepgramLyricsService {
     ): Promise<DeepgramLyricsResult | null> {
         try {
             console.log(`[Deepgram] Generating full lyrics from song audio (lang=${options.songLang || 'auto'})...`);
-            const transcription = await this.transcribeAudio(audioUrl, {
+            const transcription = await this.transcribeAudio(audioSource, {
                 language: this.normalizeLanguageCode(options.songLang),
                 tryVocals: options.tryVocals,
                 duration: options.duration,
@@ -984,28 +984,39 @@ export class DeepgramLyricsService {
      * precisely to the audio timeline with word-by-word highlights and instrumental breaks.
      */
     static async alignPlainLyricsWithAudio(
-        audioUrl: string,
+        audioSource: string | Buffer,
         plainLyrics: string,
         options: {
             duration?: number;
             songLang?: string;
             tryVocals?: boolean;
+            minMatchScore?: number;
         } = {}
     ): Promise<DeepgramLyricsResult | null> {
         try {
             if (!plainLyrics || !plainLyrics.trim()) {
                 console.warn(`[Deepgram] Plain lyrics text is empty. Falling back to direct transcription.`);
-                return this.generateLyricsFromSong(audioUrl, options);
+                return this.generateLyricsFromSong(audioSource, options);
             }
 
             console.log(`[Deepgram] Aligning ${plainLyrics.length} chars of plain lyrics to audio...`);
 
             // Transcribe audio using Deepgram Nova-3/Nova-2 with full duration chunking
-            const transcription = await this.transcribeAudio(audioUrl, {
+            const transcription = await this.transcribeAudio(audioSource, {
                 language: this.normalizeLanguageCode(options.songLang),
                 tryVocals: options.tryVocals,
                 duration: options.duration,
             });
+
+            // Validate alignment against threshold (default 0.6)
+            const matchScore = this.computeFuzzyMatchScore(plainLyrics, transcription.transcript || '');
+            console.log(`[DeepgramAlign] Alignment fuzzy match score: ${matchScore.toFixed(3)} (threshold: ${options.minMatchScore ?? 0.6})`);
+
+            const minScore = options.minMatchScore !== undefined ? options.minMatchScore : 0.6;
+            if (minScore > 0 && matchScore < minScore) {
+                console.warn(`[DeepgramAlign] Discarding alignment: match score ${matchScore.toFixed(3)} is below threshold ${minScore}.`);
+                return null;
+            }
 
             const deepgramWords = transcription.words || [];
             if (deepgramWords.length === 0) {
@@ -1208,8 +1219,7 @@ export class DeepgramLyricsService {
             };
         } catch (err: any) {
             console.error(`[Deepgram] alignPlainLyricsWithAudio failed:`, err.message);
-            // Fall back to direct transcription if alignment fails
-            return this.generateLyricsFromSong(audioUrl, options);
+            return null;
         }
     }
 
@@ -1374,5 +1384,31 @@ export class DeepgramLyricsService {
         }
 
         return result;
+    }
+
+    static computeFuzzyMatchScore(lyrics: string, transcript: string): number {
+        if (!lyrics || !transcript) return 0;
+        const normalize = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length > 0);
+        const lyricsWords = normalize(lyrics);
+        const transcriptWords = normalize(transcript);
+        if (lyricsWords.length === 0 || transcriptWords.length === 0) return 0;
+
+        const transcriptSet = new Set(transcriptWords);
+        let matched = 0;
+        for (const w of lyricsWords) {
+            if (transcriptSet.has(w)) {
+                matched++;
+            } else {
+                for (const tw of transcriptWords) {
+                    if (tw.length >= 3 && w.length >= 3) {
+                        if (tw === w || tw.includes(w) || w.includes(tw)) {
+                            matched += 0.8;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return Math.min(1.0, matched / lyricsWords.length);
     }
 }

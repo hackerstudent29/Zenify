@@ -699,40 +699,51 @@ export class HomeSectionsService {
       try {
         const { default: axios } = await import('axios');
 
-        // 1. Fetch authentic studio albums for user's favorite artists
+        // 1. Fetch authentic studio albums from JioSaavn for user's favorite artists
         for (const artist of favoriteArtistNames.slice(0, 4)) {
           try {
-            const itunesRes = await axios.get(`https://itunes.apple.com/search`, {
+            const saavnRes = await axios.get('https://www.jiosaavn.com/api.php', {
               params: {
-                term: artist,
-                entity: 'album',
-                limit: 4
+                __call: 'search.getAlbumResults',
+                q: artist,
+                _format: 'json',
+                n: 4,
+                p: 1,
+                api_version: '4',
+                ctx: 'web6dot0'
               },
-              timeout: 4000
+              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+              timeout: 3500
             }).catch(() => null);
 
-            if (itunesRes?.data?.results) {
-              for (const alb of itunesRes.data.results) {
-                const albTitle = (alb.collectionName || '').trim();
+            if (saavnRes?.data?.results) {
+              for (const alb of saavnRes.data.results) {
+                const albTitle = (alb.title || alb.name || '')
+                  .replace(/&quot;/g, '"')
+                  .replace(/&#039;/g, "'")
+                  .replace(/&amp;/g, '&')
+                  .trim();
                 const norm = albTitle.toLowerCase();
-                const cleanArtist = cleanArtistNames(alb.artistName || artist);
+                const cleanArtist = cleanArtistNames(alb.artist || alb.more_info?.artist_map?.primary_artists?.[0]?.name || alb.primary_artists || artist);
                 if (isFakeOrNumericArtistName(cleanArtist)) continue;
                 if (albTitle && !seenAlbumTitles.has(norm)) {
                   seenAlbumTitles.add(norm);
-                  const art = alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '';
+                  const art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+                  const count = parseInt(alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
+                  const albId = `saavn-album-${alb.id}`;
                   items.push({
-                    id: `itunes-album-${alb.collectionId}`,
+                    id: albId,
                     title: albTitle,
                     name: albTitle,
                     coverUrl: art,
                     imageUrl: art,
                     isAlbum: true,
                     type: 'album',
-                    href: `/album/itunes-album-${alb.collectionId}`,
+                    href: `/album/${albId}`,
                     artistName: cleanArtist,
-                    trackCount: alb.trackCount || 1,
-                    releaseDate: alb.releaseDate,
-                    genre: alb.primaryGenreName || 'Album',
+                    trackCount: count,
+                    releaseDate: alb.year ? `${alb.year}-01-01` : undefined,
+                    genre: alb.language ? `${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)} Album` : 'Album',
                     artist: {
                       id: `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
                       name: cleanArtist,
@@ -747,43 +758,53 @@ export class HomeSectionsService {
           if (items.length >= 12) break;
         }
 
-        // 2. Fetch popular albums / soundtracks for user's languages
+        // 2. Fetch popular albums / soundtracks from JioSaavn for user's languages
         for (const lang of languageNames.slice(0, 3)) {
           if (items.length >= 16) break;
           try {
             const langQuery = `${lang} soundtrack`;
-            const langRes = await axios.get(`https://itunes.apple.com/search`, {
+            const langRes = await axios.get('https://www.jiosaavn.com/api.php', {
               params: {
-                term: langQuery,
-                entity: 'album',
-                limit: 3,
-                country: countryCode || 'in'
+                __call: 'search.getAlbumResults',
+                q: langQuery,
+                _format: 'json',
+                n: 4,
+                p: 1,
+                api_version: '4',
+                ctx: 'web6dot0'
               },
-              timeout: 4000
+              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+              timeout: 3500
             }).catch(() => null);
 
             if (langRes?.data?.results) {
               for (const alb of langRes.data.results) {
-                const albTitle = (alb.collectionName || '').trim();
+                const albTitle = (alb.title || alb.name || '')
+                  .replace(/&quot;/g, '"')
+                  .replace(/&#039;/g, "'")
+                  .replace(/&amp;/g, '&')
+                  .trim();
                 const norm = albTitle.toLowerCase();
-                const cleanArtist = cleanArtistNames(alb.artistName || lang);
+                const cleanArtist = cleanArtistNames(alb.artist || alb.more_info?.artist_map?.primary_artists?.[0]?.name || alb.primary_artists || lang);
                 if (isFakeOrNumericArtistName(cleanArtist)) continue;
                 if (albTitle && !seenAlbumTitles.has(norm)) {
                   seenAlbumTitles.add(norm);
-                  const art = alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '';
+                  const art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+                  const count = parseInt(alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
+                  const albId = `saavn-album-${alb.id}`;
                   items.push({
-                    id: `itunes-album-${alb.collectionId}`,
+                    id: albId,
                     title: albTitle,
                     name: albTitle,
                     coverUrl: art,
                     imageUrl: art,
                     isAlbum: true,
                     type: 'album',
-                    href: `/album/itunes-album-${alb.collectionId}`,
+                    href: `/album/${albId}`,
                     artistName: cleanArtist,
-                    trackCount: alb.trackCount || 1,
-                    releaseDate: alb.releaseDate,
-                    genre: alb.primaryGenreName || 'Soundtrack',
+                    trackCount: count,
+                    releaseDate: alb.year ? `${alb.year}-01-01` : undefined,
+                    genre: alb.language ? `${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)} Soundtrack` : 'Soundtrack',
                     artist: {
                       id: `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
                       name: cleanArtist,
@@ -797,42 +818,52 @@ export class HomeSectionsService {
           } catch {}
         }
 
-        // 3. Supplement with regional top albums for user's country
+        // 3. Supplement with regional top albums from JioSaavn for user's country
         if (items.length < 8 && countryCode) {
           try {
-            const regionRes = await axios.get(`https://itunes.apple.com/search`, {
+            const regionRes = await axios.get('https://www.jiosaavn.com/api.php', {
               params: {
-                term: `${countryName} top albums`,
-                entity: 'album',
-                limit: 4,
-                country: countryCode
+                __call: 'search.getAlbumResults',
+                q: `${countryName || 'Indian'} hits`,
+                _format: 'json',
+                n: 4,
+                p: 1,
+                api_version: '4',
+                ctx: 'web6dot0'
               },
-              timeout: 4000
+              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+              timeout: 3500
             }).catch(() => null);
 
             if (regionRes?.data?.results) {
               for (const alb of regionRes.data.results) {
-                const albTitle = (alb.collectionName || '').trim();
+                const albTitle = (alb.title || alb.name || '')
+                  .replace(/&quot;/g, '"')
+                  .replace(/&#039;/g, "'")
+                  .replace(/&amp;/g, '&')
+                  .trim();
                 const norm = albTitle.toLowerCase();
                 if (albTitle && !seenAlbumTitles.has(norm)) {
                   seenAlbumTitles.add(norm);
-                  const art = alb.artworkUrl100 ? alb.artworkUrl100.replace('100x100bb', '600x600bb') : '';
+                  const art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+                  const albId = `saavn-album-${alb.id}`;
+                  const albArtist = cleanArtistNames(alb.artist || alb.more_info?.artist_map?.primary_artists?.[0]?.name || alb.primary_artists || 'Various Artists');
                   items.push({
-                    id: `itunes-album-${alb.collectionId}`,
+                    id: albId,
                     title: albTitle,
                     name: albTitle,
                     coverUrl: art,
                     imageUrl: art,
                     isAlbum: true,
                     type: 'album',
-                    href: `/album/itunes-album-${alb.collectionId}`,
-                    artistName: alb.artistName,
-                    trackCount: alb.trackCount || 1,
-                    releaseDate: alb.releaseDate,
-                    genre: alb.primaryGenreName || 'Album',
+                    href: `/album/${albId}`,
+                    artistName: albArtist,
+                    trackCount: 1,
+                    releaseDate: alb.year ? `${alb.year}-01-01` : undefined,
+                    genre: alb.language ? `${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)} Album` : 'Album',
                     artist: {
-                      id: `artist-${(alb.artistName || 'Artist').toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-                      name: alb.artistName,
+                      id: `artist-${albArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                      name: albArtist,
                       imageUrl: art
                     }
                   });

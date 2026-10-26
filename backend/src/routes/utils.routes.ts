@@ -891,7 +891,23 @@ export async function utilsRoutes(server: FastifyInstance) {
      * to avoid CORS blockages when downloading/trimming audio in the browser.
      * Supports Range requests for browser seeking and streams to avoid buffering large files.
      */
-    server.get('/proxy-audio', async (request, reply) => {
+    const ALLOWED_STREAM_CDNS = [
+        'saavncdn.com',
+        'aac.saavncdn.com',
+        'c.saavncdn.com',
+        'preview.saavncdn.com',
+        'googlevideo.com',
+        'r2.dev',
+        'cloudinary.com',
+        'scdn.co'
+    ];
+
+    const isAllowedCdnHost = (hostname: string): boolean => {
+        const low = hostname.toLowerCase();
+        return ALLOWED_STREAM_CDNS.some(allowed => low === allowed || low.endsWith(`.${allowed}`));
+    };
+
+    const handleAudioStreamProxy = async (request: any, reply: any) => {
         const { url } = request.query as { url?: string };
         if (!url) return reply.status(400).send({ error: 'Missing url parameter' });
         if (!isSafePublicUrl(url)) return reply.status(400).send({ error: 'Invalid or restricted URL' });
@@ -899,6 +915,10 @@ export async function utilsRoutes(server: FastifyInstance) {
         let targetUrl: URL;
         try { targetUrl = new URL(url); } catch {
             return reply.status(400).send({ error: 'Invalid URL' });
+        }
+
+        if (!isAllowedCdnHost(targetUrl.hostname) && !isSafePublicUrl(url)) {
+            return reply.status(403).send({ error: 'Host not in allowed CDN list' });
         }
 
         const rangeHeader = (request.headers as any)['range'] as string | undefined;
@@ -983,7 +1003,10 @@ export async function utilsRoutes(server: FastifyInstance) {
                 return reply.status(502).send({ error: 'Could not reach audio source' });
             }
         }
-    });
+    };
+
+    server.get('/proxy-audio', handleAudioStreamProxy);
+    server.get('/stream', handleAudioStreamProxy);
 
     server.get('/stream-youtube', async (request, reply) => {
         let { url, title, artist, album, trackId, preview, mode, language, previewUrl } = request.query as {
