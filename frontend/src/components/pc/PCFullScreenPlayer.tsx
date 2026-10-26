@@ -371,7 +371,7 @@ export function PCFullScreenPlayer() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 36 }}
                 transition={{ x: SPRING_SOFT, opacity: { duration: 0.3 } }}
-                className="pointer-events-auto absolute bottom-12 right-14 top-7 max-w-3xl"
+                className="pointer-events-auto absolute bottom-8 right-8 top-7 max-w-4xl overflow-hidden"
                 style={{ left: `${LEFT_GUTTER + PANEL_W + 64}px` }}
               >
                 <LyricsView
