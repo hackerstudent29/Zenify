@@ -60,15 +60,24 @@ function stringSimilarity(s1: string, s2: string): number {
   return (maxLen - row[l2]) / maxLen;
 }
 
+function getBaseTitle(title: string): string {
+  return (title || '')
+    .replace(/\(.*?\)|\[.*?\]/g, '')
+    .split(/[-–—]/)[0]
+    .trim();
+}
+
 function scoreItem(
   targetName: string,
   query: string,
   type: 'artist' | 'album' | 'track' | 'playlist',
   popularity: number = 0,
   isLocal: boolean = false,
-  albumTitle?: string
+  albumTitle?: string,
+  year?: number
 ): number {
   const t = targetName.toLowerCase().trim();
+  const baseT = getBaseTitle(t).toLowerCase().trim();
   const q = query.toLowerCase().trim();
   let score = 0;
 
@@ -78,24 +87,24 @@ function scoreItem(
   const allTInQ = tWords.length > 0 && tWords.every(tw => q.includes(tw));
   const allQInT = qWords.length > 0 && qWords.every(qw => t.includes(qw));
 
-  if (t === q) {
-    score += 260; // Exact match
-  } else if (t.startsWith(q)) {
-    score += 180; // Starts with query
+  if (t === q || (type === 'track' && baseT === q)) {
+    score += 270; // Exact match
+  } else if (t.startsWith(q) || (type === 'track' && baseT.startsWith(q))) {
+    score += 190; // Starts with query
   } else if (allQInT) {
-    score += 150; // All query words match target (e.g. "anirudh ravi" in "Anirudh Ravichander")
+    score += 160; // All query words match target (e.g. "anirudh ravi" in "Anirudh Ravichander")
   } else if (allTInQ) {
     score += 140; // Target is fully contained in query (e.g. "Anirudh Ravichander" in "Anirudh Ravichander songs")
   } else if (t.split(/[\s\-&,/]+/).some(word => word.startsWith(q))) {
-    score += 120; // Word start match (e.g. "Mahadevan" in "Shankar Mahadevan")
+    score += 120; // Word start match
   } else if (t.includes(q)) {
-    score += 70;  // Substring match
+    score += 80;  // Substring match
   } else if (q.includes(t)) {
-    score += 65;  // Query contains target
+    score += 70;  // Query contains target
   } else if (qWords.some(qw => qw.length > 2 && tWords.some(tw => tw.startsWith(qw) || qw.startsWith(tw)))) {
-    score += 40;  // Partial token overlap
+    score += 45;  // Partial token overlap
   } else {
-    // Check fuzzy similarity across tokens & full string (catches transliteration/typos like tiruchitrambalam vs thiruchitrambalam)
+    // Check fuzzy similarity across tokens & full string
     let maxFuzzy = 0;
     for (const qw of qWords) {
       for (const tw of tWords) {
@@ -109,14 +118,12 @@ function scoreItem(
     if (overallSim > maxFuzzy) maxFuzzy = overallSim;
 
     if (maxFuzzy >= 0.75) {
-      score += Math.round(150 * maxFuzzy); // Highly confident fuzzy match
+      score += Math.round(150 * maxFuzzy);
     } else if (maxFuzzy >= 0.6) {
       score += Math.round(90 * maxFuzzy);
     } else if (!isLocal) {
-      // Catalog provider returned this item specifically for this query (e.g. Apple Music / JioSaavn search engine match)
       score += 45;
     } else {
-      // If target does not match query at all in local DB, strict rejection for artist, album, playlist
       if (type === 'artist' || type === 'album' || type === 'playlist') {
         return 0;
       }
@@ -129,14 +136,14 @@ function scoreItem(
   const targetTag = extractSequelTag(t);
   if (queryTag && targetTag) {
     if (queryTag === targetTag) {
-      score += 150; // Sequel match bonus
+      score += 150;
     } else {
-      score -= 300; // Sequel mismatch penalty
+      score -= 300;
     }
   } else if (queryTag && !targetTag) {
-    score -= 220; // User explicitly asked for sequel ("Jailer 2"), but this is the original
+    score -= 220;
   } else if (!queryTag && targetTag) {
-    score -= 100; // User asked for original ("Jailer"), penalize sequel ("Jailer 2") unless requested
+    score -= 100;
   }
 
   // Filter compilations/jukeboxes from top tracks
@@ -144,39 +151,54 @@ function scoreItem(
     score -= 160;
   }
 
-  // Local verified items play immediately without proxy latency
-  if (isLocal) score += 35;
+  // Local verified items play immediately
+  if (isLocal) score += 40;
 
   // Type Intent Boosts:
   if (type === 'artist') {
-    score += 50; // Artists prioritized when user types artist name
+    score += 55;
+    if (t === q || t.startsWith(q) || q.startsWith(t)) {
+      score += 70; // Direct artist intent bonus
+    }
     if (popularity > 0) {
-      score += Math.min(25, Math.round(Math.log10(popularity + 1) * 3));
+      score += Math.min(80, Math.round(Math.log10(popularity + 1) * 16));
     }
   } else if (type === 'album') {
     score += 35;
+    if (year) {
+      if (year >= 2025) score += 35;
+      else if (year >= 2024) score += 25;
+      else if (year >= 2022) score += 10;
+    }
   } else if (type === 'track') {
-    // Album / Movie Name match bonus (essential for finding OST and soundtrack tracks by movie name)
+    // Album / Movie Name match bonus
     if (albumTitle) {
       const albLower = albumTitle.toLowerCase().trim();
       if (albLower === q || albLower === `${q} (original motion picture soundtrack)`) {
-        score += 280;
+        score += 290;
       } else if (albLower.startsWith(q) || q.startsWith(albLower)) {
-        score += 220;
+        score += 230;
       } else if (albLower.includes(q)) {
-        score += 140;
+        score += 150;
       }
     }
 
     if (popularity > 0) {
-      score += Math.min(25, Math.round(Math.log10(popularity + 1) * 2.5));
+      score += Math.min(120, Math.round(Math.log10(popularity + 1) * 16));
     }
-    // Penalize cover / remix / karaoke versions unless query explicitly includes those words, while preserving official themes and OST
+
+    if (year) {
+      if (year >= 2025) score += 35;
+      else if (year >= 2024) score += 25;
+      else if (year >= 2022) score += 10;
+    }
+
+    // Penalize cover / remix / karaoke versions unless query explicitly includes those words
     const isThemeOrBgm = /\b(theme|bgm|score|soundtrack|ost)\b/i.test(t);
     const isDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone)\b/i.test(t);
     const wantsDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone|theme|bgm|score|soundtrack|ost)\b/i.test(q);
     if (isDerivative && !wantsDerivative && !isThemeOrBgm) {
-      score -= 50;
+      score -= 180;
     }
   } else if (type === 'playlist') {
     score += 15;
@@ -357,16 +379,17 @@ export async function searchRoutes(server: FastifyInstance) {
         for (const singleName of individualNames) {
           if (isFakeOrNumericArtistName(singleName)) continue;
           const norm = singleName.toLowerCase().trim();
-          const score = scoreItem(singleName, cleanQ, 'artist', 0, false);
+          const pop = ca.follower_count || 0;
+          const score = scoreItem(singleName, cleanQ, 'artist', pop, false);
           if (score <= 0) continue; // STRICT REJECTION: Must actually match the search query!
 
-          if (!artistsMap.has(norm)) {
+          if (!artistsMap.has(norm) || (artistsMap.get(norm).score < score)) {
             artistsMap.set(norm, {
               id: ca.id && !ca.id.startsWith('itunes-artist-') && !/^\d+$/.test(ca.id) ? ca.id : `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
               name: singleName,
               imageUrl: ca.imageUrl,
               coverUrl: ca.imageUrl,
-              follower_count: 0,
+              follower_count: pop,
               isArtist: true,
               type: 'artist',
               isLocal: false,
@@ -392,6 +415,7 @@ export async function searchRoutes(server: FastifyInstance) {
           artist: alb.artist,
           trackCount: alb._count?.tracks || 0,
           releaseDate: alb.releaseDate,
+          year: alb.releaseDate ? String(alb.releaseDate).slice(0, 4) : undefined,
           isAlbum: true,
           type: 'album',
           isLocal: true,
@@ -404,7 +428,8 @@ export async function searchRoutes(server: FastifyInstance) {
         if (isFakeOrNumericArtistName(cleanArtist)) continue;
         const norm = `${calb.id}::${calb.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
         if (!albumsMap.has(norm)) {
-          const score = scoreItem(calb.title, cleanQ, 'album', calb.trackCount || 0, false);
+          const albYear = calb.year ? parseInt(String(calb.year), 10) : (calb.releaseDate ? parseInt(calb.releaseDate.slice(0, 4), 10) : 0);
+          const score = scoreItem(calb.title, cleanQ, 'album', calb.trackCount || 0, false, undefined, albYear);
           if (score <= 0) continue;
           albumsMap.set(norm, {
             id: calb.id,
@@ -417,6 +442,7 @@ export async function searchRoutes(server: FastifyInstance) {
             },
             trackCount: calb.trackCount || 1,
             releaseDate: calb.releaseDate,
+            year: calb.year || (calb.releaseDate ? String(calb.releaseDate).slice(0, 4) : undefined),
             isAlbum: true,
             type: 'album',
             isLocal: false,
@@ -467,7 +493,9 @@ export async function searchRoutes(server: FastifyInstance) {
         const cleanArtist = cleanArtistNames(ct.artists?.[0]?.name || ct.artist?.name || '');
         const norm = `${ct.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
         if (!tracksMap.has(norm)) {
-          const score = scoreItem(ct.title, cleanQ, 'track', 2500000, false, ct.album?.title);
+          const trackStreams = ct.streams || ct.playCount || 100000;
+          const trackYear = ct.year || 0;
+          const score = scoreItem(ct.title, cleanQ, 'track', trackStreams, false, ct.album?.title, trackYear);
           if (score <= 0) continue;
           tracksMap.set(norm, {
             id: ct.id,
@@ -481,8 +509,8 @@ export async function searchRoutes(server: FastifyInstance) {
             duration: ct.duration,
             genre: ct.genre || 'Pop',
             language: ct.language,
-            streams: 2500000,
-            like_count: 120000,
+            streams: trackStreams,
+            like_count: Math.round(trackStreams * 0.05),
             inLibrary: false,
             isVirtual: true,
             artistId: ct.artists?.[0]?.id || (cleanArtist ? `artist-${cleanArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : ''),
@@ -498,6 +526,7 @@ export async function searchRoutes(server: FastifyInstance) {
             } : undefined,
             type: 'track',
             isLocal: false,
+            year: ct.year,
             score
           });
         }
@@ -574,15 +603,28 @@ export async function searchRoutes(server: FastifyInstance) {
       const albumScore = topAlbum ? topAlbum.score : -1;
       const trackScore = topTrack ? topTrack.score : -1;
 
+      const cleanQLower = cleanQ.toLowerCase();
+      const isArtistIntent = topArtist && (
+        topArtist.name.toLowerCase() === cleanQLower ||
+        topArtist.name.toLowerCase().startsWith(cleanQLower) ||
+        cleanQLower.startsWith(topArtist.name.toLowerCase())
+      );
+      const isAlbumIntent = topAlbum && (
+        topAlbum.title.toLowerCase() === cleanQLower ||
+        topAlbum.title.toLowerCase().startsWith(cleanQLower)
+      );
+
       // If user typed an artist name, surface Artist as Top Result
-      if (topArtist && artistScore >= trackScore && artistScore >= albumScore) {
+      if (isArtistIntent) {
         topResult = { item: topArtist, type: 'artist' };
-      } else if (topAlbum && albumScore > artistScore && albumScore >= trackScore) {
+      } else if (isAlbumIntent && albumScore >= trackScore) {
         topResult = { item: topAlbum, type: 'album' };
       } else if (topTrack) {
         topResult = { item: topTrack, type: 'track' };
       } else if (topArtist) {
         topResult = { item: topArtist, type: 'artist' };
+      } else if (topAlbum) {
+        topResult = { item: topAlbum, type: 'album' };
       }
 
       const response = {

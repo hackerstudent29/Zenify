@@ -20,8 +20,8 @@ export interface CatalogAlbumRef {
 }
 
 export interface CatalogTrack {
-  id: string; // Unique catalog ID e.g. "itunes-12345" | "apple-12345" | "rapid-12345"
-  source: 'apple' | 'itunes' | 'rapidapi' | 'spotify';
+  id: string; // Unique catalog ID e.g. "itunes-12345" | "apple-12345" | "rapid-12345" | "saavn-12345"
+  source: 'apple' | 'itunes' | 'rapidapi' | 'spotify' | 'jiosaavn';
   sourceId: string;
   isrc?: string;
   title: string;
@@ -39,11 +39,14 @@ export interface CatalogTrack {
   fetchedAt: number;
   isVirtual: true;
   inLibrary?: boolean;
+  streams?: number;
+  playCount?: number;
+  year?: number;
 }
 
 export interface CatalogAlbum {
   id: string;
-  source: 'apple' | 'itunes' | 'rapidapi' | 'spotify';
+  source: 'apple' | 'itunes' | 'rapidapi' | 'spotify' | 'jiosaavn';
   sourceId: string;
   title: string;
   artist: CatalogArtistRef;
@@ -51,15 +54,18 @@ export interface CatalogAlbum {
   genre?: string;
   trackCount?: number;
   releaseDate?: string;
+  year?: string | number;
 }
 
 export interface CatalogArtist {
   id: string;
-  source: 'apple' | 'itunes' | 'rapidapi' | 'spotify';
+  source: 'apple' | 'itunes' | 'rapidapi' | 'spotify' | 'jiosaavn';
   sourceId: string;
   name: string;
   imageUrl?: string;
   genres?: string[];
+  follower_count?: number;
+  trackCount?: number;
 }
 
 export interface CatalogSearchResult {

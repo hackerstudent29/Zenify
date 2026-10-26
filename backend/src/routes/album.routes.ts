@@ -229,8 +229,8 @@ export async function albumRoutes(server: FastifyInstance) {
         }
 
         // 0.5. Virtual Album Resolution (JioSaavn regional multi-language album)
-        if (decodedId.startsWith('saavn-album-')) {
-            const saavnAlbumId = decodedId.replace(/^saavn-album-/, '');
+        if (decodedId.startsWith('saavn-album-') || decodedId.startsWith('sp-album-')) {
+            const saavnAlbumId = decodedId.replace(/^(saavn|sp)-album-/, '');
             try {
                 const { default: axios } = await import('axios');
                 const res = await axios.get('https://www.jiosaavn.com/api.php', {
