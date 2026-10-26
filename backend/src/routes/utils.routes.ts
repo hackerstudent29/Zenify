@@ -1239,8 +1239,8 @@ export async function utilsRoutes(server: FastifyInstance) {
             try {
                 const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
                 const cdnResult = await CleanCdnAudioService.resolveAudio({
-                    title: cleanCandTitle,
-                    primaryArtist: cleanCandArtist,
+                    title: candTitle || cleanCandTitle,
+                    primaryArtist: cleanCandArtist || candArtist,
                     album: candAlbum,
                     duration: localTrack?.duration,
                     language: resolvedSongLang
