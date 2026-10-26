@@ -1515,6 +1515,24 @@ export class ExternalMetadataService {
         console.log(`[SmartAudio] Initiating intake for: "${title}" by "${artist}" (Target: ${targetDuration}s, Mode: ${options.preview ? 'PREVIEW' : 'FULL_SONG'})`);
         const tempDir = os.tmpdir();
 
+        // Priority 1: Clean 320kbps CDN Resolver (JioSaavn Akamai edge full song - Priority 1 per AGENTS.md)
+        try {
+            const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
+            const cleanCdn = await CleanCdnAudioService.resolveAudio({
+                title,
+                primaryArtist: artist,
+                duration: targetDuration
+            });
+            if (cleanCdn?.url) {
+                console.log(`[SmartAudio] Clean 320kbps CDN resolved before intake for "${title}": ${cleanCdn.url.slice(0, 70)}...`);
+                if (options.preview) {
+                    return { url: cleanCdn.url, duration: cleanCdn.duration || targetDuration || 180, sourceType: 'clean_cdn_direct', watchUrl: undefined };
+                }
+            }
+        } catch (cdnErr: any) {
+            console.warn(`[SmartAudio] Clean CDN resolution skipped: ${cdnErr.message}`);
+        }
+
         // Fast iTunes search preview-first optimization
         if (false) { // Disabled: 100% full song streaming only
             try {
@@ -1635,6 +1653,26 @@ export class ExternalMetadataService {
         };
 
         try {
+            // Step 0: Clean 320kbps CDN Resolver (JioSaavn Akamai edge full song - Priority 1 per AGENTS.md)
+            if (!directUrl) {
+                try {
+                    const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
+                    const cleanCdn = await CleanCdnAudioService.resolveAudio({
+                        title,
+                        primaryArtist: artist,
+                        duration: targetDuration
+                    });
+                    if (cleanCdn?.url) {
+                        console.log(`[SmartAudio] Step 0: Clean 320kbps CDN resolved for "${title}": ${cleanCdn.url.slice(0, 70)}...`);
+                        if (options.preview) {
+                            return { url: cleanCdn.url, duration: cleanCdn.duration || targetDuration || 180, sourceType: 'clean_cdn_direct', watchUrl: undefined };
+                        }
+                    }
+                } catch (cdnErr: any) {
+                    console.warn(`[SmartAudio] Step 0 Clean CDN resolution skipped: ${cdnErr.message}`);
+                }
+            }
+
             // Direct URL logic (YouTube override)
             if (directUrl) {
                 console.log(`[SmartAudio] Direct URL override: ${directUrl}`);

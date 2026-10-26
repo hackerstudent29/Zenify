@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { prisma } from '../utils/prisma.js';
 import { splitArtistString } from '../utils/artist.js';
+import { CleanCdnAudioService } from './clean-cdn-audio.service.js';
 import { CatalogTrack, CatalogArtist, CatalogAlbum, CatalogSearchResult, CatalogArtistRef } from './catalog-provider.service.js';
 
 export interface UniversalTrackItem {
@@ -139,7 +140,7 @@ function scoreTrack(title: string, artist: string, query: string, source: string
 
   // Source preference boosts
   if (source === 'zenify') score += 50; // Verified local track
-  else if (source === 'jiosaavn') score += 25; // 320kbps licensed master
+  else if (source === 'jiosaavn') score += 160; // Primary source: instant 320kbps Akamai CDN stream
   else if (source === 'itunes') score += 20;
 
   // Strict Sequel / Part matching:
@@ -341,7 +342,7 @@ export class UniversalSearchService {
             duration: { totalMilliseconds: dur * 1000 },
             duration_ms: dur * 1000,
             trackTimeMillis: dur * 1000,
-            audioUrl: undefined,
+            audioUrl: (s.encrypted_media_url || s.more_info?.encrypted_media_url) ? (CleanCdnAudioService.decryptSaavnMediaUrl(s.encrypted_media_url || s.more_info?.encrypted_media_url) || undefined) : undefined,
             isZenify: false,
             isImported: false,
             source: 'jiosaavn',
@@ -713,7 +714,7 @@ export class UniversalSearchService {
                 duration: { totalMilliseconds: sDur * 1000 },
                 duration_ms: sDur * 1000,
                 trackTimeMillis: sDur * 1000,
-                audioUrl: undefined,
+                audioUrl: (s.encrypted_media_url || s.more_info?.encrypted_media_url) ? (CleanCdnAudioService.decryptSaavnMediaUrl(s.encrypted_media_url || s.more_info?.encrypted_media_url) || undefined) : undefined,
                 isZenify: false,
                 isImported: false,
                 source: 'jiosaavn',
@@ -762,7 +763,7 @@ export class UniversalSearchService {
         duration: Math.round(t.duration_ms / 1000),
         artwork: t.coverUrl,
         coverUrl: t.coverUrl,
-        audioUrl: t.audioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${primaryArtistName} - ${t.name}`)}`,
+        audioUrl: t.audioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${primaryArtistName} - ${t.name}`)}&title=${encodeURIComponent(t.name)}&artist=${encodeURIComponent(primaryArtistName)}`,
         storefront,
         fetchedAt: Date.now(),
         isVirtual: true,

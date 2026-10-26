@@ -181,24 +181,32 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
     const cookiesArgs = getCookieArgs();
     const proxyArgs = getProxyArgs();
 
-    // 0. Clean 320kbps CDN Resolver (Only when url is a raw search query, NOT an explicit YouTube or HTTP media link)
-    if (!url.startsWith('http') && !url.startsWith('ytsearch') && !videoId && queryHint) {
+    // 0. Clean 320kbps CDN Resolver (Pristine Akamai CDN full song - Priority 1 per AGENTS.md Rule 1)
+    let effectiveHint = queryHint;
+    if (!effectiveHint && url && !url.includes('youtube.com/watch') && !url.includes('youtu.be/')) {
+        const rawClean = url.replace(/^ytsearch[0-9]*:/, '').trim();
+        if (rawClean.length > 2) effectiveHint = rawClean;
+    }
+    if (effectiveHint) {
         try {
             const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
-            const cdnResult = await CleanCdnAudioService.resolveAudio(queryHint);
+            const cdnResult = await CleanCdnAudioService.resolveAudio(effectiveHint);
             if (cdnResult?.url) {
                 server.log.info(`[stream-youtube] Direct media URL resolved via Clean CDN (320kbps): ${cdnResult.url.slice(0, 80)}...`);
                 return cdnResult.url;
             }
-        } catch {}
+        } catch (cdnErr: any) {
+            server.log.warn(`[stream-youtube] Clean CDN resolution skipped in Step 0: ${cdnErr.message}`);
+        }
     }
 
-    // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active 5-min circuit breaker cooldown)
+    // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active circuit breaker cooldown)
     const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
     if (ytBin && !isLocalBlocked) {
-        // Priority: android_music, tv_embedded bypass datacenter IP bot challenges; keep timeout strictly within 8s total to prevent Heroku H12 router cutoff
+        // Priority: android_music, tv_embedded bypass datacenter IP bot challenges
         const gClients: (string | null)[] = ['android_music', 'tv_embedded'];
-        let allThrottled = true;
+        let allThrottled = false;
+        let detectedBotBlock = false;
         for (const client of gClients) {
             try {
                 const { safeExecFile } = await import('../utils/security.js');
@@ -215,10 +223,10 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
                     ...(client ? ['--extractor-args', `youtube:player_client=${client}`] : []),
                     '-f', 'ba/18/b/best',
                     '--no-playlist',
-                    '--socket-timeout', '6',
+                    '--socket-timeout', '8',
                     url
                 ];
-                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 4500 });
+                const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 9500 });
                 const urls = stdout.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('http'));
                 const directMediaUrl = urls.find(u => u.includes('mime=audio') || u.includes('audio')) || urls[0];
                 if (directMediaUrl && directMediaUrl.startsWith('http')) {
@@ -227,15 +235,14 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
                 }
             } catch (gErr: any) {
                 server.log.warn(`[stream-youtube] Direct URL lookup -g (${client || 'default-node'}) failed: ${gErr.message}`);
-                // Only consider throttled if error indicates bot block or rate limit
-                if (!gErr.message?.includes('Sign in to confirm') && !gErr.message?.includes('bot') && !gErr.message?.includes('429')) {
-                    allThrottled = false;
+                if (gErr.message?.includes('Sign in to confirm') || gErr.message?.includes('bot') || gErr.message?.includes('429')) {
+                    detectedBotBlock = true;
                 }
             }
         }
-        if (allThrottled) {
-            server.log.warn(`[stream-youtube] YouTube IP block/bot challenge detected across all clients. Engaging 5-minute circuit breaker to route directly to Infinity Gates.`);
-            localYtBlockCooldownUntil = Date.now() + 5 * 60 * 1000;
+        if (detectedBotBlock) {
+            server.log.warn(`[stream-youtube] YouTube IP block/bot challenge detected. Engaging 30-second circuit breaker.`);
+            localYtBlockCooldownUntil = Date.now() + 30 * 1000;
         }
     } else if (isLocalBlocked) {
         server.log.info(`[stream-youtube] Host IP in active circuit breaker cooldown. Routing directly to Infinity Gates network.`);
@@ -258,15 +265,29 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
         }
     }
 
-    // Gate 1: RapidAPI MP3 Gateway
+    // Gate 1: RapidAPI Spotify / Music Downloader (Priority 3 per AGENTS.md)
     try {
         const { SystemSettingsService } = await import('../services/system-settings.service.js');
         const rapidApiKey = await SystemSettingsService.getRapidApiKey();
         if (rapidApiKey) {
+            const targetQuery = queryHint || (url.startsWith('ytsearch') ? url.replace(/^ytsearch[0-9]*:/, '').trim() : url);
+            // 1a. Try Spotify81 full track downloader
+            const s81Res = await axios.get('https://spotify81.p.rapidapi.com/download_track', {
+                params: { q: targetQuery, onlyLinks: 'true' },
+                headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
+                timeout: 8000
+            }).catch(() => null);
+
+            if (s81Res?.data?.url && !s81Res.data.url.includes('audio-ssl') && !s81Res.data.url.includes('mzstatic')) {
+                server.log.info(`[stream-youtube] Infinity Gate 1 (RapidAPI Spotify81) successfully resolved full audio stream!`);
+                return s81Res.data.url;
+            }
+
+            // 1b. Fallback to YT MP3 downloader
             const mp3Res = await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
                 params: { url },
                 headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com' },
-                timeout: 6000
+                timeout: 5000
             }).catch(() => null);
 
             if (mp3Res?.data?.success && mp3Res?.data?.download) {
@@ -1262,7 +1283,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                     duration: localTrack?.duration,
                     language: resolvedSongLang
                 });
-                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 4500));
+                const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 9000));
                 const resolution: any = await Promise.race([resolverPromise, timeoutPromise]);
 
                 if (resolution && resolution.watchUrl) {
@@ -1770,6 +1791,69 @@ export async function utilsRoutes(server: FastifyInstance) {
         } catch (err: any) {
             server.log.error(`flush-cache error: ${err.message}`);
             return reply.status(500).send({ error: 'Failed to flush caches securely.' });
+        }
+    });
+
+    // Reset catalog data (Tracks, Albums, Artists, Lyrics, Caches) while strictly preserving Users
+    server.post('/reset-catalog-data', {
+        preHandler: [server.authenticate, server.authorize(['ADMIN'])],
+    }, async (request, reply) => {
+        try {
+            const { prisma } = await import('../utils/prisma.js');
+            const { flushAllCaches } = await import('../utils/cache.js');
+
+            server.log.info('[Maintenance] Beginning catalog reset (preserving users)...');
+
+            // 1. Delete dependent records
+            await prisma.lyricEnrichmentJob.deleteMany({}).catch(() => {});
+            await prisma.trackVibeProfile.deleteMany({}).catch(() => {});
+            await prisma.trackAnalytics.deleteMany({}).catch(() => {});
+            await prisma.playlistTrack.deleteMany({}).catch(() => {});
+            await prisma.like.deleteMany({}).catch(() => {});
+            await prisma.rating.deleteMany({}).catch(() => {});
+            await prisma.userTrackStat.deleteMany({}).catch(() => {});
+            await prisma.history.deleteMany({}).catch(() => {});
+            await prisma.purchase.deleteMany({}).catch(() => {});
+            await prisma.featuredContent.deleteMany({}).catch(() => {});
+
+            // 2. Delete Tracks & Lyrics
+            const deletedTracks = await prisma.track.deleteMany({});
+
+            // 3. Delete Albums
+            const deletedAlbums = await prisma.album.deleteMany({});
+
+            // 4. Delete Artist Aliases & Artists
+            await prisma.artistAlias.deleteMany({}).catch(() => {});
+            const deletedArtists = await prisma.artist.deleteMany({});
+
+            // 5. Flush All Caches
+            await flushAllCaches();
+
+            const usersCount = await prisma.user.count();
+            const tracksCount = await prisma.track.count();
+            const albumsCount = await prisma.album.count();
+            const artistsCount = await prisma.artist.count();
+
+            server.log.info(`[Maintenance] Catalog reset complete. Users preserved: ${usersCount}. Remaining tracks: ${tracksCount}.`);
+
+            return reply.send({
+                success: true,
+                message: 'All track details, artists, albums, lyrics, and caches have been reset successfully while preserving all user accounts.',
+                usersPreserved: usersCount,
+                deleted: {
+                    tracks: deletedTracks.count,
+                    albums: deletedAlbums.count,
+                    artists: deletedArtists.count
+                },
+                remaining: {
+                    tracks: tracksCount,
+                    albums: albumsCount,
+                    artists: artistsCount
+                }
+            });
+        } catch (err: any) {
+            server.log.error(`reset-catalog-data error: ${err.message}`);
+            return reply.status(500).send({ error: err.message });
         }
     });
 }

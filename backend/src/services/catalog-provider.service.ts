@@ -731,9 +731,137 @@ export class RapidApiCatalogProvider implements CatalogProvider {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. COMPOSITE CATALOG SERVICE (Auto Failover & Central Orchestrator)
+export class JioSaavnCatalogProvider implements CatalogProvider {
+  name = 'jiosaavn';
+  private bucket = new TokenBucket(30, 10);
+  private circuit = new CircuitBreaker(5, 30000);
+
+  isAvailable(): boolean {
+    return !this.circuit.isOpen();
+  }
+
+  async search(query: string, storefront: string, limit = 15): Promise<CatalogSearchResult> {
+    await this.bucket.acquire();
+    try {
+      const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
+      const res = await axios.get('https://www.jiosaavn.com/api.php', {
+        params: {
+          __call: 'search.getResults',
+          q: query,
+          p: 1,
+          n: limit,
+          _format: 'json',
+          _marker: '0',
+          api_version: '4',
+          ctx: 'web6dot0'
+        },
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+        timeout: 3500
+      });
+
+      const rawTracks = res.data?.results || [];
+      const tracks: CatalogTrack[] = [];
+      const artists: CatalogArtist[] = [];
+      const albums: CatalogAlbum[] = [];
+
+      for (const t of rawTracks) {
+        if (!t.song && !t.title) continue;
+        const songTitle = (t.song || t.title).replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').trim();
+        const primaryArtist = (t.primary_artists || t.singers || 'Unknown Artist').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').trim();
+        const albumTitle = (t.album || 'Single').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').trim();
+        const cover = (t.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+        const dur = parseInt(t.duration || '180', 10) || 180;
+
+        const enc = t.encrypted_media_url || t.more_info?.encrypted_media_url;
+        const directAudioUrl = enc ? CleanCdnAudioService.decryptSaavnMediaUrl(enc) : null;
+
+        const artistObj: CatalogArtistRef = {
+          id: `artist-${encodeURIComponent(primaryArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+          name: primaryArtist,
+          imageUrl: cover
+        };
+
+        tracks.push({
+          id: `saavn-${t.id}`,
+          source: 'jiosaavn' as any,
+          sourceId: t.id,
+          title: songTitle,
+          artists: [artistObj],
+          artist: artistObj,
+          album: {
+            id: `album-${encodeURIComponent(albumTitle.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+            title: albumTitle,
+            coverUrl: cover
+          },
+          duration: dur,
+          artwork: cover,
+          coverUrl: cover,
+          audioUrl: directAudioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${primaryArtist} - ${songTitle}`)}&title=${encodeURIComponent(songTitle)}&artist=${encodeURIComponent(primaryArtist)}&trackId=saavn-${t.id}`,
+          storefront,
+          fetchedAt: Date.now(),
+          isVirtual: true
+        });
+      }
+
+      this.circuit.recordSuccess();
+      return { tracks, artists, albums };
+    } catch (err: any) {
+      this.circuit.recordFailure(err.response?.status === 429);
+      return { tracks: [], artists: [], albums: [] };
+    }
+  }
+
+  async getSearchHints(query: string, storefront: string): Promise<string[]> {
+    try {
+      const res = await axios.get('https://www.jiosaavn.com/api.php', {
+        params: {
+          __call: 'autocomplete.get',
+          query,
+          _format: 'json',
+          _marker: '0',
+          ctx: 'web6dot0'
+        },
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+        timeout: 2500
+      });
+      const top = res.data?.topquery?.data || [];
+      const songs = res.data?.songs?.data || [];
+      return [...top, ...songs].map((x: any) => x.title || x.song).filter(Boolean).slice(0, 8);
+    } catch {
+      return [];
+    }
+  }
+
+  async getCharts(storefront: string, limit = 25): Promise<CatalogTrack[]> {
+    const searchRes = await this.search('Top Trending Songs', storefront, limit);
+    return searchRes.tracks;
+  }
+
+  async getNewReleases(storefront: string, languages?: string[], limit = 25): Promise<CatalogTrack[]> {
+    const lang = languages?.[0] || 'Tamil';
+    const searchRes = await this.search(`Latest ${lang} Hits`, storefront, limit);
+    return searchRes.tracks;
+  }
+
+  async getArtistTopSongs(artistName: string, storefront: string, limit = 15): Promise<CatalogTrack[]> {
+    const searchRes = await this.search(artistName, storefront, limit);
+    return searchRes.tracks;
+  }
+
+  async getTrending(storefront: string, languages?: string[], limit = 25): Promise<CatalogTrack[]> {
+    const lang = languages?.[0] || '';
+    const q = lang ? `Trending ${lang}` : 'Trending Hits';
+    const searchRes = await this.search(q, storefront, limit);
+    return searchRes.tracks;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. COMPOSITE CATALOG SERVICE (Auto Failover & Central Orchestrator)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class CompositeCatalogService {
+  private static jiosaavnProvider = new JioSaavnCatalogProvider();
   private static appleProvider = new AppleMusicProvider();
   private static itunesProvider = new ITunesCatalogProvider();
   private static rapidProvider = new RapidApiCatalogProvider();
@@ -745,6 +873,7 @@ export class CompositeCatalogService {
 
   private static getActiveProviders(): CatalogProvider[] {
     const list: CatalogProvider[] = [];
+    if (this.jiosaavnProvider.isAvailable()) list.push(this.jiosaavnProvider);
     if (this.appleProvider.isAvailable()) list.push(this.appleProvider);
     list.push(this.itunesProvider);
     if (this.rapidProvider.isAvailable()) list.push(this.rapidProvider);

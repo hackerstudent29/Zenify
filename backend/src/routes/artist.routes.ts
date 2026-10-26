@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { ArtistController } from '../controllers/artist.controller';
 import { cleanArtistNames, isFakeOrNumericArtistName } from '../utils/artist.js';
+import { CleanCdnAudioService } from '../services/clean-cdn-audio.service.js';
 
 export async function artistRoutes(server: FastifyInstance) {
     const artistController = new ArtistController(server);
@@ -97,7 +98,11 @@ export async function artistRoutes(server: FastifyInstance) {
             return null;
         }
 
-        // 3. Pre-fetch Deezer metadata & candidate for real profile pic, banner & related artists
+        // 3. Pre-fetch JioSaavn, Deezer & Wikipedia metadata
+        let saavnArtistData: any = null;
+        let saavnPic: string | null = null;
+        let saavnBio: string | null = null;
+        let saavnFollowers: number | null = null;
         let deezerArtistId: number | null = null;
         let deezerPic: string | null = null;
         let deezerCover: string | null = null;
@@ -110,7 +115,77 @@ export async function artistRoutes(server: FastifyInstance) {
             const targetQuery = artist ? artist.name : cleanName;
             const normTarget = targetQuery.replace(/\s+/g, '').toLowerCase();
 
-            // Parallel lookup: Deezer Artist Search & Wikipedia Summary
+            // Primary: JioSaavn Artist Lookup
+            const sRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                params: {
+                    __call: 'search.getArtistResults',
+                    _format: 'json',
+                    _marker: '0',
+                    api_version: '4',
+                    ctx: 'web6dot0',
+                    p: 1,
+                    n: 1,
+                    q: targetQuery
+                },
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                timeout: 3500
+            }).catch(() => null);
+
+            const sArtistId = sRes?.data?.results?.[0]?.id;
+            if (sArtistId) {
+                const aRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'artist.getArtistPageDetails',
+                        _format: 'json',
+                        _marker: '0',
+                        api_version: '4',
+                        ctx: 'web6dot0',
+                        artistId: sArtistId,
+                        n_song: 50,
+                        n_album: 50
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 4500
+                }).catch(() => null);
+
+                if (aRes?.data?.name) {
+                    saavnArtistData = aRes.data;
+                    if (saavnArtistData.image) {
+                        saavnPic = saavnArtistData.image.replace('150x150', '500x500').replace('50x50', '500x500');
+                    }
+                    if (saavnArtistData.bio) {
+                        try {
+                            const parsedBio = typeof saavnArtistData.bio === 'string' ? JSON.parse(saavnArtistData.bio) : saavnArtistData.bio;
+                            if (Array.isArray(parsedBio)) {
+                                saavnBio = parsedBio.map((b: any) => b.text || b).join(' ');
+                            } else if (typeof parsedBio === 'string') {
+                                saavnBio = parsedBio;
+                            }
+                        } catch {
+                            if (typeof saavnArtistData.bio === 'string') saavnBio = saavnArtistData.bio;
+                        }
+                    }
+                    if (saavnArtistData.follower_count) {
+                        saavnFollowers = parseInt(saavnArtistData.follower_count, 10) || null;
+                    }
+                    if (saavnArtistData.similarArtists && Array.isArray(saavnArtistData.similarArtists) && saavnArtistData.similarArtists.length > 0) {
+                        relatedArtists = saavnArtistData.similarArtists.slice(0, 15).map((a: any) => {
+                            const artPic = (a.image_url || a.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+                            return {
+                                id: `artist-${(a.name || '').toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                                name: a.name,
+                                imageUrl: artPic,
+                                coverUrl: artPic,
+                                follower_count: 500000,
+                                isArtist: true,
+                                type: 'artist'
+                            };
+                        });
+                    }
+                }
+            }
+
+            // Secondary lookup: Deezer Artist Search & Wikipedia Summary
             const [dzRes, wikiRes] = await Promise.all([
                 axios.get(`https://api.deezer.com/search/artist?q=${encodeURIComponent(targetQuery)}`, { timeout: 3500 }).catch(() => null),
                 axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(targetQuery)}`, { 
@@ -143,8 +218,8 @@ export async function artistRoutes(server: FastifyInstance) {
                 }
             }
 
-            // Fetch Deezer Related Artists if deezerArtistId was resolved
-            if (deezerArtistId) {
+            // Fetch Deezer Related Artists if not already filled by JioSaavn
+            if (deezerArtistId && relatedArtists.length === 0) {
                 const relRes = await axios.get(`https://api.deezer.com/artist/${deezerArtistId}/related`, { timeout: 3500 }).catch(() => null);
                 if (relRes?.data?.data && Array.isArray(relRes.data.data)) {
                     relatedArtists = relRes.data.data.slice(0, 15).map((a: any) => {
@@ -170,9 +245,9 @@ export async function artistRoutes(server: FastifyInstance) {
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(cleanName).catch(() => null);
 
-            const resolvedImage = deezerPic || canonical?.imageUrl || adbInfo?.imageUrl;
-            const resolvedCover = wikiBanner || deezerCover || adbInfo?.coverUrl || resolvedImage;
-            const resolvedBio = wikiBio || canonical?.bio || adbInfo?.bio;
+            const resolvedImage = saavnPic || deezerPic || canonical?.imageUrl || adbInfo?.imageUrl;
+            const resolvedCover = saavnPic || wikiBanner || deezerCover || adbInfo?.coverUrl || resolvedImage;
+            const resolvedBio = saavnBio || wikiBio || canonical?.bio || adbInfo?.bio;
             const capitalizedName = cleanName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
             const newArtist = await prisma.artist.create({
@@ -182,7 +257,7 @@ export async function artistRoutes(server: FastifyInstance) {
                     imageUrl: resolvedImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=18181b&color=e11d48&size=512`,
                     coverUrl: resolvedCover,
                     birthDate: canonical?.birthDate ? new Date(canonical.birthDate) : null,
-                    follower_count: adbInfo?.followers || 500000
+                    follower_count: saavnFollowers || adbInfo?.followers || 500000
                 },
                 include: { albums: true }
             }).catch(() => null);
@@ -341,6 +416,53 @@ export async function artistRoutes(server: FastifyInstance) {
                 }).catch(() => null) : Promise.resolve(null)
             ]);
 
+            // 0. Primary Pass: Official JioSaavn Top Songs with direct 160kbps audio URLs
+            const saavnSongsList: any[] = Array.isArray(saavnArtistData?.topSongs) ? saavnArtistData.topSongs : (saavnArtistData?.topSongs?.songs || []);
+            if (saavnSongsList.length > 0) {
+                const existingTitles = new Set(finalTopTracks.map(t => t.title.toLowerCase().trim()));
+                for (const s of saavnSongsList) {
+                    const cleanTitle = (s.song || s.title || '')
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#039;/g, "'")
+                        .replace(/&amp;/g, '&')
+                        .trim();
+                    if (!cleanTitle || existingTitles.has(cleanTitle.toLowerCase())) continue;
+                    existingTitles.add(cleanTitle.toLowerCase());
+
+                    let artwork = (s.image || artist.imageUrl || '').replace('150x150', '500x500').replace('50x50', '500x500');
+                    const encMedia = s.more_info?.encrypted_media_url || s.encrypted_media_url;
+                    let directAudio = '';
+                    if (encMedia) {
+                        directAudio = CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '160') || '';
+                    }
+                    const rawSingers = s.singers || s.primary_artists || s.more_info?.singers;
+                    const trackArtist = cleanArtistNames(rawSingers, artist.name);
+                    const albTitle = (s.album || s.more_info?.album || 'Single').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&');
+                    const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
+
+                    const finalAudio = directAudio || `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}&trackId=saavn-${s.id}`;
+
+                    finalTopTracks.push({
+                        id: `saavn-${s.id}`,
+                        title: cleanTitle,
+                        duration: dur,
+                        coverUrl: artwork,
+                        audioUrl: finalAudio,
+                        artistId: artist.id,
+                        artist: { id: artist.id, name: trackArtist, imageUrl: artist.imageUrl },
+                        album: {
+                            id: `saavn-album-${s.album_id || s.albumid || s.id}`,
+                            title: albTitle,
+                            coverUrl: artwork
+                        },
+                        isVirtual: true,
+                        isLocalAvailable: false,
+                        streams: parseInt(s.play_count || s.more_info?.play_count, 10) || 50000,
+                        like_count: 0
+                    } as any);
+                }
+            }
+
             // Combine candidate songs strictly prioritizing verified Apple Music lookup
             const rawLookupTracks = (itunesLookupSongsRes?.data?.results || [])
                 .filter((r: any) => r.wrapperType === 'track' && r.kind === 'song');
@@ -423,6 +545,38 @@ export async function artistRoutes(server: FastifyInstance) {
             const allItunesAlbums = [...rawLookupAlbums, ...rawSearchAlbums];
             const seenCollectionIds = new Set<string>(finalAlbums.map(a => a.id));
             const seenAlbumKeys = new Set<string>(finalAlbums.map(a => `${(a.title || '').toLowerCase().trim()}:::${a.id}`));
+
+            // 0. Primary Pass: Official JioSaavn Albums
+            const saavnAlbumsList: any[] = [
+                ...(Array.isArray(saavnArtistData?.topAlbums) ? saavnArtistData.topAlbums : (saavnArtistData?.topAlbums?.albums || [])),
+                ...(saavnAlbumsRes?.data?.results || [])
+            ];
+            for (const alb of saavnAlbumsList) {
+                const albTitle = (alb.album || alb.title || alb.name || '')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#039;/g, "'")
+                    .replace(/&amp;/g, '&')
+                    .trim();
+                const saavnAlbId = `saavn-album-${alb.albumid || alb.id}`;
+                if (!albTitle || seenCollectionIds.has(saavnAlbId)) continue;
+                seenCollectionIds.add(saavnAlbId);
+
+                const albArt = (alb.imageUrl || alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+                const count = parseInt(alb.numSongs || alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
+
+                finalAlbums.push({
+                    id: saavnAlbId,
+                    title: albTitle,
+                    artistName: artist.name,
+                    coverUrl: albArt,
+                    artistId: artist.id,
+                    releaseDate: alb.year ? new Date(`${alb.year}-01-01`) : new Date(),
+                    createdAt: alb.year ? new Date(`${alb.year}-01-01`) : new Date(),
+                    trackCount: count,
+                    isSingle: count <= 1,
+                    genre: alb.language ? `${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)}` : 'Indian'
+                });
+            }
 
             for (const alb of allItunesAlbums) {
                 const albTitle = (alb.collectionName || '').trim();
