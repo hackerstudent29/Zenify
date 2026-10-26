@@ -351,15 +351,15 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCurrent, isPast, interlude, timing, smoothTimeValue, isUnsynced, lineStartTime, lineEndTime, sb]);
 
-  // Dynamic Apple Music alignment based on wording, length, and backing vocals
-  const isBackingVocal = cleaned.startsWith("(") && cleaned.endsWith(")");
-  const isShortLine = tokens.length <= 3 || cleaned.length <= 18;
-  const isMediumLine = tokens.length <= 6 && cleaned.length <= 28;
-
+  // Dynamic Apple Music alignment based on wording, length, and backing vocals (STRICTLY FOR SIDEBAR TAB ONLY)
   let alignClass = "justify-start text-left";
   let dynamicStyleIndent: React.CSSProperties = {};
 
-  if (!interlude) {
+  if (sb && !interlude) {
+    const isBackingVocal = cleaned.startsWith("(") && cleaned.endsWith(")");
+    const isShortLine = tokens.length <= 3 || cleaned.length <= 18;
+    const isMediumLine = tokens.length <= 6 && cleaned.length <= 28;
+
     if (isBackingVocal) {
       alignClass = "justify-end text-right italic";
     } else if (isShortLine) {
@@ -368,15 +368,13 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         alignClass = "justify-center text-center";
       } else if (step === 2) {
         alignClass = "justify-start text-left";
-        dynamicStyleIndent = { paddingLeft: sb ? "1.6rem" : "2.2rem" };
+        dynamicStyleIndent = { paddingLeft: "1.6rem" };
       } else {
         alignClass = "justify-start text-left";
       }
     } else if (isMediumLine && ((props.lineIndex ?? 0) % 2 === 1)) {
       alignClass = "justify-start text-left";
-      dynamicStyleIndent = { paddingLeft: sb ? "0.9rem" : "1.2rem" };
-    } else {
-      alignClass = "justify-start text-left";
+      dynamicStyleIndent = { paddingLeft: "0.9rem" };
     }
   }
 
@@ -445,7 +443,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
               wordBreak: "break-word",
               wordSpacing: "0.02em",
               maxWidth: "100%",
-              textWrap: "balance" as any,
+              textWrap: sb ? ("balance" as any) : undefined,
             }}
           >
             {tokens.map((tokObj, i) => (
