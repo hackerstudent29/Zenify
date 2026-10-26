@@ -69,14 +69,12 @@ const LY_CSS = `
 }
 .ly-dot {
   background: #ffffff;
-  will-change: opacity, transform;
-}
-/* Sidebar: tighter glow so the compact type stays crisp */
-.ly-sb .ly-glow {
-  filter: blur(3px);
+  border-radius: 999px;
+  will-change: transform, opacity, box-shadow;
+  transition: transform 120ms cubic-bezier(.2,.8,.3,1), opacity 150ms ease, box-shadow 180ms ease;
 }
 .ly-sb .ly-dot {
-  transition: box-shadow 400ms ease;
+  transition: transform 120ms cubic-bezier(.2,.8,.3,1), opacity 150ms ease, box-shadow 180ms ease;
 }
 @media (hover: hover) {
   .ly-row:not(.ly-nohover):hover {
@@ -208,8 +206,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
 
   const fontSize = isFullscreen
     ? isMobile
-      ? "clamp(20px, 5.5vw, 26px)"
-      : "clamp(24px, 2.5vw, 36px)"
+      ? "clamp(22px, 5.5vw, 28px)"
+      : "clamp(28px, 2.8vw, 42px)"
     : isMobile
     ? "clamp(18px, 5vw, 22px)"
     : isSidebar
@@ -301,19 +299,39 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
   React.useLayoutEffect(() => {
     if (interlude) {
       const drawDots = (t: number) => {
-        const s = lineStartTime,
-          e = lineEndTime > s ? lineEndTime : s + 3.5;
-        const p = Math.max(0, Math.min(1, (t - s) / Math.max(0.1, e - s)));
+        const s = lineStartTime;
+        const e = lineEndTime > s ? lineEndTime : s + 3.5;
+        const elapsed = t - s;
+        // Tempo-synced wave frequency (~120bpm)
+        const freq = 4.0;
+        const baseT = elapsed * freq;
+
         dotEls.current.forEach((d, i) => {
           if (!d) return;
-          // Clean pulse without physical bounce or jumping
-          const phase = Math.sin((p * Math.PI * 2) - i * 0.8);
-          const opacity = isCurrent ? 0.35 + 0.65 * Math.max(0, phase) : isPast ? 0.3 : 0.2;
-          d.style.opacity = String(opacity);
-          // Sidebar: dots also breathe (Apple-style) – scale only, never moves layout
-          if (sb) {
-            const sc = isCurrent ? 0.82 + 0.28 * Math.max(0, phase) : 0.82;
-            d.style.transform = `scale(${sc})`;
+          if (isCurrent) {
+            // Fluid undulating harmonic wave with acoustic pill morphing
+            const phase = baseT - i * 0.95;
+            const wave = Math.sin(phase);
+            const intensity = Math.max(0, wave); // 0 to 1
+            const yShift = -wave * (sb ? 3.5 : 5.0); // Smooth floating wave
+            const scaleY = 1.0 + intensity * (sb ? 0.45 : 0.6); // Liquid pill elongation
+            const scaleX = 1.0 - intensity * 0.15; // Elastic volume conservation
+            const glow = (8 + intensity * 18).toFixed(1);
+            const glowAlpha = (0.55 + intensity * 0.45).toFixed(2);
+
+            d.style.transform = `translate3d(0, ${yShift.toFixed(2)}px, 0) scale(${scaleX.toFixed(2)}, ${scaleY.toFixed(2)})`;
+            d.style.opacity = String(Math.max(0.45, 0.5 + 0.5 * intensity));
+            d.style.boxShadow = `0 0 ${glow}px rgba(255, 255, 255, ${glowAlpha})`;
+          } else if (isPast) {
+            d.style.transform = "scale(0.82)";
+            d.style.opacity = "0.28";
+            d.style.boxShadow = "none";
+          } else {
+            // Upcoming interlude: calm ambient breathing
+            const idleWave = Math.sin(t * 1.6 - i * 0.7);
+            d.style.transform = `scale(${(0.82 + 0.12 * Math.max(0, idleWave)).toFixed(2)})`;
+            d.style.opacity = String((0.2 + 0.15 * Math.max(0, idleWave)).toFixed(2));
+            d.style.boxShadow = "none";
           }
         });
       };
@@ -322,10 +340,20 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         drawDots(smoothTimeValue.get());
         return smoothTimeValue.on("change", drawDots);
       }
-      dotEls.current.forEach((d) => {
-        if (d) {
-          d.style.opacity = isPast ? "0.35" : "0.2";
-          if (sb) d.style.transform = "scale(0.82)";
+      dotEls.current.forEach((d, i) => {
+        if (!d) return;
+        if (isCurrent) {
+          d.style.transform = "translate3d(0, -2px, 0) scale(1.15, 1.25)";
+          d.style.opacity = "0.9";
+          d.style.boxShadow = "0 0 14px rgba(255, 255, 255, 0.75)";
+        } else if (isPast) {
+          d.style.transform = "scale(0.82)";
+          d.style.opacity = "0.28";
+          d.style.boxShadow = "none";
+        } else {
+          d.style.transform = "scale(0.82)";
+          d.style.opacity = "0.22";
+          d.style.boxShadow = "none";
         }
       });
       return;
@@ -385,7 +413,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       style={{
         y,
         fontSize,
-        padding: sb ? "0.38em 0.4em" : isMobile ? "0.32em 0.25em" : "0.35em 0.5em",
+        padding: isFullscreen ? "0.44em 0.5em" : sb ? "0.38em 0.4em" : isMobile ? "0.32em 0.25em" : "0.35em 0.5em",
         willChange: inWindow ? "transform" : undefined,
       }}
       onClick={onClick}
@@ -403,9 +431,9 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         )}
         style={{
           fontFamily: '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif',
-          lineHeight: sb ? 1.28 : 1.26,
+          lineHeight: isFullscreen ? 1.24 : sb ? 1.28 : 1.26,
           fontWeight: 800,
-          letterSpacing: sb ? "-0.015em" : "-0.01em",
+          letterSpacing: isFullscreen ? "-0.02em" : sb ? "-0.015em" : "-0.01em",
           opacity: dp.o,
           filter: dp.b > 0 ? `blur(${dp.b}px)` : "none",
           transform: `scale(${dp.s}) translateZ(0)`,
@@ -415,7 +443,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
         }}
       >
         {interlude ? (
-          <div className={cn("flex items-center justify-start py-[0.35em] pl-1", sb ? "gap-[0.55em]" : "gap-[0.65em]")}>
+          <div className={cn("flex items-center justify-start py-[0.42em] pl-1", sb ? "gap-[0.65em]" : "gap-[0.75em]")}>
             {[0, 1, 2].map((i) => (
               <span
                 key={i}
@@ -423,9 +451,8 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
                   dotEls.current[i] = el;
                 }}
                 className={cn(
-                  "ly-dot block rounded-full transition-shadow duration-300",
-                  sb ? "h-[0.4em] w-[0.4em]" : "h-[0.45em] w-[0.45em]",
-                  isCurrent && "shadow-[0_0_10px_rgba(255,255,255,0.8)]"
+                  "ly-dot block rounded-full",
+                  sb ? "h-[0.48em] w-[0.48em]" : "h-[0.52em] w-[0.52em]"
                 )}
               />
             ))}

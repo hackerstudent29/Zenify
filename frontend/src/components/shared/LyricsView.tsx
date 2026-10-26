@@ -348,8 +348,8 @@ export function LyricsView({
   const activeRef = React.useRef(activeIndex);
 
   const [containerHeight, setContainerHeight] = React.useState(360);
-  // sidebar: active line sits a little lower than before so the line above it can breathe
-  const ratio = isFullscreen ? 0.38 : isSidebar ? 0.22 : isMobile ? (isIdle ? 0.42 : 0.3) : 0.35;
+  // sidebar: active line sits slightly above center (0.38) with headroom for previous lines
+  const ratio = isFullscreen ? 0.38 : isSidebar ? 0.38 : isMobile ? (isIdle ? 0.42 : 0.3) : 0.36;
   const ratioRef = React.useRef(ratio);
   ratioRef.current = ratio;
 
@@ -741,7 +741,7 @@ export function LyricsView({
           onTouchCancel={onTouchEnd}
         >
           <style dangerouslySetInnerHTML={{ __html: ".scrollbar-none::-webkit-scrollbar{display:none!important}" }} />
-          <div className={cn("relative flex w-full flex-col items-start text-left", isFullscreen ? "mx-auto max-w-5xl px-8" : isSidebar ? "px-3.5" : isMobile ? "px-4" : "px-6")}>
+          <div className={cn("relative flex w-full flex-col items-start text-left", isFullscreen ? "w-full max-w-3xl px-4 lg:px-6" : isSidebar ? "px-3.5" : isMobile ? "px-4" : "px-6")}>
             <div className="w-full shrink-0" style={{ height: topSpacer }} />
 
             {processedLines.map((line: any, idx: number) => {
