@@ -81,8 +81,10 @@ export class CleanCdnAudioService {
             else if (rawQueryStr.includes('punjabi') || rawQueryStr.includes('(pa)')) detectedLang = 'punjabi';
 
             let opts: CleanAudioOptions;
+            let rawQueryInput = '';
             if (typeof queryOrOpts === 'string') {
                 if (!queryOrOpts || typeof queryOrOpts !== 'string') return null;
+                rawQueryInput = queryOrOpts;
                 const cleanInput = queryOrOpts
                     .replace(/^ytsearch[0-9]*:/, '')
                     .replace(/https?:\/\/[^\s]+/g, '')
@@ -102,6 +104,7 @@ export class CleanCdnAudioService {
                 }
             } else {
                 opts = queryOrOpts;
+                rawQueryInput = `${opts.title || ''} ${opts.album || ''}`;
             }
             if (!opts.language && detectedLang) {
                 opts.language = detectedLang;
@@ -127,8 +130,15 @@ export class CleanCdnAudioService {
                 .replace(/\s+/g, ' ')
                 .trim();
 
-            const langSuffix = opts.language && !cleanT.includes(opts.language.toLowerCase()) ? ` ${opts.language}` : '';
-            const searchQuery = (cleanA ? `${cleanA} ${cleanT}${langSuffix}` : `${cleanT}${langSuffix}`).slice(0, 120).trim();
+            const cdnHeaders = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://www.jiosaavn.com/'
+            };
+
+            // Search with natural title + artist first (appending language artificially breaks searches for instrumentals/English titles)
+            const searchQuery = (cleanA ? `${cleanA} ${cleanT}` : cleanT).slice(0, 120).trim();
             console.log(`[CleanCdnAudio] Searching CDN candidate for: "${searchQuery}" (Req Lang: ${opts.language || 'any'}, Artist: ${cleanA || 'any'})`);
 
             // 1. Fetch Candidates via Search API and Autocomplete
@@ -141,10 +151,10 @@ export class CleanCdnAudioService {
                         _marker: '0',
                         ctx: 'web6dot0',
                         p: '1',
-                        n: '10'
+                        n: '15'
                     },
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
-                    timeout: 3500
+                    headers: cdnHeaders,
+                    timeout: 4000
                 }).catch(() => null),
                 axios.get('https://www.jiosaavn.com/api.php', {
                     params: {
@@ -154,8 +164,8 @@ export class CleanCdnAudioService {
                         _marker: '0',
                         ctx: 'web6dot0'
                     },
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
-                    timeout: 3000
+                    headers: cdnHeaders,
+                    timeout: 3500
                 }).catch(() => null)
             ]);
 
@@ -180,6 +190,32 @@ export class CleanCdnAudioService {
                 }
             }
 
+            // Fallback search with language suffix only if zero candidates were found
+            if (candidates.length === 0 && opts.language && !cleanT.includes(opts.language.toLowerCase())) {
+                const langQuery = `${searchQuery} ${opts.language}`.slice(0, 120).trim();
+                const langRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'search.getResults',
+                        q: langQuery,
+                        _format: 'json',
+                        _marker: '0',
+                        ctx: 'web6dot0',
+                        p: '1',
+                        n: '10'
+                    },
+                    headers: cdnHeaders,
+                    timeout: 3500
+                }).catch(() => null);
+                if (langRes?.data?.results && Array.isArray(langRes.data.results)) {
+                    for (const r of langRes.data.results) {
+                        if (r && (r.id || r.perma_url) && !seenIds.has(r.id || r.perma_url)) {
+                            seenIds.add(r.id || r.perma_url);
+                            candidates.push(r);
+                        }
+                    }
+                }
+            }
+
             if (candidates.length === 0) {
                 console.log(`[CleanCdnAudio] Zero CDN candidates found for: "${searchQuery}"`);
                 return null;
@@ -199,7 +235,9 @@ export class CleanCdnAudioService {
                 let hasRejectTerm = false;
                 for (const term of CDN_HARD_REJECT_TERMS) {
                     // If target requested title/album explicitly contains this term, allow it (e.g., official instrumental/acoustic tracks)
-                    const isTargetRequestingTerm = rawTitle.toLowerCase().includes(term) || (opts.album && opts.album.toLowerCase().includes(term));
+                    const isTargetRequestingTerm = rawTitle.toLowerCase().includes(term) || 
+                                                  (opts.album && opts.album.toLowerCase().includes(term)) ||
+                                                  rawQueryInput.toLowerCase().includes(term);
                     if (!isTargetRequestingTerm && (candTitleLower.includes(term) || candAlbum.includes(term) || candDesc.includes(term))) {
                         hasRejectTerm = true;
                         break;
@@ -212,7 +250,8 @@ export class CleanCdnAudioService {
                 // Protocol Check 2: Language Matching
                 if (opts.language) {
                     const reqLang = opts.language.toLowerCase().trim();
-                    if (candLang && candLang !== reqLang && candLang !== 'unknown') {
+                    const isInst = candTitleLower.includes('instrumental') || rawTitle.toLowerCase().includes('instrumental') || rawQueryInput.toLowerCase().includes('instrumental');
+                    if (candLang && candLang !== reqLang && candLang !== 'unknown' && candLang !== '' && !isInst) {
                         continue; // Skip conflicting language
                     }
                 }
