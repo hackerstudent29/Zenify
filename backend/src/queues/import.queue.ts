@@ -295,6 +295,18 @@ export async function processFinalizeStage(data: ImportJobData & { streamTarget:
   let tempTranscodedPath: string | null = null;
 
   try {
+    const isDirectStream = streamTarget.includes('saavncdn.com') || streamTarget.includes('/stream-youtube') || streamTarget.includes('stream-youtube') || streamTarget.includes('r2.dev');
+    if (isDirectStream) {
+      console.log(`[FinalizeWorker] Track "${title}" uses direct stream (${streamTarget.slice(0, 50)}). Skipping audio download/R2 upload.`);
+      trackProgressEmitter.emit('progress', {
+        trackId,
+        stage: 'finalized',
+        audioUrl: streamTarget,
+        timings: { finalizeMs: Date.now() - startTime }
+      } as ProgressEvent);
+      return;
+    }
+
     if (streamTarget.startsWith('http://') || streamTarget.startsWith('https://')) {
       const isAppleSnippet = streamTarget.includes('audio-ssl') || streamTarget.includes('mzstatic') || streamTarget.includes('itunes.apple.com') || streamTarget.includes('apple.com');
       if (isAppleSnippet) {

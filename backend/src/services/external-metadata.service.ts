@@ -1524,10 +1524,15 @@ export class ExternalMetadataService {
                 duration: targetDuration
             });
             if (cleanCdn?.url) {
-                console.log(`[SmartAudio] Clean 320kbps CDN resolved before intake for "${title}": ${cleanCdn.url.slice(0, 70)}...`);
-                if (options.preview) {
-                    return { url: cleanCdn.url, duration: cleanCdn.duration || targetDuration || 180, sourceType: 'clean_cdn_direct', watchUrl: undefined };
-                }
+                console.log(`[SmartAudio] Clean 320kbps CDN direct stream resolved for "${title}": ${cleanCdn.url.slice(0, 70)}...`);
+                const directResult = {
+                    url: cleanCdn.url,
+                    duration: cleanCdn.duration || targetDuration || 180,
+                    sourceType: 'clean_cdn_direct',
+                    watchUrl: undefined
+                };
+                audioSearchCache.set(cacheKey, { ...directResult, expires: Date.now() + CACHE_TTL });
+                return directResult;
             }
         } catch (cdnErr: any) {
             console.warn(`[SmartAudio] Clean CDN resolution skipped: ${cdnErr.message}`);
@@ -1884,36 +1889,17 @@ export class ExternalMetadataService {
                         duration: targetDuration || best.duration
                     });
                     if (cleanCdn?.url) {
-                        console.log(`[SmartAudio] Clean 320kbps CDN resolved for intake: ${cleanCdn.url.slice(0, 70)}...`);
-                        if (options.preview) {
-                            return { url: cleanCdn.url, duration: cleanCdn.duration || best.duration, sourceType: 'clean_cdn_direct', watchUrl: videoUrl };
-                        }
-                        const dest = `${fileStem}.mp4`;
-                        await ExternalMetadataService.downloadFile(cleanCdn.url, dest);
-                        if (fs.existsSync(dest)) {
-                            const buffer = fs.readFileSync(dest);
-                            const fileKey = `zenify/smart_imports/${fileId}.mp4`;
-                            const publicUrl = await uploadToR2(fileKey, buffer, 'audio/mp4');
-                            fs.unlinkSync(dest);
-                            return { url: publicUrl, duration: cleanCdn.duration || best.duration, sourceType: 'clean_cdn_direct', watchUrl: videoUrl };
-                        }
+                        console.log(`[SmartAudio] Clean 320kbps CDN direct stream resolved for intake: ${cleanCdn.url.slice(0, 70)}...`);
+                        return { url: cleanCdn.url, duration: cleanCdn.duration || best.duration, sourceType: 'clean_cdn_direct', watchUrl: videoUrl };
                     }
                 } catch (cleanCdnErr: any) {
                     console.warn(`[SmartAudio] Clean CDN intake skipped:`, cleanCdnErr.message);
                 }
                 
-                console.log("[SmartAudio] Downloading audio with fallback support...");
-                await ExternalMetadataService.execYtDlp(`-f "ba[ext=m4a]/ba" --no-playlist --quiet`, videoUrl, fileStem);
-                
-                const actualFile = findActualFile(fileStem);
-                if (actualFile) {
-                    const buffer = fs.readFileSync(actualFile);
-                    const fileKey = `zenify/smart_imports/${fileId}${path.extname(actualFile)}`;
-                    const publicUrl = await uploadToR2(fileKey, buffer, path.extname(actualFile) === '.mp3' ? 'audio/mpeg' : 'audio/mp4');
-                    fs.unlinkSync(actualFile);
-                    return { url: publicUrl, duration: best.duration, sourceType, watchUrl: videoUrl };
-                }
-                throw new Error("File extraction failed");
+                // Direct streaming via stream proxy URL (no physical file download)
+                const streamProxyUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(videoUrl)}`;
+                console.log(`[SmartAudio] Using direct stream proxy for intake: ${streamProxyUrl}`);
+                return { url: streamProxyUrl, duration: best.duration, sourceType: 'stream_proxy', watchUrl: videoUrl };
             })();
 
             const finalResult = await result;

@@ -1457,6 +1457,8 @@ export class TrackService {
             audioUrl.includes('googlevideo.com') ||
             audioUrl.includes('cobalt') ||
             audioUrl.includes('/tunnel') ||
+            audioUrl.includes('saavncdn.com') ||
+            audioUrl.includes('/stream') ||
             !audioUrl.startsWith('http')
         ));
 
@@ -1473,7 +1475,8 @@ export class TrackService {
         }
 
         let finalAudioUrl = audioUrl;
-        if (finalAudioUrl && !isExternalSource && !isApplePreview) {
+        // Direct streaming: Never download or upload direct CDN streams to R2
+        if (finalAudioUrl && !isExternalSource && !isApplePreview && !finalAudioUrl.includes('saavncdn.com')) {
             finalAudioUrl = await uploadUrlToR2(finalAudioUrl, 'zenify/tracks').catch(() => null) || finalAudioUrl;
         }
 
@@ -1533,7 +1536,8 @@ export class TrackService {
                 });
             }
 
-            const needsFullIntake = isExternalSource || !updated.audioUrl || isApplePreview || updated.audioUrl.includes('itunes.apple.com') || updated.audioUrl.includes('audio-ssl');
+            const isCdnStream = !!(updated.audioUrl && (updated.audioUrl.includes('saavncdn.com') || updated.audioUrl.includes('/stream')));
+            const needsFullIntake = !isCdnStream && (isExternalSource || !updated.audioUrl || isApplePreview || updated.audioUrl.includes('itunes.apple.com') || updated.audioUrl.includes('audio-ssl'));
             if (needsFullIntake) {
                 await enqueueImport({
                     trackId: updated.id,
@@ -1577,7 +1581,8 @@ export class TrackService {
             include: { artist: true, album: true }
         });
 
-        const needsFullIntake = isExternalSource || !newTrack.audioUrl || isApplePreview || newTrack.audioUrl.includes('itunes.apple.com') || newTrack.audioUrl.includes('audio-ssl');
+        const isNewCdnStream = !!(newTrack.audioUrl && (newTrack.audioUrl.includes('saavncdn.com') || newTrack.audioUrl.includes('/stream')));
+        const needsFullIntake = !isNewCdnStream && (isExternalSource || !newTrack.audioUrl || isApplePreview || newTrack.audioUrl.includes('itunes.apple.com') || newTrack.audioUrl.includes('audio-ssl'));
         if (needsFullIntake) {
             await enqueueImport({
                 trackId: newTrack.id,
