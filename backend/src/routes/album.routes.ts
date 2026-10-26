@@ -259,10 +259,10 @@ export async function albumRoutes(server: FastifyInstance) {
                         let songArt = s.image || artwork;
                         songArt = songArt.replace('150x150', '500x500').replace('50x50', '500x500');
 
-                        const encMediaUrl = s.more_info?.encrypted_media_url || s.encrypted_media_url;
+                        const encMediaUrl = s.encrypted_media_url || s.more_info?.encrypted_media_url;
                         let directAudioUrl = '';
                         if (encMediaUrl) {
-                            directAudioUrl = CleanCdnAudioService.decryptSaavnMediaUrl(encMediaUrl, '160') || '';
+                            directAudioUrl = CleanCdnAudioService.decryptSaavnMediaUrl(encMediaUrl, '320') || CleanCdnAudioService.decryptSaavnMediaUrl(encMediaUrl, '160') || '';
                         }
                         const finalAudioUrl = directAudioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanT}`)}&title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}`;
 
@@ -336,6 +336,112 @@ export async function albumRoutes(server: FastifyInstance) {
                     const artwork = collection.artworkUrl100 ? collection.artworkUrl100.replace('100x100bb', '1000x1000bb') : '';
                     const artistName = collection.artistName || 'Unknown Artist';
                     const cleanMainArtist = cleanArtistNames(artistName);
+
+                    // 1.1 Seamless Redirect: Look up this album in JioSaavn catalog first for high-fidelity 320kbps full songs
+                    try {
+                        const cleanAlbName = (collection.collectionName || '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
+                        const saavnQuery = `${cleanAlbName} ${cleanMainArtist}`.trim();
+                        const saavnSearchRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                            params: {
+                                __call: 'search.getAlbumResults',
+                                q: saavnQuery,
+                                _format: 'json',
+                                _marker: '0',
+                                api_version: '4',
+                                ctx: 'web6dot0',
+                                n: 5,
+                                p: 1
+                            },
+                            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+                            timeout: 3500
+                        }).catch(() => null);
+
+                        const candidates = saavnSearchRes?.data?.results || [];
+                        const matchedSaavnAlbum = candidates.find((cand: any) => {
+                            const candTitle = (cand.title || cand.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                            const targetTitle = cleanAlbName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            return candTitle.includes(targetTitle) || targetTitle.includes(candTitle);
+                        }) || candidates[0];
+
+                        if (matchedSaavnAlbum?.id) {
+                            const albDetRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                                params: {
+                                    __call: 'content.getAlbumDetails',
+                                    _format: 'json',
+                                    albumid: matchedSaavnAlbum.id
+                                },
+                                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+                                timeout: 4500
+                            }).catch(() => null);
+
+                            if (albDetRes?.data && (albDetRes.data.list || albDetRes.data.songs)) {
+                                const albData = albDetRes.data;
+                                const albTitle = albData.title || albData.name || collection.collectionName;
+                                let albCover = albData.image || artwork;
+                                albCover = albCover.replace('150x150', '500x500').replace('50x50', '500x500');
+                                const songsList = albData.list || albData.songs || [];
+
+                                const saavnTracks = songsList.map((s: any, idx: number) => {
+                                    const cleanT = (s.song || s.title || `Track ${idx + 1}`).trim();
+                                    const trackArtist = cleanArtistNames(s.singers || s.primary_artists, cleanMainArtist);
+                                    const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
+                                    let songArt = s.image || albCover;
+                                    songArt = songArt.replace('150x150', '500x500').replace('50x50', '500x500');
+
+                                    const encMediaUrl = s.encrypted_media_url || s.more_info?.encrypted_media_url;
+                                    let directAudioUrl = '';
+                                    if (encMediaUrl) {
+                                        directAudioUrl = CleanCdnAudioService.decryptSaavnMediaUrl(encMediaUrl, '320') || CleanCdnAudioService.decryptSaavnMediaUrl(encMediaUrl, '160') || '';
+                                    }
+                                    const finalAudioUrl = directAudioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanT}`)}&title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}&trackId=saavn-${s.id}`;
+
+                                    return {
+                                        id: `saavn-${s.id}`,
+                                        title: cleanT,
+                                        duration: dur,
+                                        trackNumber: idx + 1,
+                                        coverUrl: songArt,
+                                        audioUrl: finalAudioUrl,
+                                        artistId: `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                                        artist: {
+                                            id: `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                                            name: trackArtist,
+                                            imageUrl: songArt
+                                        },
+                                        album: {
+                                            id: decodedId,
+                                            title: albTitle,
+                                            coverUrl: albCover
+                                        },
+                                        genre: albData.language ? `${albData.language.charAt(0).toUpperCase() + albData.language.slice(1)} Soundtrack` : (collection.primaryGenreName || 'Soundtrack'),
+                                        isVirtual: true,
+                                        streams: 0,
+                                        like_count: 0
+                                    };
+                                });
+
+                                if (saavnTracks.length > 0) {
+                                    console.log(`[AlbumRoute] Seamlessly redirected itunes album ${collectionId} to JioSaavn album ${matchedSaavnAlbum.id} ("${albTitle}") with ${saavnTracks.length} high-fidelity tracks!`);
+                                    return {
+                                        id: decodedId,
+                                        title: albTitle,
+                                        coverUrl: albCover,
+                                        releaseDate: albData.release_date ? new Date(albData.release_date) : (albData.year ? new Date(`${albData.year}-01-01`) : new Date()),
+                                        createdAt: albData.release_date ? new Date(albData.release_date) : new Date(),
+                                        genre: albData.language ? `${albData.language.charAt(0).toUpperCase() + albData.language.slice(1)} Soundtrack` : (collection.primaryGenreName || 'Soundtrack'),
+                                        artist: {
+                                            id: `artist-${encodeURIComponent(cleanMainArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                                            name: cleanMainArtist,
+                                            imageUrl: albCover
+                                        },
+                                        tracks: saavnTracks
+                                    };
+                                }
+                            }
+                        }
+                    } catch (saavnRedirectErr: any) {
+                        console.warn(`[AlbumRoute] Failed to redirect itunes album to JioSaavn: ${saavnRedirectErr.message}`);
+                    }
 
                     let dbArtist = await prisma.artist.findFirst({
                         where: { name: { equals: artistName, mode: 'insensitive' } }

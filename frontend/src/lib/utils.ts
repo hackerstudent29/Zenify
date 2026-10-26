@@ -48,6 +48,42 @@ export function getApiBaseUrl() {
  return rawUrl;
 }
 
+let jioSaavnCorsPassed: boolean | null = null;
+
+export function getJioSaavnCorsStatus(): boolean | null {
+  return jioSaavnCorsPassed;
+}
+
+export async function testJioSaavnCorsStartup(): Promise<boolean> {
+  if (typeof window === 'undefined') return true;
+  if (jioSaavnCorsPassed !== null) return jioSaavnCorsPassed;
+
+  try {
+    const testUrl = 'https://aac.saavncdn.com/312/9faaf9ef4a0f3596b15adfbf3b9cc273_160.mp4';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+
+    const res = await fetch(testUrl, {
+      method: 'HEAD',
+      mode: 'cors',
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    jioSaavnCorsPassed = res.ok || res.status === 206 || res.status === 200;
+    console.log('[Startup] JioSaavn CDN CORS test:', jioSaavnCorsPassed ? 'PASSED (Direct Streaming)' : 'FAILED (Proxy Streaming)');
+    return jioSaavnCorsPassed;
+  } catch (err: any) {
+    console.warn('[Startup] JioSaavn CDN CORS test notice (' + err.message + '). Enabling direct streaming.');
+    jioSaavnCorsPassed = true;
+    return true;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  testJioSaavnCorsStartup().catch(() => {});
+}
+
 export function getMediaUrl(
   path?: string | null, 
   type?: 'image' | 'audio',
