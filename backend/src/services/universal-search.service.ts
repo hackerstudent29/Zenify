@@ -25,19 +25,32 @@ export interface UniversalTrackItem {
   isImported: boolean;
   source: 'zenify' | 'jiosaavn' | 'itunes' | 'youtube' | 'spotify';
   score: number;
+  streams?: number;
+  playCount?: number;
+  year?: number;
 }
 
 const memoryCache = new Map<string, { data: any; expiresAt: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-function cleanEntity(str: string): string {
+export function cleanEntity(str: string): string {
   if (!str) return '';
   return str
     .replace(/&quot;/g, '"')
     .replace(/&#039;/g, "'")
+    .replace(/&#39;/g, "'")
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&copy;/g, '')
+    .trim();
+}
+
+export function getBaseTitle(title: string): string {
+  return (title || '')
+    .replace(/\(.*?\)|\[.*?\]/g, '')
+    .split(/[-–—]/)[0]
     .trim();
 }
 
@@ -116,31 +129,50 @@ export function cleanArtistNames(rawArtist: string, rawMusicDirector?: string): 
   return finalNames.length > 0 ? finalNames.join(', ') : (cleaned || 'Unknown Artist');
 }
 
-function scoreTrack(title: string, artist: string, query: string, source: string, album?: string): number {
+export function scoreTrack(
+  title: string,
+  artist: string,
+  query: string,
+  source: string,
+  album?: string,
+  playCount = 0,
+  year = 0
+): number {
   const t = (title || '').toLowerCase().trim();
+  const baseT = getBaseTitle(t).toLowerCase().trim();
   const a = (artist || '').toLowerCase().trim();
   const q = query.toLowerCase().trim();
   let score = 0;
 
-  if (t === q) score += 250;
-  else if (t.startsWith(q)) score += 180;
-  else if (t.includes(q)) score += 90;
+  if (t === q || baseT === q) score += 270;
+  else if (t.startsWith(q) || baseT.startsWith(q)) score += 200;
+  else if (t.includes(q)) score += 110;
 
-  if (a === q) score += 150;
-  else if (a.startsWith(q)) score += 100;
-  else if (a.includes(q)) score += 60;
+  if (a === q) score += 170;
+  else if (a.startsWith(q)) score += 120;
+  else if (a.includes(q)) score += 75;
 
   // Major boost if track's album/movie matches query (e.g. 'Hukum' or 'Kaavaalaa' in album 'Jailer')
   if (album) {
     const albLower = album.toLowerCase().trim();
-    if (albLower === q || albLower === `${q} (original motion picture soundtrack)`) score += 280;
-    else if (albLower.startsWith(q) || q.startsWith(albLower)) score += 220;
-    else if (albLower.includes(q)) score += 140;
+    if (albLower === q || albLower === `${q} (original motion picture soundtrack)`) score += 290;
+    else if (albLower.startsWith(q) || q.startsWith(albLower)) score += 230;
+    else if (albLower.includes(q)) score += 150;
   }
 
+  // Popularity bonus from real streaming play count
+  if (playCount > 0) {
+    score += Math.min(180, Math.round(Math.log10(playCount + 1) * 22));
+  }
+
+  // Recency bonus for latest releases
+  if (year >= 2025) score += 40;
+  else if (year >= 2024) score += 30;
+  else if (year >= 2022) score += 15;
+
   // Source preference boosts
-  if (source === 'zenify') score += 50; // Verified local track
-  else if (source === 'jiosaavn') score += 160; // Primary source: instant 320kbps Akamai CDN stream
+  if (source === 'zenify') score += 60; // Verified local track
+  else if (source === 'jiosaavn') score += 180; // Primary source: instant 320kbps Akamai CDN stream
   else if (source === 'itunes') score += 20;
 
   // Strict Sequel / Part matching:
@@ -162,10 +194,10 @@ function scoreTrack(title: string, artist: string, query: string, source: string
 
   // Penalize karaoke / instrumental / cover unless user explicitly typed it or it's an authentic theme/bgm/ost
   const isThemeOrBgm = /\b(theme|bgm|score|soundtrack|ost)\b/i.test(t);
-  const isDerivative = /\b(karaoke|instrumental|acoustic|cover|backing track|tribute|remix|lofi)\b/i.test(t);
-  const wantsDerivative = /\b(karaoke|instrumental|acoustic|cover|backing track|tribute|remix|lofi|theme|bgm|score|soundtrack|ost)\b/i.test(q);
+  const isDerivative = /\b(karaoke|instrumental|acoustic|cover|covers|backing track|tribute|remix|lofi|slowed|reverb)\b/i.test(`${t} ${a} ${album ? album.toLowerCase() : ''}`);
+  const wantsDerivative = /\b(karaoke|instrumental|acoustic|cover|covers|backing track|tribute|remix|lofi|theme|bgm|score|soundtrack|ost)\b/i.test(q);
   if (isDerivative && !wantsDerivative && !isThemeOrBgm) {
-    score -= 120;
+    score -= 200;
   }
 
   return score;
@@ -296,11 +328,14 @@ export class UniversalSearchService {
           const album = cleanEntity(s.album || s.more_info?.album || 'Single');
           if (!title || !artist) continue;
 
+          const playCount = parseInt(s.play_count || s.more_info?.play_count || '0', 10);
+          const year = parseInt(s.year || s.more_info?.year || s.release_date?.slice(0, 4) || '0', 10);
+
           const key = dedupeKey(title, artist);
           let cover = s.image || s.more_info?.image || '';
           cover = cover.replace('150x150', '500x500').replace('50x50', '500x500');
           const candLang = (s.language || s.more_info?.language || '').toLowerCase().trim();
-          let score = scoreTrack(title, artist, cleanQ, 'jiosaavn', album);
+          let score = scoreTrack(title, artist, cleanQ, 'jiosaavn', album, playCount, year);
           const preferredLang = (options.language || '').toLowerCase().trim();
           if (preferredLang) {
             if (candLang === preferredLang) score += 200;
@@ -309,22 +344,28 @@ export class UniversalSearchService {
 
           const existing = resultMap.get(key);
           if (existing) {
-            const existingLang = ((existing as any).language || '').toLowerCase().trim();
-            if (preferredLang && candLang === preferredLang && existingLang !== preferredLang) {
-              existing.coverUrl = cover;
-              existing.artworkUrl100 = cover;
-              existing.collectionName = album;
-              existing.albumOfTrack.name = album;
-              existing.albumOfTrack.coverArt.sources = [{ url: cover, width: 500 }];
-              (existing as any).language = candLang;
-              (existing as any).id = `saavn-${s.id}`;
-            }
-            if (!existing.coverUrl && cover) {
-              existing.coverUrl = cover;
-              existing.artworkUrl100 = cover;
+            if (score > (existing.score || 0)) {
+              existing.score = score;
+              existing.playCount = playCount;
+              existing.streams = playCount || 2500000;
+              existing.year = year;
+              if (cover) {
+                existing.coverUrl = cover;
+                existing.artworkUrl100 = cover;
+              }
+              if (s.id) {
+                (existing as any).id = `saavn-${s.id}`;
+                const encMedia = s.encrypted_media_url || s.more_info?.encrypted_media_url;
+                if (encMedia) {
+                  existing.audioUrl = CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '320') || CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '160') || existing.audioUrl;
+                }
+              }
             }
             continue;
           }
+
+          const encMedia = s.encrypted_media_url || s.more_info?.encrypted_media_url;
+          const directAudio = encMedia ? (CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '320') || CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '160') || undefined) : undefined;
 
           resultMap.set(key, {
             id: `saavn-${s.id}`,
@@ -342,11 +383,14 @@ export class UniversalSearchService {
             duration: { totalMilliseconds: dur * 1000 },
             duration_ms: dur * 1000,
             trackTimeMillis: dur * 1000,
-            audioUrl: (s.encrypted_media_url || s.more_info?.encrypted_media_url) ? (CleanCdnAudioService.decryptSaavnMediaUrl(s.encrypted_media_url || s.more_info?.encrypted_media_url) || undefined) : undefined,
+            audioUrl: directAudio,
             isZenify: false,
             isImported: false,
             source: 'jiosaavn',
-            score
+            score,
+            playCount,
+            streams: playCount || 2500000,
+            year
           });
         }
       } catch (err: any) {
@@ -522,12 +566,13 @@ export class UniversalSearchService {
     const [tracks, externalArtistsSettled, externalAlbumsSettled, externalPlaylistsSettled] = await Promise.all([
       this.searchTracks(cleanQ, { country: storefront, limit }),
       Promise.allSettled([
-        // 1. iTunes Artist Lookup
-        axios.get('https://itunes.apple.com/search', {
-          params: { term: cleanQ, entity: 'musicArtist', country: storefront, limit: 6 },
+        // 1. JioSaavn Primary Artist Search (Authentic portraits, real official names, CTR popularity)
+        axios.get('https://www.jiosaavn.com/api.php', {
+          params: { __call: 'search.getArtistResults', q: cleanQ, p: 1, n: 10, _format: 'json', ctx: 'web6dot0' },
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
           timeout: 2800
         }).then(r => r.data?.results || []).catch(() => []),
-        // 2. JioSaavn Artist Auto-Suggest
+        // 2. JioSaavn Artist Auto-Suggest & Top Query
         axios.get('https://www.jiosaavn.com/api.php', {
           params: { __call: 'autocomplete.get', query: cleanQ, _format: 'json', ctx: 'web6dot0' },
           headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
@@ -535,18 +580,23 @@ export class UniversalSearchService {
         }).then(r => [
           ...(r.data?.topquery?.data?.filter((x: any) => x.type === 'artist') || []),
           ...(r.data?.artists?.data || [])
-        ]).catch(() => [])
+        ]).catch(() => []),
+        // 3. iTunes Artist Lookup (Fallback for Western indie)
+        axios.get('https://itunes.apple.com/search', {
+          params: { term: cleanQ, entity: 'musicArtist', country: storefront, limit: 6 },
+          timeout: 2800
+        }).then(r => r.data?.results || []).catch(() => [])
       ]),
       Promise.allSettled([
-        // 1. iTunes Album Search
-        axios.get('https://itunes.apple.com/search', {
-          params: { term: cleanQ, entity: 'album', country: storefront, limit: 10 },
+        // 1. JioSaavn Album Search (Authentic regional posters & multi-language versions)
+        axios.get('https://www.jiosaavn.com/api.php', {
+          params: { __call: 'search.getAlbumResults', q: cleanQ, p: 1, n: 12, _format: 'json', ctx: 'web6dot0' },
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
           timeout: 2800
         }).then(r => r.data?.results || []).catch(() => []),
-        // 2. JioSaavn Album Search (Authentic regional posters & multi-language versions)
-        axios.get('https://www.jiosaavn.com/api.php', {
-          params: { __call: 'search.getAlbumResults', q: cleanQ, p: 1, n: 10, _format: 'json', ctx: 'web6dot0' },
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        // 2. iTunes Album Search
+        axios.get('https://itunes.apple.com/search', {
+          params: { term: cleanQ, entity: 'album', country: storefront, limit: 10 },
           timeout: 2800
         }).then(r => r.data?.results || []).catch(() => [])
       ]),
@@ -564,9 +614,32 @@ export class UniversalSearchService {
     const artistsMap = new Map<string, CatalogArtist>();
     const albumsMap = new Map<string, CatalogAlbum>();
 
-    // 1. Ingest dedicated artists first (Highest quality artist entities)
-    const itunesArtists = externalArtistsSettled[0].status === 'fulfilled' ? externalArtistsSettled[0].value : [];
-    const saavnArtists = externalArtistsSettled[1].status === 'fulfilled' ? externalArtistsSettled[1].value : [];
+    // 1. Ingest dedicated artists (JioSaavn artists FIRST with authentic 500x500 portraits and CTR)
+    const saavnArtistResults = externalArtistsSettled[0].status === 'fulfilled' ? externalArtistsSettled[0].value : [];
+    const saavnAutoArtists = externalArtistsSettled[1].status === 'fulfilled' ? externalArtistsSettled[1].value : [];
+    const itunesArtists = externalArtistsSettled[2].status === 'fulfilled' ? externalArtistsSettled[2].value : [];
+
+    for (const a of [...saavnArtistResults, ...saavnAutoArtists]) {
+      const name = cleanEntity(a.name || a.title);
+      const norm = name.toLowerCase().trim();
+      if (!norm) continue;
+      let img = (a.image || '').replace('50x50', '500x500').replace('150x150', '500x500');
+      if (img.includes('artist-default')) img = '';
+      const ctr = parseInt(a.ctr || '0', 10);
+
+      if (!artistsMap.has(norm)) {
+        artistsMap.set(norm, {
+          id: `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
+          source: 'jiosaavn',
+          sourceId: String(a.id || norm),
+          name,
+          imageUrl: img || undefined,
+          follower_count: ctr
+        });
+      } else if (img && !artistsMap.get(norm)!.imageUrl) {
+        artistsMap.get(norm)!.imageUrl = img;
+      }
+    }
 
     for (const a of itunesArtists) {
       const name = cleanEntity(a.artistName);
@@ -581,31 +654,37 @@ export class UniversalSearchService {
       });
     }
 
-    for (const a of saavnArtists) {
-      const name = cleanEntity(a.title || a.name);
-      const norm = name.toLowerCase().trim();
-      if (!norm) continue;
-      let img = (a.image || '').replace('50x50', '500x500').replace('150x150', '500x500');
-      if (img.includes('artist-default')) img = '';
+    // 2. Ingest dedicated albums (JioSaavn albums FIRST with authentic high-res covers and saavn-album- IDs)
+    const saavnAlbums = externalAlbumsSettled[0].status === 'fulfilled' ? externalAlbumsSettled[0].value : [];
+    const itunesAlbums = externalAlbumsSettled[1].status === 'fulfilled' ? externalAlbumsSettled[1].value : [];
 
-      if (artistsMap.has(norm)) {
-        if (img && !artistsMap.get(norm)!.imageUrl) {
-          artistsMap.get(norm)!.imageUrl = img;
-        }
-      } else {
-        artistsMap.set(norm, {
-          id: `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
-          source: 'jiosaavn' as any,
-          sourceId: String(a.id || norm),
-          name,
-          imageUrl: img || undefined
-        });
-      }
+    for (const alb of saavnAlbums) {
+      const title = cleanEntity(alb.title || alb.name);
+      const rawMusic = cleanEntity(alb.music);
+      const rawSingers = cleanEntity(alb.primary_artists || alb.more_info?.primary_artists);
+      const artistName = cleanArtistNames(rawSingers, rawMusic);
+      const albId = alb.albumid || alb.id;
+      const normKey = `${title.toLowerCase().trim()}::${alb.language || ''}::${albId || ''}`;
+      if (!title || albumsMap.has(normKey)) continue;
+
+      let art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+      albumsMap.set(normKey, {
+        id: `saavn-album-${albId}`,
+        source: 'jiosaavn',
+        sourceId: String(albId),
+        title: alb.language ? `${title} (${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)})` : title,
+        artist: {
+          id: `artist-${encodeURIComponent(artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+          name: artistName,
+          imageUrl: art
+        },
+        coverUrl: art,
+        genre: alb.language ? `${alb.language} Soundtrack` : 'Soundtrack',
+        releaseDate: alb.year ? `${alb.year}-01-01` : undefined,
+        year: alb.year || undefined,
+        trackCount: parseInt(alb.more_info?.song_pids ? alb.more_info.song_pids.split(',').length : 1, 10) || 1
+      });
     }
-
-    // 2. Ingest dedicated albums (Multi-language and sequels preserved!)
-    const itunesAlbums = externalAlbumsSettled[0].status === 'fulfilled' ? externalAlbumsSettled[0].value : [];
-    const saavnAlbums = externalAlbumsSettled[1].status === 'fulfilled' ? externalAlbumsSettled[1].value : [];
 
     for (const alb of itunesAlbums) {
       const title = cleanEntity(alb.collectionName);
@@ -627,34 +706,8 @@ export class UniversalSearchService {
         coverUrl: art,
         genre: alb.primaryGenreName,
         releaseDate: alb.releaseDate ? String(alb.releaseDate) : undefined,
+        year: alb.releaseDate ? String(alb.releaseDate).slice(0, 4) : undefined,
         trackCount: alb.trackCount || 1
-      });
-    }
-
-    for (const alb of saavnAlbums) {
-      const title = cleanEntity(alb.title || alb.name);
-      const rawMusic = cleanEntity(alb.music);
-      const rawSingers = cleanEntity(alb.primary_artists || alb.more_info?.primary_artists);
-      const artistName = cleanArtistNames(rawSingers, rawMusic);
-      const albId = alb.albumid || alb.id;
-      const normKey = `${title.toLowerCase().trim()}::${alb.language || ''}::${albId || ''}`;
-      if (!title || albumsMap.has(normKey)) continue;
-
-      let art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
-      albumsMap.set(normKey, {
-        id: `sp-album-${albId}`,
-        source: 'jiosaavn' as any,
-        sourceId: String(albId),
-        title: alb.language ? `${title} (${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)})` : title,
-        artist: {
-          id: `artist-${encodeURIComponent(artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
-          name: artistName,
-          imageUrl: art
-        },
-        coverUrl: art,
-        genre: alb.language ? `${alb.language} Soundtrack` : 'Soundtrack',
-        releaseDate: alb.year ? `${alb.year}-01-01` : undefined,
-        trackCount: parseInt(alb.more_info?.song_pids ? alb.more_info.song_pids.split(',').length : 1, 10) || 1
       });
     }
 
@@ -767,7 +820,10 @@ export class UniversalSearchService {
         storefront,
         fetchedAt: Date.now(),
         isVirtual: true,
-        inLibrary: t.isZenify
+        inLibrary: t.isZenify,
+        streams: (t as any).streams || (t as any).playCount || 2500000,
+        playCount: (t as any).playCount,
+        year: (t as any).year
       });
 
       // Collect deduplicated artists

@@ -35,9 +35,15 @@ export function HeaderSearchButton() {
         aria-label="Spotlight Search"
         title="Search (⌘K or /)"
         onClick={() => setOpen(true)}
-        className="flex items-center justify-center w-9 h-9 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-white/10 text-brand press cursor-pointer shrink-0"
+        className="flex items-center gap-2.5 h-9 px-2.5 md:px-3 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-white/10 text-zinc-400 hover:text-zinc-200 press cursor-pointer shrink-0 transition-all w-9 md:w-60 lg:w-72 justify-center md:justify-start"
       >
-        <Icon name="search" size={18} className="text-brand" />
+        <Icon name="search" size={16} className="text-brand shrink-0" />
+        <span className="hidden md:inline text-xs font-medium text-zinc-400 truncate flex-1 text-left">
+          Search songs, artists, albums...
+        </span>
+        <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-medium text-zinc-400 bg-white/5 border border-white/10 rounded">
+          ⌘K
+        </kbd>
       </button>
       {open && (
         <SpotlightSearchOverlay
@@ -186,23 +192,16 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
     if (activeFilter === "artist") return resultsData.artists;
     if (activeFilter === "album") return resultsData.albums;
 
-    // "all": curated overview with artists, top tracks, and albums
+    // "all": curated overview with artists, top tracks, and albums cleanly grouped
     const combined: SearchItem[] = [];
     if (resultsData.artists.length > 0) {
-      combined.push(...resultsData.artists.slice(0, 3));
-    }
-    if (resultsData.albums.length > 0) {
-      combined.push(...resultsData.albums.slice(0, 3));
+      combined.push(...resultsData.artists.slice(0, 4));
     }
     if (resultsData.tracks.length > 0) {
-      combined.push(...resultsData.tracks.slice(0, 8));
+      combined.push(...resultsData.tracks.slice(0, 10));
     }
-    // Append remaining albums/tracks if space permits
-    if (resultsData.albums.length > 3) {
-      combined.push(...resultsData.albums.slice(3, 8));
-    }
-    if (resultsData.tracks.length > 8) {
-      combined.push(...resultsData.tracks.slice(8, 16));
+    if (resultsData.albums.length > 0) {
+      combined.push(...resultsData.albums.slice(0, 6));
     }
 
     return combined;
@@ -314,61 +313,79 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
 
         {filteredItems.length > 0 && (
           <ul className="sp-results divide-y divide-white/5">
-            {filteredItems.map((it, i) => (
-              <li
-                key={it.id}
-                data-sel={i === sel}
-                onMouseEnter={() => setSel(i)}
-                onClick={() => selectItem(it)}
-                className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-xl transition-colors duration-100"
-              >
-                {/* Round avatar for artists, rounded-xl cover for tracks & albums */}
-                <div
-                  className={cn(
-                    "overflow-hidden bg-zinc-800 shrink-0 border border-white/10 flex items-center justify-center",
-                    it.type === "artist"
-                      ? "w-11 h-11 rounded-full ring-2 ring-brand/40 shadow-sm"
-                      : "w-11 h-11 rounded-xl"
+            {filteredItems.map((it, i) => {
+              const showCategoryHeader =
+                activeFilter === "all" &&
+                (i === 0 || filteredItems[i].type !== filteredItems[i - 1].type);
+
+              return (
+                <React.Fragment key={it.id}>
+                  {showCategoryHeader && (
+                    <li className="px-3 pt-3 pb-1 text-[10px] font-bold tracking-wider uppercase text-zinc-400 select-none bg-black/20 list-none pointer-events-none">
+                      {it.type === "track"
+                        ? "Top Songs"
+                        : it.type === "artist"
+                        ? "Artists"
+                        : it.type === "album"
+                        ? "Albums"
+                        : "Playlists"}
+                    </li>
                   )}
-                >
-                  <img
-                    src={getMediaUrl(it.coverUrl) || (it.type === "artist" ? "/logo.png" : "/logo.png")}
-                    alt={it.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "/logo.png";
-                    }}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white/95 truncate">
-                    {it.title}
-                  </p>
-                  <p className="text-xs text-white/50 truncate flex items-center mt-0.5">
-                    <span
+                  <li
+                    data-sel={i === sel}
+                    onMouseEnter={() => setSel(i)}
+                    onClick={() => selectItem(it)}
+                    className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-xl transition-colors duration-100"
+                  >
+                    {/* Round avatar for artists, rounded-xl cover for tracks & albums */}
+                    <div
                       className={cn(
-                        "uppercase text-[9px] tracking-wider font-bold mr-1.5 px-1.5 py-0.2 rounded",
+                        "overflow-hidden bg-zinc-800 shrink-0 border border-white/10 flex items-center justify-center",
                         it.type === "artist"
-                          ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                          : it.type === "album"
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                          : "bg-brand/20 text-brand border border-brand/30"
+                          ? "w-11 h-11 rounded-full ring-2 ring-brand/40 shadow-sm"
+                          : "w-11 h-11 rounded-xl"
                       )}
                     >
-                      {it.type === "track" ? "Song" : it.type}
-                    </span>
-                    <span className="truncate">{it.subtitle}</span>
-                  </p>
-                </div>
-                <Icon
-                  name={it.type === "track" ? "play" : "chevron-right"}
-                  size={16}
-                  className="text-white/40 shrink-0"
-                />
-              </li>
-            ))}
+                      <img
+                        src={getMediaUrl(it.coverUrl) || (it.type === "artist" ? "/logo.png" : "/logo.png")}
+                        alt={it.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "/logo.png";
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white/95 truncate">
+                        {it.title}
+                      </p>
+                      <p className="text-xs text-white/50 truncate flex items-center mt-0.5">
+                        <span
+                          className={cn(
+                            "uppercase text-[9px] tracking-wider font-bold mr-1.5 px-1.5 py-0.2 rounded",
+                            it.type === "artist"
+                              ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                              : it.type === "album"
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                              : "bg-brand/20 text-brand border border-brand/30"
+                          )}
+                        >
+                          {it.type === "track" ? "Song" : it.type}
+                        </span>
+                        <span className="truncate">{it.subtitle}</span>
+                      </p>
+                    </div>
+                    <Icon
+                      name={it.type === "track" ? "play" : "chevron-right"}
+                      size={16}
+                      className="text-white/40 shrink-0"
+                    />
+                  </li>
+                </React.Fragment>
+              );
+            })}
           </ul>
         )}
 

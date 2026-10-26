@@ -533,7 +533,7 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
       return res.data;
     },
     enabled: !!debouncedQuery,
-    staleTime: 1000 * 60 * 10,
+    staleTime: 15000,
   });
 
   // Live provider search hints autocomplete
