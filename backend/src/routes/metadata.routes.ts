@@ -166,6 +166,12 @@ export async function metadataRoutes(server: FastifyInstance) {
             }
         } else {
             // Auto / Best Available Pipeline:
+            // 0. Primary JioSaavn authentic lyrics
+            const saavn = await LyricsEnhancementService.fetchJioSaavnLyrics(track.title, artistName, (track as any).sourceId || track.id).catch(() => null);
+            if (saavn?.lyrics) {
+                plainLyrics = saavn.lyrics;
+                chosenSource = 'JIOSAAVN';
+            }
             // 1. LRCLIB with language verification
             const lrc = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration, targetLanguage).catch(() => null);
             if (lrc?.lyrics) {

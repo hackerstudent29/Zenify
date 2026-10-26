@@ -2,42 +2,154 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://listenzenify.vercel.app/</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://listenzenify.vercel.app/search</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://listenzenify.vercel.app/pricing</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://listenzenify.vercel.app/about-zenify</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://listenzenify.vercel.app/about</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://listenzenify.vercel.app/discover</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://listenzenify.vercel.app/radio</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://listenzenify.vercel.app/local-library</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://listenzenify.vercel.app/privacy</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
   </url>
   <url>
     <loc>https://listenzenify.vercel.app/terms</loc>
-    <lastmod>2026-10-25</lastmod>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/track/55c22a00-c217-4541-9ebe-ce03da8526d0</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/track/0701ee3b-f97a-44b7-aca0-d3203cc02700</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/track/35a1d478-db3f-4d15-845e-9c85c14877c9</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/864da827-a86e-40ff-9c36-7b2ddd5a448a</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/4e69f285-a9e4-40c4-9754-873902284225</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/06e551d0-fac6-4bdf-9af8-5691722d4f06</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/02ead60a-a608-4d31-8c5b-17b05073d9c8</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-a. r. rahman</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-anirudh ravichander</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-harris jayaraj</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-yuvan shankar raja</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-sid sriram</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-g. v. prakash kumar</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-d. imman</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-santhosh narayanan</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-sam c. s.</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-hip hop tamizha</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-thaman s</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-ilaiyaraaja</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-sean roldan</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-ghibran</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-sai abhyankkar</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-deva</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-devi sri prasad</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/artist/canonical-sushin shyam</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/album/b7b17fdb-841a-418d-a2a2-e9443efae5d7</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/album/e1f13397-ed21-4091-b26e-f3349d787c12</loc>
+    <lastmod>2026-10-26</lastmod>
+  </url>
+  <url>
+    <loc>https://listenzenify.vercel.app/album/56f7a4e0-6041-4b2d-882e-49c897fd5961</loc>
+    <lastmod>2026-10-26</lastmod>
   </url>
 </urlset>

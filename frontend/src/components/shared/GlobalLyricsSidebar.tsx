@@ -8,6 +8,9 @@ import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { cn, getTrackCover } from "@/lib/utils";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
 
+/** compact Apple Music sidebar width */
+const SIDEBAR_W = 400;
+
 export function GlobalLyricsSidebar() {
   const { isLyricsOpen, setIsLyricsOpen, isFullScreenPlayerOpen } = useUIStore();
   const showReactiveBg = useReactiveBgStore(state => state.lyrics);
@@ -21,58 +24,58 @@ export function GlobalLyricsSidebar() {
       {isLyricsOpen && currentTrack && !isFullScreenPlayerOpen && (
         <motion.div
           initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 380, opacity: 1 }}
+          animate={{ width: SIDEBAR_W, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{
             type: "spring",
-            stiffness: 350,
-            damping: 32,
-            mass: 0.8
+            stiffness: 320,
+            damping: 33,
+            mass: 0.85,
+            opacity: { duration: 0.22 }
           }}
           className={cn(
-            "relative h-full flex flex-col pointer-events-auto shrink-0 overflow-hidden",
-            "border-l border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)] z-[40]"
+            "relative h-full max-h-screen flex flex-col pointer-events-auto shrink-0 overflow-hidden",
+            "border-l border-white/10 shadow-[0_0_60px_rgba(0,0,0,0.85)] z-[40]"
           )}
         >
-          <motion.div 
-            initial={{ x: 60, opacity: 0 }}
+          <motion.div
+            initial={{ x: 48, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 60, opacity: 0 }}
+            exit={{ x: 48, opacity: 0 }}
             transition={{
               type: "spring",
-              stiffness: 350,
-              damping: 32,
-              mass: 0.8,
+              stiffness: 320,
+              damping: 30,
+              mass: 0.85,
               delay: 0.05
             }}
-            className="w-[380px] h-full flex flex-col relative overflow-hidden bg-black"
+            style={{ width: SIDEBAR_W }}
+            className="h-full max-h-screen flex flex-col relative overflow-hidden bg-[#0e0e11]/90 backdrop-blur-3xl"
           >
 
-            {/* Reactive Liquid Background for sidebar lyrics (Default OFF) */}
+            {/* Reactive Liquid Background for sidebar lyrics */}
             {showReactiveBg && (
               <div className="absolute inset-0 z-0 overflow-hidden">
                 <DynamicBackground surface="other" coverUrl={loadedCover} />
-                <div className="absolute inset-0 bg-black/40 pointer-events-none z-10" />
+                <div className="absolute inset-0 bg-black/55 pointer-events-none z-10" />
               </div>
             )}
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0 z-20 bg-black/30 backdrop-blur-md">
-              <h2 className="text-sm font-bold text-white tracking-wide uppercase font-brand">Lyrics</h2>
-              <div className="flex items-center gap-2">
-                
-                <button
-                  onClick={() => setIsLyricsOpen(false)}
-                  className="p-1.5 text-white/50 hover:text-white transition-colors rounded-full hover:bg-white/10 active:scale-90"
-                  title="Close Lyrics"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
+            {/* Apple-style floating minimal close button (compact) */}
+            <motion.button
+              onClick={() => setIsLyricsOpen(false)}
+              whileTap={{ scale: 0.88 }}
+              whileHover={{ scale: 1.06 }}
+              transition={{ type: "spring", stiffness: 520, damping: 28 }}
+              className="absolute top-3 right-3 z-40 flex h-7 w-7 items-center justify-center text-white/60 hover:text-white bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/10 rounded-full shadow-lg transition-colors cursor-pointer"
+              title="Close Lyrics"
+              aria-label="Close Lyrics"
+            >
+              <X size={13} />
+            </motion.button>
 
-            {/* Lyrics Content */}
-            <div className="flex-1 min-h-0 relative pb-[var(--player-height,80px)] z-20">
+            {/* Full-Length Lyrics Content (No header taking up space) */}
+            <div className="flex-1 min-h-0 h-full w-full relative pb-[var(--player-height,80px)] z-20">
               <LyricsView
                 trackId={currentTrack.id}
                 title={currentTrack.title}
@@ -81,7 +84,8 @@ export function GlobalLyricsSidebar() {
                 isLyricsOpen={true}
                 isMobile={false}
                 isFullscreen={false}
-                transparent={showReactiveBg}
+                isSidebar={true}
+                transparent={true}
               />
             </div>
           </motion.div>
@@ -90,4 +94,3 @@ export function GlobalLyricsSidebar() {
     </AnimatePresence>
   );
 }
-

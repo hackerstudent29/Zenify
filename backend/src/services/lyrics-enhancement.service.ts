@@ -162,6 +162,34 @@ export class LyricsEnhancementService {
     }
 
     /**
+     * Fetch authentic lyrics from JioSaavn Official Engine
+     */
+    static async fetchJioSaavnLyrics(title: string, artist: string, songId?: string): Promise<{ lyrics: string; isSynced: boolean; quality: number } | null> {
+        try {
+            const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
+            let lyricsText: string | null = null;
+            if (songId) {
+                const cleanId = songId.replace(/^saavn-/, '');
+                lyricsText = await CleanCdnAudioService.getLyrics(cleanId);
+            }
+            if (!lyricsText) {
+                lyricsText = await CleanCdnAudioService.resolveLyrics(title, artist);
+            }
+            if (lyricsText && this.isValidSongLyrics(lyricsText)) {
+                console.log(`[JioSaavnLyrics] Found authentic lyrics for "${title}" (${lyricsText.length} chars)`);
+                return {
+                    lyrics: this.cleanLyricsText(lyricsText),
+                    isSynced: false,
+                    quality: 5
+                };
+            }
+        } catch (err: any) {
+            console.warn('[JioSaavnLyrics] Failed:', err.message);
+        }
+        return null;
+    }
+
+    /**
      * Fetch from LRCLib (BEST SOURCE - Provides accurate time-synced LRC with Language Verification)
      */
     static async fetchLRCLib(title: string, artist: string, durationSeconds?: number, targetLanguage?: string): Promise<{ lyrics: string; isSynced: boolean; quality: number } | null> {

@@ -4,6 +4,7 @@ import { uploadUrlToCloudinary, deleteFromCloudinary } from '../utils/cloudinary
 import { invalidateCache } from '../utils/cache';
 import { DeduplicationService } from '../services/deduplication.service.js';
 import { cleanArtistNames } from '../utils/artist.js';
+import { CleanCdnAudioService } from '../services/clean-cdn-audio.service.js';
 
 async function clearAlbumCaches() {
     try {
@@ -248,7 +249,7 @@ export async function albumRoutes(server: FastifyInstance) {
                     const artistName = albData.primary_artists || 'Various Artists';
                     const cleanMainArtist = cleanArtistNames(artistName);
 
-                    const songsList = albData.songs || [];
+                    const songsList = albData.list || albData.songs || [];
                     const tracks = songsList.map((s: any, idx: number) => {
                         const cleanT = (s.song || s.title || `Track ${idx + 1}`).trim();
                         const rawSingers = s.singers || s.primary_artists || s.more_info?.singers;
@@ -258,13 +259,20 @@ export async function albumRoutes(server: FastifyInstance) {
                         let songArt = s.image || artwork;
                         songArt = songArt.replace('150x150', '500x500').replace('50x50', '500x500');
 
+                        const encMediaUrl = s.more_info?.encrypted_media_url || s.encrypted_media_url;
+                        let directAudioUrl = '';
+                        if (encMediaUrl) {
+                            directAudioUrl = CleanCdnAudioService.decryptSaavnMediaUrl(encMediaUrl, '160') || '';
+                        }
+                        const finalAudioUrl = directAudioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanT}`)}&title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}`;
+
                         return {
                             id: `saavn-${s.id}`,
                             title: cleanT,
                             duration: dur,
                             trackNumber: idx + 1,
                             coverUrl: songArt,
-                            audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanT}`)}&title=${encodeURIComponent(cleanT)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}`,
+                            audioUrl: finalAudioUrl,
                             artistId: `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
                             artist: {
                                 id: `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
@@ -420,10 +428,36 @@ export async function albumRoutes(server: FastifyInstance) {
             include: { artist: true }
         }).catch(() => null);
 
-        // Fallback: If not found by ID, search by title with strict language awareness
+        // Fallback: If not found by ID, search by title with JioSaavn as primary
         if (!album) {
             try {
                 const { default: axios } = await import('axios');
+                // 1. Primary: JioSaavn Album Search
+                const saavnSearch = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'search.getAlbumResults',
+                        q: decodedId,
+                        _format: 'json',
+                        _marker: '0',
+                        api_version: '4',
+                        ctx: 'web6dot0',
+                        p: 1,
+                        n: 5
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 4500
+                }).catch(() => null);
+
+                const firstSaavnAlbum = saavnSearch?.data?.results?.[0];
+                if (firstSaavnAlbum?.id) {
+                    return (server as any).inject({
+                        method: 'GET',
+                        url: `/api/albums/saavn-album-${firstSaavnAlbum.id}`,
+                        headers: req.headers
+                    }).then((r: any) => JSON.parse(r.body));
+                }
+
+                // 2. Secondary fallback: iTunes
                 const searchRes = await axios.get(`https://itunes.apple.com/search`, {
                     params: { term: decodedId, media: 'music', entity: 'album', country: 'IN', limit: 10 },
                     timeout: 4500

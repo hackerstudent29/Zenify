@@ -22,6 +22,7 @@ interface LyricsViewProps {
   isIdle?: boolean;
   duration?: number;
   isFullscreen?: boolean;
+  isSidebar?: boolean;
   transparent?: boolean;
   albumArt?: string;
   onUserScrollChange?: (scrolling: boolean) => void;
@@ -58,8 +59,18 @@ const LEAD = 0.12;
 /** spring for the line-follow motion */
 const FOLLOW = { type: "spring" as const, stiffness: 165, damping: 23, mass: 1, restDelta: 0.15 };
 
+/* ── Sidebar-only tuning (compact column: fewer lines on screen, softer & a touch bouncier follow) ── */
+const WINDOW_SB = 7;
+const LEAD_SB = 0.14;
+const FOLLOW_SB = { type: "spring" as const, stiffness: 150, damping: 20.5, mass: 0.95, restDelta: 0.15 };
+/** seconds of extra delay per line below the active one (the "waterfall") */
+const STAGGER = 0.04;
+const STAGGER_SB = 0.034;
+const STAGGER_MAX = 5;
+const STAGGER_MAX_SB = 6;
+
 export function LyricsView({
-  trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isIdle, duration,
+  trackId, title, artist, isLyricsOpen, rawLyrics, isMobile, isSidebar, isIdle, duration,
   isFullscreen, transparent, onUserScrollChange, onClose,
 }: LyricsViewProps) {
   const queryClient = useQueryClient();
@@ -321,6 +332,11 @@ export function LyricsView({
   const linesRef = React.useRef<any[]>(processedLines);
   linesRef.current = processedLines;
 
+  // sidebar flag lives in a ref so the (stable) goTo / RAF callbacks always see the latest value
+  const sidebarRef = React.useRef(!!isSidebar);
+  sidebarRef.current = !!isSidebar;
+  const windowSize = isSidebar ? WINDOW_SB : WINDOW;
+
   const [activeIndex, setActiveIndex] = React.useState(() => {
     const audio = audioEngine.getActiveAudioElement();
     const t = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : usePlayerStore.getState().currentTime;
@@ -332,7 +348,8 @@ export function LyricsView({
   const activeRef = React.useRef(activeIndex);
 
   const [containerHeight, setContainerHeight] = React.useState(360);
-  const ratio = isFullscreen ? 0.38 : isMobile ? (isIdle ? 0.42 : 0.3) : 0.35;
+  // sidebar: active line sits a little lower than before so the line above it can breathe
+  const ratio = isFullscreen ? 0.38 : isSidebar ? 0.22 : isMobile ? (isIdle ? 0.42 : 0.3) : 0.35;
   const ratioRef = React.useRef(ratio);
   ratioRef.current = ratio;
 
@@ -370,11 +387,16 @@ export function LyricsView({
     const idx = Math.max(0, Math.min(arr.length - 1, i));
     const S = targetFor(idx);
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const sb = sidebarRef.current;
+    const win = sb ? WINDOW_SB : WINDOW;
+    const spring = sb ? FOLLOW_SB : FOLLOW;
+    const stagger = sb ? STAGGER_SB : STAGGER;
+    const staggerMax = sb ? STAGGER_MAX_SB : STAGGER_MAX;
     for (let k = 0; k < arr.length; k++) {
       const d = k - idx;
       const y = arr[k];
-      if (instant || reduce || Math.abs(d) > WINDOW) { y.stop(); y.set(-S); continue; }
-      animate(y, -S, { ...FOLLOW, delay: d > 0 ? Math.min(d, 5) * 0.04 : 0 });
+      if (instant || reduce || Math.abs(d) > win) { y.stop(); y.set(-S); continue; }
+      animate(y, -S, { ...spring, delay: d > 0 ? Math.min(d, staggerMax) * stagger : 0 });
     }
   }, []);
 
@@ -417,7 +439,7 @@ export function LyricsView({
   React.useLayoutEffect(() => {
     measure();
     goTo(activeRef.current, true);
-  }, [processedLines, isFullscreen, isMobile, containerHeight, measure, goTo]);
+  }, [processedLines, isFullscreen, isMobile, isSidebar, containerHeight, measure, goTo]);
 
   React.useEffect(() => { goTo(activeRef.current); }, [ratio, goTo]);
 
@@ -519,7 +541,7 @@ export function LyricsView({
 
       const lines = linesRef.current;
       if (!lines.length || lines[0].isUnsynced) return;
-      const tt = t + LEAD;
+      const tt = t + (sidebarRef.current ? LEAD_SB : LEAD);
       let n = activeRef.current;
       while (n + 1 < lines.length && tt >= lines[n + 1].time) n++;
       while (n >= 0 && tt < lines[n].time) n--;
@@ -645,7 +667,8 @@ export function LyricsView({
   const showOffset = !isUnsyncedSet && data?.source !== "QUICKLRC";
   const toolbar = (
     <LyricsToolbar
-      placement="top-right"
+      placement={isSidebar ? "top-left" : "top-right"}
+      compact={!!isSidebar}
       canTranslate={canTranslate}
       isRomanized={isRomanized}
       romanizedLabel={romanizedLabel}
@@ -653,7 +676,7 @@ export function LyricsView({
       showOffset={showOffset}
       offsetMs={lyricsOffsetMs}
       onOffset={handleOffsetChange}
-      onClose={!isMobile ? onClose : undefined}
+      onClose={!isMobile && !isSidebar ? onClose : undefined}
       hidden={isUserScrolling || !!isIdle}
     />
   );
@@ -665,14 +688,21 @@ export function LyricsView({
       <div className={shell}>
         <LyricsStyles />
         <div
-          className={cn("relative z-10 h-full min-h-0 w-full select-text overflow-y-auto scrollbar-none", isMobile ? "p-4" : "p-6")}
+          className={cn(
+            "relative z-10 h-full min-h-0 w-full select-text overflow-y-auto scrollbar-none",
+            isSidebar ? "px-4 pb-4 pt-14" : isMobile ? "p-4" : "p-6"
+          )}
           style={{ msOverflowStyle: "none", scrollbarWidth: "none", overscrollBehavior: "contain" }}
         >
-          <div className={cn("flex flex-col gap-8 pb-28", isFullscreen ? "mx-auto max-w-5xl" : "")}>
+          <div className={cn("flex flex-col pb-28", isSidebar ? "gap-5" : "gap-8", isFullscreen ? "mx-auto max-w-5xl" : "")}>
             {processedLines.map((line: any, i: number) => (
               <p
                 key={`${trackId}-u-${i}`}
-                className={cn("text-left font-semibold leading-[1.6] text-white/85", isMobile ? "text-[20px]" : isFullscreen ? "text-[28px]" : "text-[22px]")}
+                className={cn(
+                  "text-left font-semibold text-white/85",
+                  isSidebar ? "text-[17px] leading-[1.4] tracking-[-0.01em]" : "leading-[1.6]",
+                  !isSidebar && (isMobile ? "text-[20px]" : isFullscreen ? "text-[28px]" : "text-[22px]")
+                )}
               >
                 {line.text}
               </p>
@@ -686,14 +716,19 @@ export function LyricsView({
 
   const topSpacer = Math.round(containerHeight * ratio);
 
+  // sidebar: softer, longer fade at the top (under the compact toolbar) and bottom (above the player)
+  const maskGradient = isSidebar
+    ? "linear-gradient(to bottom, transparent 0, #000 12%, #000 80%, transparent 100%)"
+    : "linear-gradient(to bottom, transparent 0, #000 9%, #000 84%, transparent 100%)";
+
   return (
     <div className={shell}>
       <LyricsStyles />
       <div
         className="relative h-full min-h-0 w-full flex-1 overflow-hidden"
         style={{
-          WebkitMaskImage: "linear-gradient(to bottom, transparent 0, #000 9%, #000 84%, transparent 100%)",
-          maskImage: "linear-gradient(to bottom, transparent 0, #000 9%, #000 84%, transparent 100%)",
+          WebkitMaskImage: maskGradient,
+          maskImage: maskGradient,
         }}
       >
         <div
@@ -706,7 +741,7 @@ export function LyricsView({
           onTouchCancel={onTouchEnd}
         >
           <style dangerouslySetInnerHTML={{ __html: ".scrollbar-none::-webkit-scrollbar{display:none!important}" }} />
-          <div className={cn("relative flex w-full flex-col items-start text-left", isFullscreen ? "mx-auto max-w-5xl px-8" : isMobile ? "px-4" : "px-6")}>
+          <div className={cn("relative flex w-full flex-col items-start text-left", isFullscreen ? "mx-auto max-w-5xl px-8" : isSidebar ? "px-3.5" : isMobile ? "px-4" : "px-6")}>
             <div className="w-full shrink-0" style={{ height: topSpacer }} />
 
             {processedLines.map((line: any, idx: number) => {
@@ -729,9 +764,11 @@ export function LyricsView({
                   words={line.words}
                   isFullscreen={isFullscreen}
                   isMobile={isMobile}
+                  isSidebar={isSidebar}
+                  lineIndex={idx}
                   isInterlude={line.isInterlude || line.text === "• • •" || line.isInstrumental}
                   isUserScrolling={isUserScrolling}
-                  inWindow={Math.abs(dist) <= WINDOW}
+                  inWindow={Math.abs(dist) <= windowSize}
                   onClick={() => handleLineClick(idx, line)}
                 />
               );
@@ -740,20 +777,23 @@ export function LyricsView({
             {/* credits */}
             <motion.div
               style={{ y: ys[ys.length - 1] }}
-              className="mt-16 flex w-full flex-col items-center gap-3 pb-6 opacity-40"
+              className={cn(
+                "flex w-full flex-col items-center opacity-40",
+                isSidebar ? "mt-10 gap-2 pb-4" : "mt-16 gap-3 pb-6"
+              )}
             >
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <div className={cn("flex items-center justify-center rounded-full border border-white/10 bg-white/5", isSidebar ? "h-9 w-9" : "h-11 w-11")}>
+                <svg width={isSidebar ? 18 : 22} height={isSidebar ? 18 : 22} viewBox="0 0 24 24" fill="none">
                   <rect x="3" y="10" width="3" height="4" rx="1.5" fill="currentColor" />
                   <rect x="8" y="6" width="3" height="12" rx="1.5" fill="currentColor" />
                   <rect x="13" y="3" width="3" height="18" rx="1.5" fill="currentColor" />
                   <rect x="18" y="8" width="3" height="8" rx="1.5" fill="currentColor" />
                 </svg>
               </div>
-              <div className="space-y-1 text-center text-xs text-white/55">
+              <div className={cn("text-center text-white/55", isSidebar ? "space-y-0.5 text-[11px]" : "space-y-1 text-xs")}>
                 <p className="font-semibold text-white/80">{title}</p>
                 <p>Written & Performed by {artist}</p>
-                <p className="mt-2 border-t border-white/10 pt-2 text-[10px] tracking-widest uppercase">
+                <p className={cn("border-t border-white/10 tracking-widest uppercase", isSidebar ? "mt-1.5 pt-1.5 text-[9px]" : "mt-2 pt-2 text-[10px]")}>
                   Provided by <span className="font-zenify">zenify</span> Lyrics Engine
                 </p>
               </div>
@@ -765,7 +805,7 @@ export function LyricsView({
       </div>
 
       {toolbar}
-      <LyricsSyncPill show={isUserScrolling} onSync={handleSync} position={isMobile ? "top" : "bottom"} />
+      <LyricsSyncPill show={isUserScrolling} onSync={handleSync} position={isMobile ? "top" : "bottom"} compact={!!isSidebar} />
     </div>
   );
 }

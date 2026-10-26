@@ -10,16 +10,20 @@ const Svg = ({ children, size = 15 }: { children: React.ReactNode; size?: number
     {children}
   </svg>
 );
-const SFTiming = () => (<Svg><circle cx="12" cy="13" r="7.5" /><path d="M12 13V9M9.5 3h5" /></Svg>);
-const SFMinus = () => (<Svg size={14}><path d="M6 12h12" /></Svg>);
-const SFPlus = () => (<Svg size={14}><path d="M12 6v12M6 12h12" /></Svg>);
-const SFArrowDown = () => (<Svg size={14}><path d="M12 5v14M6 13l6 6 6-6" /></Svg>);
+const SFTiming = ({ size = 15 }: { size?: number }) => (<Svg size={size}><circle cx="12" cy="13" r="7.5" /><path d="M12 13V9M9.5 3h5" /></Svg>);
+const SFMinus = ({ size = 14 }: { size?: number }) => (<Svg size={size}><path d="M6 12h12" /></Svg>);
+const SFPlus = ({ size = 14 }: { size?: number }) => (<Svg size={size}><path d="M12 6v12M6 12h12" /></Svg>);
+const SFArrowDown = ({ size = 14 }: { size?: number }) => (<Svg size={size}><path d="M12 5v14M6 13l6 6 6-6" /></Svg>);
 
 const fmt = (ms: number) => `${ms > 0 ? "+" : ""}${(ms / 1000).toFixed(1)}s`;
 
+/** Sidebar-only springs: a touch snappier + a hint of overshoot so the capsule feels alive but small. */
+const SPRING_COMPACT = { type: "spring" as const, stiffness: 520, damping: 34, mass: 0.7 };
+const SPRING_COMPACT_SOFT = { type: "spring" as const, stiffness: 380, damping: 32, mass: 0.8 };
+
 export interface LyricsToolbarProps {
   /** where the capsule floats (it is opaque, so lyrics are hidden behind it) */
-  placement: "bottom" | "top-right";
+  placement: "bottom" | "top-right" | "top-left";
   canTranslate: boolean;
   isRomanized: boolean;
   romanizedLabel: string;
@@ -29,17 +33,22 @@ export interface LyricsToolbarProps {
   onOffset: (deltaMs: number) => void;
   onClose?: () => void;
   hidden?: boolean;
+  /** smaller capsule used by the sidebar lyrics */
+  compact?: boolean;
 }
 
 /**
  * One frosted capsule instead of three loose pills:
  *   [ Original | Tanglish ] · [ ⏱ ]  (⏱ expands into  − +0.3s +  and folds back by itself)
  * Solid fill (no backdrop-filter): nothing shows through it, and nothing re-blurs while lyrics move.
+ *
+ * `compact` (sidebar): 24px tall controls, 11px type, tighter paddings, softer shadow.
  */
 export function LyricsToolbar(p: LyricsToolbarProps) {
   const uid = useId();
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const compact = !!p.compact;
 
   const arm = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -53,11 +62,28 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
   const step = (d: number) => { p.onOffset(d); arm(); };
   const offsetActive = p.offsetMs !== 0;
 
+  const springMain = compact ? SPRING_COMPACT : SPRING;
+  const springSoft = compact ? SPRING_COMPACT_SOFT : SPRING_SOFT;
+
+  // sizing tokens (regular vs compact)
+  const btnH = compact ? "h-6" : "h-7";
+  const iconBtn = compact ? "h-6 w-6" : "h-7 w-7";
+  const segPad = compact ? "px-2.5" : "px-3";
+  const fontSz = compact ? "text-[11px]" : "text-[12px]";
+  const iconSz = compact ? 13 : 15;
+  const stepIconSz = compact ? 12 : 14;
+
   return (
     <div
       className={cn(
         "pointer-events-none absolute z-30 flex",
-        p.placement === "bottom" ? "inset-x-0 bottom-3 justify-center" : "right-3 top-2 justify-end"
+        p.placement === "bottom"
+          ? "inset-x-0 bottom-3 justify-center"
+          : p.placement === "top-left"
+          ? compact
+            ? "left-3 top-3 justify-start"
+            : "left-4 top-3 justify-start"
+          : "right-3 top-2 justify-end"
       )}
     >
       <motion.div
@@ -67,17 +93,22 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
           y: p.hidden ? (p.placement === "bottom" ? 14 : -10) : 0,
           scale: p.hidden ? 0.95 : 1,
         }}
-        transition={{ ...SPRING_SOFT, opacity: { duration: 0.2 } }}
-        style={{ pointerEvents: p.hidden ? "none" : "auto" }}
+        transition={{ ...springSoft, opacity: { duration: 0.2 } }}
+        style={{ pointerEvents: p.hidden ? "none" : "auto", transformOrigin: p.placement === "top-left" ? "left top" : "center" }}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
         <LayoutGroup id={uid}>
           <motion.div
             layout
-            transition={{ layout: SPRING_SOFT }}
+            transition={{ layout: springSoft }}
             style={{ borderRadius: 999 }}
-            className="flex items-center gap-1 border border-white/[0.12] bg-[#1d1d20] p-[3px] shadow-[0_10px_30px_rgba(0,0,0,0.55)]"
+            className={cn(
+              "flex items-center border border-white/[0.12] bg-[#1d1d20]",
+              compact
+                ? "gap-0.5 p-[2px] shadow-[0_6px_20px_rgba(0,0,0,0.5)]"
+                : "gap-1 p-[3px] shadow-[0_10px_30px_rgba(0,0,0,0.55)]"
+            )}
           >
             {/* Language */}
             {p.canTranslate && (
@@ -91,12 +122,12 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
                     <SpringButton
                       key={String(o.k)}
                       onClick={() => p.onModeChange(o.k)}
-                      className="relative h-7 rounded-full px-3 text-[12px] font-semibold tracking-[-0.01em]"
+                      className={cn("relative rounded-full font-semibold tracking-[-0.01em]", btnH, segPad, fontSz)}
                     >
                       {active && (
                         <motion.span
                           layoutId="lyr-seg"
-                          transition={SPRING}
+                          transition={springMain}
                           style={{ borderRadius: 999 }}
                           className="absolute inset-0 bg-white/[0.22]"
                         />
@@ -108,7 +139,7 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
               </motion.div>
             )}
 
-            {p.canTranslate && p.showOffset && <span className="mx-0.5 h-4 w-px bg-white/15" />}
+            {p.canTranslate && p.showOffset && <span className={cn("mx-0.5 w-px bg-white/15", compact ? "h-3" : "h-4")} />}
 
             {/* Timing */}
             {p.showOffset && (
@@ -117,11 +148,14 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
                   onClick={() => { setOpen((o) => !o); arm(); }}
                   title="Adjust lyrics timing"
                   className={cn(
-                    "h-7 gap-1.5 rounded-full px-2.5 text-[12px] font-semibold tabular-nums transition-colors duration-200",
+                    "gap-1.5 rounded-full font-semibold tabular-nums transition-colors duration-200",
+                    btnH,
+                    fontSz,
+                    compact ? "px-2" : "px-2.5",
                     open ? "bg-white/[0.22] text-white" : offsetActive ? "text-brand" : "text-white/60 hover:text-white"
                   )}
                 >
-                  <SFTiming />
+                  <SFTiming size={iconSz} />
                   {!open && offsetActive && <span>{fmt(p.offsetMs)}</span>}
                 </SpringButton>
 
@@ -132,21 +166,27 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
                       initial={{ width: 0, opacity: 0 }}
                       animate={{ width: "auto", opacity: 1 }}
                       exit={{ width: 0, opacity: 0 }}
-                      transition={{ width: SPRING_SOFT, opacity: { duration: 0.18 } }}
+                      transition={{ width: springSoft, opacity: { duration: 0.18 } }}
                       className="flex items-center overflow-hidden"
                     >
-                      <SpringButton onClick={() => step(-100)} title="Lyrics earlier −0.1s" className="ml-1 h-7 w-7 rounded-full text-white/80 hover:bg-white/10">
-                        <SFMinus />
+                      <SpringButton onClick={() => step(-100)} title="Lyrics earlier −0.1s" className={cn("ml-1 rounded-full text-white/80 hover:bg-white/10", iconBtn)}>
+                        <SFMinus size={stepIconSz} />
                       </SpringButton>
                       <SpringButton
                         onClick={() => { p.onOffset(0); arm(); }}
                         title="Reset"
-                        className={cn("h-7 min-w-[46px] rounded-full px-1 text-[12px] font-bold tabular-nums", offsetActive ? "text-brand" : "text-white/70")}
+                        className={cn(
+                          "rounded-full px-1 font-bold tabular-nums",
+                          btnH,
+                          fontSz,
+                          compact ? "min-w-[40px]" : "min-w-[46px]",
+                          offsetActive ? "text-brand" : "text-white/70"
+                        )}
                       >
                         {fmt(p.offsetMs)}
                       </SpringButton>
-                      <SpringButton onClick={() => step(100)} title="Lyrics later +0.1s" className="h-7 w-7 rounded-full text-white/80 hover:bg-white/10">
-                        <SFPlus />
+                      <SpringButton onClick={() => step(100)} title="Lyrics later +0.1s" className={cn("rounded-full text-white/80 hover:bg-white/10", iconBtn)}>
+                        <SFPlus size={stepIconSz} />
                       </SpringButton>
                     </motion.div>
                   )}
@@ -170,9 +210,21 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
 }
 
 /** "Back to now" pill — appears while the user is browsing lyrics manually. */
-export function LyricsSyncPill({ show, onSync, position = "bottom" }: { show: boolean; onSync: () => void; position?: "top" | "bottom" }) {
+export function LyricsSyncPill({
+  show,
+  onSync,
+  position = "bottom",
+  compact = false,
+}: {
+  show: boolean;
+  onSync: () => void;
+  position?: "top" | "bottom";
+  /** smaller pill used by the sidebar lyrics */
+  compact?: boolean;
+}) {
+  const spring = compact ? SPRING_COMPACT : SPRING;
   return (
-    <div className={cn("pointer-events-none absolute inset-x-0 z-40 flex justify-center", position === "top" ? "top-2" : "bottom-3")}>
+    <div className={cn("pointer-events-none absolute inset-x-0 z-40 flex justify-center", position === "top" ? "top-2" : compact ? "bottom-4" : "bottom-3")}>
       <AnimatePresence>
         {show && (
           <motion.button
@@ -180,13 +232,18 @@ export function LyricsSyncPill({ show, onSync, position = "bottom" }: { show: bo
             initial={{ opacity: 0, y: position === "top" ? -18 : 18, scale: 0.88 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: position === "top" ? -12 : 12, scale: 0.92 }}
-            transition={{ y: SPRING, scale: SPRING, opacity: { duration: 0.18 } }}
+            transition={{ y: spring, scale: spring, opacity: { duration: 0.18 } }}
             whileTap={{ scale: 0.93 }}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onSync(); }}
-            className="pointer-events-auto flex h-9 cursor-pointer select-none items-center gap-1.5 rounded-full bg-white/95 pl-3 pr-4 text-[13px] font-semibold text-black shadow-[0_10px_30px_rgba(0,0,0,0.45)] outline-none"
+            className={cn(
+              "pointer-events-auto flex cursor-pointer select-none items-center rounded-full bg-white/95 font-semibold text-black outline-none",
+              compact
+                ? "h-7 gap-1 pl-2.5 pr-3 text-[12px] shadow-[0_6px_20px_rgba(0,0,0,0.45)]"
+                : "h-9 gap-1.5 pl-3 pr-4 text-[13px] shadow-[0_10px_30px_rgba(0,0,0,0.45)]"
+            )}
           >
-            <SFArrowDown />
+            <SFArrowDown size={compact ? 12 : 14} />
             Now Playing
           </motion.button>
         )}

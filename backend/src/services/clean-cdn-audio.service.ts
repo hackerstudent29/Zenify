@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { isSafePublicUrl } from '../utils/security';
-const des = require('des.js');
+// @ts-ignore
+import des from 'des.js';
 
 export interface CleanAudioResult {
     url: string;
@@ -33,7 +34,7 @@ const CDN_HARD_REJECT_TERMS = [
 ];
 
 export class CleanCdnAudioService {
-    public static decryptSaavnMediaUrl(encBase64: string): string | null {
+    public static decryptSaavnMediaUrl(encBase64: string, quality: '96' | '160' | '320' = '160'): string | null {
         try {
             if (!encBase64 || typeof encBase64 !== 'string') return null;
             const key = Buffer.from('38346591');
@@ -52,10 +53,11 @@ export class CleanCdnAudioService {
             let url = Buffer.from(clean).toString('utf8');
             if (!url.startsWith('http://') && !url.startsWith('https://')) return null;
 
+            const targetQuality = `_${quality}.mp4`;
             if (url.endsWith('.mp4') || url.endsWith('.m4a')) {
-                url = url.replace(/_[0-9]+(\.mp4|\.m4a)$/, '_320.mp4');
+                url = url.replace(/_[0-9]+(\.mp4|\.m4a)$/, targetQuality);
             } else {
-                url = url.replace(/_[0-9]+$/, '_320.mp4');
+                url = url.replace(/_[0-9]+$/, targetQuality);
             }
             return url;
         } catch {
@@ -242,17 +244,29 @@ export class CleanCdnAudioService {
                     continue; // Skip title mismatch
                 }
 
-                // Protocol Check 6: DRM Protection on Western Labels
-                // Western DRM tracks on JioSaavn often only have karaoke backing or truncated snippets
-                if (cand.is_drm === 1 || cand.is_drm === '1') {
-                    if (candLang === 'english' || (!candLang && !/[^\x00-\x7F]/.test(candTitle))) {
-                        continue; // Bypassed: Western DRM tracks route to verified YouTube official audio
-                    }
-                }
-
                 // Candidate PASSED ALL PROTOCOLS! Resolve full song details
                 let songData = cand;
                 let encUrl = cand.encrypted_media_url || cand.more_info?.encrypted_media_url;
+
+                if (!encUrl && cand.id) {
+                    try {
+                        const detRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                            params: {
+                                __call: 'song.getDetails',
+                                pids: cand.id,
+                                _format: 'json',
+                                _marker: '0',
+                                api_version: '4',
+                                ctx: 'web6dot0'
+                            },
+                            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+                            timeout: 3000
+                        }).catch(() => null);
+
+                        songData = detRes?.data?.songs?.[0] || detRes?.data?.[cand.id] || cand;
+                        encUrl = songData?.encrypted_media_url || songData?.more_info?.encrypted_media_url;
+                    } catch {}
+                }
 
                 if (!encUrl && (cand.url || cand.perma_url)) {
                     const songUrl = cand.url || cand.perma_url;
@@ -287,7 +301,7 @@ export class CleanCdnAudioService {
                     duration: candDur || parseInt(songData.duration, 10) || 0,
                     title: candTitle,
                     artist: candArtists || opts.primaryArtist || '',
-                    bitrate: '320kbps',
+                    bitrate: '160kbps',
                     source: 'saavn_direct_cdn'
                 };
             }
@@ -299,4 +313,113 @@ export class CleanCdnAudioService {
             return null;
         }
     }
+
+    /**
+     * Retrieves official lyrics from JioSaavn by lyrics_id or song_id.
+     */
+    public static async getLyrics(songIdOrLyricsId: string): Promise<string | null> {
+        try {
+            if (!songIdOrLyricsId) return null;
+            const res = await axios.get('https://www.jiosaavn.com/api.php', {
+                params: {
+                    __call: 'lyrics.getLyrics',
+                    lyrics_id: songIdOrLyricsId,
+                    _format: 'json',
+                    _marker: '0',
+                    api_version: '4',
+                    ctx: 'web6dot0'
+                },
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+                timeout: 3500
+            }).catch(() => null);
+
+            const rawLyrics = res?.data?.lyrics;
+            if (rawLyrics && typeof rawLyrics === 'string') {
+                return rawLyrics
+                    .replace(/<br\s*\/?>/gi, '\n')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#039;/g, "'")
+                    .replace(/&amp;/g, '&')
+                    .trim();
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Resolves official lyrics for a track by searching JioSaavn.
+     */
+    public static async resolveLyrics(title: string, artist?: string): Promise<string | null> {
+        try {
+            const cleanT = (title || '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
+            const cleanA = (artist || '').split(/[,&/|]/)[0].trim();
+            const q = cleanA ? `${cleanA} ${cleanT}` : cleanT;
+            if (!q) return null;
+
+            const searchRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                params: {
+                    __call: 'search.getResults',
+                    q,
+                    p: 1,
+                    n: 3,
+                    _format: 'json',
+                    _marker: '0',
+                    api_version: '4',
+                    ctx: 'web6dot0'
+                },
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+                timeout: 3500
+            }).catch(() => null);
+
+            const results = searchRes?.data?.results || [];
+            for (const r of results) {
+                if (r?.has_lyrics === 'true' || r?.has_lyrics === true || r?.id) {
+                    const lyrics = await this.getLyrics(r.id);
+                    if (lyrics && lyrics.length > 20) {
+                        return lyrics;
+                    }
+                }
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Fetches detailed song metadata and decrypted 320kbps URL by song ID.
+     */
+    public static async getSongDetails(songId: string): Promise<any | null> {
+        try {
+            if (!songId) return null;
+            const res = await axios.get('https://www.jiosaavn.com/api.php', {
+                params: {
+                    __call: 'song.getDetails',
+                    pids: songId,
+                    _format: 'json',
+                    _marker: '0',
+                    api_version: '4',
+                    ctx: 'web6dot0'
+                },
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+                timeout: 4000
+            }).catch(() => null);
+
+            const song = res?.data?.songs?.[0] || res?.data?.[songId];
+            if (!song) return null;
+
+            const enc = song.encrypted_media_url || song.more_info?.encrypted_media_url;
+            const audioUrl = enc ? this.decryptSaavnMediaUrl(enc) : null;
+
+            return {
+                ...song,
+                audioUrl
+            };
+        } catch {
+            return null;
+        }
+    }
 }
+
