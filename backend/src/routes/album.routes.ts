@@ -128,8 +128,9 @@ export async function albumRoutes(server: FastifyInstance) {
                         PaletteService.extractAndSaveTrack(track.id, track.coverUrl).catch(console.error);
                     }
                     
-                    // Fetch Audio (Always Full Song)
-                    ExternalMetadataService.fetchAudio(track.title, artistName, track.duration, undefined, { preview: false, bypassCache: true })
+                    // Fetch Audio if not already a direct JioSaavn 320kbps CDN stream
+                    if (!track.audioUrl || !track.audioUrl.includes('saavncdn.com')) {
+                        ExternalMetadataService.fetchAudio(track.title, artistName, track.duration, undefined, { preview: false, bypassCache: true })
                         .then(async (audioResult) => {
                             if (audioResult) {
                                 const isPreview = audioResult.url && (audioResult.url.includes('itunes.apple.com') || audioResult.url.includes('audio-ssl'));
@@ -146,6 +147,7 @@ export async function albumRoutes(server: FastifyInstance) {
                             }
                         })
                         .catch(err => console.warn(`[AudioSync] Failed for track "${track.title}":`, err.message));
+                    }
 
                     // Fetch Lyrics and Detect language
                     LyricsSyncService.detectSongLanguage(track.title, artistName, track.lyrics || undefined)
