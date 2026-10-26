@@ -83,7 +83,7 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
           ? compact
             ? "left-3 top-3 justify-start"
             : "left-4 top-3 justify-start"
-          : "right-3 top-2 justify-end"
+          : "right-24 top-0.5 justify-end"
       )}
     >
       <motion.div
@@ -104,10 +104,10 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
             transition={{ layout: springSoft }}
             style={{ borderRadius: 999 }}
             className={cn(
-              "flex items-center border border-white/[0.12] bg-[#1d1d20]",
+              "flex items-center rounded-full border border-white/20 bg-white/10 dark:bg-black/25 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)]",
               compact
-                ? "gap-0.5 p-[2px] shadow-[0_6px_20px_rgba(0,0,0,0.5)]"
-                : "gap-1 p-[3px] shadow-[0_10px_30px_rgba(0,0,0,0.55)]"
+                ? "gap-0.5 p-[2px]"
+                : "gap-1 p-[3px]"
             )}
           >
             {/* Language */}
@@ -129,17 +129,17 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
                           layoutId="lyr-seg"
                           transition={springMain}
                           style={{ borderRadius: 999 }}
-                          className="absolute inset-0 bg-white/[0.22]"
+                          className="absolute inset-0 bg-white/20 backdrop-blur-md shadow-sm"
                         />
                       )}
-                      <span className={cn("relative transition-colors duration-200", active ? "text-white" : "text-white/55")}>{o.label}</span>
+                      <span className={cn("relative transition-colors duration-200", active ? "text-white font-bold" : "text-white/60 hover:text-white")}>{o.label}</span>
                     </SpringButton>
                   );
                 })}
               </motion.div>
             )}
 
-            {p.canTranslate && p.showOffset && <span className={cn("mx-0.5 w-px bg-white/15", compact ? "h-3" : "h-4")} />}
+            {p.canTranslate && p.showOffset && <span className={cn("mx-0.5 w-px bg-white/20", compact ? "h-3" : "h-4")} />}
 
             {/* Timing */}
             {p.showOffset && (
@@ -152,7 +152,7 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
                     btnH,
                     fontSz,
                     compact ? "px-2" : "px-2.5",
-                    open ? "bg-white/[0.22] text-white" : offsetActive ? "text-brand" : "text-white/60 hover:text-white"
+                    open ? "bg-white/20 text-white" : offsetActive ? "text-brand bg-white/10" : "text-white/70 hover:text-white hover:bg-white/10"
                   )}
                 >
                   <SFTiming size={iconSz} />
@@ -169,14 +169,14 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
                       transition={{ width: springSoft, opacity: { duration: 0.18 } }}
                       className="flex items-center overflow-hidden"
                     >
-                      <SpringButton onClick={() => step(-100)} title="Lyrics earlier −0.1s" className={cn("ml-1 rounded-full text-white/80 hover:bg-white/10", iconBtn)}>
+                      <SpringButton onClick={() => step(-500)} title="Lyrics earlier −0.5s" className={cn("ml-1 rounded-full text-white/80 hover:bg-white/15", iconBtn)}>
                         <SFMinus size={stepIconSz} />
                       </SpringButton>
                       <SpringButton
                         onClick={() => { p.onOffset(0); arm(); }}
                         title="Reset"
                         className={cn(
-                          "rounded-full px-1 font-bold tabular-nums",
+                          "rounded-full px-1 font-bold tabular-nums hover:bg-white/15 transition-colors",
                           btnH,
                           fontSz,
                           compact ? "min-w-[40px]" : "min-w-[46px]",
@@ -185,7 +185,7 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
                       >
                         {fmt(p.offsetMs)}
                       </SpringButton>
-                      <SpringButton onClick={() => step(100)} title="Lyrics later +0.1s" className={cn("rounded-full text-white/80 hover:bg-white/10", iconBtn)}>
+                      <SpringButton onClick={() => step(500)} title="Lyrics later +0.5s" className={cn("rounded-full text-white/80 hover:bg-white/15", iconBtn)}>
                         <SFPlus size={stepIconSz} />
                       </SpringButton>
                     </motion.div>
@@ -196,7 +196,7 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
 
             {p.onClose && (
               <motion.div layout="position" className="flex items-center">
-                <span className="mx-0.5 h-4 w-px bg-white/15" />
+                <span className="mx-0.5 h-4 w-px bg-white/20" />
                 <SpringButton onClick={p.onClose} title="Close lyrics" className="h-7 w-7 rounded-full text-white/70 hover:bg-white/10 hover:text-white">
                   <SFClose size={13} />
                 </SpringButton>

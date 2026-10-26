@@ -676,7 +676,7 @@ export function LyricsView({
       showOffset={showOffset}
       offsetMs={lyricsOffsetMs}
       onOffset={handleOffsetChange}
-      onClose={!isMobile && !isSidebar ? onClose : undefined}
+      onClose={!isMobile && !isSidebar && !isFullscreen ? onClose : undefined}
       hidden={isUserScrolling || !!isIdle}
     />
   );
