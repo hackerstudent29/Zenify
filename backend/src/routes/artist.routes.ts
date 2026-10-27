@@ -267,22 +267,30 @@ export async function artistRoutes(server: FastifyInstance) {
 
         if (!artist) return null;
 
-        // Enrich artist bio / image / banner if missing or placeholder
-        const hasBadCover = !artist.coverUrl || artist.coverUrl.trim() === '' || artist.coverUrl.includes('placeholder') || artist.coverUrl.includes('logo.png');
-        const hasBadImage = !artist.imageUrl || artist.imageUrl.trim() === '' || artist.imageUrl.includes('ui-avatars.com') || artist.imageUrl.includes('placeholder') || artist.imageUrl.includes('logo.png');
-        const hasBadBio = !artist.bio || artist.bio.startsWith('Listen to tracks') || artist.bio.length < 30;
+        // Enrich artist bio / image / banner if missing or placeholder or not widescreen
+        let widescreenBanner: string | null = null;
+        const hasBadBio = !artist.bio || artist.bio.length < 30 || artist.bio.includes('ui-avatars.com');
+        const hasBadImage = !artist.imageUrl || artist.imageUrl.includes('ui-avatars.com') || artist.imageUrl.includes('artist-default');
+        const hasBadCover = !artist.coverUrl || artist.coverUrl.includes('ui-avatars.com') || artist.coverUrl.includes('artist-default');
+        const isCurrentBannerWidescreen = artist.coverUrl && (
+            artist.coverUrl.includes('1920x1080') || 
+            artist.coverUrl.includes('mzstatic') || 
+            artist.coverUrl.includes('headerImage') || 
+            artist.coverUrl.includes('dzcdn.net')
+        );
 
-        if (hasBadBio || hasBadImage || hasBadCover) {
+        if (!isCurrentBannerWidescreen || hasBadBio || hasBadImage || hasBadCover) {
             try {
                 const { ArtistMetadataService } = await import('../services/artist-metadata.service.js');
                 const visuals = await ArtistMetadataService.fetchArtistVisuals(artist.id, artist.name).catch(() => null);
                 if (visuals) {
                     const updateData: any = {};
-                    if (visuals.coverUrl && visuals.coverUrl !== artist.coverUrl) {
+                    if (visuals.coverUrl) {
+                        widescreenBanner = visuals.coverUrl;
                         artist.coverUrl = visuals.coverUrl;
                         updateData.coverUrl = visuals.coverUrl;
                     }
-                    if (visuals.imageUrl && visuals.imageUrl !== artist.imageUrl) {
+                    if (visuals.imageUrl && (hasBadImage || !artist.imageUrl)) {
                         artist.imageUrl = visuals.imageUrl;
                         updateData.imageUrl = visuals.imageUrl;
                     }
@@ -433,7 +441,7 @@ export async function artistRoutes(server: FastifyInstance) {
                     const encMedia = s.more_info?.encrypted_media_url || s.encrypted_media_url;
                     let directAudio = '';
                     if (encMedia) {
-                        directAudio = CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '160') || '';
+                        directAudio = CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '320') || CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '160') || '';
                     }
                     const rawSingers = s.singers || s.primary_artists || s.more_info?.singers;
                     const trackArtist = cleanArtistNames(rawSingers, artist.name);
@@ -448,13 +456,17 @@ export async function artistRoutes(server: FastifyInstance) {
                         duration: dur,
                         coverUrl: artwork,
                         audioUrl: finalAudio,
+                        streamUrl: finalAudio,
                         artistId: artist.id,
                         artist: { id: artist.id, name: trackArtist, imageUrl: artist.imageUrl },
+                        artists: [{ id: artist.id, name: trackArtist, imageUrl: artist.imageUrl }],
                         album: {
                             id: `saavn-album-${s.album_id || s.albumid || s.id}`,
                             title: albTitle,
                             coverUrl: artwork
                         },
+                        releaseDate: s.year ? new Date(`${s.year}-01-01`) : new Date(),
+                        createdAt: s.year ? new Date(`${s.year}-01-01`) : new Date(),
                         isVirtual: true,
                         isLocalAvailable: false,
                         streams: parseInt(s.play_count || s.more_info?.play_count, 10) || 50000,
@@ -835,7 +847,7 @@ export async function artistRoutes(server: FastifyInstance) {
             }
         }
 
-        // Categorize releases for Apple Music layout
+        // Categorize releases for layout
         const sortedAlbums = [...finalAlbums].sort((a, b) => {
             const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
             const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
@@ -847,24 +859,103 @@ export async function artistRoutes(server: FastifyInstance) {
         const singlesAndEPs = sortedAlbums.filter(a => a.isSingle || (a.title || '').toLowerCase().includes('single') || (a.title || '').toLowerCase().includes('ep'));
         const essentialAlbums = studioAlbums.length >= 2 ? studioAlbums.slice(0, 6) : [];
 
+        // ── Map JioSaavn Rich Sections ─────────────────────────────────────────
+        // 1. "Just [Artist Name]" Dedicated Playlists
+        const dedicatedPlaylists = (saavnArtistData?.dedicated_artist_playlist || []).map((pl: any, pIdx: number) => {
+            const title = (pl.title || pl.name || '').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&');
+            const image = (pl.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+            const songCount = pl.subtitle || (pl.more_info?.song_count ? `${pl.more_info.song_count} Songs` : 'Playlist');
+            return {
+                id: `saavn-playlist-${pl.id || pIdx}`,
+                title,
+                name: title,
+                subtitle: songCount,
+                coverUrl: image,
+                image,
+                trackCount: parseInt(pl.more_info?.song_count || '0', 10) || 50,
+                type: 'playlist',
+                isVirtual: true
+            };
+        }).filter((p: any) => p.title && p.coverUrl);
+
+        // 2. "Featured In" Playlists & Soundtracks
+        const featuredInPlaylists = (saavnArtistData?.featured_artist_playlist || []).map((pl: any, pIdx: number) => {
+            const title = (pl.title || pl.name || '').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&');
+            const image = (pl.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+            const songCount = pl.subtitle || (pl.more_info?.song_count ? `${pl.more_info.song_count} Songs` : 'Playlist');
+            return {
+                id: `saavn-playlist-${pl.id || pIdx}`,
+                title,
+                name: title,
+                subtitle: songCount,
+                coverUrl: image,
+                image,
+                trackCount: parseInt(pl.more_info?.song_count || '0', 10) || 50,
+                type: 'playlist',
+                isVirtual: true
+            };
+        }).filter((p: any) => p.title && p.coverUrl);
+
+        // 3. "Latest Releases"
+        const latestReleases = (saavnArtistData?.latest_release || []).map((lr: any, rIdx: number) => {
+            const title = (lr.title || lr.name || '').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&');
+            const image = (lr.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+            return {
+                id: lr.type === 'song' ? `saavn-${lr.id || rIdx}` : `saavn-album-${lr.id || rIdx}`,
+                title,
+                name: title,
+                subtitle: lr.subtitle || lr.description || (lr.year ? `Released ${lr.year}` : 'Latest Release'),
+                coverUrl: image,
+                image,
+                year: lr.year || '2026',
+                type: lr.type || 'album',
+                isVirtual: true
+            };
+        }).filter((lr: any) => lr.title && lr.coverUrl);
+
+        // 4. "Singles"
+        const saavnSingles = (saavnArtistData?.singles || []).map((sg: any, sIdx: number) => {
+            const title = (sg.title || sg.name || '').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&');
+            const image = (sg.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+            return {
+                id: sg.type === 'song' ? `saavn-${sg.id || sIdx}` : `saavn-album-${sg.id || sIdx}`,
+                title,
+                name: title,
+                subtitle: sg.year ? `Single • ${sg.year}` : 'Single',
+                coverUrl: image,
+                image,
+                year: sg.year || '',
+                type: sg.type || 'single',
+                isVirtual: true
+            };
+        }).filter((sg: any) => sg.title && sg.coverUrl);
+
+        const heroBanner = widescreenBanner || artist.coverUrl || wikiBanner || deezerCover || finalImageUrl;
+
         return JSON.parse(JSON.stringify({ 
             ...artist, 
             imageUrl: finalImageUrl,
-            coverUrl: artist.coverUrl || wikiBanner || deezerCover || finalImageUrl,
-            bio: artist.bio || wikiBio,
+            coverUrl: heroBanner,
+            bannerUrl: heroBanner,
+            bio: artist.bio || saavnBio || wikiBio,
             latestRelease,
+            latestReleases: latestReleases.length > 0 ? latestReleases : (latestRelease ? [latestRelease] : []),
             essentialAlbums,
             studioAlbums,
             singlesAndEPs,
+            singles: saavnSingles.length > 0 ? saavnSingles : singlesAndEPs,
+            topAlbums: finalAlbums,
+            dedicatedPlaylists,
+            featuredInPlaylists,
             appearsOn: appearsOnAlbums,
             compilations: appearsOnAlbums.length > 0 ? appearsOnAlbums : [],
             topTracks: finalTopTracks, 
             albums: finalAlbums,
-            playlists: artistPlaylists,
+            playlists: dedicatedPlaylists.length > 0 ? dedicatedPlaylists : artistPlaylists,
             relatedArtists: relatedArtists.length > 0 ? relatedArtists : [],
             trackCount: Math.max(trackCount, finalTopTracks.length), 
             totalStreams: Number(streamAgg._sum.streams || 0),
-            follower_count: artist.follower_count || 0,
+            follower_count: artist.follower_count || saavnFollowers || 0,
             monthlyListeners: artist.monthlyListeners || 0
         },
             (key, value) => typeof value === 'bigint' ? value.toString() : value

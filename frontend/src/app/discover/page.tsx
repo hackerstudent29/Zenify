@@ -14,6 +14,8 @@ import {
   TrendingUp,
   ChevronRight,
   ChevronDown,
+  User,
+  Disc,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -536,17 +538,37 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
     staleTime: 15000,
   });
 
-  // Live provider search hints autocomplete
-  const { data: suggestions } = useQuery({
-    queryKey: ["search-hints", debouncedQuery],
+  // Live provider search rich autocomplete (Artists, Tracks, Albums & Hints)
+  const { data: autocompleteData } = useQuery({
+    queryKey: ["search-autocomplete", debouncedQuery],
     queryFn: async ({ signal }) => {
-      if (!debouncedQuery || debouncedQuery.trim().length < 2) return [];
+      if (!debouncedQuery || debouncedQuery.trim().length < 2) return null;
       const res = await api.get("search/autocomplete", { params: { q: debouncedQuery.trim() }, signal });
-      return Array.isArray(res.data) ? res.data : [];
+      return res.data;
     },
     enabled: !!debouncedQuery && debouncedQuery.trim().length >= 2,
     staleTime: 1000 * 60 * 5,
   });
+
+  const suggestions = useMemo(() => {
+    if (!autocompleteData) return [];
+    if (Array.isArray(autocompleteData)) return autocompleteData;
+    return autocompleteData.hints || [];
+  }, [autocompleteData]);
+
+  const autocompleteArtists = useMemo(() => autocompleteData?.artists || [], [autocompleteData]);
+  const autocompleteTracks = useMemo(() => autocompleteData?.tracks || [], [autocompleteData]);
+  const autocompleteAlbums = useMemo(() => autocompleteData?.albums || [], [autocompleteData]);
+
+  // Flattened items for keyboard navigation (Down/Up/Enter)
+  const flattenedNavItems = useMemo(() => {
+    const list: { type: "artist" | "track" | "album" | "hint"; data: any }[] = [];
+    autocompleteArtists.slice(0, 2).forEach((a: any) => list.push({ type: "artist", data: a }));
+    autocompleteTracks.slice(0, 4).forEach((t: any) => list.push({ type: "track", data: t }));
+    autocompleteAlbums.slice(0, 2).forEach((alb: any) => list.push({ type: "album", data: alb }));
+    suggestions.slice(0, 3).forEach((h: any) => list.push({ type: "hint", data: h }));
+    return list;
+  }, [autocompleteArtists, autocompleteTracks, autocompleteAlbums, suggestions]);
 
   // Discovery Home data (genres, top charts, trending, country top songs)
   const { data: homeData } = useQuery({
@@ -587,18 +609,30 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!suggestions || suggestions.length === 0) return;
+    if (flattenedNavItems.length === 0) return;
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedSuggestionIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
+      setSelectedSuggestionIndex((prev) => Math.min(prev + 1, flattenedNavItems.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedSuggestionIndex((prev) => Math.max(prev - 1, -1));
     } else if (e.key === "Enter") {
-      if (selectedSuggestionIndex >= 0 && suggestions[selectedSuggestionIndex]) {
+      if (selectedSuggestionIndex >= 0 && flattenedNavItems[selectedSuggestionIndex]) {
         e.preventDefault();
-        handleSelectSuggestion(suggestions[selectedSuggestionIndex].title);
+        const item = flattenedNavItems[selectedSuggestionIndex];
+        if (item.type === "track") {
+          playTrack(item.data);
+          setIsInputFocused(false);
+        } else if (item.type === "artist") {
+          router.push(`/artist/${item.data.id}`);
+          setIsInputFocused(false);
+        } else if (item.type === "album") {
+          router.push(`/album/${item.data.id}`);
+          setIsInputFocused(false);
+        } else if (item.type === "hint") {
+          handleSelectSuggestion(item.data.title);
+        }
       } else {
         setIsInputFocused(false);
       }
@@ -614,7 +648,12 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
   };
 
   const playTrack = (track: any, log = true) => {
-    setTrack(track);
+    const formatted = {
+      ...track,
+      artwork: track.artwork || track.coverUrl || track.image,
+      streamUrl: track.streamUrl || track.audioUrl,
+    };
+    setTrack(formatted);
     setPlayerMinimized(false);
     if (log) logSearchEvent("track", track.id, track.title);
   };
@@ -738,37 +777,241 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
                   </motion.button>
                 </div>
 
-                {/* macOS menu style suggestions */}
+                {/* Rich Spotify / Apple Music style autocomplete dropdown */}
                 <AnimatePresence>
-                  {isInputFocused && suggestions && suggestions.length > 0 && (
+                  {isInputFocused && flattenedNavItems.length > 0 && (
                     <motion.div
                       id="search-suggestions-listbox"
                       role="listbox"
-                      initial={{ opacity: 0, scale: 0.97, y: -6 }}
+                      initial={{ opacity: 0, scale: 0.98, y: -4 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.97, y: -6 }}
+                      exit={{ opacity: 0, scale: 0.98, y: -4 }}
                       transition={SPRING}
                       style={{ transformOrigin: "top center" }}
-                      className="absolute left-0 right-0 top-full mt-2 p-1 rounded-xl bg-[rgba(44,44,46,0.72)] backdrop-blur-2xl backdrop-saturate-150 border border-white/[0.14] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.7)] z-50"
+                      className="absolute left-0 right-0 top-full mt-2 p-1.5 rounded-2xl bg-[rgba(24,24,27,0.92)] backdrop-blur-2xl backdrop-saturate-150 border border-white/[0.14] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85)] z-50 max-h-[480px] overflow-y-auto no-scrollbar space-y-1"
                     >
-                      {suggestions.slice(0, 6).map((hint: any, idx: number) => (
-                        <div
-                          key={hint.id || idx}
-                          role="option"
-                          aria-selected={selectedSuggestionIndex === idx}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            handleSelectSuggestion(hint.title);
-                          }}
-                          className={cn(
-                            "flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[14px] cursor-pointer transition-colors",
-                            selectedSuggestionIndex === idx ? "bg-brand text-white" : "text-white/85 hover:bg-brand hover:text-white"
-                          )}
-                        >
-                          <SearchIcon size={13} className="opacity-60 shrink-0" />
-                          <span className="truncate flex-1">{hint.title}</span>
+                      {/* Top Artists Section */}
+                      {autocompleteArtists.length > 0 && (
+                        <div className="p-1">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 px-2.5 py-1 flex items-center gap-1.5">
+                            <User size={11} className="text-brand" />
+                            <span>Artists</span>
+                          </div>
+                          {autocompleteArtists.slice(0, 2).map((artist: any, aIdx: number) => {
+                            const navIdx = aIdx;
+                            const isSelected = selectedSuggestionIndex === navIdx;
+                            return (
+                              <div
+                                key={artist.id || `artist-${aIdx}`}
+                                role="option"
+                                aria-selected={isSelected}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  router.push(`/artist/${artist.id}`);
+                                  setIsInputFocused(false);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-3 px-2.5 py-2 rounded-xl cursor-pointer transition-all group",
+                                  isSelected
+                                    ? "bg-white/15 text-white"
+                                    : "text-white/85 hover:bg-white/10 hover:text-white"
+                                )}
+                              >
+                                {artist.imageUrl || artist.image ? (
+                                  <img
+                                    src={getMediaUrl(artist.imageUrl || artist.image)}
+                                    alt={artist.name}
+                                    className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = FALLBACK_ARTIST;
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                                    <User size={14} className="text-white/60" />
+                                  </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[13px] font-semibold text-white truncate group-hover:text-brand transition-colors">
+                                    {artist.name}
+                                  </div>
+                                  <div className="text-[11px] text-white/45 truncate">
+                                    Artist {artist.follower_count || artist.followers ? `• ${((artist.follower_count || artist.followers) / 1000).toFixed(0)}k followers` : ""}
+                                  </div>
+                                </div>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 uppercase font-bold tracking-wider shrink-0">
+                                  Artist
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
-                      ))}
+                      )}
+
+                      {/* Top Songs Section */}
+                      {autocompleteTracks.length > 0 && (
+                        <div className="p-1 border-t border-white/5">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 px-2.5 py-1 flex items-center gap-1.5">
+                            <Music size={11} className="text-brand" />
+                            <span>Songs</span>
+                          </div>
+                          {autocompleteTracks.slice(0, 4).map((track: any, tIdx: number) => {
+                            const navIdx = Math.min(autocompleteArtists.length, 2) + tIdx;
+                            const isSelected = selectedSuggestionIndex === navIdx;
+                            const isCurrent = currentTrack?.id === track.id;
+                            return (
+                              <div
+                                key={track.id || `track-${tIdx}`}
+                                role="option"
+                                aria-selected={isSelected}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  playTrack(track);
+                                  setIsInputFocused(false);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-3 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all group",
+                                  isSelected
+                                    ? "bg-white/15 text-white"
+                                    : "text-white/85 hover:bg-white/10 hover:text-white"
+                                )}
+                              >
+                                <div className="relative w-9 h-9 shrink-0 rounded-lg overflow-hidden border border-white/10">
+                                  <img
+                                    src={getMediaUrl(track.coverUrl || track.artwork || track.image)}
+                                    alt={track.title}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = FALLBACK_TRACK;
+                                    }}
+                                  />
+                                  <div
+                                    className={cn(
+                                      "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
+                                      isCurrent ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                    )}
+                                  >
+                                    {isCurrent && isPlaying ? (
+                                      <Pause size={12} className="text-white fill-white" />
+                                    ) : (
+                                      <Play size={12} className="text-white fill-white ml-0.5" />
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div
+                                    className={cn(
+                                      "text-[13px] font-medium truncate transition-colors",
+                                      isCurrent ? "text-brand font-semibold" : "text-white group-hover:text-white"
+                                    )}
+                                  >
+                                    {track.title}
+                                  </div>
+                                  <div className="text-[11px] text-white/45 truncate">
+                                    {track.artist || track.artists?.map((a: any) => a.name).join(", ")}
+                                    {track.album ? ` • ${track.album}` : ""}
+                                  </div>
+                                </div>
+                                {track.duration ? (
+                                  <span className="text-[11px] text-white/40 tabular-nums shrink-0">
+                                    {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, "0")}
+                                  </span>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Top Albums Section */}
+                      {autocompleteAlbums.length > 0 && (
+                        <div className="p-1 border-t border-white/5">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-white/40 px-2.5 py-1 flex items-center gap-1.5">
+                            <Disc size={11} className="text-brand" />
+                            <span>Albums</span>
+                          </div>
+                          {autocompleteAlbums.slice(0, 2).map((album: any, albIdx: number) => {
+                            const navIdx =
+                              Math.min(autocompleteArtists.length, 2) +
+                              Math.min(autocompleteTracks.length, 4) +
+                              albIdx;
+                            const isSelected = selectedSuggestionIndex === navIdx;
+                            return (
+                              <div
+                                key={album.id || `album-${albIdx}`}
+                                role="option"
+                                aria-selected={isSelected}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  router.push(`/album/${album.id}`);
+                                  setIsInputFocused(false);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-3 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all group",
+                                  isSelected
+                                    ? "bg-white/15 text-white"
+                                    : "text-white/85 hover:bg-white/10 hover:text-white"
+                                )}
+                              >
+                                <img
+                                  src={getMediaUrl(album.coverUrl || album.artwork || album.image)}
+                                  alt={album.title || album.name}
+                                  className="w-9 h-9 rounded-md object-cover border border-white/10 shrink-0"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = FALLBACK_ALBUM;
+                                  }}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[13px] font-medium text-white truncate group-hover:text-brand transition-colors">
+                                    {album.title || album.name}
+                                  </div>
+                                  <div className="text-[11px] text-white/45 truncate">
+                                    Album • {album.artist || album.artists?.map((a: any) => a.name).join(", ")}
+                                    {album.year ? ` • ${album.year}` : ""}
+                                  </div>
+                                </div>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 uppercase font-bold tracking-wider shrink-0">
+                                  Album
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Search Hints */}
+                      {suggestions.length > 0 && (
+                        <div className="p-1 border-t border-white/5">
+                          {suggestions.slice(0, 3).map((hint: any, hIdx: number) => {
+                            const navIdx =
+                              Math.min(autocompleteArtists.length, 2) +
+                              Math.min(autocompleteTracks.length, 4) +
+                              Math.min(autocompleteAlbums.length, 2) +
+                              hIdx;
+                            const isSelected = selectedSuggestionIndex === navIdx;
+                            return (
+                              <div
+                                key={hint.id || `hint-${hIdx}`}
+                                role="option"
+                                aria-selected={isSelected}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleSelectSuggestion(hint.title);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] cursor-pointer transition-colors",
+                                  isSelected
+                                    ? "bg-brand text-white"
+                                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                                )}
+                              >
+                                <SearchIcon size={12} className="opacity-50 shrink-0" />
+                                <span className="truncate flex-1">{hint.title}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>

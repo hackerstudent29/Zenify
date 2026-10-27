@@ -106,12 +106,25 @@ export class ArtistMetadataService {
                 }).catch(() => null);
 
                 if (pageRes?.data) {
-                    const $ = cheerio.load(pageRes.data);
-                    const ogImage = $('meta[property="og:image"]').attr('content');
-                    if (ogImage && ogImage.includes('mzstatic')) {
-                        heroBanner = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/1920x1080bb.$1');
-                        avatar = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/600x600bb.$1');
+                    const html = pageRes.data;
+                    const $ = cheerio.load(html);
+
+                    // 1. Prioritize official Apple Music AMCArtistImages master banner (2560x1440)
+                    const amcMatches = html.match(/https:\/\/[^"'\s]+AMCArtistImages[^"'\s]+/g);
+                    if (amcMatches && amcMatches.length > 0) {
+                        const rawAmc = amcMatches[0].replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '');
+                        heroBanner = `${rawAmc}/2560x1440bb.webp`;
+                        avatar = `${rawAmc}/600x600bb.jpg`;
                         source = 'apple_music';
+                    }
+
+                    if (!heroBanner) {
+                        const ogImage = $('meta[property="og:image"]').attr('content');
+                        if (ogImage && ogImage.includes('mzstatic')) {
+                            heroBanner = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/2560x1440bb.$1');
+                            avatar = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/600x600bb.$1');
+                            source = 'apple_music';
+                        }
                     }
 
                     // Also extract editorial bio if present

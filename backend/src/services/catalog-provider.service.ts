@@ -850,6 +850,61 @@ export class JioSaavnCatalogProvider implements CatalogProvider {
   }
 
   async getArtistTopSongs(artistName: string, storefront: string, limit = 15): Promise<CatalogTrack[]> {
+    try {
+      // 1. Search for verified JioSaavn artist ID
+      const artistSearch = await axios.get('https://www.jiosaavn.com/api.php', {
+        params: { __call: 'search.getArtistResults', q: artistName, p: 1, n: 3, _format: 'json', ctx: 'web6dot0' },
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+        timeout: 2500
+      });
+      const topArtist = artistSearch.data?.results?.[0];
+      if (topArtist?.id) {
+        // 2. Fetch official top songs for artist
+        const detailsRes = await axios.get('https://www.jiosaavn.com/api.php', {
+          params: { __call: 'artist.getArtistPageDetails', artistId: topArtist.id, _format: 'json', ctx: 'web6dot0' },
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+          timeout: 2800
+        });
+        const rawSongs = detailsRes.data?.topSongs || [];
+        if (rawSongs.length > 0) {
+          const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
+          const tracks: CatalogTrack[] = [];
+          for (const s of rawSongs.slice(0, limit)) {
+            const songTitle = (s.title || s.song || '').trim();
+            if (!songTitle) continue;
+            const dur = parseInt(s.more_info?.duration || s.duration, 10) || 180;
+            const primaryArtist = topArtist.name || artistName;
+            const albumName = s.more_info?.album || s.album || 'Single';
+            const encMedia = s.more_info?.encrypted_media_url || s.encrypted_media_url;
+            const directAudioUrl = encMedia ? CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '320') : undefined;
+            let cover = (s.image || s.more_info?.image || topArtist.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+            const playCount = parseInt(s.play_count || '50000000', 10) || 50000000;
+
+            tracks.push({
+              id: `saavn-${s.id}`,
+              source: 'jiosaavn',
+              sourceId: String(s.id),
+              title: songTitle,
+              artists: [{ id: `artist-${encodeURIComponent(primaryArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`, name: primaryArtist, imageUrl: cover }],
+              artist: { id: `artist-${encodeURIComponent(primaryArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`, name: primaryArtist, imageUrl: cover },
+              album: { id: `album-${encodeURIComponent(albumName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`, title: albumName, coverUrl: cover },
+              duration: dur,
+              artwork: cover,
+              coverUrl: cover,
+              audioUrl: directAudioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${primaryArtist} - ${songTitle}`)}&title=${encodeURIComponent(songTitle)}&artist=${encodeURIComponent(primaryArtist)}&trackId=saavn-${s.id}`,
+              storefront,
+              fetchedAt: Date.now(),
+              isVirtual: true,
+              streams: playCount,
+              playCount: playCount
+            });
+          }
+          if (tracks.length > 0) return tracks;
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[JioSaavn] getArtistTopSongs failed for "${artistName}":`, err.message);
+    }
     const searchRes = await this.search(artistName, storefront, limit);
     return searchRes.tracks;
   }

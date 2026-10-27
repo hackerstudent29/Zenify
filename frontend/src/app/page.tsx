@@ -147,8 +147,10 @@ export default function Home() {
       {isMobile ? (
         <MobileHomePage />
       ) : (
-        <div className="space-y-8 md:space-y-12 pb-24 pt-[88px] md:pt-[104px] min-h-screen bg-background">
-          <div className="space-y-12 px-0">
+        <div className="relative space-y-8 md:space-y-12 pb-24 pt-[88px] md:pt-[104px] min-h-screen">
+          {/* Subtle Apple Music ambient depth glow behind glass elements */}
+          <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-10%,rgba(140,130,220,0.08),rgba(0,0,0,0))] opacity-80" />
+          <div className="relative z-10 space-y-12 px-0">
             {!hasAnyItems && !isAllLoading ? (
               <div className="flex flex-col items-center justify-center py-24 px-6 text-center border border-dashed border-white/5 rounded-3xl bg-white/[0.02] mx-4 md:mx-6">
                 <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mb-6">

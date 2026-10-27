@@ -57,7 +57,18 @@ export class MetadataResolverService {
         const cleanedTitle = this.cleanTitle(rawTitle);
         const normalizedTitle = cleanedTitle.toLowerCase().trim();
 
-        const rawArtist = input.artistName || "Various Artists";
+        let rawArtist = input.artistName;
+        let cdnHint: any = null;
+        if (!rawArtist || rawArtist === 'Various Artists') {
+            try {
+                const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
+                cdnHint = await CleanCdnAudioService.resolveAudio({ title: cleanedTitle });
+                if (cdnHint && cdnHint.artist && cdnHint.artist !== 'Unknown Artist') {
+                    rawArtist = cdnHint.artist;
+                }
+            } catch {}
+        }
+        if (!rawArtist) rawArtist = "Various Artists";
 
         // Step 1: Resolve Artist Entity & split primary vs featured artists
         let resolvedArtist = await ArtistMappingService.resolveArtist(rawArtist);

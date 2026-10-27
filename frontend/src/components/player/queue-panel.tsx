@@ -68,52 +68,48 @@ export function QueuePanel() {
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[1200] pointer-events-none">
-        {/* Backdrop */}
+        {/* Backdrop: transparent click catcher on desktop so the page stays visible and blurred, darkened on mobile */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={() => setIsQueueOpen(false)}
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm pointer-events-auto"
+          className={cn("absolute inset-0 pointer-events-auto", isMobile ? "bg-black/50 backdrop-blur-sm" : "bg-transparent")}
         />
 
-        {/* Panel */}
+        {/* Panel (Slim & Lengthy Apple Music Frosted Glass Drawer) */}
         <motion.div
           initial={isMobile ? { y: "100%" } : { x: "100%" }}
           animate={isMobile ? { y: 0 } : { x: 0 }}
           exit={isMobile ? { y: "100%" } : { x: "100%" }}
-          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          transition={{ type: "spring", damping: 28, stiffness: 240 }}
           className={cn(
-            "absolute pointer-events-auto flex flex-col shadow-2xl",
-            isGlassmorphism
-              ? "bg-[#121214]/95 backdrop-blur-2xl border border-white/10 ring-1 ring-white/5"
-              : "bg-[#121214] border-white/5",
+            "absolute pointer-events-auto flex flex-col shadow-[-16px_0_40px_rgba(0,0,0,0.4)]",
+            "bg-black/15 backdrop-blur-md border-l border-white/10",
             isMobile
-              ? "bottom-0 left-0 right-0 h-[82vh] rounded-t-[36px] border-t"
-              : "top-0 right-0 bottom-0 w-[420px] border-l"
+              ? "bottom-0 left-0 right-0 h-[84vh] rounded-t-[32px] border-t"
+              : "top-0 right-0 bottom-0 w-[320px] sm:w-[350px] md:w-[360px] border-l"
           )}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 sm:px-8 pt-6 pb-4 border-b border-white/5">
-            <div className="flex items-center gap-3">
-              <ListMusic className="text-brand" size={20} />
-              <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">Queue</h2>
-            </div>
+          {/* Header (Apple Music 'Up next' style) */}
+          <div className="flex items-center justify-between px-5 sm:px-6 pt-5 pb-3.5 border-b border-white/10">
+            <h2 className="text-[17px] font-bold text-white tracking-tight">Up next</h2>
             <div className="flex items-center gap-2">
               {(userQueue && userQueue.length > 0) && (
                 <button
                   onClick={() => clearUserQueue()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-red-400 transition-all cursor-pointer active:scale-95"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[10px] font-bold uppercase tracking-wider text-white/60 hover:text-red-400 transition-all cursor-pointer active:scale-95"
                 >
-                  <Trash size={12} />
-                  Clear Queue
+                  <Trash size={11} />
+                  Clear
                 </button>
               )}
               <button
                 onClick={() => setIsQueueOpen(false)}
-                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors cursor-pointer active:scale-95"
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer active:scale-95"
+                title="Close"
               >
-                <X size={20} />
+                <X size={14} />
               </button>
             </div>
           </div>
@@ -342,8 +338,8 @@ export function QueuePanel() {
                   </h3>
 
                   {(!contextQueue || contextQueue.length === 0) ? (
-                    <div className="px-3 py-3 rounded-xl bg-white/[0.02] border border-white/5 text-white/30 text-[11px] font-medium text-center">
-                      End of context tracks.
+                    <div className="py-12 px-4 text-center">
+                      <p className="text-[14px] font-medium text-white/40 tracking-tight">No upcoming songs</p>
                     </div>
                   ) : (
                     <div className="space-y-1">

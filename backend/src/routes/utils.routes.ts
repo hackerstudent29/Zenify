@@ -1258,18 +1258,18 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
 
         // ── 0.5. ULTRA-FAST CLEAN 320KBPS CDN RESOLVER (Protocol-Verified) ──
-        if (cleanCandTitle && cleanCandArtist) {
+        if (cleanCandTitle) {
             try {
                 const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
                 const cdnResult = await CleanCdnAudioService.resolveAudio({
                     title: candTitle || cleanCandTitle,
-                    primaryArtist: cleanCandArtist || candArtist,
+                    primaryArtist: cleanCandArtist || candArtist || '',
                     album: candAlbum,
                     duration: localTrack?.duration,
                     language: resolvedSongLang
                 });
                 if (cdnResult?.url) {
-                    server.log.info(`[stream-youtube] Protocol-Verified Clean CDN match (320kbps): "${cdnResult.title}" by "${cdnResult.artist}"`);
+                    server.log.info(`[stream-youtube] Protocol-Verified Clean CDN match (320kbps): "${cdnResult.title}" by "${cdnResult.artist}" (Album: "${cdnResult.album || 'Single'}")`);
 
                     const cachePayload = { directUrl: cdnResult.url, expiresAt: Date.now() + 4 * 60 * 60 * 1000 };
                     youtubeStreamCache.set(url, cachePayload);
@@ -1279,6 +1279,11 @@ export async function utilsRoutes(server: FastifyInstance) {
                     if (effectiveTrackId) {
                         youtubeStreamCache.set(`track:${effectiveTrackId}`, cachePayload);
                     }
+
+                    if (cdnResult.title) reply.header('x-zenify-track-title', encodeURIComponent(cdnResult.title));
+                    if (cdnResult.artist) reply.header('x-zenify-track-artist', encodeURIComponent(cdnResult.artist));
+                    if (cdnResult.album) reply.header('x-zenify-track-album', encodeURIComponent(cdnResult.album));
+                    if (cdnResult.coverUrl) reply.header('x-zenify-track-cover', encodeURIComponent(cdnResult.coverUrl));
 
                     return await streamProxyUrl(cdnResult.url, request, reply);
                 }
@@ -1877,6 +1882,32 @@ export async function utilsRoutes(server: FastifyInstance) {
             });
         } catch (err: any) {
             server.log.error(`reset-catalog-data error: ${err.message}`);
+            return reply.status(500).send({ error: err.message });
+        }
+    });
+
+    // Reset home section songs for all users (FeaturedContent, History, UserTrackStat, and flush caches)
+    server.post('/reset-home-data', async (request, reply) => {
+        try {
+            const { prisma } = await import('../utils/prisma.js');
+            const { flushAllCaches } = await import('../utils/cache.js');
+
+            const [f, h, u] = await Promise.all([
+                prisma.featuredContent.deleteMany({}).catch(() => ({ count: 0 })),
+                prisma.history.deleteMany({}).catch(() => ({ count: 0 })),
+                prisma.userTrackStat.deleteMany({}).catch(() => ({ count: 0 }))
+            ]);
+
+            await flushAllCaches().catch(() => {});
+
+            server.log.info(`[Maintenance] Home sections reset. FeaturedContent: ${f.count}, History: ${h.count}, UserTrackStats: ${u.count}`);
+            return reply.send({
+                success: true,
+                message: 'Home section songs have been reset for all users.',
+                deleted: { featured: f.count, history: h.count, userStats: u.count }
+            });
+        } catch (err: any) {
+            server.log.error(`reset-home-data error: ${err.message}`);
             return reply.status(500).send({ error: err.message });
         }
     });

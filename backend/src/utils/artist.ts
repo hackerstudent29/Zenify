@@ -151,7 +151,7 @@ const ALIASES: Record<string, string> = {
 export function splitArtistString(rawArtist: string): string[] {
     if (!rawArtist) return [];
     const parts = rawArtist
-        .split(/\s*(?:,|&|\band\b|\bfeat\.?\b|\bft\.?\b|\bwith\b|\bvs\.?\b|\/|;)\s*/i)
+        .split(/\s*(?:,|&|\||\band\b|\bfeat\.?\b|\bft\.?\b|\bwith\b|\bvs\.?\b|\/|;|\s{2,})\s*/i)
         .map(p => p.trim())
         .filter(p => p.length > 0 && !/^(official|topic|various artists|vevo)$/i.test(p));
 
