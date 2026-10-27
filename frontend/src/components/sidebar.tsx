@@ -270,14 +270,14 @@ export function Sidebar() {
         style={
           {
             "--spring": SPRING_LINEAR,
-            width: collapsed ? COLLAPSED_W : "var(--sidebar-width, 250px)",
+            width: "100%",
+            height: "100%",
             fontFamily: 'var(--font-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif)',
             WebkitFontSmoothing: "antialiased",
           } as React.CSSProperties
         }
         className={cn(
-          "sticky top-0 left-0 z-20 h-screen shrink-0 select-none",
-          "transition-[width] duration-[720ms]",
+          "relative h-full w-full shrink-0 select-none",
           SPRING
         )}
       >

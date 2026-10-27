@@ -55,7 +55,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
     <section className={cn("space-y-4 w-full", className)}>
       <div
         className="flex items-end justify-between pr-4 md:pr-8 transition-[padding] duration-300"
-        style={{ paddingLeft: !isMobile ? `${sidebarWidth + 32}px` : '16px' }}
+        style={{ paddingLeft: !isMobile ? `${sidebarWidth + 24}px` : '16px' }}
       >
         <div className="space-y-1">
           <h2 className="text-lg font-bold tracking-tight text-foreground/95 font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>{title}</h2>
@@ -101,13 +101,15 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
         <div
           ref={scrollRef}
           onScroll={checkScroll}
-          className="flex gap-4 overflow-x-auto pb-6 no-scrollbar scroll-smooth snap-x snap-mandatory w-full transition-[padding] duration-300"
-          style={{
-            paddingLeft: !isMobile ? `${sidebarWidth + 32}px` : '16px',
-            paddingRight: '32px'
-          }}
+          className="flex gap-4 overflow-x-auto pb-6 no-scrollbar scroll-smooth snap-x snap-mandatory w-full"
         >
- {isLoading ? (
+          {/* Leading spacer that sets the exact default starting point after the sidebar */}
+          <div
+            className="shrink-0 transition-[width] duration-300 pointer-events-none"
+            style={{ width: !isMobile ? `${sidebarWidth + 24}px` : '16px' }}
+            aria-hidden="true"
+          />
+          {isLoading ? (
    Array.from({ length: 5 }).map((_, i) => (
      <div 
        key={i} 

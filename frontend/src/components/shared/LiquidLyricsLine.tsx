@@ -211,7 +211,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     : isMobile
     ? "clamp(18px, 5vw, 22px)"
     : isSidebar
-    ? "clamp(15px, 1.25vw, 17px)"
+    ? "clamp(19px, 1.6vw, 23px)"
     : "clamp(19px, 1.8vw, 23px)";
 
   const cleaned = React.useMemo(
@@ -379,30 +379,14 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCurrent, isPast, interlude, timing, smoothTimeValue, isUnsynced, lineStartTime, lineEndTime, sb]);
 
-  // Dynamic Apple Music alignment based on wording, length, and backing vocals (STRICTLY FOR SIDEBAR TAB ONLY)
+  // Clean Apple Music alignment: left-aligned across full width, backing vocals right-aligned
   let alignClass = "justify-start text-left";
-  let dynamicStyleIndent: React.CSSProperties = {};
+  const dynamicStyleIndent: React.CSSProperties = {};
 
   if (sb && !interlude) {
     const isBackingVocal = cleaned.startsWith("(") && cleaned.endsWith(")");
-    const isShortLine = tokens.length <= 3 || cleaned.length <= 18;
-    const isMediumLine = tokens.length <= 6 && cleaned.length <= 28;
-
     if (isBackingVocal) {
       alignClass = "justify-end text-right italic";
-    } else if (isShortLine) {
-      const step = ((props.lineIndex ?? 0) % 3);
-      if (step === 1) {
-        alignClass = "justify-center text-center";
-      } else if (step === 2) {
-        alignClass = "justify-start text-left";
-        dynamicStyleIndent = { paddingLeft: "1.6rem" };
-      } else {
-        alignClass = "justify-start text-left";
-      }
-    } else if (isMediumLine && ((props.lineIndex ?? 0) % 2 === 1)) {
-      alignClass = "justify-start text-left";
-      dynamicStyleIndent = { paddingLeft: "0.9rem" };
     }
   }
 

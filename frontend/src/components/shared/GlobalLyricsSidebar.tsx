@@ -8,8 +8,8 @@ import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { cn, getTrackCover } from "@/lib/utils";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
 
-/** Slim & lengthy Apple Music frosted glass sidebar width (compact 280px) */
-const SIDEBAR_W = 280;
+/** Slim & lengthy Apple Music frosted glass sidebar width (380px matching Queue tab) */
+const SIDEBAR_W = 380;
 
 export function GlobalLyricsSidebar() {
   const { isLyricsOpen, setIsLyricsOpen, isFullScreenPlayerOpen } = useUIStore();
