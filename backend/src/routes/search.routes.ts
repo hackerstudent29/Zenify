@@ -77,8 +77,16 @@ function scoreItem(
   year?: number
 ): number {
   const t = targetName.toLowerCase().trim();
+  const norm = (s = '') =>
+    s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+     .replace(/\(.*?\)|\[.*?\]/g, ' ')
+     .replace(/[^a-z0-9\u0900-\u0D7F\s]/g, ' ')
+     .replace(/\s+/g, ' ').trim();
+
   const baseT = getBaseTitle(t).toLowerCase().trim();
   const q = query.toLowerCase().trim();
+  const qNorm = norm(query);
+  const tNorm = norm(targetName);
   let score = 0;
 
   const tWords = t.split(/[\s\-&,/]+/).filter(Boolean);
@@ -87,18 +95,18 @@ function scoreItem(
   const allTInQ = tWords.length > 0 && tWords.every(tw => q.includes(tw));
   const allQInT = qWords.length > 0 && qWords.every(qw => t.includes(qw));
 
-  if (t === q || (type === 'track' && baseT === q)) {
-    score += 270; // Exact match
-  } else if (t.startsWith(q) || (type === 'track' && baseT.startsWith(q))) {
-    score += 190; // Starts with query
+  if (tNorm === qNorm || t === q || (type === 'track' && baseT === q)) {
+    score += 350; // Exact match (Tier 0)
+  } else if (tNorm.startsWith(qNorm + ' ') || t.startsWith(q) || (type === 'track' && baseT.startsWith(q))) {
+    score += 240; // Starts with query (Tier 1)
   } else if (allQInT) {
     score += 160; // All query words match target (e.g. "anirudh ravi" in "Anirudh Ravichander")
   } else if (allTInQ) {
     score += 140; // Target is fully contained in query (e.g. "Anirudh Ravichander" in "Anirudh Ravichander songs")
   } else if (t.split(/[\s\-&,/]+/).some(word => word.startsWith(q))) {
     score += 120; // Word start match
-  } else if (t.includes(q)) {
-    score += 80;  // Substring match
+  } else if (tNorm.includes(qNorm) || t.includes(q)) {
+    score += 110;  // Substring match (Tier 2)
   } else if (q.includes(t)) {
     score += 70;  // Query contains target
   } else if (qWords.some(qw => qw.length > 2 && tWords.some(tw => tw.startsWith(qw) || qw.startsWith(tw)))) {
@@ -156,12 +164,19 @@ function scoreItem(
 
   // Type Intent Boosts:
   if (type === 'artist') {
-    score += 55;
     if (t === q || t.startsWith(q) || q.startsWith(t)) {
       score += 70; // Direct artist intent bonus
     }
-    if (popularity > 0) {
-      score += Math.min(80, Math.round(Math.log10(popularity + 1) * 16));
+    // High-impact artist popularity weighting
+    if (popularity >= 50000) {
+      score += 150; // Major verified artist (Anirudh, AR Rahman, Arijit Singh, Ed Sheeran)
+    } else if (popularity >= 5000) {
+      score += 100;
+    } else if (popularity >= 500) {
+      score += 50;
+    } else if (popularity <= 20 && !isLocal) {
+      // Severe demotion for 0-follower random entity submissions (e.g. artist registered as 'Shape of You' or 'Hukum')
+      score -= 250;
     }
   } else if (type === 'album') {
     score += 35;
@@ -171,34 +186,37 @@ function scoreItem(
       else if (year >= 2022) score += 10;
     }
   } else if (type === 'track') {
-    // Album / Movie Name match bonus
-    if (albumTitle) {
+    // Album / Movie Name match bonus (only when track title itself is not already an exact match)
+    if (albumTitle && tNorm !== qNorm && t !== q) {
       const albLower = albumTitle.toLowerCase().trim();
       if (albLower === q || albLower === `${q} (original motion picture soundtrack)`) {
-        score += 290;
+        score += 250;
       } else if (albLower.startsWith(q) || q.startsWith(albLower)) {
-        score += 230;
+        score += 260;
       } else if (albLower.includes(q)) {
-        score += 150;
+        score += 170;
       }
     }
 
+    // Popularity weighting for tracks (Logarithmic Spotify/JioSaavn scale)
     if (popularity > 0) {
-      score += Math.min(120, Math.round(Math.log10(popularity + 1) * 16));
+      score += Math.min(Math.round(Math.log10(popularity) * 45), 340);
+    } else if (!isLocal) {
+      score -= 150; // Heavily demote 0-stream obscure noise
     }
 
-    if (year) {
-      if (year >= 2025) score += 35;
-      else if (year >= 2024) score += 25;
+    if (year && popularity >= 5000) {
+      if (year >= 2025) score += 30;
+      else if (year >= 2024) score += 20;
       else if (year >= 2022) score += 10;
     }
 
     // Penalize cover / remix / karaoke versions unless query explicitly includes those words
     const isThemeOrBgm = /\b(theme|bgm|score|soundtrack|ost)\b/i.test(t);
-    const isDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone)\b/i.test(t);
-    const wantsDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone|theme|bgm|score|soundtrack|ost)\b/i.test(q);
+    const isDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone|carnatic mix|tribute|piano cover|guitar cover|sped up|chipmunk|8d audio|mashup|nightcore|piano version)\b/i.test(`${t} ${albumTitle || ''}`);
+    const wantsDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone|theme|bgm|score|soundtrack|ost|tribute)\b/i.test(q);
     if (isDerivative && !wantsDerivative && !isThemeOrBgm) {
-      score -= 180;
+      score -= 420;
     }
   } else if (type === 'playlist') {
     score += 15;
@@ -493,7 +511,7 @@ export async function searchRoutes(server: FastifyInstance) {
         const cleanArtist = cleanArtistNames(ct.artists?.[0]?.name || ct.artist?.name || '');
         const norm = `${ct.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
         if (!tracksMap.has(norm)) {
-          const trackStreams = ct.streams || ct.playCount || 100000;
+          const trackStreams = ct.playCount || ct.streams || 0;
           const trackYear = ct.year || 0;
           const score = scoreItem(ct.title, cleanQ, 'track', trackStreams, false, ct.album?.title, trackYear);
           if (score <= 0) continue;
@@ -532,17 +550,75 @@ export async function searchRoutes(server: FastifyInstance) {
         }
       }
 
+      // C. If user query matches a prominent artist, inject their authentic iconic greatest hits!
+      if (rankedArtists.length > 0) {
+        const topArt = rankedArtists[0];
+        const isQueryArtist = topArt && (
+          topArt.name.toLowerCase() === cleanQ.toLowerCase() ||
+          topArt.name.toLowerCase().startsWith(cleanQ.toLowerCase()) ||
+          cleanQ.toLowerCase().startsWith(topArt.name.toLowerCase())
+        ) && ((topArt.follower_count && topArt.follower_count > 100) || topArt.isLocal);
+
+        if (isQueryArtist) {
+          try {
+            const artistHits = await CompositeCatalogService.getArtistTopSongs(topArt.name, storefront, 8);
+            for (const hit of artistHits) {
+              const candidate = hit.artist?.name || topArt.name;
+              const cleanArtist = cleanArtistNames(candidate);
+              const finalArtist = (cleanArtist && cleanArtist !== 'Unknown Artist' && cleanArtist !== 'Various Artists') ? cleanArtist : topArt.name;
+              const norm = `${hit.title.toLowerCase().trim()}::${finalArtist.toLowerCase().trim()}`;
+              const playCount = hit.streams || hit.playCount || 50000000;
+              if (!tracksMap.has(norm)) {
+                tracksMap.set(norm, {
+                  id: hit.id,
+                  catalogId: hit.id,
+                  source: hit.source,
+                  sourceId: hit.sourceId,
+                  title: hit.title,
+                  coverUrl: hit.coverUrl,
+                  audioUrl: hit.audioUrl,
+                  duration: hit.duration,
+                  genre: hit.genre || 'Soundtrack',
+                  language: hit.language,
+                  streams: playCount,
+                  like_count: Math.round(playCount * 0.05),
+                  inLibrary: false,
+                  isVirtual: true,
+                  artistId: topArt.id,
+                  artist: {
+                    id: topArt.id,
+                    name: finalArtist,
+                    imageUrl: hit.coverUrl || topArt.imageUrl
+                  },
+                  album: hit.album,
+                  type: 'track',
+                  isLocal: false,
+                  year: hit.year,
+                  score: 720 // High score to guarantee famous artist tracks appear on top!
+                });
+              } else {
+                const existing = tracksMap.get(norm);
+                existing.score = Math.max(existing.score, 720);
+                if (!existing.artist?.name || existing.artist.name === 'Unknown Artist') {
+                  existing.artist = { id: topArt.id, name: finalArtist, imageUrl: hit.coverUrl || topArt.imageUrl };
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+
       const allTracks = Array.from(tracksMap.values());
       const originals: any[] = [];
       const otherVersions: any[] = [];
 
       for (const item of allTracks) {
         const titleLower = item.title.toLowerCase();
-        const isDerivative = titleLower.includes('remix') || titleLower.includes('cover') || 
-                             titleLower.includes('acoustic') || titleLower.includes('karaoke') ||
-                             titleLower.includes('slowed') || titleLower.includes('reverb');
+        const isThemeOrBgm = /\b(theme|bgm|score|soundtrack|ost)\b/i.test(titleLower);
+        const isDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone|carnatic mix|tribute|piano cover|guitar cover|sped up|chipmunk|8d audio|mashup)\b|\s+x\s+/i.test(`${titleLower} ${item.album?.title || ''}`);
+        const wantsDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone|theme|bgm|score|soundtrack|ost|tribute)\b/i.test(cleanQ);
 
-        if (isDerivative) {
+        if (isDerivative && !wantsDerivative && !isThemeOrBgm) {
           otherVersions.push(item);
         } else {
           originals.push(item);
@@ -608,20 +684,27 @@ export async function searchRoutes(server: FastifyInstance) {
         topArtist.name.toLowerCase() === cleanQLower ||
         topArtist.name.toLowerCase().startsWith(cleanQLower) ||
         cleanQLower.startsWith(topArtist.name.toLowerCase())
-      );
-      const isAlbumIntent = topAlbum && (
-        topAlbum.title.toLowerCase() === cleanQLower ||
-        topAlbum.title.toLowerCase().startsWith(cleanQLower)
+      ) && (
+        (topArtist.follower_count && topArtist.follower_count > 100) ||
+        topArtist.isLocal ||
+        (topArtist.trackCount && topArtist.trackCount >= 3)
       );
 
-      // If user typed an artist name, surface Artist as Top Result
+      const isAlbumIntent = topAlbum && (
+        topAlbum.title.toLowerCase() === cleanQLower ||
+        topAlbum.title.toLowerCase().startsWith(cleanQLower) ||
+        topAlbum.title.toLowerCase().includes(`(from "${cleanQLower}")`) ||
+        cleanQLower.startsWith(topAlbum.title.toLowerCase())
+      );
+
+      // Top Result Decision:
       if (isArtistIntent) {
         topResult = { item: topArtist, type: 'artist' };
-      } else if (isAlbumIntent && albumScore >= trackScore) {
+      } else if (isAlbumIntent && (!topTrack || albumScore >= (trackScore - 30))) {
         topResult = { item: topAlbum, type: 'album' };
       } else if (topTrack) {
         topResult = { item: topTrack, type: 'track' };
-      } else if (topArtist) {
+      } else if (topArtist && ((topArtist.follower_count && topArtist.follower_count > 200) || topArtist.isLocal)) {
         topResult = { item: topArtist, type: 'artist' };
       } else if (topAlbum) {
         topResult = { item: topAlbum, type: 'album' };
@@ -655,21 +738,69 @@ export async function searchRoutes(server: FastifyInstance) {
 
   /**
    * 2. LIVE SUGGESTIONS & SEARCH HINTS (Provider Hints, 250-300ms debounce)
+   * Returns rich categorized autocomplete: Artists (with avatar), Tracks (with play trigger), Albums & Hints.
    */
   server.get('/autocomplete', {
     schema: { querystring: autocompleteSchema }
   }, async (req: FastifyRequest<{ Querystring: z.infer<typeof autocompleteSchema> }>, reply: FastifyReply) => {
     const { q } = req.query;
+    const cleanQ = q.trim();
     try {
-      const hints = await CompositeCatalogService.getSearchHints(q);
-      const suggestions = hints.map(h => ({
+      const [hints, catalogResult] = await Promise.all([
+        CompositeCatalogService.getSearchHints(cleanQ),
+        CompositeCatalogService.search(cleanQ, 'in', 6).catch(() => ({ tracks: [], artists: [], albums: [] }))
+      ]);
+
+      const topArtists = (catalogResult.artists || [])
+        .filter(a => !isFakeOrNumericArtistName(a.name) && ((a.follower_count || 0) > 100 || a.name.toLowerCase().includes(cleanQ.toLowerCase()) || cleanQ.toLowerCase().includes(a.name.toLowerCase())))
+        .slice(0, 2)
+        .map(a => ({
+          id: a.id,
+          name: a.name,
+          imageUrl: a.imageUrl,
+          follower_count: a.follower_count,
+          type: 'artist'
+        }));
+
+      const topTracks = (catalogResult.tracks || [])
+        .filter(t => !/\b(karaoke|instrumental|cover|remix|slowed)\b/i.test(t.title))
+        .slice(0, 4)
+        .map(t => ({
+          id: t.id,
+          title: t.title,
+          artist: t.artist?.name || t.artists?.[0]?.name || 'Artist',
+          coverUrl: t.coverUrl,
+          duration: t.duration,
+          audioUrl: t.audioUrl,
+          type: 'track'
+        }));
+
+      const topAlbums = (catalogResult.albums || [])
+        .slice(0, 2)
+        .map(a => ({
+          id: a.id,
+          title: a.title,
+          artist: a.artist?.name || 'Artist',
+          coverUrl: a.coverUrl,
+          year: a.year,
+          type: 'album'
+        }));
+
+      const formattedHints = hints.slice(0, 6).map(h => ({
         id: `hint-${encodeURIComponent(h)}`,
         title: h,
         isHint: true
       }));
-      return reply.send(suggestions);
+
+      return reply.send({
+        hints: formattedHints,
+        artists: topArtists,
+        tracks: topTracks,
+        albums: topAlbums,
+        legacy: formattedHints
+      });
     } catch {
-      return reply.send([]);
+      return reply.send({ hints: [], artists: [], tracks: [], albums: [] });
     }
   });
 

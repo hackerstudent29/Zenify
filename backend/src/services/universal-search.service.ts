@@ -138,42 +138,61 @@ export function scoreTrack(
   playCount = 0,
   year = 0
 ): number {
+  const norm = (s = '') =>
+    s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+     .replace(/\(.*?\)|\[.*?\]/g, ' ')
+     .replace(/[^a-z0-9\u0900-\u0D7F\s]/g, ' ')
+     .replace(/\s+/g, ' ').trim();
+
   const t = (title || '').toLowerCase().trim();
   const baseT = getBaseTitle(t).toLowerCase().trim();
   const a = (artist || '').toLowerCase().trim();
   const q = query.toLowerCase().trim();
+  const qNorm = norm(query);
+  const tNorm = norm(title);
   let score = 0;
 
-  if (t === q || baseT === q) score += 270;
-  else if (t.startsWith(q) || baseT.startsWith(q)) score += 200;
-  else if (t.includes(q)) score += 110;
+  // Tiering by title match (Exact title match lands in tier 0)
+  if (tNorm === qNorm || t === q || baseT === q) {
+    score += 350; // Exact title match
+  } else if (tNorm.startsWith(qNorm + ' ') || t.startsWith(q) || baseT.startsWith(q)) {
+    score += 240; // Prefix / sequel match
+  } else if (tNorm.includes(qNorm) || t.includes(q)) {
+    score += 130; // Substring match
+  }
 
   if (a === q) score += 170;
   else if (a.startsWith(q)) score += 120;
   else if (a.includes(q)) score += 75;
 
-  // Major boost if track's album/movie matches query (e.g. 'Hukum' or 'Kaavaalaa' in album 'Jailer')
-  if (album) {
+  // Major boost if track's album/movie matches query only when track title is not already an exact match (e.g. 'Hukum' or 'Kaavaalaa' in album 'Jailer')
+  if (album && tNorm !== qNorm && t !== q) {
     const albLower = album.toLowerCase().trim();
-    if (albLower === q || albLower === `${q} (original motion picture soundtrack)`) score += 290;
-    else if (albLower.startsWith(q) || q.startsWith(albLower)) score += 230;
-    else if (albLower.includes(q)) score += 150;
+    if (albLower === q || albLower === `${q} (original motion picture soundtrack)`) score += 250;
+    else if (albLower.startsWith(q) || q.startsWith(albLower)) score += 180;
+    else if (albLower.includes(q)) score += 120;
   }
 
-  // Popularity bonus from real streaming play count
+  // Streaming popularity weighting (Spotify / JioSaavn authentic scale)
   if (playCount > 0) {
-    score += Math.min(180, Math.round(Math.log10(playCount + 1) * 22));
+    // Logarithmic scale: 50M -> ~345, 10M -> ~315, 1M -> ~270, 100k -> ~225, 10k -> ~180, 1k -> ~135
+    score += Math.min(Math.round(Math.log10(Math.max(playCount, 1)) * 45), 340);
+  } else {
+    // Penalize obscure 0-play noise so it never beats real songs
+    score -= 140;
   }
 
-  // Recency bonus for latest releases
-  if (year >= 2025) score += 40;
-  else if (year >= 2024) score += 30;
-  else if (year >= 2022) score += 15;
+  // Recency bonus ONLY for tracks that have genuine listener engagement (preventing 0-play fakes)
+  if (playCount >= 5000) {
+    if (year >= 2025) score += 30;
+    else if (year >= 2024) score += 20;
+    else if (year >= 2022) score += 10;
+  }
 
   // Source preference boosts
   if (source === 'zenify') score += 60; // Verified local track
   else if (source === 'jiosaavn') score += 180; // Primary source: instant 320kbps Akamai CDN stream
-  else if (source === 'itunes') score += 20;
+  else if (source === 'itunes') score += 10;
 
   // Strict Sequel / Part matching:
   const querySequel = extractSequelTag(query);
@@ -194,10 +213,10 @@ export function scoreTrack(
 
   // Penalize karaoke / instrumental / cover unless user explicitly typed it or it's an authentic theme/bgm/ost
   const isThemeOrBgm = /\b(theme|bgm|score|soundtrack|ost)\b/i.test(t);
-  const isDerivative = /\b(karaoke|instrumental|acoustic|cover|covers|backing track|tribute|remix|lofi|slowed|reverb)\b/i.test(`${t} ${a} ${album ? album.toLowerCase() : ''}`);
+  const isDerivative = /\b(karaoke|instrumental|acoustic|cover|covers|backing track|tribute|remix|lofi|slowed|reverb|carnatic mix|remake|in the style of|originally performed by|made famous by|ringtone|bass boosted|sped up|chipmunk|8d audio|mashup|nightcore|piano version)\b/i.test(`${t} ${a} ${album ? album.toLowerCase() : ''}`);
   const wantsDerivative = /\b(karaoke|instrumental|acoustic|cover|covers|backing track|tribute|remix|lofi|theme|bgm|score|soundtrack|ost)\b/i.test(q);
   if (isDerivative && !wantsDerivative && !isThemeOrBgm) {
-    score -= 200;
+    score -= 420;
   }
 
   return score;
@@ -283,39 +302,47 @@ export class UniversalSearchService {
     // 2. JioSaavn Official Engine (Unmatched Bollywood/Kollywood/Tollywood + Global Western 320k)
     const saavnPromise = (async () => {
       try {
-        const [searchRes, autoRes] = await Promise.all([
+        const [p1, p2, p3, autoRes] = await Promise.all([
           axios.get('https://www.jiosaavn.com/api.php', {
-            params: {
-              __call: 'search.getResults',
-              q: cleanQ,
-              p: 1,
-              n: 20,
-              _format: 'json',
-              _marker: '0',
-              ctx: 'web6dot0'
-            },
+            params: { __call: 'search.getResults', q: cleanQ, p: 1, n: 40, _format: 'json', ctx: 'web6dot0' },
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-            timeout: 3200
+            timeout: 3800
           }).catch(() => null),
           axios.get('https://www.jiosaavn.com/api.php', {
-            params: {
-              __call: 'autocomplete.get',
-              query: cleanQ,
-              _format: 'json',
-              _marker: '0',
-              ctx: 'web6dot0'
-            },
+            params: { __call: 'search.getResults', q: cleanQ, p: 2, n: 40, _format: 'json', ctx: 'web6dot0' },
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+            timeout: 3800
+          }).catch(() => null),
+          axios.get('https://www.jiosaavn.com/api.php', {
+            params: { __call: 'search.getResults', q: cleanQ, p: 3, n: 40, _format: 'json', ctx: 'web6dot0' },
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+            timeout: 3800
+          }).catch(() => null),
+          axios.get('https://www.jiosaavn.com/api.php', {
+            params: { __call: 'autocomplete.get', query: cleanQ, _format: 'json', ctx: 'web6dot0' },
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
             timeout: 2500
           }).catch(() => null)
         ]);
 
         const rawList = [
-          ...(searchRes?.data?.results || []),
+          ...(p1?.data?.results || []),
+          ...(p2?.data?.results || []),
+          ...(p3?.data?.results || []),
           ...(autoRes?.data?.songs?.data || [])
         ];
 
-        for (const s of rawList) {
+        const seenIds = new Set<string>();
+        const dedupedList = rawList.filter(s => {
+          const sid = s?.id || s?.perma_url;
+          if (sid && !seenIds.has(sid)) {
+            seenIds.add(sid);
+            return true;
+          }
+          return false;
+        });
+
+        for (const s of dedupedList) {
           const title = cleanEntity(s.song || s.title);
           const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
           
@@ -347,7 +374,7 @@ export class UniversalSearchService {
             if (score > (existing.score || 0)) {
               existing.score = score;
               existing.playCount = playCount;
-              existing.streams = playCount || 2500000;
+              existing.streams = playCount || 0;
               existing.year = year;
               if (cover) {
                 existing.coverUrl = cover;
@@ -366,6 +393,7 @@ export class UniversalSearchService {
 
           const encMedia = s.encrypted_media_url || s.more_info?.encrypted_media_url;
           const directAudio = encMedia ? (CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '320') || CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '160') || undefined) : undefined;
+          const fallbackAudio = directAudio || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist} - ${title}`)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}&trackId=saavn-${s.id}`;
 
           resultMap.set(key, {
             id: `saavn-${s.id}`,
@@ -383,13 +411,13 @@ export class UniversalSearchService {
             duration: { totalMilliseconds: dur * 1000 },
             duration_ms: dur * 1000,
             trackTimeMillis: dur * 1000,
-            audioUrl: directAudio,
+            audioUrl: directAudio || fallbackAudio,
             isZenify: false,
             isImported: false,
             source: 'jiosaavn',
             score,
             playCount,
-            streams: playCount || 2500000,
+            streams: playCount || 0,
             year
           });
         }
@@ -821,8 +849,8 @@ export class UniversalSearchService {
         fetchedAt: Date.now(),
         isVirtual: true,
         inLibrary: t.isZenify,
-        streams: (t as any).streams || (t as any).playCount || 2500000,
-        playCount: (t as any).playCount,
+        streams: (t as any).playCount || (t as any).streams || 0,
+        playCount: (t as any).playCount || 0,
         year: (t as any).year
       });
 

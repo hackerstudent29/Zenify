@@ -925,5 +925,50 @@ export function GlobalAudio() {
     return () => clearInterval(interval);
   }, [currentTrack?.id, queryClient]);
 
+  // Proactive Track Metadata Enrichment (Album, Artist, Cover)
+  useEffect(() => {
+    if (!currentTrack || !currentTrack.title) return;
+    const currentArtist = currentTrack.artist?.name || (currentTrack as any).artistName || '';
+    const hasGenericArtist = !currentArtist || currentArtist === 'Various Artist' || currentArtist === 'Various Artists' || currentArtist === 'Unknown Artist';
+    const hasMissingAlbum = !currentTrack.album || !currentTrack.album.title || currentTrack.album.title === 'Single';
+
+    if (hasGenericArtist || hasMissingAlbum) {
+      import('@/lib/api').then(({ default: api }) => {
+        api.post(`/tracks/${currentTrack.id}/refetch-audio`, {
+          title: currentTrack.title,
+          artistName: hasGenericArtist ? '' : currentArtist,
+          duration: currentTrack.duration
+        }).then((res: any) => {
+          const resolved = res.data?.track;
+          if (resolved) {
+            const newArtist = resolved.artist?.name;
+            const newAlbum = resolved.album?.title;
+            const newCover = resolved.coverUrl;
+            if ((newArtist && newArtist !== 'Various Artists' && newArtist !== 'Various Artist' && newArtist !== 'Unknown Artist') || (newAlbum && newAlbum !== 'Single')) {
+              usePlayerStore.setState(state => {
+                if (state.currentTrack?.id !== currentTrack.id) return {};
+                const enriched = {
+                  ...state.currentTrack,
+                  artist: newArtist ? { ...state.currentTrack.artist, name: newArtist } : state.currentTrack.artist,
+                  album: newAlbum ? {
+                    id: resolved.album?.id || `album-${newAlbum.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+                    title: newAlbum,
+                    coverUrl: newCover || state.currentTrack.coverUrl,
+                    artistId: state.currentTrack.artistId || state.currentTrack.artist?.id || 'unknown'
+                  } : state.currentTrack.album,
+                  coverUrl: newCover || state.currentTrack.coverUrl
+                };
+                return {
+                  currentTrack: enriched,
+                  queue: state.queue.map(t => t.id === currentTrack.id ? { ...t, ...enriched } : t)
+                };
+              });
+            }
+          }
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+  }, [currentTrack?.id, currentTrack?.title]);
+
   return null;
 }

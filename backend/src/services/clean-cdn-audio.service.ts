@@ -8,6 +8,11 @@ export interface CleanAudioResult {
     duration: number;
     title: string;
     artist: string;
+    album?: string;
+    albumId?: string;
+    coverUrl?: string;
+    playCount?: number;
+    trackId?: string;
     bitrate: string;
     source: 'saavn_direct_cdn';
 }
@@ -19,6 +24,16 @@ export interface CleanAudioOptions {
     duration?: number;
     language?: string;
 }
+
+const SAAVN_RANK_NOISE = /\b(cover|karaoke|tribute|instrumental|remix|live|acoustic|slowed|reverb|sped up|nightcore|lofi|8d|piano version|originally performed|unplugged|mashup)\b/i;
+
+const normSaavn = (s = '') =>
+  s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+   .replace(/\(.*?\)|\[.*?\]/g, ' ')
+   .replace(/[^a-z0-9\u0900-\u0D7F\s]/g, ' ')
+   .replace(/\s+/g, ' ').trim();
+
+const cdnQueryCache = new Map<string, { result: CleanAudioResult | null; expiresAt: number }>();
 
 const CDN_HARD_REJECT_TERMS = [
     'cover', 'covers', 'cover version', 'acoustic cover', 'guitar cover', 'piano cover', 
@@ -139,59 +154,50 @@ export class CleanCdnAudioService {
 
             // Search with natural title + artist first (appending language artificially breaks searches for instrumentals/English titles)
             const searchQuery = (cleanA ? `${cleanA} ${cleanT}` : cleanT).slice(0, 120).trim();
-            console.log(`[CleanCdnAudio] Searching CDN candidate for: "${searchQuery}" (Req Lang: ${opts.language || 'any'}, Artist: ${cleanA || 'any'})`);
-
-            // 1. Fetch Candidates via Search API and Autocomplete
-            const [searchRes, autoRes] = await Promise.all([
-                axios.get('https://www.jiosaavn.com/api.php', {
-                    params: {
-                        __call: 'search.getResults',
-                        q: searchQuery,
-                        _format: 'json',
-                        _marker: '0',
-                        ctx: 'web6dot0',
-                        p: '1',
-                        n: '15'
-                    },
-                    headers: cdnHeaders,
-                    timeout: 4000
-                }).catch(() => null),
-                axios.get('https://www.jiosaavn.com/api.php', {
-                    params: {
-                        __call: 'autocomplete.get',
-                        query: searchQuery,
-                        _format: 'json',
-                        _marker: '0',
-                        ctx: 'web6dot0'
-                    },
-                    headers: cdnHeaders,
-                    timeout: 3500
-                }).catch(() => null)
-            ]);
-
-            const candidates: any[] = [];
-            const seenIds = new Set<string>();
-
-            if (searchRes?.data?.results && Array.isArray(searchRes.data.results)) {
-                for (const r of searchRes.data.results) {
-                    if (r && (r.id || r.perma_url) && !seenIds.has(r.id || r.perma_url)) {
-                        seenIds.add(r.id || r.perma_url);
-                        candidates.push(r);
-                    }
-                }
+            const cacheKey = `${cleanT}:::${cleanA}:::${opts.language || ''}`.toLowerCase();
+            const cached = cdnQueryCache.get(cacheKey);
+            if (cached && cached.expiresAt > Date.now()) {
+                return cached.result;
             }
 
-            if (autoRes?.data?.songs?.data && Array.isArray(autoRes.data.songs.data)) {
-                for (const s of autoRes.data.songs.data) {
-                    if (s && s.id && !seenIds.has(s.id)) {
-                        seenIds.add(s.id);
-                        candidates.push(s);
-                    }
+            console.log(`[CleanCdnAudio] Searching CDN candidate for: "${searchQuery}" (Req Lang: ${opts.language || 'any'}, Artist: ${cleanA || 'any'})`);
+
+            // 1. Fetch 3 pages in parallel so the original isn't hidden past page 0/1
+            const [p1, p2, p3, autoRes] = await Promise.all([
+                axios.get('https://www.jiosaavn.com/api.php', {
+                    params: { __call: 'search.getResults', q: searchQuery, _format: 'json', ctx: 'web6dot0', p: '1', n: '40' },
+                    headers: cdnHeaders,
+                    timeout: 4000
+                }).then(r => r.data?.results || []).catch(() => []),
+                axios.get('https://www.jiosaavn.com/api.php', {
+                    params: { __call: 'search.getResults', q: searchQuery, _format: 'json', ctx: 'web6dot0', p: '2', n: '40' },
+                    headers: cdnHeaders,
+                    timeout: 4000
+                }).then(r => r.data?.results || []).catch(() => []),
+                axios.get('https://www.jiosaavn.com/api.php', {
+                    params: { __call: 'search.getResults', q: searchQuery, _format: 'json', ctx: 'web6dot0', p: '3', n: '40' },
+                    headers: cdnHeaders,
+                    timeout: 4000
+                }).then(r => r.data?.results || []).catch(() => []),
+                axios.get('https://www.jiosaavn.com/api.php', {
+                    params: { __call: 'autocomplete.get', query: searchQuery, _format: 'json', ctx: 'web6dot0' },
+                    headers: cdnHeaders,
+                    timeout: 3000
+                }).then(r => r.data?.songs?.data || []).catch(() => [])
+            ]);
+
+            const seenIds = new Set<string>();
+            const candidatesRaw: any[] = [];
+            for (const r of [...p1, ...p2, ...p3, ...autoRes]) {
+                const sid = r?.id || r?.perma_url;
+                if (sid && !seenIds.has(sid)) {
+                    seenIds.add(sid);
+                    candidatesRaw.push(r);
                 }
             }
 
             // Fallback search with language suffix only if zero candidates were found
-            if (candidates.length === 0 && opts.language && !cleanT.includes(opts.language.toLowerCase())) {
+            if (candidatesRaw.length === 0 && opts.language && !cleanT.includes(opts.language.toLowerCase())) {
                 const langQuery = `${searchQuery} ${opts.language}`.slice(0, 120).trim();
                 const langRes = await axios.get('https://www.jiosaavn.com/api.php', {
                     params: {
@@ -201,44 +207,74 @@ export class CleanCdnAudioService {
                         _marker: '0',
                         ctx: 'web6dot0',
                         p: '1',
-                        n: '10'
+                        n: '20'
                     },
                     headers: cdnHeaders,
                     timeout: 3500
                 }).catch(() => null);
                 if (langRes?.data?.results && Array.isArray(langRes.data.results)) {
                     for (const r of langRes.data.results) {
-                        if (r && (r.id || r.perma_url) && !seenIds.has(r.id || r.perma_url)) {
-                            seenIds.add(r.id || r.perma_url);
-                            candidates.push(r);
+                        const sid = r?.id || r?.perma_url;
+                        if (sid && !seenIds.has(sid)) {
+                            seenIds.add(sid);
+                            candidatesRaw.push(r);
                         }
                     }
                 }
             }
 
-            if (candidates.length === 0) {
+            if (candidatesRaw.length === 0) {
                 console.log(`[CleanCdnAudio] Zero CDN candidates found for: "${searchQuery}"`);
+                cdnQueryCache.set(cacheKey, { result: null, expiresAt: Date.now() + 60 * 1000 });
                 return null;
             }
 
-            // 2. Filter & Score Candidates Against Strict Protocols
+            // 2. Rank Candidates: Exact title match first, covers/noise down, most-played (original) first
+            const qNorm = normSaavn(cleanT);
+            const noisyQuery = SAAVN_RANK_NOISE.test(rawTitle);
+
+            const tierOf = (s: any) => {
+                const t = normSaavn(s.song || s.title || '');
+                if (t === qNorm) return 0;
+                if (t.startsWith(qNorm + ' ')) return 1;
+                if (t.includes(qNorm)) return 2;
+                return 3;
+            };
+
+            const candidates = candidatesRaw.map(s => {
+                const titleStr = s.song || s.title || '';
+                const albumStr = s.album || s.more_info?.album || '';
+                return {
+                    s,
+                    tier: tierOf(s),
+                    noisy: !noisyQuery && SAAVN_RANK_NOISE.test(`${titleStr} ${albumStr}`) ? 1 : 0,
+                    plays: Number(s.play_count || s.more_info?.play_count || 0)
+                };
+            }).sort((a, b) =>
+                a.tier - b.tier ||
+                a.noisy - b.noisy ||
+                b.plays - a.plays
+            ).map(x => x.s);
+
+            // 3. Filter & Resolve Candidates Against Strict Protocols
             for (const cand of candidates) {
                 const candTitle = (cand.song || cand.title || '').trim();
                 const candTitleLower = candTitle.toLowerCase();
-                const candAlbum = (cand.album || '').toLowerCase();
+                const candAlbum = (cand.album || cand.more_info?.album || 'Single').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').trim();
                 const candDesc = (cand.description || '').toLowerCase();
-                const candArtists = (cand.primary_artists || cand.singers || cand.more_info?.primary_artists || cand.more_info?.singers || '').toLowerCase();
+                const rawArtists = cand.primary_artists || cand.singers || cand.more_info?.primary_artists || cand.more_info?.singers || cand.more_info?.artist_map?.primary_artists?.[0]?.name || cand.music || '';
+                const candArtists = rawArtists.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').trim();
+                const candArtistsLower = candArtists.toLowerCase();
                 const candLang = (cand.language || cand.more_info?.language || '').toLowerCase().trim();
                 const candDur = parseInt(cand.duration || cand.more_info?.duration, 10) || 0;
 
                 // Protocol Check 1: Hard Reject Terms (instrumentals, covers, guitar, piano, karaoke, etc.)
                 let hasRejectTerm = false;
                 for (const term of CDN_HARD_REJECT_TERMS) {
-                    // If target requested title/album explicitly contains this term, allow it (e.g., official instrumental/acoustic tracks)
                     const isTargetRequestingTerm = rawTitle.toLowerCase().includes(term) || 
                                                   (opts.album && opts.album.toLowerCase().includes(term)) ||
                                                   rawQueryInput.toLowerCase().includes(term);
-                    if (!isTargetRequestingTerm && (candTitleLower.includes(term) || candAlbum.includes(term) || candDesc.includes(term))) {
+                    if (!isTargetRequestingTerm && (candTitleLower.includes(term) || candAlbum.toLowerCase().includes(term) || candDesc.includes(term))) {
                         hasRejectTerm = true;
                         break;
                     }
@@ -256,10 +292,10 @@ export class CleanCdnAudioService {
                     }
                 }
 
-                // Protocol Check 3: Artist Matching
+                // Protocol Check 3: Artist Matching (only if caller specified a non-empty primary artist)
                 if (cleanA && cleanA.length > 2) {
-                    const artistMatch = candArtists.includes(cleanA) || 
-                                        cleanA.includes(candArtists) || 
+                    const artistMatch = candArtistsLower.includes(cleanA) || 
+                                        cleanA.includes(candArtistsLower) || 
                                         candDesc.includes(cleanA) ||
                                         candTitleLower.includes(cleanA);
                     if (!artistMatch) {
@@ -333,21 +369,34 @@ export class CleanCdnAudioService {
 
                 if (!encUrl) continue;
 
-                const directCdnUrl = this.decryptSaavnMediaUrl(encUrl);
+                const directCdnUrl = this.decryptSaavnMediaUrl(encUrl, '320') || this.decryptSaavnMediaUrl(encUrl, '160');
                 if (!directCdnUrl || !isSafePublicUrl(directCdnUrl)) continue;
 
-                console.log(`[CleanCdnAudio] Verified official CDN match: "${candTitle}" by "${candArtists || cleanA}" (${directCdnUrl.slice(0, 60)}...)`);
-                return {
+                const finalArtist = candArtists || opts.primaryArtist || 'Unknown Artist';
+                const finalAlbum = candAlbum || opts.album || 'Single';
+                const finalCover = (cand.image || cand.more_info?.image || songData.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+                const finalPlays = parseInt(cand.play_count || cand.more_info?.play_count || songData.play_count || '0', 10);
+
+                console.log(`[CleanCdnAudio] Verified official CDN match (320k): "${candTitle}" by "${finalArtist}" (Album: "${finalAlbum}", Plays: ${finalPlays})`);
+                const result: CleanAudioResult = {
                     url: directCdnUrl,
                     duration: candDur || parseInt(songData.duration, 10) || 0,
                     title: candTitle,
-                    artist: candArtists || opts.primaryArtist || '',
-                    bitrate: '160kbps',
+                    artist: finalArtist,
+                    album: finalAlbum,
+                    albumId: cand.albumid || cand.album_id || cand.more_info?.album_id,
+                    coverUrl: finalCover,
+                    playCount: finalPlays,
+                    trackId: cand.id,
+                    bitrate: '320kbps',
                     source: 'saavn_direct_cdn'
                 };
+                cdnQueryCache.set(cacheKey, { result, expiresAt: Date.now() + 5 * 60 * 1000 });
+                return result;
             }
 
-            console.log(`[CleanCdnAudio] All ${candidates.length} candidates failed strict protocol validation. Falling back to master AudioResolver.`);
+            console.log(`[CleanCdnAudio] All ${candidates.length} candidates failed strict protocol validation.`);
+            cdnQueryCache.set(cacheKey, { result: null, expiresAt: Date.now() + 60 * 1000 });
             return null;
         } catch (err: any) {
             console.warn(`[CleanCdnAudio] Resolution error: ${err.message}`);

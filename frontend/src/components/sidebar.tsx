@@ -283,10 +283,7 @@ export function Sidebar() {
       >
         {/* Clipped column (no CSS border: the edge line is drawn below so the tab can join it) */}
         <div
-          className={cn(
-            "flex h-full w-full flex-col overflow-hidden",
-            isAlbumPage ? "bg-transparent" : "bg-[#1c1c1e]"
-          )}
+          className="flex h-full w-full flex-col overflow-hidden bg-transparent"
         >
           {/* Logo: full wordmark when open, the Z mark when closed (cross-fade, centred on x=36) */}
           <div className="relative h-[72px] shrink-0">

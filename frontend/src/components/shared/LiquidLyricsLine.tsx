@@ -211,7 +211,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
     : isMobile
     ? "clamp(18px, 5vw, 22px)"
     : isSidebar
-    ? "clamp(20px, 1.8vw, 26px)"
+    ? "clamp(15px, 1.25vw, 17px)"
     : "clamp(19px, 1.8vw, 23px)";
 
   const cleaned = React.useMemo(
@@ -413,7 +413,7 @@ export const LiquidLyricsLine = React.memo(function LiquidLyricsLine(props: Liqu
       style={{
         y,
         fontSize,
-        padding: isFullscreen ? "0.44em 0.5em" : sb ? "0.38em 0.4em" : isMobile ? "0.32em 0.25em" : "0.35em 0.5em",
+        padding: isFullscreen ? "0.44em 0.5em" : sb ? "0.26em 0.35em" : isMobile ? "0.32em 0.25em" : "0.35em 0.5em",
         willChange: inWindow ? "transform" : undefined,
       }}
       onClick={onClick}

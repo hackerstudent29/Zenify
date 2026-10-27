@@ -157,10 +157,22 @@ export async function trackRoutes(server: FastifyInstance) {
                         duration: body.duration
                     });
                     if (cdnRes?.url && !cdnRes.url.includes('audio-ssl') && !cdnRes.url.includes('mzstatic') && !cdnRes.url.includes('itunes.apple.com')) {
+                        const finalTitle = cdnRes.title || titleToUse;
+                        const finalArtist = cdnRes.artist || artistToUse || 'Unknown Artist';
+                        const finalAlbum = cdnRes.album || 'Single';
+                        const finalCover = cdnRes.coverUrl || '';
                         return reply.send({
                             success: true,
                             audioUrl: cdnRes.url,
-                            track: { id, title: titleToUse, artist: { name: artistToUse }, audioUrl: cdnRes.url }
+                            track: {
+                                id,
+                                title: finalTitle,
+                                artist: { name: finalArtist },
+                                album: { title: finalAlbum, coverUrl: finalCover },
+                                coverUrl: finalCover,
+                                duration: cdnRes.duration,
+                                audioUrl: cdnRes.url
+                            }
                         });
                     }
                 } catch {}
@@ -214,6 +226,32 @@ export async function trackRoutes(server: FastifyInstance) {
                     language: track.language || undefined
                 });
                 if (cdnRes?.url && !cdnRes.url.includes('audio-ssl') && !cdnRes.url.includes('mzstatic') && !cdnRes.url.includes('itunes.apple.com')) {
+                    let updatedAlbum = track.album;
+                    if (!track.albumId && cdnRes.album && cdnRes.album !== 'Single') {
+                        const dbAlb = await prisma.album.findFirst({
+                            where: { title: { equals: cdnRes.album, mode: 'insensitive' } }
+                        }).catch(() => null);
+                        let albId = dbAlb?.id;
+                        if (!albId) {
+                            const newAlb = await prisma.album.create({
+                                data: {
+                                    title: cdnRes.album,
+                                    coverUrl: cdnRes.coverUrl || track.coverUrl,
+                                    artistId: track.artistId,
+                                    releaseDate: track.releaseDate || new Date()
+                                }
+                            }).catch(() => null);
+                            albId = newAlb?.id;
+                        }
+                        if (albId) {
+                            await prisma.track.update({
+                                where: { id: track.id },
+                                data: { albumId: albId }
+                            }).catch(() => {});
+                            updatedAlbum = { id: albId, title: cdnRes.album, coverUrl: cdnRes.coverUrl || track.coverUrl } as any;
+                        }
+                    }
+
                     await prisma.track.update({
                         where: { id: track.id },
                         data: {
@@ -224,7 +262,7 @@ export async function trackRoutes(server: FastifyInstance) {
                     return reply.send({
                         success: true,
                         audioUrl: cdnRes.url,
-                        track: { ...track, audioUrl: cdnRes.url }
+                        track: { ...track, album: updatedAlbum || track.album, audioUrl: cdnRes.url }
                     });
                 }
             } catch (cdnErr) {

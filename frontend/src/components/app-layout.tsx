@@ -396,9 +396,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {hasSidebar && (
  <aside
  className={cn(
- "flex flex-col absolute left-0 top-0 bottom-0 z-[120] transition-[width,background-color,backdrop-filter] duration-700 ease-out",
+ "flex flex-col absolute left-0 top-0 bottom-0 z-[120] transition-[width,background-color,backdrop-filter] duration-700 ease-out pointer-events-auto",
  APPLE_EASE,
- isAlbumPage ? "bg-[var(--side)] backdrop-blur-2xl border-r border-white/10" : "bg-[#1c1c1e] border-r border-white/[0.08]"
+ "bg-black/15 backdrop-blur-md border-r border-white/10"
  )}
  style={{ width: `${sidebarWidth}px` }}
  >
@@ -406,13 +406,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  </aside>
  )}
 
- {/* Content Area */}
+ {/* Content Area - Full width across screen, allowing cards and banners to slide under frosted glass */}
  <div 
  className={cn(
- "flex-1 flex flex-col relative overflow-hidden transition-[padding] duration-[450ms]",
+ "flex-1 flex flex-col relative overflow-hidden",
  APPLE_EASE
  )}
- style={{ paddingLeft: hasSidebar ? `${sidebarWidth}px` : 0 }}
  >
  <AnimatePresence>
  {showHeader && (
