@@ -262,34 +262,37 @@ export default function ArtistPage() {
 
       {/* ── 1. ARTIST HERO (Apple Music dual-layout: Widescreen Master Banner vs Round Shape Profile) ── */}
       {isWidescreenUrl ? (
-        /* WIDESCREEN MASTER BANNER (Anirudh, Justin Bieber, etc.) */
-        <div 
-          className="relative h-[50vh] min-h-[380px] sm:h-[58vh] md:h-[66vh] overflow-hidden select-none am-layout-transition"
-          style={{
-            marginLeft: "calc(var(--sb-w) * -1)",
-            marginRight: "calc(var(--rp-w) * -1)",
-            width: "calc(100% + var(--sb-w) + var(--rp-w))",
-          }}
-        >
-          {bannerUrl ? (
-            <img
-              src={getMediaUrl(bannerUrl) || undefined}
-              alt={displayName}
-              className="absolute inset-0 w-full h-full object-cover object-[50%_25%] filter brightness-95"
-              fetchPriority="high"
-              decoding="async"
-            />
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 to-[#121214]" />
-          )}
-
-          {/* Ambient top vignette & smooth bottom fade into universal dark charcoal #121214 */}
-          <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
-          <div className="absolute inset-x-0 bottom-0 h-40 sm:h-52 md:h-60 bg-gradient-to-t from-[#121214] via-[#121214]/85 to-transparent pointer-events-none" />
-
-          {/* Hero Content: Artist Name & Action Controls (docked down into bottom fade, centered in visible space) */}
+        /* WIDESCREEN MASTER BANNER (Anirudh, Justin Bieber, G V Prakash, etc.) */
+        <div className="relative w-full">
+          {/* Master Widescreen Banner Image */}
           <div 
-            className="absolute inset-x-0 bottom-0 flex flex-col items-center text-center px-4 pb-3 sm:pb-4 md:pb-3.5 z-10 am-layout-transition"
+            className="relative h-[48vh] min-h-[360px] sm:h-[56vh] md:h-[62vh] overflow-hidden select-none am-layout-transition"
+            style={{
+              marginLeft: "calc(var(--sb-w) * -1)",
+              marginRight: "calc(var(--rp-w) * -1)",
+              width: "calc(100% + var(--sb-w) + var(--rp-w))",
+            }}
+          >
+            {bannerUrl ? (
+              <img
+                src={getMediaUrl(bannerUrl) || undefined}
+                alt={displayName}
+                className="absolute inset-0 w-full h-full object-cover object-[50%_25%] filter brightness-95"
+                fetchPriority="high"
+                decoding="async"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 to-[#121214]" />
+            )}
+
+            {/* Ambient top vignette & smooth bottom fade into universal dark charcoal #121214 */}
+            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-52 sm:h-64 md:h-80 bg-gradient-to-t from-[#121214] via-[#121214]/85 to-transparent pointer-events-none" />
+          </div>
+
+          {/* Hero Content: Artist Name & Action Controls (docked down clear of face into bottom fade) */}
+          <div 
+            className="relative -mt-24 sm:-mt-28 md:-mt-32 flex flex-col items-center text-center px-4 pb-3 z-10 am-layout-transition"
             style={{
               paddingLeft: "calc(var(--sb-w) + 16px)",
               paddingRight: "calc(var(--rp-w) + 16px)",
@@ -304,7 +307,7 @@ export default function ArtistPage() {
               {/* Refined Artist Title: shifted down to the lower gradient clear of face */}
               <h1
                 ref={heroNameRef}
-                className="text-xl sm:text-2xl md:text-3xl lg:text-[32px] font-bold text-white tracking-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)] mb-2 sm:mb-2.5 select-text max-w-full px-2 break-words md:translate-y-1"
+                className="text-2xl sm:text-3xl md:text-4xl lg:text-[40px] font-bold text-white tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.95)] mb-3 sm:mb-4 select-text max-w-full px-2 break-words"
               >
                 {displayName}
               </h1>
