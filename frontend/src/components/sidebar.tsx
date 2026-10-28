@@ -396,10 +396,9 @@ export function Sidebar() {
           {/* Version pinned to the bottom, clear of the player */}
           <div
             className={cn(
-              "mt-auto px-[26px] text-[11px] font-medium text-white/30 transition-opacity duration-200",
+              "mt-auto px-[26px] pb-3 text-[11px] font-medium text-white/30 transition-opacity duration-200",
               collapsed && "opacity-0"
             )}
-            style={{ paddingBottom: currentTrack ? 98 : 12 }}
           >
             <span className="font-zenify not-italic">zenify</span> v2.5.3
           </div>
