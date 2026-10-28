@@ -31,6 +31,7 @@ import {
 
 import { motion } from "framer-motion";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
+import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
 
 interface Playlist {
  id: string;
@@ -197,12 +198,25 @@ export default function PlaylistDetailPage() {
  const isOwner = user?.id === playlist?.user?.id;
  const firstTrack = playlist?.tracks?.[0]?.track || playlist?.tracks?.[0];
  const colors = useAlbumColor(playlist?.coverUrl || firstTrack?.coverUrl, firstTrack?.palette);
+ const playlistCover = getMediaUrl(playlist?.coverUrl) || getMediaUrl(firstTrack?.coverUrl) || playlist?.tracks?.[0]?.coverUrl;
+
+ React.useEffect(() => {
+   if (!playlistCover) return;
+   extractArtworkAverageColor(playlistCover).then((rgb) => {
+     if (rgb) {
+       applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
+     }
+   });
+   return () => {
+     resetArtworkTheme();
+   };
+ }, [playlistCover]);
 
  if (isLoading) return <div className="p-8 text-white">Loading playlist...</div>;
  if (error || !playlist) return <div className="p-8 text-white">Playlist not found</div>;
 
  return (
- <div className="min-h-screen w-full bg-transparent overflow-x-hidden text-white relative">
+ <div className="min-h-screen w-full bg-transparent text-white relative">
  <div 
    className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden am-layout-transition"
    style={{

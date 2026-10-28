@@ -21,6 +21,7 @@ import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
+import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -305,6 +306,19 @@ export default function TrackPage() {
  const totalSecs = track.duration % 60;
  const durationStr = `${totalMins}:${String(totalSecs).padStart(2, "0")}`;
 
+ // Dynamic Apple Music Artwork Tint: compute dominant RGB and update CSS variables (--h, --s, --page, --side)
+ useEffect(() => {
+   if (!coverUrl) return;
+   extractArtworkAverageColor(coverUrl).then((rgb) => {
+     if (rgb) {
+       applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
+     }
+   });
+   return () => {
+     resetArtworkTheme();
+   };
+ }, [coverUrl]);
+
   // Extract movie or album title from title brackets like (From "3 (Tamil)") or (From Jailer)
   const extractMovieFromTitle = (titleStr: string): string | null => {
     if (!titleStr) return null;
@@ -328,10 +342,19 @@ export default function TrackPage() {
     ? "Zenify"
     : rawLabel;
 
- return (
- <div className="min-h-screen w-full text-foreground relative overflow-hidden">
-  {/* Apple Music Fluid Flowing Artwork Background */}
-  <DynamicBackground surface="trackPage" coverUrl={coverUrl} palette={track?.palette} />
+  return (
+    <div className="min-h-screen w-full text-foreground relative">
+      {/* Apple Music Fluid Flowing Artwork Background */}
+      <div 
+        className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden am-layout-transition"
+        style={{
+          marginLeft: "calc(var(--sb-w) * -1)",
+          marginRight: "calc(var(--rp-w) * -1)",
+          width: "calc(100% + var(--sb-w) + var(--rp-w))",
+        }}
+      >
+        <DynamicBackground surface="trackPage" coverUrl={coverUrl} palette={track?.palette} />
+      </div>
 
   {/* ── Page content ── */}
   <div className="relative z-10 px-4 sm:px-10 lg:px-12">

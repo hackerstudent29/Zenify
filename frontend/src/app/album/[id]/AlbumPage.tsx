@@ -348,7 +348,7 @@ export default function AlbumPage() {
   const otherAlbums = (artistData?.albums || []).filter((a: any) => a.id !== album.id);
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[var(--page,#121214)] transition-colors duration-700 ease-out text-white relative pb-32">
+    <div className="min-h-screen w-full max-w-full bg-transparent text-white relative pb-32">
       <SEO
         title={`${formatDisplayTitle(album.title)} by ${album.artist?.name || "Artist"} – Zenify`}
         description={albumDescription}
