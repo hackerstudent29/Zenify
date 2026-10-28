@@ -156,19 +156,79 @@ export default function ArtistPage() {
   const bannerUrl = isWidescreenUrl ? rawBanner : null;
   const avatarUrl = artist?.imageUrl || artist?.coverUrl || artist?.bannerUrl || null;
 
-  // Dynamic Apple Music Artwork Tint: compute dominant RGB from banner or avatar (MUST run before early returns)
+  // Dynamic Apple Music Artwork Tint: compute dominant RGB with multi-source fallback
+  // Evaluates banner, avatar, and top track artwork to find the authentic vibrant brand color
   useEffect(() => {
-    const targetArtwork = getMediaUrl(bannerUrl || avatarUrl || rawBanner);
-    if (!targetArtwork) return;
-    extractArtworkAverageColor(targetArtwork).then((rgb) => {
-      if (rgb) {
-        applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
+    let isCancelled = false;
+
+    async function resolveArtistTheme() {
+      // 1. Gather artist visual assets in preference order
+      const candidates = [
+        getMediaUrl(bannerUrl || rawBanner),
+        getMediaUrl(avatarUrl),
+        getMediaUrl(artist?.imageUrl),
+        getMediaUrl(artist?.coverUrl),
+      ].filter(Boolean) as string[];
+
+      // 2. Try each candidate — if it has vibrant color (saturation >= 0.12), adopt it immediately!
+      for (const candidate of candidates) {
+        if (isCancelled) return;
+        const rgb = await extractArtworkAverageColor(candidate);
+        if (!rgb) continue;
+
+        const [R, G, B] = rgb.map((v) => v / 255);
+        const max = Math.max(R, G, B);
+        const min = Math.min(R, G, B);
+        const d = max - min;
+        const l = (max + min) / 2;
+        const sat = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+
+        if (sat >= 0.12) {
+          if (!isCancelled) applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
+          return;
+        }
       }
-    });
+
+      // 3. If banner/avatar are monochrome/B&W (like Arivu's banner), check top song cover art!
+      const tracks = artist?.tracks || [];
+      for (const tr of tracks.slice(0, 3)) {
+        const cover = tr?.coverUrl || tr?.artwork || tr?.album?.coverUrl;
+        if (!cover) continue;
+        const trackArt = getMediaUrl(cover);
+        if (trackArt && !isCancelled) {
+          const trackRgb = await extractArtworkAverageColor(trackArt);
+          if (trackRgb) {
+            const [R, G, B] = trackRgb.map((v) => v / 255);
+            const d = Math.max(R, G, B) - Math.min(R, G, B);
+            const l = (Math.max(R, G, B) + Math.min(R, G, B)) / 2;
+            const sat = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+            if (sat >= 0.12) {
+              if (!isCancelled) applyArtworkTheme(trackRgb[0], trackRgb[1], trackRgb[2]);
+              return;
+            }
+          }
+        }
+      }
+
+      // 4. Fallback to candidate 0 or neutral theme
+      if (candidates[0]) {
+        const fallbackRgb = await extractArtworkAverageColor(candidates[0]);
+        if (fallbackRgb && !isCancelled) {
+          applyArtworkTheme(fallbackRgb[0], fallbackRgb[1], fallbackRgb[2]);
+          return;
+        }
+      }
+
+      if (!isCancelled) resetArtworkTheme();
+    }
+
+    resolveArtistTheme();
+
     return () => {
+      isCancelled = true;
       resetArtworkTheme();
     };
-  }, [bannerUrl, avatarUrl, rawBanner]);
+  }, [bannerUrl, avatarUrl, rawBanner, artist]);
 
   if (isLoading) {
     return (
