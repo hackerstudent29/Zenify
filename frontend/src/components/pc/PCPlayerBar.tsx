@@ -476,10 +476,10 @@ export function PCPlayerBar() {
             transition={{ scale: SPRING_SOFT, opacity: { duration: 0.2 } }}
             onClick={handleHidePlayer}
             style={{ fontFamily: FONT_STACK, WebkitFontSmoothing: "antialiased" }}
-            className="w-full h-full px-[22px] flex items-center justify-between gap-3 relative select-none bg-transparent border-none"
+            className="w-full h-full px-4 flex items-center justify-between gap-2.5 relative select-none bg-transparent border-none"
           >
             {/* 1. Left transport */}
-            <div className="relative flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
               <SpringButton
                 onClick={toggleShuffle}
                 className={cn("p-1", isShuffled ? activeBtn : inactiveBtn)}
@@ -544,7 +544,7 @@ export function PCPlayerBar() {
             </div>
 
             {/* 2. Middle: track info on top, seekbar anchored at the bottom */}
-            <div className="relative shrink-0 w-[310px] h-[50px]" onClick={(e) => e.stopPropagation()}>
+            <div className="relative shrink-0 w-[270px] h-[50px]" onClick={(e) => e.stopPropagation()}>
               {/* Track info: springs out/in on every song change, and dims + blurs behind the seekbar */}
               <div
                 className="absolute inset-x-0 top-0 h-[37px] min-w-0 overflow-hidden"
@@ -618,7 +618,7 @@ export function PCPlayerBar() {
             </div>
 
             {/* 3. Right controls */}
-            <div className="relative flex items-center shrink-0 w-[166px] justify-end" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex items-center shrink-0 w-[156px] justify-end" onClick={(e) => e.stopPropagation()}>
               <div
                 className="flex items-center"
                 style={{
