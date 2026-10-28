@@ -10,7 +10,7 @@ import { PremiumMobilePlayer } from "@/components/mobile/PremiumMobilePlayer";
 import { FullScreenPlayer } from "@/components/player/full-screen-player";
 import { GlobalAudio } from "@/components/player/global-audio";
 import { QueuePanel } from "@/components/player/queue-panel";
-import { cn } from "@/lib/utils";
+import { cn, getMediaUrl } from "@/lib/utils";
 import { Maximize2, Check, X, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlayerStore } from "@/store/player";
@@ -394,14 +394,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  "flex-1 flex flex-row relative overflow-hidden isolate"
  )}
  >
- {/* Sidebar (Desktop): static Apple Music style column on every page */}
+ {/* Sidebar (Desktop): static Apple Music style glass column on every page */}
  {hasSidebar && (
  <aside
  className={cn(
- "hidden md:flex flex-col shrink-0 w-[260px] h-full relative z-[120] pointer-events-auto",
- "bg-black/15 backdrop-blur-md border-r border-white/10"
+ "hidden md:flex flex-col shrink-0 w-[260px] h-full relative z-[120] pointer-events-auto overflow-hidden",
+ "bg-[#121214]/60 backdrop-blur-2xl border-r border-white/10"
  )}
  >
+   {/* Ambient Frosted Glass Background Layer */}
+   {activeCoverUrl && (
+     <div
+       className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-35 scale-125 transition-all duration-1000 pointer-events-none -z-10"
+       style={{ backgroundImage: `url(${getMediaUrl(activeCoverUrl)})` }}
+     />
+   )}
+   <div className="absolute inset-0 bg-black/25 pointer-events-none -z-10" />
  <Sidebar />
  </aside>
  )}
