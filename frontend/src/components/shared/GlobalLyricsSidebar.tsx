@@ -24,7 +24,7 @@ export function GlobalLyricsSidebar() {
           animate={{ x: 0 }}
           exit={{ x: SIDEBAR_W }}
           transition={PANEL_SPRING}
-          style={{ width: SIDEBAR_W }}
+          style={{ width: SIDEBAR_W, backgroundColor: "var(--side)" }}
           // The glass blurs the cards scrolling underneath: no cover layer needed here.
           className={cn(
             "fixed top-0 right-0 bottom-0 z-[140] flex flex-col overflow-hidden pointer-events-auto",
