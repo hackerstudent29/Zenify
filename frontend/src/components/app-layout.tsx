@@ -117,6 +117,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  // removed unused subscription (toggleShuffle): it re-rendered the whole layout on every change
  // removed unused subscription (toggleRepeat): it re-rendered the whole layout on every change
 
+ const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
+ const isQueueOpen = useUIStore(state => state.isQueueOpen);
  const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
  const isPlayerMinimized = useUIStore(state => state.isPlayerMinimized);
  const setPlayerMinimized = useUIStore(state => state.setPlayerMinimized);
@@ -392,25 +394,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  "flex-1 flex flex-row relative overflow-hidden isolate"
  )}
  >
- {/* Sidebar (Desktop): flat, sticky-left, Apple Music style on every page */}
+ {/* Sidebar (Desktop): static Apple Music style column on every page */}
  {hasSidebar && (
  <aside
  className={cn(
- "flex flex-col absolute left-0 top-0 bottom-0 z-[120] transition-[width,background-color,backdrop-filter] duration-700 ease-out pointer-events-auto",
- APPLE_EASE,
- "bg-black/15 backdrop-blur-md"
+ "hidden md:flex flex-col shrink-0 w-[260px] h-full relative z-[120] pointer-events-auto",
+ "bg-black/15 backdrop-blur-md border-r border-white/10"
  )}
- style={{ width: `${sidebarWidth}px` }}
  >
  <Sidebar />
  </aside>
  )}
 
- {/* Content Area - Full width across screen, allowing cards and banners to slide under frosted glass */}
+ {/* Content Area - Resizes dynamically when Queue or Lyrics is opened */}
  <div 
  className={cn(
- "flex-1 flex flex-col relative overflow-hidden",
- APPLE_EASE
+ "flex-1 flex flex-col relative overflow-hidden transition-[margin] duration-500",
+ APPLE_EASE,
+ (isLyricsOpen || isQueueOpen) && !isMobile && "mr-[380px]"
  )}
  >
  <AnimatePresence>
@@ -428,7 +429,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     )}
   style={{
   height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto",
-  paddingLeft: !isMobile ? `${sidebarWidth}px` : 0
+  paddingLeft: 0
   }}
  >
  <div className={cn("w-full pointer-events-auto", isMobile ? "h-full" : "h-[var(--header-height)]")}>
@@ -462,12 +463,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {/* Desktop Player: hidden on mobile, visible sm+ only */}
  {!isMobile && isMobile !== null && (
  <footer className={cn(
- "fixed z-[800] transition-[left,transform,opacity] duration-[450ms]",
+ "fixed z-[800] transition-[left,right,transform,opacity] duration-500",
  APPLE_EASE,
- "right-0 bottom-0 pointer-events-none",
+ "bottom-0 pointer-events-none",
  (!currentTrack || isLyricSyncPage) && "translate-y-full opacity-0"
  )}
- style={{ left: `${sidebarWidth}px` }}
+ style={{
+   left: hasSidebar ? "260px" : "0px",
+   right: (isLyricsOpen || isQueueOpen) ? "380px" : "0px"
+ }}
  >
  <AnimatePresence>
  {!isFullScreenPlayerOpen && (

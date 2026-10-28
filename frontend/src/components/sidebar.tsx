@@ -159,58 +159,7 @@ function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Edge tab. The sidebar's right hairline is drawn as two segments     */
-/* that stop exactly where the tab starts; the tab's own outline       */
-/* continues the same line around its curve. One line, never two.      */
-/* ------------------------------------------------------------------ */
-const TAB_FILL = "M0 0 Q0 8 8 8 H10 Q20 8 20 18 V54 Q20 64 10 64 H8 Q0 64 0 72 Z";
-const TAB_EDGE = "M0 0 Q0 8 8 8 H10 Q20 8 20 18 V54 Q20 64 10 64 H8 Q0 64 0 72";
 
-function EdgeTab({
-  collapsed,
-  translucent,
-  onToggle,
-}: {
-  collapsed: boolean;
-  translucent: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onToggle();
-      }}
-      title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      className={cn(
-        "group/tab absolute z-50 w-[22px] origin-left cursor-pointer outline-none",
-        "transition-transform duration-300 hover:scale-x-[1.1] active:scale-x-[0.94] active:duration-75",
-        SMOOTH
-      )}
-      style={{ left: "100%", marginLeft: -1, top: TAB_TOP, height: TAB_H }}
-    >
-      <svg width="22" height={TAB_H} viewBox="0 0 22 72" className="absolute inset-0 overflow-visible" aria-hidden>
-        <path d={TAB_FILL} fill={translucent ? "rgba(28,28,30,0.72)" : BAR_BG} />
-        <g transform="translate(0.5 0)">
-          <path d={TAB_EDGE} fill="none" stroke={LINE} strokeWidth="1" />
-        </g>
-      </svg>
-      <span
-        className={cn(
-          "absolute left-[5px] top-1/2 -mt-[7px] flex text-white/65 transition-[transform,color] duration-[720ms] group-hover/tab:text-white",
-          SPRING,
-          !collapsed && "rotate-180"
-        )}
-      >
-        <ChevronRight size={14} strokeWidth={2.6} />
-      </span>
-    </button>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* Sidebar                                                             */
@@ -221,8 +170,7 @@ export function Sidebar() {
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab");
   const { user, isAuthenticated } = useAuthStore();
-  const collapsed = useUIStore((s) => s.isSidebarCollapsed);
-  const setSidebarCollapsed = useUIStore((s) => s.setSidebarCollapsed);
+  const collapsed = false;
   const currentTrack = usePlayerStore((s) => s.currentTrack);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -285,31 +233,15 @@ export function Sidebar() {
         <div
           className="flex h-full w-full flex-col overflow-hidden bg-transparent"
         >
-          {/* Logo: full wordmark when open, the Z mark when closed (cross-fade, centred on x=36) */}
-          <div className="relative h-[72px] shrink-0">
+          {/* Logo: Apple Music style fixed brand header */}
+          <div className="relative h-[72px] shrink-0 flex items-center px-[18px]">
             <button
               type="button"
               onClick={() => router.push("/")}
               title="Zenify Home"
-              tabIndex={collapsed ? -1 : 0}
-              className={cn(
-                "absolute left-[18px] top-1/2 -translate-y-1/2 outline-none transition-opacity duration-300",
-                collapsed ? "pointer-events-none opacity-0" : "opacity-100"
-              )}
+              className="outline-none cursor-pointer hover:opacity-85 transition-opacity"
             >
               <ZenifyLogo size={42} />
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              title="Zenify Home"
-              tabIndex={collapsed ? 0 : -1}
-              className={cn(
-                "absolute left-5 top-1/2 -translate-y-1/2 outline-none transition-opacity duration-300",
-                collapsed ? "opacity-100" : "pointer-events-none opacity-0"
-              )}
-            >
-              <ZenifyLogo markOnly size={32} />
             </button>
           </div>
 
@@ -472,25 +404,6 @@ export function Sidebar() {
             <span className="font-zenify not-italic">zenify</span> v2.5.3
           </div>
         </div>
-
-        {/* The single edge hairline, in two pieces that stop where the tab begins and resumes where it ends */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute right-0 top-0 w-px"
-          style={{ height: TAB_TOP, background: LINE }}
-        />
-        <span
-          aria-hidden
-          className="pointer-events-none absolute bottom-0 right-0 w-px"
-          style={{ top: TAB_TOP + TAB_H, background: LINE }}
-        />
-
-        {/* Edge-attached open/close tab, at the top */}
-        <EdgeTab
-          collapsed={collapsed}
-          translucent={isAlbumPage}
-          onToggle={() => setSidebarCollapsed(!collapsed)}
-        />
       </aside>
 
       {/* Outside the <aside> so sticky/transitions can never offset or clip the modal */}

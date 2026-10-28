@@ -209,7 +209,7 @@ export function JioSaavnCardSection({
 
   return (
     <section className="mb-9 select-none">
-      {/* ── Section title + arrows ── */}
+      {/* ── Section title ── */}
       <div className="mb-3 flex items-center justify-between gap-4">
         {seeAllHref ? (
           <Link
@@ -228,31 +228,50 @@ export function JioSaavnCardSection({
         ) : (
           <h2 className="text-[22px] font-bold leading-7 tracking-[-0.02em] text-white">{title}</h2>
         )}
-
-        <div className="hidden items-center gap-1.5 sm:flex">
-          <NavArrow dir="left" disabled={edge.left} onClick={() => scroll("left")} />
-          <NavArrow dir="right" disabled={edge.right} onClick={() => scroll("right")} />
-        </div>
       </div>
 
-      {/* ── Carousel ── */}
-      <div
-        ref={scrollRef}
-        onScroll={updateEdges}
-        className="no-scrollbar flex items-start gap-3.5 overflow-x-auto scroll-smooth pb-1"
-        style={{ scrollSnapType: "x proximity", overscrollBehaviorX: "contain" }}
-      >
-        {items.map((item, idx) => (
-          <ReleaseCard
-            key={item.id || `${title}-${idx}`}
-            item={item}
-            idx={idx}
-            sectionTitle={title}
-            href={getItemLink(item)}
-            isThisPlaying={currentCollectionId === item.id && !!isPlaying}
-            onPlayItem={onPlayItem}
-          />
-        ))}
+      {/* ── Carousel with Floating Apple Music Movers ── */}
+      <div className="relative group/section">
+        {!edge.left && (
+          <button
+            type="button"
+            onClick={() => scroll("left")}
+            className="absolute left-1 sm:left-2 top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/section:opacity-100"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft size={22} strokeWidth={2.4} />
+          </button>
+        )}
+
+        {!edge.right && (
+          <button
+            type="button"
+            onClick={() => scroll("right")}
+            className="absolute right-1 sm:right-2 top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/section:opacity-100"
+            aria-label="Scroll right"
+          >
+            <ChevronRight size={22} strokeWidth={2.4} />
+          </button>
+        )}
+
+        <div
+          ref={scrollRef}
+          onScroll={updateEdges}
+          className="no-scrollbar flex items-start gap-3.5 overflow-x-auto scroll-smooth pb-1"
+          style={{ scrollSnapType: "x proximity", overscrollBehaviorX: "contain" }}
+        >
+          {items.map((item, idx) => (
+            <ReleaseCard
+              key={item.id || `${title}-${idx}`}
+              item={item}
+              idx={idx}
+              sectionTitle={title}
+              href={getItemLink(item)}
+              isThisPlaying={currentCollectionId === item.id && !!isPlaying}
+              onPlayItem={onPlayItem}
+            />
+          ))}
+        </div>
       </div>
     </section>
   );
