@@ -291,7 +291,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const rightPanelOpen = !isMobile && (isLyricsOpen || isQueueOpen);
   const layoutVars = {
     "--sb-w": hasSidebar ? `${SIDEBAR_EXPANDED}px` : "0px",
-    "--rp-w": rightPanelOpen ? "380px" : "0px",
+    "--rp-w": rightPanelOpen ? "320px" : "0px",
   } as React.CSSProperties;
   // One source of truth for the sidebar width (aside, content padding, header, player footer)
   const sidebarWidth = isSidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;

@@ -54,6 +54,102 @@ const formatDuration = (s?: number | null) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
+function AlbumHorizontalCarousel({
+  title,
+  seeAllHref,
+  children,
+}: {
+  title: string;
+  seeAllHref?: string;
+  children: React.ReactNode;
+}) {
+  const scrollRef = useState<HTMLDivElement | null>(null);
+  const elRef = (node: HTMLDivElement | null) => {
+    scrollRef[1](node);
+  };
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = () => {
+    const el = scrollRef[0];
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  };
+
+  useEffect(() => {
+    checkScroll();
+  }, [children, scrollRef[0]]);
+
+  const scroll = (dir: "left" | "right") => {
+    const el = scrollRef[0];
+    if (!el) return;
+    const distance = el.clientWidth * 0.8;
+    el.scrollBy({ left: (dir === "left" ? -1 : 1) * distance, behavior: "smooth" });
+  };
+
+  return (
+    <div className="mb-14 select-none group/album-carousel">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[20px] font-bold text-white">{title}</h3>
+        {seeAllHref && (
+          <Link href={seeAllHref} className="text-sm font-semibold text-brand hover:underline">
+            See all
+          </Link>
+        )}
+      </div>
+
+      <div
+        className="am-layout-transition relative"
+        style={{
+          marginLeft: "calc(var(--sb-w) * -1)",
+          marginRight: "calc(var(--rp-w) * -1)",
+        }}
+      >
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scroll("left")}
+            style={{ left: "calc(var(--sb-w) + 12px)" }}
+            className="am-glass-chip am-layout-transition absolute top-[38%] -translate-y-1/2 z-30 h-10 w-10 sm:h-12 sm:w-12 rounded-full text-white flex items-center justify-center opacity-0 group-hover/album-carousel:opacity-100 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft size={22} strokeWidth={2.4} />
+          </button>
+        )}
+
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scroll("right")}
+            style={{ right: "calc(var(--rp-w) + 12px)" }}
+            className="am-glass-chip am-layout-transition absolute top-[38%] -translate-y-1/2 z-30 h-10 w-10 sm:h-12 sm:w-12 rounded-full text-white flex items-center justify-center opacity-0 group-hover/album-carousel:opacity-100 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
+            aria-label="Scroll right"
+          >
+            <ChevronRight size={22} strokeWidth={2.4} />
+          </button>
+        )}
+
+        <div
+          ref={elRef}
+          onScroll={checkScroll}
+          className="am-layout-transition no-scrollbar flex items-start gap-4 overflow-x-auto scroll-smooth pb-2 pt-1"
+          style={{
+            scrollSnapType: "x proximity",
+            overscrollBehaviorX: "contain",
+            paddingLeft: "calc(var(--sb-w) + var(--row-gutter, 28px))",
+            paddingRight: "calc(var(--rp-w) + var(--row-gutter, 28px))",
+            scrollPaddingLeft: "calc(var(--sb-w) + var(--row-gutter, 28px))",
+            scrollPaddingRight: "calc(var(--rp-w) + var(--row-gutter, 28px))",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AlbumPage() {
   const params = useParams();
   const router = useRouter();
@@ -257,9 +353,18 @@ export default function AlbumPage() {
         title={`${formatDisplayTitle(album.title)} by ${album.artist?.name || "Artist"} – Zenify`}
         description={albumDescription}
       />
-      <DynamicBackground surface="albumPage" coverUrl={coverUrl} palette={album?.palette || album?.tracks?.[0]?.palette} />
+      <div 
+        className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden am-layout-transition"
+        style={{
+          marginLeft: "calc(var(--sb-w) * -1)",
+          marginRight: "calc(var(--rp-w) * -1)",
+          width: "calc(100% + var(--sb-w) + var(--rp-w))",
+        }}
+      >
+        <DynamicBackground surface="albumPage" coverUrl={coverUrl} palette={album?.palette || album?.tracks?.[0]?.palette} />
+      </div>
 
-      <div className="w-full relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-10 pt-4 md:pt-8 min-w-0 max-w-full overflow-hidden">
+      <div className="w-full relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-10 pt-4 md:pt-8 min-w-0 max-w-full">
         {/* ── 1. Top Header Navigation (Back / Forward) ────────────────── */}
         <div className="flex items-center justify-end w-full mb-4">
           <div className="inline-flex items-center bg-black/30 border border-white/10 rounded-full p-1 gap-1">
@@ -603,69 +708,56 @@ export default function AlbumPage() {
 
         {/* ── 6. More by this artist ────────────────────────────────────────── */}
         {(otherAlbums?.length || 0) > 0 && (
-          <div className="mb-14">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[20px] font-bold text-white">More by {album.artist?.name || "this artist"}</h3>
-              {(album.artistId || getArtistTarget(album)) && (
-                <Link
-                  href={album.artistId ? `/artist/${album.artistId}` : (getArtistTarget(album) || "#")}
-                  className="text-sm font-semibold text-brand hover:underline"
-                >
-                  See all
-                </Link>
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {otherAlbums.slice(0, 6).map((oth: any) => (
-                <Link
-                  key={oth.id}
-                  href={`/album/${oth.id}`}
-                  className="group flex flex-col gap-2 rounded-lg p-2 hover:bg-white/5 transition-all"
-                >
-                  <div className="w-full aspect-square rounded-md overflow-hidden bg-zinc-800 shadow relative">
-                    <img
-                      src={getMediaUrl(oth.coverUrl)}
-                      alt={oth.title}
-                      className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
-                    />
-                  </div>
-                  <span className="text-[14px] font-medium text-white truncate">{oth.title}</span>
-                  <span className="text-[12px] text-white/50">
-                    {oth.releaseDate ? new Date(oth.releaseDate).getFullYear() : "Album"}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
+          <AlbumHorizontalCarousel
+            title={`More by ${album.artist?.name || "this artist"}`}
+            seeAllHref={album.artistId ? `/artist/${album.artistId}` : (getArtistTarget(album) || undefined)}
+          >
+            {otherAlbums.map((oth: any) => (
+              <Link
+                key={oth.id}
+                href={`/album/${oth.id}`}
+                className="group w-[150px] sm:w-[165px] md:w-[180px] shrink-0 flex flex-col gap-2 rounded-lg p-1.5 hover:bg-white/5 transition-all"
+              >
+                <div className="w-full aspect-square rounded-[8px] overflow-hidden bg-white/[0.06] shadow-[0_2px_10px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10 relative">
+                  <img
+                    src={getMediaUrl(oth.coverUrl)}
+                    alt={oth.title}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span className="text-[14px] font-medium text-white truncate leading-tight">{oth.title}</span>
+                <span className="text-[12px] text-white/50">
+                  {oth.releaseDate ? new Date(oth.releaseDate).getFullYear() : "Album"}
+                </span>
+              </Link>
+            ))}
+          </AlbumHorizontalCarousel>
         )}
 
         {/* ── 8. You might also like ─────────────────────────────────────────── */}
         {(relatedArtists?.length || 0) > 0 && (
-          <div className="mb-14">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[20px] font-bold text-white">You might also like</h3>
-              <span className="text-sm font-semibold text-brand">See all</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {(relatedArtists || []).slice(0, 6).map((rel: any) => (
-                <Link
-                  key={rel.id}
-                  href={`/artist/${rel.id}`}
-                  className="group flex flex-col items-center text-center gap-2 rounded-lg p-2 hover:bg-white/5 transition-all"
-                >
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-zinc-800 shadow relative">
-                    <img
-                      src={getMediaUrl(rel.imageUrl || rel.coverUrl)}
-                      alt={rel.name}
-                      className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
-                    />
-                  </div>
-                  <span className="text-[14px] font-medium text-white truncate w-full">{rel.name}</span>
-                  <span className="text-[12px] text-white/50">Artist</span>
-                </Link>
-              ))}
-            </div>
-          </div>
+          <AlbumHorizontalCarousel
+            title="You might also like"
+            seeAllHref={album.artistId ? `/artist/${album.artistId}` : undefined}
+          >
+            {(relatedArtists || []).map((rel: any) => (
+              <Link
+                key={rel.id}
+                href={`/artist/${rel.id}`}
+                className="group w-[130px] sm:w-[145px] md:w-[160px] shrink-0 flex flex-col items-center text-center gap-2 rounded-lg p-2 hover:bg-white/5 transition-all"
+              >
+                <div className="w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full overflow-hidden bg-zinc-800 ring-1 ring-inset ring-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.4)] relative">
+                  <img
+                    src={getMediaUrl(rel.imageUrl || rel.coverUrl)}
+                    alt={rel.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span className="text-[14px] font-medium text-white truncate w-full">{rel.name}</span>
+                <span className="text-[12px] text-white/50">Artist</span>
+              </Link>
+            ))}
+          </AlbumHorizontalCarousel>
         )}
 
         {/* ── 9. Language Strip ────────────────────────────────────────────── */}

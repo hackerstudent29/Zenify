@@ -83,13 +83,13 @@ export function QueuePanel() {
             />
           )}
 
-          {/* Panel (Apple Music Frosted Glass Drawer - 380px) */}
+          {/* Panel (Apple Music Frosted Glass Drawer - 320px) */}
           <motion.div
-            initial={isMobile ? { y: "100%" } : { x: 380 }}
+            initial={isMobile ? { y: "100%" } : { x: 320 }}
             animate={isMobile ? { y: 0 } : { x: 0 }}
-            exit={isMobile ? { y: "100%" } : { x: 380 }}
+            exit={isMobile ? { y: "100%" } : { x: 320 }}
             transition={{ type: "spring", damping: 32, stiffness: 340, mass: 0.85 }}
-            style={{ width: isMobile ? undefined : 380 }}
+            style={{ width: isMobile ? undefined : 320 }}
             className={cn(
               "absolute pointer-events-auto flex flex-col overflow-hidden z-[140] am-glass will-change-transform",
               isMobile

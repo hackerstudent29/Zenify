@@ -7,7 +7,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Same width as the queue and the --rp-w variable set by the layout */
-const SIDEBAR_W = 380;
+const SIDEBAR_W = 320;
 
 const PANEL_SPRING = { type: "spring", stiffness: 340, damping: 32, mass: 0.85 } as const;
 
