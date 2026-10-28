@@ -10,6 +10,7 @@ import { useUIStore } from "@/store/ui";
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { usePlayerPrefs } from "@/store/playerPrefs";
 import { applyAccentColor } from "@/lib/accent-colors";
+import { reapplyArtworkTheme } from "@/lib/theme";
 import {
   Volume2,
   Play,
@@ -33,6 +34,7 @@ import {
   Maximize2,
   ScrollText,
   User,
+  Sparkles,
 } from "lucide-react";
 import {
   SettingsWindow,
@@ -83,6 +85,8 @@ export function SettingsModal({
   const setFx = usePlayerStore((state) => state.setFx);
   const reducedMotion = useUIStore((s) => s.reducedMotion);
   const setReducedMotion = useUIStore((s) => s.setReducedMotion);
+  const coloredBackground = useUIStore((s) => s.coloredBackground);
+  const setColoredBackground = useUIStore((s) => s.setColoredBackground);
   const showToast = useUIStore((s) => s.showToast);
   const reactiveBgStore = useReactiveBgStore();
   const autoHideDetails = usePlayerPrefs((s) => s.autoHideDetails);
@@ -365,6 +369,28 @@ export function SettingsModal({
                   { value: "gold", label: "Gold (Gradient)" },
                   { value: "midnight", label: "Midnight (Gradient)" },
                 ]}
+              />
+            </Row>
+          </Group>
+
+          <Group
+            header="Dynamic Page Background"
+            footer="When turned ON, Artist, Album, Playlist, and Track pages display vibrant, rich backgrounds extracted dynamically from their artwork. When turned OFF, pages use the default neutral dark (#1c1c1e) background."
+          >
+            <Row
+              label="Artwork Colored Background"
+              icon={Palette}
+              tint={TINT.purple}
+              description="Display vibrant artwork-tinted background on Artist, Album, Playlist & Track pages"
+            >
+              <Toggle
+                label="Artwork Colored Background"
+                checked={coloredBackground}
+                onCheckedChange={(v) => {
+                  setColoredBackground(v);
+                  reapplyArtworkTheme();
+                  showToast(v ? "Artwork colored backgrounds enabled" : "Default neutral dark background enabled");
+                }}
               />
             </Row>
           </Group>

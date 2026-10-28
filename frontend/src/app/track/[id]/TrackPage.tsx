@@ -327,7 +327,6 @@ export default function TrackPage() {
     return match ? match[1].trim() : null;
   };
 
-  const albumReleaseId = track.album?.id || track.albumId || (track as any).collectionId;
   const embeddedMovie = extractMovieFromTitle(track.title);
   const rawAlbumTitle = decodeHtmlEntities((track.album?.title || (track as any).albumTitle || (track as any).collectionName || '').trim());
   const isSameAsSong = rawAlbumTitle.toLowerCase() === track.title.trim().toLowerCase();
@@ -337,7 +336,25 @@ export default function TrackPage() {
     : (!isSameAsSong && rawAlbumTitle && rawAlbumTitle.toLowerCase() !== 'unknown')
       ? rawAlbumTitle
       : 'Single';
-  const albumHref = albumReleaseId ? `/album/${albumReleaseId}` : undefined;
+
+  const rawAlbumId = track.album?.id || track.albumId || (track as any).collectionId;
+  const isExternalAlbum = rawAlbumId && (
+    String(rawAlbumId).startsWith('saavn-album-') || 
+    String(rawAlbumId).startsWith('itunes-album-') || 
+    String(rawAlbumId).startsWith('yt-album-')
+  );
+
+  // If track is from a movie (e.g. Jailer 2), route directly to the movie album so all tracks load via JioSaavn
+  // Otherwise if it has an external album ID use it, or route by album title
+  const albumTarget = embeddedMovie
+    ? embeddedMovie
+    : isExternalAlbum
+      ? rawAlbumId
+      : (albumDisplay && albumDisplay !== 'Single')
+        ? albumDisplay
+        : rawAlbumId;
+
+  const albumHref = albumTarget ? `/album/${encodeURIComponent(albumTarget)}` : undefined;
   const rawLabel = (track as any).label || (track as any).publisher || (track.album as any)?.label;
   const labelDisplay = (!rawLabel || rawLabel.trim().toLowerCase() === "unknown" || rawLabel.trim().toLowerCase() === "null")
     ? "Zenify"

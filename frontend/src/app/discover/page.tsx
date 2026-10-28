@@ -237,7 +237,7 @@ function SongRow({
   );
 }
 
-/** Square artwork card (albums / regional tracks) */
+/** Square artwork card (albums / regional tracks) - Apple Music MediaCard aesthetic */
 function ArtCard({
   cover,
   title,
@@ -258,14 +258,11 @@ function ArtCard({
   alt: string;
 }) {
   return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.97 }}
-      transition={SPRING}
+    <div
       onClick={onClick}
-      className="group cursor-pointer min-w-0"
+      className="group relative flex flex-col gap-1 p-1 rounded-lg transition-all duration-300 hover:bg-white/[0.03] cursor-pointer font-sans min-w-0"
     >
-      <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-800 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+      <div className="group/art relative aspect-square w-full overflow-hidden rounded-[8px] bg-white/[0.06] shadow-[0_2px_10px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10">
         <img
           src={cover}
           alt={alt}
@@ -273,34 +270,42 @@ function ArtCard({
           height={180}
           loading="lazy"
           decoding="async"
-          className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.04]"
+          className="w-full h-full object-cover"
         />
         {playable && (
-          <div className={cn("absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent transition-opacity duration-200", isPlayingNow ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
-            <div className="absolute left-2.5 bottom-2.5 w-9 h-9 rounded-full bg-white/25 backdrop-blur-xl border border-white/30 flex items-center justify-center text-white shadow-lg">
-              {isPlayingNow ? <Pause size={16} className="fill-current" /> : <Play size={16} className="fill-current ml-0.5" />}
+          <>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover/art:opacity-100" />
+            <div
+              className={cn(
+                "am-glass-chip absolute bottom-2.5 left-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full text-white outline-none cursor-pointer",
+                "translate-y-1.5 scale-90 opacity-0 transition-[opacity,transform] duration-300 ease-[var(--spring)]",
+                "group-hover/art:translate-y-0 group-hover/art:scale-100 group-hover/art:opacity-100",
+                "active:!scale-90 hover:bg-white/25",
+                isPlayingNow && "!translate-y-0 !scale-100 !opacity-100"
+              )}
+            >
+              {isPlayingNow ? <Pause size={14} className="fill-current" /> : <Play size={14} className="fill-current ml-0.5" />}
             </div>
-          </div>
+          </>
         )}
       </div>
-      <p className={cn("mt-2 text-[14px] leading-5 font-medium truncate", isPlayingNow ? "text-brand" : "text-white")}>{title}</p>
-      {subtitle && <p className="text-[13px] leading-4 text-white/55 truncate">{subtitle}</p>}
-      {caption && <p className="text-[11px] leading-4 text-white/35 truncate mt-0.5">{caption}</p>}
-    </motion.div>
+      <div className="flex flex-col min-w-0 flex-1 px-1 gap-0.5 mt-2">
+        <p className={cn("text-sm font-sans font-semibold tracking-normal truncate transition-colors leading-snug", isPlayingNow ? "text-brand" : "text-white/95 group-hover:text-brand")}>{title}</p>
+        {subtitle && <p className="text-[12px] font-medium tracking-tight font-sans text-zinc-400 truncate">{subtitle}</p>}
+        {caption && <p className="text-[11px] font-medium tracking-tight font-sans text-zinc-500 truncate">{caption}</p>}
+      </div>
+    </div>
   );
 }
 
-/** Circular artist card */
+/** Circular artist card - Apple Music MediaCard aesthetic */
 function ArtistCard({ artist, onClick }: { artist: any; onClick: () => void }) {
   return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.96 }}
-      transition={SPRING}
+    <div
       onClick={onClick}
-      className="group flex flex-col items-center text-center cursor-pointer min-w-0"
+      className="group relative flex flex-col items-center text-center gap-1 p-1 rounded-lg transition-all duration-300 cursor-pointer font-sans min-w-0"
     >
-      <div className="w-full max-w-[140px] aspect-square rounded-full overflow-hidden bg-zinc-800 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+      <div className="group/art relative aspect-square w-full rounded-full overflow-hidden bg-white/[0.06] shadow-[0_2px_10px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10">
         <img
           src={getMediaUrl(artist.imageUrl) || FALLBACK_ARTIST}
           alt={artist.name || "Artist portrait"}
@@ -308,12 +313,14 @@ function ArtistCard({ artist, onClick }: { artist: any; onClick: () => void }) {
           height={140}
           loading="lazy"
           decoding="async"
-          className="w-full h-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-[1.05]"
+          className="w-full h-full object-cover"
         />
       </div>
-      <p className="mt-2 text-[14px] font-medium text-white truncate w-full">{artist.name}</p>
-      <p className="text-[13px] text-white/50">Artist</p>
-    </motion.div>
+      <div className="flex flex-col items-center min-w-0 w-full px-1 gap-0.5 mt-2">
+        <p className="text-sm font-sans font-semibold tracking-normal text-white/95 group-hover:text-brand truncate w-full transition-colors">{artist.name}</p>
+        <p className="text-[12px] font-medium tracking-tight font-sans text-brand">Artist</p>
+      </div>
+    </div>
   );
 }
 
@@ -1452,6 +1459,7 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
                                 alt={album.title || "Album artwork"}
                                 title={album.title}
                                 subtitle={`${album.artist?.name || "Album"}${album.year ? ` • ${album.year}` : ""}`}
+                                caption={album.trackCount ? `${album.trackCount} ${album.trackCount === 1 ? 'Song' : 'Songs'}` : undefined}
                                 onClick={() => {
                                   router.push(`/album/${album.id}`);
                                   logSearchEvent("album", album.id, album.title);

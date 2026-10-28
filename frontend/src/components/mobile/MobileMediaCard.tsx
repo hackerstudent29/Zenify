@@ -267,7 +267,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
   </div>
   
   <div className={cn("text-[11px] font-medium tracking-tight font-sans truncate w-full block", isCurrent ? "text-zinc-400" : isArtist ? "text-brand" : "text-white/40")} onClick={(e) => e.stopPropagation()}>
-  {isArtist ? 'Artist' : isPlaylist ? ((track as any).description || (track as any).subtitle || 'Curated Playlist') : (
+  {isArtist ? 'Artist' : isPlaylist ? ((track as any).description || (track as any).subtitle || 'Curated Playlist') : isAlbum ? ((track as any).subtitle || ((track as any).year ? `${(track as any).year} · ${(track as any).isSingle ? "Single" : "Album"}` : ((track as any).artist?.name || (track as any).artistName || 'Album'))) : (
     <ArtistLinks track={track} maxArtists={2} linkClassName="text-white/40 hover:text-white hover:underline" />
   )}
   </div>

@@ -710,7 +710,7 @@ export class UniversalSearchService {
         genre: alb.language ? `${alb.language} Soundtrack` : 'Soundtrack',
         releaseDate: alb.year ? `${alb.year}-01-01` : undefined,
         year: alb.year || undefined,
-        trackCount: parseInt(alb.more_info?.song_pids ? alb.more_info.song_pids.split(',').length : 1, 10) || 1
+        trackCount: parseInt(alb.more_info?.song_count || alb.song_count || (alb.more_info?.song_pids ? alb.more_info.song_pids.split(',').length : 0) || alb.numsongs || 1, 10) || 1
       });
     }
 

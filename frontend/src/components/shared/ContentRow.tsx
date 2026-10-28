@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { MediaCard } from "./MediaCard";
+import { MediaCard, MEDIA_CARD_WIDTH } from "./MediaCard";
 import { Track } from "@/store/player";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +29,7 @@ interface ContentRowProps {
 const EDGE_L = "calc(var(--sb-w) + var(--row-gutter))";
 const EDGE_R = "calc(var(--rp-w) + var(--row-gutter))";
 
-const CARD_W = "w-[168px] sm:w-[184px] lg:w-[200px] xl:w-[216px] 2xl:w-[232px]";
+const CARD_W = MEDIA_CARD_WIDTH;
 
 export function ContentRow({ title, subtitle, items, className, seeAllHref, isLoading }: ContentRowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
