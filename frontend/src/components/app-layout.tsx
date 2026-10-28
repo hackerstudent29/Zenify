@@ -400,6 +400,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {/* Sidebar (Desktop): static Apple Music style glass column on every page */}
  {hasSidebar && (
  <aside
+ style={{ backgroundColor: "var(--side)" }}
  className="hidden md:flex flex-col w-[260px] h-full absolute left-0 top-0 bottom-0 z-[120] pointer-events-auto overflow-hidden am-glass am-glass-left"
  >
  <Sidebar />

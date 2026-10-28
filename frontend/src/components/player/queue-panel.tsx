@@ -89,7 +89,7 @@ export function QueuePanel() {
             animate={isMobile ? { y: 0 } : { x: 0 }}
             exit={isMobile ? { y: "100%" } : { x: 320 }}
             transition={{ type: "spring", damping: 32, stiffness: 340, mass: 0.85 }}
-            style={{ width: isMobile ? undefined : 320 }}
+            style={{ width: isMobile ? undefined : 320, backgroundColor: "var(--side)" }}
             className={cn(
               "absolute pointer-events-auto flex flex-col overflow-hidden z-[140] am-glass will-change-transform",
               isMobile

@@ -24,16 +24,15 @@ export function themeVars(r: number, g: number, b: number) {
   const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
 
   // Apple Music exact measured values:
-  // Saturation clamped between 25% and 65% for rich, vibrant Apple Music tone
-  const satNum = Math.round(Math.min(Math.max(s, 0.28), 0.65) * 100);
+  // Saturation clamped between 30% and 75% for rich, vibrant Apple Music tone
+  const satNum = Math.round(Math.min(Math.max(s, 0.32), 0.75) * 100);
   const satStr = `${satNum}%`;
 
-  // Page: uniform static Apple Music background color (exact 15.5% - 16% lightness)
+  // Page: uniform static Apple Music background color (exact 16% lightness)
   const page = `hsl(${h} ${satStr} 16%)`;
 
-  // Sidebar: matching darker Apple Music panel tone (10% lightness)
-  const sideSat = `${Math.round(satNum * 0.72)}%`;
-  const side = `hsl(${h} ${sideSat} 10%)`;
+  // Sidebar & Panels: matching rich Apple Music panel tone (13.5% lightness, preserving full vibrant saturation)
+  const side = `hsl(${h} ${satStr} 13.5%)`;
 
   const text2 = `hsl(${h} 25% 80%)`;
   const pill = `rgba(255, 255, 255, 0.08)`;
