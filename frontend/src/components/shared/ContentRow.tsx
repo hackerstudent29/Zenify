@@ -53,62 +53,50 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
 
   return (
     <section className={cn("space-y-4 w-full", className)}>
-      <div
-        className="flex items-end justify-between pr-4 md:pr-8 transition-[padding] duration-300"
-        style={{ paddingLeft: !isMobile ? `${sidebarWidth + 24}px` : '16px' }}
-      >
+      <div className="flex items-end justify-between px-6 sm:px-8 md:px-10">
         <div className="space-y-1">
           <h2 className="text-lg font-bold tracking-tight text-foreground/95 font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>{title}</h2>
           {subtitle && <p className="text-[12px] text-muted font-medium opacity-60 uppercase tracking-wider">{subtitle}</p>}
         </div>
 
-        <div className="flex items-center gap-4">
-          {seeAllHref && (
-            <Link
-              href={seeAllHref}
-              className="text-xs font-bold text-accent hover:underline flex items-center gap-1 group/link mr-2"
-            >
-              See All
-              <ArrowRight size={12} className="group-hover/link:translate-x-1 transition-transform" />
-            </Link>
-          )}
-          <div className="flex gap-1">
-            <button
-              onClick={() => scroll('left')}
-              className={cn(
-                "btn-icon h-7 w-7 bg-surface-hover/80 text-muted transition-all hover:bg-surface-active",
-                !canScrollLeft && "opacity-20 cursor-not-allowed"
-              )}
-              disabled={!canScrollLeft}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={() => scroll('right')}
-              className={cn(
-                "btn-icon h-7 w-7 bg-surface-hover/80 text-muted transition-all hover:bg-surface-active",
-                !canScrollRight && "opacity-20 cursor-not-allowed"
-              )}
-              disabled={!canScrollRight}
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+        {seeAllHref && (
+          <Link
+            href={seeAllHref}
+            className="text-xs font-bold text-accent hover:underline flex items-center gap-1 group/link mr-2"
+          >
+            See All
+            <ArrowRight size={12} className="group-hover/link:translate-x-1 transition-transform" />
+          </Link>
+        )}
       </div>
 
-      <div className="relative group/scroll w-full">
+      <div className="relative group/scroll w-full px-6 sm:px-8 md:px-10">
+        {/* Apple Music Floating Movers over Content */}
+        {canScrollLeft && (
+          <button
+            onClick={() => scroll('left')}
+            className="absolute left-2 sm:left-4 top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/scroll:opacity-100"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft size={22} strokeWidth={2.4} />
+          </button>
+        )}
+
+        {canScrollRight && (
+          <button
+            onClick={() => scroll('right')}
+            className="absolute right-2 sm:right-4 top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/scroll:opacity-100"
+            aria-label="Scroll right"
+          >
+            <ChevronRight size={22} strokeWidth={2.4} />
+          </button>
+        )}
+
         <div
           ref={scrollRef}
           onScroll={checkScroll}
           className="flex gap-4 overflow-x-auto pb-6 no-scrollbar scroll-smooth snap-x snap-mandatory w-full"
         >
-          {/* Leading spacer that sets the exact default starting point after the sidebar */}
-          <div
-            className="shrink-0 transition-[width] duration-300 pointer-events-none"
-            style={{ width: !isMobile ? `${sidebarWidth + 24}px` : '16px' }}
-            aria-hidden="true"
-          />
           {isLoading ? (
    Array.from({ length: 5 }).map((_, i) => (
      <div 

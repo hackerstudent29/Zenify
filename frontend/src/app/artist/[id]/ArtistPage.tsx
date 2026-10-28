@@ -280,18 +280,18 @@ export default function ArtistPage() {
           <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
           <div className="absolute inset-x-0 bottom-0 h-40 sm:h-52 md:h-60 bg-gradient-to-t from-[#121214] via-[#121214]/85 to-transparent pointer-events-none" />
 
-          {/* Hero Content: Artist Name & Action Controls (Apple Music style: reduced size & docked at bottom) */}
-          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center text-center px-4 pb-4 sm:pb-5 md:pb-6 z-10">
+          {/* Hero Content: Artist Name & Action Controls (docked down into bottom fade) */}
+          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center text-center px-4 pb-3 sm:pb-4 md:pb-3.5 z-10">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col items-center max-w-4xl w-full min-w-0"
             >
-              {/* Refined Artist Title (Apple Music typography) */}
+              {/* Refined Artist Title: shifted down to the lower gradient clear of face */}
               <h1
                 ref={heroNameRef}
-                className="text-xl sm:text-2xl md:text-3xl lg:text-[34px] font-bold text-white tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.85)] mb-3 select-text max-w-full px-2 break-words"
+                className="text-xl sm:text-2xl md:text-3xl lg:text-[32px] font-bold text-white tracking-tight drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)] mb-2 sm:mb-2.5 select-text max-w-full px-2 break-words md:translate-y-1"
               >
                 {displayName}
               </h1>
