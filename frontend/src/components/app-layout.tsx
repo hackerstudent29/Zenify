@@ -415,7 +415,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     "z-[100] pointer-events-none am-layout-transition absolute top-0 safe-area-top",
     isMobile 
       ? "bg-[#121214]/95 backdrop-blur-md border-b border-white/5 left-0 right-0 w-full" 
-      : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/"))
+      : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/") || pathname?.startsWith("/artist/"))
         ? "bg-transparent"
         : "bg-gradient-to-b from-[#121214]/80 to-transparent",
     isMobile && isHeaderHidden && "-translate-y-full opacity-0 pointer-events-none"
