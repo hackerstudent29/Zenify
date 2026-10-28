@@ -135,6 +135,41 @@ export default function ArtistPage() {
     };
   }, [artist?.bannerUrl, artist?.coverUrl, artist?.imageUrl]);
 
+  const rawBanner = artist?.bannerUrl || artist?.coverUrl || null;
+  const isWidescreenUrl = isWidescreen === true || (
+    isWidescreen === null &&
+    Boolean(
+      rawBanner &&
+      !rawBanner.includes('placeholder') &&
+      !rawBanner.includes('logo.png') &&
+      !rawBanner.includes('ui-avatars.com') &&
+      (
+        rawBanner.includes('AMCArtistImages') ||
+        rawBanner.includes('1920x') ||
+        rawBanner.includes('2560x') ||
+        rawBanner.includes('3840x') ||
+        rawBanner.includes('headerImage')
+      ) &&
+      rawBanner !== artist?.imageUrl
+    )
+  );
+  const bannerUrl = isWidescreenUrl ? rawBanner : null;
+  const avatarUrl = artist?.imageUrl || artist?.coverUrl || artist?.bannerUrl || null;
+
+  // Dynamic Apple Music Artwork Tint: compute dominant RGB from banner or avatar (MUST run before early returns)
+  useEffect(() => {
+    const targetArtwork = getMediaUrl(bannerUrl || avatarUrl || rawBanner);
+    if (!targetArtwork) return;
+    extractArtworkAverageColor(targetArtwork).then((rgb) => {
+      if (rgb) {
+        applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
+      }
+    });
+    return () => {
+      resetArtworkTheme();
+    };
+  }, [bannerUrl, avatarUrl, rawBanner]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[70vh] bg-transparent">
@@ -152,28 +187,6 @@ export default function ArtistPage() {
     );
   }
 
-
-
-  const rawBanner = artist.bannerUrl || artist.coverUrl || null;
-  const isWidescreenUrl = isWidescreen === true || (
-    isWidescreen === null &&
-    Boolean(
-      rawBanner &&
-      !rawBanner.includes('placeholder') &&
-      !rawBanner.includes('logo.png') &&
-      !rawBanner.includes('ui-avatars.com') &&
-      (
-        rawBanner.includes('AMCArtistImages') ||
-        rawBanner.includes('1920x') ||
-        rawBanner.includes('2560x') ||
-        rawBanner.includes('3840x') ||
-        rawBanner.includes('headerImage')
-      ) &&
-      rawBanner !== artist.imageUrl
-    )
-  );
-  const bannerUrl = isWidescreenUrl ? rawBanner : null;
-  const avatarUrl = artist.imageUrl || artist.coverUrl || artist.bannerUrl || null;
   const isArtistActive = artist.topTracks?.some((t: any) => t.id === currentTrack?.id);
 
   const handlePlayTopTracks = () => {
@@ -253,20 +266,6 @@ export default function ArtistPage() {
   };
 
   const displayName = formatDisplayTitle(artist.name);
-
-  // Dynamic Apple Music Artwork Tint: compute dominant RGB from banner or avatar
-  useEffect(() => {
-    const targetArtwork = getMediaUrl(bannerUrl || avatarUrl || rawBanner);
-    if (!targetArtwork) return;
-    extractArtworkAverageColor(targetArtwork).then((rgb) => {
-      if (rgb) {
-        applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
-      }
-    });
-    return () => {
-      resetArtworkTheme();
-    };
-  }, [bannerUrl, avatarUrl, rawBanner]);
 
   return (
     <div className="min-h-screen w-full bg-transparent text-white relative">

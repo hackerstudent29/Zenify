@@ -96,6 +96,20 @@ export default function TrackPage() {
     : queue.find(t => t.id === id || (t as any).youtubeId === id);
 
   const track = dbTrack || currentOrQueueTrack;
+  const trackCoverUrl = track ? (getMediaUrl(track.coverUrl) || "/logo.png") : null;
+
+  // Dynamic Apple Music Artwork Tint: compute dominant RGB (must be declared before early returns)
+  useEffect(() => {
+    if (!trackCoverUrl) return;
+    extractArtworkAverageColor(trackCoverUrl).then((rgb) => {
+      if (rgb) {
+        applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
+      }
+    });
+    return () => {
+      resetArtworkTheme();
+    };
+  }, [trackCoverUrl]);
 
   // Background auto-healing: if song is playing but not yet persistent in DB, instantly import it
   useEffect(() => {
@@ -301,23 +315,10 @@ export default function TrackPage() {
  </div>
  );
 
- const coverUrl = getMediaUrl(track.coverUrl) || "/logo.png";
+ const coverUrl = trackCoverUrl || getMediaUrl(track.coverUrl) || "/logo.png";
  const totalMins = Math.floor(track.duration / 60);
  const totalSecs = track.duration % 60;
  const durationStr = `${totalMins}:${String(totalSecs).padStart(2, "0")}`;
-
- // Dynamic Apple Music Artwork Tint: compute dominant RGB and update CSS variables (--h, --s, --page, --side)
- useEffect(() => {
-   if (!coverUrl) return;
-   extractArtworkAverageColor(coverUrl).then((rgb) => {
-     if (rgb) {
-       applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
-     }
-   });
-   return () => {
-     resetArtworkTheme();
-   };
- }, [coverUrl]);
 
   // Extract movie or album title from title brackets like (From "3 (Tamil)") or (From Jailer)
   const extractMovieFromTitle = (titleStr: string): string | null => {
