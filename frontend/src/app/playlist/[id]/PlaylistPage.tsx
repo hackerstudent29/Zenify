@@ -203,7 +203,16 @@ export default function PlaylistDetailPage() {
 
  return (
  <div className="min-h-screen w-full bg-transparent overflow-x-hidden text-white relative">
- <DynamicBackground surface="albumPage" coverUrl={playlist?.coverUrl || firstTrack?.coverUrl} />
+ <div 
+   className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden am-layout-transition"
+   style={{
+     marginLeft: "calc(var(--sb-w) * -1)",
+     marginRight: "calc(var(--rp-w) * -1)",
+     width: "calc(100% + var(--sb-w) + var(--rp-w))",
+   }}
+ >
+   <DynamicBackground surface="albumPage" coverUrl={playlist?.coverUrl || firstTrack?.coverUrl} />
+ </div>
  <div className="w-full relative z-10">
  {/* ── HEADER SECTION ─────────────────────────────────── */}
  <div className="relative px-6 pt-4 pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">

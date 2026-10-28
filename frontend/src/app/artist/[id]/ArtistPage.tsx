@@ -263,7 +263,14 @@ export default function ArtistPage() {
       {/* ── 1. ARTIST HERO (Apple Music dual-layout: Widescreen Master Banner vs Round Shape Profile) ── */}
       {isWidescreenUrl ? (
         /* WIDESCREEN MASTER BANNER (Anirudh, Justin Bieber, etc.) */
-        <div className="relative w-full h-[50vh] min-h-[380px] sm:h-[58vh] md:h-[66vh] overflow-hidden select-none">
+        <div 
+          className="relative h-[50vh] min-h-[380px] sm:h-[58vh] md:h-[66vh] overflow-hidden select-none am-layout-transition"
+          style={{
+            marginLeft: "calc(var(--sb-w) * -1)",
+            marginRight: "calc(var(--rp-w) * -1)",
+            width: "calc(100% + var(--sb-w) + var(--rp-w))",
+          }}
+        >
           {bannerUrl ? (
             <img
               src={getMediaUrl(bannerUrl) || undefined}
@@ -277,11 +284,17 @@ export default function ArtistPage() {
           )}
 
           {/* Ambient top vignette & smooth bottom fade into universal dark charcoal #121214 */}
-          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
+          <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
           <div className="absolute inset-x-0 bottom-0 h-40 sm:h-52 md:h-60 bg-gradient-to-t from-[#121214] via-[#121214]/85 to-transparent pointer-events-none" />
 
-          {/* Hero Content: Artist Name & Action Controls (docked down into bottom fade) */}
-          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center text-center px-4 pb-3 sm:pb-4 md:pb-3.5 z-10">
+          {/* Hero Content: Artist Name & Action Controls (docked down into bottom fade, centered in visible space) */}
+          <div 
+            className="absolute inset-x-0 bottom-0 flex flex-col items-center text-center px-4 pb-3 sm:pb-4 md:pb-3.5 z-10 am-layout-transition"
+            style={{
+              paddingLeft: "calc(var(--sb-w) + 16px)",
+              paddingRight: "calc(var(--rp-w) + 16px)",
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -489,16 +502,18 @@ export default function ArtistPage() {
       )}
 
       {/* ── 2. JIOSAAVN REDESIGNED SECTIONS (Screenshot 1 & Screenshot 2) ── */}
-      <div className="relative z-10 px-4 sm:px-8 md:px-12 lg:px-16 pt-6 sm:pt-8 pb-28 max-w-[1600px] mx-auto w-full text-white min-w-0 overflow-hidden">
-        {/* SECTION 1: Top Songs Table with Popular, Date, Name filters & Load more (Screenshot 1) */}
-        <JioSaavnSongTable
-          tracks={artist.topTracks || artist.topSongs || []}
-          currentTrackId={currentTrack?.id}
-          isPlaying={isPlaying}
-          likedTrackIds={likedTrackIds}
-          onPlayTrack={handlePlayTrack}
-          onToggleLike={toggleLike}
-        />
+      <div className="relative z-10 pt-6 sm:pt-8 pb-28 w-full text-white min-w-0">
+        {/* SECTION 1: Top Songs Table with Popular, Date, Name filters & Load more */}
+        <div className="px-4 sm:px-8 md:px-12 max-w-[1400px] mx-auto w-full mb-8">
+          <JioSaavnSongTable
+            tracks={artist.topTracks || artist.topSongs || []}
+            currentTrackId={currentTrack?.id}
+            isPlaying={isPlaying}
+            likedTrackIds={likedTrackIds}
+            onPlayTrack={handlePlayTrack}
+            onToggleLike={toggleLike}
+          />
+        </div>
 
         {/* SECTION 2: "Just [Artist Name]" Dedicated Playlists (Screenshot 2) */}
         {artist.dedicatedPlaylists && artist.dedicatedPlaylists.length > 0 && (

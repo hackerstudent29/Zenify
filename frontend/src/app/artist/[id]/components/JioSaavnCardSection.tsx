@@ -218,7 +218,7 @@ export function JioSaavnCardSection({
   return (
     <section className="mb-9 select-none">
       {/* ── Section title ── */}
-      <div className="mb-3 flex items-center justify-between gap-4">
+      <div className="mb-3 flex items-center justify-between gap-4" style={{ paddingInline: "var(--row-gutter, 28px)" }}>
         {seeAllHref ? (
           <Link
             href={seeAllHref}
@@ -240,7 +240,7 @@ export function JioSaavnCardSection({
 
       {/* ── Carousel with Floating Apple Music Movers ── */}
       <div 
-        className="relative group/section"
+        className="am-layout-transition relative group/section"
         style={{
           marginLeft: "calc(var(--sb-w) * -1)",
           marginRight: "calc(var(--rp-w) * -1)",
@@ -251,7 +251,7 @@ export function JioSaavnCardSection({
             type="button"
             onClick={() => scroll("left")}
             style={{ left: "calc(var(--sb-w) + 12px)" }}
-            className="am-glass-chip absolute top-[38%] -translate-y-1/2 z-30 h-10 w-10 sm:h-12 sm:w-12 rounded-full text-white flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
+            className="am-glass-chip am-layout-transition absolute top-[38%] -translate-y-1/2 z-30 h-10 w-10 sm:h-12 sm:w-12 rounded-full text-white flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
             aria-label="Scroll left"
           >
             <ChevronLeft size={22} strokeWidth={2.4} />
@@ -263,7 +263,7 @@ export function JioSaavnCardSection({
             type="button"
             onClick={() => scroll("right")}
             style={{ right: "calc(var(--rp-w) + 12px)" }}
-            className="am-glass-chip absolute top-[38%] -translate-y-1/2 z-30 h-10 w-10 sm:h-12 sm:w-12 rounded-full text-white flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
+            className="am-glass-chip am-layout-transition absolute top-[38%] -translate-y-1/2 z-30 h-10 w-10 sm:h-12 sm:w-12 rounded-full text-white flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
             aria-label="Scroll right"
           >
             <ChevronRight size={22} strokeWidth={2.4} />
@@ -273,12 +273,14 @@ export function JioSaavnCardSection({
         <div
           ref={scrollRef}
           onScroll={updateEdges}
-          className="no-scrollbar flex items-start gap-3.5 overflow-x-auto scroll-smooth pb-1"
+          className="am-layout-transition no-scrollbar flex items-start gap-3.5 overflow-x-auto scroll-smooth pb-1"
           style={{
             scrollSnapType: "x proximity",
             overscrollBehaviorX: "contain",
-            paddingLeft: "calc(var(--sb-w) + 32px)",
-            paddingRight: "calc(var(--rp-w) + 32px)",
+            paddingLeft: "calc(var(--sb-w) + var(--row-gutter, 28px))",
+            paddingRight: "calc(var(--rp-w) + var(--row-gutter, 28px))",
+            scrollPaddingLeft: "calc(var(--sb-w) + var(--row-gutter, 28px))",
+            scrollPaddingRight: "calc(var(--rp-w) + var(--row-gutter, 28px))",
           }}
         >
           {items.map((item, idx) => (
