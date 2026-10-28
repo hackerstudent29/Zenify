@@ -7,6 +7,7 @@ import { Track } from "@/store/player";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useUIStore } from "@/store/ui";
+import { useAuthStore } from "@/store/authStore";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface ContentRowProps {
@@ -24,7 +25,10 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
   const [canScrollRight, setCanScrollRight] = useState(true);
   const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
   const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
+  const isQueueOpen = useUIStore(state => state.isQueueOpen);
+  const { isAuthenticated } = useAuthStore();
   const isMobile = useIsMobile();
+  const hasSidebar = !isMobile && isAuthenticated;
   const sidebarWidth = isMobile ? 0 : (isSidebarCollapsed ? 72 : 260);
 
   const checkScroll = () => {
@@ -70,12 +74,21 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
         )}
       </div>
 
-      <div className="relative group/scroll w-full px-6 sm:px-8 md:px-10">
+      <div 
+        className={cn(
+          "relative group/scroll w-full transition-all duration-500",
+          hasSidebar && "md:-ml-[260px] md:pl-[260px]",
+          (isLyricsOpen || isQueueOpen) && !isMobile && "md:-mr-[380px] md:pr-[380px]"
+        )}
+      >
         {/* Apple Music Floating Movers over Content */}
         {canScrollLeft && (
           <button
             onClick={() => scroll('left')}
-            className="absolute left-2 sm:left-4 top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/scroll:opacity-100"
+            className={cn(
+              "absolute top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/scroll:opacity-100",
+              hasSidebar ? "left-[270px] sm:left-[274px]" : "left-2 sm:left-4"
+            )}
             aria-label="Scroll left"
           >
             <ChevronLeft size={22} strokeWidth={2.4} />
@@ -85,7 +98,10 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
         {canScrollRight && (
           <button
             onClick={() => scroll('right')}
-            className="absolute right-2 sm:right-4 top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/scroll:opacity-100"
+            className={cn(
+              "absolute top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/scroll:opacity-100",
+              (isLyricsOpen || isQueueOpen) && !isMobile ? "right-[392px] sm:right-[396px]" : "right-2 sm:right-4"
+            )}
             aria-label="Scroll right"
           >
             <ChevronRight size={22} strokeWidth={2.4} />
@@ -95,7 +111,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
         <div
           ref={scrollRef}
           onScroll={checkScroll}
-          className="flex gap-4 overflow-x-auto pb-6 no-scrollbar scroll-smooth snap-x snap-mandatory w-full"
+          className="flex gap-4 overflow-x-auto pb-6 no-scrollbar scroll-smooth snap-x snap-mandatory w-full px-6 sm:px-8 md:px-10"
         >
           {isLoading ? (
    Array.from({ length: 5 }).map((_, i) => (

@@ -95,7 +95,7 @@ export function QueuePanel() {
           className={cn(
             "absolute pointer-events-auto flex flex-col shadow-[-16px_0_40px_rgba(0,0,0,0.5)] overflow-hidden",
             "border-l border-white/10 z-[140]",
-            "bg-[#121214]/60 backdrop-blur-2xl",
+            "bg-[#121214]/50 backdrop-blur-2xl",
             isMobile
               ? "bottom-0 left-0 right-0 h-[84vh] rounded-t-[32px] border-t"
               : "top-0 right-0 bottom-0 border-l"
@@ -104,11 +104,11 @@ export function QueuePanel() {
           {/* Ambient Frosted Glass Background Layer */}
           {currentTrack && (
             <div
-              className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-40 scale-125 transition-all duration-1000 pointer-events-none -z-10"
+              className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-20 scale-125 transition-all duration-1000 pointer-events-none -z-10"
               style={{ backgroundImage: `url(${getMediaUrl(currentTrack.coverUrl || (currentTrack as any).artwork)})` }}
             />
           )}
-          <div className="absolute inset-0 bg-black/25 pointer-events-none -z-10" />
+          <div className="absolute inset-0 bg-black/15 pointer-events-none -z-10" />
           {/* Header (Apple Music 'Up next' style with Red 'Clear' button) */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/[0.08] shrink-0">
             <h2 className="text-[20px] font-bold text-white tracking-tight">Up next</h2>

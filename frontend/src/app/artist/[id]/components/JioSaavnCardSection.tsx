@@ -3,8 +3,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, ChevronLeft, Disc3, Play, Pause } from "lucide-react";
-import { getMediaUrl, formatDisplayTitle } from "@/lib/utils";
+import { getMediaUrl, formatDisplayTitle, cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useUIStore } from "@/store/ui";
+import { useAuthStore } from "@/store/authStore";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 /* ── Springs (iOS-like: quick response, no wobble) ── */
 const SPRING = { type: "spring" as const, stiffness: 420, damping: 34, mass: 0.8 };
@@ -167,6 +170,11 @@ export function JioSaavnCardSection({
 }: JioSaavnCardSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [edge, setEdge] = useState({ left: true, right: false });
+  const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
+  const isQueueOpen = useUIStore(state => state.isQueueOpen);
+  const { isAuthenticated } = useAuthStore();
+  const isMobile = useIsMobile();
+  const hasSidebar = !isMobile && isAuthenticated;
 
   const updateEdges = useCallback(() => {
     const el = scrollRef.current;
@@ -231,12 +239,21 @@ export function JioSaavnCardSection({
       </div>
 
       {/* ── Carousel with Floating Apple Music Movers ── */}
-      <div className="relative group/section">
+      <div 
+        className={cn(
+          "relative group/section transition-all duration-500",
+          hasSidebar && "md:-ml-[260px] md:pl-[260px]",
+          (isLyricsOpen || isQueueOpen) && !isMobile && "md:-mr-[380px] md:pr-[380px]"
+        )}
+      >
         {!edge.left && (
           <button
             type="button"
             onClick={() => scroll("left")}
-            className="absolute left-1 sm:left-2 top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/section:opacity-100"
+            className={cn(
+              "absolute top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/section:opacity-100",
+              hasSidebar ? "left-[270px] sm:left-[274px]" : "left-1 sm:left-2"
+            )}
             aria-label="Scroll left"
           >
             <ChevronLeft size={22} strokeWidth={2.4} />
@@ -247,7 +264,10 @@ export function JioSaavnCardSection({
           <button
             type="button"
             onClick={() => scroll("right")}
-            className="absolute right-1 sm:right-2 top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/section:opacity-100"
+            className={cn(
+              "absolute top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/section:opacity-100",
+              (isLyricsOpen || isQueueOpen) && !isMobile ? "right-[392px] sm:right-[396px]" : "right-1 sm:right-2"
+            )}
             aria-label="Scroll right"
           >
             <ChevronRight size={22} strokeWidth={2.4} />

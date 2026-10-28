@@ -6,6 +6,9 @@ import { User2 } from "lucide-react";
 import { cn, getMediaUrl, formatDisplayTitle } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
+import { useUIStore } from "@/store/ui";
+import { useAuthStore } from "@/store/authStore";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface FansAlsoLikeProps {
   currentArtistId: string;
@@ -15,6 +18,11 @@ interface FansAlsoLikeProps {
 export function FansAlsoLike({ currentArtistId, initialRelated }: FansAlsoLikeProps) {
   const [artists, setArtists] = useState<any[]>(initialRelated && initialRelated.length > 0 ? initialRelated : []);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
+  const isQueueOpen = useUIStore(state => state.isQueueOpen);
+  const { isAuthenticated } = useAuthStore();
+  const isMobile = useIsMobile();
+  const hasSidebar = !isMobile && isAuthenticated;
   
   const [isDragging, setIsDragging] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
@@ -78,7 +86,11 @@ export function FansAlsoLike({ currentArtistId, initialRelated }: FansAlsoLikePr
         onMouseLeave={handleMouseLeave}
         onMouseUp={handleMouseUp}
         onMouseMove={handleMouseMove}
-        className="flex gap-4 md:gap-8 overflow-x-auto pb-6 pt-2 px-2 hide-scrollbar cursor-grab active:cursor-grabbing select-none"
+        className={cn(
+          "flex gap-4 md:gap-8 overflow-x-auto pb-6 pt-2 px-2 hide-scrollbar cursor-grab active:cursor-grabbing select-none transition-all duration-500",
+          hasSidebar && "md:-ml-[260px] md:pl-[260px]",
+          (isLyricsOpen || isQueueOpen) && !isMobile && "md:-mr-[380px] md:pr-[380px]"
+        )}
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {artists.map((artist, idx) => (
