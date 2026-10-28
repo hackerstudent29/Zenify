@@ -482,8 +482,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  transition={SPRING}
     id="tour-player"
     data-tour="player"
-    // Pill: fixed 770x66, lifted with mb-8
-    className="pointer-events-auto relative mx-auto w-[770px] max-w-[calc(100%-2rem)] mb-8 rounded-full h-[66px]"
+    // Pill: sleek compact 660x66, lifted with mb-8
+    className="pointer-events-auto relative mx-auto w-[660px] max-w-[calc(100%-2rem)] mb-8 rounded-full h-[66px]"
     >
       <div 
         className="absolute inset-0 pointer-events-none rounded-full overflow-hidden backdrop-blur-lg bg-black/10 border border-white/10"
