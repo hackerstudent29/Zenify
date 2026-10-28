@@ -35,10 +35,18 @@ export function GlobalLyricsSidebar() {
           style={{ width: SIDEBAR_W }}
           className={cn(
             "fixed top-0 right-0 bottom-0 flex flex-col pointer-events-auto overflow-hidden",
-            "border-l border-white/10 shadow-[-16px_0_40px_rgba(0,0,0,0.4)] z-[140]",
-            "bg-black/15 backdrop-blur-md"
+            "border-l border-white/10 shadow-[-16px_0_40px_rgba(0,0,0,0.5)] z-[140]",
+            "bg-[#121214]/60 backdrop-blur-2xl"
           )}
         >
+          {/* Ambient Frosted Glass Background Layer */}
+          {loadedCover && (
+            <div
+              className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-40 scale-125 transition-all duration-1000 pointer-events-none -z-10"
+              style={{ backgroundImage: `url(${loadedCover})` }}
+            />
+          )}
+          <div className="absolute inset-0 bg-black/25 pointer-events-none -z-10" />
           {/* Apple-style floating minimal close button (compact) */}
           <motion.button
             onClick={() => setIsLyricsOpen(false)}
