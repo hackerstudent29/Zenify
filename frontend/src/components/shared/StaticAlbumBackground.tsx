@@ -60,23 +60,10 @@ export const StaticAlbumBackground = React.memo(function StaticAlbumBackground({
     <div
       aria-hidden
       className={cn(
-        "absolute inset-0 z-0 overflow-hidden pointer-events-none select-none bg-[var(--page,#121214)] transition-colors duration-700 ease-out h-full w-full min-h-[100dvh]",
+        "absolute inset-0 z-0 overflow-hidden pointer-events-none select-none bg-[var(--page,#121214)] transition-colors duration-700 ease-out h-full w-full",
         className
       )}
-      style={{ contain: "layout paint style" }}
-    >
-      {/* High-definition subtle Apple Music ambient lighting wash */}
-      <div
-        className="absolute inset-0 pointer-events-none transition-opacity duration-700 ease-out"
-        style={{
-          background: `
-            radial-gradient(ellipse 1100px 750px at 22% 160px, rgba(var(--album-rgb, ${primary.r}, ${primary.g}, ${primary.b}), 0.45) 0%, rgba(var(--album-rgb, ${primary.r}, ${primary.g}, ${primary.b}), 0.16) 55%, transparent 85%),
-            linear-gradient(180deg, rgba(var(--album-rgb, ${primary.r}, ${primary.g}, ${primary.b}), 0.35) 0%, rgba(var(--album-rgb, ${primary.r}, ${primary.g}, ${primary.b}), 0.08) 500px, transparent 950px),
-            linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.10) 40%, rgba(0, 0, 0, 0.35) 100%)
-          `,
-        }}
-      />
-    </div>
+    />
   );
 });
 
