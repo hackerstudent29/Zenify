@@ -243,6 +243,7 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  >
  {/* PC Artwork Container */}
  <motion.div
+  whileTap={{ scale: 0.975 }}
   onMouseEnter={() => {
     setIsArtHovered(true);
     checkOverflow();
@@ -250,157 +251,201 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
   onMouseLeave={() => {
     setIsArtHovered(false);
   }}
-  transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+  transition={{ duration: 0.2, ease: "easeOut" }}
   className={cn(
-  "group/art relative aspect-square w-full overflow-hidden bg-surface-hover shadow-xl transition-all duration-500",
-  isArtist ? "rounded-full" : "rounded-lg"
+  "group/art relative aspect-square w-full overflow-hidden bg-white/[0.06] shadow-[0_2px_10px_rgba(0,0,0,0.35)]",
+  isArtist ? "rounded-full" : "rounded-[8px]"
   )}
   >
  <UniversalMediaCover
  track={track}
- className={cn(
- "w-full h-full object-cover transition-transform duration-700 ease-out"
- )}
+ className="w-full h-full object-cover"
  />
 
-  {/* Top Gradient for Action Buttons Visibility */}
-  {!isArtist && (
-  <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 pointer-events-none" />
-  )}
+ {/* Hairline ring so light artwork keeps an edge on dark backgrounds */}
+ <div className={cn(
+   "pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10",
+   isArtist ? "rounded-full" : "rounded-[8px]"
+ )} />
 
-  {/* Micro-Interaction Actions */}
+ {/* Bottom Scrim for Controls Visibility */}
  {!isArtist && (
- <div className="absolute top-3 right-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-[-10px] group-hover:translate-y-0 z-40">
- {!isAlbum && (
- <button
- onClick={(e) => {
- e.stopPropagation();
- toggleLikeMutation.mutate();
- }}
- className="p-1 outline-none bg-transparent"
- >
- <motion.div
- whileTap={{ scale: 0.7 }}
- animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
- transition={{ duration: 0.35, ease: "easeOut" }}
- className={cn(
- isLiked
- ? "text-brand"
- : "text-white/60 hover:text-brand"
- )}
- >
- <Heart size={18} className={cn(isLiked && "fill-current")} />
- </motion.div>
- </button>
+   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover/art:opacity-100" />
  )}
 
- <AnimatedDropdown
- align="end"
- contentClassName="z-[100] pointer-events-auto"
- trigger={
- <button
- onClick={(e) => e.stopPropagation()}
- className="p-1 text-white/60 hover:text-rose-500 transition-colors outline-none bg-transparent"
- >
- <MoreHorizontal size={18} />
- </button>
- }
- items={[
- {
- id: 'add-to-queue',
- icon: <ListPlus size={16} className="opacity-70 text-brand" />,
- label: "Add to Queue",
- onClick: async (e: any) => {
-   e.stopPropagation();
-   try {
-     if (isAlbum) {
-       const albumData = (track as any).tracks ? track : (await api.get(`/albums/${track.id}`)).data;
-       if (albumData?.tracks?.length) {
-         usePlayerStore.getState().addToUserQueue(albumData.tracks, { contextName: track.title || (track as any).name });
-       } else {
-         showToast("Album has no tracks", "error");
-       }
-     } else if (isPlaylist) {
-       const plData = (track as any).tracks ? track : (await api.get(`/playlists/${track.id}`)).data;
-       const tracks = plData?.tracks?.map((t: any) => t.track || t) || [];
-       if (tracks.length) {
-         usePlayerStore.getState().addToUserQueue(tracks, { contextName: track.title || (track as any).name });
-       } else {
-         showToast("Playlist has no tracks", "error");
-       }
-     } else {
-       usePlayerStore.getState().addToUserQueue(track);
-     }
-   } catch (err) {
-     showToast("Failed to queue items", "error");
-   }
- }
- },
- ...(!isAlbum && !isPlaylist ? [
-  {
-    id: 'refetch-audio',
-    icon: <RefreshCw size={16} className={cn("opacity-70", isRefetching === track.id && "animate-spin text-brand")} />,
-    label: isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio",
-    onClick: (e: any) => { e.stopPropagation(); refetchTrackAudio(track, showToast); }
-  },
-  getRefetchLyricsAnimatedMenuItem(track, refetchTrackLyrics, showToast),
-] : []),
-  ...(!isAlbum ? [{
- id: 'favorite',
- icon: <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />,
- label: isLiked ? "Saved to Library" : "Save to Library",
- onClick: (e: any) => { e.stopPropagation(); toggleLikeMutation.mutate(); }
- }] : []),
- ...(getArtistTarget(track) ? [{
- id: 'artist',
- icon: <User size={16} className="opacity-70" />,
- label: "Go to Artist",
- onClick: (e: any) => { e.stopPropagation(); const target = getArtistTarget(track); if (target) router.push(target); }
- }] : []),
- ...(!isAlbum ? [{
- id: 'playlist',
- icon: <Plus size={16} className="opacity-70" />,
- label: "Add to Playlist",
- subMenu: [
- ...(playlists || []).map((p: any) => ({
- id: p.id,
- label: p.name,
- onClick: (e: any) => { e.stopPropagation(); addToPlaylistMutation.mutate(p.id); }
- })),
- {
- id: 'create-inline',
- isSeparator: (playlists?.length || 0) > 0 // only add separator if there are existing playlists above it
- },
- {
- id: 'create-inline-content',
- content: <InlinePlaylistCreator trackId={track.id} onSuccess={() => showToast("Created & Added!", "success")} />
- }
- ].filter(item => !(item as any).isSeparator || ((item as any).isSeparator && (playlists?.length || 0) > 0))
- }] : []),
- ...(user?.role === 'ADMIN' && !isAlbum ? [{
- id: 'sync',
- icon: <Mic size={16} className="opacity-70 text-violet-400" />,
- label: "Sync Lyrics",
- className: "text-violet-400 focus:text-violet-300",
- onClick: (e: any) => { e.stopPropagation(); router.push(`/admin/lyric-sync?trackId=${track.id}`); }
- }] : []),
- { id: 'sep1', isSeparator: true },
- {
- id: 'download',
- icon: isAlbum ? <ArrowRight size={16} className="opacity-70" /> : <Download size={16} className="opacity-70 text-brand" />,
- label: isAlbum ? "View Album" : "Download Hi-Res",
- className: "text-brand focus:text-brand",
- onClick: (e: any) => { e.stopPropagation(); if (isAlbum) { window.location.href = (track as any).href; } else { openDownloadModal(track); } }
- }
- ]}
- />
- </div>
+ {/* Top-Right Like Button */}
+ {!isArtist && !isAlbum && (
+   <button
+     onClick={(e) => {
+       e.stopPropagation();
+       toggleLikeMutation.mutate();
+     }}
+     aria-label={isLiked ? "Unlike" : "Like"}
+     className="am-glass-chip absolute top-2.5 right-2.5 z-20 flex h-7 w-7 items-center justify-center rounded-full text-white outline-none opacity-0 group-hover/art:opacity-100 transition-opacity hover:bg-white/25 cursor-pointer"
+   >
+     <motion.div
+       whileTap={{ scale: 0.7 }}
+       animate={{ scale: isLiked ? [1, 1.4, 1] : 1 }}
+       transition={{ duration: 0.35, ease: "easeOut" }}
+       className={cn(
+         isLiked
+           ? "text-brand"
+           : "text-white/80 hover:text-brand"
+       )}
+     >
+       <Heart size={14} className={cn(isLiked && "fill-current")} />
+     </motion.div>
+   </button>
+ )}
+
+ {/* Bottom Controls: Play Button & More Options (Apple Music Style) */}
+ {!isArtist && (
+   <>
+     <button
+       type="button"
+       onClick={(e) => {
+         e.preventDefault();
+         e.stopPropagation();
+         if (isCurrent) {
+           togglePlay();
+         } else {
+           setTrack(track, contextTracks);
+           setPlayerMinimized(false);
+         }
+       }}
+       aria-label={isActuallyPlaying ? "Pause" : `Play ${formatDisplayTitle(track.title || (track as any).name)}`}
+       className={cn(
+         "am-glass-chip absolute bottom-2.5 left-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full text-white outline-none cursor-pointer",
+         "translate-y-1.5 scale-90 opacity-0 transition-[opacity,transform] duration-300 ease-[var(--spring)]",
+         "group-hover/art:translate-y-0 group-hover/art:scale-100 group-hover/art:opacity-100",
+         "focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 active:!scale-90 hover:bg-white/25",
+         isActuallyPlaying && "!translate-y-0 !scale-100 !opacity-100"
+       )}
+     >
+       {isActuallyPlaying ? (
+         <Pause size={14} className="fill-current" />
+       ) : (
+         <Play size={14} className="fill-current ml-0.5" />
+       )}
+     </button>
+
+     <div
+       className={cn(
+         "am-glass-chip absolute bottom-2.5 right-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full text-white outline-none cursor-pointer",
+         "translate-y-1.5 scale-90 opacity-0 transition-[opacity,transform] duration-300 ease-[var(--spring)]",
+         "group-hover/art:translate-y-0 group-hover/art:scale-100 group-hover/art:opacity-100",
+         "focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 active:!scale-90 hover:bg-white/25"
+       )}
+     >
+       <AnimatedDropdown
+         align="end"
+         contentClassName="z-[100] pointer-events-auto"
+         trigger={
+           <button
+             type="button"
+             onClick={(e) => e.stopPropagation()}
+             className="w-full h-full flex items-center justify-center text-white outline-none bg-transparent cursor-pointer"
+           >
+             <MoreHorizontal size={16} />
+           </button>
+         }
+         items={[
+           {
+             id: 'add-to-queue',
+             icon: <ListPlus size={16} className="opacity-70 text-brand" />,
+             label: "Add to Queue",
+             onClick: async (e: any) => {
+               e.stopPropagation();
+               try {
+                 if (isAlbum) {
+                   const albumData = (track as any).tracks ? track : (await api.get(`/albums/${track.id}`)).data;
+                   if (albumData?.tracks?.length) {
+                     usePlayerStore.getState().addToUserQueue(albumData.tracks, { contextName: track.title || (track as any).name });
+                   } else {
+                     showToast("Album has no tracks", "error");
+                   }
+                 } else if (isPlaylist) {
+                   const plData = (track as any).tracks ? track : (await api.get(`/playlists/${track.id}`)).data;
+                   const tracks = plData?.tracks?.map((t: any) => t.track || t) || [];
+                   if (tracks.length) {
+                     usePlayerStore.getState().addToUserQueue(tracks, { contextName: track.title || (track as any).name });
+                   } else {
+                     showToast("Playlist has no tracks", "error");
+                   }
+                 } else {
+                   usePlayerStore.getState().addToUserQueue(track);
+                 }
+               } catch (err) {
+                 showToast("Failed to queue items", "error");
+               }
+             }
+           },
+           ...(!isAlbum && !isPlaylist ? [
+             {
+               id: 'refetch-audio',
+               icon: <RefreshCw size={16} className={cn("opacity-70", isRefetching === track.id && "animate-spin text-brand")} />,
+               label: isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio",
+               onClick: (e: any) => { e.stopPropagation(); refetchTrackAudio(track, showToast); }
+             },
+             getRefetchLyricsAnimatedMenuItem(track, refetchTrackLyrics, showToast),
+           ] : []),
+           ...(!isAlbum ? [{
+             id: 'favorite',
+             icon: <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />,
+             label: isLiked ? "Saved to Library" : "Save to Library",
+             onClick: (e: any) => { e.stopPropagation(); toggleLikeMutation.mutate(); }
+           }] : []),
+           ...(getArtistTarget(track) ? [{
+             id: 'artist',
+             icon: <User size={16} className="opacity-70" />,
+             label: "Go to Artist",
+             onClick: (e: any) => { e.stopPropagation(); const target = getArtistTarget(track); if (target) router.push(target); }
+           }] : []),
+           ...(!isAlbum ? [{
+             id: 'playlist',
+             icon: <Plus size={16} className="opacity-70" />,
+             label: "Add to Playlist",
+             subMenu: [
+               ...(playlists || []).map((p: any) => ({
+                 id: p.id,
+                 label: p.name,
+                 onClick: (e: any) => { e.stopPropagation(); addToPlaylistMutation.mutate(p.id); }
+               })),
+               {
+                 id: 'create-inline',
+                 isSeparator: (playlists?.length || 0) > 0
+               },
+               {
+                 id: 'create-inline-content',
+                 content: <InlinePlaylistCreator trackId={track.id} onSuccess={() => showToast("Created & Added!", "success")} />
+               }
+             ].filter(item => !(item as any).isSeparator || ((item as any).isSeparator && (playlists?.length || 0) > 0))
+           }] : []),
+           ...(user?.role === 'ADMIN' && !isAlbum ? [{
+             id: 'sync',
+             icon: <Mic size={16} className="opacity-70 text-violet-400" />,
+             label: "Sync Lyrics",
+             className: "text-violet-400 focus:text-violet-300",
+             onClick: (e: any) => { e.stopPropagation(); router.push(`/admin/lyric-sync?trackId=${track.id}`); }
+           }] : []),
+           { id: 'sep1', isSeparator: true },
+           {
+             id: 'download',
+             icon: isAlbum ? <ArrowRight size={16} className="opacity-70" /> : <Download size={16} className="opacity-70 text-brand" />,
+             label: isAlbum ? "View Album" : "Download Hi-Res",
+             className: "text-brand focus:text-brand",
+             onClick: (e: any) => { e.stopPropagation(); if (isAlbum) { window.location.href = (track as any).href; } else { openDownloadModal(track); } }
+           }
+         ]}
+       />
+     </div>
+   </>
  )}
 
  {/* Playing Indicator */}
  <AnimatePresence>
  {isActuallyPlaying && (
- <div className="absolute bottom-3 left-3 pointer-events-none z-20">
+ <div className="absolute bottom-3 left-12 pointer-events-none z-20">
  <div className="flex items-end gap-[2px] h-[14px]">
  {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
  <motion.div

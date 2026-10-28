@@ -66,88 +66,76 @@ export function QueuePanel() {
     reorderUserQueue(result.source.index, result.destination.index);
   };
 
-  if (!isQueueOpen) return null;
-
   const totalTracksCount = (currentTrack ? 1 : 0) + (userQueue?.length || 0) + (contextQueue?.length || 0);
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[1200] pointer-events-none">
-        {/* Backdrop: transparent on desktop, blurred backdrop on mobile */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={() => setIsQueueOpen(false)}
-          className={cn(
-            "absolute inset-0 pointer-events-auto",
-            isMobile ? "bg-black/50 backdrop-blur-sm" : "bg-transparent"
-          )}
-        />
-
-        {/* Panel (Slim & Lengthy Apple Music Frosted Glass Drawer - 380px matching Lyrics Drawer) */}
-        <motion.div
-          initial={isMobile ? { y: "100%" } : { x: 380 }}
-          animate={isMobile ? { y: 0 } : { x: 0 }}
-          exit={isMobile ? { y: "100%" } : { x: 380 }}
-          transition={{ type: "spring", damping: 32, stiffness: 340, mass: 0.85 }}
-          style={{ width: isMobile ? undefined : 380 }}
-          className={cn(
-            "absolute pointer-events-auto flex flex-col shadow-[-16px_0_40px_rgba(0,0,0,0.5)] overflow-hidden",
-            "border-l border-white/10 z-[140]",
-            "bg-[#121214]/50 backdrop-blur-2xl",
-            isMobile
-              ? "bottom-0 left-0 right-0 h-[84vh] rounded-t-[32px] border-t"
-              : "top-0 right-0 bottom-0 border-l"
-          )}
-        >
-          {/* Ambient Frosted Glass Background Layer */}
-          {currentTrack && (
-            <div
-              className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-20 scale-125 transition-all duration-1000 pointer-events-none -z-10"
-              style={{ backgroundImage: `url(${getMediaUrl(currentTrack.coverUrl || (currentTrack as any).artwork)})` }}
+      {isQueueOpen && (
+        <div key="queue" className="fixed inset-0 z-[1200] pointer-events-none">
+          {/* Backdrop: mobile only */}
+          {isMobile && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsQueueOpen(false)}
+              className="absolute inset-0 pointer-events-auto bg-black/50 backdrop-blur-sm"
             />
           )}
-          <div className="absolute inset-0 bg-black/15 pointer-events-none -z-10" />
-          {/* Header (Apple Music 'Up next' style with Red 'Clear' button) */}
-          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/[0.08] shrink-0">
-            <h2 className="text-[20px] font-bold text-white tracking-tight">Up next</h2>
 
-            <div className="flex items-center gap-3">
-              {/* Optional Search Toggle Button */}
-              <button
-                onClick={() => setShowSearch(!showSearch)}
-                className={cn(
-                  "w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer active:scale-95",
-                  showSearch ? "bg-white/20 text-white" : "bg-white/10 hover:bg-white/20 text-white/60 hover:text-white"
-                )}
-                title="Search and add songs"
-                aria-label="Search"
-              >
-                <Search size={13} />
-              </button>
+          {/* Panel (Apple Music Frosted Glass Drawer - 380px) */}
+          <motion.div
+            initial={isMobile ? { y: "100%" } : { x: 380 }}
+            animate={isMobile ? { y: 0 } : { x: 0 }}
+            exit={isMobile ? { y: "100%" } : { x: 380 }}
+            transition={{ type: "spring", damping: 32, stiffness: 340, mass: 0.85 }}
+            style={{ width: isMobile ? undefined : 380 }}
+            className={cn(
+              "absolute pointer-events-auto flex flex-col overflow-hidden z-[140] am-glass will-change-transform",
+              isMobile
+                ? "bottom-0 left-0 right-0 h-[84vh] rounded-t-[28px] shadow-[0_-20px_60px_rgba(0,0,0,0.4)]"
+                : "top-0 right-0 bottom-0 am-glass-right shadow-[-20px_0_60px_rgba(0,0,0,0.35)]"
+            )}
+          >
+            {/* Header (Apple Music 'Up next' style with Red 'Clear' button) */}
+            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/[0.08] shrink-0">
+              <h2 className="text-[20px] font-bold text-white tracking-tight">Up next</h2>
 
-              {/* Red 'Clear' action as seen in Apple Music screenshot */}
-              {userQueue && userQueue.length > 0 && (
+              <div className="flex items-center gap-3">
+                {/* Optional Search Toggle Button */}
                 <button
-                  onClick={() => clearUserQueue()}
-                  className="text-[#ff3b30] hover:text-[#ff453a] text-[15px] font-semibold transition-colors cursor-pointer active:scale-95 px-1"
+                  onClick={() => setShowSearch(!showSearch)}
+                  className={cn(
+                    "am-glass-chip w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer active:scale-95",
+                    showSearch ? "bg-white/20 text-white" : "text-white/70 hover:text-white"
+                  )}
+                  title="Search and add songs"
+                  aria-label="Search"
                 >
-                  Clear
+                  <Search size={13} />
                 </button>
-              )}
 
-              {/* Apple-style floating minimal close button */}
-              <button
-                onClick={() => setIsQueueOpen(false)}
-                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer active:scale-95"
-                title="Close Queue"
-                aria-label="Close Queue"
-              >
-                <X size={13} />
-              </button>
+                {/* Red 'Clear' action as seen in Apple Music screenshot */}
+                {userQueue && userQueue.length > 0 && (
+                  <button
+                    onClick={() => clearUserQueue()}
+                    className="text-[#ff3b30] hover:text-[#ff453a] text-[15px] font-semibold transition-colors cursor-pointer active:scale-95 px-1"
+                  >
+                    Clear
+                  </button>
+                )}
+
+                {/* Apple-style floating minimal close button */}
+                <button
+                  onClick={() => setIsQueueOpen(false)}
+                  className="am-glass-chip w-7 h-7 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer active:scale-95"
+                  title="Close Queue"
+                  aria-label="Close Queue"
+                >
+                  <X size={13} />
+                </button>
+              </div>
             </div>
-          </div>
 
           {/* Collapsible Search Input */}
           <AnimatePresence>
@@ -478,6 +466,7 @@ export function QueuePanel() {
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
-  );
+    )}
+  </AnimatePresence>
+);
 }

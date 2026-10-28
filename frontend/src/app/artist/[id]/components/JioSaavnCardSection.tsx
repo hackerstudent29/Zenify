@@ -93,8 +93,8 @@ function ReleaseCard({
     >
       <Link href={href} className="block outline-none">
         <div className="flex flex-col gap-2">
-          {/* Flat artwork: 6px corners, hairline ring, no shadow glow */}
-          <div className="relative aspect-square w-full overflow-hidden rounded-[6px] bg-zinc-900 ring-1 ring-inset ring-white/[0.08]">
+          {/* Flat artwork: 8px corners, hairline ring, am-glass-chip play button */}
+          <div className="relative aspect-square w-full overflow-hidden rounded-[8px] bg-white/[0.06] shadow-[0_2px_10px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10">
             {cover ? (
               <img
                 src={cover}
@@ -114,7 +114,7 @@ function ReleaseCard({
 
             {/* Hover dim */}
             <div
-              className="pointer-events-none absolute inset-0 bg-black/30 transition-opacity duration-200"
+              className="pointer-events-none absolute inset-0 bg-black/40 transition-opacity duration-200"
               style={{ opacity: showPlay ? 1 : 0 }}
             />
 
@@ -133,14 +133,14 @@ function ReleaseCard({
                     e.stopPropagation();
                     if (onPlayItem) onPlayItem(item, e);
                   }}
-                  className="absolute bottom-2 left-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white text-black outline-none"
+                  className="am-glass-chip absolute bottom-2 left-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white outline-none hover:bg-white/25 active:scale-90"
                   title={isThisPlaying ? "Pause" : "Play"}
                   aria-label={isThisPlaying ? "Pause" : "Play"}
                 >
                   {isThisPlaying ? (
-                    <Pause size={14} className="fill-black" />
+                    <Pause size={14} className="fill-current" />
                   ) : (
-                    <Play size={14} className="ml-0.5 fill-black" />
+                    <Play size={14} className="ml-0.5 fill-current" />
                   )}
                 </motion.button>
               )}
@@ -240,20 +240,18 @@ export function JioSaavnCardSection({
 
       {/* ── Carousel with Floating Apple Music Movers ── */}
       <div 
-        className={cn(
-          "relative group/section transition-all duration-500",
-          hasSidebar && "md:-ml-[260px] md:pl-[260px]",
-          (isLyricsOpen || isQueueOpen) && !isMobile && "md:-mr-[380px] md:pr-[380px]"
-        )}
+        className="relative group/section"
+        style={{
+          marginLeft: "calc(var(--sb-w) * -1)",
+          marginRight: "calc(var(--rp-w) * -1)",
+        }}
       >
         {!edge.left && (
           <button
             type="button"
             onClick={() => scroll("left")}
-            className={cn(
-              "absolute top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/section:opacity-100",
-              hasSidebar ? "left-[270px] sm:left-[274px]" : "left-1 sm:left-2"
-            )}
+            style={{ left: "calc(var(--sb-w) + 12px)" }}
+            className="am-glass-chip absolute top-[38%] -translate-y-1/2 z-30 h-10 w-10 sm:h-12 sm:w-12 rounded-full text-white flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
             aria-label="Scroll left"
           >
             <ChevronLeft size={22} strokeWidth={2.4} />
@@ -264,10 +262,8 @@ export function JioSaavnCardSection({
           <button
             type="button"
             onClick={() => scroll("right")}
-            className={cn(
-              "absolute top-[38%] -translate-y-1/2 z-30 w-8 h-12 sm:w-9 sm:h-14 rounded-full bg-black/75 hover:bg-black/95 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-all cursor-pointer opacity-0 group-hover/section:opacity-100",
-              (isLyricsOpen || isQueueOpen) && !isMobile ? "right-[392px] sm:right-[396px]" : "right-1 sm:right-2"
-            )}
+            style={{ right: "calc(var(--rp-w) + 12px)" }}
+            className="am-glass-chip absolute top-[38%] -translate-y-1/2 z-30 h-10 w-10 sm:h-12 sm:w-12 rounded-full text-white flex items-center justify-center opacity-0 group-hover/section:opacity-100 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
             aria-label="Scroll right"
           >
             <ChevronRight size={22} strokeWidth={2.4} />
@@ -278,7 +274,12 @@ export function JioSaavnCardSection({
           ref={scrollRef}
           onScroll={updateEdges}
           className="no-scrollbar flex items-start gap-3.5 overflow-x-auto scroll-smooth pb-1"
-          style={{ scrollSnapType: "x proximity", overscrollBehaviorX: "contain" }}
+          style={{
+            scrollSnapType: "x proximity",
+            overscrollBehaviorX: "contain",
+            paddingLeft: "calc(var(--sb-w) + 32px)",
+            paddingRight: "calc(var(--rp-w) + 32px)",
+          }}
         >
           {items.map((item, idx) => (
             <ReleaseCard

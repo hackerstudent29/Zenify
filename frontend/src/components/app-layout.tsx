@@ -288,6 +288,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isInfoPage = pathname?.startsWith("/terms") || pathname?.startsWith("/privacy") || pathname?.startsWith("/about") || pathname?.startsWith("/creator");
   const isLyricSyncPage = pathname?.includes("/admin/lyric-sync");
   const hasSidebar = !isMobile && isAuthenticated;
+  const rightPanelOpen = !isMobile && (isLyricsOpen || isQueueOpen);
+  const layoutVars = {
+    "--sb-w": hasSidebar ? `${SIDEBAR_EXPANDED}px` : "0px",
+    "--rp-w": rightPanelOpen ? "380px" : "0px",
+  } as React.CSSProperties;
   // One source of truth for the sidebar width (aside, content padding, header, player footer)
   const sidebarWidth = isSidebarCollapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;
 
@@ -373,7 +378,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
  return (
  <div
- style={{ fontFamily: FONT_STACK, WebkitFontSmoothing: "antialiased" }}
+ style={{ fontFamily: FONT_STACK, WebkitFontSmoothing: "antialiased", ...layoutVars }}
  className={cn(
  "flex flex-col w-full text-foreground h-[100dvh] overflow-hidden relative z-0 transition-colors duration-700 ease-out",
  isAlbumPage ? "bg-[var(--page)]" : "bg-[#121214]"
@@ -397,36 +402,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {/* Sidebar (Desktop): static Apple Music style glass column on every page */}
  {hasSidebar && (
  <aside
- className={cn(
- "hidden md:flex flex-col w-[260px] h-full absolute left-0 top-0 bottom-0 z-[120] pointer-events-auto overflow-hidden",
- "bg-[#121214]/50 backdrop-blur-2xl border-r border-white/10 shadow-[8px_0_30px_rgba(0,0,0,0.3)]"
- )}
+ className="hidden md:flex flex-col w-[260px] h-full absolute left-0 top-0 bottom-0 z-[120] pointer-events-auto overflow-hidden am-glass am-glass-left"
  >
-   {/* Ambient Frosted Glass Background Layer */}
-   {activeCoverUrl && (
-     <div
-       className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-20 scale-125 transition-all duration-1000 pointer-events-none -z-10"
-       style={{ backgroundImage: `url(${getMediaUrl(activeCoverUrl)})` }}
-     />
-   )}
-   <div className="absolute inset-0 bg-black/15 pointer-events-none -z-10" />
  <Sidebar />
  </aside>
  )}
 
  {/* Content Area - spans full width so cards bleed behind sidebar and queue/lyrics */}
- <div 
- className={cn(
- "flex-1 flex flex-col relative w-full h-full overflow-hidden transition-all duration-500",
- APPLE_EASE
- )}
- >
+ <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden">
  <AnimatePresence>
  {showHeader && (
     <header 
     className={cn(
-    "z-[100] pointer-events-none transition-all duration-500 absolute top-0 safe-area-top",
-    APPLE_EASE,
+    "z-[100] pointer-events-none am-layout-transition absolute top-0 safe-area-top",
     isMobile 
       ? "bg-[#121214]/95 backdrop-blur-md border-b border-white/5 left-0 right-0 w-full" 
       : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/"))
@@ -435,12 +423,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isMobile && isHeaderHidden && "-translate-y-full opacity-0 pointer-events-none"
     )}
   style={{
-    left: !isMobile && hasSidebar ? 260 : 0,
-    right: !isMobile && (isLyricsOpen || isQueueOpen) ? 380 : 0,
+    left: "var(--sb-w)",
+    right: "var(--rp-w)",
     width: "auto",
     height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto",
     paddingLeft: 0,
-    transition: "left 500ms cubic-bezier(0.32, 0.72, 0, 1), right 500ms cubic-bezier(0.32, 0.72, 0, 1)"
   }}
  >
  <div className={cn("w-full pointer-events-auto", isMobile ? "h-full" : "h-[var(--header-height)]")}>
@@ -457,19 +444,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  >
  <div 
  className={cn(
- "w-full min-h-full transition-all duration-500 transform-gpu origin-top-left",
- APPLE_EASE,
- // PC: if minimized, pb-8. If visible, pb-28. Mobile: pb-32.
+ "w-full min-h-full am-layout-transition",
  (currentTrack && !isLyricSyncPage) 
  ? (isMobile ? "pb-32" : (isPlayerMinimized ? "pb-8" : "pb-28")) 
- : "pb-20 sm:pb-0",
- isSidebarCollapsed && !isMobile ? "scale-[1.025]" : "scale-100"
+ : "pb-20 sm:pb-0"
  )}
- style={{
-   paddingLeft: !isMobile && hasSidebar ? 260 : 0,
-   paddingRight: !isMobile && (isLyricsOpen || isQueueOpen) ? 380 : 0,
-   transition: "padding 500ms cubic-bezier(0.32, 0.72, 0, 1)"
- }}
+ style={{ paddingLeft: "var(--sb-w)", paddingRight: "var(--rp-w)" }}
  >
  {children}
  </div>
@@ -487,8 +467,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  (!currentTrack || isLyricSyncPage) && "translate-y-full opacity-0"
  )}
  style={{
-   left: hasSidebar ? "260px" : "0px",
-   right: (isLyricsOpen || isQueueOpen) ? "380px" : "0px"
+   left: "var(--sb-w)",
+   right: "var(--rp-w)"
  }}
  >
  <AnimatePresence>

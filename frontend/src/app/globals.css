@@ -969,3 +969,55 @@ summary,
 }
 
 a * { cursor: pointer !important; }
+
+/* ------------------------------------------------------------------
+   Apple Music UI & Glass Panel Design System
+   ------------------------------------------------------------------ */
+
+:root {
+  /* Spring (stiffness 140, damping 16.6) as a CSS easing, same as your sidebar */
+  --spring: linear(0,0.0279,0.0987,0.196,0.3067,0.4212,0.5322,0.6349,0.7265,0.8053,0.871,0.924,0.9653,0.9962,1.0181,1.0326,1.0411,1.0449,1.0452,1.043,1.0392,1.0345,1.0294,1.0242,1.0193,1.0148,1.0109,1.0076,1.0048,1.0026,1.001,0.9997,0.9989,0.9983,1);
+  /* Apple's no-overshoot ease. Used for anything that reflows layout. */
+  --ease-apple: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Set on the layout root. Rows, header and footer all read these. */
+  --sb-w: 0px; /* left sidebar width  */
+  --rp-w: 0px; /* right panel (queue / lyrics) width */
+
+  --row-gutter: clamp(20px, 2.4vw, 40px);
+}
+
+/* Anything that has to move in lockstep with the sidebar / right panel */
+.am-layout-transition {
+  transition-property: padding, margin, left, right;
+  transition-duration: 520ms;
+  transition-timing-function: var(--ease-apple);
+}
+
+/* Apple Music glass: heavy blur + saturation boost so artwork behind turns
+   into soft coloured light instead of grey mush. */
+.am-glass {
+  background-color: rgba(34, 34, 36, 0.55);
+  -webkit-backdrop-filter: blur(40px) saturate(190%);
+  backdrop-filter: blur(40px) saturate(190%);
+}
+/* 0.5px hairline drawn inside, so it never adds layout width */
+.am-glass-left  { box-shadow: inset -0.5px 0 0 rgba(255, 255, 255, 0.10); }
+.am-glass-right { box-shadow: inset  0.5px 0 0 rgba(255, 255, 255, 0.10); }
+
+/* Small floating controls (play / more / scroll arrows) */
+.am-glass-chip {
+  background-color: rgba(30, 30, 32, 0.5);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .am-glass, .am-glass-chip { background-color: rgba(28, 28, 30, 0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am-layout-transition { transition-duration: 1ms; }
+}
+
