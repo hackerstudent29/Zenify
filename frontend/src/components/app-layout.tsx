@@ -398,46 +398,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {hasSidebar && (
  <aside
  className={cn(
- "hidden md:flex flex-col shrink-0 w-[260px] h-full relative z-[120] pointer-events-auto overflow-hidden",
- "bg-[#121214]/60 backdrop-blur-2xl border-r border-white/10"
+ "hidden md:flex flex-col w-[260px] h-full absolute left-0 top-0 bottom-0 z-[120] pointer-events-auto overflow-hidden",
+ "bg-[#121214]/50 backdrop-blur-2xl border-r border-white/10 shadow-[8px_0_30px_rgba(0,0,0,0.3)]"
  )}
  >
    {/* Ambient Frosted Glass Background Layer */}
    {activeCoverUrl && (
      <div
-       className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-35 scale-125 transition-all duration-1000 pointer-events-none -z-10"
+       className="absolute -inset-10 bg-cover bg-center filter blur-3xl opacity-20 scale-125 transition-all duration-1000 pointer-events-none -z-10"
        style={{ backgroundImage: `url(${getMediaUrl(activeCoverUrl)})` }}
      />
    )}
-   <div className="absolute inset-0 bg-black/25 pointer-events-none -z-10" />
+   <div className="absolute inset-0 bg-black/15 pointer-events-none -z-10" />
  <Sidebar />
  </aside>
  )}
 
- {/* Content Area - Resizes dynamically when Queue or Lyrics is opened */}
+ {/* Content Area - spans full width so cards bleed behind sidebar and queue/lyrics */}
  <div 
  className={cn(
- "flex-1 flex flex-col relative overflow-hidden transition-[margin] duration-500",
- APPLE_EASE,
- (isLyricsOpen || isQueueOpen) && !isMobile && "mr-[380px]"
+ "flex-1 flex flex-col relative w-full h-full overflow-hidden transition-all duration-500",
+ APPLE_EASE
  )}
  >
  <AnimatePresence>
  {showHeader && (
     <header 
     className={cn(
-    "z-[100] pointer-events-none transition-all duration-300 w-full absolute top-0 left-0 right-0 safe-area-top",
+    "z-[100] pointer-events-none transition-all duration-500 absolute top-0 safe-area-top",
     APPLE_EASE,
     isMobile 
-      ? "bg-[#121214]/95 backdrop-blur-md border-b border-white/5" 
+      ? "bg-[#121214]/95 backdrop-blur-md border-b border-white/5 left-0 right-0 w-full" 
       : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/"))
         ? "bg-transparent"
         : "bg-gradient-to-b from-[#121214]/80 to-transparent",
     isMobile && isHeaderHidden && "-translate-y-full opacity-0 pointer-events-none"
     )}
   style={{
-  height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto",
-  paddingLeft: 0
+    left: !isMobile && hasSidebar ? 260 : 0,
+    right: !isMobile && (isLyricsOpen || isQueueOpen) ? 380 : 0,
+    width: "auto",
+    height: isMobile ? "calc(3.5rem + env(safe-area-inset-top, 0px))" : "auto",
+    paddingLeft: 0,
+    transition: "left 500ms cubic-bezier(0.32, 0.72, 0, 1), right 500ms cubic-bezier(0.32, 0.72, 0, 1)"
   }}
  >
  <div className={cn("w-full pointer-events-auto", isMobile ? "h-full" : "h-[var(--header-height)]")}>
@@ -449,18 +452,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
  <main 
    ref={scrollRef} 
-   className="flex-1 overflow-x-hidden relative overflow-y-auto scroll-smooth" 
+   className="flex-1 overflow-x-hidden relative overflow-y-auto scroll-smooth w-full h-full" 
    style={isMobile ? { paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))', WebkitOverflowScrolling: 'touch' } : { overscrollBehaviorY: 'auto' }}
  >
- <div className={cn(
- "w-full min-h-full transition-transform duration-500 transform-gpu origin-top-left",
+ <div 
+ className={cn(
+ "w-full min-h-full transition-all duration-500 transform-gpu origin-top-left",
  APPLE_EASE,
  // PC: if minimized, pb-8. If visible, pb-28. Mobile: pb-32.
  (currentTrack && !isLyricSyncPage) 
  ? (isMobile ? "pb-32" : (isPlayerMinimized ? "pb-8" : "pb-28")) 
  : "pb-20 sm:pb-0",
  isSidebarCollapsed && !isMobile ? "scale-[1.025]" : "scale-100"
- )}>
+ )}
+ style={{
+   paddingLeft: !isMobile && hasSidebar ? 260 : 0,
+   paddingRight: !isMobile && (isLyricsOpen || isQueueOpen) ? 380 : 0,
+   transition: "padding 500ms cubic-bezier(0.32, 0.72, 0, 1)"
+ }}
+ >
  {children}
  </div>
  </main>
