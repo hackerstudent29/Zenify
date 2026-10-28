@@ -31,8 +31,8 @@ export function themeVars(r: number, g: number, b: number) {
   // Page: uniform static Apple Music background color (exact 16% lightness)
   const page = `hsl(${h} ${satStr} 16%)`;
 
-  // Sidebar & Panels: matching rich Apple Music panel tone (13.5% lightness, preserving full vibrant saturation)
-  const side = `hsl(${h} ${satStr} 13.5%)`;
+  // Sidebar & Panels: matching rich Apple Music panel tone with glass translucency (70% alpha)
+  const side = `hsl(${h} ${satStr} 13.5% / 0.70)`;
 
   const text2 = `hsl(${h} 25% 80%)`;
   const pill = `rgba(255, 255, 255, 0.08)`;

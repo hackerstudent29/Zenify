@@ -291,7 +291,7 @@ export default function ArtistPage() {
               <img
                 src={getMediaUrl(bannerUrl) || undefined}
                 alt={displayName}
-                className="absolute inset-0 w-full h-full object-cover object-[50%_25%] filter brightness-95"
+                className="absolute inset-0 w-full h-full object-cover object-center filter brightness-95"
                 fetchPriority="high"
                 decoding="async"
               />
@@ -299,14 +299,14 @@ export default function ArtistPage() {
               <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 to-[var(--page,#121214)]" />
             )}
 
-            {/* Ambient top vignette & smooth bottom fade into universal dark charcoal #121214 */}
+            {/* Ambient top vignette & smooth bottom fade into universal page color */}
             <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
-            <div className="absolute inset-x-0 bottom-0 h-52 sm:h-64 md:h-80 bg-gradient-to-t from-[var(--page,#121214)] via-[var(--page,#121214)]/85 to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-24 sm:h-32 bg-gradient-to-t from-[var(--page,#121214)] via-[var(--page,#121214)]/60 to-transparent pointer-events-none" />
           </div>
 
-          {/* Hero Content: Artist Name & Action Controls (docked down clear of face into bottom fade, perfectly centered) */}
+          {/* Hero Content: Artist Name & Action Controls (moved down to bottom, fully clear of face) */}
           <div 
-            className="relative -mt-20 sm:-mt-24 md:-mt-28 flex flex-col items-center text-center px-4 pb-4 z-10 w-full"
+            className="relative mt-3 sm:mt-5 md:mt-6 flex flex-col items-center text-center px-4 pb-2 z-10 w-full"
           >
             <motion.div
               initial={{ opacity: 0, y: 15 }}
