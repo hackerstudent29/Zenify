@@ -10,6 +10,7 @@ import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
 import { cn, getMediaUrl, formatDisplayTitle, getArtistProfileImage } from "@/lib/utils";
+import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { SEO } from "@/components/shared/SEO";
 import {
@@ -253,8 +254,22 @@ export default function ArtistPage() {
 
   const displayName = formatDisplayTitle(artist.name);
 
+  // Dynamic Apple Music Artwork Tint: compute dominant RGB from banner or avatar
+  useEffect(() => {
+    const targetArtwork = getMediaUrl(bannerUrl || avatarUrl || rawBanner);
+    if (!targetArtwork) return;
+    extractArtworkAverageColor(targetArtwork).then((rgb) => {
+      if (rgb) {
+        applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
+      }
+    });
+    return () => {
+      resetArtworkTheme();
+    };
+  }, [bannerUrl, avatarUrl, rawBanner]);
+
   return (
-    <div className="min-h-screen w-full bg-[#121214] text-white overflow-x-hidden relative">
+    <div className="min-h-screen w-full bg-transparent text-white relative">
       <SEO
         title={`${displayName} - Music, Albums & Songs on Zenify`}
         description={artist.bio || `Listen to songs and albums by ${displayName} on Zenify.`}
@@ -282,21 +297,17 @@ export default function ArtistPage() {
                 decoding="async"
               />
             ) : (
-              <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 to-[#121214]" />
+              <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 to-[var(--page,#121214)]" />
             )}
 
             {/* Ambient top vignette & smooth bottom fade into universal dark charcoal #121214 */}
             <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
-            <div className="absolute inset-x-0 bottom-0 h-52 sm:h-64 md:h-80 bg-gradient-to-t from-[#121214] via-[#121214]/85 to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-52 sm:h-64 md:h-80 bg-gradient-to-t from-[var(--page,#121214)] via-[var(--page,#121214)]/85 to-transparent pointer-events-none" />
           </div>
 
-          {/* Hero Content: Artist Name & Action Controls (docked down clear of face into bottom fade) */}
+          {/* Hero Content: Artist Name & Action Controls (docked down clear of face into bottom fade, perfectly centered) */}
           <div 
-            className="relative -mt-24 sm:-mt-28 md:-mt-32 flex flex-col items-center text-center px-4 pb-3 z-10 am-layout-transition"
-            style={{
-              paddingLeft: "calc(var(--sb-w) + 16px)",
-              paddingRight: "calc(var(--rp-w) + 16px)",
-            }}
+            className="relative -mt-20 sm:-mt-24 md:-mt-28 flex flex-col items-center text-center px-4 pb-4 z-10 w-full"
           >
             <motion.div
               initial={{ opacity: 0, y: 15 }}

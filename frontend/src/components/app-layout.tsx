@@ -379,10 +379,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  return (
  <div
  style={{ fontFamily: FONT_STACK, WebkitFontSmoothing: "antialiased", ...layoutVars }}
- className={cn(
- "flex flex-col w-full text-foreground h-[100dvh] overflow-hidden relative z-0 transition-colors duration-700 ease-out",
- isAlbumPage ? "bg-[var(--page)]" : "bg-[#121214]"
- )}>
+ className="flex flex-col w-full text-foreground h-[100dvh] overflow-hidden relative z-0 transition-colors duration-700 ease-out bg-[var(--page,#121214)]"
+ >
   
  <FullScreenPlayer />
  {isMobile && (
