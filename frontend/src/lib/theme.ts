@@ -1,11 +1,20 @@
 import { getMediaUrl, getApiBaseUrl } from "@/lib/utils";
 
 /**
+ * Glass alpha lives in CSS (--glass-alpha in globals.css), so one value controls
+ * the translucency of the sidebar, lyrics, queue and right panels everywhere.
+ * 0.34 is only the fallback if the CSS variable is missing.
+ */
+const GLASS_ALPHA = "var(--glass-alpha, 0.34)";
+const NEUTRAL_SIDE = `rgba(28, 28, 30, ${GLASS_ALPHA})`;
+
+/**
  * Apple Music artwork-driven theme calculation and dynamic CSS variable setter.
  * Converts average or dominant RGB artwork colors into rich, dark ambient Apple Music tokens:
  *  - --h and --s: hue and saturation
- *  - --page: deep dark ambient background (12.5% to 13.5% lightness, rich 38% to 62% saturation)
- *  - --side: matching darker sidebar tint (9.5% to 10.5% lightness, harmonized saturation)
+ *  - --page: deep dark ambient background (16% lightness, rich 32% to 75% saturation)
+ *  - --side: matching darker panel tint (13.5% lightness) with glass translucency
+ *            driven by --glass-alpha, so the background shows through the blur
  *  - --album-rgb: pure RGB string for radial glows and linear washes
  *  - --text-2: subtle tinted secondary text color
  */
@@ -29,11 +38,12 @@ export function themeVars(r: number, g: number, b: number) {
   const satNum = isMonochrome ? 0 : Math.round(Math.min(Math.max(s, 0.32), 0.75) * 100);
   const satStr = `${satNum}%`;
 
-  // Page: uniform static Apple Music background color (exact 16% lightness, or neutral #121214 if monochrome)
-  const page = isMonochrome ? "#121214" : `hsl(${h} ${satStr} 16%)`;
+  // Page: uniform static Apple Music background color (exact 16% lightness, or neutral #1c1c1e if monochrome)
+  const page = isMonochrome ? "#1c1c1e" : `hsl(${h} ${satStr} 16%)`;
 
-  // Sidebar & Panels: matching rich Apple Music panel tone with glass translucency (70% alpha)
-  const side = isMonochrome ? "rgba(28, 28, 30, 0.70)" : `hsl(${h} ${satStr} 13.5% / 0.70)`;
+  // Sidebar, lyrics, queue & panels: tinted frosted glass.
+  // Alpha comes from --glass-alpha (globals.css) so the blurred background stays visible.
+  const side = isMonochrome ? NEUTRAL_SIDE : `hsl(${h} ${satStr} 13.5% / ${GLASS_ALPHA})`;
 
   const text2 = `hsl(${h} 25% 80%)`;
   const pill = `rgba(255, 255, 255, 0.08)`;
@@ -51,15 +61,30 @@ export function themeVars(r: number, g: number, b: number) {
   };
 }
 
+let lastAppliedRgb: [number, number, number] | null = null;
+
 export function applyArtworkTheme(r: number, g: number, b: number) {
   if (typeof document === "undefined") return;
+  lastAppliedRgb = [r, g, b];
   const vars = themeVars(r, g, b);
   const root = document.documentElement;
   root.style.setProperty("--h", String(vars.h));
   root.style.setProperty("--s", vars.s);
   root.style.setProperty("--album-rgb", vars.rgb);
-  root.style.setProperty("--page", vars.page);
-  root.style.setProperty("--side", vars.side);
+
+  let isColoredEnabled = false;
+  try {
+    const saved = localStorage.getItem("zenify_colored_background");
+    isColoredEnabled = saved === "true";
+  } catch {}
+
+  if (isColoredEnabled) {
+    root.style.setProperty("--page", vars.page);
+    root.style.setProperty("--side", vars.side);
+  } else {
+    root.style.setProperty("--page", "#1c1c1e");
+    root.style.setProperty("--side", NEUTRAL_SIDE);
+  }
   root.style.setProperty("--pill", vars.pill);
   root.style.setProperty("--line", vars.line);
   root.style.setProperty("--text-2", vars.text2);
@@ -67,15 +92,24 @@ export function applyArtworkTheme(r: number, g: number, b: number) {
 
 export function resetArtworkTheme() {
   if (typeof document === "undefined") return;
+  lastAppliedRgb = null;
   const root = document.documentElement;
   root.style.setProperty("--h", "240");
   root.style.setProperty("--s", "5%");
-  root.style.setProperty("--album-rgb", "18, 18, 20");
-  root.style.setProperty("--page", "#121214");
-  root.style.setProperty("--side", "#1c1c1e");
+  root.style.setProperty("--album-rgb", "28, 28, 30");
+  root.style.setProperty("--page", "#1c1c1e");
+  root.style.setProperty("--side", NEUTRAL_SIDE);
   root.style.setProperty("--pill", "rgba(255, 255, 255, 0.08)");
   root.style.setProperty("--line", "rgba(255, 255, 255, 0.13)");
   root.style.setProperty("--text-2", "rgba(255, 255, 255, 0.7)");
+}
+
+export function reapplyArtworkTheme() {
+  if (lastAppliedRgb) {
+    applyArtworkTheme(lastAppliedRgb[0], lastAppliedRgb[1], lastAppliedRgb[2]);
+  } else {
+    resetArtworkTheme();
+  }
 }
 
 const dominantColorCache = new Map<string, [number, number, number]>();
@@ -229,4 +263,3 @@ export async function extractArtworkDominantColor(src: string): Promise<[number,
  * Backward-compatible alias for extractArtworkDominantColor
  */
 export const extractArtworkAverageColor = extractArtworkDominantColor;
-

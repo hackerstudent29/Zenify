@@ -540,40 +540,56 @@ export async function albumRoutes(server: FastifyInstance) {
         if (!album) {
             try {
                 const { default: axios } = await import('axios');
+                const movieMatch = decodedId.match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i);
+                const cleanQuery = movieMatch ? movieMatch[1].trim() : (decodedId.replace(/[\(\[].*?[\)\]]/g, '').trim() || decodedId);
+
                 // 1. Primary: JioSaavn Album Search
                 const saavnSearch = await axios.get('https://www.jiosaavn.com/api.php', {
                     params: {
                         __call: 'search.getAlbumResults',
-                        q: decodedId,
+                        q: cleanQuery,
                         _format: 'json',
                         _marker: '0',
                         api_version: '4',
                         ctx: 'web6dot0',
                         p: 1,
-                        n: 5
+                        n: 8
                     },
                     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
                     timeout: 4500
                 }).catch(() => null);
 
-                const firstSaavnAlbum = saavnSearch?.data?.results?.[0];
-                if (firstSaavnAlbum?.id) {
+                const saavnCandidates = saavnSearch?.data?.results || [];
+                // Sort candidates: prefer albums with more songs and title similarity
+                const sortedSaavn = [...saavnCandidates].sort((a: any, b: any) => {
+                    const countA = parseInt(a.more_info?.song_count || a.song_count || '1', 10);
+                    const countB = parseInt(b.more_info?.song_count || b.song_count || '1', 10);
+                    const titleA = (a.title || a.name || '').toLowerCase();
+                    const titleB = (b.title || b.name || '').toLowerCase();
+                    const target = cleanQuery.toLowerCase();
+                    const exactA = titleA === target || titleA.startsWith(target) ? 100 : 0;
+                    const exactB = titleB === target || titleB.startsWith(target) ? 100 : 0;
+                    return (countB + exactB) - (countA + exactA);
+                });
+
+                const bestSaavnAlbum = sortedSaavn[0];
+                if (bestSaavnAlbum?.id) {
                     return (server as any).inject({
                         method: 'GET',
-                        url: `/api/albums/saavn-album-${firstSaavnAlbum.id}`,
+                        url: `/api/albums/saavn-album-${bestSaavnAlbum.id}`,
                         headers: req.headers
                     }).then((r: any) => JSON.parse(r.body));
                 }
 
                 // 2. Secondary fallback: iTunes
                 const searchRes = await axios.get(`https://itunes.apple.com/search`, {
-                    params: { term: decodedId, media: 'music', entity: 'album', country: 'IN', limit: 10 },
+                    params: { term: cleanQuery, media: 'music', entity: 'album', country: 'IN', limit: 10 },
                     timeout: 4500
                 }).catch(() => null);
 
                 if (searchRes?.data?.results?.length > 0) {
                     const results = searchRes.data.results;
-                    const lowerQuery = decodedId.toLowerCase();
+                    const lowerQuery = cleanQuery.toLowerCase();
                     const wantsTelugu = lowerQuery.includes('telugu');
                     const wantsHindi = lowerQuery.includes('hindi');
                     const wantsTamil = lowerQuery.includes('tamil');
@@ -645,6 +661,54 @@ export async function albumRoutes(server: FastifyInstance) {
                 { createdAt: 'asc' }
             ]
         });
+
+        // Background auto-enrichment: If the local album has 4 or fewer tracks and belongs to a movie/soundtrack,
+        // seamlessly check JioSaavn to see if the full OST album has more songs available.
+        if (allTracks.length <= 4 && album.title) {
+            try {
+                const { default: axios } = await import('axios');
+                const movieMatch = album.title.match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i);
+                const queryTitle = movieMatch ? movieMatch[1].trim() : album.title.replace(/[\(\[].*?[\)\]]/g, '').trim();
+
+                const saavnSearch = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'search.getAlbumResults',
+                        q: `${queryTitle} ${album.artist?.name || ''}`.trim(),
+                        _format: 'json',
+                        _marker: '0',
+                        api_version: '4',
+                        ctx: 'web6dot0',
+                        p: 1,
+                        n: 6
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 3500
+                }).catch(() => null);
+
+                const candidates = saavnSearch?.data?.results || [];
+                const fullAlbumCandidate = candidates.find((c: any) => {
+                    const songCount = parseInt(c.more_info?.song_count || c.song_count || '0', 10);
+                    return songCount > allTracks.length;
+                });
+
+                if (fullAlbumCandidate?.id) {
+                    const fullAlbum = await (server as any).inject({
+                        method: 'GET',
+                        url: `/api/albums/saavn-album-${fullAlbumCandidate.id}`,
+                        headers: req.headers
+                    }).then((r: any) => JSON.parse(r.body)).catch(() => null);
+
+                    if (fullAlbum && fullAlbum.tracks && fullAlbum.tracks.length > allTracks.length) {
+                        return {
+                            ...fullAlbum,
+                            id: album.id, // preserve requested album id for frontend route consistency
+                        };
+                    }
+                }
+            } catch (enrichErr: any) {
+                console.warn('[AlbumRoute] Background JioSaavn full-album check error:', enrichErr.message);
+            }
+        }
 
         return {
             ...album,

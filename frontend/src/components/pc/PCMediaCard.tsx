@@ -139,7 +139,9 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
    `/track/${track.id}`
  );
  const isCurrent = !isLink && currentTrack?.id === track.id;
- const isActuallyPlaying = isCurrent && isPlaying;
+ const isCurrentAlbum = isAlbum && (currentTrack?.albumId === track.id || (currentTrack as any)?.album?.id === track.id || (currentTrack as any)?.collectionId === track.id);
+ const isCurrentPlaylist = isPlaylist && ((currentTrack as any)?.playlistId === track.id || (currentTrack as any)?.collectionId === track.id);
+ const isActuallyPlaying = (isCurrent || isCurrentAlbum || isCurrentPlaylist) && isPlaying;
 
  const [toast, setToast] = React.useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
@@ -303,9 +305,49 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
    <>
      <button
        type="button"
-       onClick={(e) => {
+       onClick={async (e) => {
          e.preventDefault();
          e.stopPropagation();
+         if (isActuallyPlaying) {
+           togglePlay();
+           return;
+         }
+         if (isAlbum) {
+           try {
+             const albumData = (track as any).tracks?.length ? track : (await api.get(`/albums/${track.id}`)).data;
+             const albumTracks = (albumData?.tracks || []).filter(Boolean);
+             if (albumTracks.length > 0) {
+               const first = {
+                 ...albumTracks[0],
+                 artwork: albumTracks[0].artwork || albumTracks[0].coverUrl || albumTracks[0].image || getTrackCover(track),
+                 streamUrl: albumTracks[0].streamUrl || albumTracks[0].audioUrl,
+               };
+               setTrack(first, albumTracks);
+               setPlayerMinimized(false);
+             }
+           } catch (err) {
+             console.error("Failed to play album:", err);
+           }
+           return;
+         }
+         if (isPlaylist) {
+           try {
+             const plData = (track as any).tracks?.length ? track : (await api.get(`/playlists/${track.id}`)).data;
+             const tracks = (plData?.tracks || []).map((t: any) => t.track || t).filter(Boolean);
+             if (tracks.length > 0) {
+               const first = {
+                 ...tracks[0],
+                 artwork: tracks[0].artwork || tracks[0].coverUrl || tracks[0].image || getTrackCover(track),
+                 streamUrl: tracks[0].streamUrl || tracks[0].audioUrl,
+               };
+               setTrack(first, tracks);
+               setPlayerMinimized(false);
+             }
+           } catch (err) {
+             console.error("Failed to play playlist:", err);
+           }
+           return;
+         }
          if (isCurrent) {
            togglePlay();
          } else {
@@ -469,7 +511,7 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
   e.stopPropagation();
   router.push(targetHref);
   }}
-  className={cn("text-[15px] font-normal transition-colors text-white tracking-tight leading-snug hover:text-rose-500 cursor-pointer overflow-hidden whitespace-nowrap block relative w-full", isCurrent && "text-rose-500")}
+  className={cn("text-[15px] font-normal transition-colors text-white tracking-tight leading-snug hover:text-rose-500 cursor-pointer overflow-hidden whitespace-nowrap block relative w-full", isArtist ? "text-center" : "text-left", isCurrent && "text-rose-500")}
   >
   <span
     ref={titleTextRef}
@@ -488,12 +530,16 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  
  <div className="flex items-center justify-between gap-2 overflow-hidden h-4">
  {isArtist ? (
- <p className="text-[12px] text-brand font-medium truncate group-hover:text-brand/80 tracking-tight transition-colors flex-1 font-sans">
+ <p className="text-[12px] text-brand font-medium truncate group-hover:text-brand/80 tracking-tight transition-colors flex-1 font-sans text-center">
  Artist
  </p>
  ) : isPlaylist ? (
  <p className="text-[12px] text-zinc-400 font-medium truncate tracking-tight transition-colors flex-1 font-sans">
  {(track as any).description || (track as any).subtitle || 'Curated Playlist'}
+ </p>
+ ) : isAlbum ? (
+ <p className="text-[12px] text-zinc-400 font-medium truncate tracking-tight transition-colors flex-1 font-sans">
+ {(track as any).subtitle || ((track as any).year ? `${(track as any).year} · ${(track as any).isSingle ? "Single" : "Album"}` : ((track as any).artist?.name || (track as any).artistName || 'Album'))}
  </p>
  ) : (
  <div className="flex-1 min-w-0 overflow-hidden">

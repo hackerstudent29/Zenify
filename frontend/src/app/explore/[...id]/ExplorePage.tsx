@@ -8,8 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { PCMediaCard } from "@/components/pc/PCMediaCard";
-import { MobileMediaCard } from "@/components/mobile/MobileMediaCard";
+import { MediaCard } from "@/components/shared/MediaCard";
 
 export default function ExploreSectionPage() {
   const router = useRouter();
@@ -105,11 +104,7 @@ export default function ExploreSectionPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: Math.min(i * 0.03, 0.3) }}
             >
-              {isMobile ? (
-                <MobileMediaCard track={track} contextTracks={sectionTracks} />
-              ) : (
-                <PCMediaCard track={track} contextTracks={sectionTracks} />
-              )}
+              <MediaCard track={track} contextTracks={sectionTracks} className="w-full" />
             </motion.div>
           ))}
         </div>

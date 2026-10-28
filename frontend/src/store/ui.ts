@@ -27,6 +27,8 @@ interface UIState {
   toggleSettings: () => void;
   reducedMotion: boolean;
   setReducedMotion: (reduced: boolean) => void;
+  coloredBackground: boolean;
+  setColoredBackground: (enabled: boolean) => void;
   toast: ToastNotification | null;
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   hideToast: () => void;
@@ -82,6 +84,12 @@ const getInitialReducedMotion = (): boolean => {
   return isReduced;
 };
 
+const getInitialColoredBackground = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const saved = localStorage.getItem('zenify_colored_background');
+  return saved !== null ? saved === 'true' : false;
+};
+
 export const useUIStore = create<UIState>((set) => ({
   isPricingModalOpen: false,
   isSidebarCollapsed: false,
@@ -99,6 +107,13 @@ export const useUIStore = create<UIState>((set) => ({
   closeSettings: () => set({ isSettingsOpen: false }),
   toggleSettings: () => set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
   reducedMotion: getInitialReducedMotion(),
+  coloredBackground: getInitialColoredBackground(),
+  setColoredBackground: (enabled: boolean) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('zenify_colored_background', String(enabled));
+    }
+    set({ coloredBackground: enabled });
+  },
   setReducedMotion: (reduced: boolean) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('zenify_reduced_motion', String(reduced));
@@ -151,13 +166,13 @@ export const useUIStore = create<UIState>((set) => ({
   openAddToPlaylistModal: (track) => set({ addToPlaylistTrack: track }),
   closeAddToPlaylistModal: () => set({ addToPlaylistTrack: null }),
   openConfirmModal: (config) => set({
-    confirmModal: {
+  confirmModal: {
       ...config,
       isOpen: true
     }
   }),
   closeConfirmModal: () => set((state) => ({
-    confirmModal: {
+  confirmModal: {
       ...state.confirmModal,
       isOpen: false
     }

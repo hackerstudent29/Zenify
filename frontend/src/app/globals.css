@@ -42,16 +42,36 @@
   --text-3: rgba(255, 255, 255, 0.45);
   --text-side: rgba(255, 255, 255, 0.93);
 
+  /* ------------------------------------------------------------------
+     GLASS CONTROLS  (sidebar, lyrics, queue, right panels)
+     One place to tune the whole frosted look.
+       --glass-alpha  tint opacity. LOWER = more background visible.
+                      0.24 very see-through · 0.34 balanced · 0.50 mostly solid
+       --glass-blur   blur radius. 6px barely · 10px light Apple Music · 20px heavy
+       --glass-sat    color boost of what is behind the glass
+     ------------------------------------------------------------------ */
+  --glass-alpha: 0.34;
+  --glass-blur: 15px;
+  --glass-sat: 150%;
+
+  /* Right-side panels (lyrics, queue): stronger blur + a soft dark veil
+     so the text on top stays fully readable.
+       --glass-blur-right  24px frosted · 32px very frosted
+       --glass-dim-right   0 none · 0.20 balanced · 0.32 darker */
+  --glass-blur-right: 14px;
+  --glass-sat-right: 170%;
+  --glass-dim-right: 0.20;
+
   /* Surfaces */
-  --background: #121214;
+  --background: #1c1c1e;
   --foreground: #f2f2f3;
-  --surface: #121214;
-  --surface-hover: #18181b;
-  --elevated: #1b1d24;
-  --border: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.12);
-  --page: #121214;
-  --side: rgba(28, 28, 30, 0.70);
+  --surface: #1c1c1e;
+  --surface-hover: #2c2c2e;
+  --elevated: #242426;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  --page: #1c1c1e;
+  --side: rgba(28, 28, 30, var(--glass-alpha));
   --pill: rgba(255, 255, 255, 0.08);
   --line: rgba(255, 255, 255, 0.13);
 
@@ -378,25 +398,25 @@
    6. SURFACES & GLASS
    ========================================================================= */
 .glass {
-  background: rgba(17, 17, 18, 0.7);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(17, 17, 18, 0.5);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
 }
 
 /* Small static panels only */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.65);
   color: white;
 }
 
 .glass-player {
-  background: rgba(10, 10, 14, 0.55);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: rgba(10, 10, 14, 0.4);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   box-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: white;
@@ -404,8 +424,8 @@
 
 .player-capsule {
   background: var(--side);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
   transition: background-color 600ms ease, border-color 600ms ease;
@@ -994,30 +1014,78 @@ a * { cursor: pointer !important; }
   transition-timing-function: var(--ease-apple);
 }
 
-/* Apple Music static colored panels & glass styling */
-.am-glass {
-  background-color: var(--side, rgba(28, 28, 30, 0.70));
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
-  backdrop-filter: blur(28px) saturate(190%);
+/* ------------------------------------------------------------------
+   APPLE-STYLE FROSTED GLASS · sidebar, lyrics, queue, right panels
+   Low blur + low tint: the background stays visible but softened.
+   Tune everything with --glass-alpha / --glass-blur / --glass-sat
+   in :root (section 1).
+
+   Use on any panel:
+     .am-glass            sidebar / generic panel
+     .am-glass-lyrics     lyrics panel
+     .am-glass-queue      queue panel
+   Add .am-glass-left or .am-glass-right for the 0.5px edge hairline.
+
+   IMPORTANT: backdrop-filter only blurs what is BEHIND the panel.
+   The panel must sit above your page / artwork background layer, and
+   no ancestor between them should be opaque.
+   ------------------------------------------------------------------ */
+.am-glass,
+.am-glass-lyrics,
+.am-glass-queue {
+  background-color: var(--side, rgba(28, 28, 30, var(--glass-alpha)));
+  /* faint top-down sheen, like macOS vibrancy */
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.045) 0%,
+    rgba(255, 255, 255, 0.0) 42%
+  );
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) !important;
   transition: background-color 700ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+/* Right panels (lyrics, queue): heavier blur so content reads clearly.
+   Background still shows through, but as soft color instead of detail. */
+.am-glass-lyrics,
+.am-glass-queue,
+.am-glass-right {
+  background-color: var(--side, rgba(28, 28, 30, var(--glass-alpha)));
+  background-image:
+    linear-gradient(rgba(0, 0, 0, var(--glass-dim-right)), rgba(0, 0, 0, var(--glass-dim-right))),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0) 42%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-right)) saturate(var(--glass-sat-right)) !important;
+  backdrop-filter: blur(var(--glass-blur-right)) saturate(var(--glass-sat-right)) !important;
+}
+
 /* 0.5px hairline drawn inside, so it never adds layout width */
 .am-glass-left  { box-shadow: inset -0.5px 0 0 rgba(255, 255, 255, 0.10); }
 .am-glass-right { box-shadow: inset  0.5px 0 0 rgba(255, 255, 255, 0.10); }
 
 /* Small floating controls (play / more / scroll arrows) */
 .am-glass-chip {
-  background-color: rgba(30, 30, 32, 0.5);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
+  background-color: rgba(30, 30, 32, 0.38);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
   box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
 }
 
+/* No backdrop-filter support: go mostly opaque so text stays readable */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .am-glass, .am-glass-chip { background-color: rgba(28, 28, 30, 0.96); }
+  .am-glass, .am-glass-lyrics, .am-glass-queue, .am-glass-right { background-color: rgba(28, 28, 30, 0.96); background-image: none; }
+  .am-glass-chip { background-color: rgba(28, 28, 30, 0.96); }
+}
+
+/* User asked the OS for less transparency */
+@media (prefers-reduced-transparency: reduce) {
+  .am-glass, .am-glass-lyrics, .am-glass-queue, .am-glass-right, .am-glass-chip {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: rgba(28, 28, 30, 0.96);
+    background-image: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .am-layout-transition { transition-duration: 1ms; }
 }
-

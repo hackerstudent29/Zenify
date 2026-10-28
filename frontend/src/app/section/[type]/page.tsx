@@ -325,7 +325,7 @@ export default function SectionPage() {
       {/* Main Content Area */}
       <div className="px-4 md:px-8 max-w-7xl mx-auto">
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className="animate-pulse space-y-3">
                 <div className="aspect-square w-full rounded-2xl bg-white/5 border border-white/10" />
@@ -346,48 +346,18 @@ export default function SectionPage() {
           /* Grid View Layout */
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {filteredItems.map((item, index) => {
-              if (sectionType === "top-artists" || item.isArtist) {
-                return (
-                  <div
-                    key={item.id || index}
-                    onClick={() => router.push(`/artist/${item.id}`)}
-                    className="p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-brand/30 transition-all group cursor-pointer text-center"
-                  >
-                    <div className="w-24 h-24 sm:w-28 sm:h-28 mx-auto rounded-full overflow-hidden mb-3 border border-white/10 shadow-xl relative bg-zinc-900">
-                      <UniversalMediaCover track={item} className="w-full h-full object-cover" />
-                    </div>
-                    <p className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-brand transition-colors">
-                      {item.name || item.title}
-                    </p>
-                    <p className="text-[10px] text-zinc-400 mt-0.5">Artist</p>
-                  </div>
-                );
-              }
-
-              if (sectionType === "top-albums" || item.isAlbum) {
-                return (
-                  <div
-                    key={item.id || index}
-                    onClick={() => router.push(`/album/${item.id}`)}
-                    className="p-3 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-brand/30 transition-all group cursor-pointer"
-                  >
-                    <div className="aspect-square w-full rounded-xl overflow-hidden mb-3 border border-white/10 shadow-xl relative bg-zinc-900">
-                      <UniversalMediaCover track={item} className="w-full h-full object-cover" />
-                    </div>
-                    <p className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-brand transition-colors">
-                      {formatDisplayTitle(item.title)}
-                    </p>
-                    <p className="text-[10px] text-zinc-400 mt-0.5 truncate">
-                      {formatArtists(item) || "Album"}
-                    </p>
-                  </div>
-                );
-              }
+              const isArtist = sectionType === "top-artists" || item.isArtist;
+              const isAlbum = sectionType === "top-albums" || item.isAlbum;
+              const formattedItem = {
+                ...item,
+                isArtist,
+                isAlbum,
+              };
 
               return (
                 <MediaCard
                   key={item.id || index}
-                  track={item}
+                  track={formattedItem}
                   index={index}
                   contextTracks={filteredItems}
                   className="w-full"

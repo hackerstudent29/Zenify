@@ -135,24 +135,8 @@ export default function ArtistPage() {
     };
   }, [artist?.bannerUrl, artist?.coverUrl, artist?.imageUrl]);
 
-  const rawBanner = artist?.bannerUrl || artist?.coverUrl || null;
-  const isWidescreenUrl = isWidescreen === true || (
-    isWidescreen === null &&
-    Boolean(
-      rawBanner &&
-      !rawBanner.includes('placeholder') &&
-      !rawBanner.includes('logo.png') &&
-      !rawBanner.includes('ui-avatars.com') &&
-      (
-        rawBanner.includes('AMCArtistImages') ||
-        rawBanner.includes('1920x') ||
-        rawBanner.includes('2560x') ||
-        rawBanner.includes('3840x') ||
-        rawBanner.includes('headerImage')
-      ) &&
-      rawBanner !== artist?.imageUrl
-    )
-  );
+  const rawBanner = (artist?.bannerUrl && artist.bannerUrl !== artist?.imageUrl) ? artist.bannerUrl : null;
+  const isWidescreenUrl = Boolean(isWidescreen === true && rawBanner && !rawBanner.includes('500x500') && !rawBanner.includes('600x600'));
   const bannerUrl = isWidescreenUrl ? rawBanner : null;
   const avatarUrl = artist?.imageUrl || artist?.coverUrl || artist?.bannerUrl || null;
 
@@ -170,47 +154,34 @@ export default function ArtistPage() {
         getMediaUrl(artist?.coverUrl),
       ].filter(Boolean) as string[];
 
-      // 2. Try each candidate — if it has vibrant color (saturation >= 0.12), adopt it immediately!
+      // Also gather top track covers for vibrant fallback sampling
+      const topTracks = artist?.topTracks || artist?.topSongs || [];
+      for (const tr of topTracks.slice(0, 5)) {
+        const c = tr?.coverUrl || tr?.artwork || tr?.image || tr?.album?.coverUrl;
+        if (c) {
+          const formatted = getMediaUrl(c);
+          if (formatted) candidates.push(formatted);
+        }
+      }
+
+      // 2. Try each candidate — if it has color (saturation >= 0.05), adopt it immediately!
       for (const candidate of candidates) {
         if (isCancelled) return;
         const rgb = await extractArtworkAverageColor(candidate);
         if (!rgb) continue;
 
         const [R, G, B] = rgb.map((v) => v / 255);
-        const max = Math.max(R, G, B);
-        const min = Math.min(R, G, B);
-        const d = max - min;
-        const l = (max + min) / 2;
+        const d = Math.max(R, G, B) - Math.min(R, G, B);
+        const l = (Math.max(R, G, B) + Math.min(R, G, B)) / 2;
         const sat = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
 
-        if (sat >= 0.12) {
+        if (sat >= 0.05) {
           if (!isCancelled) applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
           return;
         }
       }
 
-      // 3. If banner/avatar are monochrome/B&W (like Arivu's banner), check top song cover art!
-      const tracks = artist?.tracks || [];
-      for (const tr of tracks.slice(0, 3)) {
-        const cover = tr?.coverUrl || tr?.artwork || tr?.album?.coverUrl;
-        if (!cover) continue;
-        const trackArt = getMediaUrl(cover);
-        if (trackArt && !isCancelled) {
-          const trackRgb = await extractArtworkAverageColor(trackArt);
-          if (trackRgb) {
-            const [R, G, B] = trackRgb.map((v) => v / 255);
-            const d = Math.max(R, G, B) - Math.min(R, G, B);
-            const l = (Math.max(R, G, B) + Math.min(R, G, B)) / 2;
-            const sat = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
-            if (sat >= 0.12) {
-              if (!isCancelled) applyArtworkTheme(trackRgb[0], trackRgb[1], trackRgb[2]);
-              return;
-            }
-          }
-        }
-      }
-
-      // 4. Fallback to candidate 0 or neutral theme
+      // 3. Fallback to candidate 0
       if (candidates[0]) {
         const fallbackRgb = await extractArtworkAverageColor(candidates[0]);
         if (fallbackRgb && !isCancelled) {
@@ -334,75 +305,66 @@ export default function ArtistPage() {
         description={artist.bio || `Listen to songs and albums by ${displayName} on Zenify.`}
       />
 
-      {/* ── 1. ARTIST HERO (Apple Music dual-layout: Widescreen Master Banner vs Round Shape Profile) ── */}
-      {isWidescreenUrl ? (
-        /* WIDESCREEN MASTER BANNER (Anirudh, Justin Bieber, G V Prakash, etc.) */
-        <div className="relative w-full">
-          {/* Master Widescreen Banner Image */}
-          <div 
-            className="relative h-[48vh] min-h-[360px] sm:h-[56vh] md:h-[62vh] overflow-hidden select-none am-layout-transition"
-            style={{
-              marginLeft: "calc(var(--sb-w) * -1)",
-              marginRight: "calc(var(--rp-w) * -1)",
-              width: "calc(100% + var(--sb-w) + var(--rp-w))",
-            }}
-          >
-            {bannerUrl ? (
-              <img
-                src={getMediaUrl(bannerUrl) || undefined}
-                alt={displayName}
-                className="absolute inset-0 w-full h-full object-cover object-center filter brightness-95"
-                fetchPriority="high"
-                decoding="async"
-              />
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 to-[var(--page,#121214)]" />
-            )}
+      {/* ── 1. ARTIST HERO ── */}
+      {isWidescreenUrl && bannerUrl ? (
+        /* WIDESCREEN FULL-SIZE MASTER BANNER: Apple Music Extended Showcase */
+        <div 
+          className="relative w-full h-[62vh] sm:h-[70vh] md:h-[76vh] min-h-[500px] max-h-[760px] overflow-hidden select-none am-layout-transition mb-6 sm:mb-8"
+          style={{
+            marginLeft: "calc(var(--sb-w) * -1)",
+            marginRight: "calc(var(--rp-w) * -1)",
+            width: "calc(100% + var(--sb-w) + var(--rp-w))",
+          }}
+        >
+          <img
+            src={getMediaUrl(bannerUrl) || undefined}
+            alt={displayName}
+            className="absolute inset-0 w-full h-full object-cover object-top filter brightness-95"
+            fetchPriority="high"
+            decoding="async"
+          />
 
-            {/* Ambient top vignette & smooth bottom fade into universal page color */}
-            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
-            <div className="absolute inset-x-0 bottom-0 h-24 sm:h-32 bg-gradient-to-t from-[var(--page,#121214)] via-[var(--page,#121214)]/60 to-transparent pointer-events-none" />
-          </div>
+          {/* Top subtle vignette for header contrast */}
+          <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none z-10" />
 
-          {/* Hero Content: Artist Name & Action Controls (moved down to bottom, fully clear of face) */}
-          <div 
-            className="relative mt-3 sm:mt-5 md:mt-6 flex flex-col items-center text-center px-4 pb-2 z-10 w-full"
-          >
+          {/* Smooth bottom transition to page background directly before songs list */}
+          <div className="absolute inset-x-0 bottom-0 h-44 sm:h-56 bg-gradient-to-t from-[var(--page,#121214)] via-[var(--page,#121214)]/70 to-transparent pointer-events-none z-10" />
+
+          {/* Hero Content: Artist Name & Action Controls LIVE OVER THE EXPANDED BANNER IMAGE */}
+          <div className="absolute inset-x-0 bottom-6 sm:bottom-8 z-20 flex flex-col items-center text-center px-4">
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col items-center max-w-4xl w-full min-w-0"
             >
-              {/* Refined Artist Title: shifted down to the lower gradient clear of face */}
               <h1
                 ref={heroNameRef}
-                className="text-2xl sm:text-3xl md:text-4xl lg:text-[40px] font-bold text-white tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.95)] mb-3 sm:mb-4 select-text max-w-full px-2 break-words"
+                className="text-3xl sm:text-4xl md:text-5xl lg:text-[54px] font-bold text-white tracking-tight drop-shadow-[0_4px_32px_rgba(0,0,0,0.95)] mb-3 sm:mb-4 select-text max-w-full px-2 break-words"
               >
                 {displayName}
               </h1>
 
-              {/* Action Buttons */}
               <div className="flex items-center justify-center gap-2.5 sm:gap-3.5 flex-wrap">
                 {/* Info / Bio Button */}
                 <button
                   onClick={() => setIsBioOpen(true)}
-                  className="w-9 h-9 sm:w-10 sm:h-10 md:w-10 md:h-10 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-xl transition active:scale-95 shadow-xl cursor-pointer"
+                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-xl transition active:scale-95 shadow-xl cursor-pointer"
                   title="Artist Bio"
                 >
-                  <Info size={16} strokeWidth={2.2} />
+                  <Info size={18} strokeWidth={2.2} />
                 </button>
 
-                {/* Primary White Play Circle (Apple Music size) */}
+                {/* Primary White Play Circle */}
                 <button
                   onClick={handlePlayTopTracks}
-                  className="w-11 h-11 sm:w-12 sm:h-12 md:w-13 md:h-13 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_6px_24px_rgba(255,255,255,0.25)] cursor-pointer"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_6px_24px_rgba(255,255,255,0.25)] cursor-pointer"
                   title={isPlaying && isArtistActive ? "Pause" : "Play Top Songs"}
                 >
                   {isPlaying && isArtistActive ? (
-                    <SwiftUIPause size={20} fill="black" />
+                    <SwiftUIPause size={22} fill="black" />
                   ) : (
-                    <SwiftUIPlay size={20} fill="black" className="ml-0.5" />
+                    <SwiftUIPlay size={22} fill="black" className="ml-0.5" />
                   )}
                 </button>
 
@@ -410,7 +372,7 @@ export default function ArtistPage() {
                 <button
                   onClick={() => setIsFavorited(!isFavorited)}
                   className={cn(
-                    "w-9 h-9 sm:w-10 sm:h-10 md:w-10 md:h-10 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl cursor-pointer",
+                    "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl cursor-pointer",
                     isFavorited
                       ? "bg-brand/20 border-brand text-brand"
                       : "bg-white/10 hover:bg-white/20 border-white/15 text-white/90 hover:text-white"
@@ -418,7 +380,7 @@ export default function ArtistPage() {
                   title={isFavorited ? "Favorited" : "Favorite Artist"}
                 >
                   <Star
-                    size={16}
+                    size={18}
                     className={cn(isFavorited ? "fill-brand text-brand" : "text-white")}
                     strokeWidth={2}
                   />
@@ -428,24 +390,24 @@ export default function ArtistPage() {
                 <button
                   onClick={handleShufflePlay}
                   className={cn(
-                    "w-9 h-9 sm:w-10 sm:h-10 md:w-10 md:h-10 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl cursor-pointer",
+                    "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl cursor-pointer",
                     isShuffled
                       ? "bg-brand/20 border-brand text-brand"
                       : "bg-white/10 hover:bg-white/20 border-white/15 text-white/90 hover:text-white"
                   )}
                   title="Shuffle Artist Songs"
                 >
-                  <SwiftUIShuffle size={16} stroke="currentColor" />
+                  <SwiftUIShuffle size={18} stroke="currentColor" />
                 </button>
 
                 {/* Glass Ellipsis Menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      className="w-9 h-9 sm:w-10 sm:h-10 md:w-10 md:h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white flex items-center justify-center active:scale-95 transition-all shadow-xl cursor-pointer"
+                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white flex items-center justify-center active:scale-95 transition-all shadow-xl cursor-pointer"
                       title="More Options"
                     >
-                      <SwiftUIEllipsis size={16} fill="currentColor" />
+                      <SwiftUIEllipsis size={18} fill="currentColor" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="center" className="w-48 bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl p-1">
@@ -470,18 +432,18 @@ export default function ArtistPage() {
           </div>
         </div>
       ) : (
-        /* ROUND SHAPE ARTIST PROFILE (Screenshot 3 - 24kGoldn fallback when no widescreen banner) */
-        <div className="relative w-full pt-12 sm:pt-16 md:pt-20 pb-8 sm:pb-12 flex flex-col items-center justify-center text-center overflow-hidden select-none">
+        /* ROUND SHAPE PROFILE PIC (When artist has no banner or square avatar) */
+        <div className="relative w-full pt-10 sm:pt-14 md:pt-16 pb-8 sm:pb-10 flex flex-col items-center justify-center text-center overflow-hidden select-none">
           {/* Subtle warm ambient radial glow behind avatar */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-white/[0.04] blur-3xl pointer-events-none" />
 
-          {/* Centered Circular Artist Avatar */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             className="relative z-10 flex flex-col items-center"
           >
+            {/* Centered Circular Artist Avatar */}
             <div className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 rounded-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-white/10 ring-1 ring-white/10 mx-auto mb-6 bg-zinc-800">
               <img
                 src={getMediaUrl(avatarUrl || rawBanner) || "/images/placeholder.png"}
@@ -495,87 +457,101 @@ export default function ArtistPage() {
             {/* Apple Music centered Artist Title */}
             <h1
               ref={heroNameRef}
-              className="text-2xl sm:text-3xl md:text-4xl lg:text-[42px] font-bold text-white tracking-tight drop-shadow-md mb-5 px-4 break-words"
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-[46px] font-bold text-white tracking-tight drop-shadow-md mb-5 px-4 break-words"
             >
               {displayName}
             </h1>
 
-            {/* Centered Action Controls: (i) Info, Play, Star, More */}
-            <div className="flex items-center justify-center gap-3 sm:gap-4">
-              {/* (i) Info / Bio Button */}
-              <button
-                onClick={() => setIsBioOpen(true)}
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-xl transition active:scale-95 shadow-lg cursor-pointer"
-                title="Artist Bio"
-              >
-                <Info size={16} strokeWidth={2.2} />
-              </button>
-
-              {/* White Circular Play Button */}
-              <button
-                onClick={handlePlayTopTracks}
-                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_8px_30px_rgba(255,255,255,0.25)] cursor-pointer"
-                title={isPlaying && isArtistActive ? "Pause" : "Play Top Songs"}
-              >
-                {isPlaying && isArtistActive ? (
-                  <SwiftUIPause size={22} fill="black" />
-                ) : (
-                  <SwiftUIPlay size={22} fill="black" className="ml-0.5" />
-                )}
-              </button>
-
-              {/* Star / Favorite Button */}
-              <button
-                onClick={() => setIsFavorited(!isFavorited)}
-                className={cn(
-                  "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-lg cursor-pointer",
-                  isFavorited
-                    ? "bg-brand/20 border-brand text-brand"
-                    : "bg-white/10 hover:bg-white/20 border-white/15 text-white/90 hover:text-white"
-                )}
-                title={isFavorited ? "Favorited" : "Favorite Artist"}
-              >
-                <Star
-                  size={16}
-                  className={cn(isFavorited ? "fill-brand text-brand" : "text-white")}
-                  strokeWidth={2}
-                />
-              </button>
-
-              {/* Glass Ellipsis Menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+            {/* Centered Action Controls */}
+            <div className="flex items-center justify-center gap-2.5 sm:gap-3.5 flex-wrap">
+              {/* Info / Bio Button */}
                   <button
-                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white flex items-center justify-center active:scale-95 transition-all shadow-lg cursor-pointer"
-                    title="More Options"
+                    onClick={() => setIsBioOpen(true)}
+                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-xl transition active:scale-95 shadow-xl cursor-pointer"
+                    title="Artist Bio"
                   >
-                    <SwiftUIEllipsis size={16} fill="currentColor" />
+                    <Info size={18} strokeWidth={2.2} />
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="w-48 bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl p-1">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      navigator.clipboard.writeText(window.location.href);
-                    }}
-                    className="cursor-pointer text-xs font-semibold py-2"
-                  >
-                    Share Artist
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
+
+                  {/* Primary White Play Circle */}
+                  <button
                     onClick={handlePlayTopTracks}
-                    className="cursor-pointer text-xs font-semibold py-2"
+                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-[0_6px_24px_rgba(255,255,255,0.25)] cursor-pointer"
+                    title={isPlaying && isArtistActive ? "Pause" : "Play Top Songs"}
                   >
-                    Play All Songs
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    {isPlaying && isArtistActive ? (
+                      <SwiftUIPause size={22} fill="black" />
+                    ) : (
+                      <SwiftUIPlay size={22} fill="black" className="ml-0.5" />
+                    )}
+                  </button>
+
+                  {/* Star / Favorite Button */}
+                  <button
+                    onClick={() => setIsFavorited(!isFavorited)}
+                    className={cn(
+                      "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl cursor-pointer",
+                      isFavorited
+                        ? "bg-brand/20 border-brand text-brand"
+                        : "bg-white/10 hover:bg-white/20 border-white/15 text-white/90 hover:text-white"
+                    )}
+                    title={isFavorited ? "Favorited" : "Favorite Artist"}
+                  >
+                    <Star
+                      size={18}
+                      className={cn(isFavorited ? "fill-brand text-brand" : "text-white")}
+                      strokeWidth={2}
+                    />
+                  </button>
+
+                  {/* Glass Shuffle Circle */}
+                  <button
+                    onClick={handleShufflePlay}
+                    className={cn(
+                      "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center backdrop-blur-xl border transition-all active:scale-95 shadow-xl cursor-pointer",
+                      isShuffled
+                        ? "bg-brand/20 border-brand text-brand"
+                        : "bg-white/10 hover:bg-white/20 border-white/15 text-white/90 hover:text-white"
+                    )}
+                    title="Shuffle Artist Songs"
+                  >
+                    <SwiftUIShuffle size={18} stroke="currentColor" />
+                  </button>
+
+                  {/* Glass Ellipsis Menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white flex items-center justify-center active:scale-95 transition-all shadow-xl cursor-pointer"
+                        title="More Options"
+                      >
+                        <SwiftUIEllipsis size={18} fill="currentColor" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" className="w-48 bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl p-1">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          navigator.clipboard.writeText(window.location.href);
+                        }}
+                        className="cursor-pointer text-xs font-semibold py-2"
+                      >
+                        Share Artist
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handlePlayTopTracks}
+                        className="cursor-pointer text-xs font-semibold py-2"
+                      >
+                        Play All Songs
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
             </div>
           </motion.div>
         </div>
       )}
 
       {/* ── 2. JIOSAAVN REDESIGNED SECTIONS (Screenshot 1 & Screenshot 2) ── */}
-      <div className="relative z-10 pt-6 sm:pt-8 pb-28 w-full text-white min-w-0">
+      <div className="relative z-10 pt-4 sm:pt-6 pb-28 w-full text-white min-w-0">
         {/* SECTION 1: Top Songs Table with Popular, Date, Name filters & Load more */}
         <div className="px-4 sm:px-8 md:px-12 max-w-[1400px] mx-auto w-full mb-8">
           <JioSaavnSongTable
@@ -614,7 +590,7 @@ export default function ArtistPage() {
         {((artist.topAlbums && artist.topAlbums.length > 0) || (artist.albums && artist.albums.length > 0)) && (
           <JioSaavnCardSection
             title="Top Albums"
-            items={artist.topAlbums || artist.albums || []}
+            items={(artist.topAlbums || artist.albums || []).filter((a: any) => (a.trackCount || a.songCount || 0) > 1 && !a.isSingle)}
             onPlayItem={handlePlayCollection}
             currentCollectionId={currentCollectionId || undefined}
             isPlaying={isPlaying}
@@ -625,7 +601,7 @@ export default function ArtistPage() {
         {((artist.singles && artist.singles.length > 0) || (artist.singlesAndEPs && artist.singlesAndEPs.length > 0)) && (
           <JioSaavnCardSection
             title="Singles"
-            items={artist.singles || artist.singlesAndEPs || []}
+            items={((artist.singles && artist.singles.length > 0) ? artist.singles : artist.singlesAndEPs) || []}
             onPlayItem={handlePlayCollection}
             currentCollectionId={currentCollectionId || undefined}
             isPlaying={isPlaying}

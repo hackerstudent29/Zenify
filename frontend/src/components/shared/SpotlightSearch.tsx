@@ -80,6 +80,7 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
   const dq = useDeferredValue(q);
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [resultsData, setResultsData] = useState<{
+    topResult?: SearchItem;
     tracks: SearchItem[];
     artists: SearchItem[];
     albums: SearchItem[];
@@ -121,6 +122,24 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
         const mappedTracks: SearchItem[] = [];
         const mappedArtists: SearchItem[] = [];
         const mappedAlbums: SearchItem[] = [];
+        let mappedTopResult: SearchItem | undefined = undefined;
+
+        if (data?.topResult?.item) {
+          const top = data.topResult.item;
+          const topType = data.topResult.type || (top.isArtist ? "artist" : top.isAlbum ? "album" : "track");
+          mappedTopResult = {
+            id: `top-${top.id}`,
+            type: topType,
+            title: top.title || top.name,
+            subtitle: topType === "artist" 
+              ? (top.follower_count ? `${top.follower_count.toLocaleString()} Monthly Listeners` : "Artist") 
+              : topType === "album" 
+                ? [top.artist?.name || "Album", top.year, top.trackCount ? `${top.trackCount} ${top.trackCount === 1 ? 'Song' : 'Songs'}` : ""].filter(Boolean).join(" • ")
+                : (top.artist?.name || top.artistName || "Song"),
+            coverUrl: topType === "artist" ? (top.imageUrl || top.coverUrl) : (top.coverUrl || getTrackCover(top)),
+            raw: top,
+          };
+        }
 
         if (Array.isArray(data?.tracks)) {
           data.tracks.forEach((t: any) => {
@@ -141,7 +160,7 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
               id: `artist-${a.id}`,
               type: "artist",
               title: a.name,
-              subtitle: a.trackCount ? `${a.trackCount} Songs` : "Artist",
+              subtitle: a.trackCount ? `${a.trackCount} ${a.trackCount === 1 ? 'Song' : 'Songs'}` : "Artist",
               coverUrl: a.imageUrl || a.coverUrl,
               raw: a,
             });
@@ -152,7 +171,7 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
           data.albums.forEach((al: any) => {
             const artistName = al.artist?.name || "Album";
             const year = al.releaseDate ? String(al.releaseDate).slice(0, 4) : "";
-            const tracksInfo = al.trackCount ? `${al.trackCount} Tracks` : "";
+            const tracksInfo = al.trackCount ? `${al.trackCount} ${al.trackCount === 1 ? 'Song' : 'Songs'}` : "";
             const meta = [artistName, year, tracksInfo].filter(Boolean).join(" • ");
 
             mappedAlbums.push({
@@ -167,6 +186,7 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
         }
 
         setResultsData({
+          topResult: mappedTopResult,
           tracks: mappedTracks,
           artists: mappedArtists,
           albums: mappedAlbums,
@@ -192,19 +212,33 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
     if (activeFilter === "artist") return resultsData.artists;
     if (activeFilter === "album") return resultsData.albums;
 
-    // "all": curated overview with artists, top tracks, and albums cleanly grouped
-    const combined: SearchItem[] = [];
-    if (resultsData.artists.length > 0) {
-      combined.push(...resultsData.artists.slice(0, 4));
-    }
-    if (resultsData.tracks.length > 0) {
-      combined.push(...resultsData.tracks.slice(0, 10));
-    }
-    if (resultsData.albums.length > 0) {
-      combined.push(...resultsData.albums.slice(0, 6));
+    // "all": unified high-priority matching list without artificial category partitions
+    const allItems: SearchItem[] = [];
+    const seen = new Set<string>();
+
+    if (resultsData.topResult) {
+      allItems.push(resultsData.topResult);
+      seen.add(resultsData.topResult.raw?.id || resultsData.topResult.id);
     }
 
-    return combined;
+    const pool = [
+      ...resultsData.tracks,
+      ...resultsData.artists,
+      ...resultsData.albums,
+    ];
+
+    // Sort by relevance score descending so exact and closest matches always come first
+    pool.sort((a, b) => (b.raw?.score || 0) - (a.raw?.score || 0));
+
+    for (const item of pool) {
+      const key = item.raw?.id || item.id;
+      if (!seen.has(key)) {
+        seen.add(key);
+        allItems.push(item);
+      }
+    }
+
+    return allItems.slice(0, 20);
   }, [activeFilter, resultsData]);
 
   const tabCounts = useMemo(
@@ -314,29 +348,14 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
         {filteredItems.length > 0 && (
           <ul className="sp-results divide-y divide-white/5">
             {filteredItems.map((it, i) => {
-              const showCategoryHeader =
-                activeFilter === "all" &&
-                (i === 0 || filteredItems[i].type !== filteredItems[i - 1].type);
-
               return (
-                <React.Fragment key={it.id}>
-                  {showCategoryHeader && (
-                    <li className="px-3 pt-3 pb-1 text-[10px] font-bold tracking-wider uppercase text-zinc-400 select-none bg-black/20 list-none pointer-events-none">
-                      {it.type === "track"
-                        ? "Top Songs"
-                        : it.type === "artist"
-                        ? "Artists"
-                        : it.type === "album"
-                        ? "Albums"
-                        : "Playlists"}
-                    </li>
-                  )}
-                  <li
-                    data-sel={i === sel}
-                    onMouseEnter={() => setSel(i)}
-                    onClick={() => selectItem(it)}
-                    className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-xl transition-colors duration-100"
-                  >
+                <li
+                  key={it.id}
+                  data-sel={i === sel}
+                  onMouseEnter={() => setSel(i)}
+                  onClick={() => selectItem(it)}
+                  className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-xl transition-colors duration-100"
+                >
                     {/* Round avatar for artists, rounded-xl cover for tracks & albums */}
                     <div
                       className={cn(
@@ -383,7 +402,6 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
                       className="text-white/40 shrink-0"
                     />
                   </li>
-                </React.Fragment>
               );
             })}
           </ul>

@@ -325,6 +325,7 @@ export async function artistRoutes(server: FastifyInstance) {
 
         let finalTopTracks = [...topTracks];
 
+                const normTitle = (t: string) => (t || '').toLowerCase().replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/[^a-z0-9]/g, '').trim();
         // Filter out duplicate or fake albums where album title equals a single track title and track count <= 1
         const validLocalAlbums = (artist.albums || []).filter((alb: any) => {
             const isSingleTrackNamedAlbum = topTracks.some(t => 
@@ -574,7 +575,16 @@ export async function artistRoutes(server: FastifyInstance) {
                 seenCollectionIds.add(saavnAlbId);
 
                 const albArt = (alb.imageUrl || alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
-                const count = parseInt(alb.numSongs || alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
+                const count = parseInt(alb.more_info?.song_count || alb.song_count || alb.numSongs || alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
+
+                const existingLocal = finalAlbums.find(a => normTitle(a.title) === normTitle(albTitle));
+                if (existingLocal) {
+                    existingLocal.trackCount = Math.max(existingLocal.trackCount || 1, count);
+                    existingLocal.isSingle = existingLocal.trackCount <= 1;
+                    if (!existingLocal.coverUrl && albArt) existingLocal.coverUrl = albArt;
+                    seenCollectionIds.add(saavnAlbId);
+                    continue;
+                }
 
                 finalAlbums.push({
                     id: saavnAlbId,
@@ -605,6 +615,12 @@ export async function artistRoutes(server: FastifyInstance) {
 
                 if (isAuthentic) {
                     seenCollectionIds.add(colId);
+                    const existingMatch = finalAlbums.find(a => normTitle(a.title) === normTitle(albTitle));
+                    if (existingMatch) {
+                        existingMatch.trackCount = Math.max(existingMatch.trackCount || 1, count);
+                        existingMatch.isSingle = existingMatch.trackCount <= 1;
+                        continue;
+                    }
                     finalAlbums.push({
                         id: colId,
                         title: albTitle,
@@ -666,6 +682,17 @@ export async function artistRoutes(server: FastifyInstance) {
 
                 let saArt = sa.image || '';
                 saArt = saArt.replace('150x150', '500x500').replace('50x50', '500x500');
+                const saCount = parseInt(sa.more_info?.song_count || sa.song_count || sa.numSongs || '1', 10) || 1;
+
+                const existingMatch = finalAlbums.find(a => normTitle(a.title) === normTitle(saTitle));
+                if (existingMatch) {
+                    existingMatch.trackCount = Math.max(existingMatch.trackCount || 1, saCount);
+                    existingMatch.isSingle = existingMatch.trackCount <= 1;
+                    if ((!existingMatch.coverUrl || existingMatch.coverUrl.includes('placeholder')) && saArt) {
+                        existingMatch.coverUrl = saArt;
+                    }
+                    continue;
+                }
 
                 finalAlbums.push({
                     id: saId,
@@ -675,9 +702,9 @@ export async function artistRoutes(server: FastifyInstance) {
                     artistId: artist.id,
                     releaseDate: sa.year ? new Date(`${sa.year}-01-01`) : new Date(),
                     createdAt: sa.year ? new Date(`${sa.year}-01-01`) : new Date(),
-                    trackCount: parseInt(sa.more_info?.song_count || '1', 10) || 1,
+                    trackCount: saCount,
                     genre: sa.language ? `${sa.language.charAt(0).toUpperCase() + sa.language.slice(1)} Soundtrack` : 'Soundtrack',
-                    isSingle: (parseInt(sa.more_info?.song_count || '1', 10) <= 1),
+                    isSingle: (saCount <= 1),
                     isVirtual: true
                 } as any);
             }
@@ -855,8 +882,35 @@ export async function artistRoutes(server: FastifyInstance) {
         });
 
         const latestRelease = sortedAlbums[0] || null;
-        const studioAlbums = sortedAlbums.filter(a => !a.isSingle && !(a.title || '').toLowerCase().includes('single') && !(a.title || '').toLowerCase().includes('ep'));
-        const singlesAndEPs = sortedAlbums.filter(a => a.isSingle || (a.title || '').toLowerCase().includes('single') || (a.title || '').toLowerCase().includes('ep'));
+
+        const dedupedStudioMap = new Map();
+        for (const alb of sortedAlbums) {
+            const count = alb.trackCount || 1;
+            if (alb.isSingle || count <= 1 || (alb.title || '').toLowerCase().includes('single') || (alb.title || '').toLowerCase().includes('ep')) {
+                continue;
+            }
+            const key = normTitle(alb.title);
+            if (!dedupedStudioMap.has(key)) {
+                dedupedStudioMap.set(key, alb);
+            } else {
+                const existing = dedupedStudioMap.get(key);
+                existing.trackCount = Math.max(existing.trackCount || 1, count);
+            }
+        }
+        const studioAlbums = Array.from(dedupedStudioMap.values());
+
+        const dedupedSinglesMap = new Map();
+        for (const item of sortedAlbums) {
+            const count = item.trackCount || 1;
+            if (!item.isSingle && count > 1 && !(item.title || '').toLowerCase().includes('single') && !(item.title || '').toLowerCase().includes('ep')) {
+                continue;
+            }
+            const key = normTitle(item.title);
+            if (!dedupedSinglesMap.has(key) && !dedupedStudioMap.has(key)) {
+                dedupedSinglesMap.set(key, item);
+            }
+        }
+        const singlesAndEPs = Array.from(dedupedSinglesMap.values());
         const essentialAlbums = studioAlbums.length >= 2 ? studioAlbums.slice(0, 6) : [];
 
         // ── Map JioSaavn Rich Sections ─────────────────────────────────────────
@@ -944,13 +998,13 @@ export async function artistRoutes(server: FastifyInstance) {
             studioAlbums,
             singlesAndEPs,
             singles: saavnSingles.length > 0 ? saavnSingles : singlesAndEPs,
-            topAlbums: finalAlbums,
+            topAlbums: studioAlbums.length > 0 ? studioAlbums : finalAlbums.filter(a => (a.trackCount || 1) > 1),
             dedicatedPlaylists,
             featuredInPlaylists,
             appearsOn: appearsOnAlbums,
             compilations: appearsOnAlbums.length > 0 ? appearsOnAlbums : [],
             topTracks: finalTopTracks, 
-            albums: finalAlbums,
+            albums: studioAlbums.length > 0 ? studioAlbums : finalAlbums,
             playlists: dedicatedPlaylists.length > 0 ? dedicatedPlaylists : artistPlaylists,
             relatedArtists: relatedArtists.length > 0 ? relatedArtists : [],
             trackCount: Math.max(trackCount, finalTopTracks.length), 

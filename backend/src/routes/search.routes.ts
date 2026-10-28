@@ -126,32 +126,31 @@ function scoreItem(
     if (overallSim > maxFuzzy) maxFuzzy = overallSim;
 
     if (maxFuzzy >= 0.75) {
-      score += Math.round(150 * maxFuzzy);
-    } else if (maxFuzzy >= 0.6) {
-      score += Math.round(90 * maxFuzzy);
-    } else if (!isLocal) {
-      score += 45;
+      score += Math.round(180 * maxFuzzy);
+    } else if (maxFuzzy >= 0.55) {
+      score += Math.round(100 * maxFuzzy);
     } else {
-      if (type === 'artist' || type === 'album' || type === 'playlist') {
+      // Reject random noise entities that have no relation to the query,
+      // UNLESS this is a track whose album name directly matches the search query (e.g. movie OST)
+      if (type === 'track' && albumTitle && (albumTitle.toLowerCase().includes(q) || q.includes(albumTitle.toLowerCase()))) {
+        score += 80;
+      } else {
         return 0;
       }
-      score += 10;
     }
   }
 
   // Sequel & Part Number Strict Verification (e.g. Jailer 1 vs Jailer 2)
   const queryTag = extractSequelTag(q);
-  const targetTag = extractSequelTag(t);
+  const targetTag = extractSequelTag(`${t} ${albumTitle || ''}`);
   if (queryTag && targetTag) {
     if (queryTag === targetTag) {
       score += 150;
     } else {
       score -= 300;
     }
-  } else if (queryTag && !targetTag) {
-    score -= 220;
   } else if (!queryTag && targetTag) {
-    score -= 100;
+    score -= 80;
   }
 
   // Filter compilations/jukeboxes from top tracks
