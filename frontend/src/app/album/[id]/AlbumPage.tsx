@@ -670,10 +670,10 @@ export default function AlbumPage() {
                   <img
                     src={getMediaUrl(oth.coverUrl)}
                     alt={oth.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
                   />
                 </div>
-                <span className="text-[14px] font-medium text-white truncate leading-tight">{oth.title}</span>
+                <span className="text-[14px] font-medium text-white truncate leading-tight group-hover:text-brand transition-colors">{oth.title}</span>
                 <span className="text-[12px] text-white/50">
                   {oth.releaseDate ? new Date(oth.releaseDate).getFullYear() : "Album"}
                 </span>
@@ -692,17 +692,21 @@ export default function AlbumPage() {
               <Link
                 key={rel.id}
                 href={`/artist/${rel.id}`}
-                className="group w-[130px] sm:w-[145px] md:w-[160px] shrink-0 flex flex-col items-center text-center gap-2 rounded-lg p-2 hover:bg-white/5 transition-all"
+                className="group shrink-0 flex flex-col items-center text-center gap-3 rounded-lg p-2 hover:bg-white/5 transition-all w-[140px] sm:w-[155px] md:w-[165px]"
               >
-                <div className="w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 rounded-full overflow-hidden bg-zinc-800 ring-1 ring-inset ring-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.4)] relative">
+                {/* Round portrait — uniform artist-page size */}
+                <div className="w-full aspect-square rounded-full overflow-hidden bg-zinc-800 ring-1 ring-inset ring-white/10 shadow-xl shadow-black/40 group-hover:ring-2 group-hover:ring-brand/50 transition-all duration-300">
                   <img
                     src={getMediaUrl(rel.imageUrl || rel.coverUrl)}
                     alt={rel.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                    loading="lazy"
                   />
                 </div>
-                <span className="text-[14px] font-medium text-white truncate w-full">{rel.name}</span>
-                <span className="text-[12px] text-white/50">Artist</span>
+                <div>
+                  <p className="text-[14px] font-semibold text-white truncate w-full group-hover:text-brand transition-colors">{rel.name}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-white/45 mt-0.5">Artist</p>
+                </div>
               </Link>
             ))}
           </AlbumHorizontalCarousel>

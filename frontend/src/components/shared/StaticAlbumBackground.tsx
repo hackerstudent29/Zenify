@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
-import { applyArtworkTheme } from "@/lib/theme";
 
 export interface StaticAlbumBackgroundProps {
   coverUrl?: string | null;
@@ -48,21 +47,22 @@ export const StaticAlbumBackground = React.memo(function StaticAlbumBackground({
     return { r: r1, g: g1, b: b1 };
   }, [colors]);
 
-  // Synchronize extracted color directly to CSS variables (--page, --side, --album-rgb)
-  // Only apply when primary is an authentic, non-neutral color to prevent wiping theme tokens
-  useEffect(() => {
-    if (primary && !isNeutralOrDark(primary.r, primary.g, primary.b)) {
-      applyArtworkTheme(primary.r, primary.g, primary.b);
-    }
-  }, [primary.r, primary.g, primary.b]);
+  // NOTE: applyArtworkTheme is intentionally NOT called here.
+  // Each page (TrackPage, AlbumPage, ArtistPage, etc.) calls it directly
+  // from its own useEffect using extractArtworkAverageColor. Calling it in
+  // two places caused a race condition that made the color flicker/reset.
 
   return (
     <div
       aria-hidden
       className={cn(
-        "absolute inset-0 z-0 overflow-hidden pointer-events-none select-none bg-[var(--page,#121214)] transition-colors duration-700 ease-out h-full w-full",
+        "absolute inset-0 z-0 overflow-hidden pointer-events-none select-none bg-[var(--page,#121214)] h-full w-full",
         className
       )}
+      style={{
+        // Transition matches the CSS --page variable transition (700ms)
+        transition: "background-color 700ms ease-out",
+      }}
     />
   );
 });

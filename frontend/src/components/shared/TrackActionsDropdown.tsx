@@ -118,20 +118,22 @@ const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min)
 /**
  * Apple Music glass: dark translucent grey, strong blur + saturation,
  * 1px light hairline border, soft shadow.
+ * clear=true → a touch more transparent (used in dark-on-dark contexts)
  */
 function glassSurface(clear: boolean, sheet = false): React.CSSProperties {
-  const blur = sheet
-    ? "blur(calc(var(--glass-blur, 10px) + 20px)) saturate(180%)"
-    : "blur(calc(var(--glass-blur, 10px) + 14px)) saturate(180%)";
+  const blurAmount = sheet ? 32 : 24;
+  const blur = `blur(${blurAmount}px) saturate(200%)`;
   return {
-    backgroundColor: clear ? "rgba(44, 44, 46, 0.55)" : "rgba(36, 36, 38, 0.78)",
+    backgroundColor: clear
+      ? "rgba(32, 32, 34, 0.62)"
+      : "rgba(28, 28, 30, 0.82)",
     backgroundImage:
-      "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 45%)",
+      "linear-gradient(180deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0) 50%)",
     backdropFilter: blur,
     WebkitBackdropFilter: blur,
-    border: "1px solid rgba(255,255,255,0.14)",
+    border: "1px solid rgba(255,255,255,0.16)",
     boxShadow:
-      "0 16px 40px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)",
+      "0 20px 60px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
   };
 }
 
