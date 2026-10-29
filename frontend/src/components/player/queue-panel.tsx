@@ -10,7 +10,9 @@ import {
   Play,
   Search,
   Plus,
-  MoreHorizontal,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
   Disc3,
   Shuffle,
   Repeat
@@ -48,6 +50,9 @@ export function QueuePanel() {
     removeFromUserQueue,
     playUserQueueItem,
     reorderUserQueue,
+    reorderContextQueue,
+    moveUserQueueItem,
+    moveContextQueueItem,
     clearUserQueue,
     removeFromContextQueue,
     setTrack
@@ -450,18 +455,52 @@ export function QueuePanel() {
                                       </div>
                                     </div>
 
-                                    {/* Right Side: Duration & Drag Handle */}
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      <span className="text-[12px] text-white/45 tabular-nums font-medium">
+                                    {/* Right Side: Duration & Move Controls & Drag Handle */}
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <span className={cn(
+                                        "text-[12px] text-white/45 tabular-nums font-medium",
+                                        isMobile ? "hidden" : "group-hover:hidden"
+                                      )}>
                                         {formatTime(item.track.duration)}
                                       </span>
+
+                                      {/* Move Up / Move Down buttons */}
+                                      <div className={cn(
+                                        "items-center gap-0.5",
+                                        isMobile ? "flex" : "hidden group-hover:flex"
+                                      )}>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveUserQueueItem(index, 'up');
+                                          }}
+                                          disabled={index === 0}
+                                          className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                          title="Move up in order"
+                                          aria-label="Move up in order"
+                                        >
+                                          <ChevronUp size={15} />
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            moveUserQueueItem(index, 'down');
+                                          }}
+                                          disabled={index === userQueue.length - 1}
+                                          className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                          title="Move down in order"
+                                          aria-label="Move down in order"
+                                        >
+                                          <ChevronDown size={15} />
+                                        </button>
+                                      </div>
 
                                       {/* Drag Handle */}
                                       <div
                                         {...provided.dragHandleProps}
                                         onClick={(e) => e.stopPropagation()}
                                         className="p-1 text-white/20 group-hover:text-white/60 cursor-grab active:cursor-grabbing rounded hover:bg-white/5"
-                                        title="Reorder"
+                                        title="Drag to reorder"
                                       >
                                         <GripVertical size={14} />
                                       </div>
@@ -526,22 +565,60 @@ export function QueuePanel() {
                             </div>
                           </div>
 
-                          {/* Right Side: Duration & Actions */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[12px] text-white/45 tabular-nums font-medium group-hover:hidden">
+                          {/* Right Side: Duration & Move & Delete Actions */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className={cn(
+                              "text-[12px] text-white/45 tabular-nums font-medium",
+                              isMobile ? "hidden" : "group-hover:hidden"
+                            )}>
                               {formatTime(track.duration)}
                             </span>
 
-                            {/* More Options / Delete on hover */}
+                            {/* Move Up / Move Down buttons */}
+                            <div className={cn(
+                              "items-center gap-0.5",
+                              isMobile ? "flex" : "hidden group-hover:flex"
+                            )}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  moveContextQueueItem(idx, 'up');
+                                }}
+                                disabled={idx === 0}
+                                className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                title="Move up in order"
+                                aria-label="Move up in order"
+                              >
+                                <ChevronUp size={15} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  moveContextQueueItem(idx, 'down');
+                                }}
+                                disabled={idx === contextQueue.length - 1}
+                                className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                title="Move down in order"
+                                aria-label="Move down in order"
+                              >
+                                <ChevronDown size={15} />
+                              </button>
+                            </div>
+
+                            {/* Delete button: Trash icon (replaces confusing three-dot button) */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 removeFromContextQueue(track.id);
                               }}
-                              className="hidden group-hover:flex w-6 h-6 items-center justify-center text-white/40 hover:text-white rounded-md hover:bg-white/10 transition-colors cursor-pointer"
-                              title="Remove"
+                              className={cn(
+                                "w-6 h-6 items-center justify-center text-white/40 hover:text-red-400 rounded-md hover:bg-red-500/10 transition-colors cursor-pointer",
+                                isMobile ? "flex" : "hidden group-hover:flex"
+                              )}
+                              title="Delete from queue"
+                              aria-label="Delete from queue"
                             >
-                              <MoreHorizontal size={14} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </div>
