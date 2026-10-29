@@ -175,7 +175,10 @@ function scoreItem(
       score += 50;
     } else if (popularity <= 20 && !isLocal) {
       // Severe demotion for 0-follower random entity submissions (e.g. artist registered as 'Shape of You' or 'Hukum')
-      score -= 250;
+      const matchesQuery = t === q || t.startsWith(q) || q.startsWith(t) || stringSimilarity(t, q) >= 0.75;
+      if (!matchesQuery) {
+        score -= 250;
+      }
     }
   } else if (type === 'album') {
     score += 35;
@@ -351,10 +354,10 @@ export async function searchRoutes(server: FastifyInstance) {
         return [[], [], [], []] as [any[], any[], any[], any[]];
       });
 
-      // External catalog search (capped at 3500ms so network lags never drop valid catalog tracks)
+      // External catalog search (capped at 9000ms so cold external queries never drop valid catalog tracks)
       const catalogPromise = Promise.race([
         CompositeCatalogService.search(cleanQ, storefront, limit),
-        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('catalog_timeout')), 3500))
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('catalog_timeout')), 9000))
       ]).catch(() => ({ tracks: [], artists: [], albums: [] }));
 
       const [[dbArtists, dbAlbums, dbTracks, dbPlaylists], catalogResult] = await Promise.all([
@@ -446,7 +449,18 @@ export async function searchRoutes(server: FastifyInstance) {
         const norm = `${calb.id}::${calb.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
         if (!albumsMap.has(norm)) {
           const albYear = calb.year ? parseInt(String(calb.year), 10) : (calb.releaseDate ? parseInt(calb.releaseDate.slice(0, 4), 10) : 0);
-          const score = scoreItem(calb.title, cleanQ, 'album', calb.trackCount || 0, false, undefined, albYear);
+          const titleScore = scoreItem(calb.title, cleanQ, 'album', calb.trackCount || 0, false, undefined, albYear);
+          let artistScore = 0;
+          if (cleanArtist) {
+            const cLow = cleanArtist.toLowerCase();
+            const qLow = cleanQ.toLowerCase();
+            if (cLow === qLow || cLow.startsWith(qLow) || qLow.startsWith(cLow) || stringSimilarity(cLow, qLow) >= 0.75) {
+              artistScore = 200 + (calb.trackCount || 0) * 2;
+            } else if (cLow.includes(qLow) || qLow.includes(cLow)) {
+              artistScore = 150;
+            }
+          }
+          const score = Math.max(titleScore, artistScore);
           if (score <= 0) continue;
           albumsMap.set(norm, {
             id: calb.id,
@@ -477,7 +491,18 @@ export async function searchRoutes(server: FastifyInstance) {
       for (const t of dbTracks) {
         const cleanArtist = cleanArtistNames(t.artist?.name || t.artistName || '');
         const norm = `${t.title.toLowerCase().trim()}::${cleanArtist.toLowerCase().trim()}`;
-        const score = scoreItem(t.title, cleanQ, 'track', t.streams || 0, true, t.album?.title);
+        const titleScore = scoreItem(t.title, cleanQ, 'track', t.streams || 0, true, t.album?.title);
+        let artistScore = 0;
+        if (cleanArtist) {
+          const cLow = cleanArtist.toLowerCase();
+          const qLow = cleanQ.toLowerCase();
+          if (cLow === qLow || cLow.startsWith(qLow) || qLow.startsWith(cLow) || stringSimilarity(cLow, qLow) >= 0.75) {
+            artistScore = 260 + Math.min(Math.round(Math.log10(Math.max(t.streams || 0, 1000)) * 40), 320);
+          } else if (cLow.includes(qLow) || qLow.includes(cLow)) {
+            artistScore = 220 + Math.min(Math.round(Math.log10(Math.max(t.streams || 0, 1000)) * 30), 250);
+          }
+        }
+        const score = Math.max(titleScore, artistScore);
         tracksMap.set(norm, {
           id: t.id,
           title: t.title,
@@ -512,7 +537,29 @@ export async function searchRoutes(server: FastifyInstance) {
         if (!tracksMap.has(norm)) {
           const trackStreams = ct.playCount || ct.streams || 0;
           const trackYear = ct.year || 0;
-          const score = scoreItem(ct.title, cleanQ, 'track', trackStreams, false, ct.album?.title, trackYear);
+          const titleScore = scoreItem(ct.title, cleanQ, 'track', trackStreams, false, ct.album?.title, trackYear);
+          let artistScore = 0;
+          if (cleanArtist) {
+            const cLow = cleanArtist.toLowerCase();
+            const qLow = cleanQ.toLowerCase();
+            if (cLow === qLow || cLow.startsWith(qLow) || qLow.startsWith(cLow) || stringSimilarity(cLow, qLow) >= 0.75) {
+              artistScore = 260 + Math.min(Math.round(Math.log10(Math.max(trackStreams, 1000)) * 40), 320);
+            } else if (cLow.includes(qLow) || qLow.includes(cLow)) {
+              artistScore = 220 + Math.min(Math.round(Math.log10(Math.max(trackStreams, 1000)) * 30), 250);
+            }
+          }
+          let albumScore = 0;
+          const albumTitle = ct.album?.title || '';
+          if (albumTitle) {
+            const aLow = albumTitle.toLowerCase();
+            const qLow = cleanQ.toLowerCase();
+            if (aLow === qLow || aLow.startsWith(qLow) || qLow.startsWith(aLow)) {
+              albumScore = 240 + Math.min(Math.round(Math.log10(Math.max(trackStreams, 1000)) * 30), 200);
+            } else if (aLow.includes(qLow) || qLow.includes(aLow)) {
+              albumScore = 180;
+            }
+          }
+          const score = Math.max(titleScore, artistScore, albumScore);
           if (score <= 0) continue;
           tracksMap.set(norm, {
             id: ct.id,
@@ -555,8 +602,9 @@ export async function searchRoutes(server: FastifyInstance) {
         const isQueryArtist = topArt && (
           topArt.name.toLowerCase() === cleanQ.toLowerCase() ||
           topArt.name.toLowerCase().startsWith(cleanQ.toLowerCase()) ||
-          cleanQ.toLowerCase().startsWith(topArt.name.toLowerCase())
-        ) && ((topArt.follower_count && topArt.follower_count > 100) || topArt.isLocal);
+          cleanQ.toLowerCase().startsWith(topArt.name.toLowerCase()) ||
+          stringSimilarity(topArt.name.toLowerCase(), cleanQ.toLowerCase()) >= 0.75
+        );
 
         if (isQueryArtist) {
           try {
@@ -682,11 +730,8 @@ export async function searchRoutes(server: FastifyInstance) {
       const isArtistIntent = topArtist && (
         topArtist.name.toLowerCase() === cleanQLower ||
         topArtist.name.toLowerCase().startsWith(cleanQLower) ||
-        cleanQLower.startsWith(topArtist.name.toLowerCase())
-      ) && (
-        (topArtist.follower_count && topArtist.follower_count > 100) ||
-        topArtist.isLocal ||
-        (topArtist.trackCount && topArtist.trackCount >= 3)
+        cleanQLower.startsWith(topArtist.name.toLowerCase()) ||
+        stringSimilarity(topArtist.name.toLowerCase(), cleanQLower) >= 0.75
       );
 
       const isAlbumIntent = topAlbum && (
@@ -720,7 +765,9 @@ export async function searchRoutes(server: FastifyInstance) {
         durationMs: Date.now() - startTime
       };
 
-      searchCache.set(cacheKey, { data: response, expires: Date.now() + SEARCH_CACHE_TTL });
+      if (rankedTracks.length > 0 || rankedArtists.length > 0 || rankedAlbums.length > 0) {
+        searchCache.set(cacheKey, { data: response, expires: Date.now() + SEARCH_CACHE_TTL });
+      }
 
       // Log search event asynchronously
       if (userId) {

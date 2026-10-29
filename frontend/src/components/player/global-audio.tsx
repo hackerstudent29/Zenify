@@ -565,12 +565,13 @@ export function GlobalAudio() {
         language: trackLang
       };
 
-      const isUnplayableWebPage = currentTrack.audioUrl ? (
-        currentTrack.audioUrl.startsWith('spotify:') ||
-        (currentTrack.audioUrl.includes('spotify.com') && !currentTrack.audioUrl.includes('.mp3'))
+      const rawAudioPath = currentTrack.audioUrl || (currentTrack as any).streamUrl;
+      const isUnplayableWebPage = rawAudioPath ? (
+        rawAudioPath.startsWith('spotify:') ||
+        (rawAudioPath.includes('spotify.com') && !rawAudioPath.includes('.mp3'))
       ) : false;
 
-      let targetSrc = isUnplayableWebPage ? undefined : getMediaUrl(currentTrack.audioUrl, 'audio', trackContext);
+      let targetSrc = isUnplayableWebPage ? undefined : getMediaUrl(rawAudioPath, 'audio', trackContext);
       if (typeof window !== 'undefined') {
         if (!targetSrc || targetSrc === '' || targetSrc === '/' || targetSrc === window.location.origin || targetSrc === `${window.location.origin}/` || targetSrc === window.location.href) {
           targetSrc = undefined;
