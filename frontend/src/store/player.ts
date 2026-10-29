@@ -92,6 +92,9 @@ interface PlayerState {
   removeFromUserQueue: (queueId: string) => void;
   playUserQueueItem: (queueId: string) => void;
   reorderUserQueue: (startIndex: number, endIndex: number) => void;
+  reorderContextQueue: (startIndex: number, endIndex: number) => void;
+  moveUserQueueItem: (index: number, direction: "up" | "down") => void;
+  moveContextQueueItem: (index: number, direction: "up" | "down") => void;
   clearUserQueue: () => void;
   removeFromContextQueue: (trackId: string) => void;
 
@@ -377,6 +380,36 @@ export const usePlayerStore = create<PlayerState>()(
           queue: computeTotalQueue(currentTrack, newQueue, contextQueue),
           originalQueue: computeTotalQueue(currentTrack, newQueue, contextQueue),
         });
+      },
+
+      reorderContextQueue: (startIndex, endIndex) => {
+        const { contextQueue, currentTrack, userQueue } = get();
+        const newQueue = [...(contextQueue || [])];
+        const [removed] = newQueue.splice(startIndex, 1);
+        if (removed) {
+          newQueue.splice(endIndex, 0, removed);
+        }
+        set({
+          contextQueue: newQueue,
+          queue: computeTotalQueue(currentTrack, userQueue, newQueue),
+          originalQueue: computeTotalQueue(currentTrack, userQueue, newQueue),
+        });
+      },
+
+      moveUserQueueItem: (index, direction) => {
+        const { userQueue } = get();
+        if (!userQueue || userQueue.length <= 1) return;
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= userQueue.length) return;
+        get().reorderUserQueue(index, targetIndex);
+      },
+
+      moveContextQueueItem: (index, direction) => {
+        const { contextQueue } = get();
+        if (!contextQueue || contextQueue.length <= 1) return;
+        const targetIndex = direction === "up" ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= contextQueue.length) return;
+        get().reorderContextQueue(index, targetIndex);
       },
 
       clearUserQueue: () => {
