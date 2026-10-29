@@ -997,9 +997,15 @@ export async function utilsRoutes(server: FastifyInstance) {
         try {
             await makeRequest(url);
         } catch (err: any) {
-            console.error('[proxy-audio] EXCEPTION DETECTED:', err);
-            server.log.error({ err }, 'Audio proxy error');
-            if (!reply.raw.headersSent) {
+            const isAborted = err?.message === 'Client aborted' || 
+                              err?.code === 'ECONNRESET' || 
+                              err?.code === 'ERR_STREAM_PREMATURE_CLOSE' || 
+                              err?.message?.includes('aborted');
+            if (!isAborted) {
+                console.error('[proxy-audio] Upstream audio proxy error:', err?.message || err);
+                server.log.error({ err }, 'Audio proxy error');
+            }
+            if (!reply.raw.headersSent && !isAborted) {
                 return reply.status(502).send({ error: 'Could not reach audio source' });
             }
         }

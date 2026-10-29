@@ -11,7 +11,9 @@ import {
   Search,
   Plus,
   MoreHorizontal,
-  Disc3
+  Disc3,
+  Shuffle,
+  Repeat
 } from "lucide-react";
 import { cn, getMediaUrl, formatDisplayTitle, formatArtists, formatDuration } from "@/lib/utils";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -38,8 +40,13 @@ export function QueuePanel() {
     userQueue,
     contextQueue,
     contextName,
+    isShuffled,
+    repeatMode,
+    toggleShuffle,
+    toggleRepeat,
     addToUserQueue,
     removeFromUserQueue,
+    playUserQueueItem,
     reorderUserQueue,
     clearUserQueue,
     removeFromContextQueue,
@@ -55,11 +62,34 @@ export function QueuePanel() {
     queryKey: ["queue-search", debouncedQuery],
     queryFn: async () => {
       if (!debouncedQuery) return null;
-      const res = await api.get("search", { params: { q: debouncedQuery, limit: 15 } });
+      const res = await api.get("search", { params: { q: debouncedQuery, limit: 50 } });
       return res.data;
     },
     enabled: !!debouncedQuery,
   });
+
+  const searchTracks = (() => {
+    if (!debouncedQuery) return [];
+    const list: any[] = [];
+    if (searchResults?.topResult?.type === 'track' && searchResults.topResult.item) {
+      list.push(searchResults.topResult.item);
+    }
+    if (Array.isArray(searchResults?.tracks)) {
+      list.push(...searchResults.tracks);
+    }
+    if (Array.isArray(searchResults?.otherVersions)) {
+      list.push(...searchResults.otherVersions);
+    }
+    const seen = new Set<string>();
+    const unique: any[] = [];
+    for (const t of list) {
+      if (t && t.id && !seen.has(t.id)) {
+        seen.add(t.id);
+        unique.push(t);
+      }
+    }
+    return unique;
+  })();
 
   const onUserQueueDragEnd = (result: DropResult) => {
     if (!result.destination) return;
@@ -97,38 +127,81 @@ export function QueuePanel() {
                 : "top-0 right-0 bottom-0 am-glass-right shadow-[-20px_0_60px_rgba(0,0,0,0.35)]"
             )}
           >
-            {/* Header (Apple Music 'Up next' style with Red 'Clear' button) */}
-            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/[0.08] shrink-0">
-              <h2 className="text-[20px] font-bold text-white tracking-tight">Up next</h2>
+            {/* Header (Apple Music 'Up next' style with essential minimal controls) */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/[0.08] shrink-0">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <h2 className="text-[19px] font-bold text-white tracking-tight">Up next</h2>
+                {totalTracksCount > 0 && (
+                  <span className="text-[11px] font-medium text-white/40 tabular-nums">
+                    {totalTracksCount} {totalTracksCount === 1 ? 'song' : 'songs'}
+                  </span>
+                )}
+              </div>
 
-              <div className="flex items-center gap-3">
-                {/* Optional Search Toggle Button */}
+              <div className="flex items-center gap-1.5">
+                {/* Minimal Shuffle Toggle */}
+                <button
+                  onClick={toggleShuffle}
+                  className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95",
+                    isShuffled
+                      ? "bg-brand/20 text-brand border border-brand/40 shadow-sm"
+                      : "text-white/60 hover:text-white hover:bg-white/10"
+                  )}
+                  title={isShuffled ? "Shuffle is ON" : "Shuffle is OFF"}
+                  aria-label="Toggle Shuffle"
+                >
+                  <Shuffle size={13} />
+                </button>
+
+                {/* Minimal Repeat Toggle */}
+                <button
+                  onClick={toggleRepeat}
+                  className={cn(
+                    "relative w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95",
+                    repeatMode !== "off"
+                      ? "bg-brand/20 text-brand border border-brand/40 shadow-sm"
+                      : "text-white/60 hover:text-white hover:bg-white/10"
+                  )}
+                  title={`Repeat: ${repeatMode.toUpperCase()}`}
+                  aria-label="Toggle Repeat"
+                >
+                  <Repeat size={13} />
+                  {repeatMode === "one" && (
+                    <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-brand text-white text-[8px] font-black rounded-full flex items-center justify-center shadow-xs">
+                      1
+                    </span>
+                  )}
+                </button>
+
+                {/* Search Toggle Button */}
                 <button
                   onClick={() => setShowSearch(!showSearch)}
                   className={cn(
-                    "am-glass-chip w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer active:scale-95",
-                    showSearch ? "bg-white/20 text-white" : "text-white/70 hover:text-white"
+                    "w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer active:scale-95",
+                    showSearch ? "bg-white/20 text-white" : "text-white/60 hover:text-white hover:bg-white/10"
                   )}
-                  title="Search and add songs"
+                  title="Search & add songs"
                   aria-label="Search"
                 >
                   <Search size={13} />
                 </button>
 
-                {/* Red 'Clear' action as seen in Apple Music screenshot */}
+                {/* Red 'Clear' action */}
                 {userQueue && userQueue.length > 0 && (
                   <button
                     onClick={() => clearUserQueue()}
-                    className="text-[#ff3b30] hover:text-[#ff453a] text-[15px] font-semibold transition-colors cursor-pointer active:scale-95 px-1"
+                    className="text-[#ff3b30] hover:text-[#ff453a] text-[13px] font-semibold transition-colors cursor-pointer active:scale-95 px-1 py-0.5 rounded hover:bg-white/5"
+                    title="Clear queue"
                   >
                     Clear
                   </button>
                 )}
 
-                {/* Apple-style floating minimal close button */}
+                {/* Minimal Close Button */}
                 <button
                   onClick={() => setIsQueueOpen(false)}
-                  className="am-glass-chip w-7 h-7 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer active:scale-95"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer active:scale-95 ml-0.5"
                   title="Close Queue"
                   aria-label="Close Queue"
                 >
@@ -174,21 +247,28 @@ export function QueuePanel() {
             {/* Search Results Mode */}
             {searchQuery ? (
               <div className="space-y-1 px-1">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2 px-2">
-                  Search Results
-                </h3>
+                <div className="flex items-center justify-between mb-2 px-2">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
+                    Search Results
+                  </h3>
+                  {!isSearchLoading && searchTracks.length > 0 && (
+                    <span className="text-[11px] font-medium text-white/40 tabular-nums">
+                      {searchTracks.length} {searchTracks.length === 1 ? 'track' : 'tracks'}
+                    </span>
+                  )}
+                </div>
                 {isSearchLoading && (
                   <div className="flex items-center justify-center py-8">
                     <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
-                {!isSearchLoading && searchResults?.tracks?.length === 0 && (
+                {!isSearchLoading && searchTracks.length === 0 && (
                   <div className="text-center py-8 text-white/40 text-xs">
                     No tracks found for "{searchQuery}"
                   </div>
                 )}
                 {!isSearchLoading &&
-                  searchResults?.tracks?.map((track: any) => (
+                  searchTracks.map((track: any) => (
                     <div
                       key={track.id}
                       onClick={() => {
@@ -225,18 +305,32 @@ export function QueuePanel() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addToUserQueue(track);
-                          setSearchQuery("");
-                          setShowSearch(false);
-                        }}
-                        className="p-2 text-white/40 group-hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer shrink-0"
-                        title="Add to queue"
-                      >
-                        <Plus size={15} />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTrack(track);
+                            setSearchQuery("");
+                            setShowSearch(false);
+                          }}
+                          className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                          title="Play now"
+                        >
+                          <Play size={13} fill="currentColor" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToUserQueue(track);
+                            setSearchQuery("");
+                            setShowSearch(false);
+                          }}
+                          className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                          title="Add to queue"
+                        >
+                          <Plus size={15} />
+                        </button>
+                      </div>
                     </div>
                   ))}
               </div>
@@ -310,7 +404,7 @@ export function QueuePanel() {
                                   <div
                                     ref={provided.innerRef}
                                     {...provided.draggableProps}
-                                    onClick={() => usePlayerStore.getState().playNext(true)}
+                                    onClick={() => playUserQueueItem(item.queueId)}
                                     className={cn(
                                       "group relative flex items-center justify-between px-2.5 py-2 rounded-xl transition-all select-none cursor-pointer border-b border-white/[0.02]",
                                       snapshot.isDragging

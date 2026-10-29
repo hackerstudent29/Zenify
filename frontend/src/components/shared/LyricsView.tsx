@@ -75,14 +75,26 @@ export function LyricsView({
 }: LyricsViewProps) {
   const queryClient = useQueryClient();
   const [refetchInterval, setRefetchInterval] = React.useState<number | false>(5000);
+  const currentTrack = usePlayerStore((s) => s.currentTrack);
+
+  const albumName = (typeof currentTrack?.album === 'string' ? currentTrack?.album : currentTrack?.album?.title) || (currentTrack as any)?.albumTitle;
+  const trackLang = (currentTrack as any)?.language || (currentTrack as any)?.vibeProfile?.language || (currentTrack as any)?.languageName;
 
   /* ───────────────────────── data ───────────────────────── */
   const { data, isLoading } = useQuery({
-    queryKey: ["lyrics", trackId, title, artist],
+    queryKey: ["lyrics", trackId, title, artist, trackLang, albumName],
     queryFn: async () => {
       if (!title) return { syncedTokens: [], source: undefined as string | undefined, status: "not_found" as const };
       try {
-        const res = await api.post(`metadata/sync-lyrics`, { trackId, title, artist, rawLyrics, duration });
+        const res = await api.post(`metadata/sync-lyrics`, { 
+          trackId, 
+          title, 
+          artist, 
+          rawLyrics, 
+          duration,
+          language: trackLang,
+          album: albumName
+        });
         return {
           status: (res.data?.status || "available") as string,
           message: res.data?.message as string | undefined,
@@ -101,8 +113,6 @@ export function LyricsView({
     staleTime: 10000,
     refetchInterval,
   });
-
-  const currentTrack = usePlayerStore((s) => s.currentTrack);
 
   const [isRomanized, setIsRomanized] = React.useState<boolean>(() => {
     if (typeof window === "undefined") return false;

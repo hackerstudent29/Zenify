@@ -709,13 +709,14 @@ export async function searchRoutes(server: FastifyInstance) {
         topResult = { item: topAlbum, type: 'album' };
       }
 
+      const requestedLimit = Math.max(Number(limit) || 24, 24);
       const response = {
         topResult,
-        tracks: rankedTracks.slice(0, 24),
+        tracks: rankedTracks.slice(0, Math.max(requestedLimit, 40)),
         artists: rankedArtists.slice(0, 10),
         albums: rankedAlbums.slice(0, 10),
         playlists: rankedPlaylists.slice(0, 8),
-        otherVersions: otherVersions.slice(0, 10),
+        otherVersions: otherVersions.slice(0, 15),
         durationMs: Date.now() - startTime
       };
 

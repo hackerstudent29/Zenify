@@ -90,6 +90,7 @@ interface PlayerState {
   setTrack: (track: Track, contextTracks?: Track[], contextName?: string) => void;
   addToUserQueue: (trackOrTracks: Track | Track[], options?: { feedback?: boolean; contextName?: string }) => void;
   removeFromUserQueue: (queueId: string) => void;
+  playUserQueueItem: (queueId: string) => void;
   reorderUserQueue: (startIndex: number, endIndex: number) => void;
   clearUserQueue: () => void;
   removeFromContextQueue: (trackId: string) => void;
@@ -344,6 +345,26 @@ export const usePlayerStore = create<PlayerState>()(
         });
       },
 
+      playUserQueueItem: (queueId) => {
+        try { audioEngine.resume(); } catch (e) {}
+        const { userQueue, contextQueue, playHistory, currentTrack } = get();
+        const target = (userQueue || []).find(u => u.queueId === queueId);
+        if (!target) return;
+        const remaining = (userQueue || []).filter(u => u.queueId !== queueId);
+        const updatedHistory = currentTrack ? [...playHistory, currentTrack].slice(-50) : playHistory;
+        set({
+          currentTrack: target.track,
+          isPlaying: true,
+          userQueue: remaining,
+          playHistory: updatedHistory,
+          repeatCounter: 0,
+          currentTime: 0,
+          duration: target.track.duration || 0,
+          queue: computeTotalQueue(target.track, remaining, contextQueue),
+          originalQueue: computeTotalQueue(target.track, remaining, contextQueue),
+        });
+      },
+
       reorderUserQueue: (startIndex, endIndex) => {
         const { userQueue, currentTrack, contextQueue } = get();
         const newQueue = [...(userQueue || [])];
@@ -486,7 +507,12 @@ export const usePlayerStore = create<PlayerState>()(
         // 2. User Queue order: User Queue plays first! Played User Queue items are removed.
         if (userQueue && userQueue.length > 0) {
           const [nextItem, ...remainingUserQueue] = userQueue;
-          const nextTrack = nextItem.track;
+          const nextTrack = nextItem?.track || (nextItem as any);
+          if (!nextTrack || !nextTrack.id) {
+            set({ userQueue: remainingUserQueue });
+            get().playNext(force);
+            return;
+          }
           set({
             currentTrack: nextTrack,
             isPlaying: true,
