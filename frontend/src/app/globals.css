@@ -198,6 +198,13 @@
     scroll-behavior: smooth;
   }
 
+  /* Smooth transition for artwork-tinted page background so toggling the
+     "Colored background" setting or navigating between tracks doesn't flash.
+     700ms ease-out matches Apple Music's own cross-fade speed. */
+  :root {
+    transition: --page 700ms ease-out, --side 700ms ease-out;
+  }
+
   /* Form controls and links always inherit the primary font */
   button, a, input, select, textarea, [role="button"] {
     font-family: inherit;
@@ -1009,8 +1016,8 @@ a * { cursor: pointer !important; }
 
 /* Anything that has to move in lockstep with the sidebar / right panel */
 .am-layout-transition {
-  transition-property: padding, margin, left, right;
-  transition-duration: 520ms;
+  transition-property: padding, margin, left, right, background-color, width;
+  transition-duration: 520ms, 520ms, 520ms, 520ms, 700ms, 520ms;
   transition-timing-function: var(--ease-apple);
 }
 
