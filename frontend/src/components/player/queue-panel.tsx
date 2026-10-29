@@ -13,12 +13,13 @@ import {
   Trash2,
   ChevronUp,
   ChevronDown,
+  ArrowUpToLine,
+  ArrowDownToLine,
   Disc3,
   Shuffle,
   Repeat
 } from "lucide-react";
 import { cn, getMediaUrl, formatDisplayTitle, formatArtists, formatDuration } from "@/lib/utils";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDebounce } from "use-debounce";
@@ -53,6 +54,11 @@ export function QueuePanel() {
     reorderContextQueue,
     moveUserQueueItem,
     moveContextQueueItem,
+    moveUserQueueToTop,
+    moveUserQueueToBottom,
+    moveContextQueueToTop,
+    moveContextQueueToBottom,
+    promoteContextTrackToNext,
     clearUserQueue,
     removeFromContextQueue,
     setTrack
@@ -62,6 +68,12 @@ export function QueuePanel() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery] = useDebounce(searchQuery, 400);
+
+  // Drag and drop state
+  const [draggedUserQueueIdx, setDraggedUserQueueIdx] = useState<number | null>(null);
+  const [dragOverUserQueueIdx, setDragOverUserQueueIdx] = useState<number | null>(null);
+  const [draggedContextQueueIdx, setDraggedContextQueueIdx] = useState<number | null>(null);
+  const [dragOverContextQueueIdx, setDragOverContextQueueIdx] = useState<number | null>(null);
 
   const { data: searchResults, isLoading: isSearchLoading } = useQuery({
     queryKey: ["queue-search", debouncedQuery],
@@ -96,10 +108,6 @@ export function QueuePanel() {
     return unique;
   })();
 
-  const onUserQueueDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-    reorderUserQueue(result.source.index, result.destination.index);
-  };
 
   const totalTracksCount = (currentTrack ? 1 : 0) + (userQueue?.length || 0) + (contextQueue?.length || 0);
 
@@ -396,124 +404,238 @@ export function QueuePanel() {
                   </div>
                 )}
 
-                {/* 2. USER QUEUE (Items added by user, with Apple-style red minus delete button) */}
+                {/* 2. USER QUEUE (Items added by user) */}
                 {userQueue && userQueue.length > 0 && (
-                  <div>
-                    <DragDropContext onDragEnd={onUserQueueDragEnd}>
-                      <Droppable droppableId="user-queue">
-                        {(provided) => (
-                          <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-0.5">
-                            {userQueue.map((item, index) => (
-                              <Draggable key={item.queueId} draggableId={item.queueId} index={index}>
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    onClick={() => playUserQueueItem(item.queueId)}
-                                    className={cn(
-                                      "group relative flex items-center justify-between px-2.5 py-2 rounded-xl transition-all select-none cursor-pointer border-b border-white/[0.02]",
-                                      snapshot.isDragging
-                                        ? "bg-zinc-900 border-white/20 shadow-2xl scale-[1.02] z-50"
-                                        : "hover:bg-white/[0.06]"
-                                    )}
-                                  >
-                                    <div className="flex items-center gap-2.5 min-w-0 pr-2 flex-1">
-                                      {/* Apple Music Style: Red circular minus button to remove */}
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          removeFromUserQueue(item.queueId);
-                                        }}
-                                        className="w-5 h-5 rounded-full bg-[#ff3b30] hover:bg-[#ff453a] flex items-center justify-center text-white shrink-0 shadow-sm transition-transform active:scale-90 cursor-pointer"
-                                        title="Remove from queue"
-                                        aria-label="Remove"
-                                      >
-                                        <Minus size={11} strokeWidth={3} />
-                                      </button>
+                  <div className="mb-2">
+                    <div className="px-2 pt-1 pb-1 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
+                        Playing Next ({userQueue.length})
+                      </span>
+                    </div>
 
-                                      {/* Artwork */}
-                                      <div className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 shadow-md border border-white/5">
-                                        <UniversalMediaCover track={item.track} className="w-full h-full object-cover" />
-                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                          <Play size={13} fill="white" className="text-white ml-0.5" />
-                                        </div>
-                                      </div>
+                    <div className="space-y-0.5">
+                      {userQueue.map((item, index) => {
+                        const isDragging = draggedUserQueueIdx === index;
+                        const isOver = dragOverUserQueueIdx === index && draggedUserQueueIdx !== index;
 
-                                      {/* Track details */}
-                                      <div className="min-w-0 flex-1">
-                                        <h4 className="text-[13.5px] font-semibold text-white truncate leading-snug">
-                                          {formatDisplayTitle(item.track.title)}
-                                        </h4>
-                                        <div className="mt-0.5 truncate">
-                                          <ArtistLinks
-                                            track={item.track}
-                                            maxArtists={2}
-                                            className="text-[12px] text-white/50 truncate font-normal"
-                                            onClick={() => setIsQueueOpen(false)}
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
+                        return (
+                          <div
+                            key={item.queueId}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/plain", index.toString());
+                              e.dataTransfer.effectAllowed = "move";
+                              setDraggedUserQueueIdx(index);
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                              if (dragOverUserQueueIdx !== index) {
+                                setDragOverUserQueueIdx(index);
+                              }
+                            }}
+                            onDragLeave={() => {
+                              if (dragOverUserQueueIdx === index) {
+                                setDragOverUserQueueIdx(null);
+                              }
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const src = draggedUserQueueIdx !== null ? draggedUserQueueIdx : parseInt(e.dataTransfer.getData("text/plain"), 10);
+                              if (!isNaN(src) && src !== index) {
+                                reorderUserQueue(src, index);
+                              }
+                              setDraggedUserQueueIdx(null);
+                              setDragOverUserQueueIdx(null);
+                            }}
+                            onDragEnd={() => {
+                              setDraggedUserQueueIdx(null);
+                              setDragOverUserQueueIdx(null);
+                            }}
+                            onClick={() => playUserQueueItem(item.queueId)}
+                            className={cn(
+                              "group relative flex items-center justify-between px-2.5 py-2 rounded-xl transition-all select-none cursor-pointer border border-transparent",
+                              isDragging && "opacity-30 scale-[0.98] bg-white/[0.02] border-brand/40",
+                              isOver && "border-t-2 !border-t-brand bg-brand/10 shadow-lg",
+                              !isDragging && !isOver && "hover:bg-white/[0.06] border-b-white/[0.02]"
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 pr-1 flex-1">
+                              {/* Apple Music Style: Red circular minus button to remove */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeFromUserQueue(item.queueId);
+                                }}
+                                className="w-5 h-5 rounded-full bg-[#ff3b30] hover:bg-[#ff453a] flex items-center justify-center text-white shrink-0 shadow-sm transition-transform active:scale-90 cursor-pointer"
+                                title="Delete from queue"
+                                aria-label="Delete from queue"
+                              >
+                                <Minus size={11} strokeWidth={3} />
+                              </button>
 
-                                    {/* Right Side: Duration & Move Controls & Drag Handle */}
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <span className={cn(
-                                        "text-[12px] text-white/45 tabular-nums font-medium",
-                                        isMobile ? "hidden" : "group-hover:hidden"
-                                      )}>
-                                        {formatTime(item.track.duration)}
-                                      </span>
+                              {/* Artwork */}
+                              <div className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 shadow-md border border-white/5">
+                                <UniversalMediaCover track={item.track} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Play size={13} fill="white" className="text-white ml-0.5" />
+                                </div>
+                              </div>
 
-                                      {/* Move Up / Move Down buttons */}
-                                      <div className={cn(
-                                        "items-center gap-0.5",
-                                        isMobile ? "flex" : "hidden group-hover:flex"
-                                      )}>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            moveUserQueueItem(index, 'up');
-                                          }}
-                                          disabled={index === 0}
-                                          className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                          title="Move up in order"
-                                          aria-label="Move up in order"
-                                        >
-                                          <ChevronUp size={15} />
-                                        </button>
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            moveUserQueueItem(index, 'down');
-                                          }}
-                                          disabled={index === userQueue.length - 1}
-                                          className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                          title="Move down in order"
-                                          aria-label="Move down in order"
-                                        >
-                                          <ChevronDown size={15} />
-                                        </button>
-                                      </div>
+                              {/* Track details */}
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-[13.5px] font-semibold text-white truncate leading-snug">
+                                  {formatDisplayTitle(item.track.title)}
+                                </h4>
+                                <div className="mt-0.5 truncate">
+                                  <ArtistLinks
+                                    track={item.track}
+                                    maxArtists={2}
+                                    className="text-[12px] text-white/50 truncate font-normal"
+                                    onClick={() => setIsQueueOpen(false)}
+                                  />
+                                </div>
+                              </div>
+                            </div>
 
-                                      {/* Drag Handle */}
-                                      <div
-                                        {...provided.dragHandleProps}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="p-1 text-white/20 group-hover:text-white/60 cursor-grab active:cursor-grabbing rounded hover:bg-white/5"
-                                        title="Drag to reorder"
-                                      >
-                                        <GripVertical size={14} />
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
+                            {/* Right Side: Duration & Fast Move Controls & Delete & Drag Handle */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className={cn(
+                                "text-[12px] text-white/45 tabular-nums font-medium",
+                                isMobile ? "hidden" : "group-hover:hidden"
+                              )}>
+                                {formatTime(item.track.duration)}
+                              </span>
+
+                              {/* Action controls toolbar */}
+                              <div className={cn(
+                                "items-center gap-0.5",
+                                isMobile ? "flex" : "hidden group-hover:flex"
+                              )}>
+                                {/* Move to first / Play next */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveUserQueueToTop(index);
+                                  }}
+                                  disabled={index === 0}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-brand rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                  title="Move to first / Play next"
+                                  aria-label="Move to top"
+                                >
+                                  <ArrowUpToLine size={13} />
+                                </button>
+
+                                {/* Move Up 1 */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveUserQueueItem(index, 'up');
+                                  }}
+                                  disabled={index === 0}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                  title="Move up one position"
+                                  aria-label="Move up"
+                                >
+                                  <ChevronUp size={14} />
+                                </button>
+
+                                {/* Move Down 1 */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveUserQueueItem(index, 'down');
+                                  }}
+                                  disabled={index === userQueue.length - 1}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                  title="Move down one position"
+                                  aria-label="Move down"
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+
+                                {/* Move to last / Play at end */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveUserQueueToBottom(index);
+                                  }}
+                                  disabled={index === userQueue.length - 1}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-brand rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                  title="Move to last"
+                                  aria-label="Move to bottom"
+                                >
+                                  <ArrowDownToLine size={13} />
+                                </button>
+
+                                {/* Delete button: clear trash icon */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeFromUserQueue(item.queueId);
+                                  }}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-red-400 rounded hover:bg-red-500/10 transition-colors cursor-pointer"
+                                  title="Delete from queue"
+                                  aria-label="Delete from queue"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+
+                              {/* Drag Handle */}
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1 text-white/30 group-hover:text-white/70 cursor-grab active:cursor-grabbing rounded hover:bg-white/10 transition-colors"
+                                title="Drag to move anywhere"
+                              >
+                                <GripVertical size={14} />
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </Droppable>
-                    </DragDropContext>
+                        );
+                      })}
+
+                      {/* Drop zone to move to last position */}
+                      {draggedUserQueueIdx !== null && (
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            setDragOverUserQueueIdx(userQueue.length);
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverUserQueueIdx === userQueue.length) {
+                              setDragOverUserQueueIdx(null);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const src = draggedUserQueueIdx !== null ? draggedUserQueueIdx : parseInt(e.dataTransfer.getData("text/plain"), 10);
+                            if (!isNaN(src) && src !== userQueue.length - 1) {
+                              reorderUserQueue(src, userQueue.length - 1);
+                            }
+                            setDraggedUserQueueIdx(null);
+                            setDragOverUserQueueIdx(null);
+                          }}
+                          className={cn(
+                            "h-7 border border-dashed rounded-lg flex items-center justify-center text-[11px] font-medium transition-all my-1 select-none",
+                            dragOverUserQueueIdx === userQueue.length
+                              ? "border-brand bg-brand/10 text-brand"
+                              : "border-white/10 text-white/30"
+                          )}
+                        >
+                          Drop here to move to last position
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -534,95 +656,213 @@ export function QueuePanel() {
                     )
                   ) : (
                     <div className="space-y-0.5">
-                      {contextQueue.slice(0, 40).map((track, idx) => (
-                        <div
-                          key={`${track.id}-${idx}`}
-                          onClick={() => setTrack(track, [track, ...contextQueue.slice(idx + 1)], contextName)}
-                          className="group relative flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-white/[0.06] transition-colors cursor-pointer select-none border-b border-white/[0.02]"
-                        >
-                          <div className="flex items-center gap-3 min-w-0 pr-2 flex-1">
-                            {/* Artwork */}
-                            <div className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 shadow-md border border-white/5">
-                              <UniversalMediaCover track={track} className="w-full h-full object-cover" />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Play size={13} fill="white" className="text-white ml-0.5" />
+                      {contextQueue.slice(0, 40).map((track, idx) => {
+                        const isDragging = draggedContextQueueIdx === idx;
+                        const isOver = dragOverContextQueueIdx === idx && draggedContextQueueIdx !== idx;
+
+                        return (
+                          <div
+                            key={`${track.id}-${idx}`}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/plain", idx.toString());
+                              e.dataTransfer.effectAllowed = "move";
+                              setDraggedContextQueueIdx(idx);
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                              if (dragOverContextQueueIdx !== idx) {
+                                setDragOverContextQueueIdx(idx);
+                              }
+                            }}
+                            onDragLeave={() => {
+                              if (dragOverContextQueueIdx === idx) {
+                                setDragOverContextQueueIdx(null);
+                              }
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const src = draggedContextQueueIdx !== null ? draggedContextQueueIdx : parseInt(e.dataTransfer.getData("text/plain"), 10);
+                              if (!isNaN(src) && src !== idx) {
+                                reorderContextQueue(src, idx);
+                              }
+                              setDraggedContextQueueIdx(null);
+                              setDragOverContextQueueIdx(null);
+                            }}
+                            onDragEnd={() => {
+                              setDraggedContextQueueIdx(null);
+                              setDragOverContextQueueIdx(null);
+                            }}
+                            onClick={() => setTrack(track, [track, ...contextQueue.slice(idx + 1)], contextName)}
+                            className={cn(
+                              "group relative flex items-center justify-between px-2.5 py-2 rounded-xl transition-all cursor-pointer select-none border border-transparent",
+                              isDragging && "opacity-30 scale-[0.98] bg-white/[0.02] border-brand/40",
+                              isOver && "border-t-2 !border-t-brand bg-brand/10 shadow-lg",
+                              !isDragging && !isOver && "hover:bg-white/[0.06] border-b-white/[0.02]"
+                            )}
+                          >
+                            <div className="flex items-center gap-3 min-w-0 pr-1 flex-1">
+                              {/* Artwork */}
+                              <div className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 shadow-md border border-white/5">
+                                <UniversalMediaCover track={track} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Play size={13} fill="white" className="text-white ml-0.5" />
+                                </div>
+                              </div>
+
+                              {/* Track details */}
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-[13.5px] font-semibold text-white truncate leading-snug">
+                                  {formatDisplayTitle(track.title)}
+                                </h4>
+                                <div className="mt-0.5 truncate">
+                                  <ArtistLinks
+                                    track={track}
+                                    maxArtists={2}
+                                    className="text-[12px] text-white/50 truncate font-normal"
+                                    onClick={() => setIsQueueOpen(false)}
+                                  />
+                                </div>
                               </div>
                             </div>
 
-                            {/* Track details */}
-                            <div className="min-w-0 flex-1">
-                              <h4 className="text-[13.5px] font-semibold text-white truncate leading-snug">
-                                {formatDisplayTitle(track.title)}
-                              </h4>
-                              <div className="mt-0.5 truncate">
-                                <ArtistLinks
-                                  track={track}
-                                  maxArtists={2}
-                                  className="text-[12px] text-white/50 truncate font-normal"
-                                  onClick={() => setIsQueueOpen(false)}
-                                />
-                              </div>
-                            </div>
-                          </div>
+                            {/* Right Side: Duration & Fast Move & Delete Actions & Drag Handle */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className={cn(
+                                "text-[12px] text-white/45 tabular-nums font-medium",
+                                isMobile ? "hidden" : "group-hover:hidden"
+                              )}>
+                                {formatTime(track.duration)}
+                              </span>
 
-                          {/* Right Side: Duration & Move & Delete Actions */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className={cn(
-                              "text-[12px] text-white/45 tabular-nums font-medium",
-                              isMobile ? "hidden" : "group-hover:hidden"
-                            )}>
-                              {formatTime(track.duration)}
-                            </span>
-
-                            {/* Move Up / Move Down buttons */}
-                            <div className={cn(
-                              "items-center gap-0.5",
-                              isMobile ? "flex" : "hidden group-hover:flex"
-                            )}>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  moveContextQueueItem(idx, 'up');
-                                }}
-                                disabled={idx === 0}
-                                className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                title="Move up in order"
-                                aria-label="Move up in order"
-                              >
-                                <ChevronUp size={15} />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  moveContextQueueItem(idx, 'down');
-                                }}
-                                disabled={idx === contextQueue.length - 1}
-                                className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                title="Move down in order"
-                                aria-label="Move down in order"
-                              >
-                                <ChevronDown size={15} />
-                              </button>
-                            </div>
-
-                            {/* Delete button: Trash icon (replaces confusing three-dot button) */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeFromContextQueue(track.id);
-                              }}
-                              className={cn(
-                                "w-6 h-6 items-center justify-center text-white/40 hover:text-red-400 rounded-md hover:bg-red-500/10 transition-colors cursor-pointer",
+                              {/* Fast Movement Toolbar */}
+                              <div className={cn(
+                                "items-center gap-0.5",
                                 isMobile ? "flex" : "hidden group-hover:flex"
-                              )}
-                              title="Delete from queue"
-                              aria-label="Delete from queue"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                              )}>
+                                {/* Move to first / Play next */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveContextQueueToTop(idx);
+                                  }}
+                                  disabled={idx === 0}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-brand rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                  title="Move to first / Play next"
+                                  aria-label="Move to top"
+                                >
+                                  <ArrowUpToLine size={13} />
+                                </button>
+
+                                {/* Move Up 1 */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveContextQueueItem(idx, 'up');
+                                  }}
+                                  disabled={idx === 0}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                  title="Move up one position"
+                                  aria-label="Move up"
+                                >
+                                  <ChevronUp size={14} />
+                                </button>
+
+                                {/* Move Down 1 */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveContextQueueItem(idx, 'down');
+                                  }}
+                                  disabled={idx === contextQueue.length - 1}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                  title="Move down one position"
+                                  aria-label="Move down"
+                                >
+                                  <ChevronDown size={14} />
+                                </button>
+
+                                {/* Move to last */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveContextQueueToBottom(idx);
+                                  }}
+                                  disabled={idx === contextQueue.length - 1}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-brand rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                  title="Move to last"
+                                  aria-label="Move to bottom"
+                                >
+                                  <ArrowDownToLine size={13} />
+                                </button>
+
+                                {/* Delete button: Trash icon (replaces confusing three-dot button) */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeFromContextQueue(track.id);
+                                  }}
+                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-red-400 rounded-md hover:bg-red-500/10 transition-colors cursor-pointer"
+                                  title="Delete from queue"
+                                  aria-label="Delete from queue"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+
+                              {/* Drag Handle */}
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1 text-white/30 group-hover:text-white/70 cursor-grab active:cursor-grabbing rounded hover:bg-white/10 transition-colors"
+                                title="Drag to move anywhere"
+                              >
+                                <GripVertical size={14} />
+                              </div>
+                            </div>
                           </div>
+                        );
+                      })}
+
+                      {/* Drop zone to move context track to end */}
+                      {draggedContextQueueIdx !== null && (
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = "move";
+                            setDragOverContextQueueIdx(contextQueue.length);
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverContextQueueIdx === contextQueue.length) {
+                              setDragOverContextQueueIdx(null);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const src = draggedContextQueueIdx !== null ? draggedContextQueueIdx : parseInt(e.dataTransfer.getData("text/plain"), 10);
+                            if (!isNaN(src) && src !== contextQueue.length - 1) {
+                              reorderContextQueue(src, contextQueue.length - 1);
+                            }
+                            setDraggedContextQueueIdx(null);
+                            setDragOverContextQueueIdx(null);
+                          }}
+                          className={cn(
+                            "h-7 border border-dashed rounded-lg flex items-center justify-center text-[11px] font-medium transition-all my-1 select-none",
+                            dragOverContextQueueIdx === contextQueue.length
+                              ? "border-brand bg-brand/10 text-brand"
+                              : "border-white/10 text-white/30"
+                          )}
+                        >
+                          Drop here to move to last position
                         </div>
-                      ))}
+                      )}
 
                       {contextQueue.length > 40 && (
                         <p className="text-[11px] text-white/30 text-center py-3">

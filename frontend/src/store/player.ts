@@ -95,6 +95,11 @@ interface PlayerState {
   reorderContextQueue: (startIndex: number, endIndex: number) => void;
   moveUserQueueItem: (index: number, direction: "up" | "down") => void;
   moveContextQueueItem: (index: number, direction: "up" | "down") => void;
+  moveUserQueueToTop: (index: number) => void;
+  moveUserQueueToBottom: (index: number) => void;
+  moveContextQueueToTop: (index: number) => void;
+  moveContextQueueToBottom: (index: number) => void;
+  promoteContextTrackToNext: (trackId: string) => void;
   clearUserQueue: () => void;
   removeFromContextQueue: (trackId: string) => void;
 
@@ -410,6 +415,48 @@ export const usePlayerStore = create<PlayerState>()(
         const targetIndex = direction === "up" ? index - 1 : index + 1;
         if (targetIndex < 0 || targetIndex >= contextQueue.length) return;
         get().reorderContextQueue(index, targetIndex);
+      },
+
+      moveUserQueueToTop: (index) => {
+        const { userQueue } = get();
+        if (!userQueue || userQueue.length <= 1 || index === 0) return;
+        get().reorderUserQueue(index, 0);
+      },
+
+      moveUserQueueToBottom: (index) => {
+        const { userQueue } = get();
+        if (!userQueue || userQueue.length <= 1 || index === userQueue.length - 1) return;
+        get().reorderUserQueue(index, userQueue.length - 1);
+      },
+
+      moveContextQueueToTop: (index) => {
+        const { contextQueue } = get();
+        if (!contextQueue || contextQueue.length <= 1 || index === 0) return;
+        get().reorderContextQueue(index, 0);
+      },
+
+      moveContextQueueToBottom: (index) => {
+        const { contextQueue } = get();
+        if (!contextQueue || contextQueue.length <= 1 || index === contextQueue.length - 1) return;
+        get().reorderContextQueue(index, contextQueue.length - 1);
+      },
+
+      promoteContextTrackToNext: (trackId) => {
+        const { contextQueue, userQueue, currentTrack } = get();
+        const target = (contextQueue || []).find(t => t.id === trackId);
+        if (!target) return;
+        const remainingContext = (contextQueue || []).filter(t => t.id !== trackId);
+        const newItem: UserQueueItem = {
+          queueId: `${target.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          track: target
+        };
+        const updatedUserQueue = [newItem, ...(userQueue || [])];
+        set({
+          userQueue: updatedUserQueue,
+          contextQueue: remainingContext,
+          queue: computeTotalQueue(currentTrack, updatedUserQueue, remainingContext),
+          originalQueue: computeTotalQueue(currentTrack, updatedUserQueue, remainingContext),
+        });
       },
 
       clearUserQueue: () => {
