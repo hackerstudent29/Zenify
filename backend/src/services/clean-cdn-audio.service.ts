@@ -439,39 +439,103 @@ export class CleanCdnAudioService {
     }
 
     /**
-     * Resolves official lyrics for a track by searching JioSaavn.
+     * Resolves official lyrics for a track by searching JioSaavn with language and album fidelity.
      */
-    public static async resolveLyrics(title: string, artist?: string): Promise<string | null> {
+    public static async resolveLyrics(title: string, artist?: string, language?: string, album?: string): Promise<string | null> {
         try {
             const cleanT = (title || '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
             const cleanA = (artist || '').split(/[,&/|]/)[0].trim();
-            const q = cleanA ? `${cleanA} ${cleanT}` : cleanT;
-            if (!q) return null;
+            const cleanAlbum = (album || '').replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
+            if (!cleanT) return null;
 
-            const searchRes = await axios.get('https://www.jiosaavn.com/api.php', {
-                params: {
-                    __call: 'search.getResults',
-                    q,
-                    p: 1,
-                    n: 3,
-                    _format: 'json',
-                    _marker: '0',
-                    api_version: '4',
-                    ctx: 'web6dot0'
-                },
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
-                timeout: 3500
-            }).catch(() => null);
+            const queries: string[] = [];
+            if (language && language !== 'other') {
+                if (cleanAlbum && cleanAlbum.toLowerCase() !== cleanT.toLowerCase()) {
+                    queries.push(`${cleanT} ${cleanAlbum} ${language}`);
+                }
+                if (cleanA) {
+                    queries.push(`${cleanA} ${cleanT} ${language}`);
+                }
+                queries.push(`${cleanT} ${language}`);
+            }
+            if (cleanAlbum && cleanAlbum.toLowerCase() !== cleanT.toLowerCase()) {
+                queries.push(`${cleanT} ${cleanAlbum}`);
+            }
+            if (cleanA) {
+                queries.push(`${cleanA} ${cleanT}`);
+            } else {
+                queries.push(cleanT);
+            }
 
-            const results = searchRes?.data?.results || [];
-            for (const r of results) {
-                if (r?.has_lyrics === 'true' || r?.has_lyrics === true || r?.id) {
-                    const lyrics = await this.getLyrics(r.id);
-                    if (lyrics && lyrics.length > 20) {
-                        return lyrics;
+            const { LyricsEnhancementService } = await import('./lyrics-enhancement.service.js');
+            const targetLang = language?.toLowerCase().trim();
+
+            for (const q of queries) {
+                const searchRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'search.getResults',
+                        q,
+                        p: 1,
+                        n: 10,
+                        _format: 'json',
+                        _marker: '0',
+                        api_version: '4',
+                        ctx: 'web6dot0'
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
+                    timeout: 4000
+                }).catch(() => null);
+
+                const rawResults = searchRes?.data?.results || [];
+                if (!Array.isArray(rawResults) || rawResults.length === 0) continue;
+
+                // Sort results: matching target language and album gets highest priority
+                const sorted = [...rawResults].sort((a, b) => {
+                    let scoreA = 0;
+                    let scoreB = 0;
+                    const langA = (a.language || '').toLowerCase();
+                    const langB = (b.language || '').toLowerCase();
+
+                    if (targetLang) {
+                        if (langA === targetLang) scoreA += 50;
+                        if (langB === targetLang) scoreB += 50;
+                        if (langA && langA !== targetLang) scoreA -= 50;
+                        if (langB && langB !== targetLang) scoreB -= 50;
+                    }
+
+                    if (cleanAlbum) {
+                        const albA = (a.album || '').toLowerCase();
+                        const albB = (b.album || '').toLowerCase();
+                        if (albA.includes(cleanAlbum.toLowerCase())) scoreA += 20;
+                        if (albB.includes(cleanAlbum.toLowerCase())) scoreB += 20;
+                    }
+
+                    if (a.has_lyrics === 'true' || a.has_lyrics === true) scoreA += 10;
+                    if (b.has_lyrics === 'true' || b.has_lyrics === true) scoreB += 10;
+
+                    return scoreB - scoreA;
+                });
+
+                for (const r of sorted) {
+                    if (r?.id) {
+                        // If target language is specified, skip results with explicit conflicting language tag
+                        const candLang = (r.language || '').toLowerCase();
+                        if (targetLang && candLang && candLang !== targetLang && candLang !== 'unknown') {
+                            continue;
+                        }
+
+                        const lyrics = await this.getLyrics(r.id);
+                        if (lyrics && lyrics.length > 20) {
+                            if (targetLang && LyricsEnhancementService.isLyricsLanguageMismatch(lyrics, targetLang)) {
+                                console.log(`[JioSaavnLyrics] Discarding result ${r.id} (${candLang}) due to language mismatch with "${targetLang}".`);
+                                continue;
+                            }
+                            return lyrics;
+                        }
                     }
                 }
             }
+
             return null;
         } catch {
             return null;

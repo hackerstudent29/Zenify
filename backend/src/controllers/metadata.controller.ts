@@ -247,44 +247,97 @@ export class MetadataController {
         return reply.send(metadata);
     }
     
-    syncLyrics = async (req: FastifyRequest<{ Body: { trackId?: string; title: string; artist: string; audioUrl?: string; rawLyrics?: string; duration?: number; force?: boolean } }>, reply: FastifyReply) => {
-        const { trackId, title, artist, audioUrl, rawLyrics, duration, force } = req.body;
+    syncLyrics = async (req: FastifyRequest<{ Body: { trackId?: string; title: string; artist: string; audioUrl?: string; rawLyrics?: string; duration?: number; force?: boolean; language?: string; album?: string } }>, reply: FastifyReply) => {
+        const { trackId, title, artist, audioUrl, rawLyrics, duration, force, language: bodyLang, album: bodyAlbum } = req.body;
         if (!title || !artist) {
             return reply.status(400).send({ message: 'Title and Artist are required' });
         }
         
         try {
             const prisma = (await import('../utils/prisma.js')).prisma;
+            const { LyricsSyncService } = await import('../services/lyrics-sync.service.js');
+            const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
             
             // 1. Check DB first for pre-existing synced lyrics and track metadata
             const track = trackId 
                 ? await prisma.track.findUnique({
                     where: { id: trackId },
-                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true, sync_source: true, romanizedLyrics: true, romanizedSyncedLyrics: true, romanizedLang: true }
+                    select: { 
+                        id: true, 
+                        title: true, 
+                        audioUrl: true, 
+                        duration: true, 
+                        lyrics: true, 
+                        synced_lyrics: true, 
+                        sync_source: true, 
+                        romanizedLyrics: true, 
+                        romanizedSyncedLyrics: true, 
+                        romanizedLang: true,
+                        language: true,
+                        languageCode: true,
+                        album: { select: { id: true, title: true } }
+                    }
                   })
                 : await prisma.track.findFirst({
                     where: { 
                         title: { equals: title, mode: 'insensitive' }, 
                         artist: { name: { equals: artist, mode: 'insensitive' } } 
                     },
-                    select: { id: true, title: true, audioUrl: true, duration: true, lyrics: true, synced_lyrics: true, sync_source: true, romanizedLyrics: true, romanizedSyncedLyrics: true, romanizedLang: true }
+                    select: { 
+                        id: true, 
+                        title: true, 
+                        audioUrl: true, 
+                        duration: true, 
+                        lyrics: true, 
+                        synced_lyrics: true, 
+                        sync_source: true, 
+                        romanizedLyrics: true, 
+                        romanizedSyncedLyrics: true, 
+                        romanizedLang: true,
+                        language: true,
+                        languageCode: true,
+                        album: { select: { id: true, title: true } }
+                    }
                   });
 
-            const targetLang = (track as any)?.language || (
-                (title || track?.title || '').toLowerCase().includes('tamil') ? 'tamil' :
-                (title || track?.title || '').toLowerCase().includes('telugu') ? 'telugu' :
-                (title || track?.title || '').toLowerCase().includes('hindi') ? 'hindi' :
-                (title || track?.title || '').toLowerCase().includes('malayalam') ? 'malayalam' :
-                (title || track?.title || '').toLowerCase().includes('kannada') ? 'kannada' : undefined
-            );
+            const detectedHeuristicLang = await LyricsSyncService.detectSongLanguage(title, artist, track?.lyrics || undefined);
+            const targetLang = (
+                (bodyLang && bodyLang !== 'english' && bodyLang !== 'other') ? bodyLang :
+                (track?.language && track.language !== 'english' && track.language !== 'other') ? track.language :
+                (track as any)?.languageCode ||
+                ((title || track?.title || '').toLowerCase().includes('tamil') ? 'tamil' :
+                 (title || track?.title || '').toLowerCase().includes('telugu') ? 'telugu' :
+                 (title || track?.title || '').toLowerCase().includes('hindi') ? 'hindi' :
+                 (title || track?.title || '').toLowerCase().includes('malayalam') ? 'malayalam' :
+                 (title || track?.title || '').toLowerCase().includes('kannada') ? 'kannada' : undefined) ||
+                (detectedHeuristicLang !== 'english' && detectedHeuristicLang !== 'other' ? detectedHeuristicLang : undefined)
+            )?.toLowerCase().trim();
 
-            const { LyricsEnhancementService } = await import('../services/lyrics-enhancement.service.js');
+            const targetAlbum = bodyAlbum || track?.album?.title || undefined;
+
             const hasLangMismatch = Boolean(
                 targetLang && track && (
                     (track.lyrics && LyricsEnhancementService.isLyricsLanguageMismatch(track.lyrics, targetLang)) ||
                     (Array.isArray(track.synced_lyrics) && LyricsEnhancementService.isLyricsLanguageMismatch(track.synced_lyrics.map((t: any) => t.text).join(' '), targetLang))
                 )
             );
+
+            if (hasLangMismatch && track) {
+                console.log(`[LyricsSync] Purging mismatched cached lyrics for "${title}" (targetLang: ${targetLang})`);
+                await prisma.track.update({
+                    where: { id: track.id },
+                    data: {
+                        synced_lyrics: null as any,
+                        raw_lrc: null,
+                        lyrics: null,
+                        sync_source: null,
+                        romanizedLyrics: null,
+                        romanizedSyncedLyrics: null as any
+                    }
+                }).catch(() => {});
+                track.synced_lyrics = null as any;
+                track.lyrics = null;
+            }
 
             if (!force && !hasLangMismatch && track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
                 console.log(`[LyricsSync] Found pre-existing synced lyrics in DB for track: ${track.id}`);
@@ -316,12 +369,22 @@ export class MetadataController {
             const effectiveLyrics = hasLangMismatch ? undefined : (rawLyrics || track?.lyrics || undefined);
             const numDuration = duration || track?.duration || undefined;
 
-            const syncedData = await LyricsSyncService.getSyncedLyrics(title, artist, effectiveAudioUrl, effectiveLyrics, numDuration, undefined, track?.id);
+            const syncedData = await LyricsSyncService.getSyncedLyrics(
+                title, 
+                artist, 
+                effectiveAudioUrl, 
+                effectiveLyrics, 
+                numDuration, 
+                undefined, 
+                track?.id,
+                targetLang,
+                targetAlbum
+            );
             
             if (syncedData && syncedData.syncedTokens && syncedData.syncedTokens.length > 0) {
                 // Background: Persist lyrics to DB if track exists
                 if (track) {
-                    const songLang = await LyricsSyncService.detectSongLanguage(title, artist, effectiveLyrics || syncedData.plainLyrics || undefined);
+                    const songLang = targetLang || await LyricsSyncService.detectSongLanguage(title, artist, effectiveLyrics || syncedData.plainLyrics || undefined);
                     const updateData: any = {
                         language: songLang,
                         synced_lyrics: syncedData.syncedTokens,

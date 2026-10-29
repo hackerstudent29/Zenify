@@ -718,32 +718,40 @@ export class LyricsSyncService {
         plainLyrics?: string, 
         duration?: number,
         youtubeUrl?: string,
-        trackId?: string
+        trackId?: string,
+        requestedLang?: string,
+        albumName?: string
     ): Promise<LyricsPipelineResult | null> {
-        const cacheKey = (trackId || `${artist}:${title}:${duration || 0}`).toLowerCase().trim();
+        const songLang = (requestedLang && requestedLang !== 'other' && requestedLang !== 'universal')
+            ? requestedLang.toLowerCase().trim()
+            : await this.detectSongLanguage(title, artist, plainLyrics);
+
+        const cacheKey = (trackId ? `${trackId}:${songLang}` : `${artist}:${title}:${songLang}:${duration || 0}`).toLowerCase().trim();
         const cached = this.stagePipelineCache.get(cacheKey);
         if (cached && cached.expiresAt > Date.now()) {
-            console.log(`[LyricsPipeline] Cache hit for "${title}" (${cached.result.source}, granularity: ${cached.result.granularity})`);
+            console.log(`[LyricsPipeline] Cache hit for "${title}" (${cached.result.source}, granularity: ${cached.result.granularity}, lang: ${songLang})`);
             return cached.result;
         }
 
-        const songLang = await this.detectSongLanguage(title, artist, plainLyrics);
-        console.log(`[LyricsPipeline] Starting 4-stage pipeline for "${title}" by "${artist}" (lang: ${songLang})`);
+        console.log(`[LyricsPipeline] Starting 4-stage pipeline for "${title}" by "${artist}" (lang: ${songLang}, album: ${albumName || 'none'})`);
 
         // Check if pre-formatted LRC exists in input plainLyrics
         if (plainLyrics && /\[\d{2}:\d{2}/.test(plainLyrics)) {
-            const parsed = this.parseLRC(plainLyrics);
-            if (parsed && parsed.length > 0) {
-                const hasWords = parsed.some(t => t.words && t.words.length > 0);
-                const res: LyricsPipelineResult = {
-                    syncedTokens: parsed,
-                    rawLrc: plainLyrics,
-                    plainLyrics,
-                    source: 'LOCAL_LRC',
-                    granularity: hasWords ? 'word' : 'line'
-                };
-                this.stagePipelineCache.set(cacheKey, { result: res, expiresAt: Date.now() + 1000 * 60 * 60 * 24 });
-                return res;
+            const { LyricsEnhancementService } = await import('./lyrics-enhancement.service.js');
+            if (!LyricsEnhancementService.isLyricsLanguageMismatch(plainLyrics, songLang)) {
+                const parsed = this.parseLRC(plainLyrics);
+                if (parsed && parsed.length > 0) {
+                    const hasWords = parsed.some(t => t.words && t.words.length > 0);
+                    const res: LyricsPipelineResult = {
+                        syncedTokens: parsed,
+                        rawLrc: plainLyrics,
+                        plainLyrics,
+                        source: 'LOCAL_LRC',
+                        granularity: hasWords ? 'word' : 'line'
+                    };
+                    this.stagePipelineCache.set(cacheKey, { result: res, expiresAt: Date.now() + 1000 * 60 * 60 * 24 });
+                    return res;
+                }
             }
         }
 
@@ -755,8 +763,8 @@ export class LyricsSyncService {
             const { LyricsEnhancementService } = await import('./lyrics-enhancement.service.js');
             
             // 1.1 lrc.red (Apple Music syllable/word-by-word sync)
-            const lrcRedRes = await LyricsEnhancementService.fetchLrcRed(title, artist);
-            if (lrcRedRes && lrcRedRes.lyrics) {
+            const lrcRedRes = await LyricsEnhancementService.fetchLrcRed(title, artist, undefined, songLang);
+            if (lrcRedRes && lrcRedRes.lyrics && !LyricsEnhancementService.isLyricsLanguageMismatch(lrcRedRes.lyrics, songLang)) {
                 const parsed = this.parseLRC(lrcRedRes.lyrics);
                 const hasWords = parsed.some(t => t.words && t.words.length > 0);
                 if (hasWords) {
@@ -772,8 +780,8 @@ export class LyricsSyncService {
             }
 
             // 1.2 RapidAPI Spotify / Apple word-level sync
-            const spotifyRes = await LyricsEnhancementService.fetchSpotifyRapidApiLyrics(title, artist);
-            if (spotifyRes && spotifyRes.lyrics) {
+            const spotifyRes = await LyricsEnhancementService.fetchSpotifyRapidApiLyrics(title, artist, songLang, albumName);
+            if (spotifyRes && spotifyRes.lyrics && !LyricsEnhancementService.isLyricsLanguageMismatch(spotifyRes.lyrics, songLang)) {
                 const parsed = this.parseLRC(spotifyRes.lyrics);
                 const hasWords = parsed.some(t => t.words && t.words.length > 0);
                 if (hasWords) {
@@ -805,7 +813,7 @@ export class LyricsSyncService {
 
             // 2.1 LRCLIB (Line-by-line synced)
             const lrclibRes = await LyricsEnhancementService.fetchLRCLib(title, artist, duration, songLang);
-            if (lrclibRes && lrclibRes.isSynced && lrclibRes.lyrics) {
+            if (lrclibRes && lrclibRes.isSynced && lrclibRes.lyrics && !LyricsEnhancementService.isLyricsLanguageMismatch(lrclibRes.lyrics, songLang)) {
                 const parsed = this.parseLRC(lrclibRes.lyrics);
                 if (parsed.length > 0) {
                     console.log(`[LyricsPipeline] Stage 2 SUCCESS via LRCLIB (line-by-line synced)!`);
@@ -820,8 +828,8 @@ export class LyricsSyncService {
             }
 
             // 2.2 Musixmatch / Spotify RapidAPI (Line-by-line fallback)
-            const spotifyLineRes = await LyricsEnhancementService.fetchSpotifyRapidApiLyrics(title, artist);
-            if (spotifyLineRes && spotifyLineRes.isSynced && spotifyLineRes.lyrics) {
+            const spotifyLineRes = await LyricsEnhancementService.fetchSpotifyRapidApiLyrics(title, artist, songLang, albumName);
+            if (spotifyLineRes && spotifyLineRes.isSynced && spotifyLineRes.lyrics && !LyricsEnhancementService.isLyricsLanguageMismatch(spotifyLineRes.lyrics, songLang)) {
                 const parsed = this.parseLRC(spotifyLineRes.lyrics);
                 if (parsed.length > 0) {
                     console.log(`[LyricsPipeline] Stage 2 SUCCESS via Spotify RapidAPI (line-by-line synced)!`);
@@ -875,16 +883,21 @@ export class LyricsSyncService {
 
         // =========================================================================
         // STAGE 3: Plain lyrics from JioSaavn + Deepgram fuzzy-match alignment
-        // Validate alignment score >= 0.6; if < 0.6, discard!
+        // Validate alignment score >= 0.6; if < 0.6, return clean authentic lines!
         // =========================================================================
-        console.log(`[LyricsPipeline] === STAGE 3: JioSaavn Plain Lyrics + Deepgram Alignment ===`);
+        console.log(`[LyricsPipeline] === STAGE 3: JioSaavn Plain Lyrics + Alignment ===`);
         const stage3Result = await this.withStageTimeout(async () => {
             const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
             const { DeepgramLyricsService } = await import('./deepgram-lyrics.service.js');
+            const { LyricsEnhancementService } = await import('./lyrics-enhancement.service.js');
 
             let saavnLyrics = plainLyrics;
             if (!saavnLyrics) {
-                saavnLyrics = (await CleanCdnAudioService.resolveLyrics(title, artist)) || undefined;
+                saavnLyrics = (await CleanCdnAudioService.resolveLyrics(title, artist, songLang, albumName)) || undefined;
+            }
+            if (saavnLyrics && LyricsEnhancementService.isLyricsLanguageMismatch(saavnLyrics, songLang)) {
+                console.log(`[LyricsPipeline] Stage 3: Discarded plain lyrics - language mismatch with "${songLang}".`);
+                saavnLyrics = undefined;
             }
 
             if (!saavnLyrics || saavnLyrics.trim().length < 20) {
@@ -893,31 +906,46 @@ export class LyricsSyncService {
             }
 
             console.log(`[LyricsPipeline] Stage 3: Found authentic JioSaavn lyrics (${saavnLyrics.length} chars). Aligning with Deepgram...`);
-            if (!resolvedAudioUrl || !DeepgramLyricsService.isAvailable()) {
-                console.log(`[LyricsPipeline] Stage 3: Deepgram not available or audio URL missing.`);
-                return null;
+            if (resolvedAudioUrl && DeepgramLyricsService.isAvailable()) {
+                const dgAligned = await DeepgramLyricsService.alignPlainLyricsWithAudio(resolvedAudioUrl, saavnLyrics, {
+                    duration,
+                    songLang,
+                    tryVocals: false,
+                    minMatchScore: 0.6
+                });
+
+                if (dgAligned && dgAligned.syncedTokens && dgAligned.syncedTokens.length > 0) {
+                    console.log(`[LyricsPipeline] Stage 3 SUCCESS: JioSaavn lyrics validated and aligned with Deepgram word timestamps!`);
+                    return {
+                        syncedTokens: dgAligned.syncedTokens,
+                        rawLrc: dgAligned.rawLrc,
+                        plainLyrics: saavnLyrics,
+                        source: 'jiosaavn_deepgram_aligned',
+                        granularity: 'word' as const
+                    };
+                }
             }
 
-            const dgAligned = await DeepgramLyricsService.alignPlainLyricsWithAudio(resolvedAudioUrl, saavnLyrics, {
-                duration,
-                songLang,
-                tryVocals: false,
-                minMatchScore: 0.6
-            });
-
-            if (dgAligned && dgAligned.syncedTokens && dgAligned.syncedTokens.length > 0) {
-                console.log(`[LyricsPipeline] Stage 3 SUCCESS: JioSaavn lyrics validated and aligned with Deepgram word timestamps!`);
-                return {
-                    syncedTokens: dgAligned.syncedTokens,
-                    rawLrc: dgAligned.rawLrc,
-                    plainLyrics: saavnLyrics,
-                    source: 'jiosaavn_deepgram_aligned',
-                    granularity: 'word' as const
-                };
-            }
-
-            console.log(`[LyricsPipeline] Stage 3: Deepgram alignment discarded (match score < 0.6 or transcription empty).`);
-            return null;
+            // Fallback: Return authentic JioSaavn plain lyrics formatted as synced line tokens
+            console.log(`[LyricsPipeline] Stage 3 Fallback: Returning authentic JioSaavn plain lyrics (${saavnLyrics.length} chars)`);
+            const lines = saavnLyrics.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            const step = duration && duration > 10 ? (duration - 5) / Math.max(lines.length, 1) : 4;
+            const tokens: SyncedLyricLine[] = lines.map((text, idx) => ({
+                time: parseFloat((idx * step).toFixed(2)),
+                endTime: parseFloat(((idx + 1) * step).toFixed(2)),
+                text
+            }));
+            return {
+                syncedTokens: tokens,
+                rawLrc: tokens.map(t => {
+                    const m = Math.floor(t.time / 60).toString().padStart(2, '0');
+                    const s = (t.time % 60).toFixed(2).padStart(5, '0');
+                    return `[${m}:${s}] ${t.text}`;
+                }).join('\n'),
+                plainLyrics: saavnLyrics,
+                source: 'jiosaavn_official',
+                granularity: 'line' as const
+            };
         }, 'Stage 3 (JioSaavn + Deepgram)', 8000);
 
         if (stage3Result) {

@@ -103,14 +103,18 @@ export class LyricsEnhancementService {
     /**
      * Fetch from lrc.red (Apple Music Word-by-word / Syllable synced lyrics)
      */
-    static async fetchLrcRed(title: string, artist: string, isrc?: string): Promise<{ lyrics: string; isSynced: boolean; quality: number; source: string } | null> {
+    static async fetchLrcRed(title: string, artist: string, isrc?: string, targetLanguage?: string): Promise<{ lyrics: string; isSynced: boolean; quality: number; source: string } | null> {
         try {
             console.log(`[lrc.red] Checking for word-by-word lyrics: "${title}" by ${artist}`);
             if (isrc) {
                 const res = await axios.get(`https://lrc.red/s/${isrc}.lrc`, { timeout: 3000 });
                 if (res.status === 200 && res.data && typeof res.data === 'string' && res.data.length > 50) {
-                    console.log(`[lrc.red] Found word-by-word lyrics directly for ISRC: ${isrc}`);
-                    return { lyrics: res.data, isSynced: true, quality: 6, source: 'lrc.red (Word-by-word)' };
+                    if (targetLanguage && this.isLyricsLanguageMismatch(res.data, targetLanguage)) {
+                        console.log(`[lrc.red] Rejecting ISRC lyrics due to language mismatch with "${targetLanguage}".`);
+                    } else {
+                        console.log(`[lrc.red] Found word-by-word lyrics directly for ISRC: ${isrc}`);
+                        return { lyrics: res.data, isSynced: true, quality: 6, source: 'lrc.red (Word-by-word)' };
+                    }
                 }
             }
 
@@ -128,6 +132,10 @@ export class LyricsEnhancementService {
                             try {
                                 const testRes = await axios.get(`https://lrc.red/s/${candIsrc}.lrc`, { timeout: 2500 });
                                 if (testRes.status === 200 && testRes.data && typeof testRes.data === 'string' && testRes.data.length > 50) {
+                                    if (targetLanguage && this.isLyricsLanguageMismatch(testRes.data, targetLanguage)) {
+                                        console.log(`[lrc.red] Skipping candidate ISRC ${candIsrc} - language mismatch for "${targetLanguage}".`);
+                                        continue;
+                                    }
                                     console.log(`[lrc.red] Found word-by-word lyrics via MusicBrainz ISRC: ${candIsrc}`);
                                     return { lyrics: testRes.data, isSynced: true, quality: 6, source: 'lrc.red (Word-by-word)' };
                                 }
@@ -142,38 +150,132 @@ export class LyricsEnhancementService {
 
     /**
      * Checks if a candidate lyrics snippet conflicts with the expected song language.
-     * Prevents cross-language dubs (e.g. Telugu lyrics for Tamil songs or vice versa).
+     * Prevents cross-language dubs (e.g. Telugu lyrics for Tamil songs or vice versa),
+     * supporting both native scripts and Romanized (Latin transliterated) text.
      */
     static isLyricsLanguageMismatch(lyricsText: string, expectedLang?: string): boolean {
         if (!lyricsText || !expectedLang) return false;
         const lang = expectedLang.toLowerCase().trim();
-        const hasTelugu = /[\u0c00-\u0c7f]/.test(lyricsText);
-        const hasTamil = /[\u0b80-\u0bff]/.test(lyricsText);
-        const hasHindi = /[\u0900-\u097f]/.test(lyricsText);
-        const hasMalayalam = /[\u0d00-\u0d7f]/.test(lyricsText);
-        const hasKannada = /[\u0c80-\u0cff]/.test(lyricsText);
+        if (lang === 'instrumental' || lang === 'other' || lang === 'universal') return false;
 
-        if (lang === 'tamil' && (hasTelugu || hasHindi || hasMalayalam || hasKannada)) return true;
-        if (lang === 'telugu' && (hasTamil || hasHindi || hasMalayalam || hasKannada)) return true;
-        if (lang === 'hindi' && (hasTamil || hasTelugu || hasMalayalam || hasKannada)) return true;
-        if (lang === 'malayalam' && (hasTamil || hasTelugu || hasHindi || hasKannada)) return true;
-        if (lang === 'kannada' && (hasTamil || hasTelugu || hasHindi || hasMalayalam)) return true;
+        // 1. Native script detection (Unicode ranges)
+        const teluguChars = (lyricsText.match(/[\u0c00-\u0c7f]/g) || []).length;
+        const tamilChars = (lyricsText.match(/[\u0b80-\u0bff]/g) || []).length;
+        const hindiChars = (lyricsText.match(/[\u0900-\u097f]/g) || []).length;
+        const malayalamChars = (lyricsText.match(/[\u0d00-\u0d7f]/g) || []).length;
+        const kannadaChars = (lyricsText.match(/[\u0c80-\u0cff]/g) || []).length;
+
+        if (lang === 'tamil') {
+            if (teluguChars >= 3 && teluguChars > tamilChars) return true;
+            if (hindiChars >= 5 && hindiChars > tamilChars) return true;
+            if (malayalamChars >= 5 && malayalamChars > tamilChars) return true;
+            if (kannadaChars >= 5 && kannadaChars > tamilChars) return true;
+        } else if (lang === 'telugu') {
+            if (tamilChars >= 3 && tamilChars > teluguChars) return true;
+            if (hindiChars >= 5 && hindiChars > teluguChars) return true;
+            if (malayalamChars >= 5 && malayalamChars > teluguChars) return true;
+            if (kannadaChars >= 5 && kannadaChars > teluguChars) return true;
+        } else if (lang === 'hindi') {
+            if (tamilChars >= 3 || teluguChars >= 3 || malayalamChars >= 3 || kannadaChars >= 3) return true;
+        } else if (lang === 'malayalam') {
+            if (tamilChars >= 5 && tamilChars > malayalamChars) return true;
+            if (teluguChars >= 3) return true;
+        } else if (lang === 'kannada') {
+            if (tamilChars >= 3 || teluguChars >= 5 || hindiChars >= 5) return true;
+        }
+
+        // 2. Romanized / Latin vocabulary detection
+        // Many Indian songs are cataloged in Latin transliteration (e.g. "Kaavaalaa", "Nuvvu kaavali").
+        const lower = lyricsText.toLowerCase();
+
+        // Telugu distinctive Romanized words
+        const teluguTokens = [
+            'nuvvu', 'nuvve', 'nenu', 'meeru', 'chala', 'ledu', 'ledhu', 'undhi', 'undi',
+            'chesi', 'cheppina', 'unnanu', 'kavali', 'raavali', 'raavayya', 'raavaiyya', 'chudu',
+            'ammai', 'abbayi', 'vachave', 'vachava', 'ledhaiyya', 'chebutha', 'manasulo',
+            'cheyyi', 'cheppave', 'ekkada', 'endhuku', 'chusthe', 'chusa', 'kalisi', 'pillada',
+            'ippudu', 'anukunna', 'telusa', 'ippude', 'naatho', 'neetho', 'nannu', 'ninnu', 'gunde'
+        ];
+
+        // Tamil distinctive Romanized words
+        const tamilTokens = [
+            'machan', 'machatha', 'achatha', 'naan', 'nee', 'enakku', 'unakku', 'enna',
+            'edhu', 'epdi', 'solla', 'sonna', 'kooda', 'mattum', 'thaan', 'dhaan', 'uyire',
+            'podhum', 'vandhaaye', 'paathu', 'theriyum', 'illai', 'illa', 'illama', 'azhaga',
+            'azhage', 'pesum', 'kadhal', 'manasu', 'nillu', 'vaada', 'vaadi', 'aachu', 'pochu',
+            'vandha', 'serndha', 'paarvai', 'siricha', 'nenjukulle', 'nenjil', 'kannukulla',
+            'kanna', 'kannu', 'vazha', 'therinja', 'irukku', 'irukken', 'vandhuten'
+        ];
+
+        // Hindi distinctive Romanized words
+        const hindiTokens = [
+            'mera', 'meri', 'mere', 'tere', 'teri', 'tera', 'hum', 'tum', 'aap', 'kya',
+            'kyun', 'nahi', 'nahin', 'hoga', 'hogi', 'karna', 'karo', 'dekha', 'zindagi',
+            'ishq', 'pyar', 'baat', 'kuch', 'saath', 'raha', 'rahi', 'karte', 'chahiye',
+            'chal', 'bolo', 'aankhon', 'muskuraye', 'dilbar', 'duniya'
+        ];
+
+        const countTokens = (tokens: string[]) => {
+            let count = 0;
+            for (const token of tokens) {
+                const regex = new RegExp(`\\b${token}\\b`, 'gi');
+                const m = lower.match(regex);
+                if (m) count += m.length;
+            }
+            return count;
+        };
+
+        const teluguCount = countTokens(teluguTokens);
+        const tamilCount = countTokens(tamilTokens);
+        const hindiCount = countTokens(hindiTokens);
+
+        if (lang === 'tamil') {
+            if (teluguCount >= 3 && teluguCount > tamilCount * 1.5) {
+                console.log(`[LanguageMismatch] Detected Telugu lyrics for expected Tamil song (Telugu tokens: ${teluguCount}, Tamil: ${tamilCount})`);
+                return true;
+            }
+            if (hindiCount >= 4 && hindiCount > tamilCount * 1.5) {
+                console.log(`[LanguageMismatch] Detected Hindi lyrics for expected Tamil song (Hindi tokens: ${hindiCount}, Tamil: ${tamilCount})`);
+                return true;
+            }
+        } else if (lang === 'telugu') {
+            if (tamilCount >= 3 && tamilCount > teluguCount * 1.5) {
+                console.log(`[LanguageMismatch] Detected Tamil lyrics for expected Telugu song (Tamil tokens: ${tamilCount}, Telugu: ${teluguCount})`);
+                return true;
+            }
+            if (hindiCount >= 4 && hindiCount > teluguCount * 1.5) {
+                console.log(`[LanguageMismatch] Detected Hindi lyrics for expected Telugu song (Hindi tokens: ${hindiCount}, Telugu: ${teluguCount})`);
+                return true;
+            }
+        } else if (lang === 'hindi') {
+            if (tamilCount >= 3 && tamilCount > hindiCount) return true;
+            if (teluguCount >= 3 && teluguCount > hindiCount) return true;
+        }
+
         return false;
     }
 
     /**
      * Fetch authentic lyrics from JioSaavn Official Engine
      */
-    static async fetchJioSaavnLyrics(title: string, artist: string, songId?: string): Promise<{ lyrics: string; isSynced: boolean; quality: number } | null> {
+    static async fetchJioSaavnLyrics(title: string, artist: string, songId?: string, targetLanguage?: string, albumName?: string): Promise<{ lyrics: string; isSynced: boolean; quality: number } | null> {
         try {
             const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
             let lyricsText: string | null = null;
             if (songId) {
                 const cleanId = songId.replace(/^saavn-/, '');
                 lyricsText = await CleanCdnAudioService.getLyrics(cleanId);
+                if (lyricsText && targetLanguage && this.isLyricsLanguageMismatch(lyricsText, targetLanguage)) {
+                    console.log(`[JioSaavnLyrics] Lyrics for songId ${songId} had language mismatch with "${targetLanguage}". Resolving via search...`);
+                    lyricsText = null;
+                }
             }
             if (!lyricsText) {
-                lyricsText = await CleanCdnAudioService.resolveLyrics(title, artist);
+                lyricsText = await CleanCdnAudioService.resolveLyrics(title, artist, targetLanguage, albumName);
+            }
+            if (lyricsText && targetLanguage && this.isLyricsLanguageMismatch(lyricsText, targetLanguage)) {
+                console.log(`[JioSaavnLyrics] Discarding lyrics for "${title}" - language mismatch with "${targetLanguage}".`);
+                return null;
             }
             if (lyricsText && this.isValidSongLyrics(lyricsText)) {
                 console.log(`[JioSaavnLyrics] Found authentic lyrics for "${title}" (${lyricsText.length} chars)`);
@@ -615,38 +717,69 @@ export class LyricsEnhancementService {
     /**
      * Fetch lyrics from Spotify23 RapidAPI
      */
-    static async fetchSpotifyRapidApiLyrics(title: string, artist: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
+    static async fetchSpotifyRapidApiLyrics(title: string, artist: string, targetLanguage?: string, albumName?: string): Promise<{ lyrics: string; quality: number; isSynced: boolean } | null> {
         const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
         try {
-            console.log(`[SpotifyRapidAPI] Searching for "${title}" by ${artist}`);
+            console.log(`[SpotifyRapidAPI] Searching for "${title}" by ${artist} (lang: ${targetLanguage || 'auto'}, album: ${albumName || 'none'})`);
             
-            // 1. Search for track to get Spotify ID
+            // 1. Search for track to get Spotify ID (search with clean terms and evaluate top candidates)
+            const cleanT = title.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').trim();
+            const searchTerms = [cleanT, albumName, artist].filter(Boolean).join(' ');
             const searchRes = await axios.get('https://spotify23.p.rapidapi.com/search/', {
-                params: { q: `${title} ${artist}`, type: 'tracks', limit: 1 },
+                params: { q: searchTerms, type: 'tracks', limit: 5 },
                 headers: {
                     'x-rapidapi-key': rapidApiKey,
                     'x-rapidapi-host': 'spotify23.p.rapidapi.com'
                 },
                 timeout: 5000
-            });
+            }).catch(() => null);
             
-            const trackItem = searchRes.data?.tracks?.items?.[0]?.data;
-            const trackName = trackItem?.name || '';
+            const rawItems = searchRes?.data?.tracks?.items || [];
             const { LyricsSyncService } = await import('./lyrics-sync.service.js');
-            if (!LyricsSyncService.isTitleMatch(title, trackName)) {
-                console.log(`[SpotifyRapidAPI] Track name "${trackName}" does not match "${title}".`);
-                return null;
+            let chosenTrackId: string | null = null;
+
+            for (const item of rawItems) {
+                const cand = item?.data;
+                const trackName = cand?.name || '';
+                if (!cand?.id || !LyricsSyncService.isTitleMatch(title, trackName)) continue;
+
+                // Check for explicit conflicting language markers in Spotify title/album
+                const lowerName = trackName.toLowerCase();
+                const candAlbum = (cand?.albumOfTrack?.name || '').toLowerCase();
+                if (targetLanguage) {
+                    const normLang = targetLanguage.toLowerCase().trim();
+                    if (normLang === 'tamil' && (lowerName.includes('telugu') || lowerName.includes('hindi') || candAlbum.includes('telugu') || candAlbum.includes('hindi'))) {
+                        continue;
+                    }
+                    if (normLang === 'telugu' && (lowerName.includes('tamil') || lowerName.includes('hindi') || candAlbum.includes('tamil') || candAlbum.includes('hindi'))) {
+                        continue;
+                    }
+                    if (normLang === 'hindi' && (lowerName.includes('tamil') || lowerName.includes('telugu') || candAlbum.includes('tamil') || candAlbum.includes('telugu'))) {
+                        continue;
+                    }
+                }
+
+                chosenTrackId = cand.id;
+                break;
             }
-            const trackId = trackItem?.id;
-            if (!trackId) {
-                console.log('[SpotifyRapidAPI] No track found.');
+
+            // Fallback to first track if title matches
+            if (!chosenTrackId && rawItems.length > 0) {
+                const first = rawItems[0]?.data;
+                if (first?.id && LyricsSyncService.isTitleMatch(title, first?.name || '')) {
+                    chosenTrackId = first.id;
+                }
+            }
+
+            if (!chosenTrackId) {
+                console.log('[SpotifyRapidAPI] No matching track found.');
                 return null;
             }
 
             // 2. Try Spotify81 lyrics endpoint first (verified active)
             try {
                 const s81Res = await axios.get('https://spotify81.p.rapidapi.com/track_lyrics', {
-                    params: { id: trackId },
+                    params: { id: chosenTrackId },
                     headers: {
                         'x-rapidapi-key': rapidApiKey,
                         'x-rapidapi-host': 'spotify81.p.rapidapi.com'
@@ -672,7 +805,11 @@ export class LyricsEnhancementService {
                         }
                     });
                     if (lrcContent.trim()) {
-                        return { lyrics: lrcContent.trim(), isSynced: hasSync, quality: 5 };
+                        if (targetLanguage && this.isLyricsLanguageMismatch(lrcContent, targetLanguage)) {
+                            console.log(`[SpotifyRapidAPI] Discarding spotify81 lyrics due to language mismatch with "${targetLanguage}".`);
+                        } else {
+                            return { lyrics: lrcContent.trim(), isSynced: hasSync, quality: 5 };
+                        }
                     }
                 }
             } catch (err: any) {
@@ -681,7 +818,7 @@ export class LyricsEnhancementService {
 
             // 3. Fallback: Spotify23 lyrics endpoint
             const lyricsRes = await axios.get('https://spotify23.p.rapidapi.com/track_lyrics/', {
-                params: { id: trackId },
+                params: { id: chosenTrackId },
                 headers: {
                     'x-rapidapi-key': rapidApiKey,
                     'x-rapidapi-host': 'spotify23.p.rapidapi.com'
@@ -710,6 +847,11 @@ export class LyricsEnhancementService {
                     }
                 });
                 
+                if (targetLanguage && this.isLyricsLanguageMismatch(lrcContent, targetLanguage)) {
+                    console.log(`[SpotifyRapidAPI] Discarding spotify23 lyrics due to language mismatch with "${targetLanguage}".`);
+                    return null;
+                }
+
                 return {
                     lyrics: lrcContent.trim(),
                     isSynced: hasSync,

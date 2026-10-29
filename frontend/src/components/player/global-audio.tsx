@@ -142,6 +142,18 @@ export function GlobalAudio() {
           syncTrackDuration(audio.duration);
         }
 
+        // Automatic end-of-track fallback: If currentTime reaches within 400ms of duration,
+        // ensure it cleanly advances to next track even if browser misses the 'ended' event
+        if (audio.duration >= 3 && audio.currentTime >= audio.duration - 0.4) {
+          if (!isSwitchingTrackRef.current) {
+            console.log("[GlobalAudio] End boundary reached via timeupdate. Advancing to next track.");
+            isSwitchingTrackRef.current = true;
+            setTimeout(() => { isSwitchingTrackRef.current = false; }, 800);
+            playNext(false);
+            return;
+          }
+        }
+
         // Smooth Swaps (Crossfade) Handler
         const crossfadeActive = useAuthStore.getState().user?.preferences?.crossfade;
         if (crossfadeActive && audio.duration > 8) {
@@ -188,11 +200,15 @@ export function GlobalAudio() {
 
                 // 2. Pre-fetch and cache lyrics for the next track
                 import("@/lib/api").then(({ default: api }) => {
+                  const albumName = (typeof nextTrack?.album === 'string' ? nextTrack?.album : nextTrack?.album?.title) || (nextTrack as any)?.albumTitle;
+                  const trackLang = (nextTrack as any)?.language || (nextTrack as any)?.vibeProfile?.language;
                   api.post('metadata/sync-lyrics', {
                     trackId: nextTrack.id,
                     title: nextTrack.title,
                     artist: nextTrack.artist?.name || nextTrack.artistName || '',
-                    duration: nextTrack.duration
+                    duration: nextTrack.duration,
+                    language: trackLang,
+                    album: albumName
                   }).catch(() => {});
                 });
               }
@@ -251,7 +267,9 @@ export function GlobalAudio() {
     };
 
     const handleEnded = () => {
-      if (isSwitchingTrackRef.current) return;
+      console.log("[GlobalAudio] Track ended event fired. Advancing to next track.");
+      isSwitchingTrackRef.current = false;
+      isSourceChanging.current = false;
       playNext(false);
     };
     const handleLoadedMetadata = () => {
@@ -274,9 +292,22 @@ export function GlobalAudio() {
     };
 
     const handleAudioError = (e: any) => {
-      if (isSwitchingTrackRef.current || isSourceChanging.current) return;
+      if (isSourceChanging.current) return;
       const error = audio.error;
       if (!error || error.code === 0) return;
+
+      // Stream EOF boundary safeguard:
+      // If the error occurred when the song is within 3s of the end or past duration,
+      // it is a stream EOF (server socket close), NOT an unplayable track! Advance to next song!
+      if (audio.duration > 5 && (audio.duration - audio.currentTime <= 3 || audio.currentTime >= audio.duration - 3)) {
+        console.log("[GlobalAudio] Stream EOF boundary reached on audio error. Advancing to next track.");
+        isSwitchingTrackRef.current = false;
+        isSourceChanging.current = false;
+        playNext(false);
+        return;
+      }
+
+      if (isSwitchingTrackRef.current) return;
 
       const isObsoleteSrc = typeof window !== 'undefined' && (
         !audio.src ||
@@ -649,10 +680,8 @@ export function GlobalAudio() {
         }
 
         setTimeout(() => {
-          if (playbackSessionIdRef.current === sessionId) {
-            isSwitchingTrackRef.current = false;
-            isSourceChanging.current = false;
-          }
+          isSwitchingTrackRef.current = false;
+          isSourceChanging.current = false;
         }, 300);
       } 
       // ── CASE 2: SAME TRACK (PLAY / PAUSE TOGGLE OR RESUME) ──────────────

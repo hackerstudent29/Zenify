@@ -47,7 +47,9 @@ export async function metadataRoutes(server: FastifyInstance) {
                 audioUrl: z.string().optional(),
                 rawLyrics: z.string().optional(),
                 duration: z.number().optional(),
-                force: z.boolean().optional()
+                force: z.boolean().optional(),
+                language: z.string().optional(),
+                album: z.string().optional()
             })
         },
         handler: controller.syncLyrics.bind(controller)
