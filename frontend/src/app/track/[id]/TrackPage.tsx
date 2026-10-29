@@ -1,143 +1,227 @@
-import { SEO } from "@/components/shared/SEO";
 "use client";
 
-import { useParams, useRouter, usePathname } from "next/navigation";
+/**
+ * Track page — Apple Music (web) layout.
+ *
+ *  ┌──────────────────────────────────────────────┐
+ *  │  [ artwork ]   Title                         │
+ *  │                Artist (accent colour)        │
+ *  │                Genre · Year                  │
+ *  │                [ ▶ Play ] [ ⤮ Shuffle ] ♡ ⋯  │
+ *  ├──────────────────────────────────────────────┤
+ *  │  ▢  Title / Artist       Album   3:42    ⋯   │
+ *  ├──────────────────────────────────────────────┤
+ *  │  October 22, 2026                            │
+ *  │  1 song, 3 minutes                           │
+ *  │  © 2026 Artist                               │
+ *  └──────────────────────────────────────────────┘
+ *
+ * "Stable": no scroll-linked hero, no sticky sheet that slides over content,
+ * no 3D tilt, no springy artwork. Everything sits in normal flow, so nothing
+ * jumps while the page loads or while background enrichment refetches.
+ */
+
+import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { Play, Pause, Heart, Disc3, Check, X, Shuffle, ScrollText, MoreHorizontal } from "lucide-react";
+
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import {
-  Play, Pause, Heart, Download, Plus, Share2,
-  User, Disc3, Check, X, Shuffle, MoreHorizontal, ScrollText, Mic, RefreshCw, ListPlus
-} from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { useAuthStore } from "@/store/authStore";
-import { useRefetchAudio } from "@/hooks/useRefetchAudio";
-import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
-import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
-import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget, decodeHtmlEntities } from "@/lib/utils";
-import Link from "next/link";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
-  DropdownMenuPortal,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { getMediaUrl, cn, formatDisplayTitle, decodeHtmlEntities } from "@/lib/utils";
+
+/* ───────────────────────── small pieces ───────────────────────── */
+
+/** Apple-style rounded-rectangle button (Play / Shuffle) */
+function PillButton({
+  children,
+  onClick,
+  variant = "glass",
+  active,
+  label,
+}: {
+  children: React.ReactNode;
+  onClick: (e: React.MouseEvent) => void;
+  variant?: "solid" | "glass";
+  active?: boolean;
+  label?: string;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      whileTap={{ scale: 0.96 }}
+      transition={{ duration: 0.1 }}
+      className={cn(
+        "flex h-10 min-w-[116px] cursor-pointer items-center justify-center gap-2 rounded-[10px] px-5 text-[15px] font-semibold tracking-[-0.01em] outline-none transition-colors",
+        variant === "solid"
+          ? "bg-brand text-white hover:brightness-110"
+          : cn(
+              "backdrop-blur-xl hover:bg-white/[0.2]",
+              active ? "bg-white/[0.24] text-brand" : "bg-white/[0.14] text-brand"
+            )
+      )}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+/** Round 40px glass icon button (Like / More) */
+const IconCircle = React.forwardRef<
+  HTMLButtonElement,
+  {
+    children: React.ReactNode;
+    title: string;
+    active?: boolean;
+    onClick?: (e: React.MouseEvent) => void;
+  } & Omit<React.ComponentPropsWithoutRef<"button">, "onClick" | "title" | "children">
+>(function IconCircle({ children, title, active, onClick, className, ...rest }, ref) {
+  return (
+    <motion.button
+      ref={ref as any}
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      whileTap={{ scale: 0.92 }}
+      transition={{ duration: 0.1 }}
+      className={cn(
+        "flex size-10 cursor-pointer items-center justify-center rounded-full bg-white/[0.14] outline-none backdrop-blur-xl transition-colors hover:bg-white/[0.2]",
+        active ? "text-brand" : "text-white/90",
+        className
+      )}
+      {...(rest as any)}
+    >
+      {children}
+    </motion.button>
+  );
+});
+
+function Equalizer({ playing }: { playing: boolean }) {
+  const reduce = useReducedMotion();
+  const frames = [
+    [0.35, 1, 0.45, 0.85, 0.35],
+    [0.9, 0.4, 1, 0.5, 0.9],
+    [0.5, 0.85, 0.35, 1, 0.5],
+    [0.7, 0.35, 0.9, 0.4, 0.7],
+  ];
+  return (
+    <span className="flex h-3.5 items-end gap-[2px]" aria-hidden="true">
+      {frames.map((f, i) => (
+        <motion.span
+          key={i}
+          className="w-[2.5px] origin-bottom rounded-full bg-brand"
+          style={{ height: "100%" }}
+          animate={playing && !reduce ? { scaleY: f } : { scaleY: 0.3 }}
+          transition={
+            playing && !reduce
+              ? { duration: 0.8 + i * 0.12, repeat: Infinity, ease: "easeInOut" }
+              : { duration: 0.2 }
+          }
+        />
+      ))}
+    </span>
+  );
+}
+
+/* ───────────────────────── page ───────────────────────── */
 
 export default function TrackPage() {
   const params = useParams();
   const router = useRouter();
   const rawId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
-  const id = rawId ? rawId.replace(/^(itunes-)+/, 'itunes-') : rawId;
+  const id = rawId ? rawId.replace(/^(itunes-)+/, "itunes-") : rawId;
 
-  const currentTrack = usePlayerStore(s => s.currentTrack);
-  const isPlaying = usePlayerStore(s => s.isPlaying);
-  const setTrack = usePlayerStore(s => s.setTrack);
-  const togglePlay = usePlayerStore(s => s.togglePlay);
-  const isShuffled = usePlayerStore(s => s.isShuffled);
-  const toggleShuffle = usePlayerStore(s => s.toggleShuffle);
-  const queue = usePlayerStore(s => s.queue);
-  const addToQueue = usePlayerStore(s => s.addToQueue);
-  const addToUserQueue = usePlayerStore(s => s.addToUserQueue);
+  const currentTrack = usePlayerStore((s) => s.currentTrack);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const setTrack = usePlayerStore((s) => s.setTrack);
+  const togglePlay = usePlayerStore((s) => s.togglePlay);
+  const isShuffled = usePlayerStore((s) => s.isShuffled);
+  const toggleShuffle = usePlayerStore((s) => s.toggleShuffle);
+  const queue = usePlayerStore((s) => s.queue);
+  const updateCurrentTrackData = usePlayerStore((s) => s.updateCurrentTrackData);
 
-  const { openDownloadModal, setPlayerMinimized, isLyricsOpen, setIsLyricsOpen } = useUIStore();
-  const { user } = useAuthStore();
-  const openAddToPlaylistModal = useUIStore(s => s.openAddToPlaylistModal);
-  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
-  const { refetchTrackLyrics } = useRefetchLyrics();
+  const { setPlayerMinimized, isLyricsOpen, setIsLyricsOpen } = useUIStore();
+  const setPageCoverUrl = useUIStore((s) => s.setPageCoverUrl);
   const queryClient = useQueryClient();
 
-  const isGlassmorphism = user?.preferences?.sidebarStyle === "glassmorphism";
-  const pathname = usePathname();
-  const isFullScreenPlayerOpen = useUIStore(s => s.isFullScreenPlayerOpen);
-  const isTrackPageActive = pathname === `/track/${id}` && !isFullScreenPlayerOpen && !isLyricsOpen;
- 
- const [previousTrackId, setPreviousTrackId] = useState<string | null>(currentTrack?.id || null);
+  const [previousTrackId, setPreviousTrackId] = useState<string | null>(currentTrack?.id || null);
 
+  /* Follow the player to the new track page (persistent tracks only) */
   useEffect(() => {
-    // Auto-navigate to the new track if it's a persistent track (not yt- temporary)
     if (currentTrack && previousTrackId && currentTrack.id !== previousTrackId) {
-      if (!currentTrack.id.startsWith("yt-")) {
-        router.replace(`/track/${currentTrack.id}`);
-      }
+      if (!currentTrack.id.startsWith("yt-")) router.replace(`/track/${currentTrack.id}`);
     }
-    if (currentTrack) {
-      setPreviousTrackId(currentTrack.id);
-    }
+    if (currentTrack) setPreviousTrackId(currentTrack.id);
   }, [currentTrack, previousTrackId, router]);
 
   /* ─── Queries ─── */
- const { data: dbTrack, isLoading } = useQuery({
-   queryKey: ["track-detail", id],
-   queryFn: async () => (await api.get(`/tracks/${id}`)).data,
-   enabled: !!id,
-   refetchInterval: (query: any) => {
-     const d = query?.state?.data;
-     if (!d) return false;
-     // If palette, lyrics, or synced lyrics are still enriching in the background, poll gently
-     if (!d.palette || !d.lyrics || !d.synced_lyrics) return 2000;
-     return false;
-   },
- });
+  const { data: dbTrack, isLoading } = useQuery({
+    queryKey: ["track-detail", id],
+    queryFn: async () => (await api.get(`/tracks/${id}`)).data,
+    enabled: !!id,
+    refetchInterval: (query: any) => {
+      const d = query?.state?.data;
+      if (!d) return false;
+      if (!d.palette || !d.lyrics || !d.synced_lyrics) return 2000;
+      return false;
+    },
+  });
 
-  // Fallback to active player track or queue track if DB record was cleared/purged
-  const currentOrQueueTrack = (currentTrack && (currentTrack.id === id || (currentTrack as any).youtubeId === id))
-    ? currentTrack
-    : queue.find(t => t.id === id || (t as any).youtubeId === id);
+  const currentOrQueueTrack =
+    currentTrack && (currentTrack.id === id || (currentTrack as any).youtubeId === id)
+      ? currentTrack
+      : queue.find((t) => t.id === id || (t as any).youtubeId === id);
 
   const track = dbTrack || currentOrQueueTrack;
-  const trackCoverUrl = track ? (getMediaUrl(track.coverUrl) || "/logo.png") : null;
+  const trackCoverUrl = track ? getMediaUrl(track.coverUrl) || "/logo.png" : null;
 
-  // Dynamic Apple Music Artwork Tint: compute dominant RGB (must be declared before early returns)
+  /* Artwork tint */
   useEffect(() => {
     if (!trackCoverUrl) return;
     extractArtworkAverageColor(trackCoverUrl).then((rgb) => {
-      if (rgb) {
-        applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
-      }
+      if (rgb) applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
     });
-    return () => {
-      resetArtworkTheme();
-    };
+    return () => resetArtworkTheme();
   }, [trackCoverUrl]);
 
-  // Background auto-healing: if song is playing but not yet persistent in DB, instantly import it
+  /* Instant import when the song is playing but not yet in the DB */
   useEffect(() => {
     if (!dbTrack && currentOrQueueTrack && !isLoading) {
-      console.log(`[TrackPage] Song "${currentOrQueueTrack.title}" not in DB. Triggering instant background import...`);
-      api.post('/tracks/import-instant', {
-        title: currentOrQueueTrack.title,
-        artistName: currentOrQueueTrack.artist?.name || (currentOrQueueTrack as any).artistName || 'Unknown Artist',
-        albumTitle: currentOrQueueTrack.album?.title || (currentOrQueueTrack as any).albumTitle,
-        coverUrl: currentOrQueueTrack.coverUrl,
-        audioUrl: currentOrQueueTrack.audioUrl,
-        duration: currentOrQueueTrack.duration,
-        lyrics: currentOrQueueTrack.lyrics,
-        id: currentOrQueueTrack.id,
-        sourceId: (currentOrQueueTrack as any).youtubeId
-      }).then(res => {
-        if (res.data) {
-          queryClient.setQueryData(["track-detail", id], res.data);
-          queryClient.invalidateQueries({ queryKey: ["track-detail", id] });
-        }
-      }).catch(err => {
-        console.warn('[TrackPage] Instant auto-import warning:', err.message);
-      });
+      api
+        .post("/tracks/import-instant", {
+          title: currentOrQueueTrack.title,
+          artistName:
+            currentOrQueueTrack.artist?.name || (currentOrQueueTrack as any).artistName || "Unknown Artist",
+          albumTitle: currentOrQueueTrack.album?.title || (currentOrQueueTrack as any).albumTitle,
+          coverUrl: currentOrQueueTrack.coverUrl,
+          audioUrl: currentOrQueueTrack.audioUrl,
+          duration: currentOrQueueTrack.duration,
+          lyrics: currentOrQueueTrack.lyrics,
+          id: currentOrQueueTrack.id,
+          sourceId: (currentOrQueueTrack as any).youtubeId,
+        })
+        .then((res) => {
+          if (res.data) {
+            queryClient.setQueryData(["track-detail", id], res.data);
+            queryClient.invalidateQueries({ queryKey: ["track-detail", id] });
+          }
+        })
+        .catch((err) => console.warn("[TrackPage] Instant auto-import warning:", err.message));
     }
   }, [dbTrack, currentOrQueueTrack, isLoading, id, queryClient]);
 
- const updateCurrentTrackData = usePlayerStore(s => s.updateCurrentTrackData);
-  // Real-time sync: push incoming background metadata, palette & lyrics straight into active player
+  /* Push enriched metadata into the active player */
   useEffect(() => {
     if (dbTrack && currentTrack?.id === dbTrack.id) {
       const needsLyrics = !currentTrack.lyrics && dbTrack.lyrics;
@@ -148,223 +232,187 @@ export default function TrackPage() {
           lyrics: dbTrack.lyrics || currentTrack.lyrics,
           synced_lyrics: dbTrack.synced_lyrics || currentTrack.synced_lyrics,
           romanizedLyrics: dbTrack.romanizedLyrics || currentTrack.romanizedLyrics,
-          palette: dbTrack.palette || currentTrack.palette
+          palette: dbTrack.palette || currentTrack.palette,
         });
       }
     }
   }, [dbTrack?.id, dbTrack?.lyrics, dbTrack?.palette, dbTrack?.synced_lyrics, currentTrack?.id, updateCurrentTrackData]);
 
- // Listen for instant background worker updates
- useEffect(() => {
-   const handleTrackUpdated = (e: any) => {
-     if (e?.detail?.id === id) {
-       queryClient.invalidateQueries({ queryKey: ["track-detail", id] });
-     }
-   };
-   window.addEventListener("zenify:track-updated", handleTrackUpdated);
-   return () => window.removeEventListener("zenify:track-updated", handleTrackUpdated);
- }, [id, queryClient]);
+  /* Background worker updates */
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e?.detail?.id === id) queryClient.invalidateQueries({ queryKey: ["track-detail", id] });
+    };
+    window.addEventListener("zenify:track-updated", handler);
+    return () => window.removeEventListener("zenify:track-updated", handler);
+  }, [id, queryClient]);
 
- const setPageCoverUrl = useUIStore(s => s.setPageCoverUrl);
- useEffect(() => {
-   if (track?.coverUrl) {
-     setPageCoverUrl(track.coverUrl);
-   }
- }, [track?.coverUrl, setPageCoverUrl]);
+  useEffect(() => {
+    if (track?.coverUrl) setPageCoverUrl(track.coverUrl);
+  }, [track?.coverUrl, setPageCoverUrl]);
+  useEffect(() => () => setPageCoverUrl(null), [setPageCoverUrl]);
 
- useEffect(() => {
-   return () => {
-     setPageCoverUrl(null);
-   };
- }, [setPageCoverUrl]);
+  /* ─── Toast ─── */
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    useUIStore.getState().showToast(msg, type);
+    setTimeout(() => setToast(null), 2500);
+  };
 
- const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
- const showToast = (msg: string, type: "success" | "error" = "success") => {
- setToast({ msg, type });
- useUIStore.getState().showToast(msg, type);
- setTimeout(() => setToast(null), 2500);
- };
+  /* ─── Likes ─── */
+  const { data: likedTrackIds } = useQuery({
+    queryKey: ["liked-track-ids"],
+    queryFn: async () => {
+      const res = await api.get("/tracks/liked");
+      const arr = Array.isArray(res.data) ? res.data : res.data?.items || [];
+      return arr.map((t: any) => t.id);
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+  const isLiked = likedTrackIds?.includes(id);
 
- const fmtTotalTime = (secs: number) => {
- const m = Math.floor(secs / 60);
- return `${m} minute${m !== 1 ? "s" : ""}`;
- };
- const fmtReleaseDate = (d: string) => {
- try { return new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" }); }
- catch { return ""; }
- };
+  const toggleLikeMutation = useMutation({
+    mutationFn: () => api.post(`/tracks/${id}/like`),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
+      const prev = queryClient.getQueryData<string[]>(["liked-track-ids"]);
+      const was = prev?.includes(id);
+      queryClient.setQueryData(
+        ["liked-track-ids"],
+        prev ? (was ? prev.filter((t) => t !== id) : [...prev, id]) : [id]
+      );
+      showToast(was ? "Removed from Liked Songs" : "Added to Liked Songs");
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev !== undefined) queryClient.setQueryData(["liked-track-ids"], ctx.prev);
+      showToast("Failed to update liked state", "error");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
+      queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
+    },
+  });
 
- const { data: playlists } = useQuery({
- queryKey: ["my-playlists"],
- queryFn: async () => {
-  try {
-    const res = await api.get("/playlists/my");
-    const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
-    return arr as { id: string; name: string }[];
-  }
- catch { return []; }
- },
- });
+  /* ─── Playback ─── */
+  const isCurrentTrack = currentTrack?.id === id;
+  const isCurrentTrackPlaying = isCurrentTrack && isPlaying;
 
- const { data: likedTrackIds } = useQuery({
- queryKey: ["liked-track-ids"],
- queryFn: async () => {
-   const res = await api.get("/tracks/liked");
-   const arr = Array.isArray(res.data) ? res.data : (res.data?.items || []);
-   return arr.map((t: any) => t.id);
-  },
- staleTime: 1000 * 60 * 5,
- });
+  const handlePlayTrack = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!track) return;
+    if (isCurrentTrack) {
+      togglePlay();
+    } else {
+      const inQueue = queue.some((t) => t.id === track.id);
+      setTrack(track, inQueue ? queue : [...queue, track]);
+      setPlayerMinimized(false);
+    }
+  };
 
- /* ─── Mutations ─── */
- const addToPlaylistMutation = useMutation({
- mutationFn: (playlistId: string) =>
- api.post(`/playlists/${playlistId}/tracks`, { trackId: id }),
- onSuccess: () => showToast("Added to playlist!"),
- onError: (err: any) => showToast(err.response?.data?.message || "Failed", "error"),
- });
+  const handleShuffle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleShuffle();
+    if (!isCurrentTrack && track) {
+      setTrack(track, [track]);
+      if (!isPlaying) togglePlay();
+      setPlayerMinimized(false);
+    }
+  };
 
- const isLiked = likedTrackIds?.includes(id);
- const toggleLikeMutation = useMutation({
- mutationFn: () => api.post(`/tracks/${id}/like`),
- onMutate: async () => {
- await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
- const previousLikedIds = queryClient.getQueryData<string[]>(["liked-track-ids"]);
- const currentlyLiked = previousLikedIds?.includes(id);
- const newLikedIds = previousLikedIds ? (
- currentlyLiked
- ? previousLikedIds.filter(tid => tid !== id)
- : [...previousLikedIds, id]
- ) : [id];
- queryClient.setQueryData(["liked-track-ids"], newLikedIds);
- showToast(currentlyLiked ? "Removed from Liked Songs" : "Added to Liked Songs", "success");
- return { previousLikedIds };
- },
- onError: (_err, _vars, context) => {
- if (context?.previousLikedIds !== undefined) {
- queryClient.setQueryData(["liked-track-ids"], context.previousLikedIds);
- }
- showToast("Failed to update liked state", "error");
- },
- onSettled: () => {
- queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
- queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
- },
- });
+  const handleLyricsToggle = () => setIsLyricsOpen(!isLyricsOpen);
 
- const handleGoToArtist = () => {
- const target = getArtistTarget(track);
- if (target) {
- router.push(target);
- } else {
- showToast("Artist information not available", "error");
- }
- };
+  /* ─── Loading / not found ─── */
+  if (isLoading && !track)
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <ZenLoading size="md" />
+      </div>
+    );
 
- const handleShare = async () => {
- if (!track) return;
- const url = `${window.location.origin}/track/${id}`;
- if (navigator.share) {
- try { await navigator.share({ title: track.title, url }); }
- catch (e) { if ((e as Error).name !== "AbortError") showToast("Error sharing", "error"); }
- } else {
- try { await navigator.clipboard.writeText(url); showToast("Link copied!"); }
- catch { showToast("Failed to copy", "error"); }
- }
- };
+  if (!track)
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <div className="flex size-20 items-center justify-center rounded-[18px] bg-white/[0.06]">
+          <Disc3 size={36} className="text-white/25" strokeWidth={1.2} />
+        </div>
+        <p className="text-[15px] font-medium text-white/50">Song not found</p>
+        <button
+          onClick={() => router.back()}
+          className="cursor-pointer rounded-[10px] bg-white/[0.14] px-5 py-2 text-[14px] font-semibold text-brand hover:bg-white/[0.2]"
+        >
+          Go Back
+        </button>
+      </div>
+    );
 
- const isCurrentTrack = currentTrack?.id === id;
- const isCurrentTrackPlaying = isCurrentTrack && isPlaying;
+  /* ─── Derived display data ─── */
+  const coverUrl = trackCoverUrl || getMediaUrl(track.coverUrl) || "/logo.png";
+  const totalMins = Math.floor(track.duration / 60);
+  const totalSecs = track.duration % 60;
+  const durationStr = `${totalMins}:${String(totalSecs).padStart(2, "0")}`;
+  const formattedTitle = formatDisplayTitle(track.title) || "";
 
- /** Play/pause — does NOT bubble from dropdown items */
- const handlePlayTrack = (e?: React.MouseEvent) => {
- e?.stopPropagation();
- if (!track) return;
- if (isCurrentTrack) { togglePlay(); }
- else {
- // Fix: Don't wipe out the queue when playing a single track
- const existingIndex = queue.findIndex(t => t.id === track.id);
- if (existingIndex !== -1) {
- // If it's already in the queue, just set it and preserve the queue
- setTrack(track, queue);
- } else {
- // If it's not in the queue, we can just append it and play it
- // Actually, if we just want to play it immediately and keep the queue:
- const newQueue = [...queue, track];
- setTrack(track, newQueue);
- }
- setPlayerMinimized(false);
- }
- };
-
- /* ─── Loading / not-found ─── */
- if (isLoading && !track) return (
- <div className="flex items-center justify-center min-h-[60vh]">
- <ZenLoading size="md" />
- </div>
- );
-
- if (!track) return (
- <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
- <Disc3 size={48} className="text-white/15" strokeWidth={1} />
- <p className="text-sm text-white/30">Song not found</p>
- <button onClick={() => router.back()}
- className="text-xs text-brand border border-brand/20 px-4 py-2 rounded-full hover:bg-brand/10 transition-all">
- Go Back
- </button>
- </div>
- );
-
- const coverUrl = trackCoverUrl || getMediaUrl(track.coverUrl) || "/logo.png";
- const totalMins = Math.floor(track.duration / 60);
- const totalSecs = track.duration % 60;
- const durationStr = `${totalMins}:${String(totalSecs).padStart(2, "0")}`;
-
-  // Extract movie or album title from title brackets like (From "3 (Tamil)") or (From Jailer)
-  const extractMovieFromTitle = (titleStr: string): string | null => {
-    if (!titleStr) return null;
-    const match = decodeHtmlEntities(titleStr).match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i);
-    return match ? match[1].trim() : null;
+  const extractMovieFromTitle = (s: string): string | null => {
+    if (!s) return null;
+    const m = decodeHtmlEntities(s).match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i);
+    return m ? m[1].trim() : null;
   };
 
   const embeddedMovie = extractMovieFromTitle(track.title);
-  const rawAlbumTitle = decodeHtmlEntities((track.album?.title || (track as any).albumTitle || (track as any).collectionName || '').trim());
+  const rawAlbumTitle = decodeHtmlEntities(
+    (track.album?.title || (track as any).albumTitle || (track as any).collectionName || "").trim()
+  );
   const isSameAsSong = rawAlbumTitle.toLowerCase() === track.title.trim().toLowerCase();
-
   const albumDisplay = embeddedMovie
     ? embeddedMovie
-    : (!isSameAsSong && rawAlbumTitle && rawAlbumTitle.toLowerCase() !== 'unknown')
-      ? rawAlbumTitle
-      : 'Single';
+    : !isSameAsSong && rawAlbumTitle && rawAlbumTitle.toLowerCase() !== "unknown"
+    ? rawAlbumTitle
+    : "Single";
 
   const rawAlbumId = track.album?.id || track.albumId || (track as any).collectionId;
-  const isExternalAlbum = rawAlbumId && (
-    String(rawAlbumId).startsWith('saavn-album-') || 
-    String(rawAlbumId).startsWith('itunes-album-') || 
-    String(rawAlbumId).startsWith('yt-album-')
-  );
-
-  // If track is from a movie (e.g. Jailer 2), route directly to the movie album so all tracks load via JioSaavn
-  // Otherwise if it has an external album ID use it, or route by album title
+  const isExternalAlbum =
+    rawAlbumId &&
+    ["saavn-album-", "itunes-album-", "yt-album-"].some((p) => String(rawAlbumId).startsWith(p));
   const albumTarget = embeddedMovie
     ? embeddedMovie
     : isExternalAlbum
-      ? rawAlbumId
-      : (albumDisplay && albumDisplay !== 'Single')
-        ? albumDisplay
-        : rawAlbumId;
-
+    ? rawAlbumId
+    : albumDisplay && albumDisplay !== "Single"
+    ? albumDisplay
+    : rawAlbumId;
   const albumHref = albumTarget ? `/album/${encodeURIComponent(albumTarget)}` : undefined;
+
   const rawLabel = (track as any).label || (track as any).publisher || (track.album as any)?.label;
-  const labelDisplay = (!rawLabel || rawLabel.trim().toLowerCase() === "unknown" || rawLabel.trim().toLowerCase() === "null")
-    ? "Zenify"
-    : rawLabel;
+  const labelDisplay =
+    !rawLabel || ["unknown", "null"].includes(rawLabel.trim().toLowerCase()) ? "Zenify" : rawLabel;
+
+  const dateSrc = track.releaseDate || track.createdAt;
+  const releaseDate = (() => {
+    try {
+      return new Date(dateSrc).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+    } catch {
+      return "";
+    }
+  })();
+  const year = (() => {
+    const y = new Date(dateSrc).getFullYear();
+    return Number.isFinite(y) ? String(y) : "";
+  })();
+  const genre: string =
+    typeof (track as any).genre === "string" ? (track as any).genre : (track as any).genre?.name || "";
+  const metaLine = [genre || "Song", year].filter(Boolean).join(" · ");
+  const lengthStr = `1 song, ${totalMins} minute${totalMins !== 1 ? "s" : ""}`;
+
+  const titleSize =
+    formattedTitle.length > 36 ? "text-[24px] sm:text-[30px]" : "text-[28px] sm:text-[36px]";
 
   return (
-    <div className="min-h-screen w-full text-foreground relative">
-      {/* Apple Music Fluid Flowing Artwork Background */}
-      <div 
-        className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden am-layout-transition"
+    <div className="relative min-h-screen w-full text-foreground">
+      {/* Flowing artwork background */}
+      <div
+        className="am-layout-transition pointer-events-none absolute inset-0 z-0 select-none overflow-hidden"
         style={{
           marginLeft: "calc(var(--sb-w) * -1)",
           marginRight: "calc(var(--rp-w) * -1)",
@@ -374,332 +422,227 @@ export default function TrackPage() {
         <DynamicBackground surface="trackPage" coverUrl={coverUrl} palette={track?.palette} />
       </div>
 
-  {/* ── Page content ── */}
-  <div className="relative z-10 px-4 sm:px-10 lg:px-12">
-
- {/* ── Hero: cover + metadata ── */}
-      <motion.section
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-        className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-8 pt-4 sm:pt-[100px] pb-9"
-      >
-        {/* Cover art */}
-        <div
-          className="shrink-0 rounded-lg shadow-xl overflow-hidden bg-zinc-900 border border-white/10 w-[42vw] sm:w-[180px] md:w-[210px] lg:w-[220px] xl:w-[230px] h-[42vw] sm:h-[180px] md:h-[210px] lg:h-[220px] xl:h-[230px] transition-all duration-300 hover:scale-[1.02]"
-        >
-          <img 
-            src={coverUrl} 
-            alt={`Cover art for ${track.title}`} 
-            width={230} 
-            height={230} 
-            fetchPriority="high" 
-            decoding="async" 
-            className="w-full h-full object-cover" 
+      <div className="relative z-10 mx-auto w-full max-w-[1000px] px-5 pb-40 pt-8 sm:px-8 sm:pt-12">
+        {/* ── Header ── */}
+        <header className="flex flex-col items-center gap-6 text-center md:flex-row md:items-end md:gap-8 md:text-left">
+          <img
+            src={coverUrl}
+            alt={`Cover art for ${track.title}`}
+            width={300}
+            height={300}
+            fetchPriority="high"
+            decoding="async"
+            className="aspect-square size-[240px] shrink-0 rounded-[10px] bg-zinc-900 object-cover shadow-[0_18px_48px_rgba(0,0,0,0.45)] ring-1 ring-white/10 sm:size-[280px] md:size-[300px]"
           />
-        </div>
 
-        {/* Metadata */}
-        <div className="flex flex-col justify-center items-center sm:items-start min-w-0 flex-1 pt-2 max-w-full">
-          {/* 1. Song Name */}
-          <h1 
+          <div className="flex min-w-0 flex-1 flex-col items-center md:items-start">
+            <h1
+              className={cn(
+                "w-full max-w-full font-outfit font-bold leading-[1.12] tracking-[-0.025em] text-white",
+                "line-clamp-2",
+                titleSize
+              )}
+              title={formattedTitle}
+            >
+              {formattedTitle}
+            </h1>
+
+            <div className="mt-1 max-w-full truncate text-[20px] font-medium text-brand sm:text-[22px]">
+              <ArtistLinks
+                track={track}
+                maxArtists={4}
+                linkClassName="text-brand hover:underline"
+              />
+            </div>
+
+            <p className="mt-1 text-[13px] font-medium text-white/55">{metaLine}</p>
+
+            {/* Actions */}
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5 md:justify-start">
+              <PillButton variant="solid" onClick={handlePlayTrack} label={isCurrentTrackPlaying ? "Pause" : "Play"}>
+                {isCurrentTrackPlaying ? (
+                  <Pause size={18} fill="currentColor" />
+                ) : (
+                  <Play size={18} fill="currentColor" />
+                )}
+                {isCurrentTrackPlaying ? "Pause" : "Play"}
+              </PillButton>
+
+              <PillButton active={isShuffled} onClick={handleShuffle} label="Shuffle">
+                <Shuffle size={18} />
+                Shuffle
+              </PillButton>
+
+              <IconCircle
+                title={isLiked ? "Unlike" : "Like"}
+                active={!!isLiked}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleLikeMutation.mutate();
+                }}
+              >
+                <Heart size={18} className={cn(isLiked && "fill-current")} />
+              </IconCircle>
+
+              <IconCircle
+                title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
+                active={isLyricsOpen}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isCurrentTrack && track) {
+                    setTrack(track, [track]);
+                    setPlayerMinimized(false);
+                  }
+                  handleLyricsToggle();
+                }}
+              >
+                <ScrollText size={18} />
+              </IconCircle>
+
+              <TrackActionsDropdown
+                track={track}
+                context="track-page"
+                align="end"
+                glass
+                isLyricsOpen={isLyricsOpen}
+                onLyricsToggle={handleLyricsToggle}
+                showToast={showToast}
+                trigger={
+                  <IconCircle title="More options" aria-haspopup="menu">
+                    <MoreHorizontal size={20} />
+                  </IconCircle>
+                }
+              />
+            </div>
+          </div>
+        </header>
+
+        {/* ── Track list ── */}
+        <section className="mt-10" aria-label="Songs">
+          <div className="h-px bg-white/[0.12]" />
+
+          <div
             className={cn(
-              "font-outfit text-white font-medium drop-shadow-md leading-normal py-1 mb-1 block truncate max-w-full w-full",
-              (formatDisplayTitle(track.title) || "").length > 30 
-                ? "text-lg sm:text-xl" 
-                : (formatDisplayTitle(track.title) || "").length > 20 
-                  ? "text-xl sm:text-2xl" 
-                  : "text-2xl sm:text-3xl"
+              "group relative -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors",
+              isCurrentTrack ? "bg-white/[0.1]" : "hover:bg-white/[0.07]"
             )}
-            title={formatDisplayTitle(track.title)}
           >
-            {formatDisplayTitle(track.title)}
-          </h1>
+            {/* Artwork with play overlay (number slot, like Apple's rows) */}
+            <button
+              type="button"
+              onClick={handlePlayTrack}
+              aria-label={isCurrentTrackPlaying ? "Pause" : "Play"}
+              className="relative size-11 shrink-0 cursor-pointer overflow-hidden rounded-md bg-zinc-900 outline-none ring-1 ring-white/10"
+            >
+              <img src={coverUrl} alt="" className="size-full object-cover" loading="lazy" />
+              <span
+                className={cn(
+                  "absolute inset-0 flex items-center justify-center bg-black/45 transition-opacity duration-150",
+                  isCurrentTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                )}
+              >
+                {isCurrentTrackPlaying ? (
+                  <Equalizer playing />
+                ) : (
+                  <Play size={16} className="ml-0.5 fill-white text-white" />
+                )}
+              </span>
+            </button>
 
-          {/* 2. Album Name (Mandatory: Directly below song name) */}
-          {albumDisplay && (
-            <div className="text-sm sm:text-base text-brand font-semibold mb-2 drop-shadow-md">
+            {/* Title + artist */}
+            <div className="flex min-w-0 flex-1 flex-col">
+              <button onClick={handlePlayTrack} className="w-fit max-w-full cursor-pointer text-left outline-none">
+                <span
+                  className={cn(
+                    "block truncate text-[15px] font-medium tracking-[-0.01em]",
+                    isCurrentTrack ? "text-brand" : "text-white"
+                  )}
+                >
+                  {formattedTitle}
+                </span>
+              </button>
+              <div className="truncate text-[13px] text-white/50">
+                <ArtistLinks
+                  track={track}
+                  maxArtists={3}
+                  linkClassName="text-white/50 hover:text-white hover:underline"
+                />
+              </div>
+            </div>
+
+            {/* Album */}
+            <div className="hidden min-w-0 basis-[30%] truncate text-[13px] text-white/50 md:block">
               {albumHref ? (
-                <Link href={albumHref} className="hover:underline transition-colors inline-flex items-center gap-1.5 hover:text-rose-400">
-                  <Disc3 size={15} className="inline shrink-0 opacity-80" />
-                  <span className="truncate">{albumDisplay}</span>
+                <Link href={albumHref} className="hover:text-white hover:underline">
+                  {albumDisplay}
                 </Link>
               ) : (
-                <span className="inline-flex items-center gap-1.5 text-white/80">
-                  <Disc3 size={15} className="inline shrink-0 opacity-80" />
-                  <span className="truncate">{albumDisplay}</span>
-                </span>
+                albumDisplay
               )}
             </div>
-          )}
 
-          {/* 3. Artist Names */}
-          <div className="text-sm font-medium text-zinc-400 hover:text-zinc-300 transition-colors mb-2 block w-fit">
-            <ArtistLinks track={track} maxArtists={4} linkClassName="text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:underline" />
+            {/* Duration */}
+            <span className="w-10 shrink-0 text-right text-[13px] tabular-nums text-white/50">
+              {durationStr}
+            </span>
+
+            {/* Row menu */}
+            <TrackActionsDropdown
+              track={track}
+              context="track-page"
+              align="end"
+              glass
+              isLyricsOpen={isLyricsOpen}
+              onLyricsToggle={handleLyricsToggle}
+              showToast={showToast}
+              triggerClassName="size-8 rounded-full text-white/60 hover:text-white hover:bg-white/10"
+            />
           </div>
 
-          {/* 4. Label Name */}
-          <p className="text-xs sm:text-sm text-white/50 font-medium mb-8 drop-shadow-sm">
-            {labelDisplay}
+          <div className="h-px bg-white/[0.12]" />
+        </section>
+
+        {/* ── Footer metadata ── */}
+        <footer className="mt-6 space-y-0.5 text-[13px] leading-relaxed text-white/50">
+          {releaseDate && <p>{releaseDate}</p>}
+          <p>{lengthStr}</p>
+          <p>
+            © {year}{" "}
+            {track.artist?.name || <span className="font-zenify">zenify</span>}, marketed by{" "}
+            {labelDisplay === "Zenify" ? (
+              <>
+                <span className="font-zenify">zenify</span> Music
+              </>
+            ) : (
+              labelDisplay
+            )}
+            .
           </p>
+        </footer>
+      </div>
 
-  <div className="flex items-center justify-center sm:justify-start gap-4 flex-wrap">
-
-  {/* Play / Pause pill */}
-  <button
-  onClick={handlePlayTrack}
-  className="flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all cursor-pointer shadow-none"
-  >
-  {isCurrentTrackPlaying ? (
-  <>
-  <Pause size={18} className="text-brand" fill="currentColor" />
-  <span>Pause</span>
-  </>
-  ) : (
-  <>
-  <Play size={18} className="text-brand" fill="currentColor" />
-  <span>Play</span>
-  </>
-  )}
-  </button>
-
-  {/* Shuffle (circular) */}
-  <button
-  onClick={(e) => {
-  e.stopPropagation();
-  toggleShuffle();
-  if (!isCurrentTrack && track) {
-  setTrack(track, [track]);
-  if (!isPlaying) togglePlay();
-  setPlayerMinimized(false);
-  }
-  }}
-  className={cn(
-    "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
-    isShuffled ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
-  )}
-  title="Shuffle"
-  >
-  <Shuffle size={18} />
-  </button>
-
-  {/* Lyrics (circular) */}
-  <button
-  onClick={(e) => {
-  e.stopPropagation();
-  if (!isCurrentTrack && track) {
-  setTrack(track, [track]);
-  setPlayerMinimized(false);
-  }
-  setIsLyricsOpen(!isLyricsOpen);
-  }}
-  className={cn(
-    "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
-    isLyricsOpen ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
-  )}
-  title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
-  >
-  <ScrollText size={18} />
-  </button>
-
-            
-
-          {/* Three-dot dropdown actions menu */}
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <button className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 active:scale-90 cursor-pointer transition-all shadow-none" title="More options">
-        <MoreHorizontal size={20} />
-      </button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent className="w-56" align="start">
-      <DropdownMenuItem onClick={() => addToUserQueue(track)}>
-        <ListPlus size={14} className="mr-2 text-white/60" /> Add to Queue
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => toggleLikeMutation.mutate()}>
-        <Heart size={14} className={cn("mr-2", isLiked ? "text-brand fill-brand" : "text-white/60")} />
-        {isLiked ? "Liked" : "Like"}
-      </DropdownMenuItem>
-      
-      <DropdownMenuItem onClick={handleGoToArtist}>
-        <User size={14} className="mr-2 text-white/60" /> Go to Artist
-      </DropdownMenuItem>
-
-      <DropdownMenuSeparator className="bg-white/5" />
-      
-      <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
-          <Plus size={14} className="mr-2 text-white/60" /> Add to Playlist
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => refetchTrackAudio(track, showToast)}>
-          <RefreshCw size={14} className={cn("mr-2 text-white/60", isRefetching === track.id && "animate-spin text-brand")} />
-          <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
-        </DropdownMenuItem>
-<RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
-
-      <DropdownMenuItem onClick={() => openDownloadModal({ ...track, artist: track.artist })}>
-        <Download size={14} className="mr-2 text-white/60" /> Download
-      </DropdownMenuItem>
-
-      {user?.role === 'ADMIN' && (
-        <DropdownMenuItem 
-          onClick={() => router.push(`/admin/lyric-sync?trackId=${track.id}`)}
-          className="text-violet-400 focus:text-violet-300 cursor-pointer"
-        >
-          <Mic size={14} className="mr-2 text-violet-400" /> Sync Lyrics
-        </DropdownMenuItem>
-      )}
-
-      <DropdownMenuSeparator className="bg-white/5" />
-
-      <DropdownMenuItem onClick={handleShare}>
-        <Share2 size={14} className="mr-2 text-white/60" /> Share
-      </DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-
-  </div>
- </div >
- </motion.section>
-
- {/* ── Track list ── */}
- <motion.section
- initial={{ opacity: 0 }}
- animate={{ opacity: 1 }}
- transition={{ delay: 0.06, duration: 0.32 }}
- className="select-none"
- >
- {/* Track row — only name/number are play triggers; dropdown is isolated */}
- <div className="group flex items-center py-4 px-2 transition-colors">
-
- {/* Number / Visualizer — click to play */}
- <div className="w-10 shrink-0 flex justify-center items-center">
- {isCurrentTrackPlaying ? (
- <div className="flex items-end gap-[1.5px] h-[12px] mb-0.5">
- {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
- <motion.div
- key={i}
- animate={{ height: ["30%", "100%", "30%"] }}
- transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
- className="w-[2.5px] bg-red-500 rounded-full"
- />
- ))}
- </div>
- ) : (
- <span className="text-[15px] font-bold text-white/20">1</span>
- )}
- </div>
-
- {/* Name & Subtitle — click title to play, click artist to view artist */}
- <div className="flex-1 text-left min-w-0 flex flex-col justify-center">
- <button
- onClick={handlePlayTrack}
- className="text-left cursor-pointer"
- >
- <span
- className={cn(
- "font-semibold text-[15px] truncate leading-snug hover:text-red-500 transition-colors block w-fit max-w-full",
- isCurrentTrack ? "text-red-500" : "text-foreground"
- )}
- >
- {formatDisplayTitle(track.title)}
- </span>
- </button>
- <div className="text-[12px] font-medium text-white/40 truncate mt-0.5 block" onClick={(e) => e.stopPropagation()}>
- <ArtistLinks track={track} maxArtists={3} linkClassName="text-white/40 hover:text-white hover:underline" />
- </div>
- </div>
-
- {/* Duration */}
- <span className="text-[14px] text-muted tabular-nums shrink-0 mr-3">
- {durationStr}
- </span>
-
- {/* Actions */}
- <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
- <DropdownMenu>
- <DropdownMenuTrigger asChild>
- <button className={cn("p-2 transition-colors cursor-pointer", isGlassmorphism ? "text-white/80 hover:text-white" : "text-white/50 hover:text-white")}>
- <MoreHorizontal size={20} />
- </button>
- </DropdownMenuTrigger>
- <DropdownMenuContent className="w-52" align="end">
- <DropdownMenuItem onClick={() => {
- usePlayerStore.getState().addToUserQueue(track);
- }}>
- <ListPlus size={13} className="mr-2 text-brand" /> Add to Queue
- </DropdownMenuItem>
- <DropdownMenuItem onClick={() => {
- if (!isCurrentTrack && track) {
- setTrack(track, [track]);
- setPlayerMinimized(false);
- }
- setIsLyricsOpen(!isLyricsOpen);
- }}>
- <ScrollText size={13} className="mr-2 opacity-60" /> {isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
- </DropdownMenuItem>
- <DropdownMenuItem onClick={handleGoToArtist}>
- <User size={13} className="mr-2 opacity-60" /> Go to Artist
- </DropdownMenuItem>
- <DropdownMenuSeparator className="bg-border" />
- <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
-          <Plus size={13} className="mr-2 opacity-60" /> Add to Playlist
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => refetchTrackAudio(track, showToast)}>
-          <RefreshCw size={13} className={cn("mr-2 opacity-60", isRefetching === track.id && "animate-spin text-brand")} />
-          <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
-        </DropdownMenuItem>
-<RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
- <DropdownMenuItem onClick={() => openDownloadModal(track)}>
- <Download size={13} className="mr-2 opacity-60" /> Download
- </DropdownMenuItem>
- {user?.role === 'ADMIN' && (
- <DropdownMenuItem 
- onClick={() => router.push(`/admin/lyric-sync?trackId=${track.id}`)}
- className="text-violet-400 focus:text-violet-300 cursor-pointer"
- >
- <Mic size={13} className="mr-2 text-violet-400" /> Sync Lyrics
- </DropdownMenuItem>
- )}
- </DropdownMenuContent>
- </DropdownMenu>
- </div>
- </div>
- </motion.section>
-
- {/* ── Footer metadata ── */}
- <motion.footer
- initial={{ opacity: 0 }}
- animate={{ opacity: 1 }}
- transition={{ delay: 0.1, duration: 0.32 }}
- className="mt-8 space-y-[3px] text-[12px] text-white/60 leading-relaxed drop-shadow-sm pb-10"
- >
- <p>{fmtReleaseDate(track.releaseDate || track.createdAt)}</p>
- <p>1 song, {fmtTotalTime(track.duration)}</p>
- <p className="mt-1.5">
- © {new Date(track.releaseDate || track.createdAt).getFullYear()} {track.artist?.name || <span className="font-zenify">zenify</span>}, marketed by {labelDisplay === "Zenify" ? <><span className="font-zenify">zenify</span> Music</> : labelDisplay}.
- </p>
- </motion.footer>
-
- </div>
-
- {/* ── Toast ── */}
- <AnimatePresence>
- {toast && (
- <motion.div
- initial={{ opacity: 0, y: 12 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: 6 }}
- className={cn(
- "fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2.5 rounded-xl border backdrop-blur-xl text-sm font-medium whitespace-nowrap z-[9999]",
- toast.type === "error"
- ? "bg-red-500/10 border-red-500/20 text-red-400"
- : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
- )}
- >
- {toast.type === "success" ? <Check size={14} /> : <X size={14} />}
- {toast.msg}
- </motion.div>
- )}
- </AnimatePresence>
- </div>
- );
+      {/* ── Toast ── */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.18 }}
+            className="fixed bottom-24 left-1/2 z-[9999] flex -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-xl border border-white/[0.14] bg-[#242426]/85 py-2.5 pl-3 pr-4 text-[13.5px] font-medium text-white shadow-[0_16px_40px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
+          >
+            <span
+              className={cn(
+                "flex size-5 items-center justify-center rounded-full",
+                toast.type === "error" ? "bg-red-500/25 text-red-400" : "bg-emerald-500/25 text-emerald-400"
+              )}
+            >
+              {toast.type === "success" ? <Check size={12} strokeWidth={3} /> : <X size={12} strokeWidth={3} />}
+            </span>
+            {toast.msg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }

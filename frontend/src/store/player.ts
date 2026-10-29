@@ -473,8 +473,8 @@ export const usePlayerStore = create<PlayerState>()(
         const { currentTrack, userQueue, contextQueue, contextOriginalQueue, repeatMode, repeatCounter, playHistory } = get();
         if (!currentTrack) return;
 
-        // 1. Repeat mode "one": repeats the current song
-        if (!force) {
+        // 1. Repeat mode "one": repeats the current song (unless user has manually queued songs in userQueue)
+        if (!force && (!userQueue || userQueue.length === 0)) {
           if (repeatMode === "one") {
             const audio = audioEngine.getActiveAudioElement();
             if (audio) {

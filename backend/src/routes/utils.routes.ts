@@ -834,10 +834,13 @@ export async function utilsRoutes(server: FastifyInstance) {
                     } : {}),
                     ...(rangeHeader ? { 'Range': rangeHeader } : {}),
                 },
-                timeout: 30000,
+                timeout: 15000,
             };
 
             const req = client.request(options, (res) => {
+                // Clear initial connection timeout once response begins streaming
+                req.setTimeout(0);
+                if (res.socket) res.socket.setTimeout(0);
                 if ([301, 302, 307, 308].includes(res.statusCode!) && res.headers.location) {
                     const loc = res.headers.location;
                     const nextUrl = loc.startsWith('http') ? loc : u.origin + loc;
@@ -943,10 +946,13 @@ export async function utilsRoutes(server: FastifyInstance) {
                     'Accept-Encoding': 'identity',
                     ...(rangeHeader ? { 'Range': rangeHeader } : {}),
                 },
-                timeout: 30000,
+                timeout: 15000,
             };
 
             const req = client.request(options, (res) => {
+                // Clear initial connection timeout once response begins streaming
+                req.setTimeout(0);
+                if (res.socket) res.socket.setTimeout(0);
                 // Follow redirects
                 if ([301, 302, 307, 308].includes(res.statusCode!) && res.headers.location) {
                     const loc = res.headers.location;

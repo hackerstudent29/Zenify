@@ -5,6 +5,7 @@ import { getApiBaseUrl } from '@/lib/utils';
 let rawApiUrl = getApiBaseUrl();
 // Ensure it cleanly ends with /api/
 const cleanUrl = rawApiUrl.replace(/\/+$/, '');
+// Handle both relative proxy paths (/api) and absolute URLs
 const fullApiUrl = cleanUrl.endsWith('/api') ? `${cleanUrl}/` : `${cleanUrl}/api/`;
 
 const api = axios.create({
