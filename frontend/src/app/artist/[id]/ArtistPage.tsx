@@ -14,17 +14,12 @@ import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from
 import { motion, AnimatePresence } from "framer-motion";
 import { SEO } from "@/components/shared/SEO";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   SwiftUIPlay,
   SwiftUIPause,
   SwiftUIShuffle,
   SwiftUIEllipsis,
 } from "@/components/ui/SwiftUIIcons";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 
 import { JioSaavnSongTable } from "./components/JioSaavnSongTable";
 import { JioSaavnCardSection } from "./components/JioSaavnCardSection";
@@ -401,32 +396,29 @@ export default function ArtistPage() {
                 </button>
 
                 {/* Glass Ellipsis Menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                <AnimatedDropdown
+                  align="center"
+                  trigger={
                     <button
                       className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white flex items-center justify-center active:scale-95 transition-all shadow-xl cursor-pointer"
                       title="More Options"
                     >
                       <SwiftUIEllipsis size={18} fill="currentColor" />
                     </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" className="w-48 bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl p-1">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        navigator.clipboard.writeText(window.location.href);
-                      }}
-                      className="cursor-pointer text-xs font-semibold py-2"
-                    >
-                      Share Artist
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handlePlayTopTracks}
-                      className="cursor-pointer text-xs font-semibold py-2"
-                    >
-                      Play All Songs
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  }
+                  items={[
+                    {
+                      id: "share",
+                      label: "Share Artist",
+                      onClick: () => navigator.clipboard.writeText(window.location.href),
+                    },
+                    {
+                      id: "play-all",
+                      label: "Play All Songs",
+                      onClick: handlePlayTopTracks,
+                    },
+                  ]}
+                />
               </div>
             </motion.div>
           </div>
@@ -519,32 +511,29 @@ export default function ArtistPage() {
                   </button>
 
                   {/* Glass Ellipsis Menu */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                  <AnimatedDropdown
+                    align="center"
+                    trigger={
                       <button
                         className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white flex items-center justify-center active:scale-95 transition-all shadow-xl cursor-pointer"
                         title="More Options"
                       >
                         <SwiftUIEllipsis size={18} fill="currentColor" />
                       </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="center" className="w-48 bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl p-1">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          navigator.clipboard.writeText(window.location.href);
-                        }}
-                        className="cursor-pointer text-xs font-semibold py-2"
-                      >
-                        Share Artist
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={handlePlayTopTracks}
-                        className="cursor-pointer text-xs font-semibold py-2"
-                      >
-                        Play All Songs
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    }
+                    items={[
+                      {
+                        id: "share",
+                        label: "Share Artist",
+                        onClick: () => navigator.clipboard.writeText(window.location.href),
+                      },
+                      {
+                        id: "play-all",
+                        label: "Play All Songs",
+                        onClick: handlePlayTopTracks,
+                      },
+                    ]}
+                  />
             </div>
           </motion.div>
         </div>

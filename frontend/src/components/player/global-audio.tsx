@@ -52,9 +52,21 @@ export function GlobalAudio() {
       audioEngine.resume();
       const audio = audioEngine.getActiveAudioElement();
       if (audio && usePlayerStore.getState().isPlaying && audio.paused) {
-        audio.play().catch(err => {
-          if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-        });
+        const state = usePlayerStore.getState();
+        const curr = state.currentTrack;
+        const dur = (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) ? audio.duration : (curr?.duration || 0);
+        const isEnded = audio.ended || (dur > 3 && audio.currentTime >= dur - 0.5);
+        if (isEnded) {
+          if (!isSwitchingTrackRef.current) {
+            isSwitchingTrackRef.current = true;
+            setTimeout(() => { isSwitchingTrackRef.current = false; }, 800);
+            state.playNext(false);
+          }
+        } else {
+          audio.play().catch(err => {
+            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+          });
+        }
       }
     };
 
@@ -108,20 +120,14 @@ export function GlobalAudio() {
           };
         });
 
+        const isVirtual = (track as any).isVirtual || (typeof track.id === 'string' && (track.id.startsWith('saavn-') || track.id.startsWith('itunes-') || track.id.startsWith('yt-')));
+        if (isVirtual) return;
+
         import("@/lib/api").then(({ default: api }) => {
           api.post(`tracks/${track.id}/update-duration`, { duration: rounded })
             .then(() => {
               if (queryClient) {
-                queryClient.invalidateQueries({ queryKey: ['homepage-sections-v2'] });
-                queryClient.invalidateQueries({ queryKey: ['homepage-sections-mobile-v2'] });
-                queryClient.invalidateQueries({ queryKey: ['playlist'] });
-                queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
-                queryClient.invalidateQueries({ queryKey: ['library-overview'] });
-                queryClient.invalidateQueries({ queryKey: ['search-live'] });
-                queryClient.invalidateQueries({ queryKey: ['search-smart'] });
-                queryClient.invalidateQueries({ queryKey: ['search-home'] });
-                queryClient.invalidateQueries({ queryKey: ['tracks-explore'] });
-                queryClient.invalidateQueries({ queryKey: ['track-detail'] });
+                queryClient.invalidateQueries({ queryKey: ['track-detail', track.id] });
               }
             })
             .catch((err) => console.warn("[DurationSync] Failed to correct track duration:", err));
@@ -267,9 +273,14 @@ export function GlobalAudio() {
     };
 
     const handleEnded = () => {
+      if (isSwitchingTrackRef.current) {
+        console.log("[GlobalAudio] Track ended event ignored - already switching track.");
+        return;
+      }
       console.log("[GlobalAudio] Track ended event fired. Advancing to next track.");
-      isSwitchingTrackRef.current = false;
+      isSwitchingTrackRef.current = true;
       isSourceChanging.current = false;
+      setTimeout(() => { isSwitchingTrackRef.current = false; }, 800);
       playNext(false);
     };
     const handleLoadedMetadata = () => {
@@ -297,13 +308,18 @@ export function GlobalAudio() {
       if (!error || error.code === 0) return;
 
       // Stream EOF boundary safeguard:
-      // If the error occurred when the song is within 3s of the end or past duration,
+      // If the error occurred when the song is within 4s of the end or past duration,
       // it is a stream EOF (server socket close), NOT an unplayable track! Advance to next song!
-      if (audio.duration > 5 && (audio.duration - audio.currentTime <= 3 || audio.currentTime >= audio.duration - 3)) {
+      const current = usePlayerStore.getState().currentTrack;
+      const knownDuration = (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) ? audio.duration : (current?.duration || 0);
+      if (knownDuration > 5 && (knownDuration - audio.currentTime <= 4 || audio.currentTime >= knownDuration - 4)) {
         console.log("[GlobalAudio] Stream EOF boundary reached on audio error. Advancing to next track.");
-        isSwitchingTrackRef.current = false;
-        isSourceChanging.current = false;
-        playNext(false);
+        if (!isSwitchingTrackRef.current) {
+          isSwitchingTrackRef.current = true;
+          isSourceChanging.current = false;
+          setTimeout(() => { isSwitchingTrackRef.current = false; }, 800);
+          playNext(false);
+        }
         return;
       }
 
@@ -660,9 +676,7 @@ export function GlobalAudio() {
           audio.crossOrigin = 'anonymous';
         }
         audio.src = targetSrc;
-        if (!wasActive) {
-          audio.load();
-        }
+        audio.load();
 
         // 4. Begin playback of the newly clicked or next track immediately
         const shouldPlay = isPlaying || usePlayerStore.getState().isPlaying;
@@ -692,11 +706,22 @@ export function GlobalAudio() {
         currentTrackArtistRef.current = currentArtist;
 
         if (isPlaying && audio.paused) {
-          audioEngine.resume();
-          audio.play().catch(err => {
-            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-            console.warn("[GlobalAudio] Sync Play failed:", err);
-          });
+          const curr = usePlayerStore.getState().currentTrack;
+          const dur = (audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) ? audio.duration : (curr?.duration || 0);
+          const isEnded = audio.ended || (dur > 3 && audio.currentTime >= dur - 0.5);
+          if (isEnded) {
+            if (!isSwitchingTrackRef.current) {
+              isSwitchingTrackRef.current = true;
+              setTimeout(() => { isSwitchingTrackRef.current = false; }, 800);
+              playNext(false);
+            }
+          } else {
+            audioEngine.resume();
+            audio.play().catch(err => {
+              if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+              console.warn("[GlobalAudio] Sync Play failed:", err);
+            });
+          }
         } else if (!isPlaying && !audio.paused) {
           audio.pause();
         }

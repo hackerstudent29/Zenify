@@ -4,6 +4,8 @@ import { SEO } from "@/components/shared/SEO";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
+import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import {
   Play,
@@ -609,67 +611,13 @@ export default function AlbumPage() {
                       {formatDuration(track.duration)}
                     </span>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          className="p-1.5 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/10"
-                          title="Track options"
-                        >
-                          <MoreHorizontal size={18} />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-56" align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            usePlayerStore.getState().addToUserQueue(track);
-                            showToast("Added to queue");
-                          }}
-                        >
-                          <ListPlus size={14} className="mr-2 text-brand" />
-                          <span>Add to Queue</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            const target = getArtistTarget(track) || getArtistTarget(album);
-                            if (target) router.push(target);
-                            else showToast("Artist details unavailable", "error");
-                          }}
-                        >
-                          <User size={14} className="mr-2" /> Go to Artist
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-white/10" />
-                        <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
-                          <Plus size={14} className="mr-2" /> Add to Playlist
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => refetchTrackAudio(track, showToast)}>
-                          <RefreshCw
-                            size={14}
-                            className={cn("mr-2", isRefetching === track.id && "animate-spin text-brand")}
-                          />
-                          <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
-                        </DropdownMenuItem>
-                        <RefetchLyricsSubMenu
-                          track={track}
-                          refetchTrackLyrics={refetchTrackLyrics}
-                          showToast={showToast}
-                        />
-                        <DropdownMenuItem onClick={() => openDownloadModal({ ...track, artist: album.artist })}>
-                          <Download size={14} className="mr-2" /> Download
-                        </DropdownMenuItem>
-                        {user?.role === "ADMIN" && (
-                          <DropdownMenuItem
-                            onClick={() => router.push(`/admin/lyric-sync?trackId=${track.id}`)}
-                            className="text-violet-400 focus:text-violet-300 cursor-pointer"
-                          >
-                            <Mic size={14} className="mr-2 text-violet-400" /> Sync Lyrics
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator className="bg-white/10" />
-                        <DropdownMenuItem onClick={() => handleShare(track, "track")}>
-                          <Share2 size={14} className="mr-2" /> Share
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <TrackActionsDropdown
+                      track={{ ...track, artist: track.artist || album.artist }}
+                      align="end"
+                      context="album"
+                      triggerClassName="p-1.5 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/10 cursor-pointer"
+                      onShare={() => handleShare(track, "track")}
+                    />
                   </div>
                 </motion.div>
               );

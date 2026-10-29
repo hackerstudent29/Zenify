@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useMemo, useId, useEffect } from "react";
-import { Heart, Play, Pause, MoreHorizontal, Copy } from "lucide-react";
+import React, { useState, useMemo, useId } from "react";
+import { Heart, Play, Pause } from "lucide-react";
 import { cn, formatDisplayTitle, getTrackCover } from "@/lib/utils";
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 
 /* ── Springs (iOS-like) ── */
 const SPRING = { type: "spring" as const, stiffness: 420, damping: 34, mass: 0.8 };
@@ -70,24 +71,6 @@ export function JioSaavnSongTable({
   const uid = useId();
   const [activeSort, setActiveSort] = useState<"popular" | "date" | "name">("popular");
   const [visibleCount, setVisibleCount] = useState<number>(10);
-  const [menuFor, setMenuFor] = useState<string | null>(null);
-
-  // Close the three-dot menu on outside click / Escape
-  useEffect(() => {
-    if (menuFor === null) return;
-    const onDown = (e: PointerEvent) => {
-      if (!(e.target as HTMLElement).closest("[data-row-menu]")) setMenuFor(null);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuFor(null);
-    };
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [menuFor]);
 
   const sortedTracks = useMemo(() => {
     if (!tracks || tracks.length === 0) return [];
@@ -197,8 +180,6 @@ export function JioSaavnSongTable({
             const isLiked = likedTrackIds.includes(track.id);
             const isLast = idx === displayedTracks.length - 1;
             const rowKey = track.id || `track-${idx}`;
-            const menuOpen = menuFor === rowKey;
-            const openUp = idx >= displayedTracks.length - 2 && displayedTracks.length > 3;
 
             // Heart and three dots: hidden until the row is hovered (always visible on touch)
             const revealOnHover =
@@ -214,7 +195,7 @@ export function JioSaavnSongTable({
                   y: { ...SPRING_SOFT, delay: Math.min(idx * 0.02, 0.2) },
                 }}
                 onClick={() => onPlayTrack(track)}
-                style={{ zIndex: menuOpen ? 30 : undefined }}
+                style={{ zIndex: undefined }}
                 className={cn(
                   GRID,
                   "group relative h-[56px] cursor-pointer rounded-[6px] px-2 transition-colors duration-150",
@@ -313,81 +294,18 @@ export function JioSaavnSongTable({
                 {/* Time */}
                 <div className="text-right text-[13px] tabular-nums text-white/55">{formatDuration(track.duration)}</div>
 
-                {/* Three dots + menu */}
-                <div className="relative flex items-center justify-center" data-row-menu>
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.88 }}
-                    transition={SPRING_SNAPPY}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuFor(menuOpen ? null : rowKey);
-                    }}
-                    className={cn(
+                {/* Three dots */}
+                <div className="relative flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                  <TrackActionsDropdown
+                    track={track}
+                    align="end"
+                    context="artist"
+                    hideItems={["view-details"]}
+                    triggerClassName={cn(
                       "cursor-pointer rounded-full p-1.5 text-white/70 outline-none transition-[opacity,color] duration-150 hover:text-white",
-                      menuOpen ? "opacity-100 text-white" : revealOnHover
+                      "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
                     )}
-                    title="More"
-                    aria-label="More options"
-                    aria-haspopup="menu"
-                    aria-expanded={menuOpen}
-                  >
-                    <MoreHorizontal size={18} />
-                  </motion.button>
-
-                  <AnimatePresence>
-                    {menuOpen && (
-                      <motion.div
-                        role="menu"
-                        initial={{ opacity: 0, scale: 0.94 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.94 }}
-                        transition={{ ...SPRING_SNAPPY, opacity: { duration: 0.12 } }}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ transformOrigin: openUp ? "bottom right" : "top right" }}
-                        className={cn(
-                          "absolute right-0 z-50 w-[190px] rounded-[10px] border border-white/10 bg-[#2c2c2e] py-1 shadow-[0_12px_32px_rgba(0,0,0,0.5)]",
-                          openUp ? "bottom-full mb-1" : "top-full mt-1"
-                        )}
-                      >
-                        <button
-                          role="menuitem"
-                          onClick={() => {
-                            setMenuFor(null);
-                            onPlayTrack(track);
-                          }}
-                          className="flex h-8 w-full cursor-pointer items-center gap-2.5 px-3 text-left text-[13px] text-white outline-none transition-colors hover:bg-white/10"
-                        >
-                          {isThisPlaying ? <Pause size={14} className="fill-white" /> : <Play size={14} className="fill-white" />}
-                          {isThisPlaying ? "Pause" : "Play"}
-                        </button>
-                        {onToggleLike && (
-                          <button
-                            role="menuitem"
-                            onClick={(e) => {
-                              setMenuFor(null);
-                              onToggleLike(track.id, e);
-                            }}
-                            className="flex h-8 w-full cursor-pointer items-center gap-2.5 px-3 text-left text-[13px] text-white outline-none transition-colors hover:bg-white/10"
-                          >
-                            <Heart size={14} className={cn(isLiked && "fill-brand text-brand")} />
-                            {isLiked ? "Remove from Favorites" : "Add to Favorites"}
-                          </button>
-                        )}
-                        <button
-                          role="menuitem"
-                          onClick={() => {
-                            setMenuFor(null);
-                            navigator.clipboard?.writeText(title).catch(() => {});
-                          }}
-                          className="flex h-8 w-full cursor-pointer items-center gap-2.5 px-3 text-left text-[13px] text-white outline-none transition-colors hover:bg-white/10"
-                        >
-                          <Copy size={14} />
-                          Copy Song Name
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  />
                 </div>
               </motion.div>
             );

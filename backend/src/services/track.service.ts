@@ -744,81 +744,104 @@ export class TrackService {
     }
 
     async incrementStreamCount(id: string, userId?: string, sessionData?: { listenDuration?: number; skipped?: boolean; completionRate?: number }) {
-        prisma.track.update({
-            where: { id },
-            data: {
-                streams: { increment: 1 },
-                artist: { update: { totalStreams: { increment: 1 } } }
-            }
-        }).catch((err: any) => this.server.log.error(err));
+        try {
+            const track = await prisma.track.findUnique({
+                where: { id },
+                select: { id: true, artistId: true }
+            }).catch(() => null);
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+            if (track) {
+                prisma.track.update({
+                    where: { id },
+                    data: {
+                        streams: { increment: 1 },
+                        ...(track.artistId ? { artist: { update: { totalStreams: { increment: 1 } } } } : {})
+                    }
+                }).catch((err: any) => this.server.log.warn(`[incrementStreamCount] Track stream update: ${err.message}`));
 
-        // Update Daily Track Analytics (global) streams
-        prisma.trackAnalytics.upsert({
-            where: { trackId_date: { trackId: id, date: today } },
-            create: { trackId: id, date: today, stream_count: 1, total_listen_time: 0 },
-            update: { stream_count: { increment: 1 } }
-        }).catch((err: any) => this.server.log.error(err));
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
 
-        if (userId) {
-            // Record user history (Chronological)
-            prisma.history.create({
-                data: { userId, trackId: id }
-            }).catch((err: any) => this.server.log.error(err));
+                // Update Daily Track Analytics (global) streams
+                prisma.trackAnalytics.upsert({
+                    where: { trackId_date: { trackId: id, date: today } },
+                    create: { trackId: id, date: today, stream_count: 1, total_listen_time: 0 },
+                    update: { stream_count: { increment: 1 } }
+                }).catch((err: any) => this.server.log.warn(`[incrementStreamCount] TrackAnalytics: ${err.message}`));
 
-            // Update stats (Aggregated)
-            prisma.userTrackStat.upsert({
-                where: { userId_trackId: { userId, trackId: id } },
-                create: {
-                    userId, trackId: id, streamCount: 1, lastStreamedAt: new Date(),
-                    skipCount: sessionData?.skipped ? 1 : 0,
-                    totalListenDuration: sessionData?.listenDuration || 0,
-                    completionRateAvg: sessionData?.completionRate || 0,
-                },
-                update: {
-                    streamCount: { increment: 1 },
-                    lastStreamedAt: new Date(),
-                    skipCount: sessionData?.skipped ? { increment: 1 } : undefined,
+                if (userId) {
+                    // Record user history (Chronological)
+                    prisma.history.create({
+                        data: { userId, trackId: id }
+                    }).catch((err: any) => this.server.log.warn(`[incrementStreamCount] History: ${err.message}`));
+
+                    // Update stats (Aggregated)
+                    prisma.userTrackStat.upsert({
+                        where: { userId_trackId: { userId, trackId: id } },
+                        create: {
+                            userId, trackId: id, streamCount: 1, lastStreamedAt: new Date(),
+                            skipCount: sessionData?.skipped ? 1 : 0,
+                            totalListenDuration: sessionData?.listenDuration || 0,
+                            completionRateAvg: sessionData?.completionRate || 0,
+                        },
+                        update: {
+                            streamCount: { increment: 1 },
+                            lastStreamedAt: new Date(),
+                            skipCount: sessionData?.skipped ? { increment: 1 } : undefined,
+                        }
+                    }).catch((err: any) => this.server.log.warn(`[incrementStreamCount] UserTrackStat: ${err.message}`));
                 }
-            }).catch((err: any) => this.server.log.error(err));
+            }
+        } catch (err: any) {
+            this.server.log.warn(`[incrementStreamCount] Error: ${err.message}`);
         }
     }
 
     async incrementListenDuration(id: string, userId: string, durationSeconds: number, progress?: number) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
 
-        // Update User Specific Stats
-        prisma.userTrackStat.upsert({
-            where: { userId_trackId: { userId, trackId: id } },
-            update: {
-                totalListenDuration: { increment: durationSeconds },
-                resumeProgress: progress !== undefined ? progress : undefined
-            },
-            create: {
-                userId,
-                trackId: id,
-                totalListenDuration: durationSeconds,
-                resumeProgress: progress !== undefined ? progress : 0
+            // Update User's Daily Analytics (for Trends) - always succeeds regardless of whether track is virtual
+            const minutes = Math.max(1, Math.round(durationSeconds / 60));
+            prisma.userDailyStat.upsert({
+                where: { userId_date: { userId, date: today } },
+                create: { userId, date: today, minutesListened: minutes },
+                update: { minutesListened: { increment: minutes } }
+            }).catch((err: any) => this.server.log.warn(`[incrementListenDuration] UserDailyStat: ${err.message}`));
+
+            // Only perform track-level database operations if the track actually exists in PostgreSQL
+            const track = await prisma.track.findUnique({
+                where: { id },
+                select: { id: true }
+            }).catch(() => null);
+
+            if (track) {
+                // Update User Specific Stats
+                prisma.userTrackStat.upsert({
+                    where: { userId_trackId: { userId, trackId: id } },
+                    update: {
+                        totalListenDuration: { increment: durationSeconds },
+                        resumeProgress: progress !== undefined ? progress : undefined
+                    },
+                    create: {
+                        userId,
+                        trackId: id,
+                        totalListenDuration: durationSeconds,
+                        resumeProgress: progress !== undefined ? progress : 0
+                    }
+                }).catch((err: any) => this.server.log.warn(`[incrementListenDuration] UserTrackStat: ${err.message}`));
+
+                // Update Daily Track Analytics (global) listen time
+                prisma.trackAnalytics.upsert({
+                    where: { trackId_date: { trackId: id, date: today } },
+                    create: { trackId: id, date: today, total_listen_time: durationSeconds, stream_count: 0 },
+                    update: { total_listen_time: { increment: durationSeconds } }
+                }).catch((err: any) => this.server.log.warn(`[incrementListenDuration] TrackAnalytics: ${err.message}`));
             }
-        }).catch((err: any) => this.server.log.error(err));
-
-        // Update User's Daily Analytics (for Trends)
-        const minutes = Math.max(1, Math.round(durationSeconds / 60));
-        prisma.userDailyStat.upsert({
-            where: { userId_date: { userId, date: today } },
-            create: { userId, date: today, minutesListened: minutes },
-            update: { minutesListened: { increment: minutes } }
-        }).catch((err: any) => this.server.log.error(err));
-
-        // Update Daily Track Analytics (global) listen time
-        prisma.trackAnalytics.upsert({
-            where: { trackId_date: { trackId: id, date: today } },
-            create: { trackId: id, date: today, total_listen_time: durationSeconds, stream_count: 0 },
-            update: { total_listen_time: { increment: durationSeconds } }
-        }).catch((err: any) => this.server.log.error(err));
+        } catch (err: any) {
+            this.server.log.warn(`[incrementListenDuration] Error: ${err.message}`);
+        }
     }
 
     async incrementDownloadCount(id: string) {

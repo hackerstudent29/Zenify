@@ -1,19 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { ChevronRight, Play, Pause, MoreHorizontal } from "lucide-react";
+import { ChevronRight, Play, Pause } from "lucide-react";
 import { cn, getMediaUrl, formatDisplayTitle, getTrackCover } from "@/lib/utils";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from "@/components/ui/dropdown-menu";
 import { useUIStore } from "@/store/ui";
 import { SwiftUIPlay, SwiftUIPause, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 
 interface ArtistLatestAndTopSongsProps {
   artist: any;
@@ -112,37 +106,23 @@ export function ArtistLatestAndTopSongs({
           </div>
         </div>
 
-        {/* Swift UI Ellipsis Action */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+        {/* SwiftUI Ellipsis Action */}
+        <TrackActionsDropdown
+          track={track}
+          align="end"
+          context="artist"
+          hideItems={["view-details", "refetch-audio", "refetch-lyrics", "sync-lyrics", "download", "share"]}
+          triggerClassName="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0 cursor-pointer"
+          trigger={
             <button
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0 cursor-pointer"
               title="More"
+              onClick={(e) => e.stopPropagation()}
             >
               <SwiftUIEllipsis size={16} fill="currentColor" />
             </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48 bg-zinc-900 border border-white/10 text-white rounded-xl shadow-2xl p-1">
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                onPlayTrack(track);
-              }}
-              className="cursor-pointer text-xs font-semibold py-2"
-            >
-              Play Next
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(`${window.location.origin}/track/${track.id}`);
-              }}
-              className="cursor-pointer text-xs font-semibold py-2"
-            >
-              Copy Link
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          }
+        />
       </div>
     );
   };
