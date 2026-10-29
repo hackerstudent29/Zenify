@@ -302,21 +302,11 @@ export class UniversalSearchService {
     // 2. JioSaavn Official Engine (Unmatched Bollywood/Kollywood/Tollywood + Global Western 320k)
     const saavnPromise = (async () => {
       try {
-        const [p1, p2, p3, autoRes] = await Promise.all([
+        const [p1, autoRes] = await Promise.all([
           axios.get('https://www.jiosaavn.com/api.php', {
-            params: { __call: 'search.getResults', q: cleanQ, p: 1, n: 40, _format: 'json', ctx: 'web6dot0' },
+            params: { __call: 'search.getResults', q: cleanQ, p: 1, n: 50, _format: 'json', ctx: 'web6dot0' },
             headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-            timeout: 3800
-          }).catch(() => null),
-          axios.get('https://www.jiosaavn.com/api.php', {
-            params: { __call: 'search.getResults', q: cleanQ, p: 2, n: 40, _format: 'json', ctx: 'web6dot0' },
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-            timeout: 3800
-          }).catch(() => null),
-          axios.get('https://www.jiosaavn.com/api.php', {
-            params: { __call: 'search.getResults', q: cleanQ, p: 3, n: 40, _format: 'json', ctx: 'web6dot0' },
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-            timeout: 3800
+            timeout: 3200
           }).catch(() => null),
           axios.get('https://www.jiosaavn.com/api.php', {
             params: { __call: 'autocomplete.get', query: cleanQ, _format: 'json', ctx: 'web6dot0' },
@@ -327,8 +317,6 @@ export class UniversalSearchService {
 
         const rawList = [
           ...(p1?.data?.results || []),
-          ...(p2?.data?.results || []),
-          ...(p3?.data?.results || []),
           ...(autoRes?.data?.songs?.data || [])
         ];
 

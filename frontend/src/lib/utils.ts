@@ -177,10 +177,22 @@ export function getMediaUrl(
       return `${API_BASE}/utils/stream-youtube?${params.toString()}`;
     }
 
-    // Direct CDN audio streams (Apple Akamai, Cloudinary, Supabase)
-    if (trimmedPath.includes('audio-ssl') || trimmedPath.includes('mzstatic.com') || trimmedPath.includes('apple.com') ||
-        trimmedPath.includes('spotify-api.mybackend.in') || trimmedPath.includes('youtube-db.checkleaked.com') ||
-        trimmedPath.includes('res.cloudinary.com') || trimmedPath.includes('supabase.co')) {
+    // Strict ban on 30s preview URLs: reroute directly to full audio streaming
+    if (type === 'audio' && (trimmedPath.includes('audio-ssl') || trimmedPath.includes('mzstatic.com') || trimmedPath.includes('itunes.apple.com'))) {
+      const query = `${trackContext?.artist || ''} - ${trackContext?.title || ''}`.trim() || trimmedPath;
+      const params = new URLSearchParams({ url: query });
+      if (trackContext?.id) params.set('trackId', trackContext.id);
+      if (trackContext?.title) params.set('title', trackContext.title);
+      if (trackContext?.artist) params.set('artist', trackContext.artist);
+      if (trackContext?.album) params.set('album', trackContext.album);
+      if (trackContext?.language) params.set('language', trackContext.language);
+      return `${API_BASE}/utils/stream-youtube?${params.toString()}`;
+    }
+
+    // Direct CDN audio streams with CORS support (JioSaavn Akamai, Cloudinary, Supabase, R2)
+    if (trimmedPath.includes('saavncdn.com') || trimmedPath.includes('jiosaavn.com') ||
+        trimmedPath.includes('r2.dev') || trimmedPath.includes('res.cloudinary.com') ||
+        trimmedPath.includes('supabase.co')) {
       return trimmedPath;
     }
 
