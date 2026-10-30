@@ -7,10 +7,22 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { HelmetProvider } from 'react-helmet-async';
 
-// Deferred Service Worker registration to eliminate render-blocking script from initial critical path
+// Deferred Service Worker registration with prompt update check
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).then((reg) => {
+      reg.update().catch(() => {});
+      reg.onupdatefound = () => {
+        const installingWorker = reg.installing;
+        if (installingWorker) {
+          installingWorker.onstatechange = () => {
+            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              installingWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+          };
+        }
+      };
+    }).catch(() => {});
   });
 }
 
@@ -37,9 +49,19 @@ if (typeof window !== 'undefined' && window.location.hash) {
   }
 }
 
-// Automatically reload when a new Vite build is deployed and chunk hashes change
+// Automatically reload and bust stale caches when a new Vite build is deployed
 if (typeof window !== 'undefined') {
-  window.addEventListener('vite:preloadError', () => {
+  window.addEventListener('vite:preloadError', async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        for (const key of keys) await caches.delete(key);
+      }
+    } catch (_) {}
     window.location.reload();
   });
 }

@@ -200,17 +200,20 @@ export default function PlaylistDetailPage() {
  const colors = useAlbumColor(playlist?.coverUrl || firstTrack?.coverUrl, firstTrack?.palette);
  const playlistCover = getMediaUrl(playlist?.coverUrl) || getMediaUrl(firstTrack?.coverUrl) || playlist?.tracks?.[0]?.coverUrl;
 
+ // Artwork tint — isCancelled guard + separate unmount reset
  React.useEffect(() => {
    if (!playlistCover) return;
+   let cancelled = false;
    extractArtworkAverageColor(playlistCover).then((rgb) => {
-     if (rgb) {
-       applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
-     }
+     if (!cancelled && rgb) applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
    });
-   return () => {
-     resetArtworkTheme();
-   };
+   return () => { cancelled = true; };
  }, [playlistCover]);
+
+ // Reset only on page unmount, not on every cover change
+ React.useEffect(() => {
+   return () => resetArtworkTheme();
+ }, []);
 
  if (isLoading) return <div className="p-8 text-white">Loading playlist...</div>;
  if (error || !playlist) return <div className="p-8 text-white">Playlist not found</div>;

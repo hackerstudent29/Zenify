@@ -20,17 +20,97 @@
     <link rel="dns-prefetch" href="https://va.vercel-scripts.com" />
     
     <script>
-      // Auto-reload and unregister PWA if Vite chunks fail to load (MIME type mismatch)
-      window.addEventListener('error', function(e) {
-        if (e.message && e.message.includes('Failed to fetch dynamically imported module')) {
+      (function() {
+        // Clean up URL query if recovery cache-bust was triggered
+        try {
+          if (window.location.search.includes('_zenify_bust=')) {
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('_zenify_bust');
+            window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+          }
+        } catch (_) {}
+
+        // Proactively delete any stale HTML documents precached by legacy service workers
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) {
+              if (name.includes('precache') || name.includes('workbox')) {
+                caches.open(name).then(function(c) {
+                  c.delete('/');
+                  c.delete('/index.html');
+                  c.delete('index.html');
+                }).catch(function() {});
+              }
+            });
+          }).catch(function() {});
+        }
+
+        function recoverFromStaleAssets(reason) {
+          const RECOVERY_KEY = 'zenify_last_asset_recovery_ts';
+          const now = Date.now();
+          const lastRecovery = parseInt(sessionStorage.getItem(RECOVERY_KEY) || '0', 10);
+          // Prevent infinite reload loops: allow auto-recovery at most once every 12 seconds
+          if (now - lastRecovery < 12000) return;
+          sessionStorage.setItem(RECOVERY_KEY, String(now));
+
+          console.warn('[Zenify Self-Healing] Stale build asset detected (' + reason + '). Purging caches & reloading fresh...');
+
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(regs) {
-              for(let reg of regs) reg.unregister();
-            });
+              for (var i = 0; i < regs.length; i++) {
+                try { regs[i].unregister(); } catch (_) {}
+              }
+            }).catch(function() {});
           }
-          window.location.reload();
+
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              for (var j = 0; j < keys.length; j++) {
+                try { caches.delete(keys[j]); } catch (_) {}
+              }
+            }).catch(function() {});
+          }
+
+          setTimeout(function() {
+            var sep = window.location.href.indexOf('?') !== -1 ? '&' : '?';
+            window.location.replace(window.location.href + sep + '_zenify_bust=' + now);
+          }, 80);
         }
-      });
+
+        // Capture phase listener for <link> and <script> failures (MIME type mismatch or 404)
+        window.addEventListener('error', function(e) {
+          var target = e.target;
+          if (target && (target.tagName === 'LINK' || target.tagName === 'SCRIPT')) {
+            var resourceUrl = target.src || target.href || '';
+            if (resourceUrl && (resourceUrl.indexOf('/assets/') !== -1 || resourceUrl.indexOf('index-') !== -1)) {
+              recoverFromStaleAssets('Missing asset: ' + resourceUrl);
+              return;
+            }
+          }
+          var msg = e.message || '';
+          if (
+            msg.indexOf('Failed to fetch dynamically imported module') !== -1 ||
+            msg.indexOf('MIME type') !== -1 ||
+            msg.indexOf('strict MIME checking') !== -1 ||
+            msg.indexOf('Loading chunk') !== -1
+          ) {
+            recoverFromStaleAssets('Script error: ' + msg);
+          }
+        }, true);
+
+        // Capture dynamic import rejection errors
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = (e && e.reason && (e.reason.message || String(e.reason))) || '';
+          if (
+            reason.indexOf('dynamically imported module') !== -1 ||
+            reason.indexOf('error loading dynamically imported module') !== -1 ||
+            reason.indexOf('MIME type') !== -1 ||
+            reason.indexOf('Loading chunk') !== -1
+          ) {
+            recoverFromStaleAssets('Promise rejection: ' + reason);
+          }
+        });
+      })();
     </script>
     <style>
       :root {

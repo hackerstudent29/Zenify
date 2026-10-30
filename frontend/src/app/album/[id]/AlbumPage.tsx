@@ -214,18 +214,20 @@ export default function AlbumPage() {
     album?.tracks?.[0]?.coverUrl ||
     "/logo.png";
 
-  // Dynamic Apple Music Artwork Tint: compute dominant RGB and update CSS variables (--h, --s, --page, --side)
+  // Artwork tint — isCancelled guard + separate unmount reset
   useEffect(() => {
     if (!coverUrl) return;
+    let cancelled = false;
     extractArtworkAverageColor(coverUrl).then((rgb) => {
-      if (rgb) {
-        applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
-      }
+      if (!cancelled && rgb) applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
     });
-    return () => {
-      resetArtworkTheme();
-    };
+    return () => { cancelled = true; };
   }, [coverUrl]);
+
+  // Reset only on page unmount, not on every coverUrl change
+  useEffect(() => {
+    return () => resetArtworkTheme();
+  }, []);
 
   const isTrackMatch = (t1: any, t2: any) => {
     if (!t1 || !t2) return false;

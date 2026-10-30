@@ -326,14 +326,28 @@ export default function TrackPage() {
     staleTime: 1000 * 60 * 10,
   });
 
-  /* ─── Artwork tint ─── */
+  /* ─── Artwork tint — with isCancelled guard so navigating away
+       before the promise resolves never fires applyArtworkTheme after
+       resetArtworkTheme has already been called. ─── */
   useEffect(() => {
     if (!trackCoverUrl) return;
+    let cancelled = false;
     extractArtworkAverageColor(trackCoverUrl).then((rgb) => {
-      if (rgb) applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
+      if (!cancelled && rgb) applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
     });
-    return () => resetArtworkTheme();
+    // Cleanup: cancel the in-flight promise response, but do NOT call
+    // resetArtworkTheme here — that would cause a neutral flash every time
+    // the cover URL changes (e.g. when dbTrack upgrades the URL).
+    // The actual page-level reset is done on full unmount below.
+    return () => { cancelled = true; };
   }, [trackCoverUrl]);
+
+  // Only reset the theme when this page actually unmounts (navigating away).
+  // Keeping this separate from the color effect prevents the "flash to neutral
+  // then re-apply" cycle that happened when the cleanup ran on every URL change.
+  useEffect(() => {
+    return () => resetArtworkTheme();
+  }, []);
 
   /* ─── Instant DB import for YT/unsaved tracks ─── */
   useEffect(() => {
