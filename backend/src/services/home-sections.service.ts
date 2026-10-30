@@ -229,12 +229,37 @@ export class HomeSectionsService {
   }
 
   /**
-   * Helper: Resolves User Taste Profile seeds with strict language isolation
+   * Helper: Resolves User Taste Profile seeds with strict language isolation and listening history
    */
-  private static async getUserTaste(userId?: string, requestedLang?: string, requestedCountry?: string) {
+  static async getUserTaste(
+    userId?: string,
+    requestedLang?: string,
+    requestedCountry?: string,
+    recentArtistsInput?: string | string[]
+  ) {
     const rawReqLang = (requestedLang || '').trim();
     const rawReqCountry = (requestedCountry || '').trim();
-    const cacheKey = `user_taste:v3:${userId || 'anon'}:${rawReqLang.toLowerCase()}:${rawReqCountry.toLowerCase()}`;
+
+    // Parse any client-passed recent artists (from localStorage recently played)
+    let clientRecentArtists: string[] = [];
+    if (recentArtistsInput) {
+      if (Array.isArray(recentArtistsInput)) {
+        clientRecentArtists = recentArtistsInput;
+      } else if (typeof recentArtistsInput === 'string') {
+        const trimmed = recentArtistsInput.trim();
+        if (trimmed.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) clientRecentArtists = parsed;
+          } catch {}
+        } else {
+          clientRecentArtists = trimmed.split(',').map(s => s.trim()).filter(Boolean);
+        }
+      }
+    }
+
+    const clientArtistKey = clientRecentArtists.slice(0, 3).map(a => a.toLowerCase().replace(/[^a-z0-9]/g, '')).join('_') || 'none';
+    const cacheKey = `user_taste:v4:${userId || 'anon'}:${rawReqLang.toLowerCase()}:${rawReqCountry.toLowerCase()}:${clientArtistKey}`;
     const cached = await getCacheVal(cacheKey);
     if (cached) return cached;
 
@@ -242,17 +267,31 @@ export class HomeSectionsService {
     let profile: any = null;
     let preferences: any = null;
     let recentLikes: any[] = [];
+    let historyEntries: any[] = [];
+    let userStats: any[] = [];
 
     if (userId) {
-      [dbUser, profile, preferences, recentLikes] = await Promise.all([
+      [dbUser, profile, preferences, recentLikes, historyEntries, userStats] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { country: true } }),
         prisma.userInterestProfile.findUnique({ where: { userId } }),
         prisma.userPreferences.findUnique({ where: { userId } }),
         prisma.like.findMany({
-          where: { userId },
+          where: { userId, track: { deletedAt: null } },
           include: { track: { select: { artist: { select: { name: true } }, genre: true, language: true } } },
           orderBy: { createdAt: 'desc' },
-          take: 20
+          take: 25
+        }),
+        prisma.history.findMany({
+          where: { userId, track: { deletedAt: null } },
+          include: { track: { select: { artist: { select: { name: true } }, genre: true, language: true, title: true } } },
+          orderBy: { playedAt: 'desc' },
+          take: 40
+        }),
+        prisma.userTrackStat.findMany({
+          where: { userId, track: { deletedAt: null } },
+          include: { track: { select: { artist: { select: { name: true } }, genre: true, language: true, title: true } } },
+          orderBy: { streamCount: 'desc' },
+          take: 30
         })
       ]);
     }
@@ -263,7 +302,89 @@ export class HomeSectionsService {
     const countryCode = COUNTRY_MAP[rawCountry] || 'in';
     const countryName = COUNTRY_DISPLAY_NAME_MAP[rawCountry] || COUNTRY_DISPLAY_NAME_MAP[countryCode] || 'India';
 
-    // 2. Strict Language Resolution (Single Selected Language First)
+    // 2. Aggregate Listening Signals (Artists, Languages, Genres)
+    const artistScores = new Map<string, number>();
+    const favoriteArtistsMap: Record<string, string> = {};
+    const languageCounts = new Map<string, number>();
+    const genreCounts = new Map<string, number>();
+
+    // Signal A: Recent playback history (highest immediacy for what user is currently listening to)
+    for (const h of historyEntries) {
+      const track = h.track;
+      if (!track) continue;
+      const artistName = track.artist?.name;
+      if (artistName && !isFakeOrNumericArtistName(artistName)) {
+        const clean = cleanArtistNames(artistName);
+        artistScores.set(clean, (artistScores.get(clean) || 0) + 4);
+      }
+      if (track.language) {
+        const lang = track.language.toLowerCase().trim();
+        languageCounts.set(lang, (languageCounts.get(lang) || 0) + 3);
+      }
+      if (track.genre) {
+        const genre = track.genre.trim();
+        genreCounts.set(genre, (genreCounts.get(genre) || 0) + 2);
+      }
+    }
+
+    // Signal B: Playcount stats (tracks user listens to repeatedly)
+    for (const stat of userStats) {
+      const track = stat.track;
+      if (!track) continue;
+      const artistName = track.artist?.name;
+      if (artistName && !isFakeOrNumericArtistName(artistName)) {
+        const clean = cleanArtistNames(artistName);
+        const weight = Math.min(stat.streamCount || 1, 10);
+        artistScores.set(clean, (artistScores.get(clean) || 0) + weight);
+      }
+      if (track.language) {
+        const lang = track.language.toLowerCase().trim();
+        languageCounts.set(lang, (languageCounts.get(lang) || 0) + 2);
+      }
+      if (track.genre) {
+        const genre = track.genre.trim();
+        genreCounts.set(genre, (genreCounts.get(genre) || 0) + 2);
+      }
+    }
+
+    // Signal C: Client-reported recent artists from local player listening history
+    for (const artistName of clientRecentArtists) {
+      if (artistName && !isFakeOrNumericArtistName(artistName)) {
+        const clean = cleanArtistNames(artistName);
+        artistScores.set(clean, (artistScores.get(clean) || 0) + 5);
+      }
+    }
+
+    // Signal D: Liked songs
+    for (const like of recentLikes) {
+      const track = like.track;
+      if (!track) continue;
+      const artistName = track.artist?.name;
+      if (artistName && !isFakeOrNumericArtistName(artistName)) {
+        const clean = cleanArtistNames(artistName);
+        artistScores.set(clean, (artistScores.get(clean) || 0) + 3);
+      }
+      if (track.language) {
+        const lang = track.language.toLowerCase().trim();
+        languageCounts.set(lang, (languageCounts.get(lang) || 0) + 1);
+      }
+    }
+
+    // Signal E: User explicit preferences
+    if (preferences?.favoriteArtists && Array.isArray(preferences.favoriteArtists)) {
+      for (const fav of preferences.favoriteArtists as any[]) {
+        const name = fav?.name?.trim();
+        if (name && !isFakeOrNumericArtistName(name)) {
+          const clean = cleanArtistNames(name);
+          artistScores.set(clean, (artistScores.get(clean) || 0) + 6);
+          if (fav.image) {
+            favoriteArtistsMap[clean.toLowerCase()] = fav.image;
+          }
+        }
+      }
+    }
+
+    // 3. Strict Language Resolution (Single Selected Language First)
     let primaryLangName = 'Tamil';
     let primaryLangCode = 'ta';
 
@@ -296,6 +417,16 @@ export class HomeSectionsService {
         primaryLangName = preferences.selectedLanguageName || selected;
         primaryLangCode = (preferences.selectedLanguageCode || 'ta').toLowerCase();
       }
+    } else if (languageCounts.size > 0) {
+      // Infer language from what the user is actually listening to
+      const topListenedLang = Array.from(languageCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (topListenedLang) {
+        const mapped = LANG_MAP[topListenedLang.toLowerCase()];
+        if (mapped) {
+          primaryLangName = mapped.name;
+          primaryLangCode = mapped.code;
+        }
+      }
     } else if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
       const topLang = Object.entries(profile.languageWeights as Record<string, number>)
         .sort((a, b) => b[1] - a[1])[0]?.[0];
@@ -311,10 +442,12 @@ export class HomeSectionsService {
     const languageNames: string[] = [primaryLangName];
     const languageCodes: string[] = [primaryLangCode];
 
-    // 3. Genres
+    // 4. Genres Resolution
     let genres: string[] = [];
     if (preferences?.preferredGenres && preferences.preferredGenres.length > 0) {
       genres = preferences.preferredGenres;
+    } else if (genreCounts.size > 0) {
+      genres = Array.from(genreCounts.entries()).sort((a, b) => b[1] - a[1]).map(([g]) => g).slice(0, 5);
     } else if (profile?.genreWeights && Object.keys(profile.genreWeights as any).length > 0) {
       genres = Object.keys(profile.genreWeights as any);
     }
@@ -322,26 +455,12 @@ export class HomeSectionsService {
       genres = ['Pop', 'Film Music', 'Melody', 'Soundtrack'];
     }
 
-    // 4. Favorite Artists
-    const favoriteArtistNames: string[] = [];
-    const favoriteArtistsMap: Record<string, string> = {};
-    if (preferences?.favoriteArtists && Array.isArray(preferences.favoriteArtists)) {
-      for (const fav of preferences.favoriteArtists as any[]) {
-        const name = fav?.name?.trim();
-        if (name && !favoriteArtistNames.includes(name)) {
-          favoriteArtistNames.push(name);
-          if (fav.image) {
-            favoriteArtistsMap[name.toLowerCase()] = fav.image;
-          }
-        }
-      }
-    }
-    for (const like of recentLikes) {
-      const artistName = like.track?.artist?.name?.trim();
-      if (artistName && !favoriteArtistNames.includes(artistName)) {
-        favoriteArtistNames.push(artistName);
-      }
-    }
+    // 5. Favorite / Listened Artists
+    const sortedArtistNames = Array.from(artistScores.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name]) => name);
+
+    const favoriteArtistNames: string[] = [...sortedArtistNames];
 
     const result = {
       primaryLangName,
@@ -356,7 +475,7 @@ export class HomeSectionsService {
       favoriteArtistsMap,
       topArtists: favoriteArtistNames.slice(0, 4)
     };
-    await setCacheVal(cacheKey, result, 600); // 10 minutes cache
+    await setCacheVal(cacheKey, result, 180); // 3 minutes cache for fast response to new listening
     return result;
   }
 
@@ -420,12 +539,13 @@ export class HomeSectionsService {
   /**
    * 1. Made For You (AI-Personalized strictly by user's selected language, country & artists)
    */
-  static async getMadeForYou(userId?: string, requestedLang?: string, requestedCountry?: string) {
-    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry);
+  static async getMadeForYou(userId?: string, requestedLang?: string, requestedCountry?: string, recentArtists?: string | string[]) {
+    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry, recentArtists);
     const primaryLang = taste.languageNames[0] || 'Tamil';
-    const key = `catalog:made_for_you:v2:${userId || 'anon'}:${primaryLang.toLowerCase()}:${taste.countryCode}`;
+    const artistKey = taste.favoriteArtistNames.slice(0, 3).map(a => a.toLowerCase().replace(/[^a-z0-9]/g, '')).join('_') || 'none';
+    const key = `catalog:made_for_you:v3:${userId || 'anon'}:${artistKey}:${primaryLang.toLowerCase()}:${taste.countryCode}`;
 
-    return this.getCachedOrFetch(key, SHELVES_CACHE_TTL, async () => {
+    return this.getCachedOrFetch(key, 300, async () => {
       const curation = await AICurationService.getCuration({
         language: primaryLang,
         country: taste.countryName,
@@ -438,6 +558,25 @@ export class HomeSectionsService {
         artistsToQuery.map(artist => CompositeCatalogService.getArtistTopSongs(artist, taste.countryCode, 5))
       );
       let merged = trackBatches.flat().filter(t => !isCompilationOrPlaylist(t.title, t.duration));
+
+      // Supplement with local database tracks from listened artists
+      if (artistsToQuery.length > 0) {
+        try {
+          const localTracks = await prisma.track.findMany({
+            where: {
+              deletedAt: null,
+              OR: artistsToQuery.map(artist => ({
+                artist: { name: { equals: artist, mode: 'insensitive' } }
+              }))
+            },
+            take: 8,
+            include: { artist: true, album: true }
+          });
+          if (localTracks.length > 0) {
+            merged.unshift(...localTracks.map(formatTrackItem));
+          }
+        } catch {}
+      }
 
       // Supplement with curated trending tracks of that language if needed
       if (merged.length < 12) {
@@ -462,9 +601,13 @@ export class HomeSectionsService {
       }
 
       const annotated = await this.annotateInLibrary(deduplicated);
+      const subtitle = taste.favoriteArtistNames.length > 0
+        ? `BASED ON YOUR LISTENING TO ${taste.favoriteArtistNames.slice(0, 2).join(' & ').toUpperCase()}`
+        : `TAILORED TO YOUR ${primaryLang.toUpperCase()} MUSIC TASTE`;
+
       return {
         title: 'Made For You',
-        subtitle: `TAILORED TO YOUR ${primaryLang.toUpperCase()} MUSIC TASTE`,
+        subtitle,
         type: 'made_for_you',
         items: annotated.slice(0, 15).map(formatTrackItem)
       };
@@ -552,12 +695,12 @@ export class HomeSectionsService {
   }
 
   /**
-   * 4. Trending Now (Strictly in Selected Language)
+   * 4. Trending Now (Strictly in Selected Language & Listening Context)
    */
-  static async getTrendingNow(userId?: string, requestedLang?: string, requestedCountry?: string) {
-    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry);
+  static async getTrendingNow(userId?: string, requestedLang?: string, requestedCountry?: string, recentArtists?: string | string[]) {
+    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry, recentArtists);
     const primaryLang = taste.languageNames[0] || 'Tamil';
-    const key = `catalog:trending_now:v2:${primaryLang.toLowerCase()}:${taste.countryCode}`;
+    const key = `catalog:trending_now:v3:${primaryLang.toLowerCase()}:${taste.countryCode}`;
 
     return this.getCachedOrFetch(key, CHARTS_CACHE_TTL, async () => {
       const curation = await AICurationService.getCuration({
@@ -599,8 +742,8 @@ export class HomeSectionsService {
       const annotated = await this.annotateInLibrary(tracks);
 
       return {
-        title: `Trending in ${primaryLang}`,
-        subtitle: 'THE MOST PLAYED TRACKS RIGHT NOW',
+        title: `Trending Hits`,
+        subtitle: `THE PULSE OF ${primaryLang.toUpperCase()} MUSIC`,
         type: 'trending_now',
         items: annotated.map(formatTrackItem)
       };
@@ -620,14 +763,15 @@ export class HomeSectionsService {
   }
 
   /**
-   * 6. Popular Artists in Your Languages (Strictly in Selected Language)
+   * 6. Popular Artists in Your Languages (Prioritizing User's Listened Artists)
    */
-  static async getPopularArtistsInLanguages(userId?: string, requestedLang?: string, requestedCountry?: string) {
-    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry);
+  static async getPopularArtistsInLanguages(userId?: string, requestedLang?: string, requestedCountry?: string, recentArtists?: string | string[]) {
+    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry, recentArtists);
     const primaryLang = taste.languageNames[0] || 'Tamil';
-    const key = `catalog:artists_lang:v2:${primaryLang.toLowerCase()}:${userId || 'anon'}`;
+    const artistKey = taste.favoriteArtistNames.slice(0, 3).map(a => a.toLowerCase().replace(/[^a-z0-9]/g, '')).join('_') || 'none';
+    const key = `catalog:artists_lang:v3:${primaryLang.toLowerCase()}:${userId || 'anon'}:${artistKey}`;
 
-    return this.getCachedOrFetch(key, ARTIST_CACHE_TTL, async () => {
+    return this.getCachedOrFetch(key, 600, async () => {
       const curation = await AICurationService.getCuration({
         language: primaryLang,
         country: taste.countryName,
@@ -638,7 +782,7 @@ export class HomeSectionsService {
       const items: any[] = [];
       const seenNames = new Set<string>();
 
-      // 1. User's chosen favorite artists if provided
+      // 1. User's chosen and listened artists first
       for (const artistName of taste.favoriteArtistNames) {
         if (!artistName || isFakeOrNumericArtistName(artistName)) continue;
         const lower = artistName.toLowerCase().trim();
@@ -654,6 +798,7 @@ export class HomeSectionsService {
             type: 'artist',
             href: `/artist/artist-${artistName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
           });
+          if (items.length >= 10) break;
         }
       }
 
@@ -678,8 +823,8 @@ export class HomeSectionsService {
       }
 
       return {
-        title: `Popular ${primaryLang} Artists`,
-        subtitle: 'VOICES LEADING THE SCENE',
+        title: `Artists You May Like`,
+        subtitle: 'VOICES FROM YOUR FREQUENCIES',
         type: 'popular_artists_lang',
         items
       };
@@ -687,12 +832,15 @@ export class HomeSectionsService {
   }
 
   /**
-   * 7. Top Albums for You (Curated studio albums from selected artists, languages, and region)
+   * 7. Top Albums for You (Curated studio albums from listened artists, languages, and region)
    */
-  static async getAlbumsForYou(userId?: string) {
-    const key = `catalog:albums_for_you:${userId || 'anon'}`;
-    return this.getCachedOrFetch(key, SHELVES_CACHE_TTL, async () => {
-      const { favoriteArtistNames, languageNames, countryCode, countryName } = await this.getUserTaste(userId);
+  static async getAlbumsForYou(userId?: string, requestedLang?: string, requestedCountry?: string, recentArtists?: string | string[]) {
+    const taste = await this.getUserTaste(userId, requestedLang, requestedCountry, recentArtists);
+    const artistKey = taste.favoriteArtistNames.slice(0, 3).map(a => a.toLowerCase().replace(/[^a-z0-9]/g, '')).join('_') || 'none';
+    const key = `catalog:albums_for_you:v3:${userId || 'anon'}:${artistKey}`;
+
+    return this.getCachedOrFetch(key, 600, async () => {
+      const { favoriteArtistNames, languageNames, countryCode, countryName } = taste;
       const items: any[] = [];
       const seenAlbumTitles = new Set<string>();
 
@@ -818,62 +966,7 @@ export class HomeSectionsService {
           } catch {}
         }
 
-        // 3. Supplement with regional top albums from JioSaavn for user's country
-        if (items.length < 8 && countryCode) {
-          try {
-            const regionRes = await axios.get('https://www.jiosaavn.com/api.php', {
-              params: {
-                __call: 'search.getAlbumResults',
-                q: `${countryName || 'Indian'} hits`,
-                _format: 'json',
-                n: 4,
-                p: 1,
-                api_version: '4',
-                ctx: 'web6dot0'
-              },
-              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-              timeout: 3500
-            }).catch(() => null);
-
-            if (regionRes?.data?.results) {
-              for (const alb of regionRes.data.results) {
-                const albTitle = (alb.title || alb.name || '')
-                  .replace(/&quot;/g, '"')
-                  .replace(/&#039;/g, "'")
-                  .replace(/&amp;/g, '&')
-                  .trim();
-                const norm = albTitle.toLowerCase();
-                if (albTitle && !seenAlbumTitles.has(norm)) {
-                  seenAlbumTitles.add(norm);
-                  const art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
-                  const albId = `saavn-album-${alb.id}`;
-                  const albArtist = cleanArtistNames(alb.artist || alb.more_info?.artist_map?.primary_artists?.[0]?.name || alb.primary_artists || 'Various Artists');
-                  items.push({
-                    id: albId,
-                    title: albTitle,
-                    name: albTitle,
-                    coverUrl: art,
-                    imageUrl: art,
-                    isAlbum: true,
-                    type: 'album',
-                    href: `/album/${albId}`,
-                    artistName: albArtist,
-                    trackCount: 1,
-                    releaseDate: alb.year ? `${alb.year}-01-01` : undefined,
-                    genre: alb.language ? `${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)} Album` : 'Album',
-                    artist: {
-                      id: `artist-${albArtist.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-                      name: albArtist,
-                      imageUrl: art
-                    }
-                  });
-                }
-              }
-            }
-          } catch {}
-        }
-
-        // 4. Also check local database for any albums
+        // 3. Supplement with local database albums
         try {
           const dbAlbums = await prisma.album.findMany({
             take: 6,
@@ -911,15 +1004,15 @@ export class HomeSectionsService {
 
       return {
         title: 'Top Albums for You',
-        subtitle: 'ALBUMS FROM YOUR FAVORITE ARTISTS, LANGUAGES & REGION',
+        subtitle: 'ALBUMS MATCHING YOUR TASTE',
         type: 'genre_playlists',
         items
       };
     });
   }
 
-  static async getTopGenrePlaylists(userId?: string) {
-    return this.getAlbumsForYou(userId);
+  static async getTopGenrePlaylists(userId?: string, requestedLang?: string, requestedCountry?: string, recentArtists?: string | string[]) {
+    return this.getAlbumsForYou(userId, requestedLang, requestedCountry, recentArtists);
   }
 
   /**

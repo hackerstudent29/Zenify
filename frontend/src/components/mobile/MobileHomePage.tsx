@@ -256,6 +256,11 @@ export function MobileHomePage() {
  <div className="space-y-12 pb-10">
  {sections?.map((section: any, idx: number) => {
  const icons: any = {
+ continue_listening: Music2,
+ made_for_you: Heart,
+ popular_artists_lang: User,
+ trending_now: Sparkles,
+ genre_playlists: Music2,
  most_played: TrendingUp,
  new: Music2,
  trending: Sparkles,

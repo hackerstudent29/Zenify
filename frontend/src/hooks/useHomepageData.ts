@@ -4,6 +4,29 @@ import { get, set } from "idb-keyval";
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/authStore";
 
+function getRecentArtistsFromClient(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('zenify_recently_played_tracks');
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return [];
+    const artists: string[] = [];
+    for (const t of list) {
+      const name = t?.artist?.name || t?.artistName || (typeof t?.artist === 'string' ? t.artist : null);
+      if (name && typeof name === 'string') {
+        const clean = name.trim();
+        if (clean && !artists.includes(clean)) {
+          artists.push(clean);
+        }
+      }
+    }
+    return artists.slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
 export function useHomepageData() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
@@ -47,22 +70,17 @@ export function useHomepageData() {
   const rawCountry = user?.country?.trim() || localCountry || 'India';
   const userCountry = rawCountry.trim();
 
-  const countryDisplayName = userCountry
-    ? (userCountry.toUpperCase() === 'US' || userCountry.toLowerCase() === 'usa' ? 'United States'
-      : userCountry.toUpperCase() === 'UK' || userCountry.toUpperCase() === 'GB' ? 'United Kingdom'
-      : userCountry)
-    : 'India';
-  const topCountryTitle = `Top Songs in ${countryDisplayName}`;
-
   const fetchSection = async (endpoint: string) => {
     const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const cacheKey = `homepage_cache_${userId}_${path}`;
+    const recentArtists = getRecentArtistsFromClient();
+    const cacheKey = `homepage_cache_v5_${userId}_${path}_${recentArtists.slice(0, 2).join('_')}`;
 
     try {
       const res = await api.get(`/homepage${path}`, {
         headers: {
           'x-user-language': userLang,
-          'x-user-country': userCountry
+          'x-user-country': userCountry,
+          'x-user-recent-artists': recentArtists.join(',')
         }
       });
       if (res.data) {
@@ -83,31 +101,26 @@ export function useHomepageData() {
   // Listen for real-time track and playlist updates across the application
   useEffect(() => {
     const handleInvalidate = () => {
-      queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
-      queryClient.invalidateQueries({ queryKey: ['home-top-country'] });
-      queryClient.invalidateQueries({ queryKey: ['home-new-releases-lang'] });
-      queryClient.invalidateQueries({ queryKey: ['home-trending-now'] });
-      queryClient.invalidateQueries({ queryKey: ['home-popular-artists-lang'] });
-      queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
-      queryClient.invalidateQueries({ queryKey: ['home-recently-played'] });
       queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
-      queryClient.invalidateQueries({ queryKey: ['home-featured'] });
-      queryClient.invalidateQueries({ queryKey: ['home-discover-country-lang'] });
+      queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
+      queryClient.invalidateQueries({ queryKey: ['home-popular-artists-lang'] });
+      queryClient.invalidateQueries({ queryKey: ['home-trending-now'] });
+      queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
     };
 
     const handleCountryLangChanged = () => {
       queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
       queryClient.invalidateQueries({ queryKey: ['home-trending-now'] });
-      queryClient.invalidateQueries({ queryKey: ['home-featured'] });
-      queryClient.invalidateQueries({ queryKey: ['home-top-country'] });
-      queryClient.invalidateQueries({ queryKey: ['home-new-releases-lang'] });
       queryClient.invalidateQueries({ queryKey: ['home-popular-artists-lang'] });
-      queryClient.invalidateQueries({ queryKey: ['home-discover-country-lang'] });
+      queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
     };
 
     const handleTrackPlayed = () => {
-      queryClient.invalidateQueries({ queryKey: ['home-recently-played'] });
       queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
+      queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
+      queryClient.invalidateQueries({ queryKey: ['home-popular-artists-lang'] });
+      queryClient.invalidateQueries({ queryKey: ['home-trending-now'] });
+      queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
     };
 
     window.addEventListener('zenify:track-updated', handleInvalidate);
@@ -129,25 +142,12 @@ export function useHomepageData() {
     };
   }, [queryClient]);
 
-  const REFETCH_INTERVAL = false as const; // Disable background periodic polling of all shelves
-  const STALE_TIME = 5 * 60 * 1000; // 5 minutes fresh cache
+  const REFETCH_INTERVAL = false as const;
+  const STALE_TIME = 3 * 60 * 1000; // 3 minutes fresh cache
 
   const results = useQueries({
     queries: [
-      // 1. Featured Now (dynamically matches country & language)
-      {
-        queryKey: ['home-featured', userId, userCountry, userLang],
-        queryFn: () => {
-          const params = new URLSearchParams();
-          if (userCountry) params.set('country', userCountry);
-          if (userLang) params.set('language', userLang);
-          const qs = params.toString() ? `?${params.toString()}` : '';
-          return fetchSection(`/featured${qs}`);
-        },
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      },
-      // 2. Continue Listening (Last 10 songs listened to or played)
+      // 1. Song Section 1: Continue Listening (Tracks user listened to)
       {
         queryKey: ['home-continue-listening', userId],
         queryFn: async () => {
@@ -177,93 +177,49 @@ export function useHomepageData() {
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 3. Made for you (personalized strictly by selected language, genre, artist weights)
+      // 2. Song Section 2: Made for You (Personalized songs based on user listening)
       {
         queryKey: ['home-made-for-you', userId, userLang, userCountry],
         queryFn: () => fetchSection(`/made-for-you?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 4. Top songs in your country (strictly for selected language)
-      {
-        queryKey: ['home-top-country', userId, userCountry, userLang],
-        queryFn: () => fetchSection(`/top-country?country=${encodeURIComponent(userCountry)}&language=${encodeURIComponent(userLang)}`),
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      },
-      // 5. New releases in your languages (strictly in selected language)
-      {
-        queryKey: ['home-new-releases-lang', userId, userLang, userCountry],
-        queryFn: () => fetchSection(`/new-releases-lang?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      },
-      // 6. Trending now (strictly in selected language)
-      {
-        queryKey: ['home-trending-now', userId, userLang, userCountry],
-        queryFn: () => fetchSection(`/trending-now?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      },
-      // 7. Popular artists in your languages (strictly in selected language)
+      // 3. Artists Section: Artists You May Like / Popular Artists (Matching listening context)
       {
         queryKey: ['home-popular-artists-lang', userId, userLang, userCountry],
         queryFn: () => fetchSection(`/popular-artists-lang?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 8. Top genre playlists
+      // 4. Song Section 3: Trending Hits (Top trending tracks in user's taste and language)
       {
-        queryKey: ['home-genre-playlists', userId],
-        queryFn: () => fetchSection('/genre-playlists'),
+        queryKey: ['home-trending-now', userId, userLang, userCountry],
+        queryFn: () => fetchSection(`/trending-now?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       },
-      // 9. Recently played
+      // 5. Albums Section: Top Albums for You (Authentic albums from listened artists & language)
       {
-        queryKey: ['home-recently-played', userId],
-        queryFn: () => fetchSection('/recently-played'),
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      },
-      // 10. Regional Country & Language Discovery Sections
-      {
-        queryKey: ['home-discover-country-lang', userId, userCountry, userLang],
-        queryFn: async () => {
-          try {
-            const localCountry = typeof window !== 'undefined' ? localStorage.getItem("zenify_selected_country") : null;
-            const localLang = typeof window !== 'undefined' ? localStorage.getItem("zenify_selected_language") : null;
-            const countryParam = userCountry || localCountry || 'IN';
-            const langParam = userLang || localLang || 'ta';
-            const res = await api.get(`/discover/sections?country=${encodeURIComponent(countryParam)}&language=${encodeURIComponent(langParam)}`);
-            return res.data;
-          } catch (e) {
-            return null;
-          }
-        },
+        queryKey: ['home-genre-playlists', userId, userLang, userCountry],
+        queryFn: () => fetchSection(`/genre-playlists?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
         staleTime: STALE_TIME,
         refetchInterval: REFETCH_INTERVAL,
       }
     ]
   });
 
-  const isLoading = results.slice(0, 9).some(r => r.isLoading);
-  const isError = results.slice(0, 9).every(r => r.isError);
+  const isLoading = results.some(r => r.isLoading);
+  const isError = results.every(r => r.isError);
 
   const sectionConfigs = [
-    { type: 'featured', title: 'Featured Now', subtitle: 'TOP PICKS FROM THE EDITORIAL TEAM' },
     { type: 'continue_listening', title: 'Continue Listening', subtitle: 'JUMP BACK IN' },
-    { type: 'made_for_you', title: 'Made For You', subtitle: 'BASED ON YOUR SONIC PREFERENCES' },
-    { type: 'top_country', title: topCountryTitle, subtitle: "WHAT'S BIG IN YOUR REGION" },
-    { type: 'new_releases_lang', title: 'New Releases In Your Languages', subtitle: 'FRESH DROPS IN YOUR FAVORITE FREQUENCIES' },
-    { type: 'trending_now', title: 'Trending Now', subtitle: 'THE PULSE OF THE COMMUNITY' },
-    { type: 'popular_artists_lang', title: 'Popular Artists In Your Languages', subtitle: 'VOICES LEADING THE SCENE' },
-    { type: 'genre_playlists', title: 'Top Albums for You', subtitle: 'ALBUMS FROM YOUR FAVORITE ARTISTS, LANGUAGES & REGION' },
-    { type: 'recently_played', title: 'Recently Played', subtitle: 'PICK UP WHERE YOU LEFT OFF' }
+    { type: 'made_for_you', title: 'Made For You', subtitle: 'BASED ON YOUR LISTENING' },
+    { type: 'popular_artists_lang', title: 'Artists You May Like', subtitle: 'VOICES FROM YOUR FREQUENCIES' },
+    { type: 'trending_now', title: 'Trending Hits', subtitle: 'THE PULSE OF YOUR MUSIC' },
+    { type: 'genre_playlists', title: 'Top Albums for You', subtitle: 'ALBUMS MATCHING YOUR TASTE' }
   ];
 
-  // Standard sections
-  const standardSections = results.slice(0, 9).map((r, index) => {
+  const sections = results.map((r, index) => {
     const config = sectionConfigs[index];
     if (!r.data) {
       return {
@@ -283,38 +239,6 @@ export function useHomepageData() {
       isLoading: false
     };
   });
-
-  // Verified Country & Language Shelves (From Your Country, Popular in Language, Discover, New Releases)
-  const discoverData = results[9]?.data;
-  const verifiedRegionalShelves: any[] = [];
-  if (discoverData?.sections && Array.isArray(discoverData.sections)) {
-    const userSelectedLang = userLang.toLowerCase();
-    for (const sec of discoverData.sections) {
-      if (sec.items && sec.items.length > 0) {
-        const titleLower = (sec.title || '').toLowerCase();
-        // Strict language check: if shelf title mentions an unselected language like "Hindi" or "Telugu", discard it!
-        if (titleLower.includes('popular in') || titleLower.includes('from your country')) {
-          if (!titleLower.includes(userSelectedLang) && !titleLower.includes('tamil') && !titleLower.includes('india')) {
-            continue;
-          }
-        }
-        verifiedRegionalShelves.push({
-          type: sec.id,
-          title: sec.title,
-          subtitle: sec.subtitle,
-          items: sec.items,
-          isLoading: results[9].isLoading
-        });
-      }
-    }
-  }
-
-  // Interleave verified country & language shelves seamlessly into homepage discovery
-  const sections = [
-    ...standardSections.slice(0, 2), // Featured & Continue Listening
-    ...verifiedRegionalShelves,      // Verified Country & Language Shelves
-    ...standardSections.slice(2)      // Rest of shelves
-  ];
 
   return {
     sections,
