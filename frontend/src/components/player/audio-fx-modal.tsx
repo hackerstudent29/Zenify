@@ -1350,243 +1350,238 @@ function TempoTab({ fx, live, commit }: TabProps) {
   );
 }
 
+
+
 /* ─────────────────────────────────────────────────────────────────────────────
-   Controls panel (tabs + content + footer). Also exported as AudioFxMenu.
+   Collapsible Section Component (Accordion-style for right-side panel)
 ───────────────────────────────────────────────────────────────────────────── */
-type TabId = "presets" | "tune" | "space" | "voice" | "chain" | "tempo";
-const TABS: SegOption<TabId>[] = [
-  { value: "presets", label: "Presets" },
-  { value: "tune", label: "Tune" },
-  { value: "space", label: "Space" },
-  { value: "voice", label: "Voice" },
-  { value: "chain", label: "Chain" },
-  { value: "tempo", label: "Tempo" },
-];
-
-let lastTab: TabId = "presets"; // remembered between opens
-
-interface AudioFxControlsProps {
-  className?: string;
-  contentHeight?: string | number;
+interface CollapsibleSectionProps {
+  title: string;
+  icon: LucideIcon;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: ReactNode;
 }
 
-const AudioFxControls = memo(function AudioFxControls({ className, contentHeight }: AudioFxControlsProps) {
-  const { fx, live, commit } = useFx();
-  const [tab, setTabState] = useState<TabId>(lastTab);
-  const setTab = (t: TabId) => {
-    lastTab = t;
-    setTabState(t);
-  };
-  const tabProps: TabProps = { fx, live, commit };
-
+function CollapsibleSection({ title, icon: Icon, isOpen, onToggle, children }: CollapsibleSectionProps) {
   return (
-    <div className={cn("flex min-h-0 flex-col", className)}>
-      <div className="px-5">
-        <Spectrum />
-      </div>
-
-      <div className="px-5 pb-3 pt-1">
-        <Segmented label="Studio FX sections" value={tab} options={TABS} onChange={setTab} small />
-      </div>
-
-      <motion.div
-        layoutScroll
-        className="scrollbar-hide overflow-y-auto overscroll-contain px-5 pb-5"
-        style={{ height: contentHeight, touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}
+    <div className="border-b border-white/[0.08] last:border-b-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-2.5 px-4 py-3 text-left outline-none transition-colors hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-brand/60"
       >
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0, transition: SPRING_SOFT }}
-            exit={{ opacity: 0, transition: { duration: 0.08 } }}
-          >
-            {tab === "presets" && <PresetsTab {...tabProps} />}
-            {tab === "tune" && <TuneTab {...tabProps} />}
-            {tab === "space" && <SpaceTab {...tabProps} />}
-            {tab === "voice" && <VoiceTab {...tabProps} />}
-            {tab === "chain" && <ChainTab {...tabProps} />}
-            {tab === "tempo" && <TempoTab {...tabProps} />}
-          </motion.div>
-        </AnimatePresence>
-      </motion.div>
-
-      <div className="flex items-center justify-between border-t border-white/[0.08] bg-white/[0.03] px-5 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          onClick={() =>
-            commit({ ...DEFAULT_AUDIO_FX, eq: [0, 0, 0], chain: [...DEFAULT_CHAIN], crossfade: fx.crossfade })
-          }
-          className="rounded-md px-1 py-1 text-[12px] font-medium text-white/60 outline-none transition-all hover:text-white active:scale-95 focus-visible:ring-2 focus-visible:ring-brand/60"
+        <Icon size={16} className="shrink-0 text-white/60" strokeWidth={2} />
+        <span className="flex-1 text-[14px] font-semibold text-white">{title}</span>
+        <motion.span
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={SPRING_UI}
+          className="text-white/40"
         >
-          Reset all
-        </button>
-        <span className="text-[11px] font-medium text-white/30">Zenify Engine</span>
-      </div>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={SPRING_SOFT}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 space-y-4">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
-});
-
-// Alias export for backward compatibility
-export const AudioFxMenu = AudioFxControls;
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Modal: macOS popover on desktop, draggable bottom sheet on mobile
+   Right-Side Glass Panel: matches Queue/Lyrics panel style
 ───────────────────────────────────────────────────────────────────────────── */
-// Frosted liquid glass: bright top sheen over a light smoky tint so the album art shows through
-const GLASS_BG =
-  "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 36%, rgba(255,255,255,0.04) 100%), rgba(28,28,34,0.28)";
-const GLASS_BLUR = "blur(44px) saturate(190%)";
-
 export function AudioFxModal() {
   const isOpen = useUIStore((s) => s.isAudioFxOpen);
   const setOpen = useUIStore((s) => s.setAudioFxOpen);
   const isMobile = useIsMobile();
-  const reduceMotion = useReducedMotion();
   const bypass = usePlayerStore((s) => s.audioFx.bypass);
   const setFx = usePlayerStore((s) => s.setFx);
+  const { fx, live, commit } = useFx();
 
-  const dragY = useMotionValue(0);
-  const dragControls = useDragControls();
-  const backdropFade = useTransform(dragY, [0, 360], [1, 0.15]);
+  // Collapsible sections state
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    presets: true,
+    tune: false,
+    space: false,
+    voice: false,
+    chain: false,
+    tempo: false,
+  });
+
+  const toggleSection = (id: string) => {
+    setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const close = useCallback(() => setOpen(false), [setOpen]);
 
-  // Scroll lock + Esc
+  // Esc key handler
   useEffect(() => {
     if (!isOpen) return;
-    dragY.set(0);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [isOpen, close, dragY]);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, close]);
 
   const toggleEffects = (on: boolean) => {
     audioEngine.applyFx({ bypass: !on });
     setFx({ bypass: !on });
   };
 
-  const sheetMotion: Pick<MotionProps, "initial" | "animate" | "exit"> = reduceMotion
-    ? {
-        initial: { opacity: 0 },
-        animate: { opacity: 1, y: 0, transition: { duration: 0.15 } },
-        exit: { opacity: 0, transition: { duration: 0.12 } },
-      }
-    : isMobile
-    ? {
-        initial: { y: "100%" },
-        animate: { y: 0, transition: SPRING_SHEET },
-        exit: { y: "100%", transition: { type: "spring", stiffness: 420, damping: 42, mass: 0.9 } },
-      }
-    : {
-        initial: { opacity: 0, scale: 0.9, y: 14 },
-        animate: { opacity: 1, scale: 1, y: 0, transition: SPRING_POP },
-        exit: { opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.16, ease: [0.4, 0, 1, 1] as [number, number, number, number] } },
-      };
+  const tabProps: TabProps = { fx, live, commit };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop – plain fade (a full-screen blur here is what makes sheets stutter) */}
-          <motion.div
-            key="fx-backdrop"
-            className="fixed inset-0 z-[1400]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.22 }}
-            onClick={close}
-          >
-            {isMobile && <motion.div className="absolute inset-0 bg-black/40" style={{ opacity: backdropFade }} />}
-          </motion.div>
-
-          <div
-            className={cn(
-              "pointer-events-none fixed z-[1500] flex",
-              isMobile ? "inset-x-0 bottom-0 justify-center" : "bottom-[44px] right-6"
-            )}
-          >
+        <div key="fx-panel" className="fixed inset-0 z-[1200] pointer-events-none">
+          {/* Backdrop: mobile only */}
+          {isMobile && (
             <motion.div
-              key="fx-sheet"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Studio FX"
-              style={{
-                y: dragY,
-                transformOrigin: isMobile ? "50% 100%" : "100% 100%",
-                background: GLASS_BG,
-                backdropFilter: GLASS_BLUR,
-                WebkitBackdropFilter: GLASS_BLUR,
-              }}
-              drag={isMobile ? "y" : false}
-              dragControls={dragControls}
-              dragListener={false}
-              dragConstraints={{ top: 0 }}
-              dragElastic={{ top: 0.05, bottom: 0 }}
-              dragMomentum={false}
-              onDragEnd={(_, info) => {
-                if (info.velocity.y > 500 || info.offset.y > 120) {
-                  close();
-                } else {
-                  animate(dragY, 0, { type: "spring", stiffness: 500, damping: 38, velocity: info.velocity.y });
-                }
-              }}
-              {...sheetMotion}
-              className={cn(
-                "pointer-events-auto relative flex max-h-[100dvh] flex-col overflow-hidden border-white/25 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.35),inset_0_0_0_1px_rgba(255,255,255,0.06)] will-change-transform",
-                isMobile
-                  ? "w-full max-w-[520px] rounded-t-[28px] border-t"
-                  : "w-[380px] max-w-[calc(100vw-24px)] rounded-[22px] border"
-              )}
-            >
-              {/* specular sheen */}
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/[0.12] to-transparent" />
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={close}
+              className="absolute inset-0 pointer-events-auto bg-black/50 backdrop-blur-sm"
+            />
+          )}
 
-              {/* Header / drag handle */}
-              <div
-                className={cn("relative touch-none select-none", isMobile && "cursor-grab active:cursor-grabbing")}
-                onPointerDown={(e) => {
-                  if (isMobile) dragControls.start(e);
-                }}
-              >
-                {isMobile && (
-                  <div className="flex justify-center pt-2.5">
-                    <div className="h-[5px] w-9 rounded-full bg-white/30" />
-                  </div>
-                )}
-                <div className="flex items-center gap-3 px-5 pb-2 pt-3.5">
-                  <GlassIcon icon={AudioLines} brand size={38} />
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-[17px] font-semibold leading-tight tracking-tight text-white">Studio FX</h2>
-                    <p className="text-[12px] text-white/55">{bypass ? "Effects off" : "Effects on"}</p>
-                  </div>
-                  <Switch label="Effects" checked={!bypass} onChange={toggleEffects} />
-                  <button
-                    type="button"
-                    aria-label="Close"
-                    onClick={close}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/[0.12] text-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] outline-none transition-all hover:bg-white/20 hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand/60"
-                  >
-                    <X size={15} strokeWidth={2.5} />
-                  </button>
-                </div>
+          {/* Right-side glass panel (320px wide, matches Queue panel) */}
+          <motion.div
+            initial={isMobile ? { y: "100%" } : { x: 320 }}
+            animate={isMobile ? { y: 0 } : { x: 0 }}
+            exit={isMobile ? { y: "100%" } : { x: 320 }}
+            transition={{ type: "spring", damping: 32, stiffness: 340, mass: 0.85 }}
+            style={{ width: isMobile ? undefined : 320, backgroundColor: "var(--side)" }}
+            className={cn(
+              "absolute pointer-events-auto flex flex-col overflow-hidden z-[140] am-glass will-change-transform",
+              isMobile
+                ? "bottom-0 left-0 right-0 h-[84vh] rounded-t-[28px] shadow-[0_-20px_60px_rgba(0,0,0,0.4)]"
+                : "top-0 right-0 bottom-0 am-glass-right shadow-[-20px_0_60px_rgba(0,0,0,0.35)]"
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Studio FX"
+          >
+            {/* Header (matches Queue panel style) */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/[0.08] shrink-0">
+              <div className="flex items-baseline gap-2.5 min-w-0">
+                <h2 className="text-[19px] font-bold text-white tracking-tight">Studio FX</h2>
+                <span className="text-[11px] font-medium text-white/40">
+                  {bypass ? "Off" : "On"}
+                </span>
               </div>
+              <div className="flex items-center gap-2">
+                <Switch label="Effects" checked={!bypass} onChange={toggleEffects} />
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={close}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/60 outline-none transition-colors hover:bg-white/[0.08] hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand/60"
+                >
+                  <X size={16} strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
 
-              <AudioFxControls
-                className="relative"
-                contentHeight={isMobile ? "min(56dvh, 440px)" : "min(400px, calc(100dvh - 330px))"}
-              />
-            </motion.div>
-          </div>
-        </>
+            {/* Spectrum Visualizer */}
+            <div className="px-4 py-3 border-b border-white/[0.08] shrink-0">
+              <Spectrum />
+            </div>
+
+            {/* Scrollable sections */}
+            <div className="flex-1 overflow-y-auto overscroll-contain scrollbar-hide">
+              {/* Presets Section */}
+              <CollapsibleSection
+                title="Presets"
+                icon={Sparkles}
+                isOpen={openSections.presets}
+                onToggle={() => toggleSection("presets")}
+              >
+                <PresetsTab {...tabProps} />
+              </CollapsibleSection>
+
+              {/* Tune Section */}
+              <CollapsibleSection
+                title="Tune"
+                icon={SlidersHorizontal}
+                isOpen={openSections.tune}
+                onToggle={() => toggleSection("tune")}
+              >
+                <TuneTab {...tabProps} />
+              </CollapsibleSection>
+
+              {/* Space Section */}
+              <CollapsibleSection
+                title="Space"
+                icon={Waves}
+                isOpen={openSections.space}
+                onToggle={() => toggleSection("space")}
+              >
+                <SpaceTab {...tabProps} />
+              </CollapsibleSection>
+
+              {/* Voice Section */}
+              <CollapsibleSection
+                title="Voice"
+                icon={Mic}
+                isOpen={openSections.voice}
+                onToggle={() => toggleSection("voice")}
+              >
+                <VoiceTab {...tabProps} />
+              </CollapsibleSection>
+
+              {/* Chain Section */}
+              <CollapsibleSection
+                title="Chain"
+                icon={SlidersVertical}
+                isOpen={openSections.chain}
+                onToggle={() => toggleSection("chain")}
+              >
+                <ChainTab {...tabProps} />
+              </CollapsibleSection>
+
+              {/* Tempo Section */}
+              <CollapsibleSection
+                title="Tempo"
+                icon={Repeat}
+                isOpen={openSections.tempo}
+                onToggle={() => toggleSection("tempo")}
+              >
+                <TempoTab {...tabProps} />
+              </CollapsibleSection>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between border-t border-white/[0.08] bg-white/[0.03] px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  commit({ ...DEFAULT_AUDIO_FX, eq: [0, 0, 0], chain: [...DEFAULT_CHAIN], crossfade: fx.crossfade })
+                }
+                className="rounded-md px-1 py-1 text-[12px] font-medium text-white/60 outline-none transition-all hover:text-white active:scale-95 focus-visible:ring-2 focus-visible:ring-brand/60"
+              >
+                Reset all
+              </button>
+              <span className="text-[11px] font-medium text-white/30">Zenify Engine</span>
+            </div>
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );
