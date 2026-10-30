@@ -24,7 +24,7 @@ import { useDebounce } from "use-debounce";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import Link from "next/link";
-import { cn, getMediaUrl } from "@/lib/utils";
+import { cn, getMediaUrl, getArtistProfileImage } from "@/lib/utils";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -307,7 +307,7 @@ function ArtistCard({ artist, onClick }: { artist: any; onClick: () => void }) {
     >
       <div className="group/art relative aspect-square w-full rounded-full overflow-hidden bg-white/[0.06] shadow-[0_2px_10px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10">
         <img
-          src={getMediaUrl(artist.imageUrl) || FALLBACK_ARTIST}
+          src={getArtistProfileImage(artist)}
           alt={artist.name || "Artist portrait"}
           width={140}
           height={140}
@@ -826,7 +826,7 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
                               >
                                 {artist.imageUrl || artist.image ? (
                                   <img
-                                    src={getMediaUrl(artist.imageUrl || artist.image)}
+                                    src={getArtistProfileImage(artist)}
                                     alt={artist.name}
                                     className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0"
                                     onError={(e) => {

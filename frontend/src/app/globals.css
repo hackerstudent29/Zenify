@@ -744,19 +744,21 @@ input[type="submit"]:active:not(:disabled) {
   position: fixed; inset: 0; z-index: 1000;
   display: flex; justify-content: center; align-items: flex-start;
   padding-top: max(14vh, calc(env(safe-area-inset-top) + 12px));
-  background: rgba(0,0,0,.35);
+  padding-left: 16px; padding-right: 16px; padding-bottom: 16px;
+  background: rgba(0,0,0,.58);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
   backdrop-filter: blur(10px) saturate(140%);
   animation: sp-fade 160ms ease-out;
 }
 .sp-panel {
   width: min(640px, calc(100vw - 24px));
-  border-radius: 18px; overflow: hidden;
-  background: rgba(30,30,34,.72);
+  max-height: min(680px, calc(100vh - 32px));
+  border-radius: 24px; overflow: hidden;
+  background: rgba(35,35,39,.96);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
-  border: 1px solid rgba(255,255,255,.12);
-  box-shadow: 0 24px 80px rgba(0,0,0,.5);
+  border: 1px solid rgba(255,255,255,.16);
+  box-shadow: 0 28px 90px rgba(0,0,0,.62), 0 0 0 1px rgba(255,255,255,.03);
   animation: sp-pop var(--spring-smooth-d) var(--spring-smooth) both;
 }
 .sp-input-row { display: flex; align-items: center; gap: 12px; padding: 14px 18px; color: var(--text-2); }
@@ -776,8 +778,8 @@ input[type="submit"]:active:not(:disabled) {
 @keyframes sp-pop  { from { opacity: 0; transform: translate3d(0, -10px, 0) scale(.96) } }
 
 @media (max-width: 640px) {
-  .sp-scrim { padding-top: calc(env(safe-area-inset-top) + 8px); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-  .sp-panel { width: calc(100vw - 16px); border-radius: 16px; }
+  .sp-scrim { padding: calc(env(safe-area-inset-top) + 8px) 8px 8px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .sp-panel { width: calc(100vw - 16px); border-radius: 20px; }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .sp-scrim { background: rgba(0,0,0,.7); }

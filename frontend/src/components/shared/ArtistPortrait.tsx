@@ -1,6 +1,6 @@
 "use client";
 
-import { cn, getMediaUrl } from "@/lib/utils";
+import { cn, getMediaUrl, getArtistProfileImage } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
 interface ArtistPortraitProps {
@@ -15,15 +15,17 @@ export function ArtistPortrait({ imageUrl, name, className, size = 512, priority
   const API_URL = import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL || 'https://zenify-78e257420386.herokuapp.com/api';
   const proxy = (url: string) => `${API_URL}/utils/proxy-image?url=${encodeURIComponent(url)}`;
 
-  const [imgSrc, setImgSrc] = useState<string | null>(() => (imageUrl ? getMediaUrl(imageUrl) || null : null));
+  const resolved = getArtistProfileImage({ name, imageUrl });
+  const [imgSrc, setImgSrc] = useState<string | null>(() => resolved || (imageUrl ? getMediaUrl(imageUrl) || null : null));
   const [hasFailedOnce, setHasFailedOnce] = useState(false);
-  const [useFallback, setUseFallback] = useState(!imageUrl);
+  const [useFallback, setUseFallback] = useState(!resolved && !imageUrl);
 
   useEffect(() => {
-    setImgSrc(imageUrl ? getMediaUrl(imageUrl) || null : null);
-    setUseFallback(!imageUrl);
+    const fresh = getArtistProfileImage({ name, imageUrl });
+    setImgSrc(fresh || (imageUrl ? getMediaUrl(imageUrl) || null : null));
+    setUseFallback(!fresh && !imageUrl);
     setHasFailedOnce(false);
-  }, [imageUrl]);
+  }, [imageUrl, name]);
 
   const handleError = () => {
     if (!hasFailedOnce && imageUrl) {

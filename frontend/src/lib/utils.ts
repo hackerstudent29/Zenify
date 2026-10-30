@@ -281,20 +281,29 @@ export function getTrackCover(track: any): string {
 // Universal Apple Music Canonical Artist Visuals Dictionary (High-Res 600x600bb Apple Music portraits)
 export const CANONICAL_APPLE_ARTISTS: Record<string, string> = {
   "arrahman": "https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/33/2b/3d/332b3de7-6f79-bf87-072d-794c1176d9f8/mza_8008578196274844399.png/600x600bb.jpg",
+  "rahman": "https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/33/2b/3d/332b3de7-6f79-bf87-072d-794c1176d9f8/mza_8008578196274844399.png/600x600bb.jpg",
+  "arr": "https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/33/2b/3d/332b3de7-6f79-bf87-072d-794c1176d9f8/mza_8008578196274844399.png/600x600bb.jpg",
   "anirudhravichander": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/85/84/dd/8584ddc7-a699-bb7d-027a-d3132ffb9582/mza_7960699454837846773.png/600x600bb.jpg",
   "anirudh": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/85/84/dd/8584ddc7-a699-bb7d-027a-d3132ffb9582/mza_7960699454837846773.png/600x600bb.jpg",
   "hiphoptamizha": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
   "hiphoptamizhaaadhi": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
+  "hiphopaadhi": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
   "aadhi": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
   "gvprakashkumar": "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/600x600bb.jpg",
   "gvprakash": "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/600x600bb.jpg",
+  "gvp": "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/600x600bb.jpg",
   "thamans": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg",
   "thaman": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg",
+  "sthaman": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg",
   "santhoshnarayanan": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/07/05/58/070558d1-0853-37e4-ba23-e57a86397b2f/mza_7575225160549591736.png/600x600bb.jpg",
+  "santhosh": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/07/05/58/070558d1-0853-37e4-ba23-e57a86397b2f/mza_7575225160549591736.png/600x600bb.jpg",
+  "sana": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/07/05/58/070558d1-0853-37e4-ba23-e57a86397b2f/mza_7575225160549591736.png/600x600bb.jpg",
   "sidsriram": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages116/v4/f2/5f/20/f25f20b1-f502-f671-b84b-16f802a4c234/03b4e34e-92b2-496f-9dc2-a02fb0d2122a_ami-identity-d29f291ff6700b97f78cefa15fd569b6-2023-08-04T16-27-30.791Z_cropped.png/600x600bb.jpg",
   "yuvanshankarraja": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages126/v4/75/bb/a1/75bba1b1-11a1-a9a4-ac65-7c1fce8f155b/e0e228f4-2d7c-4366-895a-9073984a6ffc_ami-identity-3337edee6879016e69bc8109b13c4208-2023-05-24T12-44-42.909Z_cropped.png/600x600bb.jpg",
   "yuvan": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages126/v4/75/bb/a1/75bba1b1-11a1-a9a4-ac65-7c1fce8f155b/e0e228f4-2d7c-4366-895a-9073984a6ffc_ami-identity-3337edee6879016e69bc8109b13c4208-2023-05-24T12-44-42.909Z_cropped.png/600x600bb.jpg",
+  "u1": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages126/v4/75/bb/a1/75bba1b1-11a1-a9a4-ac65-7c1fce8f155b/e0e228f4-2d7c-4366-895a-9073984a6ffc_ami-identity-3337edee6879016e69bc8109b13c4208-2023-05-24T12-44-42.909Z_cropped.png/600x600bb.jpg",
   "harrisjayaraj": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/15/a7/58/15a7581b-4056-d274-6ed7-1c2a61461d81/pr_source.png/600x600bb.jpg",
+  "harris": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/15/a7/58/15a7581b-4056-d274-6ed7-1c2a61461d81/pr_source.png/600x600bb.jpg",
   "dimman": "https://is1-ssl.mzstatic.com/image/thumb/Music123/v4/31/09/b2/3109b228-528d-c03c-e305-7987f515d667/886443574151.jpg/600x600bb.jpg",
   "imman": "https://is1-ssl.mzstatic.com/image/thumb/Music123/v4/31/09/b2/3109b228-528d-c03c-e305-7987f515d667/886443574151.jpg/600x600bb.jpg",
   "samcs": "https://is1-ssl.mzstatic.com/image/thumb/Features124/v4/51/3b/b8/513bb8d5-f934-0da8-9650-be89a3a3c37f/mza_3068448473619100532.png/600x600bb.jpg",
@@ -335,12 +344,23 @@ export function getArtistProfileImage(artist: any, fallbackSongCover?: string | 
   }
 
   const rawImage = typeof artist === "string" ? artist : artist.imageUrl;
+  const isJunkOrSongCover = rawImage && (
+    rawImage.includes('/albums/') ||
+    rawImage.includes('cover.jpg') ||
+    rawImage.includes('Cover.jpg') ||
+    rawImage.includes('Golden_Sparrow') ||
+    rawImage.includes('golden-sparrow') ||
+    rawImage.includes('150x150') ||
+    rawImage.includes('50x50')
+  );
+
   const hasValidImage = rawImage && 
     typeof rawImage === "string" && 
     rawImage.trim().length > 0 && 
     !rawImage.includes("placeholder") && 
     !rawImage.includes("ui-avatars.com") &&
-    !rawImage.includes("default_avatar");
+    !rawImage.includes("default_avatar") &&
+    !isJunkOrSongCover;
 
   // Priority 2: Use provided image if it is an official Apple Music visual or valid portrait
   if (hasValidImage) {

@@ -35,15 +35,10 @@ export function HeaderSearchButton() {
         aria-label="Spotlight Search"
         title="Search (⌘K or /)"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2.5 h-9 px-2.5 md:px-3 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-white/10 text-zinc-400 hover:text-zinc-200 press cursor-pointer shrink-0 transition-all w-9 md:w-60 lg:w-72 justify-center md:justify-start"
+        className="flex items-center justify-center gap-2 h-9 w-9 md:w-24 rounded-full bg-zinc-800/90 hover:bg-zinc-700/95 border border-white/15 text-zinc-200 hover:text-white press cursor-pointer shrink-0 transition-all duration-300 ease-out shadow-[0_4px_18px_rgba(0,0,0,0.2)] backdrop-blur-xl"
       >
-        <Icon name="search" size={16} className="text-brand shrink-0" />
-        <span className="hidden md:inline text-xs font-medium text-zinc-400 truncate flex-1 text-left">
-          Search songs, artists, albums...
-        </span>
-        <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-medium text-zinc-400 bg-white/5 border border-white/10 rounded">
-          ⌘K
-        </kbd>
+        <Icon name="search" size={15} className="shrink-0" />
+        <span className="hidden md:inline text-xs font-medium tracking-tight">Search</span>
       </button>
       {open && (
         <SpotlightSearchOverlay
@@ -299,7 +294,7 @@ export function SpotlightSearchOverlay({ onClose }: { onClose: () => void }) {
             ref={input}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search songs, artists, albums (ESC to close)"
+            placeholder="Search music"
             className="sp-input"
           />
           {loading && (

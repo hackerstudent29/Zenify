@@ -14,7 +14,7 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Button } from "@/components/ui/button";
-import { getMediaUrl, formatDisplayTitle, cn } from "@/lib/utils";
+import { getMediaUrl, formatDisplayTitle, cn, getArtistProfileImage } from "@/lib/utils";
 import { TrackItem } from "@/components/track-item";
 import Link from "next/link";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
@@ -354,7 +354,7 @@ export function MobileLibraryPage({
  className="flex items-center gap-5 p-2 rounded-2xl hover:bg-white/5 active:bg-white/10 transition-colors group cursor-pointer"
  >
  <div className="w-16 h-16 rounded-full overflow-hidden bg-zinc-900 shrink-0 shadow-lg border-2 border-white/5 group-active:scale-95 transition-transform">
- <img src={getMediaUrl(artist.imageUrl) || `https://ui-avatars.com/api/?name=${artist.name}`} alt={artist.name || "Artist profile"} width={64} height={64} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+ <img src={getArtistProfileImage(artist)} alt={artist.name || "Artist profile"} width={64} height={64} loading="lazy" decoding="async" className="w-full h-full object-cover" />
  </div>
  <div className="flex-1 min-w-0">
  <h3 className="font-bold text-base text-white truncate">{formatDisplayTitle(artist.name)}</h3>
