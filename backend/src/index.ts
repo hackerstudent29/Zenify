@@ -94,7 +94,7 @@ server.register(cors, {
     credentials: true,
     allowedHeaders: [
         'Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 
-        'Range', 'baggage', 'sentry-trace', 'x-user-language', 'x-user-country', 'x-admin-key'
+        'Range', 'baggage', 'sentry-trace', 'x-user-language', 'x-user-country', 'x-user-recent-artists', 'x-admin-key'
     ],
     exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type'],
 });

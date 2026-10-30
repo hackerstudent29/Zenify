@@ -1480,12 +1480,18 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
 
         // 5. Fallback: Live spawn piping with Rule 3 Container Header Integrity
-        if (Date.now() < localYtBlockCooldownUntil) {
-            server.log.warn(`[stream-youtube] Local IP in active circuit breaker cooldown. Skipping yt-dlp spawn.`);
-            return reply.status(503).send({ error: 'Audio stream temporarily unavailable.' });
+        // If local IP is under circuit breaker cooldown, skip yt-dlp spawn entirely
+        // but still run the CDN fallback chain below (CleanCDN, RapidAPI, Apify, etc.)
+        const ytSpawnBlocked = Date.now() < localYtBlockCooldownUntil;
+        if (ytSpawnBlocked) {
+            server.log.warn(`[stream-youtube] Local IP in active circuit breaker cooldown. Skipping yt-dlp spawn — routing directly to CDN fallback chain.`);
         }
 
+        let spawned = false;
+        const spawnErrors: string[] = [];
+
         try {
+            if (!ytSpawnBlocked) {
             const { spawn } = await import('child_process');
             const ytBin = getYtBin();
             const cookiesArgs = getCookieArgs();
@@ -1496,9 +1502,6 @@ export async function utilsRoutes(server: FastifyInstance) {
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_music'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=tv_embedded'],
             ];
-
-            let spawned = false;
-            const errors: string[] = [];
 
             for (const clientArgs of clientStrategies) {
                 const args = [
@@ -1601,133 +1604,134 @@ export async function utilsRoutes(server: FastifyInstance) {
                     break;
                 } else {
                     const cleanStderr = strategyStderr.trim().slice(0, 300);
-                    errors.push(`${strategyName}: ${cleanStderr || 'No stderr output'}`);
+                    spawnErrors.push(`${strategyName}: ${cleanStderr || 'No stderr output'}`);
                     killProcSafely();
                 }
             }
+        }
 
-            if (!spawned) {
-                // 6. ULTIMATE RESILIENT FALLBACK: Apple / iTunes CDN Direct AAC Stream
-                // If YouTube extraction is blocked or challenged on host, stream high-fidelity AAC directly from Apple CDN
-                try {
-                    let searchTitle = cleanCandTitle || candTitle || '';
-                    let searchArtist = cleanCandArtist || candArtist || '';
+        // 6. ULTIMATE RESILIENT FALLBACK: CDN chain runs whether yt-dlp spawn was
+        //    skipped (circuit breaker) or all strategies failed.
+        if (!spawned) {
+            try {
+                let searchTitle = cleanCandTitle || candTitle || '';
+                let searchArtist = cleanCandArtist || candArtist || '';
 
-                    if ((!searchTitle || searchTitle.startsWith('http')) && currentVideoId) {
-                        try {
-                            const oemb = await axios.get(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${currentVideoId}&format=json`, { timeout: 2000 }).catch(() => null);
-                            if (oemb?.data?.title) {
-                                searchTitle = oemb.data.title.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim();
-                                if (!searchArtist && oemb.data.author_name) searchArtist = oemb.data.author_name;
-                            }
-                        } catch {}
-                    }
-
-                    if (!searchTitle || searchTitle.startsWith('http')) {
-                        const rawClean = url.replace(/^ytsearch[0-9]*:/, '').replace(/https?:\/\/[^\s]+/g, '').trim();
-                        if (rawClean.includes(' - ')) {
-                            searchArtist = searchArtist || rawClean.split(' - ')[0].trim();
-                            searchTitle = rawClean.split(' - ').slice(1).join(' ').trim();
-                        } else {
-                            searchTitle = rawClean;
+                if ((!searchTitle || searchTitle.startsWith('http')) && currentVideoId) {
+                    try {
+                        const oemb = await axios.get(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${currentVideoId}&format=json`, { timeout: 2000 }).catch(() => null);
+                        if (oemb?.data?.title) {
+                            searchTitle = oemb.data.title.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim();
+                            if (!searchArtist && oemb.data.author_name) searchArtist = oemb.data.author_name;
                         }
-                    }
+                    } catch {}
+                }
 
-                    // 1. Clean CDN Full Song Fallback (320kbps JioSaavn pristine audio)
-                    if (searchTitle || searchArtist) {
-                        try {
-                            const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
-                            const queryToTry = searchArtist ? `${searchArtist} - ${searchTitle}` : searchTitle;
-                            const cdnResult = await CleanCdnAudioService.resolveAudio(queryToTry);
-                            if (cdnResult?.url) {
-                                server.log.info(`[stream-youtube] Ultimate Fallback: Clean CDN 320k resolved for "${queryToTry}": ${cdnResult.url}`);
-                                return await streamProxyUrl(cdnResult.url, request, reply);
-                            }
-                        } catch (cdnErr: any) {
-                            server.log.warn(`[stream-youtube] Clean CDN fallback attempt: ${cdnErr.message}`);
-                        }
+                if (!searchTitle || searchTitle.startsWith('http')) {
+                    const rawClean = url.replace(/^ytsearch[0-9]*:/, '').replace(/https?:\/\/[^\s]+/g, '').trim();
+                    if (rawClean.includes(' - ')) {
+                        searchArtist = searchArtist || rawClean.split(' - ')[0].trim();
+                        searchTitle = rawClean.split(' - ').slice(1).join(' ').trim();
+                    } else {
+                        searchTitle = rawClean;
                     }
+                }
 
-                    // 2. Full Song Fallback: Attempt intake to R2 cloud storage for permanent, 100% full song streaming
-                    if (searchTitle || searchArtist) {
-                        try {
-                            server.log.info(`[stream-youtube] Attempting full audio R2 resolution fallback for: "${searchArtist} - ${searchTitle}"`);
-                            const fullTrack = await ExternalMetadataService.fetchAudio(searchTitle, searchArtist, undefined, undefined, { preview: false, bypassCache: true });
-                            if (fullTrack?.url && !fullTrack.url.includes('/stream-youtube')) {
-                                if (!fullTrack.url.includes('audio-ssl') && !fullTrack.url.includes('itunes') && !fullTrack.url.includes('mzstatic')) {
-                                    server.log.info(`[stream-youtube] R2 full audio stream resolved: ${fullTrack.url}`);
-                                    return await streamProxyUrl(fullTrack.url, request, reply);
-                                }
-                            }
-                        } catch (r2Err: any) {
-                            server.log.warn(`[stream-youtube] R2 fallback error: ${r2Err.message}`);
-                        }
-                    }
-
-                    // 3. Clean CDN 320kbps Audio (JioSaavn) Full Song Fallback
+                // 1. Clean CDN Full Song Fallback (320kbps JioSaavn pristine audio)
+                if (searchTitle || searchArtist) {
                     try {
                         const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
-                        const cdnRes = await CleanCdnAudioService.resolveAudio({
-                            title: searchTitle || cleanCandTitle || candTitle,
-                            primaryArtist: searchArtist || cleanCandArtist || candArtist,
-                            duration: localTrack?.duration,
-                            language: resolvedSongLang
-                        });
-                        if (cdnRes?.url && !cdnRes.url.includes('audio-ssl') && !cdnRes.url.includes('mzstatic') && !cdnRes.url.includes('itunes.apple.com')) {
-                            server.log.info(`[stream-youtube] Clean CDN 320kbps full song fallback resolved: ${cdnRes.url}`);
-                            return await streamProxyUrl(cdnRes.url, request, reply);
+                        const queryToTry = searchArtist ? `${searchArtist} - ${searchTitle}` : searchTitle;
+                        const cdnResult = await CleanCdnAudioService.resolveAudio(queryToTry);
+                        if (cdnResult?.url) {
+                            server.log.info(`[stream-youtube] Ultimate Fallback: Clean CDN 320k resolved for "${queryToTry}": ${cdnResult.url}`);
+                            return await streamProxyUrl(cdnResult.url, request, reply);
                         }
                     } catch (cdnErr: any) {
-                        server.log.warn(`[stream-youtube] Clean CDN fallback error: ${cdnErr.message}`);
+                        server.log.warn(`[stream-youtube] Clean CDN fallback attempt: ${cdnErr.message}`);
                     }
+                }
 
-                    // 4. RapidAPI Spotify / Music Downloader Fallback (via RAPIDAPI_KEY)
+                // 2. Full Song Fallback: Attempt intake to R2 cloud storage for permanent, 100% full song streaming
+                if (searchTitle || searchArtist) {
                     try {
-                        const rapidApiKey = process.env.RAPIDAPI_KEY || (process.env.RAPIDAPI_KEYS ? process.env.RAPIDAPI_KEYS.split(',')[0].trim() : null);
-                        if (rapidApiKey) {
-                            const queryForRapid = (searchArtist && searchTitle ? `${searchArtist} - ${searchTitle}` : null) || targetUrl || url;
-                            server.log.info(`[stream-youtube] Attempting RapidAPI Spotify download fallback for: "${queryForRapid}"`);
-                            const rapidRes = await axios.get('https://spotify81.p.rapidapi.com/download_track', {
-                                params: { q: queryForRapid, onlyLinks: 'true' },
-                                headers: {
-                                    'x-rapidapi-key': rapidApiKey,
-                                    'x-rapidapi-host': 'spotify81.p.rapidapi.com'
-                                },
-                                timeout: 12000
-                            }).catch(() => null);
-                            if (rapidRes?.data?.url && !rapidRes.data.url.includes('audio-ssl') && !rapidRes.data.url.includes('mzstatic') && !rapidRes.data.url.includes('itunes.apple.com')) {
-                                server.log.info(`[stream-youtube] RapidAPI Spotify stream fallback resolved full audio: ${rapidRes.data.url}`);
-                                return await streamProxyUrl(rapidRes.data.url, request, reply);
+                        server.log.info(`[stream-youtube] Attempting full audio R2 resolution fallback for: "${searchArtist} - ${searchTitle}"`);
+                        const fullTrack = await ExternalMetadataService.fetchAudio(searchTitle, searchArtist, undefined, undefined, { preview: false, bypassCache: true });
+                        if (fullTrack?.url && !fullTrack.url.includes('/stream-youtube')) {
+                            if (!fullTrack.url.includes('audio-ssl') && !fullTrack.url.includes('itunes') && !fullTrack.url.includes('mzstatic')) {
+                                server.log.info(`[stream-youtube] R2 full audio stream resolved: ${fullTrack.url}`);
+                                return await streamProxyUrl(fullTrack.url, request, reply);
                             }
                         }
-                    } catch (rapidErr: any) {
-                        server.log.warn(`[stream-youtube] RapidAPI download fallback error: ${rapidErr.message}`);
+                    } catch (r2Err: any) {
+                        server.log.warn(`[stream-youtube] R2 fallback error: ${r2Err.message}`);
                     }
-
-                    // 5. Direct Apify Spotify Fallback: When local/datacenter YouTube extraction is blocked or exhausted
-                    try {
-                        const fallbackTarget = (searchArtist && searchTitle ? `${searchArtist} - ${searchTitle}` : null) || targetUrl || url;
-                        server.log.info(`[stream-youtube] Attempting Apify Spotify stream fallback for: "${fallbackTarget}"`);
-                        const apifyUrl = await ExternalMetadataService.fetchAudioViaApifySpotify(fallbackTarget);
-                        if (apifyUrl && !apifyUrl.includes('audio-ssl') && !apifyUrl.includes('mzstatic') && !apifyUrl.includes('itunes.apple.com')) {
-                            server.log.info(`[stream-youtube] Apify Spotify stream fallback resolved full audio: ${apifyUrl}`);
-                            return await streamProxyUrl(apifyUrl, request, reply);
-                        }
-                    } catch (apifyErr: any) {
-                        server.log.warn(`[stream-youtube] Apify stream fallback error: ${apifyErr.message}`);
-                    }
-                } catch (fallbackErr: any) {
-                    server.log.warn(`[stream-youtube] Fallback error: ${fallbackErr.message}`);
                 }
 
-                server.log.error({ errors }, '[stream-youtube] All client strategies failed');
-                if (!reply.raw.headersSent) {
-                    return reply.status(502).send({ 
-                        error: 'Could not stream audio — all YouTube extraction methods failed.', 
-                        details: errors 
+                // 3. Clean CDN 320kbps Audio (JioSaavn) Full Song Fallback
+                try {
+                    const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
+                    const cdnRes = await CleanCdnAudioService.resolveAudio({
+                        title: searchTitle || cleanCandTitle || candTitle,
+                        primaryArtist: searchArtist || cleanCandArtist || candArtist,
+                        duration: localTrack?.duration,
+                        language: resolvedSongLang
                     });
+                    if (cdnRes?.url && !cdnRes.url.includes('audio-ssl') && !cdnRes.url.includes('mzstatic') && !cdnRes.url.includes('itunes.apple.com')) {
+                        server.log.info(`[stream-youtube] Clean CDN 320kbps full song fallback resolved: ${cdnRes.url}`);
+                        return await streamProxyUrl(cdnRes.url, request, reply);
+                    }
+                } catch (cdnErr: any) {
+                    server.log.warn(`[stream-youtube] Clean CDN fallback error: ${cdnErr.message}`);
                 }
+
+                // 4. RapidAPI Spotify / Music Downloader Fallback (via RAPIDAPI_KEY)
+                try {
+                    const rapidApiKey = process.env.RAPIDAPI_KEY || (process.env.RAPIDAPI_KEYS ? process.env.RAPIDAPI_KEYS.split(',')[0].trim() : null);
+                    if (rapidApiKey) {
+                        const queryForRapid = (searchArtist && searchTitle ? `${searchArtist} - ${searchTitle}` : null) || targetUrl || url;
+                        server.log.info(`[stream-youtube] Attempting RapidAPI Spotify download fallback for: "${queryForRapid}"`);
+                        const rapidRes = await axios.get('https://spotify81.p.rapidapi.com/download_track', {
+                            params: { q: queryForRapid, onlyLinks: 'true' },
+                            headers: {
+                                'x-rapidapi-key': rapidApiKey,
+                                'x-rapidapi-host': 'spotify81.p.rapidapi.com'
+                            },
+                            timeout: 12000
+                        }).catch(() => null);
+                        if (rapidRes?.data?.url && !rapidRes.data.url.includes('audio-ssl') && !rapidRes.data.url.includes('mzstatic') && !rapidRes.data.url.includes('itunes.apple.com')) {
+                            server.log.info(`[stream-youtube] RapidAPI Spotify stream fallback resolved full audio: ${rapidRes.data.url}`);
+                            return await streamProxyUrl(rapidRes.data.url, request, reply);
+                        }
+                    }
+                } catch (rapidErr: any) {
+                    server.log.warn(`[stream-youtube] RapidAPI download fallback error: ${rapidErr.message}`);
+                }
+
+                // 5. Direct Apify Spotify Fallback: When local/datacenter YouTube extraction is blocked or exhausted
+                try {
+                    const fallbackTarget = (searchArtist && searchTitle ? `${searchArtist} - ${searchTitle}` : null) || targetUrl || url;
+                    server.log.info(`[stream-youtube] Attempting Apify Spotify stream fallback for: "${fallbackTarget}"`);
+                    const apifyUrl = await ExternalMetadataService.fetchAudioViaApifySpotify(fallbackTarget);
+                    if (apifyUrl && !apifyUrl.includes('audio-ssl') && !apifyUrl.includes('mzstatic') && !apifyUrl.includes('itunes.apple.com')) {
+                        server.log.info(`[stream-youtube] Apify Spotify stream fallback resolved full audio: ${apifyUrl}`);
+                        return await streamProxyUrl(apifyUrl, request, reply);
+                    }
+                } catch (apifyErr: any) {
+                    server.log.warn(`[stream-youtube] Apify stream fallback error: ${apifyErr.message}`);
+                }
+            } catch (fallbackErr: any) {
+                server.log.warn(`[stream-youtube] Fallback error: ${fallbackErr.message}`);
             }
+
+            server.log.error({ spawnErrors }, '[stream-youtube] All client strategies and CDN fallbacks failed');
+            if (!reply.raw.headersSent) {
+                return reply.status(502).send({ 
+                    error: 'Could not stream audio — all YouTube extraction methods failed.', 
+                    details: spawnErrors 
+                });
+            }
+        }
 
         } catch (err: any) {
             server.log.error(`stream-youtube error: ${err.message}`);
