@@ -37,6 +37,15 @@ function updateLruList(trackId: string): void {
 }
 
 /**
+ * Synchronously checks if an active Blob URL is already registered in-memory for this track.
+ * Returns the Blob URL with 0ms start latency without breaking user gesture activation.
+ */
+export function getSyncCachedTrackBlobUrl(trackId: string): string | null {
+  if (typeof window === 'undefined' || !trackId) return null;
+  return activeBlobUrls.get(trackId) || null;
+}
+
+/**
  * Checks if a track's audio is already cached locally.
  * Returns an instant Blob URL if cached, or null if not yet cached.
  */
@@ -70,6 +79,33 @@ export async function getCachedTrackBlobUrl(trackId: string): Promise<string | n
     console.debug('[AudioCache] Cache match error:', err);
     return null;
   }
+}
+
+/**
+ * Proactively warm up recently played audio Blob URLs in memory on application startup.
+ */
+export async function warmupAudioCache(): Promise<void> {
+  if (typeof window === 'undefined' || !('caches' in window)) return;
+  try {
+    const list = getLruList().slice(0, 5);
+    if (!list.length) return;
+    const cache = await caches.open(CACHE_NAME);
+    for (const trackId of list) {
+      if (activeBlobUrls.has(trackId)) continue;
+      const cacheKey = `https://zenify.cache/audio/${encodeURIComponent(trackId)}`;
+      const match = await cache.match(cacheKey);
+      if (match) {
+        const blob = await match.blob();
+        if (blob && blob.size >= 100000) {
+          activeBlobUrls.set(trackId, URL.createObjectURL(blob));
+        }
+      }
+    }
+  } catch {}
+}
+
+if (typeof window !== 'undefined') {
+  setTimeout(() => { warmupAudioCache().catch(() => {}); }, 2000);
 }
 
 /**
