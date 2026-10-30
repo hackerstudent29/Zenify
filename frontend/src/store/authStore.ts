@@ -22,22 +22,12 @@ interface User {
     autoplay?: boolean;
     normalizeVolume?: boolean;
     explicitFilter?: boolean;
-    theme?: string;
     accentColor?: string;
-    compactMode?: boolean;
     emailNotifications?: boolean;
     newReleaseAlerts?: boolean;
     playlistUpdates?: boolean;
     weeklySummaryEmail?: boolean;
-    privateSession?: boolean;
     listeningActivity?: boolean;
-    sidebarStyle?: string;
-    globalPlayerStyle?: string;
-    fullviewReactiveBg?: boolean;
-    trackPageReactiveBg?: boolean;
-    surroundingSpeed?: number;
-    bottomNavStyle?: "normal" | "glasso";
-    swipeNavigation?: boolean;
   };
 }
 

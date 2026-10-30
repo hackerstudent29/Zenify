@@ -387,8 +387,8 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const isLyricsOpen = useUIStore((s) => s.isLyricsOpen);
   const setIsLyricsOpen = useUIStore((s) => s.setIsLyricsOpen);
 
-  const stylePref = useAuthStore((s: any) => s.user?.preferences?.globalPlayerStyle);
-  const isGlass = stylePref !== "classic" && stylePref !== "solid";
+  // Mobile player always uses glass style
+  const isGlass = true;
 
   const { liked, toggle: toggleLike } = useTrackLike(currentTrack?.id);
   const shown = useShownCover(currentTrack);
