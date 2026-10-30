@@ -149,11 +149,16 @@ export class CleanCdnAudioService {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept': 'application/json, text/plain, */*',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': 'https://www.jiosaavn.com/'
+                'Referer': 'https://www.jiosaavn.com/',
+                'X-Forwarded-For': '49.37.100.1',
+                'Client-IP': '49.37.100.1',
+                'X-Real-IP': '49.37.100.1',
+                'CF-Connecting-IP': '49.37.100.1'
             };
 
             // Search with natural title + artist first (appending language artificially breaks searches for instrumentals/English titles)
             const searchQuery = (cleanA ? `${cleanA} ${cleanT}` : cleanT).slice(0, 120).trim();
+            const queryAlt = (cleanA ? `${cleanT} ${cleanA}` : cleanT).slice(0, 120).trim();
             const cacheKey = `${cleanT}:::${cleanA}:::${opts.language || ''}`.toLowerCase();
             const cached = cdnQueryCache.get(cacheKey);
             if (cached && cached.expiresAt > Date.now()) {
@@ -162,25 +167,25 @@ export class CleanCdnAudioService {
 
             console.log(`[CleanCdnAudio] Searching CDN candidate for: "${searchQuery}" (Req Lang: ${opts.language || 'any'}, Artist: ${cleanA || 'any'})`);
 
-            // 1. Fetch 3 pages in parallel so the original isn't hidden past page 0/1
+            // 1. Fetch mobile v4 API and web queries in parallel (bypasses datacenter geo-filtering for English/Global catalog)
             const [p1, p2, p3, autoRes] = await Promise.all([
                 axios.get('https://www.jiosaavn.com/api.php', {
-                    params: { __call: 'search.getResults', q: searchQuery, _format: 'json', ctx: 'web6dot0', p: '1', n: '40' },
+                    params: { __call: 'search.getResults', q: queryAlt, _format: 'json', api_version: '4', _marker: '0', p: '1', n: '40' },
                     headers: cdnHeaders,
                     timeout: 4000
                 }).then(r => r.data?.results || []).catch(() => []),
                 axios.get('https://www.jiosaavn.com/api.php', {
-                    params: { __call: 'search.getResults', q: searchQuery, _format: 'json', ctx: 'web6dot0', p: '2', n: '40' },
+                    params: { __call: 'search.getResults', q: searchQuery, _format: 'json', api_version: '4', _marker: '0', p: '1', n: '40' },
                     headers: cdnHeaders,
                     timeout: 4000
                 }).then(r => r.data?.results || []).catch(() => []),
                 axios.get('https://www.jiosaavn.com/api.php', {
-                    params: { __call: 'search.getResults', q: searchQuery, _format: 'json', ctx: 'web6dot0', p: '3', n: '40' },
+                    params: { __call: 'search.getResults', q: searchQuery, _format: 'json', p: '2', n: '40' },
                     headers: cdnHeaders,
                     timeout: 4000
                 }).then(r => r.data?.results || []).catch(() => []),
                 axios.get('https://www.jiosaavn.com/api.php', {
-                    params: { __call: 'autocomplete.get', query: searchQuery, _format: 'json', ctx: 'web6dot0' },
+                    params: { __call: 'autocomplete.get', query: searchQuery, _format: 'json' },
                     headers: cdnHeaders,
                     timeout: 3000
                 }).then(r => r.data?.songs?.data || []).catch(() => [])
@@ -333,11 +338,10 @@ export class CleanCdnAudioService {
                                 pids: cand.id,
                                 _format: 'json',
                                 _marker: '0',
-                                api_version: '4',
-                                ctx: 'web6dot0'
+                                api_version: '4'
                             },
-                            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
-                            timeout: 3000
+                            headers: cdnHeaders,
+                            timeout: 3500
                         }).catch(() => null);
 
                         songData = detRes?.data?.songs?.[0] || detRes?.data?.[cand.id] || cand;

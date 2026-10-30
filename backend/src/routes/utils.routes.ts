@@ -203,10 +203,9 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
     // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active circuit breaker cooldown)
     const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
     if (ytBin && !isLocalBlocked) {
-        // Priority: android_music, tv_embedded bypass datacenter IP bot challenges
-        const gClients: (string | null)[] = ['android_music', 'tv_embedded'];
-        let allThrottled = false;
-        let detectedBotBlock = false;
+        // Priority: ios, mweb, web_creator, android, tv_embedded
+        const gClients: (string | null)[] = ['ios', 'mweb', 'web_creator', 'android', 'tv_embedded'];
+        let botBlockCount = 0;
         for (const client of gClients) {
             try {
                 const { safeExecFile } = await import('../utils/security.js');
@@ -236,12 +235,12 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
             } catch (gErr: any) {
                 server.log.warn(`[stream-youtube] Direct URL lookup -g (${client || 'default-node'}) failed: ${gErr.message}`);
                 if (gErr.message?.includes('Sign in to confirm') || gErr.message?.includes('bot') || gErr.message?.includes('429')) {
-                    detectedBotBlock = true;
+                    botBlockCount++;
                 }
             }
         }
-        if (detectedBotBlock) {
-            server.log.warn(`[stream-youtube] YouTube IP block/bot challenge detected. Engaging 30-second circuit breaker.`);
+        if (botBlockCount === gClients.length) {
+            server.log.warn(`[stream-youtube] YouTube IP block/bot challenge detected across all clients. Engaging 30-second circuit breaker.`);
             localYtBlockCooldownUntil = Date.now() + 30 * 1000;
         }
     } else if (isLocalBlocked) {
@@ -1499,7 +1498,10 @@ export async function utilsRoutes(server: FastifyInstance) {
             server.log.info(`[stream-youtube] Direct extraction failed. Falling back to live spawn pipe for: ${url}`);
 
             const clientStrategies = [
-                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android_music'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=ios'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=mweb'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=web_creator'],
+                ['--force-ipv4', '--extractor-args', 'youtube:player_client=android'],
                 ['--force-ipv4', '--extractor-args', 'youtube:player_client=tv_embedded'],
             ];
 
