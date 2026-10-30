@@ -11,7 +11,7 @@ export async function homepageRoutes(server: FastifyInstance) {
     server.get('/made-for-you', { preHandler: [server.optionalAuthenticate] }, controller.getMadeForYou);
     server.get('/top-country', { preHandler: [server.optionalAuthenticate] }, controller.getTopCountry);
     server.get('/new-releases-lang', { preHandler: [server.optionalAuthenticate] }, controller.getNewReleasesInLanguages);
-    server.get('/trending-now', controller.getTrendingNow);
+    server.get('/trending-now', { preHandler: [server.optionalAuthenticate] }, controller.getTrendingNow);
     server.get('/because-you-like', { preHandler: [server.optionalAuthenticate] }, controller.getBecauseYouLike);
     server.get('/popular-artists-lang', { preHandler: [server.optionalAuthenticate] }, controller.getPopularArtistsInLanguages);
     server.get('/genre-playlists', { preHandler: [server.optionalAuthenticate] }, controller.getTopGenrePlaylists);
