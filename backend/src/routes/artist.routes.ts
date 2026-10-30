@@ -1005,14 +1005,16 @@ export async function artistRoutes(server: FastifyInstance) {
                     if (canonRel?.imageUrl) {
                         rel.imageUrl = canonRel.imageUrl;
                         rel.coverUrl = canonRel.coverUrl || canonRel.imageUrl;
+                    } else {
+                        const dbMatch = dbArtists.find(m => m.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean);
+                        if (dbMatch?.imageUrl && !dbMatch.imageUrl.includes('/albums/') && !dbMatch.imageUrl.includes('Golden_Sparrow')) {
+                            rel.imageUrl = dbMatch.imageUrl;
+                            rel.coverUrl = dbMatch.coverUrl || dbMatch.imageUrl;
+                        }
                     }
                     const dbMatch = dbArtists.find(m => m.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean);
                     if (dbMatch) {
                         rel.id = dbMatch.id;
-                        if (dbMatch.imageUrl && (dbMatch.imageUrl.includes('mzstatic') || !rel.imageUrl?.includes('mzstatic'))) {
-                            rel.imageUrl = dbMatch.imageUrl;
-                            rel.coverUrl = dbMatch.coverUrl || dbMatch.imageUrl;
-                        }
                     }
                 }
             } catch {}

@@ -135,7 +135,7 @@ export default function ArtistPage() {
   const rawBanner = (artist?.bannerUrl && artist.bannerUrl !== artist?.imageUrl) ? artist.bannerUrl : null;
   const isWidescreenUrl = Boolean(isWidescreen === true && rawBanner && !rawBanner.includes('500x500') && !rawBanner.includes('600x600'));
   const bannerUrl = isWidescreenUrl ? rawBanner : null;
-  const avatarUrl = artist?.imageUrl || artist?.coverUrl || artist?.bannerUrl || null;
+  const avatarUrl = getArtistProfileImage(artist);
 
   // Artwork tint — multi-source saturation-first loop, isCancelled guard,
   // reset only on page unmount (not on every dep change)
@@ -326,7 +326,7 @@ export default function ArtistPage() {
           <img
             src={getMediaUrl(bannerUrl) || undefined}
             alt={displayName}
-            className="absolute inset-0 w-full h-full object-cover object-top sm:object-[center_18%] md:object-[center_20%] filter brightness-95"
+            className="absolute inset-0 m-auto w-full h-full object-cover object-top sm:object-[center_15%] md:object-contain md:max-w-6xl md:max-h-[540px] filter brightness-95 pointer-events-none"
             fetchPriority="high"
             decoding="async"
           />

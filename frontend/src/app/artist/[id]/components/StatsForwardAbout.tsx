@@ -1,7 +1,7 @@
 "use client";
 
 import { BadgeCheck } from "lucide-react";
-import { cn, getMediaUrl, formatDisplayTitle } from "@/lib/utils";
+import { cn, getMediaUrl, formatDisplayTitle, getArtistProfileImage } from "@/lib/utils";
 
 interface StatsForwardAboutProps {
   artist: any;
@@ -10,7 +10,7 @@ interface StatsForwardAboutProps {
 export function StatsForwardAbout({ artist }: StatsForwardAboutProps) {
   if (!artist) return null;
 
-  const imageUrl = artist.imageUrl;
+  const imageUrl = getArtistProfileImage(artist);
   
   // Format stats nicely
   const formatStat = (num: number) => {
