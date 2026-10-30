@@ -43,9 +43,11 @@ export function themeVars(r: number, g: number, b: number) {
 /* ─── Shared state ─── */
 let lastAppliedRgb: [number, number, number] | null = null;
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+// Increments every time resetArtworkTheme is called. The debounced flush
+// checks this value and bails if it changed since it was scheduled —
+// preventing a late-firing apply from overwriting a fresh reset.
+let _resetEpoch = 0;
 
-/** Read the setting once and cache it; also register a storage listener so live-
- *  toggling from the Settings page instantly re-applies without a page reload. */
 function isColoredBgEnabled(): boolean {
   if (typeof window === "undefined") return false;
   try {
@@ -55,9 +57,6 @@ function isColoredBgEnabled(): boolean {
   }
 }
 
-/** Write the computed theme vars to the DOM, respecting the user's preference.
- *  Call is debounced (16ms) so rapid successive calls (e.g. two effects racing)
- *  collapse into one paint. */
 function _flushTheme(r: number, g: number, b: number) {
   if (typeof document === "undefined") return;
   const vars = themeVars(r, g, b);
@@ -82,19 +81,20 @@ function _flushTheme(r: number, g: number, b: number) {
 export function applyArtworkTheme(r: number, g: number, b: number) {
   if (typeof document === "undefined") return;
   lastAppliedRgb = [r, g, b];
-
-  // Debounce: if called multiple times within 16ms (one frame), only the last wins.
-  // This prevents the "StaticAlbumBackground extracts color → page effect also fires"
-  // race from causing a visible flash.
+  // Capture the epoch at scheduling time. If resetArtworkTheme fires before
+  // the 16ms timer, the epoch increments and the flush aborts.
+  const epochAtSchedule = _resetEpoch;
   if (_debounceTimer !== null) clearTimeout(_debounceTimer);
   _debounceTimer = setTimeout(() => {
     _debounceTimer = null;
+    if (_resetEpoch !== epochAtSchedule) return; // reset fired after us — abort
     if (lastAppliedRgb) _flushTheme(lastAppliedRgb[0], lastAppliedRgb[1], lastAppliedRgb[2]);
   }, 16);
 }
 
 export function resetArtworkTheme() {
   if (typeof document === "undefined") return;
+  _resetEpoch++; // invalidate any pending debounced apply
   if (_debounceTimer !== null) { clearTimeout(_debounceTimer); _debounceTimer = null; }
   lastAppliedRgb = null;
   const root = document.documentElement;

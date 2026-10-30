@@ -293,7 +293,20 @@ export default function TrackPage() {
       : queue.find((t) => t.id === id || (t as any).youtubeId === id);
 
   const track = dbTrack || currentOrQueueTrack;
-  const trackCoverUrl = track ? getMediaUrl(track.coverUrl) || "/logo.png" : null;
+
+  // Stabilise the cover URL so the artwork tint effect only re-fires when the
+  // URL genuinely changes (not just because the same URL arrived from a
+  // different source). This prevents the double-flash that occurred when
+  // currentOrQueueTrack had the URL first, then dbTrack loaded with the same URL.
+  const rawCoverUrl = track ? getMediaUrl(track.coverUrl) || "/logo.png" : null;
+  const [trackCoverUrl, setTrackCoverUrl] = React.useState<string | null>(rawCoverUrl);
+  React.useEffect(() => {
+    if (rawCoverUrl && rawCoverUrl !== "/logo.png" && rawCoverUrl !== trackCoverUrl) {
+      setTrackCoverUrl(rawCoverUrl);
+    } else if (rawCoverUrl && trackCoverUrl === null) {
+      setTrackCoverUrl(rawCoverUrl);
+    }
+  }, [rawCoverUrl]);
 
   /* ─── Artist ID for related queries ─── */
   const artistId = dbTrack?.artist?.id || dbTrack?.artistId;

@@ -135,13 +135,12 @@ export default function ArtistPage() {
   const bannerUrl = isWidescreenUrl ? rawBanner : null;
   const avatarUrl = artist?.imageUrl || artist?.coverUrl || artist?.bannerUrl || null;
 
-  // Dynamic Apple Music Artwork Tint: compute dominant RGB with multi-source fallback
-  // Evaluates banner, avatar, and top track artwork to find the authentic vibrant brand color
+  // Artwork tint — multi-source saturation-first loop, isCancelled guard,
+  // reset only on page unmount (not on every dep change)
   useEffect(() => {
     let isCancelled = false;
 
     async function resolveArtistTheme() {
-      // 1. Gather artist visual assets in preference order
       const candidates = [
         getMediaUrl(bannerUrl || rawBanner),
         getMediaUrl(avatarUrl),
@@ -149,7 +148,6 @@ export default function ArtistPage() {
         getMediaUrl(artist?.coverUrl),
       ].filter(Boolean) as string[];
 
-      // Also gather top track covers for vibrant fallback sampling
       const topTracks = artist?.topTracks || artist?.topSongs || [];
       for (const tr of topTracks.slice(0, 5)) {
         const c = tr?.coverUrl || tr?.artwork || tr?.image || tr?.album?.coverUrl;
@@ -159,7 +157,6 @@ export default function ArtistPage() {
         }
       }
 
-      // 2. Try each candidate — if it has color (saturation >= 0.05), adopt it immediately!
       for (const candidate of candidates) {
         if (isCancelled) return;
         const rgb = await extractArtworkAverageColor(candidate);
@@ -176,7 +173,6 @@ export default function ArtistPage() {
         }
       }
 
-      // 3. Fallback to candidate 0
       if (candidates[0]) {
         const fallbackRgb = await extractArtworkAverageColor(candidates[0]);
         if (fallbackRgb && !isCancelled) {
@@ -190,11 +186,15 @@ export default function ArtistPage() {
 
     resolveArtistTheme();
 
-    return () => {
-      isCancelled = true;
-      resetArtworkTheme();
-    };
+    // Cancel in-flight async work on dep change, but DON'T reset the theme
+    // here — that would flash to neutral every time artist data updates.
+    return () => { isCancelled = true; };
   }, [bannerUrl, avatarUrl, rawBanner, artist]);
+
+  // Reset theme only when the artist page fully unmounts
+  useEffect(() => {
+    return () => resetArtworkTheme();
+  }, []);
 
   if (isLoading) {
     return (
