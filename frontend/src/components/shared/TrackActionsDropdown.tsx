@@ -920,7 +920,7 @@ export function TrackActionsDropdown({
 
   return (
     <>
-      <span ref={anchorRef} className="inline-flex" onClickCapture={handleTriggerClick}>
+      <span ref={anchorRef} className="inline-flex" onClick={handleTriggerClick}>
         {trigger ?? defaultTrigger}
       </span>
 

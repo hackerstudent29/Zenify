@@ -362,9 +362,19 @@ export function LyricsView({
   const activeRef = React.useRef(activeIndex);
 
   React.useEffect(() => {
-    activeRef.current = 0;
-    setActiveIndex(0);
-  }, [trackId]);
+    const audio = audioEngine.getActiveAudioElement();
+    const currentTime = audio && Number.isFinite(audio.currentTime)
+      ? audio.currentTime
+      : usePlayerStore.getState().currentTime;
+    const offset = (currentTrack?.lyricsOffset || 0) / 1000;
+    const nextIndex = processedLines.reduce((index, line, i) => {
+      return line.time !== undefined && currentTime + offset >= line.time ? i : index;
+    }, -1);
+
+    activeRef.current = Math.max(0, nextIndex);
+    setActiveIndex(activeRef.current);
+    smoothTimeValue.set(Math.max(0, currentTime + offset));
+  }, [trackId, processedLines, currentTrack?.lyricsOffset, smoothTimeValue]);
 
   const [containerHeight, setContainerHeight] = React.useState(360);
   // sidebar: active line sits slightly above center (0.38) with headroom for previous lines
