@@ -5,6 +5,7 @@ import { usePlayerStore, extractTrackVibeParams } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { audioEngine } from "@/lib/audio-engine";
 import { getMediaUrl, getTrackCover, getApiBaseUrl } from "@/lib/utils";
+import { getCachedTrackBlobUrl, cacheTrackAudioInBackground } from "@/lib/audio-cache";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
 
@@ -643,6 +644,17 @@ export function GlobalAudio() {
 
       if (playbackSessionIdRef.current !== sessionId) return;
 
+      // Check client-side audio cache (Echo Music on-device cache pattern)
+      if (currentTrack.id) {
+        try {
+          const cachedBlobUrl = await getCachedTrackBlobUrl(currentTrack.id);
+          if (cachedBlobUrl) {
+            console.log(`[GlobalAudio] Playing from local device cache (0ms): ${currentTrack.title}`);
+            targetSrc = cachedBlobUrl;
+          }
+        } catch {}
+      }
+
       if (!targetSrc) {
         console.warn("[GlobalAudio] Track is unplayable. Skipping to next.");
         playNext(true);
@@ -677,6 +689,15 @@ export function GlobalAudio() {
         }
         audio.src = targetSrc;
         audio.load();
+
+        // If playing from a remote network stream, cache it locally in the background for instant future replays
+        if (currentTrack.id && targetSrc && !targetSrc.startsWith('blob:') && !targetSrc.startsWith('data:')) {
+          const streamToCache = targetSrc;
+          const trackIdToCache = currentTrack.id;
+          setTimeout(() => {
+            cacheTrackAudioInBackground(trackIdToCache, streamToCache);
+          }, 1500);
+        }
 
         // 4. Begin playback of the newly clicked or next track immediately
         const shouldPlay = isPlaying || usePlayerStore.getState().isPlaying;

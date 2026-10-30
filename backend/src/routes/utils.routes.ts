@@ -811,6 +811,25 @@ export async function utilsRoutes(server: FastifyInstance) {
             if (depth > 5) return reject(new Error('Too many redirects'));
             if (!isSafePublicUrl(rawUrl)) return reject(new Error('Access to private or local network addresses is prohibited'));
 
+            // ── DIRECT CDN OFFLOAD (Decentralized Akamai / Cloudflare R2 Streaming) ──
+            // If the audio URL is already on a public CORS-enabled CDN with HTTP 206 Range support,
+            // NEVER proxy audio bytes through Fastify! Immediately 302 redirect the client browser.
+            // This frees 100% of Node.js bandwidth & sockets, offloading delivery directly to the CDN edge.
+            const isDirectCdn = rawUrl.includes('saavncdn.com') ||
+                                rawUrl.includes('r2.dev') ||
+                                rawUrl.includes('jiosaavn.com') ||
+                                rawUrl.includes('res.cloudinary.com') ||
+                                rawUrl.includes('supabase.co');
+
+            if (isDirectCdn) {
+                reply.header('Access-Control-Allow-Origin', '*');
+                reply.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+                reply.header('Access-Control-Allow-Headers', 'Range, Origin, Accept, Content-Type');
+                reply.header('Cache-Control', 'public, max-age=86400, immutable');
+                reply.redirect(rawUrl, 302);
+                return resolve();
+            }
+
             let u: URL;
             try { u = new URL(rawUrl); } catch { return reject(new Error('Invalid redirect URL')); }
 
