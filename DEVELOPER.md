@@ -88,7 +88,7 @@ flowchart TB
 
 | Capability Domain | Engine Implementation | Technical Specifications |
 | :--- | :--- | :--- |
-| **3-Band Studio EQ** | `frontend/src/lib/audio-engine.ts` | Hardware-accelerated biquad filters (Low-shelf 60Hz, Peaking 1kHz, High-shelf 12kHz) with ±12dB continuous gain range. |
+| **StudioFX Multi-Band EQ** | `frontend/src/lib/audio-engine.ts` | Hardware-accelerated biquad filters with ±12dB continuous gain range and right-side glass panel interface. |
 | **8D Spatial Audio** | `frontend/src/components/player/audio-fx-menu.tsx` | Binaural `PannerNode` orbiting audio around stereo field with dual LFO oscillators and variable angular velocity. |
 | **DJ Speed & Pitch Warper** | `frontend/src/lib/audio-engine.ts` | Nightcore (1.5x speed + pitch), Daycore (0.75x slowed), and 0.50x–2.00x variable playback slider. |
 | **Convolution Reverb** | `frontend/src/lib/audio-engine.ts` | Impulse response convolution modelling Small Hall and Cathedral spaces with wet/dry balance controls. |
