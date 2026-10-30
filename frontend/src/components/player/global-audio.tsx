@@ -498,6 +498,11 @@ export function GlobalAudio() {
       audioEngine.setVolume(targetVol);
     };
 
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -505,6 +510,8 @@ export function GlobalAudio() {
     audio.addEventListener('error', handleAudioError);
 
     return () => {
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);

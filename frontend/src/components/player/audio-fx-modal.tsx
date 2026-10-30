@@ -1461,7 +1461,7 @@ export function AudioFxModal() {
             />
           )}
 
-          {/* Right-side glass panel (320px wide, matches Queue panel) */}
+          {/* Right-side panel (320px wide, matches Queue panel) */}
           <motion.div
             initial={isMobile ? { y: "100%" } : { x: 320 }}
             animate={isMobile ? { y: 0 } : { x: 0 }}
@@ -1469,10 +1469,10 @@ export function AudioFxModal() {
             transition={{ type: "spring", damping: 32, stiffness: 340, mass: 0.85 }}
             style={{ width: isMobile ? undefined : 320, backgroundColor: "var(--side)" }}
             className={cn(
-              "absolute pointer-events-auto flex flex-col overflow-hidden z-[140] am-glass will-change-transform",
+              "absolute pointer-events-auto flex flex-col overflow-hidden z-[140] bg-[var(--side)] will-change-transform",
               isMobile
-                ? "bottom-0 left-0 right-0 h-[84vh] rounded-t-[28px] shadow-[0_-20px_60px_rgba(0,0,0,0.4)]"
-                : "top-0 right-0 bottom-0 am-glass-right shadow-[-20px_0_60px_rgba(0,0,0,0.35)]"
+                ? "bottom-0 left-0 right-0 h-[84vh] rounded-t-[20px] border-t border-white/[0.08] shadow-[0_-12px_30px_rgba(0,0,0,0.3)]"
+                : "top-0 right-0 bottom-0 border-l border-white/[0.08] shadow-[-12px_0_30px_rgba(0,0,0,0.25)]"
             )}
             role="dialog"
             aria-modal="true"

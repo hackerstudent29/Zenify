@@ -136,6 +136,7 @@ export default function ArtistPage() {
   const isWidescreenUrl = Boolean(isWidescreen === true && rawBanner && !rawBanner.includes('500x500') && !rawBanner.includes('600x600'));
   const bannerUrl = isWidescreenUrl ? rawBanner : null;
   const avatarUrl = getArtistProfileImage(artist);
+  const heroImageUrl = bannerUrl || avatarUrl || rawBanner;
 
   // Artwork tint — multi-source saturation-first loop, isCancelled guard,
   // reset only on page unmount (not on every dep change)
@@ -303,10 +304,10 @@ export default function ArtistPage() {
       />
 
       {/* ── 1. ARTIST HERO ── */}
-      {isWidescreenUrl && bannerUrl ? (
-        /* WIDESCREEN FULL-SIZE MASTER BANNER: Apple Music Extended Showcase */
+      {heroImageUrl ? (
+        /* Full-size artist hero. Preserve square/profile artwork as a rectangle. */
         <div 
-          className="relative w-full h-[58vh] sm:h-[52vh] md:h-[48vh] lg:h-[46vh] min-h-[360px] max-h-[520px] overflow-hidden select-none am-layout-transition mb-6 sm:mb-8"
+          className="relative w-full h-[58vh] sm:h-[55vh] md:h-[52vh] lg:h-[50vh] min-h-[390px] max-h-[580px] overflow-hidden select-none am-layout-transition mb-6 sm:mb-8"
           style={{
             marginLeft: "calc(var(--sb-w) * -1)",
             marginRight: "calc(var(--rp-w) * -1)",
@@ -316,7 +317,7 @@ export default function ArtistPage() {
           {/* Ambient blurred backdrop so wide screens don't force excessive zoom on the artist */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <img
-              src={getMediaUrl(bannerUrl) || undefined}
+              src={getMediaUrl(heroImageUrl) || undefined}
               alt=""
               className="w-full h-full object-cover blur-3xl scale-125 opacity-35 brightness-75"
               aria-hidden="true"
@@ -324,9 +325,14 @@ export default function ArtistPage() {
           </div>
 
           <img
-            src={getMediaUrl(bannerUrl) || undefined}
+            src={getMediaUrl(heroImageUrl) || undefined}
             alt={displayName}
-            className="absolute inset-0 m-auto w-full h-full object-cover object-top sm:object-[center_15%] md:object-contain md:max-w-6xl md:max-h-[540px] filter brightness-95 pointer-events-none"
+            className={cn(
+              "absolute inset-0 m-auto w-full h-full filter brightness-95 pointer-events-none",
+              isWidescreenUrl
+                ? "object-cover object-top sm:object-[center_15%]"
+                : "object-contain object-center"
+            )}
             fetchPriority="high"
             decoding="async"
           />
@@ -436,7 +442,7 @@ export default function ArtistPage() {
           </div>
         </div>
       ) : (
-        /* ROUND SHAPE PROFILE PIC (When artist has no banner or square avatar) */
+        /* Minimal fallback when no artist artwork is available. */
         <div className="relative w-full pt-10 sm:pt-14 md:pt-16 pb-8 sm:pb-10 flex flex-col items-center justify-center text-center overflow-hidden select-none">
           {/* Subtle warm ambient radial glow behind avatar */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-white/[0.04] blur-3xl pointer-events-none" />
