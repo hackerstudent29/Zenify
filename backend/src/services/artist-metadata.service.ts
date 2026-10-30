@@ -121,7 +121,7 @@ export class ArtistMetadataService {
                     if (!heroBanner) {
                         const ogImage = $('meta[property="og:image"]').attr('content');
                         if (ogImage && ogImage.includes('mzstatic')) {
-                            heroBanner = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/2560x1440bb.$1');
+                            heroBanner = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/1920x1080cw.$1');
                             avatar = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/600x600bb.$1');
                             source = 'apple_music';
                         }
@@ -227,10 +227,22 @@ export class ArtistMetadataService {
         if (heroBanner || avatar) {
             try {
                 const updateData: any = {};
-                if (heroBanner && (!existing?.coverUrl || existing.coverUrl.includes('placeholder') || existing.coverUrl.includes('logo.png'))) {
+                const shouldUpdateCover = heroBanner && (
+                    !existing?.coverUrl || 
+                    existing.coverUrl.includes('placeholder') || 
+                    existing.coverUrl.includes('logo.png') || 
+                    (source === 'apple_music' && !existing.coverUrl.includes('mzstatic'))
+                );
+                if (shouldUpdateCover) {
                     updateData.coverUrl = heroBanner;
                 }
-                if (avatar && (!existing?.imageUrl || existing.imageUrl.includes('placeholder') || existing.imageUrl.includes('ui-avatars.com'))) {
+                const shouldUpdateImage = avatar && (
+                    !existing?.imageUrl || 
+                    existing.imageUrl.includes('placeholder') || 
+                    existing.imageUrl.includes('ui-avatars.com') || 
+                    (source === 'apple_music' && !existing.imageUrl.includes('mzstatic'))
+                );
+                if (shouldUpdateImage) {
                     updateData.imageUrl = avatar;
                 }
                 if (bio && (!existing?.bio || existing.bio.length < 30)) {

@@ -109,13 +109,15 @@ export default function ArtistPage() {
     if (
       targetUrl.includes('AMCArtistImages') ||
       targetUrl.includes('headerImage') ||
-      targetUrl.includes('2560x1440') ||
-      targetUrl.includes('1920x1080')
+      targetUrl.includes('cw.png') ||
+      targetUrl.includes('cw.jpg') ||
+      targetUrl.includes('cw.webp') ||
+      targetUrl.includes('2560x1440')
     ) {
       setIsWidescreen(true);
       return;
     }
-    if (targetUrl.includes('500x500') || targetUrl.includes('600x600') || targetUrl.includes('640x640')) {
+    if (targetUrl.includes('500x500') || targetUrl.includes('600x600') || targetUrl.includes('640x640') || targetUrl.includes('1080x1080')) {
       setIsWidescreen(false);
       return;
     }
@@ -304,17 +306,27 @@ export default function ArtistPage() {
       {isWidescreenUrl && bannerUrl ? (
         /* WIDESCREEN FULL-SIZE MASTER BANNER: Apple Music Extended Showcase */
         <div 
-          className="relative w-full h-[62vh] sm:h-[70vh] md:h-[76vh] min-h-[500px] max-h-[760px] overflow-hidden select-none am-layout-transition mb-6 sm:mb-8"
+          className="relative w-full h-[58vh] sm:h-[52vh] md:h-[48vh] lg:h-[46vh] min-h-[360px] max-h-[520px] overflow-hidden select-none am-layout-transition mb-6 sm:mb-8"
           style={{
             marginLeft: "calc(var(--sb-w) * -1)",
             marginRight: "calc(var(--rp-w) * -1)",
             width: "calc(100% + var(--sb-w) + var(--rp-w))",
           }}
         >
+          {/* Ambient blurred backdrop so wide screens don't force excessive zoom on the artist */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <img
+              src={getMediaUrl(bannerUrl) || undefined}
+              alt=""
+              className="w-full h-full object-cover blur-3xl scale-125 opacity-35 brightness-75"
+              aria-hidden="true"
+            />
+          </div>
+
           <img
             src={getMediaUrl(bannerUrl) || undefined}
             alt={displayName}
-            className="absolute inset-0 w-full h-full object-cover object-top filter brightness-95"
+            className="absolute inset-0 w-full h-full object-cover object-top sm:object-[center_18%] md:object-[center_20%] filter brightness-95"
             fetchPriority="high"
             decoding="async"
           />

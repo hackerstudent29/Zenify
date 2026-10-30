@@ -864,13 +864,18 @@ export async function artistRoutes(server: FastifyInstance) {
             })
         ]);
 
-        // If artist has no profile pic, use their song's cover artwork
-        let finalImageUrl = artist.imageUrl;
-        if (!finalImageUrl || finalImageUrl.includes('placeholder') || finalImageUrl.includes('ui-avatars.com')) {
-            const songCover = finalTopTracks.find(t => t.coverUrl && t.coverUrl.trim() !== '' && !t.coverUrl.includes('logo.png'))?.coverUrl;
-            if (songCover) {
-                finalImageUrl = songCover;
-                prisma.artist.update({ where: { id: artist.id }, data: { imageUrl: songCover } }).catch(() => {});
+        const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
+        const normName = (artist.name || '').toLowerCase().trim();
+        const canon = CANONICAL_ARTISTS[normName] || Object.values(CANONICAL_ARTISTS).find(c => c.name.toLowerCase() === normName);
+
+        let finalImageUrl = (artist.imageUrl && artist.imageUrl.includes('mzstatic')) 
+            ? artist.imageUrl 
+            : (canon?.imageUrl || artist.imageUrl);
+
+        if (!finalImageUrl || finalImageUrl.includes('placeholder') || finalImageUrl.includes('ui-avatars.com') || finalImageUrl.includes('wikimedia')) {
+            if (canon?.imageUrl) {
+                finalImageUrl = canon.imageUrl;
+                prisma.artist.update({ where: { id: artist.id }, data: { imageUrl: canon.imageUrl, coverUrl: canon.coverUrl || artist.coverUrl } }).catch(() => {});
             }
         }
 
@@ -984,7 +989,35 @@ export async function artistRoutes(server: FastifyInstance) {
             };
         }).filter((sg: any) => sg.title && sg.coverUrl);
 
-        const heroBanner = widescreenBanner || artist.coverUrl || wikiBanner || deezerCover || finalImageUrl;
+        const heroBanner = widescreenBanner || (canon?.coverUrl) || artist.coverUrl || wikiBanner || deezerCover || finalImageUrl;
+
+        if (relatedArtists.length > 0) {
+            try {
+                const names = relatedArtists.map(r => r.name).filter(Boolean);
+                const dbArtists = await prisma.artist.findMany({
+                    where: {
+                        OR: names.map(n => ({ name: { equals: n, mode: 'insensitive' } }))
+                    },
+                    select: { id: true, name: true, imageUrl: true, coverUrl: true }
+                });
+                for (const rel of relatedArtists) {
+                    const norm = (rel.name || '').toLowerCase().trim();
+                    const canonRel = CANONICAL_ARTISTS[norm] || Object.values(CANONICAL_ARTISTS).find(c => c.name.toLowerCase() === norm);
+                    if (canonRel?.imageUrl) {
+                        rel.imageUrl = canonRel.imageUrl;
+                        rel.coverUrl = canonRel.coverUrl || canonRel.imageUrl;
+                    }
+                    const dbMatch = dbArtists.find(m => m.name.toLowerCase() === norm);
+                    if (dbMatch) {
+                        rel.id = dbMatch.id;
+                        if (dbMatch.imageUrl && (dbMatch.imageUrl.includes('mzstatic') || !rel.imageUrl?.includes('mzstatic'))) {
+                            rel.imageUrl = dbMatch.imageUrl;
+                            rel.coverUrl = dbMatch.coverUrl || dbMatch.imageUrl;
+                        }
+                    }
+                }
+            } catch {}
+        }
 
         return JSON.parse(JSON.stringify({ 
             ...artist, 
@@ -1072,12 +1105,15 @@ export async function artistRoutes(server: FastifyInstance) {
                 }
             });
 
+            const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
             const processedArtists: any[] = artists
                 .filter(a => !isFakeOrNumericArtistName(a.name))
                 .map(a => {
-                    const songCover = a.tracks?.[0]?.coverUrl;
+                    const norm = (a.name || '').toLowerCase().trim();
+                    const canon = CANONICAL_ARTISTS[norm] || Object.values(CANONICAL_ARTISTS).find(c => c.name.toLowerCase() === norm);
+                    const canonImage = canon?.imageUrl;
                     const hasValidImage = a.imageUrl && !a.imageUrl.includes('placeholder') && !a.imageUrl.includes('ui-avatars.com');
-                    const finalImage = hasValidImage ? a.imageUrl : (songCover || a.imageUrl);
+                    const finalImage = (hasValidImage && a.imageUrl.includes('mzstatic')) ? a.imageUrl : (canonImage || a.imageUrl);
                     const { tracks, ...rest } = a;
                     return { ...rest, imageUrl: finalImage };
                 });

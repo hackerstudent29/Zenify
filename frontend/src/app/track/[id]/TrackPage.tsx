@@ -41,7 +41,7 @@ import { DynamicBackground } from "@/components/shared/DynamicBackground";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { MediaCard, MEDIA_CARD_WIDTH } from "@/components/shared/MediaCard";
 import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
-import { getMediaUrl, cn, formatDisplayTitle, decodeHtmlEntities, getArtistTarget } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle, decodeHtmlEntities, getArtistTarget, getArtistProfileImage } from "@/lib/utils";
 
 /* ─────────────────────────────────── Micro pieces ─────────────────────────────────── */
 
@@ -932,7 +932,7 @@ export default function TrackPage() {
                     style={{ width: "min(128px, 100%)", height: "min(128px, 100%)" }}
                   >
                     <img
-                      src={getMediaUrl(rel.imageUrl || rel.coverUrl) || "/logo.png"}
+                      src={getArtistProfileImage(rel)}
                       alt={rel.name || "Artist"}
                       className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300"
                       loading="lazy"
