@@ -7,7 +7,7 @@ Zenify offers a seamless, ad-free listening experience directly in the web brows
 
 ## Core Features
 - **Multilingual Synced Lyrics**: Sub-second synchronization with syllable-level timing and automated instrumental gap detection.
-- **Studio 3-Band Equalizer**: High-precision biquad audio filtering for bass, mids, and treble frequencies.
+- **StudioFX Multi-Band Equalizer**: Right-side glass panel audio processor with high-precision biquad audio filtering, collapsible FX sections, and quick bypass toggles.
 - **8D Spatial Audio**: Real-time binaural spatial audio panning engine simulating a 360-degree soundstage.
 - **DJ Speed & Pitch Warper**: Live DSP pitch and tempo manipulation for nightcore, daycore, and slowed-and-reverb audio.
 - **Local Audio Scanner**: In-browser client-side playback of MP3, FLAC, WAV, and AAC audio files with 100% user privacy.
