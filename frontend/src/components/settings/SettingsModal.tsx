@@ -99,22 +99,12 @@ export function SettingsModal({
     autoplay: true,
     normalizeVolume: true,
     explicitFilter: false,
-    theme: "dark",
     accentColor: "rose",
-    compactMode: false,
     emailNotifications: false,
     newReleaseAlerts: false,
     playlistUpdates: false,
     weeklySummaryEmail: false,
-    privateSession: false,
     listeningActivity: true,
-    sidebarStyle: "glassmorphism",
-    globalPlayerStyle: "glassmorphism",
-    fullviewReactiveBg: true,
-    trackPageReactiveBg: true,
-    surroundingSpeed: 3,
-    bottomNavStyle: "normal" as "normal" | "glasso",
-    swipeNavigation: true,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -211,15 +201,15 @@ export function SettingsModal({
     }
 
     const toastMap: Record<string, (v: boolean) => string> = {
-      crossfade: (v) => (v ? "Smooth Swaps enabled — Crossfading songs" : "Smooth Swaps disabled"),
-      autoplay: (v) => (v ? "Keep Playing enabled — Plays similar tracks when queue ends" : "Keep Playing disabled"),
-      normalizeVolume: (v) => (v ? "Same Volume enabled across all tracks" : "Volume normalization disabled"),
-      explicitFilter: (v) => (v ? "Explicit filter enabled — Bad words hidden" : "Explicit filter disabled"),
-      emailNotifications: (v) => (v ? "Email Notifications enabled" : "Email Notifications disabled"),
-      weeklySummaryEmail: (v) => (v ? "Weekly Summary Email enabled" : "Weekly Summary Email disabled"),
-      newReleaseAlerts: (v) => (v ? "New Music alerts enabled for followed artists" : "New Music alerts disabled"),
-      playlistUpdates: (v) => (v ? "Playlist News alerts enabled" : "Playlist News alerts disabled"),
-      listeningActivity: (v) => (v ? "Listening activity visible on profile" : "Listening activity hidden"),
+      crossfade: (v) => (v ? "Smooth crossfading enabled" : "Crossfading disabled"),
+      autoplay: (v) => (v ? "Keep Playing enabled" : "Keep Playing disabled"),
+      normalizeVolume: (v) => (v ? "Volume normalization enabled" : "Volume normalization disabled"),
+      explicitFilter: (v) => (v ? "Explicit content filter enabled" : "Explicit content filter disabled"),
+      emailNotifications: (v) => (v ? "Email notifications enabled" : "Email notifications disabled"),
+      weeklySummaryEmail: (v) => (v ? "Weekly summary email enabled" : "Weekly summary email disabled"),
+      newReleaseAlerts: (v) => (v ? "New release alerts enabled" : "New release alerts disabled"),
+      playlistUpdates: (v) => (v ? "Playlist update notifications enabled" : "Playlist update notifications disabled"),
+      listeningActivity: (v) => (v ? "Listening activity visible on profile" : "Listening activity hidden from profile"),
     };
 
     if (toastMap[key]) {
