@@ -32,7 +32,7 @@
 
 **Zenify** is an **open-source web music player and ad-free Spotify alternative** created for music lovers who appreciate clean visuals, instant playback, and **native synchronized lyrics for Indian and global regional languages**.
 
-Commercial music apps often treat non-English lyrics as an afterthought—showing unsynced blocks of text or missing romanized words entirely. Zenify features a custom **karaoke-grade lyric alignment engine**, a hardware-accelerated **Studio Audio DSP Suite** (3-band EQ, 8D spatial sound, nightcore/slowed modes), an **in-browser local audio player**, and a dynamic liquid glass UI that flows with your album's colors.
+Commercial music apps often treat non-English lyrics as an afterthought—showing unsynced blocks of text or missing romanized words entirely. Zenify features a custom **karaoke-grade lyric alignment engine**, a hardware-accelerated **StudioFX Audio DSP Suite** (right-side glass panel, 10-band EQ, 8D spatial sound, nightcore/slowed modes), an **in-browser local audio player**, and a dynamic liquid glass UI that flows with your album's colors.
 
 > 🎧 **Start listening immediately in your browser:** Visit **[listenzenify.vercel.app](https://listenzenify.vercel.app)** — no account or download required!
 
@@ -41,8 +41,9 @@ Commercial music apps often treat non-English lyrics as an afterthought—showin
 ## ✨ Why Listen on Zenify?
 
 * 🎤 **Sub-Second Synced Lyrics:** Real-time karaoke alignment for **Tamil, Tanglish, Hindi, Malayalam, and English** with smart protection during instrumental guitar and violin solos (`[BGM]`, `[Interlude]`).
-* 🎛️ **Studio Audio Suite & 8D Sound:**
-  * **3-Band Equalizer:** Fine-tune Bass, Mid, and Treble with instant **Bass Boost** and **Vocal Booster** presets.
+* 🎛️ **StudioFX Audio Suite & 8D Sound:**
+  * **Right-Side Glass FX Panel:** Quick right-side collapsible panel interface with smooth animations and bypass toggle.
+  * **Multi-Band Equalizer:** Fine-tune frequencies with instant **Bass Boost** and **Vocal Booster** presets.
   * **8D Spatial Audio:** Immersive sound that dynamically orbits around your headphones.
   * **DJ Playback Modes:** One-click **Nightcore** (1.5x speed) and **Daycore / Slowed** (0.75x speed + reverb).
   * **Acoustic Reverb Spaces:** Simulate Small Hall and Cathedral listening rooms.
