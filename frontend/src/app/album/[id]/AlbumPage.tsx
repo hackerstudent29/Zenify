@@ -31,7 +31,7 @@ import {
 import { usePlayerStore } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
-import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget } from "@/lib/utils";
+import { getMediaUrl, cn, formatDisplayTitle, getArtistTarget, getArtistProfileImage } from "@/lib/utils";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
 import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
@@ -699,7 +699,7 @@ export default function AlbumPage() {
                 {/* Round portrait — uniform artist-page size */}
                 <div className="w-full aspect-square rounded-full overflow-hidden bg-zinc-800 ring-1 ring-inset ring-white/10 shadow-xl shadow-black/40 group-hover:ring-2 group-hover:ring-brand/50 transition-all duration-300">
                   <img
-                    src={getMediaUrl(rel.imageUrl || rel.coverUrl)}
+                    src={getArtistProfileImage(rel)}
                     alt={rel.name}
                     className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
                     loading="lazy"

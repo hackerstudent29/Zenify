@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getArtistProfileImage } from "@/lib/utils";
 import api from "@/lib/api";
 import { MediaCard, MEDIA_CARD_WIDTH } from "@/components/shared/MediaCard";
 
@@ -137,8 +137,8 @@ export function FansAlsoLike({ currentArtistId, initialRelated }: FansAlsoLikePr
               id: artist.id,
               title: artist.name || artist.title,
               name: artist.name || artist.title,
-              coverUrl: artist.imageUrl || artist.coverUrl || artist.picture_xl || artist.image,
-              artwork: artist.imageUrl || artist.coverUrl || artist.picture_xl || artist.image,
+              coverUrl: getArtistProfileImage(artist),
+              artwork: getArtistProfileImage(artist),
               isArtist: true,
               subtitle: "Artist",
               href: `/artist/${artist.id}`,
