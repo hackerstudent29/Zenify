@@ -165,6 +165,34 @@ const ALIASES: Record<string, string> = {
 };
 
 /**
+ * Robust canonical artist lookup: handles spaces, dots, aliases, and punctuation
+ */
+export function getCanonicalArtist(input?: string | null): { name: string; bio?: string; birthDate?: string; imageUrl?: string; coverUrl?: string } | null {
+    if (!input || typeof input !== 'string') return null;
+    const clean = input.toLowerCase().trim();
+    const norm = clean.replace(/[^a-z0-9]/g, '');
+    if (!norm) return null;
+
+    if (CANONICAL_ARTISTS[clean]) return CANONICAL_ARTISTS[clean];
+    if (ALIASES[clean] && CANONICAL_ARTISTS[ALIASES[clean]]) return CANONICAL_ARTISTS[ALIASES[clean]];
+
+    for (const [key, val] of Object.entries(CANONICAL_ARTISTS)) {
+        const keyNorm = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const nameNorm = val.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (keyNorm === norm || nameNorm === norm) return val;
+    }
+
+    for (const [aliasKey, targetKey] of Object.entries(ALIASES)) {
+        const aliasNorm = aliasKey.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (aliasNorm === norm && CANONICAL_ARTISTS[targetKey]) {
+            return CANONICAL_ARTISTS[targetKey];
+        }
+    }
+
+    return null;
+}
+
+/**
  * Splits compound artist strings into individual, canonical artists
  * Handles: "A, B & C", "A feat. B", "A with B", "A / B"
  */

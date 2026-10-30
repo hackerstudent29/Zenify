@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../utils/prisma';
 import { ArtistController } from '../controllers/artist.controller';
-import { cleanArtistNames, isFakeOrNumericArtistName } from '../utils/artist.js';
+import { cleanArtistNames, isFakeOrNumericArtistName, CANONICAL_ARTISTS, getCanonicalArtist } from '../utils/artist.js';
 import { CleanCdnAudioService } from '../services/clean-cdn-audio.service.js';
 
 export async function artistRoutes(server: FastifyInstance) {
@@ -240,8 +240,8 @@ export async function artistRoutes(server: FastifyInstance) {
 
         // 4. If still not in DB, create new artist from Deezer, Wikipedia, canonical list, or AudioDB
         if (!artist && cleanName.length > 0 && !isFakeOrNumericArtistName(cleanName)) {
-            const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
-            const canonical = CANONICAL_ARTISTS[cleanName.toLowerCase()];
+            const { getCanonicalArtist } = await import('../utils/artist.js');
+            const canonical = getCanonicalArtist(cleanName);
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(cleanName).catch(() => null);
 
@@ -864,9 +864,8 @@ export async function artistRoutes(server: FastifyInstance) {
             })
         ]);
 
-        const { CANONICAL_ARTISTS } = await import('../utils/artist.js');
-        const normName = (artist.name || '').toLowerCase().trim();
-        const canon = CANONICAL_ARTISTS[normName] || Object.values(CANONICAL_ARTISTS).find(c => c.name.toLowerCase() === normName);
+        const { getCanonicalArtist } = await import('../utils/artist.js');
+        const canon = getCanonicalArtist(artist.name);
 
         let finalImageUrl = (artist.imageUrl && artist.imageUrl.includes('mzstatic')) 
             ? artist.imageUrl 
@@ -996,18 +995,18 @@ export async function artistRoutes(server: FastifyInstance) {
                 const names = relatedArtists.map(r => r.name).filter(Boolean);
                 const dbArtists = await prisma.artist.findMany({
                     where: {
-                        OR: names.map(n => ({ name: { equals: n, mode: 'insensitive' } }))
+                        OR: names.map(n => ({ name: { contains: n.replace(/[^a-zA-Z0-9\s]/g, '').trim(), mode: 'insensitive' } }))
                     },
                     select: { id: true, name: true, imageUrl: true, coverUrl: true }
                 });
                 for (const rel of relatedArtists) {
-                    const norm = (rel.name || '').toLowerCase().trim();
-                    const canonRel = CANONICAL_ARTISTS[norm] || Object.values(CANONICAL_ARTISTS).find(c => c.name.toLowerCase() === norm);
+                    const normClean = (rel.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const canonRel = getCanonicalArtist(rel.name);
                     if (canonRel?.imageUrl) {
                         rel.imageUrl = canonRel.imageUrl;
                         rel.coverUrl = canonRel.coverUrl || canonRel.imageUrl;
                     }
-                    const dbMatch = dbArtists.find(m => m.name.toLowerCase() === norm);
+                    const dbMatch = dbArtists.find(m => m.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean);
                     if (dbMatch) {
                         rel.id = dbMatch.id;
                         if (dbMatch.imageUrl && (dbMatch.imageUrl.includes('mzstatic') || !rel.imageUrl?.includes('mzstatic'))) {
@@ -1109,8 +1108,7 @@ export async function artistRoutes(server: FastifyInstance) {
             const processedArtists: any[] = artists
                 .filter(a => !isFakeOrNumericArtistName(a.name))
                 .map(a => {
-                    const norm = (a.name || '').toLowerCase().trim();
-                    const canon = CANONICAL_ARTISTS[norm] || Object.values(CANONICAL_ARTISTS).find(c => c.name.toLowerCase() === norm);
+                    const canon = getCanonicalArtist(a.name);
                     const canonImage = canon?.imageUrl;
                     const hasValidImage = a.imageUrl && !a.imageUrl.includes('placeholder') && !a.imageUrl.includes('ui-avatars.com');
                     const finalImage = (hasValidImage && a.imageUrl.includes('mzstatic')) ? a.imageUrl : (canonImage || a.imageUrl);

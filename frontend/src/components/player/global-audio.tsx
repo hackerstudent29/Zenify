@@ -43,6 +43,21 @@ export function GlobalAudio() {
   const prefetchedTrackIds = useRef<Set<string>>(new Set());
   const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioRecoveryAttempts = useRef<Record<string, number>>({});
+  const consecutiveFailuresRef = useRef<number[]>([]);
+
+  // Circuit breaker to halt cascading skip loops when consecutive streams fail
+  const checkCascadeLoop = (): boolean => {
+    const now = Date.now();
+    consecutiveFailuresRef.current = consecutiveFailuresRef.current.filter(t => now - t < 5000);
+    consecutiveFailuresRef.current.push(now);
+    if (consecutiveFailuresRef.current.length >= 3) {
+      console.warn('[GlobalAudio] Playback circuit breaker triggered: 3 errors in 5 seconds. Pausing playback.');
+      setIsPlaying(false);
+      useUIStore.getState().showToast('Playback paused: audio streams temporarily unavailable.', 'error');
+      return true;
+    }
+    return false;
+  };
 
   // Initialize Audio Engine & Background Resilience Listeners
   useEffect(() => {
@@ -394,17 +409,24 @@ export function GlobalAudio() {
                     console.warn("[GlobalAudio/Automator] Secondary playback attempt failed:", playErr);
                     setTimeout(() => {
                       useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
-                      playNext(true);
+                      if (checkCascadeLoop()) return;
+              playNext(true);
                     }, 300);
                   });
                   return;
                 }
               }
               useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
+
+              if (checkCascadeLoop()) return;
+
               playNext(true);
             }).catch((err) => {
               console.warn("[GlobalAudio/Automator] Refetch audio error:", err);
               useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
+
+              if (checkCascadeLoop()) return;
+
               playNext(true);
             });
           }).catch(() => {
@@ -414,6 +436,9 @@ export function GlobalAudio() {
           // Attempt limit exceeded: smoothly advance to next song in queue
           console.warn(`[GlobalAudio/Automator] Audio recovery exhausted for "${current.title}". Advancing to next track.`);
           useUIStore.getState().showToast(`Audio unavailable for "${current.title}". Playing next song.`, 'error');
+
+          if (checkCascadeLoop()) return;
+
           playNext(true);
         }
       };

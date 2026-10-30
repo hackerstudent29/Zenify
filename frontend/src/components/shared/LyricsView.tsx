@@ -270,15 +270,16 @@ export function LyricsView({
     const result: any[] = [];
     const trackDur = duration || usePlayerStore.getState().duration || 0;
 
-    if (base.length > 0 && base[0].time > 3.2 && base[0].text !== "• • •") {
-      result.push({ time: 0, endTime: Math.max(0.5, base[0].time - 0.3), text: "• • •", isInterlude: true });
+    if (base.length > 0 && base[0]?.time !== undefined && base[0].time > 3.2 && base[0].text !== "• • •") {
+      result.push({ time: 0, endTime: Math.max(0.5, (base[0].time || 0) - 0.3), text: "• • •", isInterlude: true });
     }
     for (let i = 0; i < base.length; i++) {
       const cur = base[i];
+      if (!cur) continue;
       if (cur.text === "• • •") cur.isInterlude = true;
       result.push(cur);
       const next = base[i + 1];
-      if (next) {
+      if (next && next.time !== undefined && cur.time !== undefined) {
         const wc = cur.text ? cur.text.trim().split(/\s+/).length : 0;
         const est = Math.min(Math.max(2.0, wc * 0.55), Math.max(0.5, next.time - cur.time));
         const end = cur.endTime ? cur.endTime : cur.time + est;
@@ -289,9 +290,9 @@ export function LyricsView({
     }
     if (result.length > 0 && trackDur > 0) {
       const lastL = result[result.length - 1];
-      const wc = lastL.text ? lastL.text.trim().split(/\s+/).length : 0;
-      const lastEnd = lastL.endTime || lastL.time + Math.max(2.5, wc * 0.6);
-      if (trackDur - lastEnd >= 4.5 && lastL.text !== "• • •") {
+      const wc = lastL?.text ? lastL.text.trim().split(/\s+/).length : 0;
+      const lastEnd = lastL?.endTime || (lastL?.time !== undefined ? lastL.time + Math.max(2.5, wc * 0.6) : 0);
+      if (trackDur - lastEnd >= 4.5 && lastL?.text !== "• • •") {
         result.push({ time: lastEnd + 0.5, endTime: trackDur - 0.5, text: "• • •", isInterlude: true });
       }
     }
@@ -352,10 +353,18 @@ export function LyricsView({
     const t = audio && Number.isFinite(audio.currentTime) ? audio.currentTime : usePlayerStore.getState().currentTime;
     const tt = Math.max(0, t + (currentTrack?.lyricsOffset || 0) / 1000);
     let idx = -1;
-    for (let i = 0; i < processedLines.length; i++) { if (tt >= processedLines[i].time) idx = i; else break; }
+    for (let i = 0; i < processedLines.length; i++) {
+      if (processedLines[i]?.time !== undefined && tt >= processedLines[i].time) idx = i;
+      else break;
+    }
     return idx;
   });
   const activeRef = React.useRef(activeIndex);
+
+  React.useEffect(() => {
+    activeRef.current = 0;
+    setActiveIndex(0);
+  }, [trackId]);
 
   const [containerHeight, setContainerHeight] = React.useState(360);
   // sidebar: active line sits slightly above center (0.38) with headroom for previous lines
@@ -550,11 +559,12 @@ export function LyricsView({
       smoothTimeValue.set(t);
 
       const lines = linesRef.current;
-      if (!lines.length || lines[0].isUnsynced) return;
+      if (!lines.length || lines[0]?.isUnsynced) return;
       const tt = t + (sidebarRef.current ? LEAD_SB : LEAD);
       let n = activeRef.current;
-      while (n + 1 < lines.length && tt >= lines[n + 1].time) n++;
-      while (n >= 0 && tt < lines[n].time) n--;
+      if (n >= lines.length) n = lines.length - 1;
+      while (n + 1 < lines.length && lines[n + 1]?.time !== undefined && tt >= lines[n + 1].time) n++;
+      while (n >= 0 && (lines[n]?.time === undefined || tt < lines[n].time)) n--;
       if (n !== activeRef.current) {
         activeRef.current = n;
         setActiveIndex(n);

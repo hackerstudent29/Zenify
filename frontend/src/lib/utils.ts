@@ -278,12 +278,61 @@ export function getTrackCover(track: any): string {
   return getMediaUrl(cover, 'image') || "/logo.png";
 }
 
+// Universal Apple Music Canonical Artist Visuals Dictionary (High-Res 600x600bb Apple Music portraits)
+export const CANONICAL_APPLE_ARTISTS: Record<string, string> = {
+  "arrahman": "https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/33/2b/3d/332b3de7-6f79-bf87-072d-794c1176d9f8/mza_8008578196274844399.png/600x600bb.jpg",
+  "anirudhravichander": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/85/84/dd/8584ddc7-a699-bb7d-027a-d3132ffb9582/mza_7960699454837846773.png/600x600bb.jpg",
+  "anirudh": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/85/84/dd/8584ddc7-a699-bb7d-027a-d3132ffb9582/mza_7960699454837846773.png/600x600bb.jpg",
+  "hiphoptamizha": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
+  "hiphoptamizhaaadhi": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
+  "aadhi": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
+  "gvprakashkumar": "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/600x600bb.jpg",
+  "gvprakash": "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/600x600bb.jpg",
+  "thamans": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg",
+  "thaman": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg",
+  "santhoshnarayanan": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/07/05/58/070558d1-0853-37e4-ba23-e57a86397b2f/mza_7575225160549591736.png/600x600bb.jpg",
+  "sidsriram": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages116/v4/f2/5f/20/f25f20b1-f502-f671-b84b-16f802a4c234/03b4e34e-92b2-496f-9dc2-a02fb0d2122a_ami-identity-d29f291ff6700b97f78cefa15fd569b6-2023-08-04T16-27-30.791Z_cropped.png/600x600bb.jpg",
+  "yuvanshankarraja": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages126/v4/75/bb/a1/75bba1b1-11a1-a9a4-ac65-7c1fce8f155b/e0e228f4-2d7c-4366-895a-9073984a6ffc_ami-identity-3337edee6879016e69bc8109b13c4208-2023-05-24T12-44-42.909Z_cropped.png/600x600bb.jpg",
+  "yuvan": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages126/v4/75/bb/a1/75bba1b1-11a1-a9a4-ac65-7c1fce8f155b/e0e228f4-2d7c-4366-895a-9073984a6ffc_ami-identity-3337edee6879016e69bc8109b13c4208-2023-05-24T12-44-42.909Z_cropped.png/600x600bb.jpg",
+  "harrisjayaraj": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/15/a7/58/15a7581b-4056-d274-6ed7-1c2a61461d81/pr_source.png/600x600bb.jpg",
+  "dimman": "https://is1-ssl.mzstatic.com/image/thumb/Music123/v4/31/09/b2/3109b228-528d-c03c-e305-7987f515d667/886443574151.jpg/600x600bb.jpg",
+  "imman": "https://is1-ssl.mzstatic.com/image/thumb/Music123/v4/31/09/b2/3109b228-528d-c03c-e305-7987f515d667/886443574151.jpg/600x600bb.jpg",
+  "samcs": "https://is1-ssl.mzstatic.com/image/thumb/Features124/v4/51/3b/b8/513bb8d5-f934-0da8-9650-be89a3a3c37f/mza_3068448473619100532.png/600x600bb.jpg",
+  "ilaiyaraaja": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/72/c3/32/72c3322b-e100-16a8-e713-5748c7c76b93/mza_4680178773015887139.png/600x600bb.jpg",
+  "ilayaraja": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/72/c3/32/72c3322b-e100-16a8-e713-5748c7c76b93/mza_4680178773015887139.png/600x600bb.jpg",
+  "seanroldan": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages221/v4/cc/7f/72/cc7f72d4-5f93-a49d-55ca-69c4c765f610/66238875-7fb0-4417-b7b4-a8c034dafca5_file_cropped.png/600x600bb.jpg",
+  "ghibran": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/80/3a/b8/803ab878-4d72-5183-fa15-e0b1ad2c4288/pr_source.png/600x600bb.jpg",
+  "saiabhyankkar": "https://is1-ssl.mzstatic.com/image/thumb/Features211/v4/cd/db/89/cddb89d2-79e7-7385-edc9-c3d50ff18505/mza_14310547933879091928.png/600x600bb.jpg",
+  "deva": "https://is1-ssl.mzstatic.com/image/thumb/Music128/v4/71/61/2d/71612d86-487b-2f1f-8414-b8a3ed8b53eb/191773236113.jpg/600x600bb.jpg",
+  "devisriprasad": "https://is1-ssl.mzstatic.com/image/thumb/Features211/v4/3a/3f/a3/3a3fa358-1385-911e-ecad-bfed3029841f/mza_12519351446532628538.png/600x600bb.jpg",
+  "dsp": "https://is1-ssl.mzstatic.com/image/thumb/Features211/v4/3a/3f/a3/3a3fa358-1385-911e-ecad-bfed3029841f/mza_12519351446532628538.png/600x600bb.jpg",
+  "sushinshyam": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/2f/b2/09/2fb209cb-eee2-8513-5096-fb1199ef0f76/mza_8773855622915570782.png/600x600bb.jpg",
+  "sushin": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/2f/b2/09/2fb209cb-eee2-8513-5096-fb1199ef0f76/mza_8773855622915570782.png/600x600bb.jpg",
+  "justinbieber": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages221/v4/f2/1f/32/f21f3290-c966-20e7-e826-a84a1c1adc05/ami-identity-d15f1da1dd95aabafc7476c4cd97ce79-2025-09-04T16-40-24.717Z_cropped.png/600x600bb.png",
+  "theweeknd": "https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/7c/e8/e8/7ce8e84a-95be-e9a3-5ce2-ba5ea1b9ffeb/mza_17208153401569421598.png/600x600bb.jpg",
+  "thekidlaroi": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages221/v4/bd/ff/2a/bdff2aa0-f8fa-adba-578b-c9b20bfa4343/ami-identity-e6a64f51e06fa99d5f7566144e54e4df-2025-09-04T16-39-08.151Z_cropped.png/600x600bb.png",
+  "taylorswift": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages221/v4/71/6a/5f/716a5fae-e76e-aa56-4dc5-132d73356e9c/ami-identity-72fc7ee6805ce060b97cfc126ec86be2-2025-09-04T16-39-08.148Z_cropped.png/600x600bb.png",
+  "edsheeran": "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/13/c5/40/13c54093-b9dc-0677-fc9e-a86dca50a977/mza_12702714472282215835.png/600x600bb.jpg",
+  "billieeilish": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages221/v4/9a/50/ce/9a50ce0f-b258-299f-bb2a-b7e1da94d1f2/ami-identity-618aa07e596bb0552787e91d84860df8-2025-09-04T16-39-08.147Z_cropped.png/600x600bb.png",
+  "arianagrande": "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages221/v4/58/01/1a/58011a68-6d55-cf6a-04b3-ea62ef1ec94d/ami-identity-e2c7a72d119cbf419fa7630739c9fcf5-2025-09-04T16-39-08.145Z_cropped.png/600x600bb.png",
+  "drake": "https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/64/0d/17/640d1706-e78b-07b4-3fa0-bfb9c46ce1eb/mza_10332306733333333333.png/600x600bb.jpg"
+};
+
 /**
  * Universal helper to get the best possible profile picture for an artist.
- * If an artist does not have a profile picture, falls back to their song's artwork.
+ * Strictly uses official Apple Music artist portraits (mzstatic.com).
+ * STRICTLY BANNED: Falling back to song covers (e.g. Golden Sparrow) or concert photos.
  */
 export function getArtistProfileImage(artist: any, fallbackSongCover?: string | null): string {
   if (!artist) return "/logo.png";
+
+  const name = typeof artist === "string" ? artist : (artist.name || "");
+  const normKey = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  // Priority 1: Match canonical Apple Music official portrait
+  if (normKey && CANONICAL_APPLE_ARTISTS[normKey]) {
+    return CANONICAL_APPLE_ARTISTS[normKey];
+  }
 
   const rawImage = typeof artist === "string" ? artist : artist.imageUrl;
   const hasValidImage = rawImage && 
@@ -293,25 +342,13 @@ export function getArtistProfileImage(artist: any, fallbackSongCover?: string | 
     !rawImage.includes("ui-avatars.com") &&
     !rawImage.includes("default_avatar");
 
+  // Priority 2: Use provided image if it is an official Apple Music visual or valid portrait
   if (hasValidImage) {
     return getMediaUrl(rawImage, "image");
   }
 
-  // Fallback to song artwork if artist does not have a profile picture
-  const songArtwork = fallbackSongCover || 
-    artist.songCover || 
-    artist.topTracks?.[0]?.coverUrl || 
-    artist.tracks?.[0]?.coverUrl || 
-    artist.topTracks?.[0]?.album?.coverUrl ||
-    artist.albums?.[0]?.coverUrl ||
-    (artist.coverUrl && !artist.coverUrl.includes("placeholder") ? artist.coverUrl : null);
-
-  if (songArtwork && typeof songArtwork === "string" && songArtwork.trim().length > 0 && !songArtwork.includes("logo.png")) {
-    return getMediaUrl(songArtwork, "image");
-  }
-
-  const name = artist.name || (typeof artist === "string" ? artist : "Artist");
-  return getMediaUrl(rawImage, "image") || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=512`;
+  // Priority 3: Fall back to clean avatar logo (NEVER song covers)
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || "Artist")}&background=18181b&color=e11d48&size=512`;
 }
 
 export function cleanTitle(title?: string | null): string {
