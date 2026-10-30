@@ -100,6 +100,8 @@ export function useHomepageData() {
 
   // Listen for real-time track and playlist updates across the application
   useEffect(() => {
+    let trackPlayedTimeout: any = null;
+
     const handleInvalidate = () => {
       queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
       queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
@@ -115,15 +117,15 @@ export function useHomepageData() {
       queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
     };
 
+    // Debounce track played query refetches so that song start and audio buffering get 100% bandwidth
     const handleTrackPlayed = () => {
-      queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
-      queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
-      queryClient.invalidateQueries({ queryKey: ['home-popular-artists-lang'] });
-      queryClient.invalidateQueries({ queryKey: ['home-trending-now'] });
-      queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
+      if (trackPlayedTimeout) clearTimeout(trackPlayedTimeout);
+      trackPlayedTimeout = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
+        queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
+      }, 2500);
     };
 
-    window.addEventListener('zenify:track-updated', handleInvalidate);
     window.addEventListener('zenify:track-created', handleInvalidate);
     window.addEventListener('zenify:track-deleted', handleInvalidate);
     window.addEventListener('zenify:track-played', handleTrackPlayed);
@@ -132,7 +134,7 @@ export function useHomepageData() {
     window.addEventListener('zenify:country-language-changed', handleCountryLangChanged);
 
     return () => {
-      window.removeEventListener('zenify:track-updated', handleInvalidate);
+      if (trackPlayedTimeout) clearTimeout(trackPlayedTimeout);
       window.removeEventListener('zenify:track-created', handleInvalidate);
       window.removeEventListener('zenify:track-deleted', handleInvalidate);
       window.removeEventListener('zenify:track-played', handleTrackPlayed);

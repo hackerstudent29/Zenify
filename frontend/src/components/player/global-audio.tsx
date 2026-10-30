@@ -5,7 +5,7 @@ import { usePlayerStore, extractTrackVibeParams } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { audioEngine } from "@/lib/audio-engine";
 import { getMediaUrl, getTrackCover, getApiBaseUrl } from "@/lib/utils";
-import { getCachedTrackBlobUrl, cacheTrackAudioInBackground } from "@/lib/audio-cache";
+import { getCachedTrackBlobUrl, getSyncCachedTrackBlobUrl, cacheTrackAudioInBackground } from "@/lib/audio-cache";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
 
@@ -73,7 +73,19 @@ export function GlobalAudio() {
 
     document.addEventListener('visibilitychange', handleVisibilitySync);
     window.addEventListener('focus', handleVisibilitySync);
+
+    const handleGestureSync = () => {
+      const audio = audioEngine.getActiveAudioElement();
+      if (audio && usePlayerStore.getState().isPlaying && audio.paused && audio.src) {
+        audio.play().catch(err => {
+          if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+        });
+      }
+    };
+    audioEngine.registerUserGestureHook(handleGestureSync);
+
     return () => {
+      audioEngine.registerUserGestureHook(() => {});
       document.removeEventListener('visibilitychange', handleVisibilitySync);
       window.removeEventListener('focus', handleVisibilitySync);
     };
@@ -567,7 +579,7 @@ export function GlobalAudio() {
     const isNewTrack = currentPlayingTrackIdRef.current !== currentTrack.id;
     const sessionId = ++playbackSessionIdRef.current;
 
-    const loadAudio = async () => {
+    const loadAudio = () => {
       if (playbackSessionIdRef.current !== sessionId) return;
 
       const currentArtist = currentTrack.artist?.name || (currentTrack as any).artistName || '';
@@ -644,15 +656,13 @@ export function GlobalAudio() {
 
       if (playbackSessionIdRef.current !== sessionId) return;
 
-      // Check client-side audio cache (Echo Music on-device cache pattern)
+      // 1. Check synchronous in-memory cache first (0ms start latency, keeps user gesture alive)
       if (currentTrack.id) {
-        try {
-          const cachedBlobUrl = await getCachedTrackBlobUrl(currentTrack.id);
-          if (cachedBlobUrl) {
-            console.log(`[GlobalAudio] Playing from local device cache (0ms): ${currentTrack.title}`);
-            targetSrc = cachedBlobUrl;
-          }
-        } catch {}
+        const syncBlob = getSyncCachedTrackBlobUrl(currentTrack.id);
+        if (syncBlob) {
+          console.log(`[GlobalAudio] Playing from local memory cache (0ms): ${currentTrack.title}`);
+          targetSrc = syncBlob;
+        }
       }
 
       if (!targetSrc) {
@@ -674,21 +684,27 @@ export function GlobalAudio() {
         prefetchedTrackIds.current.clear();
         isPrefetchingRadioRef.current = false;
 
-        // 1. If currently playing, we avoid audio.pause() or audio.load() to maintain continuous media session token in background tabs
-        const wasActive = isPlaying && !audio.paused;
-
-        // 2. Clear out old playback progress immediately
         audio.currentTime = 0;
         usePlayerStore.setState({ currentTime: 0, duration: currentTrack.duration || 0 });
 
-        // 3. Set crossOrigin & assign the new audio source
         if (targetSrc.startsWith('blob:') || targetSrc.startsWith('data:')) {
           audio.removeAttribute('crossOrigin');
         } else {
           audio.crossOrigin = 'anonymous';
         }
         audio.src = targetSrc;
-        audio.load();
+
+        // Ensure playback guarantees when media is ready to play
+        const handleCanPlay = () => {
+          if (usePlayerStore.getState().isPlaying && audio.paused) {
+            audioEngine.resume();
+            audio.play().catch(playErr => {
+              if (playErr?.name === 'AbortError' || playErr?.message?.includes('interrupted')) return;
+              console.warn("[GlobalAudio] canplay play notice:", playErr);
+            });
+          }
+        };
+        audio.addEventListener('canplay', handleCanPlay, { once: true });
 
         // If playing from a remote network stream, cache it locally in the background for instant future replays
         if (currentTrack.id && targetSrc && !targetSrc.startsWith('blob:') && !targetSrc.startsWith('data:')) {
@@ -699,7 +715,7 @@ export function GlobalAudio() {
           }, 1500);
         }
 
-        // 4. Begin playback of the newly clicked or next track immediately
+        // 4. Begin playback of the newly clicked or next track immediately (synchronously in user gesture tick)
         const shouldPlay = isPlaying || usePlayerStore.getState().isPlaying;
         if (shouldPlay) {
           audioEngine.resume();
@@ -709,10 +725,13 @@ export function GlobalAudio() {
           } else {
             audioEngine.setVolume(volumeRef.current);
           }
-          audio.play().catch(err => {
-            if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
-            console.warn("[GlobalAudio] Play failed:", err);
-          });
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(err => {
+              if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
+              console.warn("[GlobalAudio] Immediate play deferred to canplay:", err?.message || err);
+            });
+          }
         }
 
         setTimeout(() => {

@@ -281,7 +281,6 @@ export const usePlayerStore = create<PlayerState>()(
             const updated = [track, ...filtered].slice(0, 10);
             localStorage.setItem('zenify_recently_played_tracks', JSON.stringify(updated));
             window.dispatchEvent(new CustomEvent('zenify:track-played', { detail: { track } }));
-            window.dispatchEvent(new CustomEvent('zenify:track-updated'));
           }
         } catch (e) {}
       },

@@ -197,6 +197,7 @@ class ZenAudioEngine {
   private currentFeatures = { section: "quiet", bass: 0, mids: 0, treble: 0, rms: 0 };
   private featureWorker: Worker | null = null;
   private workerBusy = false;
+  private onUserGestureCallback: (() => void) | null = null;
 
   private constructor() {}
 
@@ -249,10 +250,9 @@ class ZenAudioEngine {
     if (typeof window !== "undefined") {
       const unlockAudio = () => {
         this.resume();
-        window.removeEventListener("pointerdown", unlockAudio);
-        window.removeEventListener("touchstart", unlockAudio);
-        window.removeEventListener("keydown", unlockAudio);
-        window.removeEventListener("click", unlockAudio);
+        try {
+          this.onUserGestureCallback?.();
+        } catch {}
       };
       window.addEventListener("pointerdown", unlockAudio, { passive: true });
       window.addEventListener("touchstart", unlockAudio, { passive: true });
@@ -267,6 +267,10 @@ class ZenAudioEngine {
         if (this.context && this.context.state === "suspended") this.context.resume().catch(() => {});
       });
     }
+  }
+
+  public registerUserGestureHook(cb: () => void) {
+    this.onUserGestureCallback = cb;
   }
 
   /* ───────────────────────────── Graph ───────────────────────────── */
