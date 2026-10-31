@@ -25,15 +25,50 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
         name: "Yuvan Shankar Raja",
         bio: "Yuvan Shankar Raja as effectively defined the sound of contemporary Tamil cinema. The son of legendary Ilaiyaraaja, he is known as the 'BGM King'. Top tracks: Loosu Penne, Oru Naalil, Pogathey, High On Love.",
         birthDate: "1979-08-31",
-        imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages126/v4/75/bb/a1/75bba1b1-11a1-a9a4-ac65-7c1fce8f155b/e0e228f4-2d7c-4366-895a-9073984a6ffc_ami-identity-3337edee6879016e69bc8109b13c4208-2023-05-24T12-44-42.909Z_cropped.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages126/v4/75/bb/a1/75bba1b1-11a1-a9a4-ac65-7c1fce8f155b/e0e228f4-2d7c-4366-895a-9073984a6ffc_ami-identity-3337edee6879016e69bc8109b13c4208-2023-05-24T12-44-42.909Z_cropped.png/1200x630cw.png"
+        imageUrl: "https://cdn-images.dzcdn.net/images/artist/1dbf7d81a2e964d9c707e53478407974/1000x1000-000000-80-0-0.jpg",
+        coverUrl: "https://cdn-images.dzcdn.net/images/artist/1dbf7d81a2e964d9c707e53478407974/1000x1000-000000-80-0-0.jpg"
     },
     "sid sriram": {
         name: "Sid Sriram",
         bio: "Sid Sriram is an Indian-American Carnatic musician, music producer, and playback singer known for his soulful, expressive voice across Tamil, Telugu, and indie music. Top tracks: Srivalli, Kannaana Kanney, Adiye, Ennodu Nee Irundhaal.",
         birthDate: "1990-03-17",
-        imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages116/v4/f2/5f/20/f25f20b1-f502-f671-b84b-16f802a4c234/03b4e34e-92b2-496f-9dc2-a02fb0d2122a_ami-identity-d29f291ff6700b97f78cefa15fd569b6-2023-08-04T16-27-30.791Z_cropped.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages116/v4/f2/5f/20/f25f20b1-f502-f671-b84b-16f802a4c234/03b4e34e-92b2-496f-9dc2-a02fb0d2122a_ami-identity-d29f291ff6700b97f78cefa15fd569b6-2023-08-04T16-27-30.791Z_cropped.png/1200x630cw.png"
+        imageUrl: "https://cdn-images.dzcdn.net/images/artist/fbe3e1d17fc6958e047f011f74233f82/1000x1000-000000-80-0-0.jpg",
+        coverUrl: "https://cdn-images.dzcdn.net/images/artist/fbe3e1d17fc6958e047f011f74233f82/1000x1000-000000-80-0-0.jpg"
+    },
+    "justin bieber": {
+        name: "Justin Bieber",
+        bio: "Justin Drew Bieber is a Canadian singer recognized for his musical versatility and genre-spanning work.",
+        birthDate: "1994-03-01",
+        imageUrl: "https://cdn-images.dzcdn.net/images/artist/fe097f693cebf1f882e3da79e99e3bf9/1000x1000-000000-80-0-0.jpg",
+        coverUrl: "https://cdn-images.dzcdn.net/images/artist/fe097f693cebf1f882e3da79e99e3bf9/1000x1000-000000-80-0-0.jpg"
+    },
+    "the kid laroi": {
+        name: "The Kid LAROI",
+        bio: "Charlton Kenneth Jeffrey Howard, known professionally as The Kid LAROI, is an Australian rapper and singer.",
+        birthDate: "2003-08-17",
+        imageUrl: "https://cdn-images.dzcdn.net/images/artist/ced3d1693e8b8add20a9e40bd01eeb2e/1000x1000-000000-80-0-0.jpg",
+        coverUrl: "https://cdn-images.dzcdn.net/images/artist/ced3d1693e8b8add20a9e40bd01eeb2e/1000x1000-000000-80-0-0.jpg"
+    },
+    "taylor swift": {
+        name: "Taylor Swift",
+        bio: "Taylor Alison Swift is an American singer-songwriter.",
+        birthDate: "1989-12-13",
+        imageUrl: "https://cdn-images.dzcdn.net/images/artist/cc2495870fe1a792ad0cdb05501ad5ec/1000x1000-000000-80-0-0.jpg",
+        coverUrl: "https://cdn-images.dzcdn.net/images/artist/cc2495870fe1a792ad0cdb05501ad5ec/1000x1000-000000-80-0-0.jpg"
+    },
+    "billie eilish": {
+        name: "Billie Eilish",
+        bio: "Billie Eilish Pirate Baird O'Connell is an American singer-songwriter.",
+        birthDate: "2001-12-18",
+        imageUrl: "https://cdn-images.dzcdn.net/images/artist/8eab1a9a644889aabaca1e193e05f984/1000x1000-000000-80-0-0.jpg",
+        coverUrl: "https://cdn-images.dzcdn.net/images/artist/8eab1a9a644889aabaca1e193e05f984/1000x1000-000000-80-0-0.jpg"
+    },
+    "ariana grande": {
+        name: "Ariana Grande",
+        bio: "Ariana Grande-Butera is an American singer, songwriter, and actress.",
+        birthDate: "1993-06-26",
+        imageUrl: "https://cdn-images.dzcdn.net/images/artist/721d8fab84b315502de422b8d0901509/1000x1000-000000-80-0-0.jpg",
+        coverUrl: "https://cdn-images.dzcdn.net/images/artist/721d8fab84b315502de422b8d0901509/1000x1000-000000-80-0-0.jpg"
     },
     "g. v. prakash kumar": {
         name: "G. V. Prakash Kumar",

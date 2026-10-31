@@ -38,7 +38,6 @@ export default function ArtistPage() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [isBioOpen, setIsBioOpen] = useState(false);
   const [currentCollectionId, setCurrentCollectionId] = useState<string | null>(null);
-  const [isWidescreen, setIsWidescreen] = useState<boolean | null>(null);
 
   const { data: artist, isLoading } = useQuery({
     queryKey: ['artist', id],
@@ -100,43 +99,12 @@ export default function ArtistPage() {
     };
   }, [artist?.name, setStickyPageTitle]);
 
-  useEffect(() => {
-    const targetUrl = artist?.bannerUrl || artist?.coverUrl || artist?.imageUrl;
-    if (!targetUrl) {
-      setIsWidescreen(false);
-      return;
-    }
-    if (
-      targetUrl.includes('AMCArtistImages') ||
-      targetUrl.includes('headerImage') ||
-      targetUrl.includes('cw.png') ||
-      targetUrl.includes('cw.jpg') ||
-      targetUrl.includes('cw.webp') ||
-      targetUrl.includes('2560x1440')
-    ) {
-      setIsWidescreen(true);
-      return;
-    }
-    if (targetUrl.includes('500x500') || targetUrl.includes('600x600') || targetUrl.includes('640x640') || targetUrl.includes('1080x1080')) {
-      setIsWidescreen(false);
-      return;
-    }
-    const img = new window.Image();
-    img.src = getMediaUrl(targetUrl);
-    img.onload = () => {
-      const ratio = img.naturalWidth / img.naturalHeight;
-      setIsWidescreen(ratio >= 1.35);
-    };
-    img.onerror = () => {
-      setIsWidescreen(false);
-    };
-  }, [artist?.bannerUrl, artist?.coverUrl, artist?.imageUrl]);
-
-  const rawBanner = (artist?.bannerUrl && artist.bannerUrl !== artist?.imageUrl) ? artist.bannerUrl : null;
-  const isWidescreenUrl = Boolean(isWidescreen === true && rawBanner && !rawBanner.includes('500x500') && !rawBanner.includes('600x600'));
-  const bannerUrl = isWidescreenUrl ? rawBanner : null;
   const avatarUrl = getArtistProfileImage(artist);
-  const heroImageUrl = bannerUrl || avatarUrl || rawBanner;
+  // Strictly filter out any circular Apple Music _cropped.png masks to guarantee full-bleed rectangular artwork
+  const cleanCover = artist?.coverUrl && !artist.coverUrl.includes('_cropped.png') ? artist.coverUrl : null;
+  const cleanBanner = artist?.bannerUrl && !artist.bannerUrl.includes('_cropped.png') ? artist.bannerUrl : null;
+  const cleanImage = artist?.imageUrl && !artist.imageUrl.includes('_cropped.png') ? artist.imageUrl : null;
+  const heroImageUrl = cleanCover || cleanBanner || avatarUrl || cleanImage;
 
   // Artwork tint — multi-source saturation-first loop, isCancelled guard,
   // reset only on page unmount (not on every dep change)
@@ -145,10 +113,11 @@ export default function ArtistPage() {
 
     async function resolveArtistTheme() {
       const candidates = [
-        getMediaUrl(bannerUrl || rawBanner),
+        getMediaUrl(heroImageUrl),
         getMediaUrl(avatarUrl),
+        getMediaUrl(cleanCover),
+        getMediaUrl(cleanBanner),
         getMediaUrl(artist?.imageUrl),
-        getMediaUrl(artist?.coverUrl),
       ].filter(Boolean) as string[];
 
       const topTracks = artist?.topTracks || artist?.topSongs || [];
@@ -192,7 +161,7 @@ export default function ArtistPage() {
     // Cancel in-flight async work on dep change, but DON'T reset the theme
     // here — that would flash to neutral every time artist data updates.
     return () => { isCancelled = true; };
-  }, [bannerUrl, avatarUrl, rawBanner, artist]);
+  }, [heroImageUrl, avatarUrl, artist]);
 
   // Reset theme only when the artist page fully unmounts
   useEffect(() => {
@@ -426,12 +395,7 @@ export default function ArtistPage() {
           <img
             src={getMediaUrl(heroImageUrl) || undefined}
             alt={displayName}
-            className={cn(
-              "absolute inset-0 m-auto w-full h-full filter brightness-95 pointer-events-none",
-              isWidescreenUrl
-                ? "object-cover object-top sm:object-[center_15%]"
-                : "object-contain object-center"
-            )}
+            className="absolute inset-0 m-auto w-full h-full object-cover object-center sm:object-[center_20%] filter brightness-95 pointer-events-none"
             fetchPriority="high"
             decoding="async"
           />
@@ -443,10 +407,10 @@ export default function ArtistPage() {
           <div className="absolute inset-x-0 bottom-0 h-16 sm:h-20 bg-gradient-to-t from-[var(--page,#121214)]/90 to-transparent pointer-events-none z-10" />
         </div>
       ) : (
-        /* Minimal fallback when no artist artwork is available. */
+        /* Minimal fallback when no artist artwork is available (Strictly NO circular avatars) */
         <div className="relative w-full pt-10 sm:pt-14 md:pt-16 pb-6 sm:pb-8 flex flex-col items-center justify-center text-center overflow-hidden select-none">
-          {/* Subtle warm ambient radial glow behind avatar */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-white/[0.04] blur-3xl pointer-events-none" />
+          {/* Subtle warm ambient radial glow behind artwork */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 sm:w-96 sm:h-96 rounded-2xl bg-white/[0.04] blur-3xl pointer-events-none" />
 
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -454,10 +418,10 @@ export default function ArtistPage() {
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             className="relative z-10 flex flex-col items-center"
           >
-            {/* Centered Circular Artist Avatar */}
-            <div className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 rounded-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-white/10 ring-1 ring-white/10 mx-auto bg-zinc-800">
+            {/* Boxy Asymmetrical Modern Showcase (Strictly NO circular shapes) */}
+            <div className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-white/10 ring-1 ring-white/10 mx-auto bg-zinc-800">
               <img
-                src={getMediaUrl(avatarUrl || rawBanner) || "/images/placeholder.png"}
+                src={getMediaUrl(avatarUrl) || "/images/placeholder.png"}
                 alt={displayName}
                 className="w-full h-full object-cover object-center filter brightness-95"
                 fetchPriority="high"
