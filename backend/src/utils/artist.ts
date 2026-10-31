@@ -5,21 +5,21 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
         bio: "Allah Rakha Rahman is an Indian musical composer, record producer, singer and songwriter who works predominantly in Indian cinema. Globally acclaimed as 'The Mozart of Madras', he has won two Academy Awards, two Grammy Awards, a BAFTA Award, and a Golden Globe. Top tracks: Jai Ho, Kun Faya Kun, Dil Se Re, Maahi Ve.",
         birthDate: "1967-01-06",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/33/2b/3d/332b3de7-6f79-bf87-072d-794c1176d9f8/mza_8008578196274844399.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/33/2b/3d/332b3de7-6f79-bf87-072d-794c1176d9f8/mza_8008578196274844399.png/1920x1080cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features115/v4/33/2b/3d/332b3de7-6f79-bf87-072d-794c1176d9f8/mza_8008578196274844399.png/600x600bb.jpg"
     },
     "anirudh ravichander": {
         name: "Anirudh Ravichander",
         bio: "Anirudh Ravichander is an Indian music composer and singer who works predominantly in Tamil films. Known for his high-energy scores and viral hits since his debut with 'Why This Kolaveri Di'. Top tracks: Vaathi Coming, Arabic Kuthu, Hukum, Naa Ready.",
         birthDate: "1990-10-16",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/85/84/dd/8584ddc7-a699-bb7d-027a-d3132ffb9582/mza_7960699454837846773.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/85/84/dd/8584ddc7-a699-bb7d-027a-d3132ffb9582/mza_7960699454837846773.png/1920x1080cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/85/84/dd/8584ddc7-a699-bb7d-027a-d3132ffb9582/mza_7960699454837846773.png/600x600bb.jpg"
     },
     "harris jayaraj": {
         name: "Harris Jayaraj",
         bio: "Harris Jayaraj is a celebrated Indian film composer known for his melodic sensibilities and unique soundscapes in Tamil and Telugu cinema. He has won multiple Filmfare Awards. Top tracks: Vaseegara, Ennamo Yeadho, Mundhinam Paarthene, Anjalay.",
         birthDate: "1975-01-08",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/15/a7/58/15a7581b-4056-d274-6ed7-1c2a61461d81/pr_source.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/15/a7/58/15a7581b-4056-d274-6ed7-1c2a61461d81/pr_source.png/1200x630cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/15/a7/58/15a7581b-4056-d274-6ed7-1c2a61461d81/pr_source.png/600x600bb.jpg"
     },
     "yuvan shankar raja": {
         name: "Yuvan Shankar Raja",
@@ -82,84 +82,84 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
         bio: "D. Imman is an Indian film composer and singer known for his soulful melodies and rural-themed scores in Tamil cinema. Winner of National Film Award for Viswasam. Top tracks: Kannaana Kanney, Onnavitta Yaarumillai, Gaandakannazhagi, Adchithooku.",
         birthDate: "1983-01-24",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music123/v4/31/09/b2/3109b228-528d-c03c-e305-7987f515d667/886443574151.jpg/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music123/v4/31/09/b2/3109b228-528d-c03c-e305-7987f515d667/886443574151.jpg/1200x630cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music123/v4/31/09/b2/3109b228-528d-c03c-e305-7987f515d667/886443574151.jpg/600x600bb.jpg"
     },
     "santhosh narayanan": {
         name: "Santhosh Narayanan",
         bio: "Santhosh Narayanan is an Indian film composer and musician known for his experimental and grounded music in the Tamil film industry. Top tracks: Enjoy Enjaami, Rakita Rakita, Nerippu Da, Sirikkadhey.",
         birthDate: "1983-05-15",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/07/05/58/070558d1-0853-37e4-ba23-e57a86397b2f/mza_7575225160549591736.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/07/05/58/070558d1-0853-37e4-ba23-e57a86397b2f/mza_7575225160549591736.png/1920x1080cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/07/05/58/070558d1-0853-37e4-ba23-e57a86397b2f/mza_7575225160549591736.png/600x600bb.jpg"
     },
     "sam c. s.": {
         name: "Sam C. S.",
         bio: "Sam C. S. is a prolific music composer and producer known for his intense background scores in Tamil, Telugu, and Malayalam films. Top tracks: Vikram Vedha Theme, Kaithi Theme, Kannu Thangom, Karuppu Vellai.",
         birthDate: "1986-07-30",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features124/v4/51/3b/b8/513bb8d5-f934-0da8-9650-be89a3a3c37f/mza_3068448473619100532.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features124/v4/51/3b/b8/513bb8d5-f934-0da8-9650-be89a3a3c37f/mza_3068448473619100532.png/1200x630cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features124/v4/51/3b/b8/513bb8d5-f934-0da8-9650-be89a3a3c37f/mza_3068448473619100532.png/600x600bb.jpg"
     },
     "hip hop tamizha": {
         name: "Hiphop Tamizha",
         bio: "Hip Hop Tamizha (Adhi) is a pioneering Indian musical duo/artist credited with introducing Hip Hop to Tamil cinema and independent music. Top tracks: Club le Mabbu le, Vaadi Pulla Vaadi, Takkaru Takkaru, Paisa Note.",
         birthDate: "1990-02-20",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/1920x1080cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg"
     },
     "thaman s": {
         name: "Thaman S",
         bio: "Thaman S is a highly successful Indian film composer who predominantly works in Telugu and Tamil cinema, known for his upbeat commercial hits. Top tracks: Butta Bomma, Ramuloo Ramulaa, Kalavathi, Ranjithame.",
         birthDate: "1983-11-16",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/1920x1080cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg"
     },
     "ilaiyaraaja": {
         name: "Ilaiyaraaja",
         bio: "Ilaiyaraaja is a legendary Indian film composer, songwriter, and singer with over 7,000 songs and 1,000 film scores to his credit. He is a multi-time National Award winner. Top tracks: Thendral Vanthu, En Kanmani, Raja Raja Chozhan, Sundari Kannal.",
         birthDate: "1943-06-03",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/72/c3/32/72c3322b-e100-16a8-e713-5748c7c76b93/mza_4680178773015887139.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/72/c3/32/72c3322b-e100-16a8-e713-5748c7c76b93/mza_4680178773015887139.png/1200x630cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/72/c3/32/72c3322b-e100-16a8-e713-5748c7c76b93/mza_4680178773015887139.png/600x600bb.jpg"
     },
     "sean roldan": {
         name: "Sean Roldan",
         bio: "Sean Roldan is an Indian composer and singer known for his fusion of folk, blues, and classical music in Tamil cinema. Top tracks: Mayakkuraane, Puli Manga Pulip, Kannama, Vaa Rayil Vidalaam.",
         birthDate: "1988-12-27",
-        imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages221/v4/cc/7f/72/cc7f72d4-5f93-a49d-55ca-69c4c765f610/66238875-7fb0-4417-b7b4-a8c034dafca5_file_cropped.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages221/v4/cc/7f/72/cc7f72d4-5f93-a49d-55ca-69c4c765f610/66238875-7fb0-4417-b7b4-a8c034dafca5_file_cropped.png/1200x630cw.png"
+        imageUrl: "https://c.saavncdn.com/artists/Sean_Roldan_000_20220601072935_500x500.jpg",
+        coverUrl: "https://c.saavncdn.com/artists/Sean_Roldan_000_20220601072935_500x500.jpg"
     },
     "ghibran": {
         name: "Ghibran",
         bio: "Ghibran is an Indian music composer known for his sophisticated arrangements and work in critically acclaimed Tamil and Telugu films. Top tracks: Sara Sara Saara Kaathu, Enadhuyire, Thalaivan Theme, Neeyum Naanum.",
         birthDate: "1980-08-12",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/80/3a/b8/803ab878-4d72-5183-fa15-e0b1ad2c4288/pr_source.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/80/3a/b8/803ab878-4d72-5183-fa15-e0b1ad2c4288/pr_source.png/1200x630cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/80/3a/b8/803ab878-4d72-5183-fa15-e0b1ad2c4288/pr_source.png/600x600bb.jpg"
     },
     "sai abhyankkar": {
         name: "Sai Abhyankkar",
         bio: "Sai Abhyankkar is a rising star in Indian independent music, known for his global viral hit 'Katchi Sera' which blended contemporary pop with traditional roots. Top tracks: Katchi Sera, Aasa Kooda, Modern Love Theme.",
         birthDate: "2004-02-23",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features211/v4/cd/db/89/cddb89d2-79e7-7385-edc9-c3d50ff18505/mza_14310547933879091928.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features211/v4/cd/db/89/cddb89d2-79e7-7385-edc9-c3d50ff18505/mza_14310547933879091928.png/1200x630cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features211/v4/cd/db/89/cddb89d2-79e7-7385-edc9-c3d50ff18505/mza_14310547933879091928.png/600x600bb.jpg"
     },
     "deva": {
         name: "Deva",
         bio: "Deva is a veteran Indian film composer and singer who has worked on over 400 films. Known as 'Thenisai Thendral', he is famous for his high-energy 'Gaana' songs and melodic background scores. Top tracks: Thillana Thillana, Nilavai Konduva, Karupputhan Enakku Pudichu, Kotapatti Rottuayile.",
         birthDate: "1950-11-20",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music128/v4/71/61/2d/71612d86-487b-2f1f-8414-b8a3ed8b53eb/191773236113.jpg/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music128/v4/71/61/2d/71612d86-487b-2f1f-8414-b8a3ed8b53eb/191773236113.jpg/1200x630cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music128/v4/71/61/2d/71612d86-487b-2f1f-8414-b8a3ed8b53eb/191773236113.jpg/600x600bb.jpg"
     },
     "devi sri prasad": {
         name: "Devi Sri Prasad",
         bio: "Devi Sri Prasad (DSP) is a dominant Indian film composer and singer known for his energetic scores and chart-busting dance numbers in Telugu and Tamil cinema. Top tracks: Oo Antava, Pushpa Pushpa, Srivalli, Seeti Maar.",
         birthDate: "1979-08-02",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features211/v4/3a/3f/a3/3a3fa358-1385-911e-ecad-bfed3029841f/mza_12519351446532628538.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features211/v4/3a/3f/a3/3a3fa358-1385-911e-ecad-bfed3029841f/mza_12519351446532628538.png/1200x630cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features211/v4/3a/3f/a3/3a3fa358-1385-911e-ecad-bfed3029841f/mza_12519351446532628538.png/600x600bb.jpg"
     },
     "sushin shyam": {
         name: "Sushin Shyam",
         bio: "Sushin Shyam is an acclaimed Indian music composer, producer, and singer who predominantly works in Malayalam cinema. Winner of the Kerala State Film Award for Best Music Director (Kumbalangi Nights, Romancham, Aavesham, Manjummel Boys). Top tracks: Jaada, Illuminati, Mathaapithakkale, Cherathukal.",
         birthDate: "1992-02-13",
         imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/2f/b2/09/2fb209cb-eee2-8513-5096-fb1199ef0f76/mza_8773855622915570782.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/2f/b2/09/2fb209cb-eee2-8513-5096-fb1199ef0f76/mza_8773855622915570782.png/1200x630cw.png"
+        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/2f/b2/09/2fb209cb-eee2-8513-5096-fb1199ef0f76/mza_8773855622915570782.png/600x600bb.jpg"
     }
 };
 
