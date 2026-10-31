@@ -7,6 +7,7 @@ import { getMediaUrl, getTrackCover, cn } from "@/lib/utils";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useNavigate } from "react-router-dom";
+import { Glass } from "@/components/ui/glass";
 
 export function HeaderSearchButton() {
   const [open, setOpen] = useState(false);
@@ -35,10 +36,49 @@ export function HeaderSearchButton() {
         aria-label="Spotlight Search"
         title="Search (⌘K or /)"
         onClick={() => setOpen(true)}
-        className="flex items-center justify-center gap-2 h-9 w-9 md:w-24 rounded-full bg-zinc-800/90 hover:bg-zinc-700/95 border border-white/15 text-zinc-200 hover:text-white press cursor-pointer shrink-0 transition-all duration-300 ease-out shadow-[0_4px_18px_rgba(0,0,0,0.2)] backdrop-blur-xl"
+        className="group relative flex items-center gap-2.5 h-10 w-10 sm:w-60 md:w-72 lg:w-80 rounded-full px-2.5 sm:px-3.5 cursor-pointer shrink-0 transition-all duration-300 ease-out select-none active:scale-[0.98] outline-none justify-center sm:justify-start"
       >
-        <Icon name="search" size={15} className="shrink-0" />
-        <span className="hidden md:inline text-xs font-medium tracking-tight">Search</span>
+        {/* Glassmorphism background matching the global player */}
+        <div
+          className="absolute inset-0 pointer-events-none rounded-full overflow-hidden backdrop-blur-xl bg-black/20 hover:bg-black/15 transition-all border border-white/15 group-hover:border-white/25"
+          style={{
+            boxShadow: "0 10px 24px -8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.12)"
+          }}
+        >
+          <div className="absolute -inset-1 opacity-90 group-hover:opacity-100 transition-opacity">
+            <Glass
+              className="w-full h-full"
+              radius={20}
+              blur={12}
+              behind="transparent"
+              optics={{
+                chroma: 0.1,
+                domeDepth: 30,
+                edgeHighlight: 0.15,
+                glow: 0.12,
+                tint: 0.05,
+                frost: 12
+              }}
+            >
+              <div className="w-full h-12" />
+            </Glass>
+          </div>
+        </div>
+
+        {/* Search Icon with subtle brand red accent on hover */}
+        <div className="relative z-10 flex items-center justify-center shrink-0 text-white/70 group-hover:text-brand transition-colors">
+          <Icon name="search" size={16} />
+        </div>
+
+        {/* Placeholder label */}
+        <span className="relative z-10 hidden sm:inline text-xs font-medium text-white/55 group-hover:text-white/85 truncate flex-1 text-left transition-colors">
+          Search songs, artists, albums...
+        </span>
+
+        {/* Shortcut badge ⌘K */}
+        <kbd className="relative z-10 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono font-semibold text-white/50 group-hover:text-white/80 bg-white/10 group-hover:bg-white/15 border border-white/15 rounded-md backdrop-blur-sm transition-all shadow-sm">
+          ⌘K
+        </kbd>
       </button>
       {open && (
         <SpotlightSearchOverlay
