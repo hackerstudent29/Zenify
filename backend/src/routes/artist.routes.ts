@@ -48,7 +48,7 @@ export async function artistRoutes(server: FastifyInstance) {
             }
         }).catch(() => null);
 
-        // 2. If not found by ID, try finding by Name (case-insensitive)
+        // 2. If not found by ID, try finding by Name / Slug (case-insensitive & space-normalized)
         let cleanName = decoded
             .replace(/^itunes-artist-/, '')
             .replace(/^itunes-/, '')
@@ -56,8 +56,11 @@ export async function artistRoutes(server: FastifyInstance) {
             .replace(/^yt-artist-/, '')
             .replace(/^sp-artist-/, '')
             .replace(/^canonical-/, '')
-            .replace(/-/g, ' ')
+            .replace(/[-_]+/g, ' ')
+            .replace(/\s+/g, ' ')
             .trim();
+
+                const canonical = getCanonicalArtist(cleanName) || getCanonicalArtist(decoded) || getCanonicalArtist(decoded.replace(/^artist-/, ''));
 
         // If cleanName is numeric or dummy iTunes artist string, resolve via Apple Music Lookup API
         if (isFakeOrNumericArtistName(cleanName)) {
@@ -74,13 +77,13 @@ export async function artistRoutes(server: FastifyInstance) {
             }
         }
 
-        if (!artist && cleanName.length > 0 && !isFakeOrNumericArtistName(cleanName)) {
+        const searchNames = [cleanName, decoded];
+        if (canonical?.name) searchNames.push(canonical.name);
+
+        if (!artist && (cleanName.length > 0 || canonical?.name)) {
             artist = await prisma.artist.findFirst({
                 where: { 
-                    OR: [
-                        { name: { equals: cleanName, mode: 'insensitive' } },
-                        { name: { equals: decoded, mode: 'insensitive' } }
-                    ]
+                    OR: searchNames.filter(Boolean).map(n => ({ name: { equals: n, mode: 'insensitive' } }))
                 },
                 include: {
                     albums: {
@@ -92,6 +95,33 @@ export async function artistRoutes(server: FastifyInstance) {
                     }
                 }
             }).catch(() => null);
+        }
+
+        // 3. Fallback: Alphanumeric match against DB artists (handles punctuation differences like "G. V." vs "G V")
+        if (!artist) {
+            const normTarget = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (normTarget.length >= 3) {
+                const dbArtists = await prisma.artist.findMany({
+                    select: { id: true, name: true }
+                }).catch(() => []);
+                const match = dbArtists.find(c => c.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normTarget);
+                if (match) {
+                    artist = await prisma.artist.findUnique({
+                        where: { id: match.id },
+                        include: {
+                            albums: {
+                                take: 50,
+                                orderBy: { releaseDate: 'desc' },
+                                include: { _count: { select: { tracks: true } } }
+                            }
+                        }
+                    }).catch(() => null);
+                }
+            }
+        }
+
+        if (artist?.name) {
+            cleanName = artist.name;
         }
 
         if (isFakeOrNumericArtistName(cleanName) && !artist) {
@@ -240,8 +270,7 @@ export async function artistRoutes(server: FastifyInstance) {
 
         // 4. If still not in DB, create new artist from Deezer, Wikipedia, canonical list, or AudioDB
         if (!artist && cleanName.length > 0 && !isFakeOrNumericArtistName(cleanName)) {
-            const { getCanonicalArtist } = await import('../utils/artist.js');
-            const canonical = getCanonicalArtist(cleanName);
+                        const canonical = getCanonicalArtist(cleanName);
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(cleanName).catch(() => null);
 
@@ -260,12 +289,32 @@ export async function artistRoutes(server: FastifyInstance) {
                     follower_count: saavnFollowers || adbInfo?.followers || 500000
                 },
                 include: { albums: true }
-            }).catch(() => null);
+            }).catch(async () => {
+                // If unique constraint error, fetch existing artist
+                return await prisma.artist.findFirst({
+                    where: { name: { equals: canonical?.name || capitalizedName, mode: 'insensitive' } },
+                    include: { albums: true }
+                }).catch(() => null);
+            });
 
             if (newArtist) artist = newArtist;
         }
 
-        if (!artist) return null;
+        if (!artist) {
+            if (canonical || saavnArtistData) {
+                artist = {
+                    id: decoded,
+                    name: canonical?.name || saavnArtistData?.name || cleanName,
+                    bio: canonical?.bio || saavnBio || `Listen to ${cleanName} on Zenify.`,
+                    imageUrl: canonical?.imageUrl || saavnPic || '',
+                    coverUrl: canonical?.coverUrl || saavnPic || '',
+                    albums: [],
+                    tracks: []
+                };
+            } else {
+                return null;
+            }
+        }
 
         // Enrich artist bio / image / banner if missing or placeholder or not widescreen
         let widescreenBanner: string | null = null;
@@ -923,8 +972,7 @@ export async function artistRoutes(server: FastifyInstance) {
             })
         ]);
 
-        const { getCanonicalArtist } = await import('../utils/artist.js');
-        const canon = getCanonicalArtist(artist.name);
+                const canon = getCanonicalArtist(artist.name);
 
         let finalImageUrl = canon?.imageUrl || artist.imageUrl;
 
@@ -1050,31 +1098,28 @@ export async function artistRoutes(server: FastifyInstance) {
 
         if (relatedArtists.length > 0) {
             try {
-                const names = relatedArtists.map(r => r.name).filter(Boolean);
-                const dbArtists = await prisma.artist.findMany({
-                    where: {
-                        OR: names.map(n => ({ name: { contains: n.replace(/[^a-zA-Z0-9\s]/g, '').trim(), mode: 'insensitive' } }))
-                    },
+                const allDbArtists = await prisma.artist.findMany({
                     select: { id: true, name: true, imageUrl: true, coverUrl: true }
-                });
+                }).catch(() => []);
+
                 for (const rel of relatedArtists) {
                     const normClean = (rel.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                     const canonRel = getCanonicalArtist(rel.name);
+                    const dbMatch = allDbArtists.find(m => m.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean);
+
                     if (canonRel?.imageUrl) {
                         rel.imageUrl = canonRel.imageUrl;
                         rel.coverUrl = canonRel.coverUrl || canonRel.imageUrl;
-                    } else {
-                        const dbMatch = dbArtists.find(m => m.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean);
-                        if (dbMatch?.imageUrl && !dbMatch.imageUrl.includes('/albums/') && !dbMatch.imageUrl.includes('Golden_Sparrow') && !dbMatch.imageUrl.includes('mza_16722262254049312592')) {
-                            rel.imageUrl = dbMatch.imageUrl;
-                            rel.coverUrl = dbMatch.coverUrl || dbMatch.imageUrl;
-                        }
+                    } else if (dbMatch?.imageUrl && !dbMatch.imageUrl.includes('/albums/') && !dbMatch.imageUrl.includes('Golden_Sparrow') && !dbMatch.imageUrl.includes('mza_16722262254049312592')) {
+                        rel.imageUrl = dbMatch.imageUrl;
+                        rel.coverUrl = dbMatch.coverUrl || dbMatch.imageUrl;
                     }
+
                     if (rel.imageUrl && (rel.imageUrl.includes('mza_16722262254049312592') || rel.imageUrl.includes('Golden_Sparrow'))) {
                         rel.imageUrl = 'https://c.saavncdn.com/artists/G_V__Prakash_Kumar_003_20251113063655_500x500.jpg';
                         rel.coverUrl = 'https://c.saavncdn.com/artists/G_V__Prakash_Kumar_003_20251113063655_500x500.jpg';
                     }
-                    const dbMatch = dbArtists.find(m => m.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean);
+
                     if (dbMatch) {
                         rel.id = dbMatch.id;
                     }

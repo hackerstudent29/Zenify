@@ -21,6 +21,18 @@ export class ArtistMetadataService {
         const cleanName = cleanArtistNames(artistName).trim();
         if (!cleanName || isFakeOrNumericArtistName(cleanName)) return null;
 
+        // Check canonical dictionary first — authentic verified portraits should never be overwritten
+        const { getCanonicalArtist } = await import('../utils/artist.js');
+        const canon = getCanonicalArtist(artistName) || getCanonicalArtist(cleanName);
+        if (canon?.imageUrl) {
+            return {
+                coverUrl: canon.coverUrl || canon.imageUrl,
+                imageUrl: canon.imageUrl,
+                bio: canon.bio || null,
+                source: 'apple_music'
+            };
+        }
+
         // Check if artist already has high-res images in database (only if not forcing fresh fetch)
         const existing = await prisma.artist.findUnique({
             where: { id: artistId },
@@ -64,7 +76,7 @@ export class ArtistMetadataService {
                 const artMatch = searchRes.data.results?.artists?.data?.[0];
                 if (artMatch) {
                     const rawArt = artMatch.attributes?.artwork?.url;
-                    if (rawArt) {
+                    if (rawArt && !rawArt.includes('mza_16722262254049312592') && !rawArt.includes('Golden_Sparrow')) {
                         heroBanner = rawArt.replace('{w}x{h}', '1920x1080').replace('{f}', 'jpg');
                         avatar = rawArt.replace('{w}x{h}', '600x600').replace('{f}', 'jpg');
                         source = 'apple_music';

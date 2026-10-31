@@ -169,7 +169,10 @@ const ALIASES: Record<string, string> = {
  */
 export function getCanonicalArtist(input?: string | null): { name: string; bio?: string; birthDate?: string; imageUrl?: string; coverUrl?: string } | null {
     if (!input || typeof input !== 'string') return null;
-    const clean = input.toLowerCase().trim();
+    const clean = input
+        .toLowerCase()
+        .replace(/^(?:artist|itunes-artist|itunes|yt-artist|sp-artist|canonical)-/, '')
+        .trim();
     const norm = clean.replace(/[^a-z0-9]/g, '');
     if (!norm) return null;
 
