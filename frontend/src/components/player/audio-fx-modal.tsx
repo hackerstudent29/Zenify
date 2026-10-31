@@ -338,7 +338,7 @@ function Section({
         <h3 className="text-[12px] font-medium text-white/50">{title}</h3>
         {action}
       </div>
-      <div className="overflow-hidden rounded-2xl bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ring-1 ring-inset ring-white/[0.07]">
+      <div className="overflow-hidden rounded-2xl bg-white/[0.04] backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] border border-white/[0.08]">
         {children}
       </div>
     </section>
@@ -665,10 +665,10 @@ function PresetTile({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "relative flex items-center gap-2.5 rounded-2xl p-2.5 text-left outline-none ring-1 ring-inset transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-brand/70",
+        "relative flex items-center gap-2.5 rounded-2xl p-2.5 text-left outline-none border transition-all duration-200 focus-visible:ring-2 focus-visible:ring-brand/70",
         active
-          ? "bg-white/[0.16] ring-brand/70"
-          : "bg-white/[0.08] ring-white/[0.07] hover:bg-white/[0.12]"
+          ? "bg-white/[0.14] border-brand/60 shadow-[0_4px_16px_rgba(225,29,72,0.15)]"
+          : "bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.08] hover:border-white/[0.14]"
       )}
     >
       <GlassIcon icon={icon} hue={hue} size={36} />
@@ -1214,7 +1214,7 @@ function ChainTab({ fx, live, commit }: TabProps) {
           onReorder={(o) => {
             setOrder(o);
           }}
-          className="relative rounded-2xl bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ring-1 ring-inset ring-white/[0.07]"
+          className="relative rounded-2xl bg-white/[0.04] backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] border border-white/[0.08]"
         >
           {order.map((id) => (
             <ChainRow
@@ -1257,7 +1257,7 @@ function TempoTab({ fx, live, commit }: TabProps) {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl bg-white/[0.08] px-4 pb-3 pt-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] ring-1 ring-inset ring-white/[0.07]">
+      <div className="rounded-2xl bg-white/[0.04] px-4 pb-3 pt-5 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] border border-white/[0.08]">
         <div className="text-center">
           <div className="text-[44px] font-semibold leading-none tracking-tight tabular-nums text-white">
             {liveSpeed.toFixed(2)}
@@ -1369,7 +1369,7 @@ function CollapsibleSection({ title, icon: Icon, isOpen, onToggle, children }: C
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-2.5 px-4 py-3 text-left outline-none transition-colors hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-brand/60"
+        className="flex w-full items-center gap-2.5 px-4 py-3 text-left outline-none transition-colors hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-brand/60"
       >
         <Icon size={16} className="shrink-0 text-white/60" strokeWidth={2} />
         <span className="flex-1 text-[14px] font-semibold text-white">{title}</span>
@@ -1469,10 +1469,10 @@ export function AudioFxModal() {
             transition={{ type: "spring", damping: 32, stiffness: 340, mass: 0.85 }}
             style={{ width: isMobile ? undefined : 320, backgroundColor: "var(--side)" }}
             className={cn(
-              "absolute pointer-events-auto flex flex-col overflow-hidden z-[140] bg-[var(--side)] will-change-transform",
+              "absolute pointer-events-auto flex flex-col overflow-hidden z-[140] am-glass will-change-transform",
               isMobile
-                ? "bottom-0 left-0 right-0 h-[84vh] rounded-t-[20px] border-t border-white/[0.08] shadow-[0_-12px_30px_rgba(0,0,0,0.3)]"
-                : "top-0 right-0 bottom-0 border-l border-white/[0.08] shadow-[-12px_0_30px_rgba(0,0,0,0.25)]"
+                ? "bottom-0 left-0 right-0 h-[84vh] rounded-t-[28px] shadow-[0_-20px_60px_rgba(0,0,0,0.4)]"
+                : "top-0 right-0 bottom-0 am-glass-right shadow-[-20px_0_60px_rgba(0,0,0,0.35)]"
             )}
             role="dialog"
             aria-modal="true"
@@ -1490,18 +1490,20 @@ export function AudioFxModal() {
                 <Switch label="Effects" checked={!bypass} onChange={toggleEffects} />
                 <button
                   type="button"
-                  aria-label="Close"
+                  aria-label="Close Studio FX"
                   onClick={close}
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-white/60 outline-none transition-colors hover:bg-white/[0.08] hover:text-white active:scale-90 focus-visible:ring-2 focus-visible:ring-brand/60"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer active:scale-95 ml-1"
                 >
-                  <X size={16} strokeWidth={2.5} />
+                  <X size={13} strokeWidth={2} />
                 </button>
               </div>
             </div>
 
             {/* Spectrum Visualizer */}
             <div className="px-4 py-3 border-b border-white/[0.08] shrink-0">
-              <Spectrum />
+              <div className="rounded-xl bg-black/25 p-2.5 border border-white/[0.06] backdrop-blur-md shadow-inner">
+                <Spectrum />
+              </div>
             </div>
 
             {/* Scrollable sections */}
@@ -1568,13 +1570,13 @@ export function AudioFxModal() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between border-t border-white/[0.08] bg-white/[0.03] px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shrink-0">
+            <div className="flex items-center justify-between border-t border-white/[0.08] bg-white/[0.02] px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shrink-0">
               <button
                 type="button"
                 onClick={() =>
                   commit({ ...DEFAULT_AUDIO_FX, eq: [0, 0, 0], chain: [...DEFAULT_CHAIN], crossfade: fx.crossfade })
                 }
-                className="rounded-md px-1 py-1 text-[12px] font-medium text-white/60 outline-none transition-all hover:text-white active:scale-95 focus-visible:ring-2 focus-visible:ring-brand/60"
+                className="am-glass-chip rounded-full px-3 py-1 text-[11px] font-semibold text-white/70 outline-none transition-all hover:text-white active:scale-95 cursor-pointer"
               >
                 Reset all
               </button>
