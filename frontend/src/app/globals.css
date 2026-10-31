@@ -754,7 +754,9 @@ input[type="submit"]:active:not(:disabled) {
   width: min(640px, calc(100vw - 24px));
   max-height: min(680px, calc(100vh - 32px));
   border-radius: 24px; overflow: hidden;
-  background: rgba(35,35,39,.96);
+  background: rgba(22, 22, 26, 0.82);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   backdrop-filter: blur(30px) saturate(180%);
   border: 1px solid rgba(255,255,255,.16);
