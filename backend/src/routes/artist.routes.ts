@@ -245,7 +245,7 @@ export async function artistRoutes(server: FastifyInstance) {
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
             const adbInfo = await ExternalMetadataService.fetchArtistFromAudioDB(cleanName).catch(() => null);
 
-            const resolvedImage = saavnPic || deezerPic || canonical?.imageUrl || adbInfo?.imageUrl;
+            const resolvedImage = canonical?.imageUrl || saavnPic || deezerPic || adbInfo?.imageUrl;
             const resolvedCover = saavnPic || wikiBanner || deezerCover || adbInfo?.coverUrl || resolvedImage;
             const resolvedBio = saavnBio || wikiBio || canonical?.bio || adbInfo?.bio;
             const capitalizedName = cleanName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -429,13 +429,13 @@ export async function artistRoutes(server: FastifyInstance) {
             const saavnSongsList: any[] = Array.isArray(saavnArtistData?.topSongs) ? saavnArtistData.topSongs : (saavnArtistData?.topSongs?.songs || []);
             if (saavnSongsList.length > 0) {
                 const existingTitles = new Set(finalTopTracks.map(t => t.title.toLowerCase().trim()));
-                for (const s of saavnSongsList) {
+                saavnSongsList.forEach((s: any, sIdx: number) => {
                     const cleanTitle = (s.song || s.title || '')
                         .replace(/&quot;/g, '"')
                         .replace(/&#039;/g, "'")
                         .replace(/&amp;/g, '&')
                         .trim();
-                    if (!cleanTitle || existingTitles.has(cleanTitle.toLowerCase())) continue;
+                    if (!cleanTitle || existingTitles.has(cleanTitle.toLowerCase())) return;
                     existingTitles.add(cleanTitle.toLowerCase());
 
                     let artwork = (s.image || artist.imageUrl || '').replace('150x150', '500x500').replace('50x50', '500x500');
@@ -446,8 +446,31 @@ export async function artistRoutes(server: FastifyInstance) {
                     }
                     const rawSingers = s.singers || s.primary_artists || s.more_info?.singers;
                     const trackArtist = cleanArtistNames(rawSingers, artist.name);
-                    const albTitle = (s.album || s.more_info?.album || 'Single').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&');
+                    const rawAlb = s.album || s.more_info?.album;
+                    const albTitle = (rawAlb && rawAlb !== 'undefined' ? rawAlb : 'Single').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').trim();
                     const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
+
+                    // Parse real release date with day/month precision from metadata or CDN timestamp
+                    let relDate: Date = new Date();
+                    const rawRel = s.more_info?.release_date || s.release_date;
+                    if (rawRel && !isNaN(new Date(rawRel).getTime())) {
+                        relDate = new Date(rawRel);
+                    } else {
+                        const cdnMatch = (s.image || '').match(/-([12][0-9]{3}[01][0-9][0-3][0-9])/);
+                        if (cdnMatch) {
+                            const y = cdnMatch[1].slice(0, 4);
+                            const m = cdnMatch[1].slice(4, 6);
+                            const d = cdnMatch[1].slice(6, 8);
+                            const parsed = new Date(`${y}-${m}-${d}`);
+                            if (!isNaN(parsed.getTime())) relDate = parsed;
+                        } else if (s.year) {
+                            relDate = new Date(`${s.year}-01-01`);
+                        }
+                    }
+
+                    // Popularity ranking: preserve JioSaavn descending popularity order
+                    const parsedPlays = parseInt(s.play_count || s.more_info?.play_count, 10);
+                    const streamCount = (parsedPlays && parsedPlays > 1000) ? parsedPlays : Math.max(10000, 10000000 - (sIdx * 45000));
 
                     const finalAudio = directAudio || `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}&trackId=saavn-${s.id}`;
 
@@ -466,14 +489,14 @@ export async function artistRoutes(server: FastifyInstance) {
                             title: albTitle,
                             coverUrl: artwork
                         },
-                        releaseDate: s.year ? new Date(`${s.year}-01-01`) : new Date(),
-                        createdAt: s.year ? new Date(`${s.year}-01-01`) : new Date(),
+                        releaseDate: relDate,
+                        createdAt: relDate,
                         isVirtual: true,
                         isLocalAvailable: false,
-                        streams: parseInt(s.play_count || s.more_info?.play_count, 10) || 50000,
+                        streams: streamCount,
                         like_count: 0
                     } as any);
-                }
+                });
             }
 
             // Combine candidate songs strictly prioritizing verified Apple Music lookup
@@ -524,6 +547,7 @@ export async function artistRoutes(server: FastifyInstance) {
                             ? localMatch.audioUrl
                             : `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albumTitle)}&trackId=itunes-${item.trackId}`;
 
+                        const itunesRelDate = item.releaseDate ? new Date(item.releaseDate) : (item.year ? new Date(`${item.year}-01-01`) : new Date());
                         finalTopTracks.push({
                             id: localMatch ? localMatch.id : `itunes-${item.trackId}`,
                             title: cleanTitle,
@@ -537,9 +561,11 @@ export async function artistRoutes(server: FastifyInstance) {
                                 title: albumTitle,
                                 coverUrl: artwork
                             },
+                            releaseDate: localMatch?.releaseDate ? new Date(localMatch.releaseDate) : itunesRelDate,
+                            createdAt: itunesRelDate,
                             isVirtual: !localMatch,
                             isLocalAvailable: !!localMatch,
-                            streams: localMatch?.streams || 0,
+                            streams: localMatch?.streams || Math.max(5000, 5000000 - (finalTopTracks.length * 30000)),
                             like_count: 0
                         } as any);
                     }
@@ -577,27 +603,60 @@ export async function artistRoutes(server: FastifyInstance) {
                 const albArt = (alb.imageUrl || alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
                 const count = parseInt(alb.more_info?.song_count || alb.song_count || alb.numSongs || alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
 
+                // Check authentic artist composer/primary credit
+                const albMusic = (alb.more_info?.music || alb.music || '').toLowerCase();
+                const primaryList = (alb.more_info?.artistMap?.primary_artists || []).map((a: any) => (a.name || '').toLowerCase());
+                const rawPrimary = (alb.primary_artists || '').toLowerCase();
+                const isComposerOrPrimary = albMusic.includes(artist.name.toLowerCase()) ||
+                    primaryList.some((p: string) => isAuthenticArtistRelease(p, artist.name)) ||
+                    isAuthenticArtistRelease(rawPrimary, artist.name) ||
+                    isAuthenticArtistRelease(alb.more_info?.artistMap?.artists?.[0]?.name, artist.name);
+
+                const realArtistName = cleanArtistNames(alb.more_info?.music || alb.more_info?.artistMap?.primary_artists?.[0]?.name || alb.primary_artists || artist.name);
+
                 const existingLocal = finalAlbums.find(a => normTitle(a.title) === normTitle(albTitle));
                 if (existingLocal) {
                     existingLocal.trackCount = Math.max(existingLocal.trackCount || 1, count);
                     existingLocal.isSingle = existingLocal.trackCount <= 1;
                     if (!existingLocal.coverUrl && albArt) existingLocal.coverUrl = albArt;
-                    seenCollectionIds.add(saavnAlbId);
                     continue;
                 }
 
-                finalAlbums.push({
-                    id: saavnAlbId,
-                    title: albTitle,
-                    artistName: artist.name,
-                    coverUrl: albArt,
-                    artistId: artist.id,
-                    releaseDate: alb.year ? new Date(`${alb.year}-01-01`) : new Date(),
-                    createdAt: alb.year ? new Date(`${alb.year}-01-01`) : new Date(),
-                    trackCount: count,
-                    isSingle: count <= 1,
-                    genre: alb.language ? `${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)}` : 'Indian'
-                });
+                let albRelDate = alb.year ? new Date(`${alb.year}-01-01`) : new Date();
+                const rawRelDate = alb.more_info?.release_date || alb.release_date;
+                if (rawRelDate && !isNaN(new Date(rawRelDate).getTime())) {
+                    albRelDate = new Date(rawRelDate);
+                }
+
+                if (isComposerOrPrimary) {
+                    finalAlbums.push({
+                        id: saavnAlbId,
+                        title: albTitle,
+                        artistName: artist.name,
+                        coverUrl: albArt,
+                        artistId: artist.id,
+                        releaseDate: albRelDate,
+                        createdAt: albRelDate,
+                        trackCount: count,
+                        isSingle: count <= 1,
+                        genre: alb.language ? `${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)}` : 'Indian'
+                    });
+                } else {
+                    // Feature / guest appearance -> Appears On
+                    appearsOnAlbums.push({
+                        id: saavnAlbId,
+                        title: albTitle,
+                        artistName: realArtistName,
+                        coverUrl: albArt,
+                        artistId: artist.id,
+                        releaseDate: albRelDate,
+                        createdAt: albRelDate,
+                        trackCount: count,
+                        genre: alb.language ? `${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)}` : 'Indian',
+                        isSingle: count <= 1,
+                        isVirtual: true
+                    } as any);
+                }
             }
 
             for (const alb of allItunesAlbums) {
@@ -867,15 +926,12 @@ export async function artistRoutes(server: FastifyInstance) {
         const { getCanonicalArtist } = await import('../utils/artist.js');
         const canon = getCanonicalArtist(artist.name);
 
-        let finalImageUrl = (artist.imageUrl && artist.imageUrl.includes('mzstatic')) 
-            ? artist.imageUrl 
-            : (canon?.imageUrl || artist.imageUrl);
+        let finalImageUrl = canon?.imageUrl || artist.imageUrl;
 
-        if (!finalImageUrl || finalImageUrl.includes('placeholder') || finalImageUrl.includes('ui-avatars.com') || finalImageUrl.includes('wikimedia')) {
-            if (canon?.imageUrl) {
-                finalImageUrl = canon.imageUrl;
-                prisma.artist.update({ where: { id: artist.id }, data: { imageUrl: canon.imageUrl, coverUrl: canon.coverUrl || artist.coverUrl } }).catch(() => {});
-            }
+        if (canon?.imageUrl && artist.imageUrl !== canon.imageUrl) {
+            finalImageUrl = canon.imageUrl;
+            artist.imageUrl = canon.imageUrl;
+            prisma.artist.update({ where: { id: artist.id }, data: { imageUrl: canon.imageUrl, coverUrl: canon.coverUrl || artist.coverUrl } }).catch(() => {});
         }
 
         // Categorize releases for layout
@@ -958,15 +1014,16 @@ export async function artistRoutes(server: FastifyInstance) {
         const latestReleases = (saavnArtistData?.latest_release || []).map((lr: any, rIdx: number) => {
             const title = (lr.title || lr.name || '').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&');
             const image = (lr.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+            const targetId = `saavn-album-${lr.albumid || lr.id || rIdx}`;
             return {
-                id: lr.type === 'song' ? `saavn-${lr.id || rIdx}` : `saavn-album-${lr.id || rIdx}`,
+                id: targetId,
                 title,
                 name: title,
                 subtitle: lr.subtitle || lr.description || (lr.year ? `Released ${lr.year}` : 'Latest Release'),
                 coverUrl: image,
                 image,
                 year: lr.year || '2026',
-                type: lr.type || 'album',
+                type: 'album',
                 isVirtual: true
             };
         }).filter((lr: any) => lr.title && lr.coverUrl);
@@ -975,15 +1032,16 @@ export async function artistRoutes(server: FastifyInstance) {
         const saavnSingles = (saavnArtistData?.singles || []).map((sg: any, sIdx: number) => {
             const title = (sg.title || sg.name || '').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&');
             const image = (sg.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+            const targetId = `saavn-album-${sg.albumid || sg.id || sIdx}`;
             return {
-                id: sg.type === 'song' ? `saavn-${sg.id || sIdx}` : `saavn-album-${sg.id || sIdx}`,
+                id: targetId,
                 title,
                 name: title,
                 subtitle: sg.year ? `Single • ${sg.year}` : 'Single',
                 coverUrl: image,
                 image,
                 year: sg.year || '',
-                type: sg.type || 'single',
+                type: 'album',
                 isVirtual: true
             };
         }).filter((sg: any) => sg.title && sg.coverUrl);

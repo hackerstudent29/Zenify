@@ -1116,10 +1116,101 @@ export class ExternalMetadataService {
     }
 
     /**
-     * Finds the highest quality SQUARE album art for a track.
+     * Search JioSaavn catalog for high-fidelity 500x500 movie/single artwork,
+     * release dates, and album metadata.
+     */
+    static async searchSaavnMetadata(title: string, artist: string, album?: string): Promise<{ coverUrl: string | null; releaseDate: string | null; genre: string | null; album?: string; title?: string; artist?: string } | null> {
+        try {
+            const cleanArtist = artist
+                .replace(/\s*-\s*topic$/i, '')
+                .replace(/\s*vevo$/i, '')
+                .replace(/\(.*?\)/g, '')
+                .replace(/\[.*?\]/g, '')
+                .replace(/feat\..*$/i, '')
+                .trim();
+            const cleanTitle = title
+                .replace(/\(.*?\)/g, '')
+                .replace(/\[.*?\]/g, '')
+                .replace(/(official|video|audio|lyric|song|full video)/gi, '')
+                .trim();
+
+            const query = `${cleanArtist} ${cleanTitle}`.trim();
+            if (!query) return null;
+
+            const res = await axios.get('https://www.jiosaavn.com/api.php', {
+                params: {
+                    __call: 'search.getResults',
+                    q: query,
+                    _format: 'json',
+                    _marker: '0',
+                    n: 6
+                },
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                timeout: 4500
+            });
+
+            const results: any[] = res.data?.results || [];
+            if (results.length > 0) {
+                const normalize = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const normTitle = normalize(cleanTitle);
+                const normArtist = normalize(cleanArtist);
+
+                let bestCand: any = null;
+                let bestScore = -1;
+
+                for (const c of results) {
+                    const cTitle = normalize(c.song || c.title || '');
+                    const cArtist = normalize(c.primary_artists || c.singers || c.music || '');
+                    let score = 0;
+
+                    if (cTitle === normTitle) score += 6;
+                    else if (cTitle.includes(normTitle) || normTitle.includes(cTitle)) score += 3;
+
+                    if (cArtist.includes(normArtist) || normArtist.includes(cArtist)) score += 4;
+                    if (album && normalize(c.album || '').includes(normalize(album))) score += 5;
+
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestCand = c;
+                    }
+                }
+
+                if (bestScore >= 2 && bestCand?.image) {
+                    const hqCover = bestCand.image.replace('150x150', '500x500').replace('50x50', '500x500');
+                    const relDate = bestCand.release_date || (bestCand.year ? `${bestCand.year}-01-01` : null);
+                    console.log(`[SaavnMetadata] Match (score ${bestScore}): "${bestCand.song || bestCand.title}" (${bestCand.album}) by "${bestCand.primary_artists || bestCand.singers}"`);
+                    return {
+                        coverUrl: hqCover,
+                        releaseDate: relDate,
+                        genre: bestCand.language ? `${bestCand.language.charAt(0).toUpperCase() + bestCand.language.slice(1)}` : null,
+                        album: bestCand.album,
+                        title: bestCand.song || bestCand.title,
+                        artist: bestCand.primary_artists || bestCand.singers || bestCand.music
+                    };
+                }
+            }
+        } catch (err: any) {
+            console.warn('[SaavnMetadata] Search failed:', err.message);
+        }
+        return null;
+    }
+
+    /**
+     * Searches iTunes metadata for songs (HQ artwork, releaseDate, genre).
+     * Strictly prioritizes JioSaavn authentic movie/soundtrack/single artwork.
      * Prevents using rectangular YouTube thumbnails.
      */
     static async searchITunesMetadata(title: string, artist: string, album?: string): Promise<{ coverUrl: string | null; releaseDate: string | null; genre: string | null } | null> {
+        // Priority 1: High-fidelity JioSaavn authentic soundtrack/single artwork
+        const saavnMatch = await ExternalMetadataService.searchSaavnMetadata(title, artist, album).catch(() => null);
+        if (saavnMatch && saavnMatch.coverUrl) {
+            return {
+                coverUrl: saavnMatch.coverUrl,
+                releaseDate: saavnMatch.releaseDate,
+                genre: saavnMatch.genre
+            };
+        }
+
         try {
             const cleanArtist = artist
                 .replace(/\s*-\s*topic$/i, '')

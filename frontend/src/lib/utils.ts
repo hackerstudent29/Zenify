@@ -267,12 +267,12 @@ export function getMediaUrl(
 export function getTrackCover(track: any): string {
   if (!track) return "/logo.png";
   
-  // Priority: track.coverUrl -> track.imageUrl -> album.coverUrl -> artist.imageUrl -> artist.coverUrl
-  const cover = (track.coverUrl && track.coverUrl.trim().length > 0) ? track.coverUrl :
-    (track.imageUrl && track.imageUrl.trim().length > 0) ? track.imageUrl :
-    (track.album?.coverUrl && track.album.coverUrl.trim().length > 0) ? track.album.coverUrl :
-    (track.artist?.imageUrl && track.artist.imageUrl.trim().length > 0) ? track.artist.imageUrl : 
-    (track.artist?.coverUrl && track.artist.coverUrl.trim().length > 0) ? track.artist.coverUrl :
+  // Priority: track.coverUrl -> track.imageUrl -> album.coverUrl -> Default Logo
+  // STRICT ARCHITECTURAL RULE: NEVER fall back to track.artist?.imageUrl or artist?.coverUrl
+  // because that replaces song/album artwork with artist facial headshots.
+  const cover = (track.coverUrl && track.coverUrl.trim().length > 0 && !track.coverUrl.includes("/logo.png")) ? track.coverUrl :
+    (track.imageUrl && track.imageUrl.trim().length > 0 && !track.imageUrl.includes("/logo.png")) ? track.imageUrl :
+    (track.album?.coverUrl && track.album.coverUrl.trim().length > 0 && !track.album.coverUrl.includes("/logo.png")) ? track.album.coverUrl :
     null;
   
   return getMediaUrl(cover, 'image') || "/logo.png";
@@ -289,9 +289,9 @@ export const CANONICAL_APPLE_ARTISTS: Record<string, string> = {
   "hiphoptamizhaaadhi": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
   "hiphopaadhi": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
   "aadhi": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/71/6f/57/716f5712-7579-f770-6803-62bc440b2627/mza_13035704302454646734.png/600x600bb.jpg",
-  "gvprakashkumar": "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/600x600bb.jpg",
-  "gvprakash": "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/600x600bb.jpg",
-  "gvp": "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/600x600bb.jpg",
+  "gvprakashkumar": "https://c.saavncdn.com/artists/G_V__Prakash_Kumar_003_20251113063655_500x500.jpg",
+  "gvprakash": "https://c.saavncdn.com/artists/G_V__Prakash_Kumar_003_20251113063655_500x500.jpg",
+  "gvp": "https://c.saavncdn.com/artists/G_V__Prakash_Kumar_003_20251113063655_500x500.jpg",
   "thamans": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg",
   "thaman": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg",
   "sthaman": "https://is1-ssl.mzstatic.com/image/thumb/Features221/v4/c8/6a/1d/c86a1d45-c95d-7bb8-356e-8e99f63e0ac4/mza_1241577601077628205.png/600x600bb.jpg",
@@ -350,6 +350,7 @@ export function getArtistProfileImage(artist: any, fallbackSongCover?: string | 
     rawImage.includes('Cover.jpg') ||
     rawImage.includes('Golden_Sparrow') ||
     rawImage.includes('golden-sparrow') ||
+    rawImage.includes('mza_16722262254049312592') ||
     rawImage.includes('150x150') ||
     rawImage.includes('50x50')
   );

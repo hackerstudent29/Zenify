@@ -229,8 +229,8 @@ export async function albumRoutes(server: FastifyInstance) {
         }
 
         // 0.5. Virtual Album Resolution (JioSaavn regional multi-language album)
-        if (decodedId.startsWith('saavn-album-') || decodedId.startsWith('sp-album-')) {
-            const saavnAlbumId = decodedId.replace(/^(saavn|sp)-album-/, '');
+        if (decodedId.startsWith('saavn-album-') || decodedId.startsWith('sp-album-') || decodedId.startsWith('saavn-')) {
+            const saavnAlbumId = decodedId.replace(/^(saavn|sp)-album-/, '').replace(/^saavn-/, '');
             try {
                 const { default: axios } = await import('axios');
                 const res = await axios.get('https://www.jiosaavn.com/api.php', {
@@ -306,6 +306,75 @@ export async function albumRoutes(server: FastifyInstance) {
                             imageUrl: artwork
                         },
                         tracks
+                    };
+                }
+
+                // Fallback: If content.getAlbumDetails did not match, check song.getDetails (single track album)
+                const songRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'song.getDetails',
+                        _format: 'json',
+                        pids: saavnAlbumId
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 4500
+                }).catch(() => null);
+
+                const songObj = songRes?.data?.[saavnAlbumId] || (songRes?.data && typeof songRes.data === 'object' && Object.values(songRes.data)[0]);
+                if (songObj && (songObj.song || songObj.title)) {
+                    const songTitle = (songObj.song || songObj.title).trim();
+                    const albTitle = (songObj.album && songObj.album !== 'undefined' ? songObj.album : songTitle).trim();
+                    let artwork = songObj.image || '';
+                    artwork = artwork.replace('150x150', '500x500').replace('50x50', '500x500');
+                    const rawSingers = songObj.singers || songObj.primary_artists || songObj.more_info?.singers;
+                    const rawMusic = songObj.music || songObj.more_info?.music;
+                    const trackArtist = cleanArtistNames(rawSingers, rawMusic || 'Various Artists');
+                    const dur = parseInt(songObj.duration || songObj.more_info?.duration, 10) || 180;
+
+                    const encMediaUrl = songObj.encrypted_media_url || songObj.more_info?.encrypted_media_url;
+                    let directAudioUrl = '';
+                    if (encMediaUrl) {
+                        directAudioUrl = CleanCdnAudioService.decryptSaavnMediaUrl(encMediaUrl, '320') || CleanCdnAudioService.decryptSaavnMediaUrl(encMediaUrl, '160') || '';
+                    }
+                    const finalAudioUrl = directAudioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${songTitle}`)}&title=${encodeURIComponent(songTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}`;
+
+                    const relDate = songObj.release_date ? new Date(songObj.release_date) : (songObj.year ? new Date(`${songObj.year}-01-01`) : new Date());
+
+                    return {
+                        id: decodedId,
+                        title: albTitle,
+                        coverUrl: artwork,
+                        releaseDate: relDate,
+                        createdAt: relDate,
+                        genre: songObj.language ? `${songObj.language.charAt(0).toUpperCase() + songObj.language.slice(1)} Single` : 'Single',
+                        artist: {
+                            id: `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                            name: trackArtist,
+                            imageUrl: artwork
+                        },
+                        tracks: [{
+                            id: `saavn-${songObj.id || saavnAlbumId}`,
+                            title: songTitle,
+                            duration: dur,
+                            trackNumber: 1,
+                            coverUrl: artwork,
+                            audioUrl: finalAudioUrl,
+                            artistId: `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                            artist: {
+                                id: `artist-${encodeURIComponent(trackArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
+                                name: trackArtist,
+                                imageUrl: artwork
+                            },
+                            album: {
+                                id: decodedId,
+                                title: albTitle,
+                                coverUrl: artwork
+                            },
+                            genre: songObj.language ? `${songObj.language.charAt(0).toUpperCase() + songObj.language.slice(1)} Single` : 'Single',
+                            isVirtual: true,
+                            streams: 0,
+                            like_count: 0
+                        }]
                     };
                 }
             } catch (err: any) {
@@ -573,10 +642,11 @@ export async function albumRoutes(server: FastifyInstance) {
                 });
 
                 const bestSaavnAlbum = sortedSaavn[0];
-                if (bestSaavnAlbum?.id) {
+                const bestSaavnAlbumId = bestSaavnAlbum?.albumid || bestSaavnAlbum?.id;
+                if (bestSaavnAlbumId) {
                     return (server as any).inject({
                         method: 'GET',
-                        url: `/api/albums/saavn-album-${bestSaavnAlbum.id}`,
+                        url: `/api/albums/saavn-album-${bestSaavnAlbumId}`,
                         headers: req.headers
                     }).then((r: any) => JSON.parse(r.body));
                 }
@@ -691,10 +761,11 @@ export async function albumRoutes(server: FastifyInstance) {
                     return songCount > allTracks.length;
                 });
 
-                if (fullAlbumCandidate?.id) {
+                const fullAlbumCandidateId = fullAlbumCandidate?.albumid || fullAlbumCandidate?.id;
+                if (fullAlbumCandidateId) {
                     const fullAlbum = await (server as any).inject({
                         method: 'GET',
-                        url: `/api/albums/saavn-album-${fullAlbumCandidate.id}`,
+                        url: `/api/albums/saavn-album-${fullAlbumCandidateId}`,
                         headers: req.headers
                     }).then((r: any) => JSON.parse(r.body)).catch(() => null);
 
