@@ -1065,10 +1065,14 @@ export async function artistRoutes(server: FastifyInstance) {
                         rel.coverUrl = canonRel.coverUrl || canonRel.imageUrl;
                     } else {
                         const dbMatch = dbArtists.find(m => m.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean);
-                        if (dbMatch?.imageUrl && !dbMatch.imageUrl.includes('/albums/') && !dbMatch.imageUrl.includes('Golden_Sparrow')) {
+                        if (dbMatch?.imageUrl && !dbMatch.imageUrl.includes('/albums/') && !dbMatch.imageUrl.includes('Golden_Sparrow') && !dbMatch.imageUrl.includes('mza_16722262254049312592')) {
                             rel.imageUrl = dbMatch.imageUrl;
                             rel.coverUrl = dbMatch.coverUrl || dbMatch.imageUrl;
                         }
+                    }
+                    if (rel.imageUrl && (rel.imageUrl.includes('mza_16722262254049312592') || rel.imageUrl.includes('Golden_Sparrow'))) {
+                        rel.imageUrl = 'https://c.saavncdn.com/artists/G_V__Prakash_Kumar_003_20251113063655_500x500.jpg';
+                        rel.coverUrl = 'https://c.saavncdn.com/artists/G_V__Prakash_Kumar_003_20251113063655_500x500.jpg';
                     }
                     const dbMatch = dbArtists.find(m => m.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normClean);
                     if (dbMatch) {
@@ -1170,8 +1174,8 @@ export async function artistRoutes(server: FastifyInstance) {
                 .map(a => {
                     const canon = getCanonicalArtist(a.name);
                     const canonImage = canon?.imageUrl;
-                    const hasValidImage = a.imageUrl && !a.imageUrl.includes('placeholder') && !a.imageUrl.includes('ui-avatars.com');
-                    const finalImage = (hasValidImage && a.imageUrl.includes('mzstatic')) ? a.imageUrl : (canonImage || a.imageUrl);
+                    const hasValidImage = a.imageUrl && !a.imageUrl.includes('placeholder') && !a.imageUrl.includes('ui-avatars.com') && !a.imageUrl.includes('mza_16722262254049312592');
+                    const finalImage = canonImage || (hasValidImage ? a.imageUrl : null) || a.imageUrl;
                     const { tracks, ...rest } = a;
                     return { ...rest, imageUrl: finalImage };
                 });
