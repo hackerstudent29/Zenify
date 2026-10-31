@@ -86,17 +86,34 @@ export function JioSaavnSongTable({
 
     if (activeSort === "date") {
       return list.sort((a, b) => {
-        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : (a.year ? new Date(`${a.year}-01-01`).getTime() : 0);
-        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : (b.year ? new Date(`${b.year}-01-01`).getTime() : 0);
-        return dateB - dateA;
+        const getTime = (t: any) => {
+          if (t.releaseDate) {
+            const ms = new Date(t.releaseDate).getTime();
+            if (!isNaN(ms) && ms > 0) return ms;
+          }
+          if (t.year) {
+            const ms = new Date(`${t.year}-01-01`).getTime();
+            if (!isNaN(ms) && ms > 0) return ms;
+          }
+          if (t.createdAt) {
+            const ms = new Date(t.createdAt).getTime();
+            if (!isNaN(ms) && ms > 0) return ms;
+          }
+          return 0;
+        };
+        const diff = getTime(b) - getTime(a);
+        if (diff !== 0) return diff;
+        return (b.streams || 0) - (a.streams || 0);
       });
     }
 
     if (activeSort === "name") {
       return list.sort((a, b) => {
-        const titleA = (a.title || a.name || "").toLowerCase();
-        const titleB = (b.title || b.name || "").toLowerCase();
-        return titleA.localeCompare(titleB);
+        const cleanName = (t: any) => {
+          const raw = formatDisplayTitle(t.title || t.name || "");
+          return raw.toLowerCase().replace(/^[^a-z0-9]+/i, "").trim();
+        };
+        return cleanName(a).localeCompare(cleanName(b));
       });
     }
 

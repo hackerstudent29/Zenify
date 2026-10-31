@@ -39,8 +39,8 @@ export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; bir
         name: "G. V. Prakash Kumar",
         bio: "G. V. Prakash Kumar is an Indian actor, music composer, and singer who has worked predominantly in Tamil cinema. He is a National Film Award winner. Top tracks: Pookkal Pookkum, Pirai Thedum, Veyilodu Vilayadu, Celebration of Life.",
         birthDate: "1987-06-13",
-        imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/600x600bb.jpg",
-        coverUrl: "https://is1-ssl.mzstatic.com/image/thumb/Features122/v4/a5/f1/60/a5f160a6-8574-d378-c78a-f59c1e6f3e46/mza_16722262254049312592.png/1920x1080cw.png"
+        imageUrl: "https://c.saavncdn.com/artists/G_V__Prakash_Kumar_003_20251113063655_500x500.jpg",
+        coverUrl: "https://c.saavncdn.com/artists/G_V__Prakash_Kumar_003_20251113063655_500x500.jpg"
     },
     "d. imman": {
         name: "D. Imman",

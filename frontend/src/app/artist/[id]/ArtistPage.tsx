@@ -307,7 +307,7 @@ export default function ArtistPage() {
       {heroImageUrl ? (
         /* Full-size artist hero. Preserve square/profile artwork as a rectangle. */
         <div 
-          className="relative w-full h-[58vh] sm:h-[55vh] md:h-[52vh] lg:h-[50vh] min-h-[390px] max-h-[580px] overflow-hidden select-none am-layout-transition mb-6 sm:mb-8"
+          className="relative w-full h-[58vh] sm:h-[55vh] md:h-[48vh] lg:h-[44vh] min-h-[360px] max-h-[460px] overflow-hidden select-none am-layout-transition mb-6 sm:mb-8"
           style={{
             marginLeft: "calc(var(--sb-w) * -1)",
             marginRight: "calc(var(--rp-w) * -1)",
@@ -330,8 +330,8 @@ export default function ArtistPage() {
             className={cn(
               "absolute inset-0 m-auto w-full h-full filter brightness-95 pointer-events-none",
               isWidescreenUrl
-                ? "object-cover object-top sm:object-[center_15%]"
-                : "object-contain object-center"
+                ? "object-cover object-top sm:object-[center_20%] md:object-[center_25%]"
+                : "object-contain object-center max-w-[800px] mx-auto"
             )}
             fetchPriority="high"
             decoding="async"

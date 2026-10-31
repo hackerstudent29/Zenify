@@ -1308,6 +1308,12 @@ export async function utilsRoutes(server: FastifyInstance) {
                     const effectiveTrackId = candId || localTrack?.id;
                     if (effectiveTrackId) {
                         youtubeStreamCache.set(`track:${effectiveTrackId}`, cachePayload);
+                        if (!effectiveTrackId.startsWith('saavn-') && !effectiveTrackId.startsWith('itunes-') && cdnResult.coverUrl) {
+                            prisma.track.update({
+                                where: { id: effectiveTrackId },
+                                data: { coverUrl: cdnResult.coverUrl }
+                            }).catch(() => {});
+                        }
                     }
 
                     if (cdnResult.title) reply.header('x-zenify-track-title', encodeURIComponent(cdnResult.title));
