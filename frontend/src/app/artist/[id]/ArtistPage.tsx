@@ -447,13 +447,6 @@ export default function ArtistPage() {
                     <SwiftUIEllipsis size={16} fill="currentColor" />
                   </button>
                 }
-                items={[
-                  { id: "play-all", label: "Play All Songs", icon: <Play size={14} />, onClick: handlePlayTopTracks },
-                  { id: "shuffle", label: isShuffled ? "Shuffle: On" : "Shuffle", icon: <SwiftUIShuffle size={14} />, onClick: handleShufflePlay },
-                  { id: "sep-share", isSeparator: true },
-                  { id: "share", label: "Share", icon: <Share2 size={14} />, onClick: handleShare },
-                  { id: "copy-link", label: "Copy Link", icon: <Link2 size={14} />, onClick: copyLink },
-                ]}
               />
             </div>
           </div>
