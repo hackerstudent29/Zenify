@@ -583,7 +583,7 @@ function Popover({
         left: pos?.x ?? 0,
         // opening upward? keep the bottom edge fixed so growing views extend up
         ...(up ? { bottom: pos!.by } : { top: pos?.y ?? 0 }),
-        width: "min(224px, calc(100vw - 16px))",
+        width: "min(208px, calc(100vw - 16px))",
         zIndex: Z,
         visibility: pos ? "visible" : "hidden",
       }}
@@ -949,25 +949,31 @@ export function TrackActionsDropdown({
   const clean = (arr: (MenuItem | false | null | undefined)[]) => arr.filter(Boolean) as MenuItem[];
   const sep = (id: string): MenuItem => ({ id, isSeparator: true });
 
-  /** Share row — direct Copy Link or native share. */
-  const shareItem = (): MenuItem | false => {
+  /** One entry → shown directly. Several → a "Go to ▸" sub-menu. */
+  const goTo = (list: MenuItem[]): MenuItem | false => {
+    if (list.length === 0) return false;
+    if (list.length === 1) return { ...list[0], label: `Go to ${list[0].label}` };
+    return { id: "goto", label: "Go to", children: list };
+  };
+
+  /** Share ▸  (Copy Link · Share… · extras). With onShare → one direct row. */
+  const shareItem = (extra: MenuItem[] = []): MenuItem | false => {
     if (hide.has("share")) return false;
+    if (onShare) return { id: "share", icon: <Share2 />, label: "Share", onClick: onShare };
     return {
       id: "share",
-      icon: <Share2 />,
       label: "Share",
-      doneLabel: "Link copied",
-      onClick: async () => {
-        if (onShare) {
-          onShare();
-          return;
-        }
-        if (canNativeShare) {
-          await nativeShare();
-        } else {
-          await copyLink();
-        }
-      },
+      children: clean([
+        {
+          id: "copy-link",
+          icon: <Link2 />,
+          label: "Copy Link",
+          doneLabel: "Link copied",
+          onClick: copyLink,
+        },
+        canNativeShare && { id: "share-native", icon: <Share2 />, label: "Share…", onClick: nativeShare },
+        ...extra,
+      ]),
     };
   };
 
@@ -1086,11 +1092,15 @@ export function TrackActionsDropdown({
         },
       },
       sep("s1"),
-      !hide.has("artist") &&
-        artistTarget &&
-        !onArtistPage && { id: "artist", icon: <User />, label: "Go to Artist", onClick: () => router.push(artistTarget) },
-      !hide.has("view-album") &&
-        !onAlbumPage && { id: "view-album", icon: <Disc />, label: "View Album", onClick: () => router.push(albumTarget) },
+      goTo(
+        clean([
+          !hide.has("artist") &&
+            artistTarget &&
+            !onArtistPage && { id: "artist", icon: <User />, label: "Artist", onClick: () => router.push(artistTarget) },
+          !hide.has("view-album") &&
+            !onAlbumPage && { id: "view-album", icon: <Disc />, label: "Album", onClick: () => router.push(albumTarget) },
+        ])
+      ),
       ...(extraItems as unknown as MenuItem[]),
       shareItem(),
     ];
@@ -1247,7 +1257,7 @@ export function TrackActionsDropdown({
 
       sep("s-lib"),
 
-      /* navigate / details */
+      /* navigate */
       !hide.has("lyrics") &&
         onLyricsToggle && {
           id: "lyrics",
@@ -1262,45 +1272,35 @@ export function TrackActionsDropdown({
             onLyricsToggle();
           },
         },
-      !hide.has("view-details") &&
-        context !== "track-page" &&
-        !onTrackPage &&
-        track?.id && {
-          id: "view-details",
-          icon: <Info />,
-          label: "View Details",
-          onClick: () => router.push(`/track/${track.id}`),
-        },
-      !hide.has("artist") &&
-        artistTarget &&
-        !onArtistPage && {
-          id: "go-artist",
-          icon: <User />,
-          label: "Go to Artist",
-          onClick: handleGoToArtist,
-        },
-      !hide.has("album") &&
-        albumTarget &&
-        !onAlbumPage && {
-          id: "go-album",
-          icon: <Disc />,
-          label: "Go to Album",
-          onClick: () => router.push(albumTarget),
-        },
-
-      /* admin */
-      isAdmin && adminKids.length > 0 && sep("s-admin"),
-      ...(isAdmin ? adminKids : []),
-
-      sep("s-end"),
-
-      /* download & share */
-      downloadItem,
-      shareItem(),
+      goTo(
+        clean([
+          !hide.has("album") &&
+            albumTarget &&
+            !onAlbumPage && { id: "album", icon: <Disc />, label: "Album", onClick: () => router.push(albumTarget) },
+          !hide.has("artist") &&
+            artistTarget &&
+            !onArtistPage && { id: "artist", icon: <User />, label: "Artist", onClick: handleGoToArtist },
+          !hide.has("view-details") &&
+            context !== "track-page" &&
+            !onTrackPage &&
+            track?.id && {
+              id: "view-details",
+              icon: <Info />,
+              label: "Details",
+              onClick: () => router.push(`/track/${track.id}`),
+            },
+        ])
+      ),
 
       ...(extraItems && extraItems.length > 0
         ? [sep("s-extra"), ...(extraItems as unknown as MenuItem[])]
         : []),
+
+      sep("s-end"),
+
+      /* share (+ download inside), admin */
+      hide.has("share") ? downloadItem : shareItem([downloadItem].filter(Boolean) as MenuItem[]),
+      isAdmin && adminKids.length > 0 && { id: "admin", label: "Admin", children: adminKids },
     ];
   }
 
