@@ -47,7 +47,6 @@ const SearchPage = lazyWithRetry(() => import('./app/search/page'));
 const RadioPage = lazyWithRetry(() => import('./app/radio/page'));
 const HistoryPage = lazyWithRetry(() => import('./app/history/page'));
 const ProfilePage = lazyWithRetry(() => import('./app/profile/page'));
-const PricingPage = lazyWithRetry(() => import('./app/pricing/page'));
 const NotificationsPage = lazyWithRetry(() => import('./app/notifications/page'));
 const LikedPage = lazyWithRetry(() => import('./app/liked/page'));
 const PaymentCallbackPage = lazyWithRetry(() => import('./app/payment/callback/page'));
@@ -96,8 +95,7 @@ export default function AppRouter() {
           <Route path="/radio" element={<RadioPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
+                    <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/library" element={<Navigate to="/liked" replace />} />
           <Route path="/liked" element={<LikedPage />} />
           <Route path="/liked-songs" element={<Navigate to="/liked" replace />} />

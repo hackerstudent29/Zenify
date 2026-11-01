@@ -26,7 +26,7 @@ export const isPublicRoute = (pathname?: string | null): boolean => {
     current.startsWith("/privacy") ||
     current.startsWith("/about") ||
     current.startsWith("/creator") ||
-    current.startsWith("/pricing") ||
+    
     current.startsWith("/discover") ||
     current.startsWith("/search") ||
     current.startsWith("/radio") ||

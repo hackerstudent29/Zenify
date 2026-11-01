@@ -3,13 +3,11 @@ import React from "react";
 import Link from "next/link";
 import { ZenifyLogo } from "./shared/ZenifyLogo";
 import { useAuthStore } from "@/store/authStore";
-import { useUIStore } from "@/store/ui";
 import { cn, getMediaUrl } from "@/lib/utils";
 
 export default function Navbar() {
  const { isAuthenticated, user } = useAuthStore();
- const { setPricingModalOpen } = useUIStore();
-
+ 
  return (
  <nav className="fixed top-0 left-0 right-0 z-[100] bg-black/50 backdrop-blur-xl border-b border-white/5">
  <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -20,12 +18,6 @@ export default function Navbar() {
  <div className="hidden md:flex items-center gap-8">
  <Link href="/liked" className="text-xs font-bold tracking-tight text-zinc-400 hover:text-white transition-colors">Liked Songs</Link>
  <Link href="/search" className="text-xs font-bold tracking-tight text-zinc-400 hover:text-white transition-colors">Search</Link>
- <button
- onClick={() => setPricingModalOpen(true)}
- className="text-xs font-bold tracking-tight text-zinc-400 hover:text-white transition-colors"
- >
- Pricing
- </button>
  </div>
 
  <div className="flex items-center gap-4">
@@ -47,14 +39,13 @@ export default function Navbar() {
  <p className="text-[10px] font-bold text-white/90 leading-tight truncate max-w-[80px]">
  {user?.username || user?.name || "User"}
  </p>
- <p className="text-[8px] font-medium text-white/30 leading-tight">Pro Account</p>
- </div>
+  </div>
  </Link>
  ) : (
  <>
  <Link href="/login" className="text-xs font-bold tracking-tight text-zinc-400 hover:text-white transition-colors px-4">Log in</Link>
  <Link href="/register" className="bg-white text-black text-[10px] font-bold tracking-wide px-6 py-3 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-xl shadow-white/5">
- Free trial
+ Get Started
  </Link>
  </>
  )}

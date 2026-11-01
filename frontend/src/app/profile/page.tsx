@@ -6,12 +6,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ProfileSection } from "@/components/account/ProfileSection";
-import { SubscriptionSection } from "@/components/account/SubscriptionSection";
 import { SecuritySection } from "@/components/account/SecuritySection";
 import { AnalyticsSection } from "@/components/account/AnalyticsSection";
 import { PreferencesSection } from "@/components/account/PreferencesSection";
 import { DangerZone } from "@/components/account/DangerZone";
-import { User, Shield, CreditCard, AlertOctagon, LogOut, BarChart3, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { User, Shield,  AlertOctagon, LogOut, BarChart3, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
@@ -19,7 +18,6 @@ const sections = [
  { id: "profile", title: "Profile", icon: User, component: ProfileSection, isDanger: false },
  { id: "preferences", title: "Music Taste", icon: SlidersHorizontal, component: PreferencesSection, isDanger: false },
  { id: "analytics", title: "Analytics", icon: BarChart3, component: AnalyticsSection, isDanger: false },
- { id: "subscription", title: "Subscription", icon: CreditCard, component: SubscriptionSection, isDanger: false },
  { id: "security", title: "Security", icon: Shield, component: SecuritySection, isDanger: false },
  { id: "danger", title: "Danger Zone", icon: AlertOctagon, component: DangerZone, isDanger: true },
 ];

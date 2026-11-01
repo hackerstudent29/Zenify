@@ -10,7 +10,7 @@ const distDir = path.resolve('dist');
 // 1. Check prerendered static files
 const testRoutes = [
   { route: '/', file: 'dist/index.html' },
-  { route: '/pricing', file: 'dist/pricing/index.html' },
+  { route:  file: 'dist/pricing/index.html' },
   { route: '/search', file: 'dist/search/index.html' },
   { route: '/about-zenify', file: 'dist/about-zenify/index.html' },
   { route: '/discover', file: 'dist/discover/index.html' },
