@@ -81,3 +81,37 @@ className="h-10 px-5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-whit
 - **Icon Accent**: `text-brand` matching red text
 - **Micro-Interactions**: `transition-all active:scale-95 cursor-pointer disabled:opacity-50`
 
+---
+
+## 5. Strict Component Reuse, Apple Music Page Structure & Right-Panel Optimization
+
+### Policy & Architectural Rules
+1. **Strict Prohibition on Ad-Hoc Tables & Cards**:
+   - Never invent custom tables, one-off grid rows, or bespoke card designs for collection or library pages.
+   - Always reuse the existing canonical components:
+     - **Songs**: `JioSaavnSongTable` (clean Apple Music table with `#`, cover art, song title, artist link, album link, `⋯` menu, and sorting tabs).
+     - **Albums & Artists**: `JioSaavnCardSection` (which renders `MediaCard` with snap carousel, responsive pagination, and smooth panel transitions).
+     - **Cards**: `MediaCard` for albums, playlists, tracks, and artists (`isArtist: true`).
+     - **Hero Action Buttons**: `MediaActionButtons` (Play, Shuffle, and optional `extraAction` button).
+
+2. **Fixed Header Clearance (No Negative Margins)**:
+   - The top header (`TopBar`) is absolute/fixed at `top-0` with height `h-[var(--header-height)]` (~64px).
+   - NEVER use negative top margins (like `-mt-6` or `-mt-10`) on page hero headers, as they pull the content directly underneath the fixed top search bar and profile picture.
+   - Always apply generous top clearance on the main page container: `pt-24 sm:pt-28 md:pt-32`.
+   - Ensure the page route is included in `app-layout.tsx` for transparent header styling if it renders a dynamic background wash.
+
+3. **Dynamic Panel Transitions & Carousel Bleed**:
+   - Right-side panels (Lyrics, Queue, StudioFX) set `--rp-w: 320px` when active.
+   - All carousels and full-bleed hero sections must integrate the layout offset:
+     ```tsx
+     style={{
+       marginLeft: "calc(var(--sb-w) * -1)",
+       marginRight: "calc(var(--rp-w) * -1)",
+     }}
+     ```
+     with `paddingRight: "calc(var(--rp-w) + var(--row-gutter, 28px))"` and `am-layout-transition` to smoothly glide behind the panels without clipping or abrupt layout breakage.
+
+4. **In-Page Scoped Search**:
+   - In-page search fields on library / collection pages must strictly filter only the items present in that collection (e.g. user's liked songs, albums, and artists), rather than triggering broad global searches.
+
+

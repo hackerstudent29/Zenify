@@ -54,6 +54,10 @@ export function JioSaavnCardSection({
   };
 
   const getItemLink = (item: any) => {
+    if (item.href) return item.href;
+    if (item.isArtist || item.type === "artist") {
+      return `/artist/${item.id}`;
+    }
     if (item.type === "playlist" || item.id?.startsWith("saavn-playlist-")) {
       return `/playlist/${item.id}`;
     }
@@ -139,13 +143,16 @@ export function JioSaavnCardSection({
           }}
         >
           {items.map((item, idx) => {
+            const isArtist = Boolean(item.isArtist || item.type === "artist");
             const isPlaylist = item.type === "playlist" || item.id?.startsWith("saavn-playlist-");
-            const isAlbum = item.type === "album" || item.id?.startsWith("saavn-album-") || item.id?.startsWith("itunes-album-") || (!isPlaylist && !item.isArtist);
+            const isAlbum = item.type === "album" || item.id?.startsWith("saavn-album-") || item.id?.startsWith("itunes-album-") || (!isPlaylist && !isArtist);
             const rawYear = item.year || item.releaseDate || item.createdAt;
             const year = rawYear ? (typeof rawYear === "string" && rawYear.length === 4 ? rawYear : new Date(rawYear).getFullYear()) : "";
             const count = Number(item.trackCount || item.songCount || 0);
             let subtitle = "";
-            if (count > 1) {
+            if (isArtist) {
+              subtitle = "Artist";
+            } else if (count > 1) {
               subtitle = `${count} Songs`;
             } else if (count === 1 || item.isSingle) {
               subtitle = year ? `${year} · Single` : "Single";
@@ -160,11 +167,11 @@ export function JioSaavnCardSection({
               id: item.id || `item-${idx}`,
               title: item.title || item.name,
               name: item.name || item.title,
-              artwork: item.artwork || item.coverUrl || item.image,
-              coverUrl: item.coverUrl || item.image || item.artwork,
+              artwork: item.artwork || item.coverUrl || item.image || item.avatarUrl || item.imageUrl,
+              coverUrl: item.coverUrl || item.image || item.artwork || item.avatarUrl || item.imageUrl,
               isAlbum,
               isPlaylist,
-              isArtist: item.isArtist || false,
+              isArtist,
               subtitle,
               href: getItemLink(item),
             };
