@@ -10,6 +10,7 @@ import { PremiumMobilePlayer } from "@/components/mobile/PremiumMobilePlayer";
 import { FullScreenPlayer } from "@/components/player/full-screen-player";
 import { GlobalAudio } from "@/components/player/global-audio";
 import { QueuePanel } from "@/components/player/queue-panel";
+import { NotificationsPanel } from "@/components/shared/NotificationsPanel";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { Maximize2, Check, X, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -119,6 +120,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
  const isLyricsOpen = useUIStore(state => state.isLyricsOpen);
  const isQueueOpen = useUIStore(state => state.isQueueOpen);
+ const isNotificationsOpen = useUIStore(state => state.isNotificationsOpen);
  const isSidebarCollapsed = useUIStore(state => state.isSidebarCollapsed);
  const isPlayerMinimized = useUIStore(state => state.isPlayerMinimized);
  const setPlayerMinimized = useUIStore(state => state.setPlayerMinimized);
@@ -288,7 +290,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isInfoPage = pathname?.startsWith("/terms") || pathname?.startsWith("/privacy") || pathname?.startsWith("/about") || pathname?.startsWith("/creator");
   const isLyricSyncPage = pathname?.includes("/admin/lyric-sync");
   const hasSidebar = !isMobile && isAuthenticated;
-  const rightPanelOpen = !isMobile && (isLyricsOpen || isQueueOpen || isAudioFxOpen);
+  const rightPanelOpen = !isMobile && (isLyricsOpen || isQueueOpen || isAudioFxOpen || isNotificationsOpen);
   const layoutVars = {
     "--sb-w": hasSidebar ? `${SIDEBAR_EXPANDED}px` : "0px",
     "--rp-w": rightPanelOpen ? "320px" : "0px",
@@ -572,6 +574,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
    <AudioFxModal />
  </React.Suspense>
  <QueuePanel />
+ <NotificationsPanel />
  <React.Suspense fallback={null}>
    <BatchImportToast />
    <CloudSyncSidePopup />

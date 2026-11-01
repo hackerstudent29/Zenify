@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useNotificationStore } from '@/store/notificationStore';
+import { useUIStore } from '@/store/ui';
 import api from '@/lib/api';
 import { getApiBaseUrl } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -95,7 +96,7 @@ export function NotificationListener() {
  animate={{ opacity: 1, x: 0, scale: 1 }}
  exit={{ opacity: 0, x: 20, scale: 0.95 }}
  onClick={() => {
- router.push('/admin/notifications');
+ useUIStore.getState().setIsNotificationsOpen(true);
  setToast(null);
  }}
  className="fixed top-24 right-6 flex items-start gap-3 p-4 rounded-xl border border-white/10 bg-[#18181B]/95 backdrop-blur-xl shadow-2xl z-[9999] cursor-pointer hover:bg-[#18181B] transition-colors max-w-[300px]"

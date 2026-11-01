@@ -124,7 +124,7 @@ export function TopBar() {
                           )}
                         </div>
                       ),
-                      onClick: () => router.push("/notifications"),
+                      onClick: () => useUIStore.getState().toggleNotifications(),
                     },
                     { id: "settings", label: "Settings", icon: <Settings size={16} />, onClick: () => useUIStore.getState().openSettings() },
                     { id: "about-creator", label: "About Creator", icon: <Info size={16} />, onClick: () => router.push("/about") },
@@ -259,7 +259,7 @@ export function TopBar() {
                             )}
                           </div>
                         ),
-                        onClick: () => router.push("/notifications"),
+                        onClick: () => useUIStore.getState().toggleNotifications(),
                       },
                       { id: "settings", label: "Settings", icon: <Settings size={14} />, onClick: () => useUIStore.getState().openSettings() },
                       { id: "about-creator", label: "About Creator", icon: <Info size={14} />, onClick: () => router.push("/about") },

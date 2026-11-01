@@ -19,12 +19,17 @@ interface UIState {
   isAudioFxOpen: boolean;
   isQueueOpen: boolean;
   isLyricsOpen: boolean;
+  isNotificationsOpen: boolean;
   isNativePlayerOpen: boolean;
   isSettingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
   openSettings: () => void;
   closeSettings: () => void;
   toggleSettings: () => void;
+  setIsNotificationsOpen: (open: boolean) => void;
+  openNotifications: () => void;
+  closeNotifications: () => void;
+  toggleNotifications: () => void;
   reducedMotion: boolean;
   setReducedMotion: (reduced: boolean) => void;
   coloredBackground: boolean;
@@ -101,6 +106,11 @@ export const useUIStore = create<UIState>((set) => ({
   isQueueOpen: false,
   isLyricsOpen: false,
   isNativePlayerOpen: false,
+  isNotificationsOpen: false,
+  setIsNotificationsOpen: (open) => set((state) => ({ isNotificationsOpen: open, ...(open ? { isQueueOpen: false, isLyricsOpen: false, isAudioFxOpen: false } : {}) })),
+  openNotifications: () => set({ isNotificationsOpen: true, isQueueOpen: false, isLyricsOpen: false, isAudioFxOpen: false }),
+  closeNotifications: () => set({ isNotificationsOpen: false }),
+  toggleNotifications: () => set((state) => ({ isNotificationsOpen: !state.isNotificationsOpen, ...(!state.isNotificationsOpen ? { isQueueOpen: false, isLyricsOpen: false, isAudioFxOpen: false } : {}) })),
   isSettingsOpen: false,
   setSettingsOpen: (open) => set({ isSettingsOpen: open }),
   openSettings: () => set({ isSettingsOpen: true }),
@@ -154,9 +164,9 @@ export const useUIStore = create<UIState>((set) => ({
   setShowLoginSplash: (show) => set({ showLoginSplash: show }),
   setPlayerMinimized: (minimized) => set({ isPlayerMinimized: minimized }),
   setFullScreenPlayerOpen: (open) => set({ isFullScreenPlayerOpen: open }),
-  setAudioFxOpen: (open) => set((state) => ({ isAudioFxOpen: open, ...(open ? { isLyricsOpen: false, isQueueOpen: false } : {}) })),
-  setIsQueueOpen: (open) => set((state) => ({ isQueueOpen: open, ...(open ? { isLyricsOpen: false, isAudioFxOpen: false } : {}) })),
-  setIsLyricsOpen: (open) => set((state) => ({ isLyricsOpen: open, ...(open ? { isQueueOpen: false, isAudioFxOpen: false } : {}) })),
+  setAudioFxOpen: (open) => set((state) => ({ isAudioFxOpen: open, ...(open ? { isLyricsOpen: false, isQueueOpen: false, isNotificationsOpen: false } : {}) })),
+  setIsQueueOpen: (open) => set((state) => ({ isQueueOpen: open, ...(open ? { isLyricsOpen: false, isAudioFxOpen: false, isNotificationsOpen: false } : {}) })),
+  setIsLyricsOpen: (open) => set((state) => ({ isLyricsOpen: open, ...(open ? { isQueueOpen: false, isAudioFxOpen: false, isNotificationsOpen: false } : {}) })),
   setPricingModalOpen: (open) => set({ isPricingModalOpen: open }),
   setNativePlayerOpen: (open) => set({ isNativePlayerOpen: open }),
   setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
