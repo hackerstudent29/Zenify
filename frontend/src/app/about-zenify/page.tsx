@@ -4,7 +4,7 @@ import { motion, MotionConfig } from "framer-motion";
 import pkg from "../../../package.json";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
 import { SEO } from "@/components/shared/SEO";
-import { PageHeader, BackButton, Section, stagger, rise } from "@/components/shared/PageChrome";
+import { PageHeader, Section, stagger, rise } from "@/components/shared/PageChrome";
 
 const features = [
   {
@@ -108,8 +108,6 @@ export default function AboutZenifyPage() {
             Version {pkg.version}
           </motion.p>
         </motion.main>
-
-        <BackButton />
       </div>
     </MotionConfig>
   );

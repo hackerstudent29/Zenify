@@ -4,7 +4,7 @@ import { SEO } from "@/components/shared/SEO";
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { 
-  Play, Pause, Shuffle, ArrowLeft, Search, Music, Sparkles, 
+  Play, Pause, Shuffle, Search, Music, Sparkles, 
   TrendingUp, Clock, User, Disc, Layers, Grid, List, Plus
 } from "lucide-react";
 import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
@@ -240,13 +240,6 @@ export default function SectionPage() {
       {/* Dynamic Header Banner */}
       <div className="pt-4 sm:pt-8 md:pt-12 px-4 md:px-8 max-w-7xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => router.back()}
-            className="w-9 h-9 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
-            title="Go Back"
-          >
-            <ArrowLeft size={16} />
-          </button>
           <span className="text-[11px] font-bold tracking-widest uppercase bg-brand/10 text-brand border border-brand/20 px-3 py-1 rounded-full flex items-center gap-1.5">
             <IconComponent size={12} /> {sectionInfo.badge}
           </span>

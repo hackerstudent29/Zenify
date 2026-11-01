@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import pkg from "../../../package.json";
 import { SEO } from "@/components/shared/SEO";
-import { PageHeader, BackButton, Section, Chevron, stagger, rise, spring } from "@/components/shared/PageChrome";
+import { PageHeader, Section, Chevron, stagger, rise, spring } from "@/components/shared/PageChrome";
 import "@fontsource/zalando-sans-semiexpanded/latin-400.css";
 import "@fontsource/zalando-sans-semiexpanded/latin-500.css";
 import "@fontsource/zalando-sans-semiexpanded/latin-700.css";
@@ -212,8 +212,6 @@ export default function AboutPage() {
             Version {pkg.version}
           </motion.p>
         </motion.main>
-
-        <BackButton />
       </div>
     </MotionConfig>
   );

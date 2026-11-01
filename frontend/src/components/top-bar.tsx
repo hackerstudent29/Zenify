@@ -41,25 +41,30 @@ export function TopBar() {
 
   return (
     <div className="h-full px-4 md:px-6 flex items-center justify-between gap-6 relative pt-[env(safe-area-inset-top,0px)]">
-      {/* Left side: Navigation / Logo + Spotlight Search + Sticky Title */}
-      <div className="flex items-center gap-3 shrink-0">
-        {/* Mobile Left Section */}
-        {isMobile &&
-          (pathname === "/" ? (
-            <div
-              className="flex items-center gap-2 group cursor-pointer shrink-0"
-              onClick={() => router.push("/")}
-            >
-              <ZenifyLogo size={48} />
-            </div>
-          ) : (
-            <button
-              onClick={() => router.back()}
-              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 text-muted hover:text-foreground active:scale-95 transition-all"
-            >
-              <ChevronLeft size={20} />
-            </button>
-          ))}
+      {/* Left side: Navigation / Logo + Universal Back Button + Spotlight Search + Sticky Title */}
+      <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
+        {/* Mobile Logo on Home */}
+        {isMobile && pathname === "/" && (
+          <div
+            className="flex items-center gap-2 group cursor-pointer shrink-0"
+            onClick={() => router.push("/")}
+          >
+            <ZenifyLogo size={48} />
+          </div>
+        )}
+
+        {/* Universal Back Button beside search (desktop, tablet, mobile) */}
+        {pathname !== "/" && (
+          <button
+            type="button"
+            onClick={() => router.back()}
+            aria-label="Go back"
+            title="Go back"
+            className="sp-glass-btn group"
+          >
+            <ChevronLeft size={18} strokeWidth={2.5} className="text-white/80 transition-transform group-hover:-translate-x-0.5" />
+          </button>
+        )}
 
         {/* Section K: Single Spotlight Search button on the left of header */}
         <HeaderSearchButton />

@@ -1,11 +1,8 @@
 import React from 'react';
-import { FileText, Music, AlertCircle, Scale, CheckCircle2, ChevronLeft } from 'lucide-react';
+import { FileText, Music, AlertCircle, Scale, CheckCircle2 } from 'lucide-react';
 import { SEO } from '@/components/shared/SEO';
-import { useRouter } from 'next/navigation';
 
 export default function TermsPage() {
-  const router = useRouter();
-
   return (
     <>
       <SEO
@@ -14,16 +11,6 @@ export default function TermsPage() {
         path="/terms"
       />
       <div className="max-w-4xl mx-auto px-6 py-12 text-zinc-300">
-        <div className="mb-8">
-          <button
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold uppercase tracking-wider text-zinc-400 hover:text-white transition-all active:scale-95 cursor-pointer"
-          >
-            <ChevronLeft size={14} />
-            <span>Back</span>
-          </button>
-        </div>
-
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
             <FileText className="w-5 h-5" />

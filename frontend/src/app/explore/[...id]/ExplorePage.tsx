@@ -85,12 +85,6 @@ export default function ExploreSectionPage() {
     <div className="min-h-screen bg-[#0A0A0C] pb-32">
       {/* Header */}
       <div className="relative md:sticky md:top-0 z-30 bg-[#0A0A0C]/80 backdrop-blur-xl border-b border-white/5 px-6 py-5 flex items-center gap-4">
-        <button
-          onClick={() => router.back()}
-          className="p-2.5 rounded-full bg-white/5 active:scale-90 transition-all text-white/70 hover:text-white"
-        >
-          <ChevronLeft size={20} />
-        </button>
         <h1 className="text-xl md:text-2xl font-brand font-bold text-white tracking-tight">{title}</h1>
       </div>
 

@@ -25,7 +25,7 @@ export const rise: Variants = {
 export function PageHeader({
   title,
   leading,
-  showBack = true,
+  showBack = false,
 }: {
   title: string;
   leading?: ReactNode;
@@ -55,25 +55,11 @@ export function PageHeader({
 }
 
 /**
- * Clean inline Back control that never overlaps fixed sidebars or bottom player bars.
+ * Universal back button lives in TopBar beside search.
+ * This component is kept as a no-op placeholder for backwards compatibility.
  */
-export function BackButton({ className }: { className?: string }) {
-  const router = useRouter();
-  return (
-    <div className={cn("mx-auto max-w-2xl px-5 pt-8", className)}>
-      <motion.button
-        type="button"
-        onClick={() => router.back()}
-        aria-label="Go back"
-        whileTap={{ scale: 0.94 }}
-        transition={spring}
-        className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/80 backdrop-blur-2xl transition-all hover:bg-white/20 hover:text-white"
-      >
-        <ChevronLeft size={15} />
-        <span>Back</span>
-      </motion.button>
-    </div>
-  );
+export function BackButton({ className: _className }: { className?: string } = {}) {
+  return null;
 }
 
 /** Titled group: small label, then rows separated by hairlines. */
