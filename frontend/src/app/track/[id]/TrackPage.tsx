@@ -1,42 +1,25 @@
 "use client";
 
 /**
- * TrackPage — Apple Music album-page style
+ * TrackPage — Apple Music song/album-page style
  *
- * Layout mirrors AlbumPage:
- *  • Large artwork left, metadata right (md+), stacked on mobile
- *  • Play pill + Shuffle pill + icon buttons (Like, Lyrics, More)
- *  • Tracklist below divider
- *  • Footer meta (date, length, copyright)
- *  • Bottom sections: "More by [Artist]" + "You Might Also Like" carousels
- *    with artist-page–sized round artwork cards
+ * Mobile  (<640)   : centered artwork → title → artist → meta → action row → list
+ * Tablet  (640–767): same stack, larger artwork
+ * md+     (768+)   : artwork left, metadata + actions right (bottom-aligned)
+ *
+ * • Song row is minimal: index / play · title + artist · duration (tap row to play).
+ *   No album name and no three-dot menu inside the list.
+ * • The three-dot menu and all other actions live only in the hero.
+ * • "More by [Artist]" and "You Might Also Like" carousels are unchanged in content.
  */
 
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import {
-  Play,
-  Pause,
-  Disc3,
-  Check,
-  X,
-  Shuffle,
-  ScrollText,
-  ChevronLeft,
-  ChevronRight,
-  ExternalLink,
-} from "lucide-react";
-import {
-  SwiftUIHeart,
-  SwiftUIPlay,
-  SwiftUIPause,
-  SwiftUIShuffle,
-  SwiftUILyrics,
-  SwiftUIEllipsis,
-} from "@/components/ui/SwiftUIIcons";
+import { Play, Pause, Disc3, Check, X, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { SwiftUILyrics } from "@/components/ui/SwiftUIIcons";
 
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -46,78 +29,25 @@ import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
-import { MediaCard, MEDIA_CARD_WIDTH } from "@/components/shared/MediaCard";
 import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
-import { getMediaUrl, cn, formatDisplayTitle, decodeHtmlEntities, getArtistTarget, getArtistProfileImage } from "@/lib/utils";
+import {
+  getMediaUrl,
+  cn,
+  formatDisplayTitle,
+  decodeHtmlEntities,
+  getArtistTarget,
+  getArtistProfileImage,
+} from "@/lib/utils";
+
+/**
+ * If your MediaActionButtons does NOT already render the three-dot menu itself,
+ * set this to true and the hero will render TrackActionsDropdown next to the
+ * lyrics button. Leave false if MediaActionButtons already shows the ⋯ button
+ * (avoids a duplicate).
+ */
+const RENDER_HERO_MENU_SEPARATELY = false;
 
 /* ─────────────────────────────────── Micro pieces ─────────────────────────────────── */
-
-function PillButton({
-  children,
-  onClick,
-  variant = "glass",
-  active,
-  label,
-}: {
-  children: React.ReactNode;
-  onClick: (e: React.MouseEvent) => void;
-  variant?: "solid" | "glass";
-  active?: boolean;
-  label?: string;
-}) {
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      whileTap={{ scale: 0.95 }}
-      transition={{ duration: 0.1 }}
-      className={cn(
-        "flex h-[38px] min-w-[110px] cursor-pointer items-center justify-center gap-2 rounded-full px-5 text-[14px] font-semibold tracking-[-0.01em] outline-none transition-colors",
-        variant === "solid"
-          ? "bg-white text-[var(--page,#0d1117)] shadow-md hover:bg-white/90"
-          : cn(
-              "border border-white/15 backdrop-blur-xl",
-              active
-                ? "bg-brand/20 text-brand border-brand/40"
-                : "bg-white/10 text-white hover:bg-white/[0.18]"
-            )
-      )}
-    >
-      {children}
-    </motion.button>
-  );
-}
-
-const IconCircle = React.forwardRef<
-  HTMLButtonElement,
-  {
-    children: React.ReactNode;
-    title: string;
-    active?: boolean;
-    onClick?: (e: React.MouseEvent) => void;
-  } & Omit<React.ComponentPropsWithoutRef<"button">, "onClick" | "title" | "children">
->(function IconCircle({ children, title, active, onClick, className, ...rest }, ref) {
-  return (
-    <motion.button
-      ref={ref as any}
-      type="button"
-      title={title}
-      aria-label={title}
-      onClick={onClick}
-      whileTap={{ scale: 0.9 }}
-      transition={{ duration: 0.1 }}
-      className={cn(
-        "flex size-[38px] cursor-pointer items-center justify-center rounded-full border border-white/15 bg-white/10 outline-none backdrop-blur-xl transition-colors hover:bg-white/[0.18]",
-        active ? "text-brand border-brand/40 bg-brand/20" : "text-white/80",
-        className
-      )}
-      {...(rest as any)}
-    >
-      {children}
-    </motion.button>
-  );
-});
 
 function Equalizer({ playing }: { playing: boolean }) {
   const reduce = useReducedMotion();
@@ -145,7 +75,7 @@ function Equalizer({ playing }: { playing: boolean }) {
   );
 }
 
-/* Horizontal scroll carousel — identical structure to FansAlsoLike on artist page */
+/* Horizontal scroll carousel — same structure as FansAlsoLike on the artist page */
 function HorizontalCarousel({
   title,
   seeAllHref,
@@ -171,7 +101,10 @@ function HorizontalCarousel({
     el.addEventListener("scroll", check, { passive: true });
     const ro = new ResizeObserver(check);
     ro.observe(el);
-    return () => { el.removeEventListener("scroll", check); ro.disconnect(); };
+    return () => {
+      el.removeEventListener("scroll", check);
+      ro.disconnect();
+    };
   }, [el, check]);
 
   const scroll = (dir: "left" | "right") => {
@@ -181,8 +114,8 @@ function HorizontalCarousel({
     el.scrollBy({ left: (dir === "left" ? -1 : 1) * Math.max(visible * 0.85, 240), behavior: "smooth" });
   };
 
-  const EDGE_L = "calc(var(--sb-w) + var(--row-gutter, 28px))";
-  const EDGE_R = "calc(var(--rp-w) + var(--row-gutter, 28px))";
+  const EDGE_L = "calc(var(--sb-w) + var(--row-gutter, 20px))";
+  const EDGE_R = "calc(var(--rp-w) + var(--row-gutter, 20px))";
 
   const arrowBase =
     "am-glass-chip absolute top-[calc(50%-28px)] z-30 hidden h-12 w-9 -translate-y-1/2 items-center justify-center " +
@@ -191,9 +124,9 @@ function HorizontalCarousel({
     "group-hover/carousel:opacity-100 focus-visible:opacity-100 cursor-pointer";
 
   return (
-    <div className="group/carousel mb-16 w-full select-none">
-      <div className="mb-3 flex items-end justify-between" style={{ paddingInline: "var(--row-gutter, 28px)" }}>
-        <h2 className="text-[22px] font-semibold leading-tight tracking-[-0.022em] text-white">
+    <section className="group/carousel mb-10 w-full select-none md:mb-14">
+      <div className="mb-2 flex items-end justify-between md:mb-3" style={{ paddingInline: "var(--row-gutter, 20px)" }}>
+        <h2 className="text-[19px] font-semibold leading-tight tracking-[-0.022em] text-white md:text-[22px]">
           {title}
         </h2>
         {seeAllHref && (
@@ -235,7 +168,7 @@ function HorizontalCarousel({
 
         <div
           ref={setEl}
-          className="am-layout-transition no-scrollbar flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain pb-6 pt-1"
+          className="am-layout-transition no-scrollbar flex snap-x snap-proximity gap-3 overflow-x-auto overscroll-x-contain pb-4 pt-1 sm:gap-4 md:gap-5 md:pb-6"
           style={{
             paddingLeft: EDGE_L,
             paddingRight: EDGE_R,
@@ -247,7 +180,7 @@ function HorizontalCarousel({
           {children}
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -302,17 +235,17 @@ export default function TrackPage() {
   const track = dbTrack || currentOrQueueTrack;
 
   // Stabilise the cover URL so the artwork tint effect only re-fires when the
-  // URL genuinely changes (not just because the same URL arrived from a
-  // different source). This prevents the double-flash that occurred when
-  // currentOrQueueTrack had the URL first, then dbTrack loaded with the same URL.
+  // URL genuinely changes (prevents a double-flash when currentOrQueueTrack and
+  // dbTrack deliver the same URL at different times).
   const rawCoverUrl = track ? getMediaUrl(track.coverUrl) || "/logo.png" : null;
-  const [trackCoverUrl, setTrackCoverUrl] = React.useState<string | null>(rawCoverUrl);
-  React.useEffect(() => {
+  const [trackCoverUrl, setTrackCoverUrl] = useState<string | null>(rawCoverUrl);
+  useEffect(() => {
     if (rawCoverUrl && rawCoverUrl !== "/logo.png" && rawCoverUrl !== trackCoverUrl) {
       setTrackCoverUrl(rawCoverUrl);
     } else if (rawCoverUrl && trackCoverUrl === null) {
       setTrackCoverUrl(rawCoverUrl);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawCoverUrl]);
 
   /* ─── Artist ID for related queries ─── */
@@ -346,25 +279,20 @@ export default function TrackPage() {
     staleTime: 1000 * 60 * 10,
   });
 
-  /* ─── Artwork tint — with isCancelled guard so navigating away
-       before the promise resolves never fires applyArtworkTheme after
-       resetArtworkTheme has already been called. ─── */
+  /* ─── Artwork tint (cancel guard so a late promise never re-tints after reset) ─── */
   useEffect(() => {
     if (!trackCoverUrl) return;
     let cancelled = false;
     extractArtworkAverageColor(trackCoverUrl).then((rgb) => {
       if (!cancelled && rgb) applyArtworkTheme(rgb[0], rgb[1], rgb[2]);
     });
-    // Cleanup: cancel the in-flight promise response, but do NOT call
-    // resetArtworkTheme here — that would cause a neutral flash every time
-    // the cover URL changes (e.g. when dbTrack upgrades the URL).
-    // The actual page-level reset is done on full unmount below.
-    return () => { cancelled = true; };
+    // Do NOT reset here — that would flash neutral on every URL change.
+    return () => {
+      cancelled = true;
+    };
   }, [trackCoverUrl]);
 
-  // Only reset the theme when this page actually unmounts (navigating away).
-  // Keeping this separate from the color effect prevents the "flash to neutral
-  // then re-apply" cycle that happened when the cleanup ran on every URL change.
+  // Reset the theme only when the page really unmounts.
   useEffect(() => {
     return () => resetArtworkTheme();
   }, []);
@@ -395,7 +323,7 @@ export default function TrackPage() {
     }
   }, [dbTrack, currentOrQueueTrack, isLoading, id, queryClient]);
 
-  /* ─── Push enriched metadata into player ─── */
+  /* ─── Push enriched metadata into the player ─── */
   useEffect(() => {
     if (dbTrack && currentTrack?.id === dbTrack.id) {
       const needsLyrics = !currentTrack.lyrics && dbTrack.lyrics;
@@ -410,9 +338,10 @@ export default function TrackPage() {
         });
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dbTrack?.id, dbTrack?.lyrics, dbTrack?.palette, dbTrack?.synced_lyrics, currentTrack?.id, updateCurrentTrackData]);
 
-  /* ─── Background worker ─── */
+  /* ─── Background worker events ─── */
   useEffect(() => {
     const handler = (e: any) => {
       if (e?.detail?.id === id) queryClient.invalidateQueries({ queryKey: ["track-detail", id] });
@@ -427,13 +356,21 @@ export default function TrackPage() {
   }, [track?.coverUrl, setPageCoverUrl]);
   useEffect(() => () => setPageCoverUrl(null), [setPageCoverUrl]);
 
-  /* ─── Toast ─── */
+  /* ─── Toast (timer is cleared so quick successive toasts don't cut each other off) ─── */
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
     useUIStore.getState().showToast(msg, type);
-    setTimeout(() => setToast(null), 2500);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2500);
   };
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    []
+  );
 
   /* ─── Likes ─── */
   const { data: likedTrackIds } = useQuery({
@@ -474,26 +411,27 @@ export default function TrackPage() {
   const isCurrentTrack = currentTrack?.id === id;
   const isCurrentTrackPlaying = isCurrentTrack && isPlaying;
 
-  const handlePlayTrack = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
+  /** Start this track (setTrack autoplays), keeping it in the existing queue. */
+  const startTrack = () => {
     if (!track) return;
-    if (isCurrentTrack) {
-      togglePlay();
-    } else {
-      const inQueue = queue.some((t) => t.id === track.id);
-      setTrack(track, inQueue ? queue : [...queue, track]);
-      setPlayerMinimized(false);
-    }
+    const inQueue = queue.some((t) => t.id === track.id);
+    setTrack(track, inQueue ? queue : [...queue, track]);
+    setPlayerMinimized(false);
   };
 
-  const handleShuffle = (e?: React.MouseEvent) => {
+  const handlePlayTrack = (e?: React.SyntheticEvent) => {
+    e?.stopPropagation();
+    if (!track) return;
+    if (isCurrentTrack) togglePlay();
+    else startTrack();
+  };
+
+  const handleShuffle = (e?: React.SyntheticEvent) => {
     e?.stopPropagation();
     toggleShuffle();
-    if (!isCurrentTrack && track) {
-      setTrack(track, [track]);
-      if (!isPlaying) togglePlay();
-      setPlayerMinimized(false);
-    }
+    // Shuffling a not-yet-playing song also starts it. We don't call togglePlay
+    // afterwards: setTrack already autoplays and a second toggle would pause it.
+    if (!isCurrentTrack) startTrack();
   };
 
   const handleLyricsToggle = () => setIsLyricsOpen(!isLyricsOpen);
@@ -508,7 +446,7 @@ export default function TrackPage() {
 
   if (!track)
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
         <div className="flex size-20 items-center justify-center rounded-[18px] bg-white/[0.06]">
           <Disc3 size={36} className="text-white/25" strokeWidth={1.2} />
         </div>
@@ -524,9 +462,10 @@ export default function TrackPage() {
 
   /* ─── Derived display data ─── */
   const coverUrl = trackCoverUrl || getMediaUrl(track.coverUrl) || "/logo.png";
-  const totalMins = Math.floor(track.duration / 60);
-  const totalSecs = track.duration % 60;
-  const durationStr = `${totalMins}:${String(totalSecs).padStart(2, "0")}`;
+  const durationSec = Math.max(0, Math.floor(Number(track.duration) || 0));
+  const durationStr = `${Math.floor(durationSec / 60)}:${String(durationSec % 60).padStart(2, "0")}`;
+  // Apple Music rounds the total ("1 song, 4 minutes"); never show "0 minutes".
+  const totalMins = Math.max(1, Math.round(durationSec / 60));
   const formattedTitle = formatDisplayTitle(track.title) || "";
 
   const extractMovieFromTitle = (s: string): string | null => {
@@ -539,7 +478,7 @@ export default function TrackPage() {
   const rawAlbumTitle = decodeHtmlEntities(
     (track.album?.title || (track as any).albumTitle || (track as any).collectionName || "").trim()
   );
-  const isSameAsSong = rawAlbumTitle.toLowerCase() === track.title.trim().toLowerCase();
+  const isSameAsSong = rawAlbumTitle.toLowerCase() === (track.title || "").trim().toLowerCase();
   const albumDisplay = embeddedMovie
     ? embeddedMovie
     : !isSameAsSong && rawAlbumTitle && rawAlbumTitle.toLowerCase() !== "unknown"
@@ -558,23 +497,15 @@ export default function TrackPage() {
     ? albumDisplay
     : rawAlbumId;
   const albumHref = albumTarget ? `/album/${encodeURIComponent(albumTarget)}` : undefined;
-
-  const rawLabel = (track as any).label || (track as any).publisher || (track.album as any)?.label;
-  const labelDisplay =
-    !rawLabel || ["unknown", "null"].includes(rawLabel.trim().toLowerCase()) ? "Zenify" : rawLabel;
+  const hasAlbum = !!albumDisplay && albumDisplay !== "Single";
 
   const dateSrc = track.releaseDate || track.createdAt;
-  const releaseDate = (() => {
-    try {
-      return new Date(dateSrc).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-    } catch {
-      return "";
-    }
-  })();
-  const year = (() => {
-    const y = new Date(dateSrc).getFullYear();
-    return Number.isFinite(y) ? String(y) : "";
-  })();
+  const parsedDate = dateSrc ? new Date(dateSrc) : null;
+  const validDate = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null;
+  const releaseDate = validDate
+    ? validDate.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })
+    : "";
+  const year = validDate ? String(validDate.getFullYear()) : "";
   const genre: string =
     typeof (track as any).genre === "string" ? (track as any).genre : (track as any).genre?.name || "";
 
@@ -582,16 +513,44 @@ export default function TrackPage() {
     formattedTitle.length > 40
       ? "text-[22px] sm:text-[26px] md:text-[28px]"
       : formattedTitle.length > 28
-      ? "text-[26px] sm:text-[30px] md:text-[34px]"
-      : "text-[28px] sm:text-[34px] md:text-[40px]";
+      ? "text-[24px] sm:text-[30px] md:text-[34px]"
+      : "text-[26px] sm:text-[34px] md:text-[40px]";
 
   /* Albums by the same artist (strip the current track's album) */
   const otherAlbums: any[] = (artistData?.albums || []).filter(
     (a: any) => a.id !== rawAlbumId && a.id !== (track.album?.id || track.albumId)
   );
 
-  const artistName: string =
-    track.artist?.name || (track as any).artistName || artistData?.name || "";
+  const visibleRelated: any[] = relatedArtists.filter((r: any) => r?.id && r.id !== artistId);
+
+  const artistName: string = track.artist?.name || (track as any).artistName || artistData?.name || "";
+
+  const handleLyricsButton = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isCurrentTrack) startTrack();
+    handleLyricsToggle();
+  };
+
+  /* Small meta line under the artist — built from parts so no dangling separators */
+  const metaParts: React.ReactNode[] = [];
+  if (hasAlbum) {
+    metaParts.push(
+      albumHref ? (
+        <Link key="album" href={albumHref} className="transition-colors hover:text-brand hover:underline">
+          {albumDisplay}
+        </Link>
+      ) : (
+        <span key="album">{albumDisplay}</span>
+      )
+    );
+  }
+  if (genre) metaParts.push(<span key="genre">{genre}</span>);
+  if (year) metaParts.push(<span key="year">{year}</span>);
+  metaParts.push(
+    <span key="lossless" className="font-semibold text-white/80">
+      Lossless
+    </span>
+  );
 
   return (
     <div className="relative min-h-screen w-full text-foreground">
@@ -607,22 +566,16 @@ export default function TrackPage() {
         <DynamicBackground surface="trackPage" coverUrl={coverUrl} palette={track?.palette} />
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-full px-4 pb-32 pt-4 sm:px-8 md:pt-[100px]">
-
-        {/* ── Hero: artwork + meta ── */}
+      <div className="relative z-10 mx-auto w-full max-w-full px-5 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-4 sm:px-8 sm:pt-8 md:pt-[100px]">
+        {/* ── Hero: artwork + meta + actions ── */}
         <motion.header
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-          className="flex flex-col items-center gap-6 text-center md:flex-row md:items-end md:gap-8 md:text-left mb-10 md:mb-12"
+          className="mb-8 flex flex-col items-center gap-5 text-center sm:gap-6 md:mb-10 md:flex-row md:items-end md:gap-8 md:text-left"
         >
           {/* Artwork */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="shrink-0"
-          >
+          <div className="shrink-0">
             <img
               src={coverUrl}
               alt={`Cover art for ${track.title}`}
@@ -630,21 +583,15 @@ export default function TrackPage() {
               height={340}
               fetchPriority="high"
               decoding="async"
-              className="aspect-square w-[min(280px,80vw)] sm:w-[310px] md:w-[338px] rounded-lg bg-zinc-900 object-cover shadow-2xl ring-1 ring-white/10"
+              className="aspect-square w-[min(300px,72vw)] rounded-[10px] bg-zinc-900 object-cover shadow-[0_20px_50px_rgba(0,0,0,0.5)] ring-1 ring-white/10 sm:w-[300px] md:w-[240px] lg:w-[300px] xl:w-[338px]"
             />
-          </motion.div>
+          </div>
 
           {/* Metadata stack */}
-          <div className="flex min-w-0 flex-1 flex-col items-center md:items-start">
-            {/* Song type badge */}
-            <span className="mb-2 text-[11px] font-black uppercase tracking-[0.4em] text-brand">
-              {genre || "Song"}
-            </span>
-
-            {/* Title */}
+          <div className="flex w-full min-w-0 flex-1 flex-col items-center md:items-start">
             <h1
               className={cn(
-                "w-full font-bold leading-[1.12] tracking-[-0.025em] text-white break-words line-clamp-3",
+                "line-clamp-3 w-full break-words font-bold leading-[1.12] tracking-[-0.025em] text-white",
                 titleSize
               )}
               title={formattedTitle}
@@ -652,131 +599,134 @@ export default function TrackPage() {
               {formattedTitle}
             </h1>
 
-            {/* Artist */}
-            <div className="mt-2 max-w-full text-[17px] sm:text-[20px] font-normal text-zinc-400">
+            {/* Artist — accent colour like Apple Music */}
+            <div className="mt-1.5 max-w-full text-[17px] font-medium text-brand sm:text-[20px] md:mt-2 md:text-[22px]">
               <ArtistLinks
                 track={track}
                 maxArtists={4}
-                linkClassName="text-zinc-400 hover:text-white hover:underline font-normal transition-colors"
+                linkClassName="text-brand hover:underline font-medium transition-colors"
               />
             </div>
 
-            {/* Album + year */}
-            <div className="mt-1 flex items-center gap-2 text-[13px] font-medium text-white/50 flex-wrap justify-center md:justify-start">
-              {albumDisplay && albumDisplay !== "Single" && (
-                <>
-                  {albumHref ? (
-                    <Link href={albumHref} className="hover:text-brand hover:underline transition-colors">
-                      {albumDisplay}
-                    </Link>
-                  ) : (
-                    <span>{albumDisplay}</span>
-                  )}
-                  <span>·</span>
-                </>
-              )}
-              {year && <span>{year}</span>}
-              <span>·</span>
-              <span className="text-white/80 font-semibold">Lossless</span>
+            {/* Album · genre · year · Lossless */}
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 text-[12px] font-semibold uppercase tracking-[0.04em] text-white/50 sm:text-[13px] md:justify-start">
+              {metaParts.map((part, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 && <span aria-hidden="true">·</span>}
+                  {part}
+                </React.Fragment>
+              ))}
             </div>
 
-            {/* Unified Action controls (Artist Page style) */}
-            <MediaActionButtons
-              isPlaying={isCurrentTrackPlaying}
-              onPlay={() => handlePlayTrack()}
-              isShuffled={isShuffled}
-              onShuffle={() => handleShuffle()}
-              isLiked={!!isLiked}
-              onToggleLike={() => toggleLikeMutation.mutate()}
-              extraAction={
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!isCurrentTrack && track) {
-                      setTrack(track, [track]);
-                      setPlayerMinimized(false);
-                    }
-                    handleLyricsToggle();
-                  }}
-                  className={cn(
-                    "flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/85 outline-none transition-[background-color,color,transform] duration-200 ease-out hover:bg-white/[0.18] hover:text-white active:scale-90",
-                    isLyricsOpen && "!text-brand"
-                  )}
-                  title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
-                  aria-label="View Lyrics"
-                >
-                  <SwiftUILyrics size={16} stroke="currentColor" />
-                </button>
-              }
-              track={track}
-              context="track-page"
-            />
+            {/* Action controls — the only place for play / shuffle / like / lyrics / ⋯ */}
+            <div className="mt-5 flex w-full items-center justify-center gap-2 md:mt-6 md:justify-start">
+              <MediaActionButtons
+                isPlaying={isCurrentTrackPlaying}
+                onPlay={() => handlePlayTrack()}
+                isShuffled={isCurrentTrack && isShuffled}
+                onShuffle={() => handleShuffle()}
+                isLiked={!!isLiked}
+                onToggleLike={() => toggleLikeMutation.mutate()}
+                extraAction={
+                  <button
+                    type="button"
+                    onClick={handleLyricsButton}
+                    className={cn(
+                      "flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/85 outline-none transition-colors duration-150 hover:bg-white/[0.18] hover:text-white focus-visible:ring-2 focus-visible:ring-brand",
+                      isLyricsOpen && "!text-brand"
+                    )}
+                    title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
+                    aria-label={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
+                    aria-pressed={isLyricsOpen}
+                  >
+                    <SwiftUILyrics size={16} stroke="currentColor" />
+                  </button>
+                }
+                track={track}
+                context="track-page"
+              />
+
+              {RENDER_HERO_MENU_SEPARATELY && (
+                <TrackActionsDropdown
+                  track={track}
+                  context="track-page"
+                  align="end"
+                  glass
+                  isLyricsOpen={isLyricsOpen}
+                  onLyricsToggle={handleLyricsToggle}
+                  showToast={showToast}
+                  triggerClassName="size-9 rounded-full bg-white/10 text-white/85 hover:bg-white/[0.18] hover:text-white transition-colors"
+                />
+              )}
+            </div>
           </div>
         </motion.header>
 
-        {/* ── Track list ── */}
+        {/* ── Song list (minimal: index · title/artist · duration) ── */}
         <motion.section
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.08, duration: 0.3 }}
           aria-label="Songs"
-          className="w-full mb-6"
+          className="mb-6 w-full"
         >
-          <div className="h-px bg-white/[0.08]" />
+          <div className="h-px bg-white/[0.1]" />
 
           <div
+            role="button"
+            tabIndex={0}
+            aria-label={`${isCurrentTrackPlaying ? "Pause" : "Play"} ${formattedTitle}`}
+            onClick={handlePlayTrack}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handlePlayTrack(e);
+              }
+            }}
             className={cn(
-              "group relative flex items-center gap-3 rounded-lg px-2 py-3 transition-colors",
-              isCurrentTrack ? "bg-white/[0.08]" : "hover:bg-white/[0.05]"
+              "group relative flex min-h-[56px] cursor-pointer items-center gap-3 rounded-lg px-2 py-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand sm:gap-4 sm:px-3",
+              isCurrentTrack
+                ? "bg-white/[0.08]"
+                : "[@media(hover:hover)]:hover:bg-white/[0.06] active:bg-white/[0.08]"
             )}
           >
-            {/* Index / Equalizer */}
-            <div className="w-6 shrink-0 flex items-center justify-center text-[14px] font-normal tabular-nums text-white/40">
-              {isCurrentTrackPlaying ? (
-                <Equalizer playing />
-              ) : isCurrentTrack ? (
-                <div className="w-2.5 h-2.5 rounded-full bg-brand animate-pulse" />
-              ) : (
-                <span>1</span>
-              )}
-            </div>
-
-            {/* Thumbnail with play overlay */}
-            <button
-              type="button"
-              onClick={handlePlayTrack}
-              aria-label={isCurrentTrackPlaying ? "Pause" : "Play"}
-              className="relative size-12 shrink-0 cursor-pointer overflow-hidden rounded-[6px] bg-zinc-900 outline-none ring-1 ring-white/10"
-            >
-              <img src={coverUrl} alt="" className="size-full object-cover" loading="lazy" />
+            {/* Index ⇄ equalizer ⇄ play/pause on hover */}
+            <div className="relative flex size-7 shrink-0 items-center justify-center text-[15px] tabular-nums text-white/45">
               <span
                 className={cn(
-                  "absolute inset-0 flex items-center justify-center bg-black/45 backdrop-blur-[2px] transition-opacity duration-150",
-                  isCurrentTrackPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  "absolute inset-0 flex items-center justify-center transition-opacity",
+                  "[@media(hover:hover)]:group-hover:opacity-0",
+                  isCurrentTrack && !isCurrentTrackPlaying && "font-semibold text-brand"
                 )}
               >
+                {isCurrentTrackPlaying ? <Equalizer playing /> : "1"}
+              </span>
+              <span
+                className="absolute inset-0 hidden items-center justify-center text-white opacity-0 transition-opacity [@media(hover:hover)]:flex [@media(hover:hover)]:group-hover:opacity-100"
+                aria-hidden="true"
+              >
                 {isCurrentTrackPlaying ? (
-                  <Pause size={15} className="fill-white text-white" />
+                  <Pause size={16} className="fill-current" />
                 ) : (
-                  <Play size={15} className="ml-0.5 fill-white text-white" />
+                  <Play size={16} className="ml-0.5 fill-current" />
                 )}
               </span>
-            </button>
+            </div>
 
             {/* Title + artist */}
             <div className="flex min-w-0 flex-1 flex-col">
-              <button onClick={handlePlayTrack} className="w-fit max-w-full cursor-pointer text-left outline-none">
-                <span
-                  className={cn(
-                    "block truncate text-[15px] font-medium tracking-[-0.01em]",
-                    isCurrentTrack ? "text-brand font-semibold" : "text-white"
-                  )}
-                >
-                  {formattedTitle}
-                </span>
-              </button>
-              <div className="truncate text-[13px] text-white/50 mt-0.5">
+              <span
+                className={cn(
+                  "block truncate text-[16px] font-medium tracking-[-0.01em] sm:text-[15px]",
+                  isCurrentTrack ? "font-semibold text-brand" : "text-white"
+                )}
+              >
+                {formattedTitle}
+              </span>
+              <div
+                className="mt-0.5 truncate text-[13px] text-white/50"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <ArtistLinks
                   track={track}
                   maxArtists={3}
@@ -785,36 +735,13 @@ export default function TrackPage() {
               </div>
             </div>
 
-            {/* Album — shown md+ */}
-            <div className="hidden min-w-0 basis-[30%] truncate text-[13px] text-white/45 md:block">
-              {albumHref ? (
-                <Link href={albumHref} className="hover:text-white hover:underline transition-colors">
-                  {albumDisplay}
-                </Link>
-              ) : (
-                <span>{albumDisplay}</span>
-              )}
-            </div>
-
             {/* Duration */}
-            <span className="w-10 shrink-0 text-right text-[13px] tabular-nums text-white/45">
+            <span className="w-11 shrink-0 text-right text-[13px] tabular-nums text-white/45">
               {durationStr}
             </span>
-
-            {/* Row menu */}
-            <TrackActionsDropdown
-              track={track}
-              context="track-page"
-              align="end"
-              glass
-              isLyricsOpen={isLyricsOpen}
-              onLyricsToggle={handleLyricsToggle}
-              showToast={showToast}
-              triggerClassName="size-8 rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-            />
           </div>
 
-          <div className="h-px bg-white/[0.08]" />
+          <div className="h-px bg-white/[0.1]" />
         </motion.section>
 
         {/* ── Footer metadata ── */}
@@ -822,17 +749,21 @@ export default function TrackPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.12, duration: 0.3 }}
-          className="mb-14 space-y-0.5 text-[13px] leading-relaxed text-white/50"
+          className="mb-10 space-y-0.5 px-2 text-[12px] leading-relaxed text-white/50 sm:px-3 sm:text-[13px] md:mb-14"
         >
           {releaseDate && <p className="font-semibold text-white/70">{releaseDate}</p>}
-          <p>1 song, {totalMins} minute{totalMins !== 1 ? "s" : ""}</p>
-          <p>℗ {year} {artistName || <span className="font-zenify">zenify</span>}</p>
+          <p>
+            1 song, {totalMins} minute{totalMins !== 1 ? "s" : ""}
+          </p>
+          <p>
+            ℗ {year} {artistName || <span className="font-zenify">zenify</span>}
+          </p>
           <div className="pt-2">
             <a
               href={`https://music.apple.com/search?term=${encodeURIComponent(formattedTitle + " " + artistName)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs text-brand hover:underline font-medium"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
             >
               <span>Also available on Apple Music</span>
               <ExternalLink size={12} />
@@ -851,70 +782,70 @@ export default function TrackPage() {
               title={`More by ${artistName}`}
               seeAllHref={artistId ? `/artist/${artistId}` : getArtistTarget(track) || undefined}
             >
-              {otherAlbums.map((alb: any) => (
-                <Link
-                  key={alb.id}
-                  href={`/album/${alb.id}`}
-                  className="group w-[150px] sm:w-[165px] md:w-[180px] shrink-0 flex flex-col gap-2 rounded-lg p-1.5 hover:bg-white/5 transition-all"
-                  style={{ scrollSnapAlign: "start" }}
-                >
-                  <div className="w-full aspect-square rounded-[8px] overflow-hidden bg-white/[0.06] shadow-[0_2px_10px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10">
-                    <img
-                      src={getMediaUrl(alb.coverUrl) || "/logo.png"}
-                      alt={alb.title || "Album"}
-                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                      loading="lazy"
-                    />
-                  </div>
-                  <p className="text-[14px] font-medium text-white truncate leading-tight group-hover:text-brand transition-colors">
-                    {alb.title}
-                  </p>
-                  <p className="text-[12px] text-white/50">
-                    {alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : "Album"}
-                  </p>
-                </Link>
-              ))}
+              {otherAlbums.map((alb: any) => {
+                const albYear = alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : null;
+                return (
+                  <Link
+                    key={alb.id}
+                    href={`/album/${alb.id}`}
+                    className="group flex w-[140px] shrink-0 flex-col gap-2 rounded-lg p-1.5 transition-all sm:w-[160px] md:w-[180px] [@media(hover:hover)]:hover:bg-white/5"
+                    style={{ scrollSnapAlign: "start" }}
+                  >
+                    <div className="aspect-square w-full overflow-hidden rounded-[8px] bg-white/[0.06] shadow-[0_2px_10px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10">
+                      <img
+                        src={getMediaUrl(alb.coverUrl) || "/logo.png"}
+                        alt={alb.title || "Album"}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                        loading="lazy"
+                      />
+                    </div>
+                    <p className="truncate text-[14px] font-medium leading-tight text-white transition-colors group-hover:text-brand">
+                      {alb.title}
+                    </p>
+                    <p className="text-[12px] text-white/50">
+                      {albYear && Number.isFinite(albYear) ? albYear : "Album"}
+                    </p>
+                  </Link>
+                );
+              })}
             </HorizontalCarousel>
           </motion.div>
         )}
 
-        {/* ── You Might Also Like (related artists) — artist-page–sized round cards ── */}
-        {relatedArtists.length > 0 && (
+        {/* ── You Might Also Like (related artists) — round artwork cards ── */}
+        {visibleRelated.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22, duration: 0.3 }}
           >
             <HorizontalCarousel title="You Might Also Like">
-              {relatedArtists.map((rel: any) => (
+              {visibleRelated.map((rel: any) => (
                 <Link
                   key={rel.id}
                   href={`/artist/${rel.id}`}
-                  className="group shrink-0 flex flex-col items-center text-center gap-3 rounded-lg p-2 hover:bg-white/5 transition-all"
+                  className="group flex shrink-0 flex-col items-center gap-3 rounded-lg p-2 text-center transition-all [@media(hover:hover)]:hover:bg-white/5"
                   style={{
                     width: "calc(var(--artist-card-w, 140px))",
                     scrollSnapAlign: "start",
                   }}
                 >
-                  {/* Round artwork — same proportions as artist-page circular portraits */}
                   <div
-                    className="w-full aspect-square rounded-full overflow-hidden bg-zinc-800 ring-1 ring-inset ring-white/10 shadow-xl shadow-black/40 group-hover:ring-2 group-hover:ring-brand/50 transition-all duration-300"
+                    className="aspect-square overflow-hidden rounded-full bg-zinc-800 shadow-xl shadow-black/40 ring-1 ring-inset ring-white/10 transition-all duration-300 group-hover:ring-2 group-hover:ring-brand/50"
                     style={{ width: "min(128px, 100%)", height: "min(128px, 100%)" }}
                   >
                     <img
                       src={getArtistProfileImage(rel)}
                       alt={rel.name || "Artist"}
-                      className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-300"
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                       loading="lazy"
                     />
                   </div>
-                  <div>
-                    <p className="text-[14px] font-semibold text-white truncate group-hover:text-brand transition-colors w-[120px]">
+                  <div className="w-full min-w-0">
+                    <p className="mx-auto w-full max-w-[120px] truncate text-[14px] font-semibold text-white transition-colors group-hover:text-brand">
                       {rel.name}
                     </p>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-white/45 mt-0.5">
-                      Artist
-                    </p>
+                    <p className="mt-0.5 text-[11px] font-bold uppercase tracking-widest text-white/45">Artist</p>
                   </div>
                 </Link>
               ))}
@@ -931,17 +862,18 @@ export default function TrackPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.18 }}
-            className="fixed bottom-24 left-1/2 z-[9999] flex -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-xl border border-white/[0.14] bg-[#242426]/85 py-2.5 pl-3 pr-4 text-[13.5px] font-medium text-white shadow-[0_16px_40px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
+            role="status"
+            className="fixed bottom-28 left-1/2 z-[9999] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2.5 whitespace-nowrap rounded-xl border border-white/[0.14] bg-[#242426]/85 py-2.5 pl-3 pr-4 text-[13.5px] font-medium text-white shadow-[0_16px_40px_rgba(0,0,0,0.5)] backdrop-blur-2xl md:bottom-24"
           >
             <span
               className={cn(
-                "flex size-5 items-center justify-center rounded-full",
+                "flex size-5 shrink-0 items-center justify-center rounded-full",
                 toast.type === "error" ? "bg-red-500/25 text-red-400" : "bg-emerald-500/25 text-emerald-400"
               )}
             >
               {toast.type === "success" ? <Check size={12} strokeWidth={3} /> : <X size={12} strokeWidth={3} />}
             </span>
-            {toast.msg}
+            <span className="truncate">{toast.msg}</span>
           </motion.div>
         )}
       </AnimatePresence>

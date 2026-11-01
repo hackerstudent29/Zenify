@@ -13,14 +13,7 @@ import { cn, getMediaUrl, formatDisplayTitle, getArtistProfileImage, CANONICAL_A
 import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { SEO } from "@/components/shared/SEO";
-import {
-  SwiftUIPlay,
-  SwiftUIPause,
-  SwiftUIShuffle,
-  SwiftUIEllipsis,
-  SwiftUIHeart,
-  SwiftUIInfo,
-} from "@/components/ui/SwiftUIIcons";
+import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 
 import { JioSaavnSongTable } from "./components/JioSaavnSongTable";
@@ -350,11 +343,6 @@ export default function ArtistPage() {
     }
   };
 
-  const pillBtn =
-    "flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold tracking-[-0.01em] outline-none transition-[background-color,color,transform] duration-200 ease-out active:scale-[0.96]";
-  const iconBtn =
-    "flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/85 outline-none transition-[background-color,color,transform] duration-200 ease-out hover:bg-white/[0.18] hover:text-white active:scale-90";
-
   const heroAvatarSrc = getMediaUrl(heroImageUrl || avatarUrl) || "/images/placeholder.png";
 
   return (
@@ -393,62 +381,18 @@ export default function ArtistPage() {
             </h1>
 
             {/* Actions */}
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-              <button
-                onClick={handlePlayTopTracks}
-                className={cn(pillBtn, "min-w-[96px] bg-white text-black hover:bg-white/90")}
-                aria-label={isPlaying && isArtistActive ? "Pause" : "Play"}
-              >
-                {isPlaying && isArtistActive ? (
-                  <SwiftUIPause size={14} fill="black" />
-                ) : (
-                  <SwiftUIPlay size={14} fill="black" />
-                )}
-                {isPlaying && isArtistActive ? "Pause" : "Play"}
-              </button>
-
-              <button
-                onClick={handleShufflePlay}
-                aria-pressed={isShuffled}
-                className={cn(
-                  pillBtn,
-                  "bg-white/10 hover:bg-white/[0.18]",
-                  isShuffled ? "text-brand" : "text-white"
-                )}
-              >
-                <SwiftUIShuffle size={14} stroke="currentColor" />
-                Shuffle
-              </button>
-
-              <button onClick={() => setIsBioOpen(true)} className={iconBtn} title="About" aria-label="About artist">
-                <Info size={16} strokeWidth={2} />
-              </button>
-
-              <button
-                onClick={() => setIsFavorited(!isFavorited)}
-                className={cn(iconBtn, isFavorited && "!text-brand")}
-                title={isFavorited ? "Favorited" : "Favorite"}
-                aria-label="Favorite artist"
-                aria-pressed={isFavorited}
-              >
-                <SwiftUIHeart
-                  size={17}
-                  filled={isFavorited}
-                  className={cn(isFavorited ? "text-brand" : "text-white/85")}
-                />
-              </button>
-
-              <TrackActionsDropdown
-                track={artist}
-                context="artist"
-                align="end"
-                trigger={
-                  <button className={iconBtn} title="More" aria-label="More options">
-                    <SwiftUIEllipsis size={16} fill="currentColor" />
-                  </button>
-                }
-              />
-            </div>
+            <MediaActionButtons
+              isPlaying={isPlaying && isArtistActive}
+              onPlay={handlePlayTopTracks}
+              isShuffled={isArtistActive && isShuffled}
+              onShuffle={handleShufflePlay}
+              onInfo={() => setIsBioOpen(true)}
+              isLiked={isFavorited}
+              onToggleLike={() => setIsFavorited(!isFavorited)}
+              track={artist}
+              context="artist"
+              className="mt-4"
+            />
           </div>
         </div>
       </motion.div>

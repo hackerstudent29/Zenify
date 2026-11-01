@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import {
   SwiftUIHeart,
-  SwiftUIArtist,
   SwiftUIHome,
   SwiftUICompass,
   SwiftUIPlaylists,
@@ -351,17 +350,10 @@ export function Sidebar() {
                 </div>
 
                 <NavLink
-                  href="/library?tab=liked"
+                  href="/liked"
                   icon={SwiftUIHeart}
                   label="Liked Songs"
-                  active={pathname.startsWith("/library") && activeTab === "liked"}
-                  collapsed={collapsed}
-                />
-                <NavLink
-                  href="/library?tab=artists"
-                  icon={SwiftUIArtist}
-                  label="Artists"
-                  active={pathname.startsWith("/library") && activeTab === "artists"}
+                  active={pathname === "/liked" || pathname.startsWith("/liked")}
                   collapsed={collapsed}
                 />
                 <NavLink

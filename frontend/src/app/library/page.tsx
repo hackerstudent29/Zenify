@@ -43,11 +43,9 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { MobileLibraryPage } from "@/components/mobile/MobileLibraryPage";
 
 const categories = [
- { id: "overview", label: "Overview", icon: LayoutDashboard },
- { id: "playlists", label: "Playlists", icon: Library },
- { id: "albums", label: "Albums", icon: Disc },
- { id: "liked", label: "Liked Songs", icon: SwiftUIHeart },
- { id: "artists", label: "Artists", icon: User },
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "playlists", label: "Playlists", icon: Library },
+  { id: "albums", label: "Albums", icon: Disc },
 ];
 
 export default function LibraryPage() {
@@ -111,14 +109,23 @@ export default function LibraryPage() {
  }
  }, []);
 
+ // Redirect legacy tabs to dedicated /liked page
+ useEffect(() => {
+   if (tabParam === "liked") {
+     router.replace("/liked");
+   } else if (tabParam === "artists") {
+     router.replace("/liked?section=artists");
+   }
+ }, [tabParam, router]);
+
  // Sync tab with URL
  useEffect(() => {
- if (tabParam && tabParam !== activeTab) {
+ if (tabParam && tabParam !== activeTab && tabParam !== "liked" && tabParam !== "artists") {
  setActiveTab(tabParam);
  } else if (!tabParam && activeTab !== "overview") {
  setActiveTab("overview");
  }
- }, [tabParam]);
+ }, [tabParam, activeTab]);
 
  const handleTabChange = (tabId: string) => {
  setActiveTab(tabId);
@@ -715,118 +722,6 @@ export default function LibraryPage() {
  </div>
  )}
 
- {/* Liked Songs Tab */}
- {activeTab === "liked" && (
- <div>
- {isLoadingTracks ? (
- <div className="flex items-center justify-center py-20">
- <ZenLoading size="md" />
- </div>
- ) : likedTracks && likedTracks.length > 0 ? (
- <div className="flex flex-col gap-1 w-full">
- <div className="flex items-center justify-between mb-4">
- <h2 className="text-sm font-bold text-brand tracking-wide">
- {likedTracks.length} saved songs
- </h2>
- <Button
- size="sm"
- className="h-8 text-[11px] font-bold uppercase tracking-widest bg-white/10 text-brand border border-white/5 hover:bg-white/20 rounded-full shadow-lg"
- >
- <Play size={12} className="mr-1.5 fill-white" /> Play
- all
- </Button>
- </div>
- {likedTracks.map((track, i) => (
- <TrackItem
- key={track.id}
- track={track}
- index={i}
- contextTracks={likedTracks}
- />
- ))}
- </div>
- ) : (
- <div className="flex flex-col items-center justify-center py-32 text-center">
- <div className="w-20 h-20 rounded-full border border-white/10 bg-white/5 mb-6 flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.05)]">
- <SwiftUIHeart
- size={28}
- className="text-white/40"
- strokeWidth={1.5}
- />
- </div>
- <h3 className="text-lg font-bold text-white mb-2 tracking-tight">
- No liked songs yet
- </h3>
- <p className="text-xs text-muted max-w-xs mb-8">
- Tap the heart on any track to add it to your Liked Songs.
- </p>
- <Button
- variant="outline"
- onClick={() => router.push("/search")}
- className="font-bold uppercase tracking-wider text-xs border-white/10 hover:bg-white/5 text-foreground"
- >
- Discover Music
- </Button>
- </div>
- )}
- </div>
- )}
-
- {/* Artists Tab */}
- {activeTab === "artists" && (
- <div className="space-y-8">
- {isLoadingOverview || isLoadingAllArtists ? (
- <div className="flex items-center justify-center py-20">
- <ZenLoading size="md" />
- </div>
- ) : (overview?.topArtists?.length > 0 || (allArtists && allArtists.length > 0)) ? (
- <div className="space-y-12">
- {/* User's Listened Artists */}
- {overview?.topArtists?.length > 0 && (
- <section>
- <h2 className="text-xl font-sans font-bold text-white tracking-tight mb-6 flex items-center gap-2">
- Your Top Artists
- </h2>
- <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
- {overview.topArtists.map((artist: any) => (
- <ArtistCard key={artist.id} artist={artist} label="Top Artist" />
- ))}
- </div>
- </section>
- )}
-
- {/* Recommended Artists (Canonical) */}
- {allArtists && allArtists.length > 0 && (
- <section>
- <h2 className="text-xl font-sans font-bold mb-6 tracking-tight text-white/90">Recommended for you</h2>
- <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
- {(() => {
-   const seen = new Set<string>();
-   return (allArtists || []).filter((artist: any) => {
-     const base = (artist.name || '').toLowerCase().replace(/\s*&\s*.*/, '').replace(/\s*,\s*.*/, '').trim();
-     if (seen.has(base)) return false;
-     seen.add(base);
-     return true;
-   });
- })().map((artist: any) => (
- <ArtistCard key={artist.id} artist={artist} label="Verified" />
- ))}
- </div>
- </section>
- )}
- </div>
- ) : (
- <div className="flex flex-col items-center justify-center py-32 text-center">
- <div className="w-20 h-20 rounded-full border border-white/5 bg-white/5 mb-6 flex items-center justify-center">
- <User size={28} className="text-zinc-600" strokeWidth={1.5} />
- </div>
- <h3 className="text-lg font-bold text-white mb-2 tracking-tight">No artists found</h3>
- <p className="text-xs text-muted max-w-xs mb-8">Start listening to your favorite artists to see them here.</p>
- <Button onClick={() => router.push('/search')} className="font-bold uppercase tracking-wider text-xs bg-white/10 text-brand border border-white/5 hover:bg-white/20">Find Artists</Button>
- </div>
- )}
- </div>
- )}
  </motion.div>
  </AnimatePresence>
  </div>
@@ -843,32 +738,5 @@ export default function LibraryPage() {
  />
  )}
  </div>
- );
-}
-
-// Artist Card Component for cleaner reuse
-function ArtistCard({ artist, label }: { artist: any; label: string }) {
- return (
- <Link
- href={`/artist/${artist.id}`}
- className="group flex flex-col items-center text-center space-y-4"
- >
- <div className="w-full aspect-square rounded-full overflow-hidden bg-white/5 border border-white/10 group- transition-all shadow-xl shadow-black/40 group-hover:ring-2 ring-brand/50">
- <ArtistPortrait 
- imageUrl={artist.imageUrl}
- name={artist.name}
- className="w-full h-full"
- size={512}
- />
- </div>
- <div>
- <h3 className="font-bold text-sm text-foreground group-hover:text-brand transition-colors line-clamp-1">
- {artist.name}
- </h3>
- <p className="text-[10px] text-zinc-500 font-bold tracking-widest mt-1 uppercase">
- {label}
- </p>
- </div>
- </Link>
  );
 }
