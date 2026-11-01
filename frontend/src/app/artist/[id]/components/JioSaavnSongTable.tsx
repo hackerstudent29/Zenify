@@ -17,21 +17,28 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
+import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { cn, getMediaUrl, formatDisplayTitle, decodeHtmlEntities } from "@/lib/utils";
 import { Equalizer } from "@/components/ui/Equalizer";
 import { SwiftUIPlay, SwiftUIPause, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 
-interface JioSaavnSongTableProps {
+export type SortKey = "popular" | "recent" | "newest" | "az";
+
+export interface JioSaavnSongTableProps {
   tracks: any[];
   currentTrackId?: string;
   isPlaying?: boolean;
   likedTrackIds?: string[];
   onPlayTrack: (track: any) => void;
   onToggleLike?: (trackId: string, e?: React.MouseEvent) => void;
+  showArtist?: boolean;
+  defaultSort?: SortKey;
+  tabs?: { key: SortKey; label: string }[];
+  pageSize?: number;
+  emptyMessage?: React.ReactNode;
 }
 
-type SortKey = "popular" | "newest" | "az";
-const TABS: { key: SortKey; label: string }[] = [
+const DEFAULT_TABS: { key: SortKey; label: string }[] = [
   { key: "popular", label: "Popular" },
   { key: "newest", label: "Newest" },
   { key: "az", label: "A–Z" },
@@ -73,9 +80,14 @@ export function JioSaavnSongTable({
   currentTrackId,
   isPlaying,
   onPlayTrack,
+  showArtist = false,
+  defaultSort = "popular",
+  tabs = DEFAULT_TABS,
+  pageSize = PAGE,
+  emptyMessage,
 }: JioSaavnSongTableProps) {
-  const [sort, setSort] = useState<SortKey>("popular");
-  const [visible, setVisible] = useState(PAGE);
+  const [sort, setSort] = useState<SortKey>(defaultSort);
+  const [visible, setVisible] = useState(pageSize);
 
   const sorted = useMemo(() => {
     const list = [...(tracks || [])];
@@ -89,10 +101,20 @@ export function JioSaavnSongTable({
       const t = (x: any) => new Date(x?.releaseDate || x?.createdAt || 0).getTime() || 0;
       list.sort((a, b) => t(b) - t(a));
     }
+    // "popular" or "recent" keeps default list order (or caller's pre-sorted order)
     return list;
   }, [tracks, sort]);
 
-  if (!sorted.length) return null;
+  if (!sorted.length) {
+    if (emptyMessage) {
+      return (
+        <section aria-label="Songs" className="w-full py-8 text-center text-white/50">
+          {emptyMessage}
+        </section>
+      );
+    }
+    return null;
+  }
 
   const shown = sorted.slice(0, visible);
 
@@ -100,12 +122,12 @@ export function JioSaavnSongTable({
     <section aria-label="Top songs" className="w-full">
       {/* Tabs */}
       <div className="mb-3 inline-flex rounded-lg bg-white/[0.06] p-[3px]">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => {
               setSort(t.key);
-              setVisible(PAGE);
+              setVisible(pageSize);
             }}
             className={cn(
               "cursor-pointer rounded-md px-3.5 py-1.5 text-[13px] font-semibold outline-none transition-colors duration-200",
@@ -173,14 +195,28 @@ export function JioSaavnSongTable({
                   draggable={false}
                   className="size-11 shrink-0 rounded-md bg-zinc-800 object-cover ring-1 ring-white/10"
                 />
-                <span
-                  className={cn(
-                    "truncate text-[15px] font-medium tracking-[-0.01em]",
-                    active ? "text-brand" : "text-white"
+                <div className="flex flex-col min-w-0">
+                  <span
+                    className={cn(
+                      "truncate text-[15px] font-medium tracking-[-0.01em]",
+                      active ? "text-brand" : "text-white"
+                    )}
+                  >
+                    {formatDisplayTitle(track.title)}
+                  </span>
+                  {showArtist && (
+                    <span
+                      className="truncate text-[12px] text-white/50"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ArtistLinks
+                        track={track}
+                        maxArtists={2}
+                        linkClassName="text-white/50 hover:text-white hover:underline transition-colors"
+                      />
+                    </span>
                   )}
-                >
-                  {formatDisplayTitle(track.title)}
-                </span>
+                </div>
               </div>
 
               {/* Album (link) */}
