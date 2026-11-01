@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, MoreHorizontal, ShoppingCart, Plus, Download } from "lucide-react";
+import { Play, Pause, ShoppingCart, Plus, Download } from "lucide-react";
 import { Equalizer } from "@/components/ui/Equalizer";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";

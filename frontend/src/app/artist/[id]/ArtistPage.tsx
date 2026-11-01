@@ -21,7 +21,7 @@ import {
   SwiftUIHeart,
   SwiftUIInfo,
 } from "@/components/ui/SwiftUIIcons";
-import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 
 import { JioSaavnSongTable } from "./components/JioSaavnSongTable";
 import { JioSaavnCardSection } from "./components/JioSaavnCardSection";
@@ -438,7 +438,9 @@ export default function ArtistPage() {
                 />
               </button>
 
-              <AnimatedDropdown
+              <TrackActionsDropdown
+                track={artist}
+                context="artist"
                 align="end"
                 trigger={
                   <button className={iconBtn} title="More" aria-label="More options">

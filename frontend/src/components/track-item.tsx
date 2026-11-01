@@ -1,8 +1,8 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Plus, Pause, Download, Check, X, User, Music, Mic, RefreshCw, ListPlus } from "lucide-react";
-import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
+import { Play, Plus, Pause, Download, Check, X, User, Music, Mic, RefreshCw, ListPlus } from "lucide-react";
+import { SwiftUIHeart, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -213,16 +213,15 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
      align="end"
      trigger={
        <motion.button
-         whileTap={{ scale: 0.7, rotate: 90 }}
-         whileHover={{ scale: 1.15 }}
-         transition={{ type: "spring", stiffness: 400, damping: 17 }}
-         className="p-2 text-muted hover:text-foreground transition-colors outline-none rounded-full"
-         onClick={(e) => e.stopPropagation()}
-         title="More options"
-         aria-label="More options"
-       >
-         <MoreHorizontal size={14} />
-       </motion.button>
+          whileTap={{ scale: 0.7 }}
+          whileHover={{ scale: 1.15 }}
+          transition={{ type: "spring", stiffness: 400, damping: 17 }}
+          className="p-2 text-muted hover:text-foreground transition-colors outline-none rounded-full cursor-pointer"
+          title="More options"
+          aria-label="More options"
+        >
+          <SwiftUIEllipsis size={14} fill="currentColor" />
+        </motion.button>
      }
    />
  </div>

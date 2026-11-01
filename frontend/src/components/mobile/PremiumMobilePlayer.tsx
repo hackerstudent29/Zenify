@@ -18,6 +18,7 @@ import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
 import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { SwiftUIForward, SwiftUIBackward, SwiftUIQueue } from "@/components/ui/SwiftUIIcons";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
@@ -307,46 +308,15 @@ function TrackMenu({ track, onLeave }: { track: any; onLeave: (to: string) => vo
     useUIStore.getState().showToast(msg, type);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <TrackActionsDropdown
+      track={track}
+      align="end"
+      trigger={
         <GlassButton title="More">
           <SFMore size={18} />
         </GlassButton>
-      </DropdownMenuTrigger>
-      <DropdownMenuPortal>
-        <DropdownMenuContent
-          align="end"
-          sideOffset={8}
-          className="z-[1200] w-56 rounded-2xl border-white/10 bg-zinc-900/90 p-2 backdrop-blur-xl"
-        >
-          <DropdownMenuItem onSelect={() => usePlayerStore.getState().addToUserQueue(track)}>
-            <ListPlus size={18} className="mr-3 text-brand opacity-50" />
-            <span className="font-medium">Add to Queue</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => refetchTrackAudio(track, showToast)}>
-            <RefreshCw
-              size={18}
-              className={cn("mr-3 opacity-50", isRefetching === track?.id && "animate-spin text-brand")}
-            />
-            <span className="font-medium">{isRefetching === track?.id ? "Refetching…" : "Refetch Audio"}</span>
-          </DropdownMenuItem>
-          <RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
-          <DropdownMenuItem
-            onSelect={() => {
-              const t = getArtistTarget(track);
-              if (t) onLeave(t);
-            }}
-          >
-            <User size={18} className="mr-3 opacity-50" />
-            <span className="font-medium">Go to Artist</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => openDownloadModal(track)}>
-            <Download size={18} className="mr-3 opacity-50" />
-            <span className="font-medium">Download Track</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenuPortal>
-    </DropdownMenu>
+      }
+    />
   );
 }
 

@@ -5,13 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
-import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import {
   Play,
   Pause,
   Shuffle,
-  MoreHorizontal,
   Share2,
   Plus,
   Download,

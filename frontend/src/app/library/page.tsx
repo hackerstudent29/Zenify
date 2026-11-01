@@ -12,13 +12,13 @@ import {
  Music,
  Play,
   LayoutDashboard,
-  MoreHorizontal,
   ListPlus,
   Trash2,
   Share2,
   Edit2
 } from "lucide-react";
-import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
+import { SwiftUIHeart, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Button } from "@/components/ui/button";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -415,7 +415,7 @@ export default function LibraryPage() {
  </p>
  </div>
  <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
- <AnimatedDropdown
+ <TrackActionsDropdown
  align="end"
  trigger={
  <button 
@@ -423,7 +423,7 @@ export default function LibraryPage() {
  className="w-7 h-7 rounded-lg text-white/40 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
  title="Playlist options"
  >
- <MoreHorizontal size={15} />
+ <SwiftUIEllipsis size={15} fill="currentColor" />
  </button>
  }
  items={[
@@ -552,7 +552,7 @@ export default function LibraryPage() {
  </p>
  </div>
  <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
- <AnimatedDropdown
+ <TrackActionsDropdown
  align="end"
  trigger={
  <button 
@@ -560,7 +560,7 @@ export default function LibraryPage() {
  className="w-7 h-7 rounded-lg text-white/40 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
  title="Playlist options"
  >
- <MoreHorizontal size={15} />
+ <SwiftUIEllipsis size={15} fill="currentColor" />
  </button>
  }
  items={[

@@ -969,8 +969,19 @@ export function GlobalAudio() {
             updated.audioUrl.startsWith('/uploads')
           );
           
-          const hasNewLyrics = updated.synced_lyrics && !currentTrack.synced_lyrics;
-          const hasNewAudio = gotR2 && (updated.audioUrl !== currentTrack.audioUrl);
+          const liveTrack = usePlayerStore.getState().currentTrack;
+          if (!liveTrack || liveTrack.id !== currentTrack.id) {
+            clearInterval(interval);
+            return;
+          }
+
+          const hasNewLyrics = Boolean(updated.synced_lyrics && !liveTrack.synced_lyrics);
+          const hasNewAudio = Boolean(gotR2 && updated.audioUrl && updated.audioUrl !== liveTrack.audioUrl);
+
+          if (!hasNewAudio && !hasNewLyrics) {
+            clearInterval(interval);
+            return;
+          }
 
           if (hasNewAudio || hasNewLyrics) {
             console.log(`[GlobalAudio] Detected background update for track "${currentTrack.title}". Updating player store...`);
@@ -1030,7 +1041,7 @@ export function GlobalAudio() {
             }
           }
           
-          if (gotR2 && updated.synced_lyrics) {
+          if ((gotR2 || updated.audioUrl) && (updated.synced_lyrics || liveTrack.synced_lyrics)) {
             clearInterval(interval);
           }
         }

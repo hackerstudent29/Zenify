@@ -31,7 +31,6 @@ import {
   type Variants,
 } from "framer-motion";
 import {
-  MoreHorizontal,
   Download,
   User,
   Music,
@@ -50,7 +49,7 @@ import {
   Edit2,
   Trash2,
 } from "lucide-react";
-import { SwiftUIHeart, SwiftUIShuffle } from "@/components/ui/SwiftUIIcons";
+import { SwiftUIHeart, SwiftUIShuffle, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 import { useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -1231,13 +1230,21 @@ export function TrackActionsDropdown({
       aria-haspopup="menu"
       aria-expanded={open}
     >
-      <MoreHorizontal size={size} />
+      <SwiftUIEllipsis size={size} fill="currentColor" />
     </motion.button>
   );
 
   return (
     <>
-      <span ref={anchorRef} className="inline-flex" onClick={handleTriggerClick}>
+      <span
+        ref={anchorRef}
+        className="inline-flex items-center justify-center cursor-pointer"
+        onClick={handleTriggerClick}
+        onClickCapture={handleTriggerClick}
+        onPointerDownCapture={(e) => {
+          e.stopPropagation();
+        }}
+      >
         {trigger ?? defaultTrigger}
       </span>
 

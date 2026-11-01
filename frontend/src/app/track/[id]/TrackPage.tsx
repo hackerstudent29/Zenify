@@ -25,7 +25,6 @@ import {
   X,
   Shuffle,
   ScrollText,
-  MoreHorizontal,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
