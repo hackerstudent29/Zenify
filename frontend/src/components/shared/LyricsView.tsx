@@ -83,7 +83,7 @@ export function LyricsView({
   /* ───────────────────────── data ───────────────────────── */
   const { data, isLoading } = useQuery({
     queryKey: ["lyrics", trackId, title, artist, trackLang, albumName],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       if (!title) return { syncedTokens: [], source: undefined as string | undefined, status: "not_found" as const };
       try {
         const res = await api.post(`metadata/sync-lyrics`, { 
@@ -94,7 +94,12 @@ export function LyricsView({
           duration,
           language: trackLang,
           album: albumName
-        });
+        }, { signal });
+
+        if (signal?.aborted) {
+          return { syncedTokens: [], source: undefined, status: "cancelled" as const };
+        }
+
         return {
           status: (res.data?.status || "available") as string,
           message: res.data?.message as string | undefined,
@@ -103,14 +108,18 @@ export function LyricsView({
           romanizedLyrics: res.data?.romanizedLyrics as string | undefined,
           romanizedSyncedLyrics: res.data?.romanizedSyncedLyrics as any[] | undefined,
           romanizedLang: res.data?.romanizedLang as string | undefined,
+          romanizationStatus: res.data?.romanizationStatus as string | undefined,
         };
       } catch (err: any) {
+        if (signal?.aborted || err?.name === 'CanceledError' || err?.name === 'AbortError') {
+          return { syncedTokens: [], source: undefined, status: "cancelled" as const };
+        }
         if (err.response?.status === 404) return { syncedTokens: [], source: undefined, status: "not_found" as const };
         return { syncedTokens: [], source: undefined, status: "failed" as const };
       }
     },
     enabled: isLyricsOpen && !!title,
-    staleTime: 10000,
+    staleTime: 60000,
     refetchInterval,
   });
 
@@ -178,11 +187,19 @@ export function LyricsView({
   React.useEffect(() => {
     const hasSync = Boolean(data?.syncedTokens && data.syncedTokens.length > 0);
     const hasRom = Boolean(data?.romanizedLyrics || (data?.romanizedSyncedLyrics && data.romanizedSyncedLyrics.length > 0));
-    if (data?.status === "processing") setRefetchInterval(2500);
-    else if (hasSync && hasRom) setRefetchInterval(false);
-    else if (hasSync && !hasRom) setRefetchInterval(3000);
-    else if (data?.status === "not_found" || data?.status === "failed") setRefetchInterval(false);
-    else setRefetchInterval(4000);
+    if (data?.status === "processing") {
+      setRefetchInterval(2500);
+    } else if (hasSync) {
+      if (hasRom || data?.status === "available" || data?.romanizationStatus === "done" || data?.romanizationStatus === "failed") {
+        setRefetchInterval(false);
+      } else {
+        setRefetchInterval(false);
+      }
+    } else if (data?.status === "not_found" || data?.status === "failed") {
+      setRefetchInterval(false);
+    } else {
+      setRefetchInterval(false);
+    }
   }, [data]);
 
   React.useEffect(() => {

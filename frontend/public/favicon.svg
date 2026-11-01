@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="zenifyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF2D55" />
+      <stop offset="50%" stop-color="#E11D48" />
+      <stop offset="100%" stop-color="#9E2339" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <path d="M120 148 C120 134 132 124 148 124 L364 124 C380 124 392 136 392 152 C392 160 388 168 382 174 L214 340 L364 340 C380 340 392 352 392 368 C392 384 380 396 364 396 L148 396 C132 396 120 384 120 368 C120 360 124 352 130 346 L298 180 L148 180 C132 180 120 168 120 148 Z" 
+        fill="url(#zenifyGrad)" 
+        filter="url(#glow)" />
+</svg>

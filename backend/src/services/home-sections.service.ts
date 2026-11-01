@@ -836,26 +836,29 @@ export class HomeSectionsService {
    */
   static async getAlbumsForYou(userId?: string, requestedLang?: string, requestedCountry?: string, recentArtists?: string | string[]) {
     const taste = await this.getUserTaste(userId, requestedLang, requestedCountry, recentArtists);
+    const primaryLang = taste.languageNames[0] || 'Tamil';
     const artistKey = taste.favoriteArtistNames.slice(0, 3).map(a => a.toLowerCase().replace(/[^a-z0-9]/g, '')).join('_') || 'none';
-    const key = `catalog:albums_for_you:v3:${userId || 'anon'}:${artistKey}`;
+    const key = `catalog:albums_for_you:v4:${userId || 'anon'}:${primaryLang.toLowerCase()}:${taste.countryCode}:${artistKey}`;
 
     return this.getCachedOrFetch(key, 600, async () => {
       const { favoriteArtistNames, languageNames, countryCode, countryName } = taste;
+      const userLangs = languageNames.map(l => l.toLowerCase().trim());
       const items: any[] = [];
       const seenAlbumTitles = new Set<string>();
 
       try {
         const { default: axios } = await import('axios');
 
-        // 1. Fetch authentic studio albums from JioSaavn for user's favorite artists
+        // 1. Fetch authentic studio albums from JioSaavn for user's favorite artists (prioritizing user's primary language)
         for (const artist of favoriteArtistNames.slice(0, 4)) {
           try {
+            const queryWithLang = `${artist} ${primaryLang}`;
             const saavnRes = await axios.get('https://www.jiosaavn.com/api.php', {
               params: {
                 __call: 'search.getAlbumResults',
-                q: artist,
+                q: queryWithLang,
                 _format: 'json',
-                n: 4,
+                n: 6,
                 p: 1,
                 api_version: '4',
                 ctx: 'web6dot0'
@@ -866,6 +869,11 @@ export class HomeSectionsService {
 
             if (saavnRes?.data?.results) {
               for (const alb of saavnRes.data.results) {
+                const albLang = (alb.language || alb.more_info?.language || '').toLowerCase().trim();
+                // Language isolation: Skip albums in unrelated languages
+                if (albLang && albLang !== 'unknown' && userLangs.length > 0 && !userLangs.includes(albLang)) {
+                  continue;
+                }
                 const albTitle = (alb.title || alb.name || '')
                   .replace(/&quot;/g, '"')
                   .replace(/&#039;/g, "'")

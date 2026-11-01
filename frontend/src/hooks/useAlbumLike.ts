@@ -96,3 +96,4 @@ export function useAlbumLike(
     isLoading: mutation.isPending,
   };
 }
+
