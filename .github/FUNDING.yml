@@ -1,0 +1,4 @@
+# GitHub Sponsor Configuration for Zenify
+# This file enables the GitHub Sponsor button on the repository
+
+custom: ['https://github.com/sponsors/hackerstudent29']
