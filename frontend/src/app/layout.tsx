@@ -15,7 +15,6 @@ import AuthGuard from "@/components/auth-guard";
 import { GlobalNotification } from "@/components/shared/GlobalNotification";
 import { NotificationListener } from "@/components/shared/NotificationListener";
 import { GlobalLoginSplash } from "@/components/auth/GlobalLoginSplash";
-
 import { CookieConsentBanner } from "@/components/shared/CookieConsentBanner";
 
 export default function RootLayout({
