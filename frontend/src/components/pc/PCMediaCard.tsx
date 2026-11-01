@@ -18,6 +18,7 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 
@@ -381,106 +382,21 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
          "focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 active:!scale-90 hover:bg-white/25"
        )}
      >
-       <AnimatedDropdown
+       <TrackActionsDropdown
+         track={track}
+         context={isAlbum ? "album" : isPlaylist ? "playlist" : isArtist ? "artist" : "card"}
          align="end"
-         contentClassName="z-[100] pointer-events-auto"
          trigger={
            <button
              type="button"
              onClick={(e) => e.stopPropagation()}
              className="w-full h-full flex items-center justify-center text-white outline-none bg-transparent cursor-pointer"
+             title="More options"
+             aria-label="More options"
            >
              <MoreHorizontal size={16} />
            </button>
          }
-         items={[
-           {
-             id: 'add-to-queue',
-             icon: <ListPlus size={16} className="opacity-70 text-brand" />,
-             label: "Add to Queue",
-             onClick: async (e: any) => {
-               e.stopPropagation();
-               try {
-                 if (isAlbum) {
-                   const albumData = (track as any).tracks ? track : (await api.get(`/albums/${track.id}`)).data;
-                   if (albumData?.tracks?.length) {
-                     usePlayerStore.getState().addToUserQueue(albumData.tracks, { contextName: track.title || (track as any).name });
-                   } else {
-                     showToast("Album has no tracks", "error");
-                   }
-                 } else if (isPlaylist) {
-                   const plData = (track as any).tracks ? track : (await api.get(`/playlists/${track.id}`)).data;
-                   const tracks = plData?.tracks?.map((t: any) => t.track || t) || [];
-                   if (tracks.length) {
-                     usePlayerStore.getState().addToUserQueue(tracks, { contextName: track.title || (track as any).name });
-                   } else {
-                     showToast("Playlist has no tracks", "error");
-                   }
-                 } else {
-                   usePlayerStore.getState().addToUserQueue(track);
-                 }
-               } catch (err) {
-                 showToast("Failed to queue items", "error");
-               }
-             }
-           },
-           ...(!isAlbum && !isPlaylist ? [
-             {
-               id: 'refetch-audio',
-               icon: <RefreshCw size={16} className={cn("opacity-70", isRefetching === track.id && "animate-spin text-brand")} />,
-               label: isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio",
-               onClick: (e: any) => { e.stopPropagation(); refetchTrackAudio(track, showToast); }
-             },
-             getRefetchLyricsAnimatedMenuItem(track, refetchTrackLyrics, showToast),
-           ] : []),
-           ...(!isAlbum ? [{
-             id: 'favorite',
-             icon: <SwiftUIHeart size={16} filled={!!isLiked} className={isLiked ? "text-brand" : "opacity-70"} />,
-             label: isLiked ? "Saved to Library" : "Save to Library",
-             onClick: (e: any) => { e.stopPropagation(); toggleLikeMutation.mutate(); }
-           }] : []),
-           ...(getArtistTarget(track) ? [{
-             id: 'artist',
-             icon: <User size={16} className="opacity-70" />,
-             label: "Go to Artist",
-             onClick: (e: any) => { e.stopPropagation(); const target = getArtistTarget(track); if (target) router.push(target); }
-           }] : []),
-           ...(!isAlbum ? [{
-             id: 'playlist',
-             icon: <Plus size={16} className="opacity-70" />,
-             label: "Add to Playlist",
-             subMenu: [
-               ...(playlists || []).map((p: any) => ({
-                 id: p.id,
-                 label: p.name,
-                 onClick: (e: any) => { e.stopPropagation(); addToPlaylistMutation.mutate(p.id); }
-               })),
-               {
-                 id: 'create-inline',
-                 isSeparator: (playlists?.length || 0) > 0
-               },
-               {
-                 id: 'create-inline-content',
-                 content: <InlinePlaylistCreator trackId={track.id} onSuccess={() => showToast("Created & Added!", "success")} />
-               }
-             ].filter(item => !(item as any).isSeparator || ((item as any).isSeparator && (playlists?.length || 0) > 0))
-           }] : []),
-           ...(user?.role === 'ADMIN' && !isAlbum ? [{
-             id: 'sync',
-             icon: <Mic size={16} className="opacity-70 text-violet-400" />,
-             label: "Sync Lyrics",
-             className: "text-violet-400 focus:text-violet-300",
-             onClick: (e: any) => { e.stopPropagation(); router.push(`/admin/lyric-sync?trackId=${track.id}`); }
-           }] : []),
-           { id: 'sep1', isSeparator: true },
-           {
-             id: 'download',
-             icon: isAlbum ? <ArrowRight size={16} className="opacity-70" /> : <Download size={16} className="opacity-70 text-brand" />,
-             label: isAlbum ? "View Album" : "Download Hi-Res",
-             className: "text-brand focus:text-brand",
-             onClick: (e: any) => { e.stopPropagation(); if (isAlbum) { window.location.href = (track as any).href; } else { openDownloadModal(track); } }
-           }
-         ]}
        />
      </div>
    </>

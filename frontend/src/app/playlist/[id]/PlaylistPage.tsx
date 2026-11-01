@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
@@ -24,11 +25,6 @@ import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
 import { Equalizer } from "@/components/ui/Equalizer";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 import { motion } from "framer-motion";
@@ -309,71 +305,77 @@ export default function PlaylistDetailPage() {
           )}
 
           {/* Playlist Three-Dot Actions Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button 
+          <TrackActionsDropdown
+            align="start"
+            trigger={
+              <button
                 className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 active:scale-90 cursor-pointer transition-all shadow-none"
                 title="Playlist Options"
+                aria-label="Playlist options"
               >
                 <MoreHorizontal size={18} />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="start">
-              {isOwner && (
-                <>
-                  <DropdownMenuItem onClick={() => setIsAddSongsModalOpen(true)}>
-                    <Plus size={14} className="mr-2 text-brand" />
-                    <span>Add Songs to Playlist</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setIsEditCoverModalOpen(true)}>
-                    <Edit2 size={14} className="mr-2 text-white/60" />
-                    <span>Edit Cover Art</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10" />
-                </>
-              )}
-              <DropdownMenuItem onClick={() => {
-                if (!playlist || !playlist.tracks || playlist.tracks.length === 0) {
-                  showToast("This playlist has no tracks yet", "error");
-                  return;
-                }
-                const tracks = (playlist.tracks || []).map((t: any) => t.track || t);
-                usePlayerStore.getState().addToUserQueue(tracks, { contextName: playlist.name });
-              }}>
-                <ListPlus size={14} className="mr-2 text-brand" />
-                <span>Add to Queue</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => {
-                if (typeof window !== 'undefined') {
-                  navigator.clipboard.writeText(window.location.href);
-                  showToast("Playlist link copied to clipboard!", "success");
-                }
-              }}>
-                <Share2 size={14} className="mr-2 text-white/60" />
-                <span>Share Playlist Link</span>
-              </DropdownMenuItem>
-              {isOwner && (
-                <>
-                  <DropdownMenuSeparator className="bg-white/10" />
-                  <DropdownMenuItem
-                    className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"
-                    onClick={() => {
-                      useUIStore.getState().openConfirmModal({
-                        title: "Delete Playlist?",
-                        message: `This will permanently remove "${playlist.name}" from your library.`,
-                        confirmText: "Erase Playlist",
-                        type: "danger",
-                        onConfirm: () => deletePlaylistMutation.mutate()
-                      });
-                    }}
-                  >
-                    <Trash2 size={14} className="mr-2 text-red-400" />
-                    <span>Delete Playlist</span>
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+            items={[
+              ...(isOwner ? [
+                {
+                  id: "add-songs",
+                  label: "Add Songs to Playlist",
+                  icon: <Plus size={14} className="text-brand" />,
+                  onClick: () => setIsAddSongsModalOpen(true),
+                },
+                {
+                  id: "edit-cover",
+                  label: "Edit Cover Art",
+                  icon: <Edit2 size={14} />,
+                  onClick: () => setIsEditCoverModalOpen(true),
+                },
+                { id: "sep-owner", isSeparator: true },
+              ] : []),
+              {
+                id: "queue",
+                label: "Add to Queue",
+                icon: <ListPlus size={14} className="text-brand" />,
+                onClick: () => {
+                  if (!playlist || !playlist.tracks || playlist.tracks.length === 0) {
+                    showToast("This playlist has no tracks yet", "error");
+                    return;
+                  }
+                  const tracks = (playlist.tracks || []).map((t: any) => t.track || t);
+                  usePlayerStore.getState().addToUserQueue(tracks, { contextName: playlist.name });
+                },
+              },
+              {
+                id: "share",
+                label: "Share Playlist Link",
+                icon: <Share2 size={14} />,
+                onClick: () => {
+                  if (typeof window !== "undefined") {
+                    navigator.clipboard.writeText(window.location.href);
+                    showToast("Playlist link copied to clipboard!", "success");
+                  }
+                },
+              },
+              ...(isOwner ? [
+                { id: "sep-delete", isSeparator: true },
+                {
+                  id: "delete",
+                  label: "Delete Playlist",
+                  icon: <Trash2 size={14} className="text-red-400" />,
+                  className: "text-red-400 focus:text-red-400",
+                  onClick: () => {
+                    useUIStore.getState().openConfirmModal({
+                      title: "Delete Playlist?",
+                      message: `This will permanently remove "${playlist.name}" from your library.`,
+                      confirmText: "Erase Playlist",
+                      type: "danger",
+                      onConfirm: () => deletePlaylistMutation.mutate(),
+                    });
+                  },
+                },
+              ] : []),
+            ]}
+          />
  </div>
  </div>
  </div>
@@ -435,64 +437,20 @@ export default function PlaylistDetailPage() {
 
  {/* Actions */}
  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
- <DropdownMenu>
- <DropdownMenuTrigger asChild>
- <button className="p-2 text-white/20 hover:text-white transition-colors outline-none bg-transparent cursor-pointer">
- <MoreHorizontal size={20} />
- </button>
- </DropdownMenuTrigger>
- <DropdownMenuContent className="w-52" align="end">
- <DropdownMenuItem onClick={() => {
- usePlayerStore.getState().addToUserQueue(track);
- }}>
- <ListPlus size={14} className="mr-2 text-brand" />
- <span>Add to Queue</span>
- </DropdownMenuItem>
- {getArtistTarget(track) && (
- <DropdownMenuItem onClick={() => {
- const target = getArtistTarget(track);
- if (target) router.push(target);
- }}>
- <User size={14} className="mr-2 text-white/60" />
- <span>Go to Artist</span>
- </DropdownMenuItem>
- )}
- <DropdownMenuItem onClick={() => openAddToPlaylistModal(track)}>
-  <Plus size={14} className="mr-2 text-white/60" />
-  <span>Add to Playlist</span>
-</DropdownMenuItem>
-<DropdownMenuItem onClick={() => refetchTrackAudio(track, showToast)}>
-  <RefreshCw size={14} className={cn("mr-2 text-white/60", isRefetching === track.id && "animate-spin text-brand")} />
-  <span>{isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio"}</span>
-</DropdownMenuItem>
-<RefetchLyricsSubMenu track={track} refetchTrackLyrics={refetchTrackLyrics} showToast={showToast} />
-<DropdownMenuItem onClick={() => openDownloadModal(track)}>
- <Download size={14} className="mr-2 text-white/60" />
- <span>Download</span>
- </DropdownMenuItem>
- {user?.role === 'ADMIN' && (
- <DropdownMenuItem 
- onClick={() => router.push(`/admin/lyric-sync?trackId=${track.id}`)}
- className="text-violet-400 focus:text-violet-300 cursor-pointer"
- >
- <Mic size={14} className="mr-2 text-violet-400" />
- <span>Sync Lyrics</span>
- </DropdownMenuItem>
- )}
- {isOwner && (
- <>
- <DropdownMenuSeparator className="bg-white/10" />
- <DropdownMenuItem
- className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"
- onClick={() => removeTrackMutation.mutate(track.id)}
- >
- <Trash2 size={14} className="mr-2 text-red-400" />
- <span>Remove from Playlist</span>
- </DropdownMenuItem>
- </>
- )}
- </DropdownMenuContent>
- </DropdownMenu>
+  <TrackActionsDropdown
+    track={track}
+    align="end"
+    context="playlist"
+    extraItems={isOwner ? [
+      {
+        id: "remove-from-playlist",
+        label: "Remove from Playlist",
+        icon: <Trash2 size={14} className="text-red-400" />,
+        className: "text-red-400 focus:text-red-400",
+        onClick: () => removeTrackMutation.mutate(track.id),
+      },
+    ] : []}
+  />
  </div>
  </div>
  );

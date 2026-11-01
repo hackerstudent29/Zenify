@@ -43,9 +43,15 @@ import {
   Share2,
   SkipForward,
   Info,
+  Play,
+  Disc,
+  FileText,
+  Plus,
+  Edit2,
+  Trash2,
 } from "lucide-react";
-import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
-import { useRouter } from "next/navigation";
+import { SwiftUIHeart, SwiftUIShuffle } from "@/components/ui/SwiftUIIcons";
+import { useRouter, usePathname } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { usePlayerStore } from "@/store/player";
@@ -53,9 +59,8 @@ import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
-import { getRefetchLyricsAnimatedMenuItem } from "@/components/shared/RefetchLyricsSubMenu";
 import type { AnimatedMenuItem } from "@/components/ui/animated-dropdown";
-import { cn, getArtistTarget, getMediaUrl } from "@/lib/utils";
+import { cn, getArtistTarget, getMediaUrl, getTrackCover } from "@/lib/utils";
 
 /* ──────────────────────────────────────────────────────────────────────────
    Types
@@ -69,19 +74,20 @@ export type TrackActionsContext =
   | "row"
   | "artist";
 
-interface MenuItem {
+export interface MenuItem {
   id: string;
-  label?: string;
+  label?: React.ReactNode;
   icon?: React.ReactNode;
-  onClick?: () => void | Promise<void>;
+  onClick?: (e?: any) => void | Promise<void>;
   isSeparator?: boolean;
   disabled?: boolean;
   className?: string;
   hint?: string;
 }
 
-interface TrackActionsDropdownProps {
-  track: any;
+export interface TrackActionsDropdownProps {
+  track?: any;
+  items?: MenuItem[];
   trigger?: React.ReactNode;
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
@@ -508,7 +514,7 @@ function Sheet({
   onClose,
 }: {
   groups: MenuItem[][];
-  track: any;
+  track?: any;
   clear: boolean;
   onSelect: (item: MenuItem) => void;
   onClose: (returnFocus?: boolean) => void;
@@ -516,7 +522,8 @@ function Sheet({
   const reduce = useReducedMotion();
   const controls: DragControls = useDragControls();
   const { panel } = useMenuVariants(reduce, true);
-  const meta = trackMeta(track);
+  const meta = track ? trackMeta(track) : null;
+  const showHeader = Boolean(meta && (meta.title !== "Unknown track" || meta.artist));
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z }}>
@@ -552,23 +559,28 @@ function Sheet({
           willChange: "transform",
         }}
       >
-        {/* Drag handle + track header */}
+        {/* Drag handle (+ optional track header) */}
         <div
-          className="shrink-0 cursor-grab touch-none px-4 pb-3 pt-2.5 active:cursor-grabbing"
+          className={cn(
+            "shrink-0 cursor-grab touch-none px-4 active:cursor-grabbing",
+            showHeader ? "pb-3 pt-2.5" : "py-3"
+          )}
           onPointerDown={(e) => controls.start(e)}
         >
-          <div className="mx-auto mb-3 h-[5px] w-9 rounded-full bg-white/30" />
-          <div className="flex items-center gap-3">
-            <Artwork src={meta.cover} />
-            <div className="min-w-0">
-              <p className="truncate text-[16px] font-semibold leading-tight tracking-[-0.015em] text-white">
-                {meta.title}
-              </p>
-              {meta.artist && (
-                <p className="mt-0.5 truncate text-[13.5px] text-white/60">{meta.artist}</p>
-              )}
+          <div className={cn("mx-auto h-[5px] w-9 rounded-full bg-white/30", showHeader && "mb-3")} />
+          {showHeader && meta && (
+            <div className="flex items-center gap-3">
+              <Artwork src={meta.cover} />
+              <div className="min-w-0">
+                <p className="truncate text-[16px] font-semibold leading-tight tracking-[-0.015em] text-white">
+                  {meta.title}
+                </p>
+                {meta.artist && (
+                  <p className="mt-0.5 truncate text-[13.5px] text-white/60">{meta.artist}</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="h-px shrink-0 bg-white/[0.1]" />
@@ -593,6 +605,7 @@ function Sheet({
 
 export function TrackActionsDropdown({
   track,
+  items,
   trigger,
   align = "end",
   side,
@@ -608,6 +621,7 @@ export function TrackActionsDropdown({
   showToast: externalShowToast,
 }: TrackActionsDropdownProps) {
   const router = useRouter();
+  const pathname = usePathname() || "";
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const openDownloadModal = useUIStore((s) => s.openDownloadModal);
@@ -684,7 +698,37 @@ export function TrackActionsDropdown({
     };
   }, [open, isSheet, close]);
 
-  /* ── Liked state ── */
+  /* ── Context & Entity Detection ── */
+  const onArtistPage = pathname.startsWith("/artist");
+  const onAlbumPage = pathname.startsWith("/album");
+  const onTrackPage = pathname.startsWith("/track");
+  const onPlaylistPage = pathname.startsWith("/playlist");
+
+  const isAdmin = user?.role === "ADMIN" || (user as any)?.role === "admin";
+
+  const isArtist =
+    context === "artist" ||
+    track?.type === "artist" ||
+    Boolean(track?.isArtist) ||
+    Boolean(track?.artistRole) ||
+    (Boolean(track?.bio) && !track?.albumId && !track?.streamUrl);
+
+  const isAlbum =
+    context === "album" ||
+    track?.type === "album" ||
+    Boolean(track?.isAlbum) ||
+    Boolean(track?.albumType) ||
+    (track?.totalTracks !== undefined && !track?.playlistId);
+
+  const isPlaylist =
+    context === "playlist" ||
+    track?.type === "playlist" ||
+    Boolean(track?.isPlaylist) ||
+    (track?.trackCount !== undefined && !track?.albumType && track?.totalTracks === undefined);
+
+  const isSong = !isArtist && !isAlbum && !isPlaylist;
+
+  /* ── Liked state (for songs) ── */
   const { data: likedTrackIds } = useQuery({
     queryKey: ["liked-track-ids"],
     queryFn: async () => {
@@ -693,13 +737,15 @@ export function TrackActionsDropdown({
       return arr.map((t: any) => t.id) as string[];
     },
     staleTime: 1000 * 60 * 5,
+    enabled: Boolean(track?.id && isSong),
   });
 
-  const isLiked = likedTrackIds?.includes(track?.id);
+  const isLiked = track?.id ? likedTrackIds?.includes(track.id) : false;
 
   const toggleLikeMutation = useMutation({
-    mutationFn: () => api.post(`/tracks/${track.id}/like`),
+    mutationFn: () => api.post(`/tracks/${track?.id}/like`),
     onMutate: async () => {
+      if (!track?.id) return;
       await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
       const prev = queryClient.getQueryData<string[]>(["liked-track-ids"]);
       const next = prev
@@ -727,10 +773,20 @@ export function TrackActionsDropdown({
       await onShare();
       return;
     }
-    const url = `${window.location.origin}/track/${track.id}`;
+    const shareId = track?.id || track?.name || "";
+    const targetPath = isArtist
+      ? getArtistTarget(track) || `/artist/${encodeURIComponent(shareId)}`
+      : isAlbum
+      ? (track as any)?.href || `/album/${encodeURIComponent(shareId)}`
+      : isPlaylist
+      ? `/playlist/${encodeURIComponent(shareId)}`
+      : `/track/${encodeURIComponent(shareId)}`;
+    const url = `${window.location.origin}${targetPath}`;
+    const title = track?.title || track?.name || "Music on Zenify";
+
     if (navigator.share) {
       try {
-        await navigator.share({ title: track.title, url });
+        await navigator.share({ title, url });
       } catch (e) {
         if ((e as Error).name !== "AbortError") showToast("Error sharing", "error");
       }
@@ -756,137 +812,398 @@ export function TrackActionsDropdown({
   const playerState: any = usePlayerStore.getState();
   const canPlayNext = typeof playerState?.playNext === "function";
 
-  const rawItems = [
-    /* Group 1 · play */
-    canPlayNext &&
-      !hide.has("play-next") && {
-        id: "play-next",
-        icon: <SkipForward size={14} />,
-        label: "Play Next",
-        onClick: () => (usePlayerStore.getState() as any).playNext(track),
-      },
+  let rawItems: (MenuItem | false | null | undefined)[] = [];
 
-    !hide.has("queue") && {
-      id: "queue",
-      icon: <ListPlus size={14} />,
-      label: "Add to Queue",
-      onClick: () => usePlayerStore.getState().addToUserQueue(track),
-    },
+  if (items && items.length > 0) {
+    rawItems = [...items, ...(extraItems || [])];
+  } else if (isArtist) {
+    const artistName = track?.name || track?.title || "Artist";
+    const artistId = track?.id || artistName;
+    const artistTarget = getArtistTarget(track) || `/artist/${encodeURIComponent(String(artistId))}`;
 
-    { id: "sep-play", isSeparator: true },
-
-    /* Group 2 · library */
-    !hide.has("like") && {
-      id: "like",
-      icon: (
-        <motion.span
-          key={likePop}
-          className="flex"
-          initial={likePop > 0 ? { scale: 0.4 } : false}
-          animate={{ scale: 1 }}
-          transition={SPRING_HEART}
-        >
-          <SwiftUIHeart size={15} filled={!!isLiked} className={cn(isLiked ? "text-brand" : "text-white/70")} />
-        </motion.span>
-      ),
-      label: isLiked ? "Liked" : "Like",
-      onClick: () => {
-        setLikePop((n) => n + 1);
-        toggleLikeMutation.mutate();
-      },
-    },
-
-    !hide.has("add-to-playlist") && {
-      id: "add-to-playlist",
-      icon: <ListMusic size={14} />,
-      label: "Add to Playlist",
-      onClick: () => openAddToPlaylistModal(track),
-    },
-
-    { id: "sep-library", isSeparator: true },
-
-    /* Group 3 · navigate */
-    !hide.has("lyrics") &&
-      onLyricsToggle && {
-        id: "lyrics",
-        icon: <ScrollText size={14} />,
-        label: isLyricsOpen ? "Close Lyrics" : "View Lyrics",
-        onClick: () => {
-          const store = usePlayerStore.getState();
-          if (!store.currentTrack || store.currentTrack?.id !== track.id) {
-            store.setTrack(track, [track]);
-            useUIStore.getState().setPlayerMinimized(false);
+    rawItems = [
+      !hide.has("play") && {
+        id: "play-top",
+        icon: <Play size={14} />,
+        label: "Play Top Songs",
+        onClick: async () => {
+          try {
+            const artistData = track?.topTracks?.length
+              ? track
+              : (await api.get(`/artists/${encodeURIComponent(String(artistId))}`)).data;
+            const tracks = artistData?.topTracks || artistData?.topSongs || [];
+            if (tracks.length > 0) {
+              usePlayerStore.getState().setTrack(tracks[0], tracks);
+              useUIStore.getState().setPlayerMinimized(false);
+            } else {
+              showToast("No tracks found for this artist", "error");
+            }
+          } catch {
+            showToast("Failed to play artist tracks", "error");
           }
-          onLyricsToggle();
+        },
+      },
+      !hide.has("shuffle") && {
+        id: "shuffle-artist",
+        icon: <SwiftUIShuffle size={14} />,
+        label: "Shuffle Songs",
+        onClick: async () => {
+          try {
+            const artistData = track?.topTracks?.length
+              ? track
+              : (await api.get(`/artists/${encodeURIComponent(String(artistId))}`)).data;
+            const tracks = [...(artistData?.topTracks || artistData?.topSongs || [])];
+            if (tracks.length > 0) {
+              const shuffled = tracks.sort(() => Math.random() - 0.5);
+              usePlayerStore.getState().setTrack(shuffled[0], shuffled);
+              useUIStore.getState().setPlayerMinimized(false);
+            } else {
+              showToast("No tracks found for this artist", "error");
+            }
+          } catch {
+            showToast("Failed to shuffle artist tracks", "error");
+          }
+        },
+      },
+      { id: "sep-artist-1", isSeparator: true },
+      !hide.has("artist") &&
+        !onArtistPage && {
+          id: "view-artist",
+          icon: <User size={14} />,
+          label: "Go to Artist",
+          onClick: () => router.push(artistTarget),
+        },
+      { id: "sep-artist-2", isSeparator: true },
+      !hide.has("share") && {
+        id: "share-artist",
+        icon: <Share2 size={14} />,
+        label: "Share Artist",
+        onClick: handleShare,
+      },
+      ...(extraItems || []),
+    ];
+  } else if (isAlbum) {
+    const albumTitle = track?.title || track?.name || "Album";
+    const albumId = track?.id || albumTitle;
+    const albumTarget = (track as any)?.href || `/album/${encodeURIComponent(String(albumId))}`;
+    const artistTarget = getArtistTarget(track);
+
+    rawItems = [
+      !hide.has("play") && {
+        id: "play-album",
+        icon: <Play size={14} />,
+        label: "Play Album",
+        onClick: async () => {
+          try {
+            const albumData = track?.tracks?.length
+              ? track
+              : (await api.get(`/albums/${track?.id}`)).data;
+            const albumTracks = (albumData?.tracks || []).filter(Boolean);
+            if (albumTracks.length > 0) {
+              const first = {
+                ...albumTracks[0],
+                artwork:
+                  albumTracks[0].artwork ||
+                  albumTracks[0].coverUrl ||
+                  albumTracks[0].image ||
+                  getTrackCover(track),
+                streamUrl: albumTracks[0].streamUrl || albumTracks[0].audioUrl,
+              };
+              usePlayerStore.getState().setTrack(first, albumTracks);
+              useUIStore.getState().setPlayerMinimized(false);
+            } else {
+              showToast("Album has no tracks", "error");
+            }
+          } catch {
+            showToast("Failed to play album", "error");
+          }
+        },
+      },
+      !hide.has("queue") && {
+        id: "queue-album",
+        icon: <ListPlus size={14} />,
+        label: "Add to Queue",
+        onClick: async () => {
+          try {
+            const albumData = track?.tracks?.length
+              ? track
+              : (await api.get(`/albums/${track?.id}`)).data;
+            if (albumData?.tracks?.length) {
+              usePlayerStore.getState().addToUserQueue(albumData.tracks, { contextName: albumTitle });
+              showToast("Album added to queue");
+            } else {
+              showToast("Album has no tracks", "error");
+            }
+          } catch {
+            showToast("Failed to queue album", "error");
+          }
+        },
+      },
+      { id: "sep-album-1", isSeparator: true },
+      !hide.has("artist") &&
+        artistTarget &&
+        !onArtistPage && {
+          id: "artist",
+          icon: <User size={14} />,
+          label: "Go to Artist",
+          onClick: () => router.push(artistTarget),
+        },
+      !hide.has("view-album") &&
+        !onAlbumPage && {
+          id: "view-album",
+          icon: <Disc size={14} />,
+          label: "View Album",
+          onClick: () => router.push(albumTarget),
+        },
+      { id: "sep-album-2", isSeparator: true },
+      !hide.has("share") && {
+        id: "share-album",
+        icon: <Share2 size={14} />,
+        label: "Share Album",
+        onClick: handleShare,
+      },
+      ...(extraItems || []),
+    ];
+  } else if (isPlaylist) {
+    const playlistTitle = track?.name || track?.title || "Playlist";
+    const playlistId = track?.id;
+    const playlistTarget = `/playlist/${playlistId}`;
+
+    rawItems = [
+      !hide.has("play") && {
+        id: "play-playlist",
+        icon: <Play size={14} />,
+        label: "Play Playlist",
+        onClick: async () => {
+          try {
+            const plData = track?.tracks?.length
+              ? track
+              : (await api.get(`/playlists/${playlistId}`)).data;
+            const tracks = (plData?.tracks || []).map((t: any) => t.track || t).filter(Boolean);
+            if (tracks.length > 0) {
+              const first = {
+                ...tracks[0],
+                artwork:
+                  tracks[0].artwork ||
+                  tracks[0].coverUrl ||
+                  tracks[0].image ||
+                  getTrackCover(track),
+                streamUrl: tracks[0].streamUrl || tracks[0].audioUrl,
+              };
+              usePlayerStore.getState().setTrack(first, tracks);
+              useUIStore.getState().setPlayerMinimized(false);
+            } else {
+              showToast("Playlist has no tracks", "error");
+            }
+          } catch {
+            showToast("Failed to play playlist", "error");
+          }
+        },
+      },
+      !hide.has("queue") && {
+        id: "queue-playlist",
+        icon: <ListPlus size={14} />,
+        label: "Add to Queue",
+        onClick: async () => {
+          try {
+            const plData = track?.tracks?.length
+              ? track
+              : (await api.get(`/playlists/${playlistId}`)).data;
+            const tracks = (plData?.tracks || []).map((t: any) => t.track || t).filter(Boolean);
+            if (tracks.length > 0) {
+              usePlayerStore.getState().addToUserQueue(tracks, { contextName: playlistTitle });
+              showToast("Playlist added to queue");
+            } else {
+              showToast("Playlist has no tracks", "error");
+            }
+          } catch {
+            showToast("Failed to queue playlist", "error");
+          }
+        },
+      },
+      { id: "sep-playlist-1", isSeparator: true },
+      !hide.has("view-playlist") &&
+        !onPlaylistPage && {
+          id: "view-playlist",
+          icon: <ListMusic size={14} />,
+          label: "View Playlist",
+          onClick: () => router.push(playlistTarget),
+        },
+      { id: "sep-playlist-2", isSeparator: true },
+      !hide.has("share") && {
+        id: "share-playlist",
+        icon: <Share2 size={14} />,
+        label: "Share Playlist",
+        onClick: handleShare,
+      },
+      ...(extraItems || []),
+    ];
+  } else {
+    // Song / Track
+    const albumId = track?.album?.id || track?.albumId || track?.collectionId;
+    const albumTitle = track?.album?.title || track?.albumTitle || track?.collectionName;
+    const albumTarget = albumId
+      ? `/album/${encodeURIComponent(String(albumId))}`
+      : albumTitle &&
+        albumTitle.toLowerCase() !== "unknown" &&
+        albumTitle.toLowerCase() !== track?.title?.toLowerCase()
+      ? `/album/${encodeURIComponent(String(albumTitle))}`
+      : null;
+    const artistTarget = getArtistTarget(track);
+
+    rawItems = [
+      /* Group 1 · play */
+      canPlayNext &&
+        !hide.has("play-next") && {
+          id: "play-next",
+          icon: <SkipForward size={14} />,
+          label: "Play Next",
+          onClick: () => (usePlayerStore.getState() as any).playNext(track),
+        },
+
+      !hide.has("queue") && {
+        id: "queue",
+        icon: <ListPlus size={14} />,
+        label: "Add to Queue",
+        onClick: () => usePlayerStore.getState().addToUserQueue(track),
+      },
+
+      { id: "sep-play", isSeparator: true },
+
+      /* Group 2 · library */
+      !hide.has("like") && {
+        id: "like",
+        icon: (
+          <motion.span
+            key={likePop}
+            className="flex"
+            initial={likePop > 0 ? { scale: 0.4 } : false}
+            animate={{ scale: 1 }}
+            transition={SPRING_HEART}
+          >
+            <SwiftUIHeart
+              size={15}
+              filled={!!isLiked}
+              className={cn(isLiked ? "text-brand" : "text-white/70")}
+            />
+          </motion.span>
+        ),
+        label: isLiked ? "Liked" : "Like",
+        onClick: () => {
+          setLikePop((n) => n + 1);
+          toggleLikeMutation.mutate();
         },
       },
 
-    !hide.has("view-details") &&
-      context !== "track-page" && {
-        id: "view-details",
-        icon: <Info size={14} />,
-        label: "View Details",
-        onClick: () => router.push(`/track/${track.id}`),
+      !hide.has("add-to-playlist") && {
+        id: "add-to-playlist",
+        icon: <ListMusic size={14} />,
+        label: "Add to Playlist",
+        onClick: () => openAddToPlaylistModal(track),
       },
 
-    !hide.has("artist") &&
-      getArtistTarget(track) && {
-        id: "artist",
-        icon: <User size={14} />,
-        label: "Go to Artist",
-        onClick: handleGoToArtist,
+      { id: "sep-library", isSeparator: true },
+
+      /* Group 3 · navigate (Strictly suppressed by current location) */
+      !hide.has("lyrics") &&
+        onLyricsToggle && {
+          id: "lyrics",
+          icon: <ScrollText size={14} />,
+          label: isLyricsOpen ? "Close Lyrics" : "View Lyrics",
+          onClick: () => {
+            const store = usePlayerStore.getState();
+            if (!store.currentTrack || store.currentTrack?.id !== track.id) {
+              store.setTrack(track, [track]);
+              useUIStore.getState().setPlayerMinimized(false);
+            }
+            onLyricsToggle();
+          },
+        },
+
+      !hide.has("view-details") &&
+        context !== "track-page" &&
+        !onTrackPage &&
+        track?.id && {
+          id: "view-details",
+          icon: <Info size={14} />,
+          label: "View Details",
+          onClick: () => router.push(`/track/${track.id}`),
+        },
+
+      !hide.has("album") &&
+        albumTarget &&
+        !onAlbumPage && {
+          id: "album",
+          icon: <Disc size={14} />,
+          label: "Go to Album",
+          onClick: () => router.push(albumTarget),
+        },
+
+      !hide.has("artist") &&
+        artistTarget &&
+        !onArtistPage && {
+          id: "artist",
+          icon: <User size={14} />,
+          label: "Go to Artist",
+          onClick: handleGoToArtist,
+        },
+
+      /* Group 4 · maintenance (Strictly ADMIN only!) */
+      ...(isAdmin
+        ? [
+            { id: "sep-admin", isSeparator: true },
+            !hide.has("refetch-audio") && {
+              id: "refetch-audio",
+              icon: (
+                <RefreshCw
+                  size={14}
+                  className={cn(isRefetching === track?.id && "animate-spin text-brand")}
+                />
+              ),
+              label: isRefetching === track?.id ? "Refetching Audio…" : "Refetch Audio",
+              onClick: () => refetchTrackAudio(track, showToast),
+            },
+            !hide.has("refetch-lyrics") && {
+              id: "refetch-lyrics",
+              icon: <FileText size={14} className="text-brand opacity-90" />,
+              label: "Refetch Lyrics",
+              onClick: () => refetchTrackLyrics(track, undefined, showToast),
+            },
+            !hide.has("sync-lyrics") && {
+              id: "sync-lyrics",
+              icon: <Mic size={14} className="text-violet-400" />,
+              label: "Sync Lyrics",
+              className: "text-violet-400",
+              onClick: () => router.push(`/admin/lyric-sync?trackId=${track?.id}`),
+            },
+          ]
+        : []),
+
+      ...(extraItems && extraItems.length > 0
+        ? [{ id: "sep-extra", isSeparator: true }, ...(extraItems as unknown as MenuItem[])]
+        : []),
+
+      { id: "sep-end", isSeparator: true },
+
+      /* Last group · share */
+      !hide.has("download") && {
+        id: "download",
+        icon: <Download size={14} />,
+        label: "Download",
+        onClick: () => openDownloadModal(track),
       },
 
-    { id: "sep-nav", isSeparator: true },
-
-    /* Group 4 · maintenance */
-    !hide.has("refetch-audio") && {
-      id: "refetch-audio",
-      icon: (
-        <RefreshCw
-          size={14}
-          className={cn(isRefetching === track.id && "animate-spin text-brand")}
-        />
-      ),
-      label: isRefetching === track.id ? "Refetching Audio…" : "Refetch Audio",
-      onClick: () => refetchTrackAudio(track, showToast),
-    },
-
-    !hide.has("refetch-lyrics") &&
-      getRefetchLyricsAnimatedMenuItem(track, refetchTrackLyrics, showToast),
-
-    !hide.has("sync-lyrics") &&
-      user?.role === "ADMIN" && {
-        id: "sync-lyrics",
-        icon: <Mic size={14} className="text-violet-400" />,
-        label: "Sync Lyrics",
-        className: "text-violet-400",
-        onClick: () => router.push(`/admin/lyric-sync?trackId=${track.id}`),
+      !hide.has("share") && {
+        id: "share",
+        icon: <Share2 size={14} />,
+        label: "Share",
+        onClick: handleShare,
       },
+    ];
+  }
 
-    ...(extraItems.length > 0
-      ? [{ id: "sep-extra", isSeparator: true }, ...(extraItems as unknown as MenuItem[])]
-      : []),
-
-    { id: "sep-end", isSeparator: true },
-
-    /* Last group · share */
-    !hide.has("download") && {
-      id: "download",
-      icon: <Download size={14} />,
-      label: "Download",
-      onClick: () => openDownloadModal(track),
-    },
-
-    !hide.has("share") && {
-      id: "share",
-      icon: <Share2 size={14} />,
-      label: "Share",
-      onClick: handleShare,
-    },
-  ].filter(Boolean) as unknown as MenuItem[];
-
-  const groups = buildGroups(rawItems);
+  const itemsFiltered = rawItems.filter(Boolean) as unknown as MenuItem[];
+  const groups = buildGroups(itemsFiltered);
 
   const handleSelect = (item: MenuItem) => {
     if (item.disabled) return;
@@ -981,3 +1298,5 @@ function buildGroups(items: MenuItem[]): MenuItem[][] {
   }
   return groups.filter((g) => g.length > 0);
 }
+
+export default TrackActionsDropdown;

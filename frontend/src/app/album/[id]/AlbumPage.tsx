@@ -43,13 +43,6 @@ import { Equalizer } from "@/components/ui/Equalizer";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 
 const formatDuration = (s?: number | null) => {
   if (!s || isNaN(s)) return "0:00";
