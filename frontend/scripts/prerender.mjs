@@ -12,7 +12,14 @@ const ROUTE_DATA = {
       <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@graph": [
+                "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://listenzenify.vercel.app/#website",
+            "name": "Zenify",
+            "alternateName": ["Zenify Music", "ListenZenify", "Zenify Web Player"],
+            "url": "https://listenzenify.vercel.app/"
+          },
           {
             "@type": "SoftwareApplication",
             "@id": "https://listenzenify.vercel.app/#application",
