@@ -99,12 +99,27 @@ export default function ArtistPage() {
     };
   }, [artist?.name, setStickyPageTitle]);
 
+  const isCircularMask = (url?: string | null): boolean => {
+    if (!url) return false;
+    return (
+      url.includes('_cropped.png') ||
+      url.includes('_cropped.jpg') ||
+      url.includes('cw.png') ||
+      url.includes('cw.jpg') ||
+      url.includes('cw.webp') ||
+      url.includes('AMCArtistImages') ||
+      url.includes('1920x1080cw') ||
+      url.includes('1200x630cw')
+    );
+  };
+
   const avatarUrl = getArtistProfileImage(artist);
   // Strictly filter out any circular Apple Music _cropped.png or cw.png masks to guarantee full-bleed rectangular artwork
-  const cleanCover = artist?.coverUrl && !artist.coverUrl.includes('_cropped.png') && !artist.coverUrl.includes('cw.png') && !artist.coverUrl.includes('cw.jpg') ? artist.coverUrl : null;
-  const cleanBanner = artist?.bannerUrl && !artist.bannerUrl.includes('_cropped.png') && !artist.bannerUrl.includes('cw.png') && !artist.bannerUrl.includes('cw.jpg') ? artist.bannerUrl : null;
-  const cleanImage = artist?.imageUrl && !artist.imageUrl.includes('_cropped.png') && !artist.imageUrl.includes('cw.png') && !artist.imageUrl.includes('cw.jpg') ? artist.imageUrl : null;
-  const heroImageUrl = cleanCover || cleanBanner || avatarUrl || cleanImage;
+  const cleanCover = artist?.coverUrl && !isCircularMask(artist.coverUrl) ? artist.coverUrl : null;
+  const cleanBanner = artist?.bannerUrl && !isCircularMask(artist.bannerUrl) ? artist.bannerUrl : null;
+  const cleanImage = artist?.imageUrl && !isCircularMask(artist.imageUrl) ? artist.imageUrl : null;
+  const cleanAvatar = avatarUrl && !isCircularMask(avatarUrl) ? avatarUrl : null;
+  const heroImageUrl = cleanCover || cleanBanner || cleanAvatar || cleanImage;
 
   // Artwork tint — multi-source saturation-first loop, isCancelled guard,
   // reset only on page unmount (not on every dep change)
@@ -265,17 +280,17 @@ export default function ArtistPage() {
 
   const displayName = formatDisplayTitle(artist.name);
 
-  /* ── Artist name + action buttons docked over the hero artwork ── */
+  /* ── Artist name + action buttons centered on page, moved down below banner ── */
   const heroHeader = (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative z-20 flex w-full min-w-0 flex-col items-center px-4 pb-4 pt-1 text-center sm:pb-6"
+      className="relative z-20 flex w-full min-w-0 flex-col items-center px-4 text-center mx-auto"
     >
       <h1
         ref={heroNameRef}
-        className="mb-3 max-w-4xl select-text break-words px-2 text-3xl font-bold tracking-tight text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.85)] sm:mb-4 sm:text-4xl md:text-5xl lg:text-[54px]"
+        className="mb-4 sm:mb-5 max-w-4xl select-text break-words px-2 text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl lg:text-[54px]"
       >
         {displayName}
       </h1>
@@ -284,7 +299,7 @@ export default function ArtistPage() {
         {/* Info / Bio Button */}
         <button
           onClick={() => setIsBioOpen(true)}
-          className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/90 shadow-xl backdrop-blur-xl transition hover:bg-white/20 hover:text-white active:scale-95 sm:h-11 sm:w-11"
+          className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/90 shadow-xl backdrop-blur-xl transition hover:bg-white/20 hover:text-white active:scale-95 sm:h-11 sm:w-11"
           title="Artist Bio"
         >
           <Info size={18} strokeWidth={2.2} />
@@ -293,7 +308,7 @@ export default function ArtistPage() {
         {/* Primary White Play Circle */}
         <button
           onClick={handlePlayTopTracks}
-          className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-white text-black shadow-[0_6px_24px_rgba(255,255,255,0.35)] transition-all hover:scale-105 active:scale-95 sm:h-14 sm:w-14"
+          className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-white text-black shadow-[0_6px_24px_rgba(255,255,255,0.25)] transition-all hover:scale-105 active:scale-95 sm:h-14 sm:w-14"
           title={isPlaying && isArtistActive ? "Pause" : "Play Top Songs"}
         >
           {isPlaying && isArtistActive ? (
@@ -310,7 +325,7 @@ export default function ArtistPage() {
             "flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border shadow-xl backdrop-blur-xl transition-all active:scale-95 sm:h-11 sm:w-11",
             isFavorited
               ? "border-brand bg-brand/20 text-brand"
-              : "border-white/15 bg-black/40 text-white/90 hover:bg-white/20 hover:text-white"
+              : "border-white/15 bg-white/10 text-white/90 hover:bg-white/20 hover:text-white"
           )}
           title={isFavorited ? "Favorited" : "Favorite Artist"}
         >
@@ -328,7 +343,7 @@ export default function ArtistPage() {
             "flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border shadow-xl backdrop-blur-xl transition-all active:scale-95 sm:h-11 sm:w-11",
             isShuffled
               ? "border-brand bg-brand/20 text-brand"
-              : "border-white/15 bg-black/40 text-white/90 hover:bg-white/20 hover:text-white"
+              : "border-white/15 bg-white/10 text-white/90 hover:bg-white/20 hover:text-white"
           )}
           title="Shuffle Artist Songs"
         >
@@ -340,7 +355,7 @@ export default function ArtistPage() {
           align="center"
           trigger={
             <button
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/40 text-white shadow-xl backdrop-blur-xl transition-all hover:bg-white/20 active:scale-95 sm:h-11 sm:w-11"
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-xl backdrop-blur-xl transition-all hover:bg-white/20 active:scale-95 sm:h-11 sm:w-11"
               title="More Options"
             >
               <SwiftUIEllipsis size={18} fill="currentColor" />
@@ -370,10 +385,10 @@ export default function ArtistPage() {
         description={artist.bio || `Listen to songs and albums by ${displayName} on Zenify.`}
       />
 
-      {/* ── 1. ARTIST HERO (Full-bleed photograph, controls docked at the bottom over the image) ── */}
+      {/* ── 1. ARTIST HERO (Clean untouched image banner) ── */}
       {heroImageUrl ? (
         <div
-          className="relative w-full h-[62vh] sm:h-[66vh] md:h-[68vh] min-h-[460px] max-h-[720px] overflow-hidden select-none am-layout-transition flex flex-col justify-end"
+          className="relative w-full h-[56vh] sm:h-[60vh] md:h-[62vh] min-h-[400px] max-h-[660px] overflow-hidden select-none am-layout-transition"
           style={{
             marginLeft: "calc(var(--sb-w) * -1)",
             marginRight: "calc(var(--rp-w) * -1)",
@@ -400,15 +415,10 @@ export default function ArtistPage() {
           />
 
           {/* Top subtle vignette for header contrast */}
-          <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/60 via-black/20 to-transparent pointer-events-none z-10" />
+          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 via-black/15 to-transparent pointer-events-none z-10" />
 
-          {/* Bottom gradient smoothly flowing into the section background */}
-          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[var(--page,#121214)] via-[var(--page,#121214)]/60 to-transparent pointer-events-none z-10" />
-
-          {/* Artist title & controls docked directly over the image */}
-          <div className="relative z-20 pb-3 sm:pb-5">
-            {heroHeader}
-          </div>
+          {/* Bottom gentle gradient fade into the page background */}
+          <div className="absolute inset-x-0 bottom-0 h-24 sm:h-32 bg-gradient-to-t from-[var(--page,#121214)] to-transparent pointer-events-none z-10" />
         </div>
       ) : (
         /* Minimal fallback when no artist artwork is available (Strictly NO circular avatars) */
@@ -432,13 +442,17 @@ export default function ArtistPage() {
                 decoding="async"
               />
             </div>
-            {heroHeader}
           </motion.div>
         </div>
       )}
 
-      {/* ── 2. JIOSAAVN REDESIGNED SECTIONS (The content sheet starts cleanly here) ── */}
-      <div className="relative z-10 pt-4 sm:pt-6 pb-28 w-full text-white min-w-0">
+      {/* ── ARTIST HEADER: Centered on page, moved down below the image banner ── */}
+      <div className="relative z-20 w-full flex flex-col items-center justify-center pt-8 sm:pt-10 pb-6 sm:pb-8 text-center">
+        {heroHeader}
+      </div>
+
+      {/* ── 2. JIOSAAVN REDESIGNED SECTIONS ── */}
+      <div className="relative z-10 pt-2 sm:pt-4 pb-28 w-full text-white min-w-0">
         {/* SECTION 1: Top Songs Table with Popular, Date, Name filters & Load more */}
         <div className="px-4 sm:px-8 md:px-12 max-w-[1400px] mx-auto w-full mb-8">
           <JioSaavnSongTable

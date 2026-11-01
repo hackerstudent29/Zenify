@@ -5,16 +5,36 @@ import { KeyPoolService } from './key-pool.service.js';
 import { cleanArtistNames, isFakeOrNumericArtistName } from '../utils/artist.js';
 
 export interface ArtistVisuals {
-    coverUrl: string | null; // Hero banner (1920x1080)
-    imageUrl: string | null; // Profile picture (600x600)
+    coverUrl: string | null; // Hero banner
+    imageUrl: string | null; // Profile picture
     bio?: string | null;
     source: 'apple_music' | 'rapidapi_spotify' | 'jiosaavn' | 'deezer' | 'db';
 }
 
+/** Helper to detect any Apple Music circular mask or cropped image URL */
+export function isCircularMaskUrl(url?: string | null): boolean {
+    if (!url) return false;
+    return (
+        url.includes('cw.png') ||
+        url.includes('cw.jpg') ||
+        url.includes('cw.webp') ||
+        url.includes('_cropped.png') ||
+        url.includes('_cropped.jpg') ||
+        url.includes('AMCArtistImages') ||
+        url.includes('1920x1080cw') ||
+        url.includes('1200x630cw')
+    );
+}
+
 export class ArtistMetadataService {
     /**
-     * Resolves high-resolution artist hero banner (1920x1080) and avatar from Apple Music,
-     * with fallbacks to RapidAPI Spotify, JioSaavn, and Deezer.
+     * Resolves high-resolution artist hero banner and avatar.
+     * Strictly BAN any circular Apple Music masks (cw.png, _cropped.png, AMCArtistImages).
+     * Priority:
+     *   1. JioSaavn CDN (500x500 pristine rectangular unmasked portrait)
+     *   2. RapidAPI Spotify (widescreen headerImage / avatarImage)
+     *   3. Deezer (1000x1000 uncropped picture_xl)
+     *   4. Apple Music ONLY if uncropped square/rectangular bb.jpg (NEVER cw.png or _cropped.png)
      * Automatically persists results into PostgreSQL database.
      */
     static async fetchArtistVisuals(artistId: string, artistName: string, forceRefresh: boolean = true): Promise<ArtistVisuals | null> {
@@ -24,16 +44,17 @@ export class ArtistMetadataService {
         // Check canonical dictionary first — authentic verified portraits should never be overwritten
         const { getCanonicalArtist } = await import('../utils/artist.js');
         const canon = getCanonicalArtist(artistName) || getCanonicalArtist(cleanName);
-        if (canon?.imageUrl) {
+        if (canon?.imageUrl && !isCircularMaskUrl(canon.imageUrl)) {
+            const cleanCover = (!isCircularMaskUrl(canon.coverUrl) ? canon.coverUrl : null) || canon.imageUrl;
             return {
-                coverUrl: canon.coverUrl || canon.imageUrl,
+                coverUrl: cleanCover,
                 imageUrl: canon.imageUrl,
                 bio: canon.bio || null,
-                source: 'apple_music'
+                source: 'jiosaavn'
             };
         }
 
-        // Check if artist already has high-res images in database (only if not forcing fresh fetch)
+        // Check if artist already has high-res images in database (only if not forcing fresh fetch and no circle masks)
         const existing = await prisma.artist.findUnique({
             where: { id: artistId },
             select: { id: true, name: true, imageUrl: true, coverUrl: true, bio: true }
@@ -42,12 +63,14 @@ export class ArtistMetadataService {
         const hasValidCover = existing?.coverUrl && 
             !existing.coverUrl.includes('placeholder') && 
             !existing.coverUrl.includes('logo.png') && 
-            !existing.coverUrl.includes('ui-avatars.com');
+            !existing.coverUrl.includes('ui-avatars.com') &&
+            !isCircularMaskUrl(existing.coverUrl);
 
         const hasValidImage = existing?.imageUrl && 
             !existing.imageUrl.includes('placeholder') && 
             !existing.imageUrl.includes('logo.png') && 
-            !existing.imageUrl.includes('ui-avatars.com');
+            !existing.imageUrl.includes('ui-avatars.com') &&
+            !isCircularMaskUrl(existing.imageUrl);
 
         if (!forceRefresh && hasValidCover && hasValidImage) {
             return {
@@ -61,98 +84,72 @@ export class ArtistMetadataService {
         let heroBanner: string | null = null;
         let avatar: string | null = null;
         let bio: string | null = existing?.bio || null;
-        let source: ArtistVisuals['source'] = 'apple_music';
+        let source: ArtistVisuals['source'] = 'jiosaavn';
 
         // ─────────────────────────────────────────────────────────────
-        // 0. PRIMARY: Apple Music Official Developer API (Pristine 1920x1080)
+        // 1. PRIMARY: JioSaavn CDN (High-resolution 500x500 rectangular full portrait)
         // ─────────────────────────────────────────────────────────────
         try {
-            await KeyPoolService.executeWithFailover('applemusic', async (amToken) => {
-                const searchRes = await axios.get(`https://amp-api.music.apple.com/v1/catalog/in/search`, {
-                    headers: { Authorization: `Bearer ${amToken}`, Origin: 'https://music.apple.com' },
-                    params: { term: cleanName, types: 'artists', limit: 1 },
-                    timeout: 4500
-                });
-                const artMatch = searchRes.data.results?.artists?.data?.[0];
-                if (artMatch) {
-                    const rawArt = artMatch.attributes?.artwork?.url;
-                    if (rawArt && !rawArt.includes('mza_16722262254049312592') && !rawArt.includes('Golden_Sparrow')) {
-                        heroBanner = rawArt.replace('{w}x{h}', '1920x1080').replace('{f}', 'jpg');
-                        avatar = rawArt.replace('{w}x{h}', '600x600').replace('{f}', 'jpg');
-                        source = 'apple_music';
-                    }
-                    const notes = artMatch.attributes?.editorialNotes;
-                    const editorialBio = notes?.standard || notes?.short;
-                    if (editorialBio && editorialBio.length > 20) {
-                        bio = editorialBio;
-                    }
-                }
-            });
-        } catch (amErr: any) {
-            console.warn(`[ArtistMetadata] Apple Music Developer API failed for "${cleanName}": ${amErr.message}`);
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // 1. FALLBACK 1: Apple Music / iTunes Web Scraper (Official 1920x1080)
-        // ─────────────────────────────────────────────────────────────
-        if (!heroBanner || !avatar) {
-            try {
-                const searchRes = await axios.get(`https://itunes.apple.com/search`, {
+            const sRes = await axios.get('https://www.jiosaavn.com/api.php', {
                 params: {
-                    term: cleanName,
-                    media: 'music',
-                    entity: 'musicArtist',
-                    limit: 1
+                    __call: 'search.getArtistResults',
+                    _format: 'json',
+                    _marker: '0',
+                    api_version: '4',
+                    ctx: 'web6dot0',
+                    p: 1,
+                    n: 3,
+                    q: cleanName
                 },
-                timeout: 5000
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                timeout: 4500
             }).catch(() => null);
 
-            const match = searchRes?.data?.results?.[0];
-            if (match?.artistLinkUrl) {
-                const pageRes = await axios.get(match.artistLinkUrl, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept-Language': 'en-US,en;q=0.9',
+            const match = sRes?.data?.results?.find((r: any) => {
+                const rName = (r.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const tName = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return rName === tName || rName.includes(tName) || tName.includes(rName);
+            }) || sRes?.data?.results?.[0];
+
+            if (match?.id) {
+                const aRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'artist.getArtistPageDetails',
+                        _format: 'json',
+                        _marker: '0',
+                        api_version: '4',
+                        ctx: 'web6dot0',
+                        artistId: match.id,
+                        n_song: 5,
+                        n_album: 5
                     },
-                    timeout: 7000
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 4500
                 }).catch(() => null);
 
-                if (pageRes?.data) {
-                    const html = pageRes.data;
-                    const $ = cheerio.load(html);
-
-                    // 1. Prioritize official Apple Music AMCArtistImages master banner (2560x1440)
-                    const amcMatches = html.match(/https:\/\/[^"'\s]+AMCArtistImages[^"'\s]+/g);
-                    if (amcMatches && amcMatches.length > 0) {
-                        const rawAmc = amcMatches[0].replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '');
-                        heroBanner = `${rawAmc}/2560x1440bb.webp`;
-                        avatar = `${rawAmc}/600x600bb.jpg`;
-                        source = 'apple_music';
-                    }
-
-                    if (!heroBanner) {
-                        const ogImage = $('meta[property="og:image"]').attr('content');
-                        if (ogImage && ogImage.includes('mzstatic')) {
-                            heroBanner = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/1920x1080cw.$1');
-                            avatar = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/600x600bb.$1');
-                            source = 'apple_music';
-                        }
-                    }
-
-                    // Also extract editorial bio if present
-                    const bioText = $('p[data-testid="artist-bio-text"], .artist-bio__text, [class*="editorial-notes"]').first().text().trim();
-                    if (bioText && bioText.length > 30) {
-                        bio = bioText;
+                const data = aRes?.data;
+                if (data?.image && !data.image.includes('artist-default')) {
+                    const cleanImg = data.image.replace('150x150', '500x500').replace('50x50', '500x500');
+                    heroBanner = cleanImg;
+                    avatar = cleanImg;
+                    source = 'jiosaavn';
+                }
+                if (!bio && data?.bio) {
+                    try {
+                        const parsed = typeof data.bio === 'string' ? JSON.parse(data.bio) : data.bio;
+                        if (Array.isArray(parsed)) bio = parsed.map((b: any) => b.text || b).join(' ');
+                        else if (typeof parsed === 'string') bio = parsed;
+                    } catch {
+                        if (typeof data.bio === 'string') bio = data.bio;
                     }
                 }
             }
-        } catch (e: any) {
-            console.warn(`[ArtistMetadata] Apple Music lookup failed for "${cleanName}": ${e.message}`);
-        }
+        } catch (saavnErr: any) {
+            console.warn(`[ArtistMetadata] JioSaavn lookup warn for "${cleanName}": ${saavnErr.message}`);
         }
 
         // ─────────────────────────────────────────────────────────────
-        // 2. FALLBACK 1: RapidAPI Spotify (using key pool failover)
+        // 2. FALLBACK 1: RapidAPI Spotify (Official Spotify Widescreen Header & Avatar)
         // ─────────────────────────────────────────────────────────────
         if (!heroBanner || !avatar) {
             try {
@@ -170,50 +167,19 @@ export class ArtistMetadataService {
                     const spAvatar = item?.visuals?.avatarImage?.sources?.[0]?.url;
                     const spHeader = item?.visuals?.headerImage?.sources?.[0]?.url;
 
-                    if (spAvatar || spHeader) {
+                    if ((spAvatar || spHeader) && !isCircularMaskUrl(spHeader) && !isCircularMaskUrl(spAvatar)) {
                         if (!heroBanner) heroBanner = spHeader || spAvatar;
                         if (!avatar) avatar = spAvatar || spHeader;
                         source = 'rapidapi_spotify';
                     }
                 });
             } catch (err: any) {
-                // Non-fatal, proceed to JioSaavn
+                // Non-fatal, proceed to Deezer
             }
         }
 
         // ─────────────────────────────────────────────────────────────
-        // 3. FALLBACK 2: JioSaavn (500x500 high-resolution regional/global)
-        // ─────────────────────────────────────────────────────────────
-        if (!heroBanner || !avatar) {
-            try {
-                const saavnRes = await axios.get('https://www.jiosaavn.com/api.php', {
-                    params: {
-                        __call: 'artist.getArtistPageDetails',
-                        artist_name: cleanName,
-                        _format: 'json',
-                        _marker: '0',
-                        api_version: '4',
-                        ctx: 'web6dot0'
-                    },
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-                    timeout: 5000
-                }).catch(() => null);
-
-                const data = saavnRes?.data;
-                if (data?.image) {
-                    const img = data.image.replace('150x150', '500x500').replace('50x50', '500x500');
-                    if (!heroBanner) heroBanner = img;
-                    if (!avatar) avatar = img;
-                    if (!bio && data.bio) bio = data.bio;
-                    source = 'jiosaavn';
-                }
-            } catch (err: any) {
-                console.warn(`[ArtistMetadata] JioSaavn lookup failed for "${cleanName}": ${err.message}`);
-            }
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // 4. FALLBACK 3: Deezer (1000x1000 picture_xl)
+        // 3. FALLBACK 2: Deezer (1000x1000 picture_xl unmasked portrait)
         // ─────────────────────────────────────────────────────────────
         if (!heroBanner || !avatar) {
             try {
@@ -224,7 +190,7 @@ export class ArtistMetadataService {
                 const match = dzRes?.data?.data?.[0];
                 if (match) {
                     const img = match.picture_xl || match.picture_big;
-                    if (img && !img.includes('artist//')) {
+                    if (img && !img.includes('artist//') && !isCircularMaskUrl(img)) {
                         if (!heroBanner) heroBanner = img;
                         if (!avatar) avatar = img;
                         source = 'deezer';
@@ -235,26 +201,55 @@ export class ArtistMetadataService {
             }
         }
 
-        // If we found any valid images, save them directly to database
+        // ─────────────────────────────────────────────────────────────
+        // 4. FALLBACK 3: Apple Music / iTunes (STRICT: Bounding Box bb.jpg ONLY, NEVER cw.png or _cropped.png)
+        // ─────────────────────────────────────────────────────────────
+        if (!heroBanner || !avatar) {
+            try {
+                const searchRes = await axios.get(`https://itunes.apple.com/search`, {
+                    params: { term: cleanName, media: 'music', entity: 'musicArtist', limit: 1 },
+                    timeout: 4000
+                }).catch(() => null);
+
+                const match = searchRes?.data?.results?.[0];
+                if (match?.artistLinkUrl) {
+                    const pageRes = await axios.get(match.artistLinkUrl, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                        },
+                        timeout: 5000
+                    }).catch(() => null);
+
+                    if (pageRes?.data) {
+                        const html = pageRes.data;
+                        const $ = cheerio.load(html);
+                        const ogImage = $('meta[property="og:image"]').attr('content');
+                        // Strictly reject any _cropped.png or cw.png
+                        if (ogImage && ogImage.includes('mzstatic') && !isCircularMaskUrl(ogImage)) {
+                            const bbImage = ogImage.replace(/\/\d+x\d+.*?\.(png|jpg|webp)/, '/600x600bb.jpg');
+                            if (!isCircularMaskUrl(bbImage)) {
+                                heroBanner = bbImage;
+                                avatar = bbImage;
+                                source = 'apple_music';
+                            }
+                        }
+
+                        const bioText = $('p[data-testid="artist-bio-text"], .artist-bio__text, [class*="editorial-notes"]').first().text().trim();
+                        if (bioText && bioText.length > 30) bio = bioText;
+                    }
+                }
+            } catch {}
+        }
+
+        // If we found any valid images, save them directly to database (only if free from circular masks)
         if (heroBanner || avatar) {
             try {
                 const updateData: any = {};
-                const shouldUpdateCover = heroBanner && (
-                    !existing?.coverUrl || 
-                    existing.coverUrl.includes('placeholder') || 
-                    existing.coverUrl.includes('logo.png') || 
-                    (source === 'apple_music' && !existing.coverUrl.includes('mzstatic'))
-                );
-                if (shouldUpdateCover) {
+                if (heroBanner && !isCircularMaskUrl(heroBanner)) {
                     updateData.coverUrl = heroBanner;
                 }
-                const shouldUpdateImage = avatar && (
-                    !existing?.imageUrl || 
-                    existing.imageUrl.includes('placeholder') || 
-                    existing.imageUrl.includes('ui-avatars.com') || 
-                    (source === 'apple_music' && !existing.imageUrl.includes('mzstatic'))
-                );
-                if (shouldUpdateImage) {
+                if (avatar && !isCircularMaskUrl(avatar)) {
                     updateData.imageUrl = avatar;
                 }
                 if (bio && (!existing?.bio || existing.bio.length < 30)) {
@@ -266,7 +261,7 @@ export class ArtistMetadataService {
                         where: { id: artistId },
                         data: updateData
                     });
-                    console.log(`[ArtistMetadata] Successfully persisted ${source} visuals to DB for artist "${cleanName}"`);
+                    console.log(`[ArtistMetadata] Successfully persisted clean ${source} visuals to DB for artist "${cleanName}"`);
                 }
             } catch (dbErr: any) {
                 console.warn(`[ArtistMetadata] Failed to save visuals to DB for "${cleanName}": ${dbErr.message}`);
@@ -274,8 +269,8 @@ export class ArtistMetadataService {
         }
 
         return {
-            coverUrl: heroBanner || existing?.coverUrl || null,
-            imageUrl: avatar || existing?.imageUrl || null,
+            coverUrl: (!isCircularMaskUrl(heroBanner) ? heroBanner : null) || (!isCircularMaskUrl(existing?.coverUrl) ? existing?.coverUrl : null) || null,
+            imageUrl: (!isCircularMaskUrl(avatar) ? avatar : null) || (!isCircularMaskUrl(existing?.imageUrl) ? existing?.imageUrl : null) || null,
             bio: bio || existing?.bio || null,
             source
         };

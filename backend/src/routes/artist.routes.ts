@@ -316,16 +316,31 @@ export async function artistRoutes(server: FastifyInstance) {
             }
         }
 
-        // Enrich artist bio / image / banner if missing or placeholder or not widescreen
+        // Helper to detect circular mask or cropped image URLs
+        const isCircular = (url?: string | null): boolean => {
+            if (!url) return false;
+            return (
+                url.includes('cw.png') ||
+                url.includes('cw.jpg') ||
+                url.includes('cw.webp') ||
+                url.includes('_cropped.png') ||
+                url.includes('_cropped.jpg') ||
+                url.includes('AMCArtistImages') ||
+                url.includes('1920x1080cw') ||
+                url.includes('1200x630cw')
+            );
+        };
+
+        // Enrich artist bio / image / banner if missing or placeholder or has circular mask
         let widescreenBanner: string | null = null;
         const hasBadBio = !artist.bio || artist.bio.length < 30 || artist.bio.includes('ui-avatars.com');
-        const hasBadImage = !artist.imageUrl || artist.imageUrl.includes('ui-avatars.com') || artist.imageUrl.includes('artist-default');
-        const hasBadCover = !artist.coverUrl || artist.coverUrl.includes('ui-avatars.com') || artist.coverUrl.includes('artist-default');
-        const isCurrentBannerWidescreen = artist.coverUrl && (
-            artist.coverUrl.includes('1920x1080') || 
-            artist.coverUrl.includes('mzstatic') || 
+        const hasBadImage = !artist.imageUrl || artist.imageUrl.includes('ui-avatars.com') || artist.imageUrl.includes('artist-default') || isCircular(artist.imageUrl);
+        const hasBadCover = !artist.coverUrl || artist.coverUrl.includes('ui-avatars.com') || artist.coverUrl.includes('artist-default') || isCircular(artist.coverUrl);
+        const isCurrentBannerWidescreen = artist.coverUrl && !isCircular(artist.coverUrl) && (
             artist.coverUrl.includes('headerImage') || 
-            artist.coverUrl.includes('dzcdn.net')
+            artist.coverUrl.includes('dzcdn.net') ||
+            artist.coverUrl.includes('saavncdn.com') ||
+            artist.coverUrl.includes('mzstatic')
         );
 
         if (!isCurrentBannerWidescreen || hasBadBio || hasBadImage || hasBadCover) {
@@ -474,20 +489,30 @@ export async function artistRoutes(server: FastifyInstance) {
                 }).catch(() => null) : Promise.resolve(null)
             ]);
 
-            // 0. Primary Pass: Official JioSaavn Top Songs with direct 160kbps audio URLs
+            // 0. Primary Pass: Official JioSaavn Top Songs with direct audio URLs
             const saavnSongsList: any[] = Array.isArray(saavnArtistData?.topSongs) ? saavnArtistData.topSongs : (saavnArtistData?.topSongs?.songs || []);
             if (saavnSongsList.length > 0) {
-                const existingTitles = new Set(finalTopTracks.map(t => t.title.toLowerCase().trim()));
+                // Build lookup for local DB tracks to preserve playback state and local audio
+                const localTrackMap = new Map<string, any>();
+                for (const t of topTracks) {
+                    if (t?.title) localTrackMap.set(t.title.toLowerCase().trim(), t);
+                }
+                finalTopTracks = [];
+                const seenTitles = new Set<string>();
+
                 saavnSongsList.forEach((s: any, sIdx: number) => {
-                    const cleanTitle = (s.song || s.title || '')
+                    const cleanTitle = (s.title || s.song || s.name || '')
                         .replace(/&quot;/g, '"')
                         .replace(/&#039;/g, "'")
                         .replace(/&amp;/g, '&')
                         .trim();
-                    if (!cleanTitle || existingTitles.has(cleanTitle.toLowerCase())) return;
-                    existingTitles.add(cleanTitle.toLowerCase());
+                    if (!cleanTitle || seenTitles.has(cleanTitle.toLowerCase())) return;
+                    seenTitles.add(cleanTitle.toLowerCase());
 
-                    let artwork = (s.image || artist.imageUrl || '').replace('150x150', '500x500').replace('50x50', '500x500');
+                    let artwork = (s.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+                    if (!artwork || artwork.includes('artist-default') || artwork.includes('placeholder')) {
+                        artwork = saavnPic || artist.imageUrl || '';
+                    }
                     const encMedia = s.more_info?.encrypted_media_url || s.encrypted_media_url;
                     let directAudio = '';
                     if (encMedia) {
@@ -521,10 +546,13 @@ export async function artistRoutes(server: FastifyInstance) {
                     const parsedPlays = parseInt(s.play_count || s.more_info?.play_count, 10);
                     const streamCount = (parsedPlays && parsedPlays > 1000) ? parsedPlays : Math.max(10000, 10000000 - (sIdx * 45000));
 
-                    const finalAudio = directAudio || `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}&trackId=saavn-${s.id}`;
+                    const localMatch = localTrackMap.get(cleanTitle.toLowerCase());
+                    const finalAudio = (localMatch && localMatch.audioUrl && !localMatch.audioUrl.includes('mzstatic') && !localMatch.audioUrl.includes('audio-ssl'))
+                        ? localMatch.audioUrl
+                        : (directAudio || `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${cleanTitle}`)}&title=${encodeURIComponent(cleanTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}&trackId=saavn-${s.id}`);
 
                     finalTopTracks.push({
-                        id: `saavn-${s.id}`,
+                        id: localMatch?.id || `saavn-${s.id}`,
                         title: cleanTitle,
                         duration: dur,
                         coverUrl: artwork,
@@ -540,12 +568,20 @@ export async function artistRoutes(server: FastifyInstance) {
                         },
                         releaseDate: relDate,
                         createdAt: relDate,
-                        isVirtual: true,
-                        isLocalAvailable: false,
+                        isVirtual: !localMatch,
+                        isLocalAvailable: !!localMatch,
                         streams: streamCount,
                         like_count: 0
                     } as any);
                 });
+
+                // Append any remaining distinct local DB tracks that were not in JioSaavn top songs
+                for (const t of topTracks) {
+                    if (t?.title && !seenTitles.has(t.title.toLowerCase().trim())) {
+                        seenTitles.add(t.title.toLowerCase().trim());
+                        finalTopTracks.push(t);
+                    }
+                }
             }
 
             // Combine candidate songs strictly prioritizing verified Apple Music lookup
@@ -1094,7 +1130,29 @@ export async function artistRoutes(server: FastifyInstance) {
             };
         }).filter((sg: any) => sg.title && sg.coverUrl);
 
-        const heroBanner = widescreenBanner || (canon?.coverUrl) || artist.coverUrl || wikiBanner || deezerCover || finalImageUrl;
+        const cleanBanner = (!isCircular(widescreenBanner) ? widescreenBanner : null)
+            || (!isCircular(canon?.coverUrl) ? canon?.coverUrl : null)
+            || (!isCircular(artist.coverUrl) ? artist.coverUrl : null)
+            || saavnPic
+            || (!isCircular(wikiBanner) ? wikiBanner : null)
+            || deezerCover
+            || (!isCircular(finalImageUrl) ? finalImageUrl : null);
+
+        const heroBanner = cleanBanner || saavnPic || deezerCover || artist.imageUrl;
+
+        // Clean any circular Apple Music masks from DB records
+        if (isCircular(artist.coverUrl) || isCircular(artist.imageUrl)) {
+            const cleanImage = (!isCircular(finalImageUrl) ? finalImageUrl : null) || saavnPic || deezerPic || heroBanner;
+            artist.coverUrl = heroBanner;
+            artist.imageUrl = cleanImage;
+            finalImageUrl = cleanImage;
+            if (artist.id) {
+                prisma.artist.update({
+                    where: { id: artist.id },
+                    data: { coverUrl: heroBanner, imageUrl: cleanImage }
+                }).catch(() => {});
+            }
+        }
 
         if (relatedArtists.length > 0) {
             try {
