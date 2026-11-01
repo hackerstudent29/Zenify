@@ -178,7 +178,7 @@ export function JioSaavnCardSection({
 
             return (
               <MediaCard
-                key={item.id || `${title}-${idx}`}
+                key={`${title}-${item.id || item.name || idx}-${idx}`}
                 track={formattedTrack}
                 index={idx}
                 className={cn("shrink-0 snap-start", MEDIA_CARD_WIDTH)}

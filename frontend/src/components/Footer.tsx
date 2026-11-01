@@ -22,7 +22,7 @@ export default function Footer() {
         <div className="space-y-6">
           <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Explore</h4>
           <ul className="space-y-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">
-            <li><Link href="/library" className="hover:text-brand transition-colors">Library</Link></li>
+            <li><Link href="/liked" className="hover:text-brand transition-colors">Liked Songs</Link></li>
             <li><Link href="/search" className="hover:text-brand transition-colors">Search</Link></li>
             <li><Link href="/about-zenify" className="hover:text-brand transition-colors">About Zenify</Link></li>
             <li><Link href="/about" className="hover:text-brand transition-colors">About Creator</Link></li>
