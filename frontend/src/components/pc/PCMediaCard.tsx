@@ -7,6 +7,7 @@ import { Equalizer } from "@/components/ui/Equalizer";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
 import { useArtistLike } from "@/hooks/useArtistLike";
+import { useAlbumLike } from "@/hooks/useAlbumLike";
 import { getRefetchLyricsAnimatedMenuItem } from "@/components/shared/RefetchLyricsSubMenu";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
@@ -170,7 +171,16 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
     isArtist ? track : undefined
   );
 
-  const isLiked = isArtist ? isArtistLiked : (!isLink && likedTrackIds?.includes(track.id));
+  const { isLiked: isAlbumLiked, toggleLike: toggleAlbumLike } = useAlbumLike(
+    isAlbum ? track.id : undefined,
+    isAlbum ? track : undefined
+  );
+
+  const isLiked = isArtist
+    ? isArtistLiked
+    : isAlbum
+    ? isAlbumLiked
+    : (!isLink && likedTrackIds?.includes(track.id));
 
   const toggleLikeMutation = useMutation({
     mutationFn: async () => {
@@ -286,12 +296,14 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  )}
 
  {/* Top-Right Like Button */}
- {!isAlbum && !isPlaylist && (
+ {!isPlaylist && (
    <button
      onClick={(e) => {
        e.stopPropagation();
        if (isArtist) {
          toggleArtistLike(e);
+       } else if (isAlbum) {
+         toggleAlbumLike(e);
        } else {
          toggleLikeMutation.mutate();
        }

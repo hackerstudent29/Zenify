@@ -5,6 +5,7 @@ import { Play, Pause, ShoppingCart, Plus, Download } from "lucide-react";
 import { Equalizer } from "@/components/ui/Equalizer";
 import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { useArtistLike } from "@/hooks/useArtistLike";
+import { useAlbumLike } from "@/hooks/useAlbumLike";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -115,7 +116,16 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
     isArtist ? track : undefined
   );
 
-  const isLiked = isArtist ? isArtistLiked : (!isLink && likedTrackIds?.includes(track.id));
+  const { isLiked: isAlbumLiked, toggleLike: toggleAlbumLike } = useAlbumLike(
+    isAlbum ? track.id : undefined,
+    isAlbum ? track : undefined
+  );
+
+  const isLiked = isArtist
+    ? isArtistLiked
+    : isAlbum
+    ? isAlbumLiked
+    : (!isLink && likedTrackIds?.includes(track.id));
 
   const toggleLikeMutation = useMutation({
     mutationFn: async () => {
@@ -236,13 +246,15 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  )}
  </AnimatePresence>
 
- {!isAlbum && !isPlaylist && (
+ {!isPlaylist && (
    <button
      type="button"
      onClick={(e) => {
        e.stopPropagation();
        if (isArtist) {
          toggleArtistLike(e);
+       } else if (isAlbum) {
+         toggleAlbumLike(e);
        } else {
          toggleLikeMutation.mutate();
        }

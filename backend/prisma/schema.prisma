@@ -89,6 +89,7 @@ model UserPreferences {
   preferredGenres       String[]  @default([])
   languages             String[]  @default([])
   favoriteArtists       Json?
+  favoriteAlbums        Json?
   audioQuality          String    @default("high")
   crossfade           Boolean  @default(false)
   autoplay            Boolean  @default(true)
