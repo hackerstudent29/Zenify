@@ -1,3 +1,4 @@
+import { GlobalTooltip } from "@/components/shared/GlobalTooltip";
 "use client";
 
 import { usePlayerStore } from "@/store/player";
@@ -57,8 +58,8 @@ const formatDuration = (s?: number | null) => {
 /* ------------------------------------------------------------------ */
 /*  Spring button                                                      */
 /* ------------------------------------------------------------------ */
-function SpringButton({ className, ...props }: HTMLMotionProps<"button">) {
-  return (
+function SpringButton({ className, title, ...props }: HTMLMotionProps<"button">) {
+  const btn = (
     <motion.button
       whileTap={{ scale: 0.9 }}
       transition={SPRING}
@@ -66,6 +67,16 @@ function SpringButton({ className, ...props }: HTMLMotionProps<"button">) {
       {...props}
     />
   );
+
+  if (title) {
+    return (
+      <GlobalTooltip content={title} side="top" sideOffset={10}>
+        {btn}
+      </GlobalTooltip>
+    );
+  }
+
+  return btn;
 }
 
 /* ------------------------------------------------------------------ */

@@ -1182,31 +1182,6 @@ export function TrackActionsDropdown({
       onClick: () => openDownloadModal(track),
     };
 
-    const adminKids = clean([
-      !hide.has("refetch-audio") && {
-        id: "refetch-audio",
-        icon: <RefreshCw className={cn(isRefetching === track?.id && "animate-spin text-brand")} />,
-        label: isRefetching === track?.id ? "Refetching Audio…" : "Refetch Audio",
-        onClick: () => {
-          refetchTrackAudio(track, showToast);
-        },
-      },
-      !hide.has("refetch-lyrics") && {
-        id: "refetch-lyrics",
-        icon: <FileText />,
-        label: "Refetch Lyrics",
-        onClick: () => {
-          refetchTrackLyrics(track, undefined, showToast);
-        },
-      },
-      !hide.has("sync-lyrics") && {
-        id: "sync-lyrics",
-        icon: <Mic className="text-violet-400" />,
-        label: "Sync Lyrics",
-        className: "text-violet-300",
-        onClick: () => router.push(`/admin/lyric-sync?trackId=${track?.id}`),
-      },
-    ]);
 
     rawItems = [
       /* play */
@@ -1300,7 +1275,6 @@ export function TrackActionsDropdown({
 
       /* share (+ download inside), admin */
       hide.has("share") ? downloadItem : shareItem([downloadItem].filter(Boolean) as MenuItem[]),
-      isAdmin && adminKids.length > 0 && { id: "admin", label: "Admin", children: adminKids },
     ];
   }
 

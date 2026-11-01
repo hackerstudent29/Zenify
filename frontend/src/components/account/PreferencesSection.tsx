@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
+import notify from '@/lib/notify';
 import {
   Check,
   ChevronDown,
@@ -240,6 +241,7 @@ export function PreferencesSection() {
       });
 
       setSaveSuccess(true);
+      notify("Preferences updated successfully", "success");
       setTimeout(() => setSaveSuccess(false), 3000);
 
       queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
@@ -253,7 +255,9 @@ export function PreferencesSection() {
       window.dispatchEvent(new CustomEvent('zenify:preferences-updated'));
     } catch (err: any) {
       console.error('Failed to update preferences:', err);
-      setErrorMessage(err.response?.data?.message || 'Failed to save preferences.');
+      const errText = err.response?.data?.message || 'Failed to save preferences.';
+      setErrorMessage(errText);
+      notify(errText, "error");
     } finally {
       setIsSaving(false);
     }

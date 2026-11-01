@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import notify from "@/lib/notify";
 
 export function useArtistLike(
   artistId?: string,
@@ -59,6 +60,11 @@ export function useArtistLike(
           ];
 
       queryClient.setQueryData(["liked-artists"], next);
+      if (exists) {
+        notify("Removed artist from Favorites", "info");
+      } else {
+        notify("Added artist to Favorites", "success");
+      }
       return { previous };
     },
     onError: (_e, _v, ctx) => {
@@ -66,6 +72,7 @@ export function useArtistLike(
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["liked-artists"] });
+      queryClient.invalidateQueries({ queryKey: ["my-artists"] });
       queryClient.invalidateQueries({ queryKey: ["library-overview"] });
     },
   });

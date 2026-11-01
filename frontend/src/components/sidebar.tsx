@@ -360,21 +360,11 @@ export function Sidebar() {
                   dataTour="device-music"
                   href="/local-library"
                   icon={SwiftUIDevice}
-                  label="Device"
+                  label="My Library"
                   active={pathname.startsWith("/local-library")}
                   collapsed={collapsed}
                 />
               </div>
-
-              {isAdmin && (
-                <NavLink
-                  href="/admin"
-                  icon={SwiftUIAdmin}
-                  label="Admin Console"
-                  active={pathname.startsWith("/admin")}
-                  collapsed={collapsed}
-                />
-              )}
               <NavLink
                 href="#"
                 icon={SwiftUISettings}

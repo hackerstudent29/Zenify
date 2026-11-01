@@ -16,6 +16,7 @@ import {
 import { Globe, Keyboard, ShieldCheck, Check, X } from "lucide-react";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import api from "@/lib/api";
+import notify from "@/lib/notify";
 import { useAuthStore } from "@/store/authStore";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -189,24 +190,6 @@ export function SecuritySection() {
  </div>
  </div>
  </section>
-
- {/* Toast Notification */}
- <AnimatePresence>
- {toast && (
- <motion.div
- initial={{ opacity: 0, y: 20 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: 10 }}
- className={`fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-[100] transition-all duration-300 ${toast.type === 'error'
- ? 'bg-red-500/10 border-red-500/20 text-red-400'
- : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
- }`}
- >
- {toast.type === 'success' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
- <span className="text-[13px] font-semibold tracking-tight">{toast.msg}</span>
- </motion.div>
- )}
- </AnimatePresence>
  </>
  );
 }

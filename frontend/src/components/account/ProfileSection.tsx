@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
+import notify from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,9 +40,11 @@ export function ProfileSection() {
  updateUser(data);
  reset(data);
  setIsSaved(true);
+    notify("Profile updated successfully", "success");
  setTimeout(() => setIsSaved(false), 3000);
  } catch (error) {
  console.error("Failed to update profile", error);
+    notify("Failed to update profile", "error");
  } finally {
  setIsLoading(false);
  }

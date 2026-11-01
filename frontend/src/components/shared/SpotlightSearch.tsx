@@ -1,3 +1,4 @@
+import { GlobalTooltip } from "@/components/shared/GlobalTooltip";
 "use client";
 import React, {
   useDeferredValue,
@@ -700,19 +701,20 @@ export function HeaderSearchButton() {
   return (
     <>
       <SpotlightStyles />
-      <button
-        ref={btn}
-        type="button"
-        aria-label="Search"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        title="Search (⌘K or /)"
-        data-open={open}
-        onClick={openSearch}
-        className="sp-glass-btn"
-      >
-        <Icon name="search" size={18} className="sp-glass-icon" />
-      </button>
+      <GlobalTooltip content="Search" shortcut="⌘K" side="bottom">
+        <button
+          ref={btn}
+          type="button"
+          aria-label="Search"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          data-open={open}
+          onClick={openSearch}
+          className="sp-glass-btn"
+        >
+          <Icon name="search" size={18} className="sp-glass-icon" />
+        </button>
+      </GlobalTooltip>
 
       {open && (
         <SpotlightSearchOverlay

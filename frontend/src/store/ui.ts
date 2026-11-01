@@ -3,10 +3,14 @@ import React from 'react';
 
 import { Track } from './player';
 
+export type NotificationType = 'success' | 'error' | 'warning' | 'info';
+
 export interface ToastNotification {
   id: string;
   msg: string;
-  type?: 'success' | 'error' | 'info';
+  type: NotificationType;
+  title?: string;
+  duration?: number;
 }
 
 interface UIState {
@@ -35,7 +39,8 @@ interface UIState {
   coloredBackground: boolean;
   setColoredBackground: (enabled: boolean) => void;
   toast: ToastNotification | null;
-  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  showToast: (msg: string, type?: NotificationType, options?: { title?: string; duration?: number }) => void;
+  showNotification: (msg: string, type?: NotificationType, options?: { title?: string; duration?: number }) => void;
   hideToast: () => void;
   /** Title to show in the TopBar when the page hero has scrolled out of view */
   stickyPageTitle: string | null;
@@ -95,7 +100,7 @@ const getInitialColoredBackground = (): boolean => {
   return saved !== null ? saved === 'true' : false;
 };
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set, get) => ({
   isPricingModalOpen: false,
   isSidebarCollapsed: false,
   isDownloadModalOpen: false,
@@ -134,12 +139,22 @@ export const useUIStore = create<UIState>((set) => ({
     set({ reducedMotion: reduced });
   },
   toast: null,
-  showToast: (msg, type = 'success') => {
-    const id = Math.random().toString();
-    set({ toast: { id, msg, type } });
+  showNotification: (msg, type = 'success', options) => {
+    if (!msg) return;
+    const current = get().toast;
+    // Prevent duplicate notification flooding
+    if (current && current.msg === msg && current.type === type) {
+      return;
+    }
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
+    const duration = options?.duration || 3200;
+    set({ toast: { id, msg, type, title: options?.title || 'Zenify', duration } });
     setTimeout(() => {
       set((state) => (state.toast?.id === id ? { toast: null } : state));
-    }, 3000);
+    }, duration);
+  },
+  showToast: (msg, type = 'success', options) => {
+    get().showNotification(msg, type, options);
   },
   hideToast: () => set({ toast: null }),
   stickyPageTitle: null,

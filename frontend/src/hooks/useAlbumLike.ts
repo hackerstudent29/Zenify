@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import notify from "@/lib/notify";
 
 export function useAlbumLike(
   albumId?: string,
@@ -75,6 +76,11 @@ export function useAlbumLike(
           ];
 
       queryClient.setQueryData(["liked-albums"], next);
+      if (exists) {
+        notify("Removed album from Favorites", "info");
+      } else {
+        notify("Added album to Favorites", "success");
+      }
       return { previous };
     },
     onError: (_e, _v, ctx) => {
@@ -96,4 +102,3 @@ export function useAlbumLike(
     isLoading: mutation.isPending,
   };
 }
-

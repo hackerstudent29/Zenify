@@ -190,6 +190,8 @@ server.register(activityRoutes, { prefix: '/api/activity' });
 server.register(queueRoutes, { prefix: '/api/queue' });
 import { discoveryRoutes } from './routes/discovery.routes';
 server.register(discoveryRoutes, { prefix: '/api/discover' });
+import { databaseAdminRoutes } from './routes/database-admin.routes';
+server.register(databaseAdminRoutes, { prefix: '/api/admin/database' });
 
 server.get('/health', async () => {
     return { status: 'ok' };
