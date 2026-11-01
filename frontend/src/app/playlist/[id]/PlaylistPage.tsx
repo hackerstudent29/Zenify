@@ -6,12 +6,13 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, Trash2, Clock, Music, Plus, MoreHorizontal, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check, Mic, RefreshCw, ListPlus } from "lucide-react";
+import { Play, Trash2, Clock, Music, Plus, Pause, Shuffle, User, Share2, Download, Edit2, ArrowLeft, Check, Mic, RefreshCw, ListPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
+import { SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { MarqueeText } from "@/components/shared/MarqueeText";
 import { useAlbumColor } from "@/hooks/useAlbumColor";
@@ -24,8 +25,6 @@ import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistM
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
 import { Equalizer } from "@/components/ui/Equalizer";
-import {
-} from "@/components/ui/dropdown-menu";
 
 import { motion } from "framer-motion";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
@@ -313,7 +312,7 @@ export default function PlaylistDetailPage() {
                 title="Playlist Options"
                 aria-label="Playlist options"
               >
-                <MoreHorizontal size={18} />
+                <SwiftUIEllipsis size={18} fill="currentColor" />
               </button>
             }
             items={[

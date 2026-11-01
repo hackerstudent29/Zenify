@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Library, Plus, Search, Disc, User, ChevronRight, Play, Filter, MoreHorizontal, Trash2, Share2, ListPlus } from "lucide-react";
-import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
+import { Library, Plus, Search, Disc, User, ChevronRight, Play, Filter, Trash2, Share2, ListPlus } from "lucide-react";
+import { SwiftUIHeart, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
 import { useQueryClient } from "@tanstack/react-query";
@@ -217,7 +218,7 @@ export function MobileLibraryPage({
                     </div>
                   </Link>
                   <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                    <AnimatedDropdown
+                    <TrackActionsDropdown
                       align="end"
                       trigger={
                         <button 
@@ -225,7 +226,7 @@ export function MobileLibraryPage({
                           className="w-9 h-9 rounded-full text-white/50 hover:text-white bg-white/5 flex items-center justify-center transition-colors cursor-pointer"
                           title="Playlist options"
                         >
-                          <MoreHorizontal size={18} />
+                          <SwiftUIEllipsis size={18} fill="currentColor" />
                         </button>
                       }
                       items={[

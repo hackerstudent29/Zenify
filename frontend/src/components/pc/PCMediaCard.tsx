@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic, ListPlus, RefreshCw } from "lucide-react";
-import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
+import { Play, Pause, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic, ListPlus, RefreshCw } from "lucide-react";
+import { SwiftUIHeart, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 import { Equalizer } from "@/components/ui/Equalizer";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
@@ -375,30 +375,31 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
      </button>
 
      <div
-       className={cn(
-         "am-glass-chip absolute bottom-2.5 right-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full text-white outline-none cursor-pointer",
-         "translate-y-1.5 scale-90 opacity-0 transition-[opacity,transform] duration-300 ease-[var(--spring)]",
-         "group-hover/art:translate-y-0 group-hover/art:scale-100 group-hover/art:opacity-100",
-         "focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 active:!scale-90 hover:bg-white/25"
-       )}
-     >
-       <TrackActionsDropdown
-         track={track}
-         context={isAlbum ? "album" : isPlaylist ? "playlist" : isArtist ? "artist" : "card"}
-         align="end"
-         trigger={
-           <button
-             type="button"
-             onClick={(e) => e.stopPropagation()}
-             className="w-full h-full flex items-center justify-center text-white outline-none bg-transparent cursor-pointer"
-             title="More options"
-             aria-label="More options"
-           >
-             <MoreHorizontal size={16} />
-           </button>
-         }
-       />
-     </div>
+        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          "am-glass-chip absolute bottom-2.5 right-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full text-white outline-none cursor-pointer",
+          "translate-y-1.5 scale-90 opacity-0 transition-[opacity,transform] duration-300 ease-[var(--spring)]",
+          "group-hover/art:translate-y-0 group-hover/art:scale-100 group-hover/art:opacity-100",
+          "focus-visible:translate-y-0 focus-visible:scale-100 focus-visible:opacity-100 active:!scale-90 hover:bg-white/25"
+        )}
+      >
+        <TrackActionsDropdown
+          track={track}
+          context={isAlbum ? "album" : isPlaylist ? "playlist" : isArtist ? "artist" : "card"}
+          align="end"
+          triggerClassName="w-full h-full"
+          trigger={
+            <button
+              type="button"
+              className="w-8 h-8 flex items-center justify-center text-white outline-none bg-transparent cursor-pointer"
+              title="More options"
+              aria-label="More options"
+            >
+              <SwiftUIEllipsis size={16} fill="currentColor" />
+            </button>
+          }
+        />
+      </div>
    </>
  )}
 

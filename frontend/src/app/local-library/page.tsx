@@ -6,7 +6,7 @@ import {
   HardDrive, Folder, Music, Play, Pause, RefreshCw, Trash2, 
   Search, ChevronRight, ArrowLeft, Disc, Layers, Sparkles, 
   Clock, ShieldCheck, FolderUp, Plus, Volume2, UploadCloud, CheckCircle2,
-  FolderPlus, User, Check, Zap, ExternalLink, MoreVertical, MoreHorizontal
+  FolderPlus, User, Check, Zap, ExternalLink, MoreVertical
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,8 @@ import { useCloudSyncStore } from "@/store/cloudSyncStore";
 import { formatDuration, cn, formatDisplayTitle, getMediaUrl, formatBytes, calculateCompressedCloudSize } from "@/lib/utils";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
+import { SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 import { SEO } from "@/components/shared/SEO";
 
 export default function LocalLibraryPage() {
@@ -508,14 +510,14 @@ export default function LocalLibraryPage() {
 
           {/* Zenify Standard 3-Dot Options Dropdown */}
           <div onClick={(e) => e.stopPropagation()}>
-            <AnimatedDropdown
+            <TrackActionsDropdown
               align="end"
               trigger={
                 <button
                   className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all outline-none cursor-pointer"
                   title="Track Options"
                 >
-                  <MoreHorizontal size={15} />
+                  <SwiftUIEllipsis size={15} fill="currentColor" />
                 </button>
               }
               items={[
@@ -887,14 +889,14 @@ export default function LocalLibraryPage() {
 
                           {/* Folder 3-Dot Options Button */}
                           <div className="absolute top-2 right-2 z-20" onClick={(e) => e.stopPropagation()}>
-                            <AnimatedDropdown
+                            <TrackActionsDropdown
                               align="end"
                               trigger={
                                 <button
                                   className="w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md text-white/80 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-lg outline-none"
                                   title="Folder Options"
                                 >
-                                  <MoreHorizontal size={14} />
+                                  <SwiftUIEllipsis size={14} fill="currentColor" />
                                 </button>
                               }
                               items={[

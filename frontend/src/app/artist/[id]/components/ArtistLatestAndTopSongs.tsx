@@ -115,9 +115,9 @@ export function ArtistLatestAndTopSongs({
           triggerClassName="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0 cursor-pointer"
           trigger={
             <button
+              type="button"
               className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 shrink-0 cursor-pointer"
               title="More"
-              onClick={(e) => e.stopPropagation()}
             >
               <SwiftUIEllipsis size={16} fill="currentColor" />
             </button>

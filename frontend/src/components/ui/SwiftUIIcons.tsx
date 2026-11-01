@@ -378,3 +378,244 @@ export function SwiftUIHeart({
   );
 }
 export const SFHeart = SwiftUIHeart;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Home: `house.fill` / `house`
+ */
+export function SwiftUIHome({
+  size = 20,
+  className = "",
+  fill = "none",
+  fillOpacity,
+  stroke = "currentColor",
+  strokeWidth = 1.8,
+  ...props
+}: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={fill}
+      fillOpacity={fillOpacity}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M3 10.5L12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5h-4.5a1 1 0 0 1-1-1v-4.5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1V20a1 1 0 0 1-1 1H4.5A1.5 1.5 0 0 1 3 20v-9.5z" />
+    </svg>
+  );
+}
+export const SFHome = SwiftUIHome;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Discover / Safari: `safari` / `compass`
+ */
+export function SwiftUICompass({
+  size = 20,
+  className = "",
+  fill = "none",
+  fillOpacity,
+  stroke = "currentColor",
+  strokeWidth = 1.8,
+  ...props
+}: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={fill}
+      fillOpacity={fillOpacity}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <circle cx="12" cy="12" r="9.5" />
+      <polygon
+        points="15.8 8.2 13.5 13.5 8.2 15.8 10.5 10.5 15.8 8.2"
+        fill={fill !== "none" ? fill : "currentColor"}
+        fillOpacity={fillOpacity !== undefined ? fillOpacity : 0.3}
+      />
+    </svg>
+  );
+}
+export const SFCompass = SwiftUICompass;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Playlists: `music.note.list`
+ */
+export function SwiftUIPlaylists({
+  size = 20,
+  className = "",
+  fill = "none",
+  fillOpacity,
+  stroke = "currentColor",
+  strokeWidth = 1.8,
+  ...props
+}: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={fill}
+      fillOpacity={fillOpacity}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M21 15V6a2 2 0 0 0-2-2H9" />
+      <path d="M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
+      <path d="M3 6h12" />
+      <path d="M3 10h12" />
+    </svg>
+  );
+}
+export const SFPlaylists = SwiftUIPlaylists;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Artists: `person.2.fill` / `person.crop.circle`
+ * Distinctive multi-artist / musician avatar silhouette replacing generic microphone.
+ */
+export function SwiftUIArtist({
+  size = 20,
+  className = "",
+  fill = "none",
+  fillOpacity,
+  stroke = "currentColor",
+  strokeWidth = 1.8,
+  ...props
+}: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={fill}
+      fillOpacity={fillOpacity}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <circle cx="9" cy="7.5" r="3.75" />
+      <path d="M2.5 19.5c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5" />
+      <path d="M15.5 4.5a3.75 3.75 0 0 1 0 7" />
+      <path d="M21.5 19.5c0-3.1-2.2-5.6-5.2-6.2" />
+    </svg>
+  );
+}
+export const SFArtist = SwiftUIArtist;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Device / Storage: `internaldrive`
+ */
+export function SwiftUIDevice({
+  size = 20,
+  className = "",
+  fill = "none",
+  fillOpacity,
+  stroke = "currentColor",
+  strokeWidth = 1.8,
+  ...props
+}: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={fill}
+      fillOpacity={fillOpacity}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <line x1="7" y1="15" x2="7.01" y2="15" strokeWidth={2.5} />
+      <line x1="16" y1="15" x2="18" y2="15" />
+    </svg>
+  );
+}
+export const SFDevice = SwiftUIDevice;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Settings: `gearshape.fill`
+ */
+export function SwiftUISettings({
+  size = 20,
+  className = "",
+  fill = "none",
+  fillOpacity,
+  stroke = "currentColor",
+  strokeWidth = 1.8,
+  ...props
+}: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={fill}
+      fillOpacity={fillOpacity}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+export const SFSettings = SwiftUISettings;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Shield / Admin: `shield.checkered`
+ */
+export function SwiftUIAdmin({
+  size = 20,
+  className = "",
+  fill = "none",
+  fillOpacity,
+  stroke = "currentColor",
+  strokeWidth = 1.8,
+  ...props
+}: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={fill}
+      fillOpacity={fillOpacity}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+export const SFAdmin = SwiftUIAdmin;
+

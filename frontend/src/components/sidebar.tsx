@@ -4,18 +4,20 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Home as HomeIcon,
-  Compass,
-  ListMusic,
-  Mic,
-  HardDrive,
-  Settings,
-  ShieldCheck,
   Plus,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
-import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
+import {
+  SwiftUIHeart,
+  SwiftUIArtist,
+  SwiftUIHome,
+  SwiftUICompass,
+  SwiftUIPlaylists,
+  SwiftUIDevice,
+  SwiftUISettings,
+  SwiftUIAdmin,
+} from "@/components/ui/SwiftUIIcons";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
@@ -248,10 +250,10 @@ export function Sidebar() {
           {/* One continuous list with a little breathing room between rows */}
           <nav className="shrink-0 px-3">
             <div id="tour-sidebar-nav" data-tour="sidebar-nav" className="flex flex-col gap-1">
-              <NavLink href="/" icon={HomeIcon} label="Home" active={pathname === "/"} collapsed={collapsed} />
+              <NavLink href="/" icon={SwiftUIHome} label="Home" active={pathname === "/"} collapsed={collapsed} />
               <NavLink
                 href="/discover"
-                icon={Compass}
+                icon={SwiftUICompass}
                 label="Discover"
                 active={pathname === "/discover" || pathname === "/search"}
                 collapsed={collapsed}
@@ -276,7 +278,7 @@ export function Sidebar() {
                     )}
                   >
                     <div className="flex min-w-0 items-center">
-                      <RowIcon icon={ListMusic} active={playlistsActive} />
+                      <RowIcon icon={SwiftUIPlaylists} active={playlistsActive} />
                       <Label collapsed={collapsed}>Playlists</Label>
                     </div>
 
@@ -357,7 +359,7 @@ export function Sidebar() {
                 />
                 <NavLink
                   href="/library?tab=artists"
-                  icon={Mic}
+                  icon={SwiftUIArtist}
                   label="Artists"
                   active={pathname.startsWith("/library") && activeTab === "artists"}
                   collapsed={collapsed}
@@ -366,7 +368,7 @@ export function Sidebar() {
                   id="tour-device-music"
                   dataTour="device-music"
                   href="/local-library"
-                  icon={HardDrive}
+                  icon={SwiftUIDevice}
                   label="Device"
                   active={pathname.startsWith("/local-library")}
                   collapsed={collapsed}
@@ -376,7 +378,7 @@ export function Sidebar() {
               {isAdmin && (
                 <NavLink
                   href="/admin"
-                  icon={ShieldCheck}
+                  icon={SwiftUIAdmin}
                   label="Admin Console"
                   active={pathname.startsWith("/admin")}
                   collapsed={collapsed}
@@ -384,7 +386,7 @@ export function Sidebar() {
               )}
               <NavLink
                 href="#"
-                icon={Settings}
+                icon={SwiftUISettings}
                 label="Settings"
                 active={useUIStore((s) => s.isSettingsOpen)}
                 collapsed={collapsed}
