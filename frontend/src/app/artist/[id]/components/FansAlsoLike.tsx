@@ -80,10 +80,7 @@ export function FansAlsoLike({ currentArtistId, initialRelated }: FansAlsoLikePr
   return (
     <section className="group/fans mb-16 w-full select-none">
       <div className="mb-3 flex items-end justify-between" style={{ paddingInline: "var(--row-gutter, 28px)" }}>
-        <h2
-          className="truncate text-[22px] font-semibold leading-tight tracking-[-0.022em] text-white font-brand"
-          style={{ fontFamily: "'Orange Avenue', serif" }}
-        >
+        <h2 className="truncate text-[22px] font-bold leading-tight tracking-[-0.022em] text-white">
           Fans Also Like
         </h2>
       </div>

@@ -1,15 +1,25 @@
 "use client";
 
-import React, { useState, useMemo, useId } from "react";
-import { Heart, Play, Pause } from "lucide-react";
-import { cn, formatDisplayTitle, getTrackCover } from "@/lib/utils";
-import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from "framer-motion";
-import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
+/**
+ * JioSaavnSongTable — Apple Music / YT Music style song list.
+ *
+ *   #  | [art] Song name           | Album (link)            | ⋯  3:42
+ *
+ *  • only: order number, album art, song name, album name, time
+ *  • the ⋯ menu appears next to the time when the row is hovered
+ *  • album name links to the album page
+ *  • tabs: Popular / Newest / A–Z, and "Show more"
+ *
+ * Props are unchanged, so ArtistPage keeps working.
+ * (likedTrackIds / onToggleLike are still accepted; liking now lives in the ⋯ menu.)
+ */
 
-/* ── Springs (iOS-like) ── */
-const SPRING = { type: "spring" as const, stiffness: 420, damping: 34, mass: 0.8 };
-const SPRING_SOFT = { type: "spring" as const, stiffness: 300, damping: 32, mass: 0.9 };
-const SPRING_SNAPPY = { type: "spring" as const, stiffness: 620, damping: 32, mass: 0.6 };
+import React, { useMemo, useState } from "react";
+import Link from "next/link";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
+import { cn, getMediaUrl, formatDisplayTitle, decodeHtmlEntities } from "@/lib/utils";
+import { Equalizer } from "@/components/ui/Equalizer";
+import { SwiftUIPlay, SwiftUIPause, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 
 interface JioSaavnSongTableProps {
   tracks: any[];
@@ -17,341 +27,217 @@ interface JioSaavnSongTableProps {
   isPlaying?: boolean;
   likedTrackIds?: string[];
   onPlayTrack: (track: any) => void;
-  onToggleLike?: (trackId: string, e: React.MouseEvent) => void;
+  onToggleLike?: (trackId: string, e?: React.MouseEvent) => void;
 }
 
-const SORTS: { key: "popular" | "date" | "name"; label: string }[] = [
+type SortKey = "popular" | "newest" | "az";
+const TABS: { key: SortKey; label: string }[] = [
   { key: "popular", label: "Popular" },
-  { key: "date", label: "Newest" },
-  { key: "name", label: "A–Z" },
+  { key: "newest", label: "Newest" },
+  { key: "az", label: "A–Z" },
 ];
+const PAGE = 10;
 
-/*
- * ONE grid template shared by the header and every row, so the columns can never drift apart.
- * Cells, in order:  #  |  artwork  |  song  |  artist (md+)  |  album (md+)  |  like  |  time  |  more
- */
 const GRID =
-  "grid items-center gap-3 grid-cols-[24px_40px_minmax(0,1fr)_32px_40px_28px] md:grid-cols-[32px_40px_minmax(0,2.4fr)_minmax(0,1.6fr)_minmax(0,1.6fr)_32px_44px_32px]";
+  "grid grid-cols-[28px_minmax(0,1fr)_92px] items-center gap-x-3 sm:grid-cols-[40px_minmax(0,1.5fr)_92px] md:grid-cols-[40px_minmax(0,1.6fr)_minmax(0,1fr)_92px] md:gap-x-4";
 
-/** Animated equalizer for the playing track (Apple Music red bars) */
-function Equalizer({ playing }: { playing: boolean }) {
-  const reduce = useReducedMotion();
-  const bars = [
-    [0.35, 1, 0.5, 0.85, 0.35],
-    [0.9, 0.4, 1, 0.5, 0.9],
-    [0.5, 0.85, 0.35, 1, 0.5],
-  ];
-  return (
-    <span className="flex h-3.5 items-end gap-[2px]" aria-hidden="true">
-      {bars.map((frames, i) => (
-        <motion.span
-          key={i}
-          className="w-[3px] origin-bottom rounded-[1px] bg-brand"
-          style={{ height: "100%" }}
-          animate={playing && !reduce ? { scaleY: frames } : { scaleY: 0.35 }}
-          transition={
-            playing && !reduce
-              ? { duration: 0.9 + i * 0.12, repeat: Infinity, ease: "easeInOut" }
-              : SPRING_SOFT
-          }
-        />
-      ))}
-    </span>
+const fmt = (secs?: number) => {
+  const s = Math.max(0, Math.round(Number(secs) || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+/** Album name + link target (same rules as the track page) */
+function albumInfo(track: any) {
+  const title: string = decodeHtmlEntities(String(track?.title || ""));
+  const movie = title.match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i)?.[1]?.trim() || null;
+
+  const name = decodeHtmlEntities(
+    String(track?.album?.title || track?.albumTitle || track?.collectionName || "").trim()
   );
+  const id = track?.album?.id || track?.albumId || track?.collectionId;
+  const external =
+    id && ["saavn-album-", "itunes-album-", "yt-album-"].some((p) => String(id).startsWith(p));
+
+  const sameAsSong = name.toLowerCase() === title.trim().toLowerCase();
+  const valid = name && name.toLowerCase() !== "unknown" && !sameAsSong;
+
+  const target = movie || (external ? id : valid ? name : id);
+  return {
+    name: valid ? name : movie || "Single",
+    href: target ? `/album/${encodeURIComponent(String(target))}` : undefined,
+  };
 }
 
 export function JioSaavnSongTable({
   tracks,
   currentTrackId,
   isPlaying,
-  likedTrackIds = [],
   onPlayTrack,
-  onToggleLike,
 }: JioSaavnSongTableProps) {
-  const uid = useId();
-  const [activeSort, setActiveSort] = useState<"popular" | "date" | "name">("popular");
-  const [visibleCount, setVisibleCount] = useState<number>(10);
+  const [sort, setSort] = useState<SortKey>("popular");
+  const [visible, setVisible] = useState(PAGE);
 
-  const sortedTracks = useMemo(() => {
-    if (!tracks || tracks.length === 0) return [];
-    const list = [...tracks];
-
-    if (activeSort === "popular") {
-      return list.sort((a, b) => {
-        const aStreams = a.streams || parseInt(a.play_count || "0", 10) || 0;
-        const bStreams = b.streams || parseInt(b.play_count || "0", 10) || 0;
-        return bStreams - aStreams;
-      });
+  const sorted = useMemo(() => {
+    const list = [...(tracks || [])];
+    if (sort === "az") {
+      list.sort((a, b) =>
+        String(formatDisplayTitle(a?.title) || "").localeCompare(String(formatDisplayTitle(b?.title) || ""), undefined, {
+          sensitivity: "base",
+        })
+      );
+    } else if (sort === "newest") {
+      const t = (x: any) => new Date(x?.releaseDate || x?.createdAt || 0).getTime() || 0;
+      list.sort((a, b) => t(b) - t(a));
     }
-
-    if (activeSort === "date") {
-      return list.sort((a, b) => {
-        const getTime = (t: any) => {
-          if (t.releaseDate) {
-            const ms = new Date(t.releaseDate).getTime();
-            if (!isNaN(ms) && ms > 0) return ms;
-          }
-          if (t.year) {
-            const ms = new Date(`${t.year}-01-01`).getTime();
-            if (!isNaN(ms) && ms > 0) return ms;
-          }
-          if (t.createdAt) {
-            const ms = new Date(t.createdAt).getTime();
-            if (!isNaN(ms) && ms > 0) return ms;
-          }
-          return 0;
-        };
-        const diff = getTime(b) - getTime(a);
-        if (diff !== 0) return diff;
-        return (b.streams || 0) - (a.streams || 0);
-      });
-    }
-
-    if (activeSort === "name") {
-      return list.sort((a, b) => {
-        const cleanName = (t: any) => {
-          const raw = formatDisplayTitle(t.title || t.name || "");
-          return raw.toLowerCase().replace(/^[^a-z0-9]+/i, "").trim();
-        };
-        return cleanName(a).localeCompare(cleanName(b));
-      });
-    }
-
     return list;
-  }, [tracks, activeSort]);
+  }, [tracks, sort]);
 
-  const displayedTracks = sortedTracks.slice(0, visibleCount);
-  const hasMore = visibleCount < sortedTracks.length;
+  if (!sorted.length) return null;
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds || isNaN(seconds)) return "3:00";
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
-  if (!tracks || tracks.length === 0) return null;
+  const shown = sorted.slice(0, visible);
 
   return (
-    <section className="mb-9 select-none">
-      <LayoutGroup id={uid}>
-        {/* ── Sort: flat segmented control ── */}
-        <div className="mb-3 flex items-center">
-          <div
-            role="tablist"
-            aria-label="Sort songs"
-            className="relative flex items-center rounded-[8px] bg-white/[0.08] p-[2px]"
+    <section aria-label="Top songs" className="w-full">
+      {/* Tabs */}
+      <div className="mb-3 inline-flex rounded-lg bg-white/[0.06] p-[3px]">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => {
+              setSort(t.key);
+              setVisible(PAGE);
+            }}
+            className={cn(
+              "cursor-pointer rounded-md px-3.5 py-1.5 text-[13px] font-semibold outline-none transition-colors duration-200",
+              sort === t.key ? "bg-white/[0.16] text-white" : "text-white/55 hover:text-white"
+            )}
           >
-            {SORTS.map((s) => {
-              const active = activeSort === s.key;
-              return (
-                <motion.button
-                  key={s.key}
-                  role="tab"
-                  aria-selected={active}
-                  whileTap={{ scale: 0.96 }}
-                  transition={SPRING_SNAPPY}
-                  onClick={() => {
-                    setActiveSort(s.key);
-                    setVisibleCount(10);
-                  }}
-                  className="relative cursor-pointer rounded-[6px] px-3.5 py-1 text-[12px] font-medium tracking-[-0.005em] outline-none"
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="saavn-sort-pill"
-                      transition={SPRING}
-                      className="absolute inset-0 rounded-[6px] bg-white/[0.16]"
-                    />
-                  )}
-                  <span className={cn("relative transition-colors duration-200", active ? "text-white" : "text-white/55 hover:text-white/85")}>
-                    {s.label}
-                  </span>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        {/* ── Column header (same grid as the rows) ── */}
-        <div className={cn(GRID, "border-b border-white/[0.08] px-2 pb-2 text-[12px] font-medium text-white/45")}>
-          <span className="text-center">#</span>
-          <span aria-hidden="true" />
-          <span>Song</span>
-          <span className="hidden md:block">Artist</span>
-          <span className="hidden md:block">Album</span>
-          <span aria-hidden="true" />
-          <span className="text-right">Time</span>
-          <span aria-hidden="true" />
-        </div>
+      {/* Column header */}
+      <div className={cn(GRID, "border-b border-white/[0.08] px-2 pb-2 text-[12px] font-medium text-white/45")}>
+        <span className="text-center">#</span>
+        <span>Song</span>
+        <span className="hidden md:block">Album</span>
+        <span className="pr-1 text-right">Time</span>
+      </div>
 
-        {/* ── Rows ── */}
-        <div className="flex flex-col pt-1">
-          {displayedTracks.map((track, idx) => {
-            const isCurrent = currentTrackId === track.id;
-            const isThisPlaying = isCurrent && !!isPlaying;
-            const cover = getTrackCover(track);
-            const title = formatDisplayTitle(track.title || track.name) || track.title || `Track ${idx + 1}`;
-            const artistName = track.artist?.name || (Array.isArray(track.artists) ? track.artists.map((a: any) => a.name).join(", ") : track.artist) || "";
-            const albumName = track.album?.title || track.albumTitle || track.album || "";
-            const isLiked = likedTrackIds.includes(track.id);
-            const isLast = idx === displayedTracks.length - 1;
-            const rowKey = track.id || `track-${idx}`;
+      {/* Rows */}
+      <div role="list">
+        {shown.map((track, i) => {
+          const active = currentTrackId === track.id;
+          const playingNow = active && !!isPlaying;
+          const album = albumInfo(track);
+          const cover =
+            getMediaUrl(track?.coverUrl || track?.artwork || track?.image || track?.album?.coverUrl) ||
+            "/logo.png";
 
-            // Heart and three dots: hidden until the row is hovered (always visible on touch)
-            const revealOnHover =
-              "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
-
-            return (
-              <motion.div
-                key={rowKey}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  opacity: { duration: 0.2, delay: Math.min(idx * 0.02, 0.2) },
-                  y: { ...SPRING_SOFT, delay: Math.min(idx * 0.02, 0.2) },
-                }}
-                onClick={() => onPlayTrack(track)}
-                style={{ zIndex: undefined }}
-                className={cn(
-                  GRID,
-                  "group relative h-[56px] cursor-pointer rounded-[6px] px-2 transition-colors duration-150",
-                  isCurrent ? "bg-white/[0.08]" : "hover:bg-white/[0.06]"
-                )}
-              >
-                {/* Hairline separator */}
-                {!isLast && (
-                  <span
-                    className={cn(
-                      "pointer-events-none absolute bottom-0 left-[60px] right-2 h-px bg-white/[0.07] transition-opacity duration-150",
-                      "group-hover:opacity-0",
-                      isCurrent && "opacity-0"
-                    )}
-                  />
-                )}
-
-                {/* # : number / equalizer, becomes play-pause on hover (Apple Music) */}
-                <div className="relative flex h-full items-center justify-center text-[14px] tabular-nums text-white/50">
-                  <span className="transition-opacity duration-150 group-hover:opacity-0">
-                    {isCurrent ? <Equalizer playing={isThisPlaying} /> : idx + 1}
-                  </span>
-                  <span className="absolute inset-0 flex items-center justify-center text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                    {isThisPlaying ? (
-                      <Pause size={15} className="fill-white" />
-                    ) : (
-                      <Play size={15} className="fill-white" />
-                    )}
-                  </span>
-                </div>
-
-                {/* Artwork */}
-                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-[4px] bg-zinc-900 ring-1 ring-inset ring-white/[0.08]">
-                  <img
-                    src={cover}
-                    alt={title}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=160";
-                    }}
-                  />
-                </div>
-
-                {/* Song (artist underneath on small screens) */}
-                <div className="min-w-0">
-                  <p
-                    className={cn(
-                      "truncate text-[14px] leading-[18px] tracking-[-0.01em]",
-                      isCurrent ? "font-medium text-brand" : "font-normal text-white"
-                    )}
-                  >
-                    {title}
-                  </p>
-                  <p className="truncate text-[13px] leading-[17px] text-white/55 md:hidden">{artistName}</p>
-                </div>
-
-                {/* Artist */}
-                <div className="hidden min-w-0 md:block">
-                  <p className="truncate text-[14px] text-white/60 transition-colors duration-150 group-hover:text-white/85">{artistName}</p>
-                </div>
-
-                {/* Album */}
-                <div className="hidden min-w-0 md:block">
-                  <p className="truncate text-[14px] text-white/60 transition-colors duration-150 group-hover:text-white/85">{albumName}</p>
-                </div>
-
-                {/* Like */}
-                <div className="flex items-center justify-center">
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.82 }}
-                    transition={SPRING_SNAPPY}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (onToggleLike) onToggleLike(track.id, e);
-                    }}
-                    className={cn(
-                      "cursor-pointer rounded-full p-1.5 outline-none transition-[opacity,color] duration-150",
-                      isLiked ? "text-brand opacity-100" : cn("text-white/65 hover:text-white", revealOnHover)
-                    )}
-                    title={isLiked ? "Remove from Favorites" : "Add to Favorites"}
-                    aria-pressed={isLiked}
-                  >
-                    <motion.span
-                      className="flex"
-                      initial={false}
-                      animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }}
-                      transition={isLiked ? { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] } : SPRING}
-                    >
-                      <Heart size={16} className={cn(isLiked && "fill-brand text-brand")} />
-                    </motion.span>
-                  </motion.button>
-                </div>
-
-                {/* Time */}
-                <div className="text-right text-[13px] tabular-nums text-white/55">{formatDuration(track.duration)}</div>
-
-                {/* Three dots */}
-                <div className="relative flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                  <TrackActionsDropdown
-                    track={track}
-                    align="end"
-                    context="artist"
-                    hideItems={["view-details"]}
-                    triggerClassName={cn(
-                      "cursor-pointer rounded-full p-1.5 text-white/70 outline-none transition-[opacity,color] duration-150 hover:text-white",
-                      "opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
-                    )}
-                  />
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {/* ── Show More ── */}
-        <AnimatePresence>
-          {hasMore && (
-            <motion.div
-              key="load-more"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="mt-3 flex justify-center"
+          return (
+            <div
+              key={track.id ?? i}
+              role="listitem"
+              onClick={() => onPlayTrack(track)}
+              className={cn(
+                GRID,
+                "group relative cursor-pointer select-none rounded-lg border-b border-white/[0.06] px-2 py-2 transition-colors duration-150",
+                active ? "bg-white/[0.08]" : "hover:bg-white/[0.06]"
+              )}
             >
-              <motion.button
-                onClick={() => setVisibleCount((prev) => prev + 15)}
-                whileTap={{ scale: 0.95 }}
-                transition={SPRING_SNAPPY}
-                className="cursor-pointer rounded-[8px] px-4 py-1.5 text-[13px] font-semibold tracking-[-0.01em] text-brand outline-none transition-colors hover:bg-white/[0.06]"
-              >
-                Show More
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </LayoutGroup>
+              {/* # (becomes play/pause on hover, equalizer while playing) */}
+              <div className="flex items-center justify-center text-[14px] tabular-nums text-white/45">
+                {playingNow ? (
+                  <span className="group-hover:hidden">
+                    <Equalizer playing size="sm" />
+                  </span>
+                ) : (
+                  <span className={cn("group-hover:hidden", active && "text-brand")}>{i + 1}</span>
+                )}
+                <span className="hidden text-white group-hover:block">
+                  {playingNow ? (
+                    <SwiftUIPause size={16} fill="currentColor" />
+                  ) : (
+                    <SwiftUIPlay size={16} fill="currentColor" className="ml-0.5" />
+                  )}
+                </span>
+              </div>
+
+              {/* Art + song name */}
+              <div className="flex min-w-0 items-center gap-3">
+                <img
+                  src={cover}
+                  alt=""
+                  loading="lazy"
+                  draggable={false}
+                  className="size-11 shrink-0 rounded-md bg-zinc-800 object-cover ring-1 ring-white/10"
+                />
+                <span
+                  className={cn(
+                    "truncate text-[15px] font-medium tracking-[-0.01em]",
+                    active ? "text-brand" : "text-white"
+                  )}
+                >
+                  {formatDisplayTitle(track.title)}
+                </span>
+              </div>
+
+              {/* Album (link) */}
+              <div className="hidden min-w-0 md:block">
+                {album.href ? (
+                  <Link
+                    href={album.href}
+                    onClick={(e) => e.stopPropagation()}
+                    className="block w-fit max-w-full truncate text-[14px] text-white/55 transition-colors hover:text-white hover:underline"
+                  >
+                    {album.name}
+                  </Link>
+                ) : (
+                  <span className="block truncate text-[14px] text-white/55">{album.name}</span>
+                )}
+              </div>
+
+              {/* ⋯ (on hover) + time */}
+              <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                <TrackActionsDropdown
+                  track={track}
+                  context="row"
+                  align="end"
+                  glass
+                  trigger={
+                    <button
+                      type="button"
+                      title="More options"
+                      aria-label="More options"
+                      className={cn(
+                        "flex size-7 cursor-pointer items-center justify-center rounded-full text-white/70 outline-none transition-[opacity,background-color,color] duration-150",
+                        "opacity-0 hover:bg-white/10 hover:text-white focus-visible:opacity-100 group-hover:opacity-100",
+                        "[@media(hover:none)]:opacity-100"
+                      )}
+                    >
+                      <SwiftUIEllipsis size={17} fill="currentColor" />
+                    </button>
+                  }
+                />
+                <span className="w-10 text-right text-[13px] tabular-nums text-white/55">
+                  {fmt(track.duration)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Show more */}
+      {visible < sorted.length && (
+        <button
+          onClick={() => setVisible((v) => v + PAGE)}
+          className="mt-3 cursor-pointer rounded-full bg-white/10 px-4 py-1.5 text-[13px] font-semibold text-white/85 outline-none transition-colors hover:bg-white/[0.18] hover:text-white"
+        >
+          Show more
+        </button>
+      )}
     </section>
   );
 }

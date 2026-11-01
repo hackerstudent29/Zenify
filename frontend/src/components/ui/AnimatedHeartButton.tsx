@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { cn } from "@/lib/utils";
 
 interface AnimatedHeartButtonProps {
@@ -80,13 +80,14 @@ export function AnimatedHeartButton({
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="relative flex items-center justify-center"
           >
-            <Heart
+            <SwiftUIHeart
               size={size}
+              filled={isLiked}
               className={cn(
                 "transition-all duration-300",
                 isLiked
-                  ? "fill-rose-500 stroke-rose-500 drop-shadow-[0_0_10px_rgba(244,63,94,0.5)]"
-                  : "stroke-current fill-none group-hover:scale-110"
+                  ? "text-rose-500 drop-shadow-[0_0_10px_rgba(244,63,94,0.5)]"
+                  : "text-zinc-400 group-hover:scale-110"
               )}
             />
             {/* Sparkle ring burst effect on liked */}

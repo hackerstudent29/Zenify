@@ -7,7 +7,6 @@ import {
   Sparkles,
   Play,
   Pause,
-  Heart,
   ListMusic,
   X,
   History,
@@ -17,6 +16,7 @@ import {
   User,
   Disc,
 } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { usePlayerStore } from "@/store/player";
@@ -229,7 +229,7 @@ function SongRow({
         )}
         title={liked ? "Unlike" : "Like"}
       >
-        <Heart size={15} className={cn(liked && "fill-current")} />
+        <SwiftUIHeart size={15} filled={liked} className={cn(liked ? "text-brand" : "text-white/50")} />
       </motion.button>
 
       <span className="text-[13px] text-white/45 tabular-nums w-10 text-right">{fmtDuration(track.duration)}</span>

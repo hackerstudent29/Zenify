@@ -20,7 +20,6 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Play,
   Pause,
-  Heart,
   Disc3,
   Check,
   X,
@@ -31,6 +30,14 @@ import {
   ChevronRight,
   ExternalLink,
 } from "lucide-react";
+import {
+  SwiftUIHeart,
+  SwiftUIPlay,
+  SwiftUIPause,
+  SwiftUIShuffle,
+  SwiftUILyrics,
+  SwiftUIEllipsis,
+} from "@/components/ui/SwiftUIIcons";
 
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -674,22 +681,26 @@ export default function TrackPage() {
             </div>
 
             {/* Action controls */}
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 md:justify-start">
-              {/* Play pill — white like AlbumPage */}
-              <PillButton variant="solid" onClick={handlePlayTrack} label={isCurrentTrackPlaying ? "Pause" : "Play"}>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3.5 md:justify-start">
+              {/* Primary White Play Circle */}
+              <button
+                type="button"
+                onClick={handlePlayTrack}
+                className="flex h-12 w-12 sm:h-14 sm:w-14 cursor-pointer items-center justify-center rounded-full bg-white text-black shadow-[0_6px_24px_rgba(255,255,255,0.25)] transition-all hover:scale-105 active:scale-95"
+                title={isCurrentTrackPlaying ? "Pause" : "Play"}
+                aria-label={isCurrentTrackPlaying ? "Pause" : "Play"}
+              >
                 {isCurrentTrackPlaying ? (
-                  <Pause size={16} fill="currentColor" />
+                  <SwiftUIPause size={22} fill="black" />
                 ) : (
-                  <Play size={16} fill="currentColor" className="ml-0.5" />
+                  <SwiftUIPlay size={22} fill="black" className="ml-0.5" />
                 )}
-                {isCurrentTrackPlaying ? "Pause" : "Play"}
-              </PillButton>
+              </button>
 
               {/* Shuffle */}
-              <PillButton active={isShuffled} onClick={handleShuffle} label="Shuffle">
-                <Shuffle size={16} />
-                Shuffle
-              </PillButton>
+              <IconCircle title={isShuffled ? "Shuffle: On" : "Shuffle"} active={isShuffled} onClick={handleShuffle}>
+                <SwiftUIShuffle size={18} stroke="currentColor" />
+              </IconCircle>
 
               {/* Like */}
               <IconCircle
@@ -706,7 +717,7 @@ export default function TrackPage() {
                   animate={{ scale: isLiked ? [1, 1.35, 1] : 1 }}
                   transition={isLiked ? { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] } : { duration: 0.1 }}
                 >
-                  <Heart size={17} className={cn(isLiked && "fill-current")} />
+                  <SwiftUIHeart size={18} filled={!!isLiked} className={cn(isLiked ? "text-brand" : "text-white/85")} />
                 </motion.span>
               </IconCircle>
 
@@ -723,7 +734,7 @@ export default function TrackPage() {
                   handleLyricsToggle();
                 }}
               >
-                <ScrollText size={17} />
+                <SwiftUILyrics size={18} stroke="currentColor" />
               </IconCircle>
 
               {/* Three-dot — glass aligned with AlbumPage */}
@@ -736,9 +747,14 @@ export default function TrackPage() {
                 onLyricsToggle={handleLyricsToggle}
                 showToast={showToast}
                 trigger={
-                  <IconCircle title="More options" aria-haspopup="menu">
-                    <MoreHorizontal size={19} />
-                  </IconCircle>
+                  <button
+                    type="button"
+                    title="More options"
+                    aria-label="More options"
+                    className="flex size-10 sm:size-11 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/85 shadow-xl backdrop-blur-xl transition hover:bg-white/20 hover:text-white active:scale-95"
+                  >
+                    <SwiftUIEllipsis size={18} fill="currentColor" />
+                  </button>
                 }
               />
             </div>

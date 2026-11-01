@@ -2,7 +2,9 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, Download, Plus, Heart } from "lucide-react";
+import { Play, Pause, Download, Plus } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
+import { Equalizer } from "@/components/ui/Equalizer";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { getMediaUrl, cn, formatDisplayTitle, formatArtists } from "@/lib/utils";
@@ -101,15 +103,8 @@ export const TopPickCard = React.memo(function TopPickCard({ track, index, allTr
 
  {/* Visualizer (if playing) */}
  {isThisTrackPlaying && (
- <div className="absolute bottom-4 left-4 flex items-end gap-[3px] h-6 bg-black/40 backdrop-blur-md px-3 py-2 rounded-full border border-white/10">
- {[0.1, 0.4, 0.2].map((delay, i) => (
- <motion.div
- key={i}
- animate={{ height: ["30%", "100%", "30%"] }}
- transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay }}
- className="w-[3px] bg-red-500 rounded-full"
- />
- ))}
+ <div className="absolute bottom-4 left-4 flex items-center bg-black/40 backdrop-blur-md px-3 py-2 rounded-full border border-white/10">
+ <Equalizer playing size="md" />
  </div>
  )}
  </div>
@@ -153,7 +148,7 @@ export const TopPickCard = React.memo(function TopPickCard({ track, index, allTr
  isLiked ? "text-brand" : "text-white/20 hover:text-brand"
  )}
  >
- <Heart size={16} className={cn(isLiked && "fill-current")} />
+ <SwiftUIHeart size={16} filled={!!isLiked} className={cn(isLiked ? "text-brand" : "text-white/40 hover:text-brand")} />
  </motion.div>
  </button>
  <button 

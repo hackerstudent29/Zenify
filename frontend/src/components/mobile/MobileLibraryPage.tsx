@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Library, Plus, Search, Heart, Disc, User, ChevronRight, Play, Filter, MoreHorizontal, Trash2, Share2, ListPlus } from "lucide-react";
+import { Library, Plus, Search, Disc, User, ChevronRight, Play, Filter, MoreHorizontal, Trash2, Share2, ListPlus } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
 import { useQueryClient } from "@tanstack/react-query";
@@ -67,7 +68,7 @@ export function MobileLibraryPage({
 
  const tabs = [
  { id: "playlists", label: "Playlists", icon: Library },
- { id: "liked", label: "Liked Songs", icon: Heart },
+ { id: "liked", label: "Liked Songs", icon: SwiftUIHeart },
  { id: "albums", label: "Albums", icon: Disc },
  { id: "artists", label: "Artists", icon: User }
  ];
@@ -276,7 +277,7 @@ export function MobileLibraryPage({
  <>
  <Link href="/liked" className="flex items-center gap-4 p-2 rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors mb-4 group cursor-pointer">
  <div className="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-indigo-500 to-purple-800 shrink-0 shadow-lg flex items-center justify-center group-active:scale-95 transition-transform">
- <Heart size={28} className="text-white fill-white" />
+ <SwiftUIHeart size={28} filled={true} className="text-white" />
  </div>
  <div className="flex-1 min-w-0">
  <h3 className="font-bold text-base text-white truncate">Liked Songs</h3>
@@ -302,7 +303,7 @@ export function MobileLibraryPage({
  ) : (
  <div className="text-center py-24 px-4">
  <div className="w-20 h-20 rounded-full bg-white/5 mx-auto flex items-center justify-center mb-6">
- <Heart size={32} className="text-white/30" />
+ <SwiftUIHeart size={32} className="text-white/30" />
  </div>
  <h3 className="text-xl font-bold text-white mb-3">No liked songs yet</h3>
  <p className="text-sm text-white/50 mb-8 max-w-[220px] mx-auto">Tap the heart on any track to add it to your Liked Songs.</p>

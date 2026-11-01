@@ -38,6 +38,8 @@ import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
+import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
+import { Equalizer } from "@/components/ui/Equalizer";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -450,96 +452,50 @@ export default function AlbumPage() {
               )}
             </div>
 
-            {/* Apple Music Action Controls (Shuffle + Play Pill + More) */}
-            <div className="flex items-center justify-center md:justify-start gap-2.5 sm:gap-3 flex-wrap max-w-full">
-              {/* Shuffle button */}
-              <motion.button
-                whileTap={{ scale: 0.88 }}
-                transition={{ type: "spring", stiffness: 450, damping: 24 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (trackCount === 0) {
-                    showToast("This album has no tracks", "error");
-                    return;
-                  }
-                  handleShufflePlay();
-                }}
-                className={cn(
-                  "w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer",
-                  isShuffled
-                    ? "bg-brand text-white shadow-lg"
-                    : "bg-white/10 hover:bg-white/20 text-white/90 border border-white/10"
-                )}
-                title="Shuffle"
-              >
-                <Shuffle size={16} />
-              </motion.button>
-
-              {/* Play Pill: White pill with page color label and icon */}
-              <motion.button
-                whileTap={{ scale: 0.94 }}
-                transition={{ type: "spring", stiffness: 450, damping: 24 }}
-                onClick={() => {
+            {/* Apple Music Action Controls Unified Suite */}
+            <div className="flex items-center justify-center md:justify-start">
+              <MediaActionButtons
+                isPlaying={isAlbumCurrentlyPlaying}
+                onPlay={() => {
                   if (trackCount === 0) {
                     showToast("This album has no tracks", "error");
                     return;
                   }
                   handlePlayAlbum();
                 }}
-                className="h-9 px-6 rounded-full bg-white text-[var(--page,#0f3434)] hover:bg-white/90 active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 font-semibold text-[14px] cursor-pointer"
-              >
-                {isAlbumCurrentlyPlaying ? (
-                  <>
-                    <Pause size={15} fill="currentColor" />
-                    <span>Pause</span>
-                  </>
-                ) : (
-                  <>
-                    <Play size={15} fill="currentColor" className="ml-0.5" />
-                    <span>Play</span>
-                  </>
-                )}
-              </motion.button>
-
-              {/* More options menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <motion.button
-                    whileTap={{ scale: 0.88 }}
-                    transition={{ type: "spring", stiffness: 450, damping: 24 }}
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 border border-white/10 transition-all cursor-pointer"
-                    title="More options"
-                  >
-                    <MoreHorizontal size={16} />
-                  </motion.button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="start">
-                  <DropdownMenuItem
-                    onClick={() => {
+                isShuffled={isShuffled}
+                onShuffle={() => {
+                  if (trackCount === 0) {
+                    showToast("This album has no tracks", "error");
+                    return;
+                  }
+                  handleShufflePlay();
+                }}
+                moreItems={[
+                  {
+                    id: "add-queue",
+                    label: "Add to Queue",
+                    onClick: () => {
                       if (!album?.tracks || album.tracks.length === 0) {
                         showToast("This album has no tracks", "error");
                         return;
                       }
                       usePlayerStore.getState().addToUserQueue(album.tracks, { contextName: album.title });
                       showToast("Album added to queue");
-                    }}
-                  >
-                    <ListPlus size={14} className="mr-2 text-brand" />
-                    <span>Add to Queue</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
+                    },
+                  },
+                  {
+                    id: "share",
+                    label: "Share Album",
+                    onClick: () => {
                       if (typeof window !== "undefined") {
                         navigator.clipboard.writeText(window.location.href);
                         showToast("Album link copied to clipboard");
                       }
-                    }}
-                  >
-                    <Share2 size={14} className="mr-2 text-white/60" />
-                    <span>Share Album</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    },
+                  },
+                ]}
+              />
             </div>
           </div>
         </div>
@@ -565,21 +521,7 @@ export default function AlbumPage() {
                     {/* Index / Visualizer */}
                     <div className="w-6 flex items-center justify-center shrink-0">
                       {isTrackPlaying ? (
-                        <div className="flex items-end gap-[1.5px] h-[13px]">
-                          {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
-                            <motion.div
-                              key={i}
-                              animate={{ height: ["30%", "100%", "30%"] }}
-                              transition={{
-                                duration: 0.8 + i * 0.1,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                                delay: d,
-                              }}
-                              className="w-[2.5px] bg-brand rounded-full"
-                            />
-                          ))}
-                        </div>
+                        <Equalizer playing size="xs" />
                       ) : isActive ? (
                         <div className="w-2.5 h-2.5 rounded-full bg-brand animate-pulse" />
                       ) : (

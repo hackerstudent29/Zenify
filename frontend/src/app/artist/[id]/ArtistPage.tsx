@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Disc3, Star, Heart, Info, X } from "lucide-react";
+import { Disc3, Info, X } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
@@ -18,6 +18,8 @@ import {
   SwiftUIPause,
   SwiftUIShuffle,
   SwiftUIEllipsis,
+  SwiftUIHeart,
+  SwiftUIInfo,
 } from "@/components/ui/SwiftUIIcons";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 
@@ -323,103 +325,37 @@ export default function ArtistPage() {
 
   const displayName = formatDisplayTitle(artist.name);
 
-  /* ── Artist name + action buttons centered on page, moved down below banner ── */
-  const heroHeader = (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative z-20 flex w-full min-w-0 flex-col items-center px-4 text-center mx-auto"
-    >
-      <h1
-        ref={heroNameRef}
-        className="mb-4 sm:mb-5 max-w-4xl select-text break-words px-2 text-3xl font-bold tracking-tight text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.85)] sm:text-4xl md:text-5xl lg:text-[54px]"
-      >
-        {displayName}
-      </h1>
+  /* ════════════════════════════════════════════════════════════════════
+     HERO — plain, compact header (no glass panel, no full-bleed tricks)
+       Sits in normal page flow, aligned with the song list below it.
+       [ round photo ]  Artist
+                        Name
+                        [ ▶ Play ] [ ⤮ Shuffle ]  (i) (☆) (⋯)
+     ════════════════════════════════════════════════════════════════════ */
 
-      <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3.5">
-        {/* Info / Bio Button */}
-        <button
-          onClick={() => setIsBioOpen(true)}
-          className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/90 shadow-xl backdrop-blur-xl transition hover:bg-white/20 hover:text-white active:scale-95 sm:h-11 sm:w-11"
-          title="Artist Bio"
-        >
-          <Info size={18} strokeWidth={2.2} />
-        </button>
+  const copyLink = () => {
+    navigator.clipboard?.writeText(window.location.href);
+  };
 
-        {/* Primary White Play Circle */}
-        <button
-          onClick={handlePlayTopTracks}
-          className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-white text-black shadow-[0_6px_24px_rgba(255,255,255,0.25)] transition-all hover:scale-105 active:scale-95 sm:h-14 sm:w-14"
-          title={isPlaying && isArtistActive ? "Pause" : "Play Top Songs"}
-        >
-          {isPlaying && isArtistActive ? (
-            <SwiftUIPause size={22} fill="black" />
-          ) : (
-            <SwiftUIPlay size={22} fill="black" className="ml-0.5" />
-          )}
-        </button>
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: displayName, url });
+      } catch {
+        /* dismissed */
+      }
+    } else {
+      copyLink();
+    }
+  };
 
-        {/* Star / Favorite Button */}
-        <button
-          onClick={() => setIsFavorited(!isFavorited)}
-          className={cn(
-            "flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border shadow-xl backdrop-blur-xl transition-all active:scale-95 sm:h-11 sm:w-11",
-            isFavorited
-              ? "border-brand bg-brand/20 text-brand"
-              : "border-white/15 bg-white/10 text-white/90 hover:bg-white/20 hover:text-white"
-          )}
-          title={isFavorited ? "Favorited" : "Favorite Artist"}
-        >
-          <Star
-            size={18}
-            className={cn(isFavorited ? "fill-brand text-brand" : "text-white")}
-            strokeWidth={2}
-          />
-        </button>
+  const pillBtn =
+    "flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold tracking-[-0.01em] outline-none transition-[background-color,color,transform] duration-200 ease-out active:scale-[0.96]";
+  const iconBtn =
+    "flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/85 outline-none transition-[background-color,color,transform] duration-200 ease-out hover:bg-white/[0.18] hover:text-white active:scale-90";
 
-        {/* Glass Shuffle Circle */}
-        <button
-          onClick={handleShufflePlay}
-          className={cn(
-            "flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border shadow-xl backdrop-blur-xl transition-all active:scale-95 sm:h-11 sm:w-11",
-            isShuffled
-              ? "border-brand bg-brand/20 text-brand"
-              : "border-white/15 bg-white/10 text-white/90 hover:bg-white/20 hover:text-white"
-          )}
-          title="Shuffle Artist Songs"
-        >
-          <SwiftUIShuffle size={18} stroke="currentColor" />
-        </button>
-
-        {/* Glass Ellipsis Menu */}
-        <AnimatedDropdown
-          align="center"
-          trigger={
-            <button
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-xl backdrop-blur-xl transition-all hover:bg-white/20 active:scale-95 sm:h-11 sm:w-11"
-              title="More Options"
-            >
-              <SwiftUIEllipsis size={18} fill="currentColor" />
-            </button>
-          }
-          items={[
-            {
-              id: "share",
-              label: "Share Artist",
-              onClick: () => navigator.clipboard.writeText(window.location.href),
-            },
-            {
-              id: "play-all",
-              label: "Play All Songs",
-              onClick: handlePlayTopTracks,
-            },
-          ]}
-        />
-      </div>
-    </motion.div>
-  );
+  const heroAvatarSrc = getMediaUrl(heroImageUrl || avatarUrl) || "/images/placeholder.png";
 
   return (
     <div className="min-h-screen w-full bg-transparent text-white relative">
@@ -428,89 +364,101 @@ export default function ArtistPage() {
         description={artist.bio || `Listen to songs and albums by ${displayName} on Zenify.`}
       />
 
-      {/* ── 1. ARTIST HERO (Clean untouched full-size image banner) ── */}
-      {heroImageUrl ? (
-        <div
-          className="relative w-full h-[62vh] sm:h-[66vh] md:h-[70vh] min-h-[480px] max-h-[760px] overflow-hidden select-none am-layout-transition flex flex-col justify-end"
-          style={{
-            marginLeft: "calc(var(--sb-w) * -1)",
-            marginRight: "calc(var(--rp-w) * -1)",
-            width: "calc(100% + var(--sb-w) + var(--rp-w))",
-          }}
-        >
-          {/* Ambient blurred backdrop so wide screens don't force excessive zoom on the artist */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <img
-              src={getMediaUrl(heroImageUrl) || undefined}
-              alt=""
-              className="w-full h-full object-cover blur-3xl scale-125 opacity-40 brightness-75"
-              aria-hidden="true"
-            />
-          </div>
+      {/* ── 1. ARTIST HERO ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 mx-auto w-full max-w-[1400px] px-4 pb-6 pt-24 sm:px-8 sm:pb-8 sm:pt-28 md:px-12"
+      >
+        <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:gap-6 sm:text-left">
+          {/* Round photo */}
+          <img
+            src={heroAvatarSrc}
+            alt={displayName}
+            className="size-32 shrink-0 rounded-full bg-zinc-800 object-cover object-[center_20%] shadow-[0_10px_30px_rgba(0,0,0,0.4)] sm:size-[148px]"
+            fetchPriority="high"
+            decoding="async"
+            draggable={false}
+          />
 
-          {/* Foreground Portrait:
-              - If widescreen banner: full-bleed cover
-              - If square/portrait: perfectly contained without aggressive zooming so full face, head & body are completely visible */}
-          {isWidescreen ? (
-            <img
-              src={getMediaUrl(heroImageUrl) || undefined}
-              alt={displayName}
-              className="absolute inset-0 m-auto w-full h-full object-cover object-top sm:object-[center_20%] filter brightness-95 pointer-events-none"
-              fetchPriority="high"
-              decoding="async"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-20 sm:pb-24">
-              <img
-                src={getMediaUrl(heroImageUrl) || undefined}
-                alt={displayName}
-                className="h-full w-auto max-h-[85%] max-w-[850px] object-contain object-center filter brightness-95 drop-shadow-[0_20px_50px_rgba(0,0,0,0.65)]"
-                fetchPriority="high"
-                decoding="async"
+          <div className="flex min-w-0 flex-1 flex-col items-center sm:items-start">
+            <p className="text-[12px] font-medium text-white/50">Artist</p>
+
+            <h1
+              ref={heroNameRef}
+              className="mt-0.5 max-w-full select-text break-words text-[28px] font-bold leading-tight tracking-[-0.025em] text-white sm:text-[34px]"
+            >
+              {displayName}
+            </h1>
+
+            {/* Actions */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+              <button
+                onClick={handlePlayTopTracks}
+                className={cn(pillBtn, "min-w-[96px] bg-white text-black hover:bg-white/90")}
+                aria-label={isPlaying && isArtistActive ? "Pause" : "Play"}
+              >
+                {isPlaying && isArtistActive ? (
+                  <SwiftUIPause size={14} fill="black" />
+                ) : (
+                  <SwiftUIPlay size={14} fill="black" />
+                )}
+                {isPlaying && isArtistActive ? "Pause" : "Play"}
+              </button>
+
+              <button
+                onClick={handleShufflePlay}
+                aria-pressed={isShuffled}
+                className={cn(
+                  pillBtn,
+                  "bg-white/10 hover:bg-white/[0.18]",
+                  isShuffled ? "text-brand" : "text-white"
+                )}
+              >
+                <SwiftUIShuffle size={14} stroke="currentColor" />
+                Shuffle
+              </button>
+
+              <button onClick={() => setIsBioOpen(true)} className={iconBtn} title="About" aria-label="About artist">
+                <Info size={16} strokeWidth={2} />
+              </button>
+
+              <button
+                onClick={() => setIsFavorited(!isFavorited)}
+                className={cn(iconBtn, isFavorited && "!text-brand")}
+                title={isFavorited ? "Favorited" : "Favorite"}
+                aria-label="Favorite artist"
+                aria-pressed={isFavorited}
+              >
+                <SwiftUIHeart
+                  size={17}
+                  filled={isFavorited}
+                  className={cn(isFavorited ? "text-brand" : "text-white/85")}
+                />
+              </button>
+
+              <AnimatedDropdown
+                align="end"
+                trigger={
+                  <button className={iconBtn} title="More" aria-label="More options">
+                    <SwiftUIEllipsis size={16} fill="currentColor" />
+                  </button>
+                }
+                items={[
+                  { id: "play-all", label: "Play All Songs", onClick: handlePlayTopTracks },
+                  { id: "shuffle", label: isShuffled ? "Shuffle: On" : "Shuffle", onClick: handleShufflePlay },
+                  { id: "share", label: "Share", onClick: handleShare },
+                  { id: "copy-link", label: "Copy Link", onClick: copyLink },
+                ]}
               />
             </div>
-          )}
-
-          {/* Top subtle vignette for header contrast */}
-          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 via-black/15 to-transparent pointer-events-none z-10" />
-
-          {/* Bottom gentle transparent gradient: smooth transition so text/buttons are readable, but image is 100% visible behind buttons */}
-          <div className="absolute inset-x-0 bottom-0 h-44 sm:h-52 bg-gradient-to-t from-[var(--page,#121214)] via-[var(--page,#121214)]/40 to-transparent pointer-events-none z-10" />
-
-          {/* Artist title & controls centered on page, docked at the bottom of the hero banner with the image showing behind */}
-          <div className="relative z-20 pb-6 sm:pb-8 flex flex-col items-center justify-center text-center px-4 w-full">
-            {heroHeader}
           </div>
         </div>
-      ) : (
-        /* Minimal fallback when no artist artwork is available (Strictly NO circular avatars) */
-        <div className="relative w-full pt-10 sm:pt-14 md:pt-16 pb-6 sm:pb-8 flex flex-col items-center justify-center text-center overflow-hidden select-none">
-          {/* Subtle warm ambient radial glow behind artwork */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 sm:w-96 sm:h-96 rounded-2xl bg-white/[0.04] blur-3xl pointer-events-none" />
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="relative z-10 flex flex-col items-center"
-          >
-            {/* Boxy Asymmetrical Modern Showcase (Strictly NO circular shapes) */}
-            <div className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.85)] border border-white/10 ring-1 ring-white/10 mx-auto bg-zinc-800 mb-6">
-              <img
-                src={getMediaUrl(avatarUrl) || "/images/placeholder.png"}
-                alt={displayName}
-                className="w-full h-full object-cover object-center filter brightness-95"
-                fetchPriority="high"
-                decoding="async"
-              />
-            </div>
-            {heroHeader}
-          </motion.div>
-        </div>
-      )}
+      </motion.div>
 
       {/* ── 2. JIOSAAVN REDESIGNED SECTIONS (The content sheet starts cleanly from section places) ── */}
-      <div className="relative z-10 pt-4 sm:pt-6 pb-28 w-full bg-[var(--page,#121214)] text-white min-w-0 transition-colors duration-500">
+      <div className="relative z-10 pt-4 sm:pt-6 pb-6 w-full bg-[var(--page,#121214)] text-white min-w-0 transition-colors duration-500">
         {/* SECTION 1: Top Songs Table with Popular, Date, Name filters & Load more */}
         <div className="px-4 sm:px-8 md:px-12 max-w-[1400px] mx-auto w-full mb-8">
           <JioSaavnSongTable
@@ -586,6 +534,23 @@ export default function ArtistPage() {
           />
         )}
       </div>
+
+      {/* ── FOOTER: a slightly darker shade of the page colour ──
+          The layout reserves empty space under the page for the floating player.
+          That space is outside this component, so the shadow below paints the same
+          colour down into it and the footer visually reaches the bottom edge. */}
+      <footer
+        className="relative z-10 w-full px-4 py-4 sm:px-8 md:px-12"
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--page, #121214) 70%, black)",
+          boxShadow: "0 100vh 0 0 color-mix(in srgb, var(--page, #121214) 70%, black)",
+        }}
+      >
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-3 border-t border-white/[0.08] pt-3 text-[12px] text-white/40">
+          <span>© {new Date().getFullYear()} Zenify. All rights reserved.</span>
+          <span className="truncate">{displayName}</span>
+        </div>
+      </footer>
 
       {/* ── 3. ARTIST BIOGRAPHY MODAL ── */}
       <AnimatePresence>

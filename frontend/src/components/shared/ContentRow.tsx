@@ -77,8 +77,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
           {seeAllHref ? (
             <Link
               href={seeAllHref}
-              className="group/title inline-flex items-center gap-0.5 text-[22px] font-semibold leading-tight tracking-[-0.022em] text-white outline-none font-brand"
-              style={{ fontFamily: "'Orange Avenue', serif" }}
+              className="group/title inline-flex items-center gap-0.5 text-[22px] font-bold leading-tight tracking-[-0.022em] text-white outline-none"
             >
               <span className="truncate">{title}</span>
               <ChevronRight
@@ -88,10 +87,7 @@ export function ContentRow({ title, subtitle, items, className, seeAllHref, isLo
               />
             </Link>
           ) : (
-            <h2 
-              className="truncate text-[22px] font-semibold leading-tight tracking-[-0.022em] text-white font-brand"
-              style={{ fontFamily: "'Orange Avenue', serif" }}
-            >
+            <h2 className="truncate text-[22px] font-bold leading-tight tracking-[-0.022em] text-white">
               {title}
             </h2>
           )}

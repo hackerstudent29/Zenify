@@ -8,6 +8,13 @@ import {
   SwiftUIForward,
   SwiftUIBackward,
   SwiftUIQueue,
+  SFShuffle,
+  SFRepeat,
+  SFHeart,
+  SFLyrics,
+  SFFx,
+  SFExpand,
+  SFSpeaker,
 } from "@/components/ui/SwiftUIIcons";
 import { cn, cleanTitle, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
@@ -45,69 +52,7 @@ const formatDuration = (s?: number | null) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
-/* ------------------------------------------------------------------ */
-/*  Icons                                                              */
-/* ------------------------------------------------------------------ */
-type IconProps = { size?: number; className?: string };
 
-const SFShuffle = ({ size = 16, className }: IconProps) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M3 7h2.6c2 0 3.3.9 4.3 2.4l3.2 5.2c1 1.5 2.3 2.4 4.3 2.4H20" />
-    <path d="M3 17h2.6c2 0 3.3-.9 4.3-2.4l3.2-5.2c1-1.5 2.3-2.4 4.3-2.4H20" />
-    <path d="M17.2 4.4L20.2 7l-3 2.6" />
-    <path d="M17.2 14.4L20.2 17l-3 2.6" />
-  </svg>
-);
-
-const SFRepeat = ({ size = 16, className }: IconProps) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M4 11v-1a3 3 0 0 1 3-3h12.2" />
-    <path d="M16.4 4.4L19.4 7l-3 2.6" />
-    <path d="M20 13v1a3 3 0 0 1-3 3H4.8" />
-    <path d="M7.6 14.4L4.6 17l3 2.6" />
-  </svg>
-);
-
-const SFHeart = ({ size = 15, filled, className }: IconProps & { filled?: boolean }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 21s-7-4.35-9.5-9C.9 8.6 2.6 4.5 6.5 4.5c2.1 0 3.9 1.1 5.5 3.2 1.6-2.1 3.4-3.2 5.5-3.2 3.9 0 5.6 4.1 4 7.5-2.5 4.65-9.5 9-9.5 9z" />
-  </svg>
-);
-
-const SFLyrics = ({ size = 15, className }: IconProps) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-    <path d="M8 9h8M8 12.5h5" />
-  </svg>
-);
-
-const SFFx = ({ size = 15, className }: IconProps) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className={className}>
-    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
-    <circle cx="15" cy="7" r="2" />
-    <circle cx="9" cy="17" r="2" />
-  </svg>
-);
-
-const SFExpand = ({ size = 13, className }: IconProps) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
-  </svg>
-);
-
-const SFSpeaker = ({ size = 16, level = 1, className }: IconProps & { level?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" />
-    {level === 0 ? (
-      <path d="M16 9.5l5 5M21 9.5l-5 5" />
-    ) : (
-      <>
-        <path d="M15.5 9a4 4 0 0 1 0 6" />
-        {level > 0.5 && <path d="M18.2 6.5a8 8 0 0 1 0 11" />}
-      </>
-    )}
-  </svg>
-);
 
 /* ------------------------------------------------------------------ */
 /*  Spring button                                                      */

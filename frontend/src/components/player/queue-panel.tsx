@@ -28,6 +28,7 @@ import api from "@/lib/api";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { UniversalMediaCover } from "@/components/shared/UniversalMediaCover";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
+import { Equalizer } from "@/components/ui/Equalizer";
 
 const formatTime = (duration?: number | null) => {
   if (!duration || isNaN(duration) || duration <= 0) return "--:--";
@@ -356,23 +357,7 @@ export function QueuePanel() {
                       <div className="relative w-11 h-11 rounded-lg overflow-hidden shadow-md shrink-0 border border-white/5">
                         <UniversalMediaCover track={currentTrack} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                          <div className="flex gap-0.5 items-end h-3">
-                            <motion.div
-                              animate={{ height: [4, 12, 6, 10, 4] }}
-                              transition={{ repeat: Infinity, duration: 1 }}
-                              className="w-0.5 bg-brand"
-                            />
-                            <motion.div
-                              animate={{ height: [10, 4, 12, 6, 10] }}
-                              transition={{ repeat: Infinity, duration: 1.2 }}
-                              className="w-0.5 bg-brand"
-                            />
-                            <motion.div
-                              animate={{ height: [6, 10, 4, 12, 6] }}
-                              transition={{ repeat: Infinity, duration: 0.8 }}
-                              className="w-0.5 bg-brand"
-                            />
-                          </div>
+                          <Equalizer playing size="xs" />
                         </div>
                       </div>
 

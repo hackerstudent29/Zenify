@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, MapPin, Sparkles, Radio, Heart, ChevronLeft } from "lucide-react";
+import { Mail, MapPin, Sparkles, Radio, ChevronLeft } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { useRouter } from "next/navigation";
 import TextType from "@/components/ui/TextType";
 import pkg from "../../../package.json";
@@ -312,7 +313,7 @@ export default function AboutPage() {
               <div className="mt-8 p-6 md:p-8 rounded-3xl bg-gradient-to-br from-rose-950/30 via-zinc-900/50 to-zinc-950/80 border border-rose-500/30 backdrop-blur-xl space-y-6 shadow-2xl">
                 <div className="flex items-center gap-3 text-rose-400">
                   <div className="w-10 h-10 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
-                    <Heart size={20} className="fill-rose-400/20" />
+                    <SwiftUIHeart size={20} filled className="text-rose-400" />
                   </div>
                   <div>
                     <h4 className="text-lg font-bold text-white tracking-tight">Support the Developer & Sponsor Zenify</h4>

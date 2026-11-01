@@ -10,13 +10,13 @@ import {
  Music2,
  Clock,
  User,
- Heart,
  Brain,
  Sparkles,
  Zap,
  Wind,
  Target
 } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 import { cn, getMediaUrl } from "@/lib/utils";
@@ -98,7 +98,7 @@ const AnalyticsContent = () => {
  { label: "Total Streams", value: data.overview.totalStreams, icon: Play },
  { label: "Mins Listened", value: data.overview.totalDownloads, icon: Clock },
  { label: "Favorite Artists", value: data.overview.totalReleases, icon: User },
- { label: "Total Saves", value: data.overview.averageRating, icon: Heart },
+ { label: "Total Saves", value: data.overview.averageRating, icon: SwiftUIHeart },
  ] : [
  { label: "Streams", value: data.overview.totalStreams, icon: Play },
  { label: "Downloads", value: data.overview.totalDownloads, icon: Download },

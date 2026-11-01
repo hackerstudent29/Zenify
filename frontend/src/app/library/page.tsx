@@ -6,7 +6,6 @@ import {
  Search,
  Plus,
  Filter,
- Heart,
  Clock,
  User,
  Disc,
@@ -19,6 +18,7 @@ import {
   Share2,
   Edit2
 } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { ZenLoading } from "@/components/ui/ZenLoading";
 import { Button } from "@/components/ui/button";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -46,7 +46,7 @@ const categories = [
  { id: "overview", label: "Overview", icon: LayoutDashboard },
  { id: "playlists", label: "Playlists", icon: Library },
  { id: "albums", label: "Albums", icon: Disc },
- { id: "liked", label: "Liked Songs", icon: Heart },
+ { id: "liked", label: "Liked Songs", icon: SwiftUIHeart },
  { id: "artists", label: "Artists", icon: User },
 ];
 
@@ -224,7 +224,7 @@ export default function LibraryPage() {
  <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center shadow-lg shadow-black/20 border border-white/5 shrink-0">
  <Library size={20} className="text-red-500" />
  </div>
- <h1 className="text-2xl font-bold text-zinc-500 tracking-tight leading-none mb-0.5 font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>
+ <h1 className="text-2xl font-bold text-white tracking-tight leading-none mb-0.5">
  Your library
  </h1>
  </div>
@@ -748,7 +748,7 @@ export default function LibraryPage() {
  ) : (
  <div className="flex flex-col items-center justify-center py-32 text-center">
  <div className="w-20 h-20 rounded-full border border-white/10 bg-white/5 mb-6 flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.05)]">
- <Heart
+ <SwiftUIHeart
  size={28}
  className="text-white/40"
  strokeWidth={1.5}

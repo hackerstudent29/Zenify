@@ -1,7 +1,8 @@
 "use client";
 
 import { Track, usePlayerStore } from "@/store/player";
-import { Play, MoreHorizontal, Heart, Plus, Pause, Download, Check, X, User, Music, Mic, RefreshCw, ListPlus } from "lucide-react";
+import { Play, MoreHorizontal, Plus, Pause, Download, Check, X, User, Music, Mic, RefreshCw, ListPlus } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
@@ -231,7 +232,7 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
   },
   {
   id: 'like',
- icon: <Heart size={14} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />,
+ icon: <SwiftUIHeart size={15} filled={!!isLiked} className={isLiked ? "text-brand" : "opacity-70"} />,
  label: isLiked ? "Liked" : "Add to Favorites",
  onClick: (e) => {
  e?.stopPropagation();
