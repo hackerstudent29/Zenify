@@ -1,0 +1,29 @@
+# GitHub CODEOWNERS file
+# Automatically request review from these users on relevant pull requests
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# All files in the repository
+* @hackerstudent29
+
+# Backend specific
+/backend/ @hackerstudent29
+/backend/src/routes/ @hackerstudent29
+/backend/prisma/ @hackerstudent29
+
+# Frontend specific
+/frontend/ @hackerstudent29
+/frontend/src/components/ @hackerstudent29
+/frontend/src/lib/audio-engine.ts @hackerstudent29
+
+# Mobile app
+/mobile/ @hackerstudent29
+
+# Documentation
+/docs/ @hackerstudent29
+*.md @hackerstudent29
+
+# Configuration files
+.github/ @hackerstudent29
+docker-compose.yml @hackerstudent29
+Dockerfile @hackerstudent29
+

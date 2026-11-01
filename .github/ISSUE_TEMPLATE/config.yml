@@ -1,0 +1,30 @@
+# GitHub Issue Template Configuration
+# https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-template-chooser
+
+blank_issues_enabled: false
+
+contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/hackerstudent29/Zenify/blob/main/README.md
+    about: Read the README and documentation first
+
+  - name: 🆘 Troubleshooting Guide
+    url: https://github.com/hackerstudent29/Zenify/blob/main/TROUBLESHOOTING.md
+    about: Check common issues and solutions
+
+  - name: 💬 Discussions
+    url: https://github.com/hackerstudent29/Zenify/discussions
+    about: Ask questions or share ideas with the community
+
+  - name: 🛡️ Report Security Issue
+    url: https://github.com/hackerstudent29/Zenify/blob/main/SECURITY.md
+    about: Report security vulnerabilities responsibly
+
+  - name: 📱 Mobile/Flutter Issues
+    url: https://github.com/hackerstudent29/Zenify/labels/mobile
+    about: Report issues with the Android app
+
+  - name: 💬 Chat / Discord
+    url: https://discord.gg/zenify
+    about: Join our community Discord server (if available)
+

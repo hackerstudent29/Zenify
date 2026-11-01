@@ -1,0 +1,53 @@
+name: Lint & Format
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Code Quality
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      # Backend linting
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Lint backend
+        working-directory: ./backend
+        run: npm run lint || true
+
+      - name: Format check (Prettier)
+        working-directory: ./backend
+        run: npm run format:check || npm run format
+
+      # Frontend linting
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: ./frontend
+        run: npm run lint || true
+
+      - name: Type check frontend
+        working-directory: ./frontend
+        run: npm run type-check || true
+
+      - name: Format check (Prettier)
+        working-directory: ./frontend
+        run: npm run format:check || npm run format
+
