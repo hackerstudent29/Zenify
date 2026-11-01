@@ -451,7 +451,7 @@ export class RecommendationsService {
               },
               coverUrl: cover,
               duration: item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 180,
-              audioUrl: item.previewUrl || '',
+              audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${item.artistName || ''} - ${item.trackName || ''}`)}&title=${encodeURIComponent(item.trackName || '')}&artist=${encodeURIComponent(item.artistName || '')}&trackId=itunes-${item.trackId}`,
               language: lang || 'English',
               type: 'track'
             };

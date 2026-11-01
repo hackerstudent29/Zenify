@@ -251,9 +251,12 @@ export async function searchRoutes(server: FastifyInstance) {
       });
     }
 
-    // 1. Resolve User ID, Language Weights & Storefront
+    // 1. Resolve User ID, Language Weights & Storefront (Per-User Personalization)
     let userId: string | null = null;
     let userLangWeights: Record<string, number> = {};
+    let userLanguages: string[] = [];
+    let userFavArtists: string[] = [];
+    let userGenres: string[] = [];
     let storefront = 'in';
 
     try {
@@ -280,17 +283,36 @@ export async function searchRoutes(server: FastifyInstance) {
           storefront = COUNTRY_MAP[user.country.toLowerCase().trim()] || 'in';
         }
 
+        if (preferences?.languages && Array.isArray(preferences.languages)) {
+          userLanguages = preferences.languages.map(l => l.toLowerCase().trim()).filter(Boolean);
+        }
+
+        if (preferences?.favoriteArtists) {
+          if (Array.isArray(preferences.favoriteArtists)) {
+            userFavArtists = preferences.favoriteArtists.map((a: any) => typeof a === 'string' ? a.toLowerCase().trim() : (a.name || '').toLowerCase().trim()).filter(Boolean);
+          }
+        }
+
+        if (preferences?.preferredGenres && Array.isArray(preferences.preferredGenres)) {
+          userGenres = preferences.preferredGenres.map(g => g.toLowerCase().trim()).filter(Boolean);
+        }
+
         if (profile?.languageWeights && Object.keys(profile.languageWeights as any).length > 0) {
           userLangWeights = profile.languageWeights as Record<string, number>;
-        } else if (preferences?.languages && preferences.languages.length > 0) {
-          preferences.languages.forEach((l, idx) => {
-            userLangWeights[l.toLowerCase()] = Math.max(0.1, 1.0 - idx * 0.2);
+        } else if (userLanguages.length > 0) {
+          userLanguages.forEach((l, idx) => {
+            userLangWeights[l] = Math.max(0.1, 1.0 - idx * 0.2);
           });
         }
       }
     } catch {}
 
-    const cacheKey = `search:${cleanQ.toLowerCase()}:${limit}:${storefront}:${userId || 'anon'}`;
+    const paramLang = ((req.query as any).language || (req.headers['x-user-language'] as string) || '').toLowerCase().trim();
+    if (paramLang && !userLanguages.includes(paramLang)) {
+      userLanguages.unshift(paramLang);
+    }
+
+    const cacheKey = `search:${cleanQ.toLowerCase()}:${limit}:${storefront}:${userId || 'anon'}:${userLanguages.join('_')}`;
     const cached = searchCache.get(cacheKey);
     if (cached && cached.expires > Date.now()) {
       return reply.send(cached.data);
@@ -665,6 +687,41 @@ export async function searchRoutes(server: FastifyInstance) {
         const isDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone|carnatic mix|tribute|piano cover|guitar cover|sped up|chipmunk|8d audio|mashup)\b|\s+x\s+/i.test(`${titleLower} ${item.album?.title || ''}`);
         const wantsDerivative = /\b(remix|cover|karaoke|acoustic|slowed|reverb|instrumental|lofi|ringtone|theme|bgm|score|soundtrack|ost|tribute)\b/i.test(cleanQ);
 
+        // Personalized ranking priority order:
+        // 1. User's selected languages
+        const trackLang = (item.language || '').toLowerCase().trim();
+        const artistName = (item.artist?.name || item.artistName || '').toLowerCase().trim();
+        const genreName = (item.genre || '').toLowerCase().trim();
+
+        let prefBoost = 0;
+        if (userLanguages.length > 0) {
+          if (trackLang) {
+            const lIdx = userLanguages.indexOf(trackLang);
+            if (lIdx === 0) prefBoost += 280; // Top selected language
+            else if (lIdx > 0) prefBoost += 200; // Multi-selected language
+            else {
+              const queryHasLang = cleanQ.toLowerCase().includes(trackLang);
+              if (!queryHasLang) prefBoost -= 220; // Unselected language penalty
+            }
+          }
+        }
+
+        // 2. Preferred artists
+        if (userFavArtists.length > 0) {
+          if (userFavArtists.some(fa => artistName.includes(fa) || fa.includes(artistName))) {
+            prefBoost += 220;
+          }
+        }
+
+        // 5. Genre (tertiary signal only)
+        if (userGenres.length > 0 && genreName) {
+          if (userGenres.some(ug => genreName.includes(ug) || ug.includes(genreName))) {
+            prefBoost += 30;
+          }
+        }
+
+        item.score = (item.score || 0) + prefBoost;
+
         if (isDerivative && !wantsDerivative && !isThemeOrBgm) {
           otherVersions.push(item);
         } else {
@@ -674,6 +731,32 @@ export async function searchRoutes(server: FastifyInstance) {
 
       originals.sort((a, b) => b.score - a.score);
       otherVersions.sort((a, b) => b.score - a.score);
+
+      // Apply personalized boost to artists
+      for (const a of rankedArtists) {
+        const aNorm = a.name.toLowerCase().trim();
+        if (userFavArtists.some(fa => aNorm.includes(fa) || fa.includes(aNorm))) {
+          a.score = (a.score || 0) + 240;
+        }
+      }
+      rankedArtists.sort((a, b) => b.score - a.score);
+
+      // Apply personalized boost to albums
+      for (const alb of rankedAlbums) {
+        const albArt = (alb.artist?.name || '').toLowerCase().trim();
+        let albBoost = 0;
+        if (userFavArtists.some(fa => albArt.includes(fa) || fa.includes(albArt))) {
+          albBoost += 200;
+        }
+        if (userLanguages.length > 0 && alb.genre) {
+          const gLow = alb.genre.toLowerCase();
+          if (userLanguages.some(l => gLow.includes(l))) {
+            albBoost += 180;
+          }
+        }
+        alb.score = (alb.score || 0) + albBoost;
+      }
+      rankedAlbums.sort((a, b) => b.score - a.score);
 
       const rankedTracks = [...originals, ...otherVersions];
 
