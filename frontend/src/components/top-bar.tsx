@@ -32,6 +32,7 @@ export function TopBar() {
   const isMobile = useIsMobile();
   const stickyPageTitle = useUIStore((state) => state.stickyPageTitle);
   const { user, logout } = useAuthStore();
+  const [avatarError, setAvatarError] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -96,19 +97,18 @@ export function TopBar() {
             contentClassName="w-56 mt-2 z-[9999] bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl"
             trigger={
               <button className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none">
-                {user?.avatarUrl ? (
-                  <img
-                    src={getMediaUrl(user.avatarUrl)}
-                    className="w-full h-full object-cover"
-                    alt={user.name ? `${user.name} profile` : "User profile"}
-                    width={40}
-                    height={40}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <UserIcon size={16} className="text-zinc-400" />
-                )}
+                                  {user?.avatarUrl && !avatarError ? (
+                    <img 
+                      src={getMediaUrl(user.avatarUrl)} 
+                      className="w-full h-full object-cover" 
+                      alt=""
+                      onError={() => setAvatarError(true)} 
+                    />
+                  ) : (
+                    <span className="text-xs font-semibold text-zinc-300 uppercase">
+                      {user?.name?.[0] || user?.username?.[0] || user?.email?.[0] || <UserIcon size={16} className="text-zinc-400" />}
+                    </span>
+                  )}
                 {useNotificationStore.getState().unreadCount > 0 && (
                   <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
                 )}
@@ -136,8 +136,7 @@ export function TopBar() {
                     { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push("/about-zenify") },
                     { id: "terms", label: "Terms of Service", icon: <FileText size={16} />, onClick: () => router.push("/terms") },
                     { id: "privacy", label: "Privacy Policy", icon: <Shield size={16} />, onClick: () => router.push("/privacy") },
-                    { id: "upgrade-pro", label: "Upgrade Pro", icon: <Sparkles size={16} className="text-brand" />, onClick: () => router.push("/pricing") },
-                    { id: "divider-logout", isSeparator: true },
+                                        { id: "divider-logout", isSeparator: true },
                     {
                       id: "logout",
                       label: "Log Out",
@@ -191,10 +190,17 @@ export function TopBar() {
                   data-tour="profile"
                   className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center overflow-hidden hover:bg-white/10 active:scale-95 transition-all shadow-xl backdrop-blur-md relative outline-none cursor-pointer"
                 >
-                  {user?.avatarUrl ? (
-                    <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="Profile" />
+                                    {user?.avatarUrl && !avatarError ? (
+                    <img 
+                      src={getMediaUrl(user.avatarUrl)} 
+                      className="w-full h-full object-cover" 
+                      alt=""
+                      onError={() => setAvatarError(true)} 
+                    />
                   ) : (
-                    <UserIcon size={16} className="text-zinc-400" />
+                    <span className="text-xs font-semibold text-zinc-300 uppercase">
+                      {user?.name?.[0] || user?.username?.[0] || user?.email?.[0] || <UserIcon size={16} className="text-zinc-400" />}
+                    </span>
                   )}
                   {useNotificationStore.getState().unreadCount > 0 && (
                     <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-brand rounded-full border border-black" />
@@ -227,17 +233,9 @@ export function TopBar() {
                           <span className="text-xs font-normal text-white truncate max-w-[110px]">
                             {user?.name || user?.username || "User"}
                           </span>
-                          {user?.role === "ADMIN" ? (
+                          {user?.role === "ADMIN" && (
                             <span className="text-[9px] font-normal bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                               Admin
-                            </span>
-                          ) : user?.role === "PRO" || user?.role === "PREMIUM" ? (
-                            <span className="text-[9px] font-normal bg-brand/10 text-brand border border-brand/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                              PRO
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-normal bg-white/5 text-zinc-400 border border-white/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                              Free
                             </span>
                           )}
                         </div>
@@ -284,14 +282,7 @@ export function TopBar() {
                       { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push("/about-zenify") },
                       { id: "terms", label: "Terms of Service", icon: <FileText size={14} />, onClick: () => router.push("/terms") },
                       { id: "privacy", label: "Privacy Policy", icon: <Shield size={14} />, onClick: () => router.push("/privacy") },
-                      {
-                        id: "upgrade-pro",
-                        label: "Upgrade Pro",
-                        icon: <Sparkles size={14} className="text-brand" />,
-                        className: "text-brand hover:text-brand bg-brand/5 hover:bg-brand/10",
-                        onClick: () => router.push("/pricing"),
-                      },
-                      { id: "divider-logout", isSeparator: true },
+                                            { id: "divider-logout", isSeparator: true },
                       {
                         id: "logout",
                         label: "Log Out",

@@ -2544,10 +2544,14 @@ export class ExternalMetadataService {
                         }
                     }
 
+                    const videoId = id || vr.videoId;
+                    const thumb = vr.thumbnail?.thumbnails?.[vr.thumbnail.thumbnails.length - 1]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
                     results.push({
-                        id,
+                        id: videoId,
+                        videoId: videoId,
                         title,
                         duration: durationSeconds,
+                        thumbnail: thumb,
                         uploader,
                         channel: uploader
                     });

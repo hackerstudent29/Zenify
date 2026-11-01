@@ -132,27 +132,6 @@ const ROUTE_DATA = {
       </section>
     `
   },
-  '/pricing': {
-    title: 'Zenify Premium – Ad-Free High Fidelity Streaming & DSP',
-    description: 'Unlock high-fidelity lossless FLAC audio streaming, studio equalizer presets, unlimited synchronized lyrics, and offline PWA listening with Zenify Premium.',
-    canonical: 'https://listenzenify.vercel.app/pricing',
-    content: `
-      <main class="px-6 py-16 max-w-4xl mx-auto text-zinc-200">
-        <h1 class="text-3xl font-black text-white mb-4">zenify Premium Plans</h1>
-        <p class="text-zinc-400 mb-8 leading-relaxed">Experience uncompromised sound with Zenify Premium. 100% ad-free music streaming, 8D spatial audio engine, customizable equalizer, and offline caching.</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div class="p-6 rounded-2xl bg-zinc-900 border border-white/10">
-            <h2 class="text-xl font-bold text-white mb-2">Free Plan</h2>
-            <p class="text-zinc-400 text-sm">Full access to synced lyrics, 8D audio, and web radio.</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-zinc-900 border border-brand/50">
-            <h2 class="text-xl font-bold text-white mb-2">Eclipse Premium</h2>
-            <p class="text-zinc-400 text-sm">Ultra-HD lossless streaming, priority audio processing, and zero interruptions.</p>
-          </div>
-        </div>
-      </main>
-    `
-  },
   '/search': {
     title: 'Search Songs, Artists & Multilingual Lyrics – Zenify',
     description: 'Search millions of songs, tracks, albums, and artists with instant sub-second synchronized lyrics on Zenify.',

@@ -364,6 +364,9 @@ export function getArtistProfileImage(artist: any, fallbackSongCover?: string | 
     !rawImage.includes("placeholder") && 
     !rawImage.includes("ui-avatars.com") &&
     !rawImage.includes("default_avatar") &&
+    !rawImage.includes("share-image") &&
+    !rawImage.includes("artist-default") &&
+    !rawImage.includes("_i/") &&
     !isJunkOrSongCover;
 
   // Priority 2: Use provided image if it is an official Apple Music visual or valid portrait

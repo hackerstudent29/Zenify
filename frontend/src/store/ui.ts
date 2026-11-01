@@ -14,7 +14,6 @@ export interface ToastNotification {
 }
 
 interface UIState {
-  isPricingModalOpen: boolean;
   isSidebarCollapsed: boolean;
   isDownloadModalOpen: boolean;
   downloadTrack: Track | null;
@@ -65,7 +64,6 @@ interface UIState {
   setAudioFxOpen: (open: boolean) => void;
   setIsQueueOpen: (open: boolean) => void;
   setIsLyricsOpen: (open: boolean) => void;
-  setPricingModalOpen: (open: boolean) => void;
   setNativePlayerOpen: (open: boolean) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   openDownloadModal: (track: Track) => void;
@@ -101,7 +99,6 @@ const getInitialColoredBackground = (): boolean => {
 };
 
 export const useUIStore = create<UIState>((set, get) => ({
-  isPricingModalOpen: false,
   isSidebarCollapsed: false,
   isDownloadModalOpen: false,
   downloadTrack: null,
@@ -182,7 +179,6 @@ export const useUIStore = create<UIState>((set, get) => ({
   setAudioFxOpen: (open) => set((state) => ({ isAudioFxOpen: open, ...(open ? { isLyricsOpen: false, isQueueOpen: false, isNotificationsOpen: false } : {}) })),
   setIsQueueOpen: (open) => set((state) => ({ isQueueOpen: open, ...(open ? { isLyricsOpen: false, isAudioFxOpen: false, isNotificationsOpen: false } : {}) })),
   setIsLyricsOpen: (open) => set((state) => ({ isLyricsOpen: open, ...(open ? { isQueueOpen: false, isAudioFxOpen: false, isNotificationsOpen: false } : {}) })),
-  setPricingModalOpen: (open) => set({ isPricingModalOpen: open }),
   setNativePlayerOpen: (open) => set({ isNativePlayerOpen: open }),
   setSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
   openDownloadModal: (track) => set({ isDownloadModalOpen: true, downloadTrack: track }),

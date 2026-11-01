@@ -106,7 +106,7 @@ api.interceptors.response.use(
               useAuthStore.getState().logout();
 
               // Do not force-redirect to /login if user is on a public page
-              const publicPaths = ['/login', '/register', '/terms', '/privacy', '/about', '/about-zenify', '/creator', '/local-library', '/pricing', '/discover', '/search', '/radio', '/track', '/artist', '/album', '/playlist', '/explore', '/section'];
+              const publicPaths = ['/login', '/register', '/terms', '/privacy', '/about', '/about-zenify', '/creator', '/local-library',  '/discover', '/search', '/radio', '/track', '/artist', '/album', '/playlist', '/explore', '/section'];
               const currentPath = window.location.pathname;
               const isCurrentlyPublic = currentPath === '/' || publicPaths.some(p => currentPath.startsWith(p));
               if (!isCurrentlyPublic) {

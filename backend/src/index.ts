@@ -201,14 +201,6 @@ server.get('/', async () => {
     return { message: 'Zenify API is running 🎵', documentation: '/documentation' };
 });
 
-server.get('/pricing', async (request, reply) => {
-    // If someone hits this on the backend port, they likely meant to hit the frontend
-    return reply.status(200).send({
-        message: 'This is the Zenify API. For the Pricing page, please visit the frontend.',
-        frontendUrl: config.FRONTEND_URL + '/pricing'
-    });
-});
-
 import { CronService } from './services/cron.service';
 
 const start = async () => {

@@ -1,12 +1,9 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { useUIStore } from "@/store/ui";
 import { ZenifyLogo } from "./shared/ZenifyLogo";
 
 export default function Footer() {
-  const { setPricingModalOpen } = useUIStore();
-
   return (
     <footer className="bg-black border-t border-white/5 pt-24 pb-12">
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12 mb-20 text-center md:text-left">
@@ -34,14 +31,6 @@ export default function Footer() {
           <ul className="space-y-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">
             <li><Link href="/privacy" className="hover:text-brand transition-colors">Privacy Policy</Link></li>
             <li><Link href="/terms" className="hover:text-brand transition-colors">Terms of Service</Link></li>
-            <li>
-              <button
-                onClick={() => setPricingModalOpen(true)}
-                className="hover:text-brand transition-colors uppercase"
-              >
-                Pricing
-              </button>
-            </li>
           </ul>
         </div>
 
