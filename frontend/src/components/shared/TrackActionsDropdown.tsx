@@ -884,7 +884,7 @@ export function TrackActionsDropdown({
   const isLiked = track?.id ? likedTrackIds?.includes(track.id) : false;
 
   const toggleLikeMutation = useMutation({
-    mutationFn: () => api.post(`/tracks/${track?.id}/like`),
+    mutationFn: () => api.post(`/tracks/${track?.id}/like`, track),
     onMutate: async () => {
       if (!track?.id) return;
       await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
@@ -1229,7 +1229,7 @@ export function TrackActionsDropdown({
       sep("s-play"),
 
       /* library */
-      !hide.has("like") && {
+      context !== "row" && !hide.has("like") && {
         id: "like",
         icon: (
           <motion.span

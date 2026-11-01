@@ -20,7 +20,9 @@ import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { cn, getMediaUrl, formatDisplayTitle, decodeHtmlEntities } from "@/lib/utils";
 import { Equalizer } from "@/components/ui/Equalizer";
-import { SwiftUIPlay, SwiftUIPause, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
+import { SwiftUIPlay, SwiftUIPause, SwiftUIEllipsis, SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
 
 export type SortKey = "popular" | "recent" | "newest" | "az";
 
@@ -46,7 +48,7 @@ const DEFAULT_TABS: { key: SortKey; label: string }[] = [
 const PAGE = 10;
 
 const GRID =
-  "grid grid-cols-[28px_minmax(0,1fr)_92px] items-center gap-x-3 sm:grid-cols-[40px_minmax(0,1.5fr)_92px] md:grid-cols-[40px_minmax(0,1.6fr)_minmax(0,1fr)_92px] md:gap-x-4";
+  "grid grid-cols-[28px_minmax(0,1fr)_120px] items-center gap-x-2 sm:grid-cols-[40px_minmax(0,1.5fr)_124px] md:grid-cols-[40px_minmax(0,1.6fr)_minmax(0,1fr)_130px] md:gap-x-4";
 
 const fmt = (secs?: number) => {
   const s = Math.max(0, Math.round(Number(secs) || 0));
@@ -79,7 +81,9 @@ export function JioSaavnSongTable({
   tracks,
   currentTrackId,
   isPlaying,
+  likedTrackIds,
   onPlayTrack,
+  onToggleLike,
   showArtist = false,
   defaultSort = "popular",
   tabs = DEFAULT_TABS,
@@ -88,6 +92,50 @@ export function JioSaavnSongTable({
 }: JioSaavnSongTableProps) {
   const [sort, setSort] = useState<SortKey>(defaultSort);
   const [visible, setVisible] = useState(pageSize);
+  const queryClient = useQueryClient();
+
+  const { data: fetchedLikedIds = [] } = useQuery<string[]>({
+    queryKey: ["liked-track-ids"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("tracks/liked");
+        const arr = Array.isArray(res.data) ? res.data : res.data?.items || [];
+        return arr.map((t: any) => t.id) as string[];
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const activeLikedIds = useMemo(() => {
+    return Array.from(new Set([...(likedTrackIds || []), ...(fetchedLikedIds || [])]));
+  }, [likedTrackIds, fetchedLikedIds]);
+
+  const handleToggleLike = async (track: any, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (onToggleLike) {
+      onToggleLike(track.id, e);
+      return;
+    }
+    const trackId = track?.id;
+    if (!trackId) return;
+
+    await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
+    const prev = queryClient.getQueryData<string[]>(["liked-track-ids"]) || [];
+    const isCurrentlyLiked = prev.includes(trackId);
+    const updated = isCurrentlyLiked ? prev.filter((id) => id !== trackId) : [...prev, trackId];
+    queryClient.setQueryData(["liked-track-ids"], updated);
+
+    try {
+      await api.post(`tracks/${trackId}/like`, track);
+      queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
+      queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
+      queryClient.invalidateQueries({ queryKey: ["library-overview"] });
+    } catch {
+      queryClient.setQueryData(["liked-track-ids"], prev);
+    }
+  };
 
   const sorted = useMemo(() => {
     const list = [...(tracks || [])];
@@ -234,8 +282,31 @@ export function JioSaavnSongTable({
                 )}
               </div>
 
-              {/* ⋯ (on hover) + time */}
-              <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+              {/* Heart (on hover/touch) + ⋯ (on hover/touch) + time */}
+              <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                {(() => {
+                  const isLiked = !!(track?.id && activeLikedIds.includes(track.id));
+                  return (
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleLike(track, e)}
+                      aria-label={isLiked ? "Unlike song" : "Like song"}
+                      title={isLiked ? "Unlike" : "Like"}
+                      className={cn(
+                        "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/70 outline-none transition-all duration-150 active:scale-90 hover:bg-white/10 hover:text-white",
+                        isLiked
+                          ? "text-brand opacity-100"
+                          : "opacity-0 hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-75"
+                      )}
+                    >
+                      <SwiftUIHeart
+                        size={15}
+                        filled={isLiked}
+                        className={cn(isLiked ? "text-brand" : "text-white/60 hover:text-white")}
+                      />
+                    </button>
+                  );
+                })()}
                 <TrackActionsDropdown
                   track={track}
                   context="row"
@@ -247,7 +318,7 @@ export function JioSaavnSongTable({
                       title="More options"
                       aria-label="More options"
                       className={cn(
-                        "flex size-7 cursor-pointer items-center justify-center rounded-full text-white/70 outline-none transition-[opacity,background-color,color] duration-150",
+                        "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/70 outline-none transition-[opacity,background-color,color] duration-150",
                         "opacity-0 hover:bg-white/10 hover:text-white focus-visible:opacity-100 group-hover:opacity-100",
                         "[@media(hover:none)]:opacity-100"
                       )}

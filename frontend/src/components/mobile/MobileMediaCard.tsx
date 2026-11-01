@@ -3,6 +3,8 @@
 import React from "react";
 import { Play, Pause, ShoppingCart, Plus, Download } from "lucide-react";
 import { Equalizer } from "@/components/ui/Equalizer";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
+import { useArtistLike } from "@/hooks/useArtistLike";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -108,33 +110,39 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  enabled: !isLink
  });
 
- const isLiked = !isLink && likedTrackIds?.includes(track.id);
+  const { isLiked: isArtistLiked, toggleLike: toggleArtistLike } = useArtistLike(
+    isArtist ? track.id : undefined,
+    isArtist ? track : undefined
+  );
 
- const toggleLikeMutation = useMutation({
- mutationFn: async () => {
- await api.post(`/tracks/${track.id}/like`);
- },
- onMutate: async () => {
- await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
- const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
- const newLikedIds = previousLikedIds ? (
- previousLikedIds.includes(track.id)
- ? previousLikedIds.filter(id => id !== track.id)
- : [...previousLikedIds, track.id]
- ) : [track.id];
- queryClient.setQueryData(['liked-track-ids'], newLikedIds);
- return { previousLikedIds };
- },
- onError: (err, newTodo, context) => {
- if (context?.previousLikedIds) {
- queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
- }
- },
- onSettled: () => {
- queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
- queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
- }
- });
+  const isLiked = isArtist ? isArtistLiked : (!isLink && likedTrackIds?.includes(track.id));
+
+  const toggleLikeMutation = useMutation({
+    mutationFn: async () => {
+      await api.post(`tracks/${track.id}/like`, track);
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+      const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+      const newLikedIds = previousLikedIds ? (
+        previousLikedIds.includes(track.id)
+          ? previousLikedIds.filter(id => id !== track.id)
+          : [...previousLikedIds, track.id]
+      ) : [track.id];
+      queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+      return { previousLikedIds };
+    },
+    onError: (err, newTodo, context) => {
+      if (context?.previousLikedIds) {
+        queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
+      queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+      queryClient.invalidateQueries({ queryKey: ['library-overview'] });
+    }
+  });
 
  const { data: playlists } = useQuery({
  queryKey: ['my-playlists'],
@@ -227,6 +235,31 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  </motion.div>
  )}
  </AnimatePresence>
+
+ {!isAlbum && !isPlaylist && (
+   <button
+     type="button"
+     onClick={(e) => {
+       e.stopPropagation();
+       if (isArtist) {
+         toggleArtistLike(e);
+       } else {
+         toggleLikeMutation.mutate();
+       }
+     }}
+     aria-label={isLiked ? "Unlike" : "Like"}
+     className={cn(
+       "absolute z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 backdrop-blur-md border border-white/10 text-white active:scale-90 transition-transform cursor-pointer",
+       isArtist ? "top-2 right-2" : "top-2 right-2"
+     )}
+   >
+     <SwiftUIHeart
+       size={14}
+       filled={!!isLiked}
+       className={cn(isLiked ? "text-brand" : "text-white/80")}
+     />
+   </button>
+ )}
  </motion.div>
 
  <div className="flex flex-col min-w-0 px-1 mt-1">

@@ -898,21 +898,129 @@ export class TrackService {
         return likes.map(like => like.track);
     }
 
-    async toggleLike(userId: string, trackId: string) {
-        const existingLike = await prisma.like.findUnique({
-            where: { userId_trackId: { userId, trackId } }
+    async ensureTrack(trackId: string, metadata?: any): Promise<any> {
+        // 1. Direct ID lookup in PostgreSQL
+        let track = await prisma.track.findUnique({
+            where: { id: trackId },
+            include: { artist: true, album: { include: { artist: true } } }
+        });
+        if (track) return track;
+
+        // 2. Check by virtual ID, youtubeId, or audioUrl
+        const saavnCleanId = trackId.replace(/^(jiosaavn-)?saavn-/, '');
+        track = await prisma.track.findFirst({
+            where: {
+                OR: [
+                    { youtubeId: trackId },
+                    { youtubeId: saavnCleanId },
+                    { audioUrl: { contains: trackId } },
+                    { audioUrl: { contains: saavnCleanId } }
+                ],
+                deletedAt: null
+            },
+            include: { artist: true, album: { include: { artist: true } } }
+        });
+        if (track) return track;
+
+        // 3. If trackId is a recognized virtual ID (saavn-, yt-, sp-, itunes-), call findOne which imports it JIT
+        if (
+            trackId.startsWith('saavn-') ||
+            trackId.startsWith('jiosaavn-') ||
+            trackId.startsWith('yt-') ||
+            trackId.startsWith('yt:') ||
+            trackId.startsWith('sp-') ||
+            trackId.startsWith('itunes-')
+        ) {
+            try {
+                const resolved = await this.findOne(trackId);
+                if (resolved && (resolved as any).id) {
+                    return resolved;
+                }
+            } catch (err: any) {
+                console.warn(`[TrackService] JIT findOne import failed for ${trackId}:`, err.message);
+            }
+        }
+
+        // 4. If metadata was provided (from client payload)
+        if (metadata && (metadata.title || metadata.song)) {
+            const rawTitle = (metadata.title || metadata.song || '').trim();
+            const rawArtist = (
+                (typeof metadata.artist === 'string' ? metadata.artist : metadata.artist?.name) ||
+                metadata.artistName ||
+                metadata.singers ||
+                'Unknown Artist'
+            ).trim();
+
+            if (rawTitle) {
+                const match = await prisma.track.findFirst({
+                    where: {
+                        title: { equals: rawTitle, mode: 'insensitive' },
+                        artist: { name: { equals: rawArtist, mode: 'insensitive' } },
+                        deletedAt: null
+                    },
+                    include: { artist: true, album: { include: { artist: true } } }
+                });
+                if (match) return match;
+            }
+
+            // Ingest via importExternal
+            try {
+                return await this.importExternal({
+                    title: rawTitle,
+                    artistName: rawArtist,
+                    albumTitle: (typeof metadata.album === 'string' ? metadata.album : metadata.album?.title) || metadata.albumTitle || 'Single',
+                    coverUrl: metadata.coverUrl || metadata.artwork || metadata.image || '',
+                    audioUrl: metadata.audioUrl || '',
+                    duration: Number(metadata.duration) || 180,
+                });
+            } catch (impErr: any) {
+                console.warn(`[TrackService] importExternal failed for ${rawTitle}:`, impErr.message);
+            }
+        }
+
+        return null;
+    }
+
+    async toggleLike(userId: string, trackId: string, metadata?: any) {
+        // Ensure track exists in PostgreSQL
+        const track = await this.ensureTrack(trackId, metadata);
+        if (!track) {
+            throw this.server.httpErrors.notFound('Track could not be resolved or found');
+        }
+
+        const realTrackId = track.id;
+
+        // Check if user already liked it by real track ID or original trackId
+        const existingLike = await prisma.like.findFirst({
+            where: {
+                userId,
+                OR: [
+                    { trackId: realTrackId },
+                    { trackId: trackId }
+                ]
+            }
         });
 
         if (existingLike) {
             await prisma.like.delete({
-                where: { userId_trackId: { userId, trackId } }
+                where: { id: existingLike.id }
             });
-            return { liked: false };
+            await prisma.track.update({
+                where: { id: realTrackId },
+                data: { like_count: { decrement: 1 } }
+            }).catch(() => {});
+
+            return { liked: false, trackId: realTrackId, originalId: trackId };
         } else {
             await prisma.like.create({
-                data: { userId, trackId }
+                data: { userId, trackId: realTrackId }
             });
-            return { liked: true };
+            await prisma.track.update({
+                where: { id: realTrackId },
+                data: { like_count: { increment: 1 } }
+            }).catch(() => {});
+
+            return { liked: true, trackId: realTrackId, originalId: trackId, track };
         }
     }
 

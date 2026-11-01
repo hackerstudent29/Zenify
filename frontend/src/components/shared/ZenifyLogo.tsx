@@ -14,7 +14,7 @@ export const ZenifyLogo = ({ className, size = 32, animated = false, markOnly = 
     return (
       <div className={cn("flex items-center justify-center pointer-events-none select-none relative shrink-0", className)}>
         <img 
-          src="/favicon_z_512.png" 
+          src="/favicon_transparent.png" 
           alt="Zenify Z Logo" 
           width={size}
           height={size}

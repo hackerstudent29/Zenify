@@ -611,7 +611,7 @@ export class TrackController {
     toggleLike = async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         const userId = (req as any).user?.id;
         if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
-        const result = await this.trackService.toggleLike(userId, req.params.id);
+        const result = await this.trackService.toggleLike(userId, req.params.id, (req as any).body);
         return reply.send(result);
     }
 

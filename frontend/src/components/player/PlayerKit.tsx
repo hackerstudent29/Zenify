@@ -18,6 +18,7 @@ import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import { SwiftUIPlay, SwiftUIPause } from "@/components/ui/SwiftUIIcons";
 import { usePlayerPrefs } from "@/store/playerPrefs";
+import { usePlayerStore } from "@/store/player";
 
 /* ------------------------------------------------------------------ */
 /*  Tokens                                                             */
@@ -427,7 +428,7 @@ export function useIdle(enabled: boolean, ms = 4500) {
 }
 
 /** Optimistic like toggle shared by every player. */
-export function useTrackLike(trackId?: string) {
+export function useTrackLike(trackId?: string, trackData?: any) {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((s: any) => s.isAuthenticated);
 
@@ -435,7 +436,7 @@ export function useTrackLike(trackId?: string) {
     queryKey: ["liked-track-ids"],
     queryFn: async () => {
       try {
-        const res = await api.get("/tracks/liked");
+        const res = await api.get("tracks/liked");
         const arr = Array.isArray(res.data) ? res.data : res.data?.items || [];
         return arr.map((t: any) => t.id) as string[];
       } catch {
@@ -448,7 +449,15 @@ export function useTrackLike(trackId?: string) {
 
   const mutation = useMutation({
     mutationFn: async (id: string) => {
-      await api.post(`/tracks/${id}/like`);
+      const activeTrack = trackData || usePlayerStore.getState().currentTrack;
+      const payload = activeTrack?.id === id ? activeTrack : undefined;
+      const res = await api.post(`tracks/${id}/like`, payload);
+      if (res.data?.trackId && res.data.trackId !== id) {
+        usePlayerStore.setState((s) => ({
+          currentTrack: s.currentTrack && s.currentTrack.id === id ? { ...s.currentTrack, id: res.data.trackId } : s.currentTrack,
+        }));
+      }
+      return res.data;
     },
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
@@ -465,6 +474,7 @@ export function useTrackLike(trackId?: string) {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
       queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
+      queryClient.invalidateQueries({ queryKey: ["library-overview"] });
     },
   });
 
