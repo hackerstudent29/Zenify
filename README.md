@@ -5,26 +5,52 @@
   </a>
   <br />
   <br />
-  <h1>Zenify — Free Web Music Player & Synced Multilingual Lyrics</h1>
+  <h1>Zenify: Free Open-Source Music Streaming App with Synced Lyrics</h1>
   <p>
-    <b>Sub-Second Synced Lyrics • Studio Equalizer & 8D Audio • In-Browser Local Audio Player • Liquid Glass UI</b>
+    <b>Ad-free Spotify alternative • Synced Tamil, Hindi, Malayalam & English lyrics • Studio EQ & 8D audio • Web + Android</b>
   </p>
   <p>
     <em>Listen to music online for free with synchronized lyrics for Tamil, Tanglish, Hindi, Malayalam & English. Ad-free, fast streaming, and cross-platform listening.</em>
   </p>
 
   <p>
-    <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/🚀_Launch_Live_Web_App-listenzenify.vercel.app-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
+    <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/🚀_Try_Live_Web_App-listenzenify.vercel.app-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/�_Download_APK-Releases-0078D4?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
     <a href="DEVELOPER.md"><img src="https://img.shields.io/badge/🛠️_Developer_Guide-DEVELOPER.md-18181B?style=for-the-badge&logo=git&logoColor=white" alt="Developer Guide" /></a>
     <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/discussions"><img src="https://img.shields.io/badge/Discussions-Join_Community-7C3AED?style=for-the-badge&logo=github" alt="GitHub Discussions" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
   </p>
 
   <p>
-    <em>Built with ❤️ by <a href="https://github.com/hackerstudent29"><b>Ramanathan S (hackerstudent29)</b></a></em>
+    <em>Built with ❤️ by <a href="https://github.com/hackerstudent29"><b>Ramanathan S</b></a></em>
   </p>
 </div>
+
+---
+
+## 📸 Screenshots & Demo
+
+| 🎵 Home Dashboard | 🎤 Synced Lyrics | 🎛️ Studio FX Engine |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/zenify_home_dashboard.png" alt="Home Dashboard" width="100%" /> | <img src="assets/screenshots/zenify_synced_lyrics.png" alt="Synced Lyrics" width="100%" /> | <img src="assets/screenshots/zenify_fullview_player.png" alt="Studio FX Player" width="100%" /> |
+
+---
+
+## 🚀 Quick Start
+
+**Web (No Installation Required):**
+1. Visit **[listenzenify.vercel.app](https://listenzenify.vercel.app)**
+2. Search for any song and start playing instantly
+3. Enjoy synced lyrics, Studio FX, and offline local file playback
+
+**Install as PWA (Web App):**
+- Click **"Install"** on your browser (Chrome, Edge, Firefox, Safari)
+- Add to home screen on mobile for native app experience
+- Full offline support + lock screen controls
+
+**Android APK:**
+- Download latest from **[Releases](https://github.com/hackerstudent29/Zenify/releases)**
+- No Play Store required, full permissions control
 
 ---
 
@@ -40,7 +66,7 @@ Unlike commercial platforms that treat non-English content as secondary, Zenify 
 
 ## ✨ Why Listen on Zenify?
 
-* 🎤 **Sub-Second Synced Lyrics with AI Onset Alignment:** Real-time karaoke-grade lyric synchronization powered by **Deepgram AI** for precise onset detection. Supports **Tamil, Tanglish, Hindi, Malayalam, Telugu, Kannabi, Bengali, Punjabi, Gujarati, and English** with automatic romanization. Features intelligent instrumental gap detection (`• • •` markers during breaks >3.2s) and word-level timing.
+* 🎤 **Sub-Second Synced Lyrics with AI Onset Alignment:** Real-time karaoke-grade lyric synchronization powered by **Deepgram AI** for precise onset detection. Supports **Tamil, Tanglish, Hindi, Malayalam, Telugu, Kannada, Bengali, Punjabi, Gujarati, and English** with automatic romanization. Features intelligent instrumental gap detection (`• • •` markers during breaks >3.2s) and word-level timing.
 
 * 🎛️ **Professional Studio FX Engine (Right-Side Glass Panel):**
   * **Collapsible Accordion Sections:** Six organized sections (Presets, Tune, Space, Voice, Chain, Tempo) in a 320px glass panel matching Queue/Lyrics style
@@ -75,26 +101,17 @@ Unlike commercial platforms that treat non-English content as secondary, Zenify 
 
 ---
 
-## 📸 Interface Showcase
+## � Zenify vs Spotify: Why Choose?
 
-<div align="center">
-
-### 🎵 Glassmorphic Home Dashboard & Persistent Miniplayer
-<img src="assets/screenshots/zenify_home_dashboard.png" alt="Zenify Music Player Home Dashboard with Glassmorphic Miniplayer" width="100%" />
-
-<br/>
-
-| 🎤 Real-Time Synchronized Lyrics | 🔮 Fullview Ambient Aura Player |
-| :---: | :---: |
-| <img src="assets/screenshots/zenify_synced_lyrics.png" alt="Zenify Real-Time Synced Lyrics Display" width="100%" /> | <img src="assets/screenshots/zenify_fullview_player.png" alt="Zenify Ambient Aura Fullview Player" width="100%" /> |
-
-<br/>
-
-| 🌟 Artist Spotlight & Discography | 📜 Multilingual Lyrics Drawer |
-| :---: | :---: |
-| <img src="assets/screenshots/zenify_artist_page.png" alt="Zenify Artist Discography View" width="100%" /> | <img src="assets/screenshots/zenify_side_lyrics.png" alt="Zenify Multilingual Side Lyrics Drawer" width="100%" /> |
-
-</div>
+| Feature | Zenify | Spotify |
+| :--- | :---: | :---: |
+| **Ad-Free** | ✅ Forever | ❌ (Premium only) |
+| **Synced Regional Lyrics** | ✅ Tamil, Hindi, Malayalam… | ❌ English only |
+| **Studio EQ & 8D Audio** | ✅ Professional DSP | ❌ Limited EQ |
+| **Local File Playback** | ✅ MP3, FLAC, WAV, M4A | ❌ Spotify files only |
+| **Open Source** | ✅ MIT License | ❌ Proprietary |
+| **Privacy-First** | ✅ No trackers | ❌ Heavy analytics |
+| **Self-Hosted Option** | ✅ Docker ready | ❌ Cloud only |
 
 ---
 
@@ -111,25 +128,46 @@ Looking to contribute, inspect the Web Audio DSP routing, self-host a backend in
 
 ---
 
-## 🔍 Topics & Keywords
+---
 
-`music-streaming` • `open-source-music-player` • `spotify-alternative` • `synced-lyrics` • `karaoke-player` • `ai-lyrics-alignment` • `deepgram-integration` • `tamil-lyrics` • `hindi-lyrics` • `tanglish-lyrics` • `malayalam-lyrics` • `telugu-lyrics` • `romanization` • `studio-fx` • `audio-equalizer` • `8d-audio` • `spatial-audio` • `vocal-isolation` • `web-audio-api` • `nightcore` • `daycore` • `slowed-reverb` • `local-music-player` • `flac-player` • `mp3-player` • `pwa-music-app` • `glassmorphism-ui` • `react-music-player` • `vite-app` • `fastify-backend` • `prisma-orm` • `postgresql` • `typescript` • `real-time-lyrics` • `music-recommendation` • `playlist-manager` • `free-streaming` • `ad-free-music`
+## � Roadmap
+
+- ✅ **v2.5** – Studio FX Glass Panel, AI Lyrics Alignment, Settings Cleanup
+- 🔄 **v2.6** (In Progress) – Mobile App Improvements, Offline Queue Sync
+- 📅 **v2.7** – Artist Verification Dashboard, Playlist Collaboration
+- 🚀 **v3.0** – Community Recommendations, Social Features, Advanced Analytics
+
+Want to contribute? Check [open issues](https://github.com/hackerstudent29/Zenify/issues) labeled `good first issue`.
 
 ---
 
-## 💖 Support & Sponsor the Developer (UPI)
+## ⚖️ Legal & Content Sources
 
-**Zenify** is maintained as a 100% free, ad-free, open-source audio streaming platform by independent developer **Ram ([Ramanathan S / hackerstudent29](https://github.com/hackerstudent29))**.
+**Music Sources:**
+- Zenify streams music from **official iTunes CDN** where available (original AAC quality, no re-encoding)
+- Falls back to **verified public APIs** for regional catalog (LyricsDB, Rapid API)
+- Local file playback uses **your own device files** (completely private, no upload)
+- **Users are responsible** for ensuring local files don't violate their local copyright laws
 
-Running and scaling Zenify requires ongoing domain renewals (`listenzenify.com`), backend server hosting, and dedicated engineering hours. If Zenify has enriched your music listening experience, please consider sending a contribution to keep the project active!
+**Lyrics:**
+- Synced lyrics sourced from **LRCLib, Musixmatch API, Apple Music LRC format**
+- Automatic romanization is **transformative fair use** (creates new educational value)
+- User-provided lyrics are **never stored** on our servers
 
-### 📱 Indian UPI Contribution (GPay / PhonePe / Paytm / BHIM)
-* **UPI ID:** `ramanathanb86@oksbi`
-* **Recipient Name:** Ramanathan S
-* **Supported Apps:** Google Pay (GPay), PhonePe, Paytm, BHIM, Amazon Pay, & all Indian Banking UPI apps.
-* **Direct Impact:** Server hosting, domain renewals, and supporting independent open-source development.
+**Self-Hosting:**
+- You are responsible for verifying music streaming rights in your jurisdiction
+- Zenify is **not endorsed by or affiliated with Spotify, Apple Music, or any streaming service**
+- Use Zenify to play **content you have rights to play**
 
-> *"Every contribution—big or small—helps keep our servers running and supports building free software for music lovers worldwide."*
+---
+
+## � Support the Project
+
+Zenify is maintained by **[Ramanathan S](https://github.com/hackerstudent29)** as a volunteer open-source project. If you enjoy it, consider:
+- ⭐ **Starring** this repo
+- 🐛 **Reporting bugs** and suggesting features
+- 🤝 **Contributing code** (see [CONTRIBUTING.md](CONTRIBUTING.md))
+- 📢 **Sharing** with others who love music
 
 ---
 
