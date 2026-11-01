@@ -8,7 +8,7 @@ export interface UseMarqueeProps {
   pauseDuration?: number; // ms
 }
 
-export function useMarquee({ text, speed = 35, pauseDuration = 2000 }: UseMarqueeProps) {
+export function useMarquee({ text, speed = 35, pauseDuration = 7000 }: UseMarqueeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);

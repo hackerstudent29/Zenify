@@ -45,6 +45,7 @@ import { useUIStore } from "@/store/ui";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
+import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
 import { MediaCard, MEDIA_CARD_WIDTH } from "@/components/shared/MediaCard";
 import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
 import { getMediaUrl, cn, formatDisplayTitle, decodeHtmlEntities, getArtistTarget, getArtistProfileImage } from "@/lib/utils";
@@ -485,8 +486,8 @@ export default function TrackPage() {
     }
   };
 
-  const handleShuffle = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleShuffle = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     toggleShuffle();
     if (!isCurrentTrack && track) {
       setTrack(track, [track]);
@@ -679,84 +680,38 @@ export default function TrackPage() {
               <span className="text-white/80 font-semibold">Lossless</span>
             </div>
 
-            {/* Action controls */}
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3.5 md:justify-start">
-              {/* Primary White Play Circle */}
-              <button
-                type="button"
-                onClick={handlePlayTrack}
-                className="flex h-12 w-12 sm:h-14 sm:w-14 cursor-pointer items-center justify-center rounded-full bg-white text-black shadow-[0_6px_24px_rgba(255,255,255,0.25)] transition-all hover:scale-105 active:scale-95"
-                title={isCurrentTrackPlaying ? "Pause" : "Play"}
-                aria-label={isCurrentTrackPlaying ? "Pause" : "Play"}
-              >
-                {isCurrentTrackPlaying ? (
-                  <SwiftUIPause size={22} fill="black" />
-                ) : (
-                  <SwiftUIPlay size={22} fill="black" className="ml-0.5" />
-                )}
-              </button>
-
-              {/* Shuffle */}
-              <IconCircle title={isShuffled ? "Shuffle: On" : "Shuffle"} active={isShuffled} onClick={handleShuffle}>
-                <SwiftUIShuffle size={18} stroke="currentColor" />
-              </IconCircle>
-
-              {/* Like */}
-              <IconCircle
-                title={isLiked ? "Unlike" : "Like"}
-                active={!!isLiked}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleLikeMutation.mutate();
-                }}
-              >
-                <motion.span
-                  className="flex"
-                  initial={false}
-                  animate={{ scale: isLiked ? [1, 1.35, 1] : 1 }}
-                  transition={isLiked ? { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] } : { duration: 0.1 }}
+            {/* Unified Action controls (Artist Page style) */}
+            <MediaActionButtons
+              isPlaying={isCurrentTrackPlaying}
+              onPlay={() => handlePlayTrack()}
+              isShuffled={isShuffled}
+              onShuffle={() => handleShuffle()}
+              isLiked={!!isLiked}
+              onToggleLike={() => toggleLikeMutation.mutate()}
+              extraAction={
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isCurrentTrack && track) {
+                      setTrack(track, [track]);
+                      setPlayerMinimized(false);
+                    }
+                    handleLyricsToggle();
+                  }}
+                  className={cn(
+                    "flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/85 outline-none transition-[background-color,color,transform] duration-200 ease-out hover:bg-white/[0.18] hover:text-white active:scale-90",
+                    isLyricsOpen && "!text-brand"
+                  )}
+                  title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
+                  aria-label="View Lyrics"
                 >
-                  <SwiftUIHeart size={18} filled={!!isLiked} className={cn(isLiked ? "text-brand" : "text-white/85")} />
-                </motion.span>
-              </IconCircle>
-
-              {/* Lyrics */}
-              <IconCircle
-                title={isLyricsOpen ? "Close Lyrics" : "View Lyrics"}
-                active={isLyricsOpen}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isCurrentTrack && track) {
-                    setTrack(track, [track]);
-                    setPlayerMinimized(false);
-                  }
-                  handleLyricsToggle();
-                }}
-              >
-                <SwiftUILyrics size={18} stroke="currentColor" />
-              </IconCircle>
-
-              {/* Three-dot — glass aligned with AlbumPage */}
-              <TrackActionsDropdown
-                track={track}
-                context="track-page"
-                align="start"
-                glass
-                isLyricsOpen={isLyricsOpen}
-                onLyricsToggle={handleLyricsToggle}
-                showToast={showToast}
-                trigger={
-                  <button
-                    type="button"
-                    title="More options"
-                    aria-label="More options"
-                    className="flex size-10 sm:size-11 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/85 shadow-xl backdrop-blur-xl transition hover:bg-white/20 hover:text-white active:scale-95"
-                  >
-                    <SwiftUIEllipsis size={18} fill="currentColor" />
-                  </button>
-                }
-              />
-            </div>
+                  <SwiftUILyrics size={16} stroke="currentColor" />
+                </button>
+              }
+              track={track}
+              context="track-page"
+            />
           </div>
         </motion.header>
 

@@ -446,6 +446,8 @@ export default function AlbumPage() {
             {/* Apple Music Action Controls Unified Suite */}
             <div className="flex items-center justify-center md:justify-start">
               <MediaActionButtons
+                track={album}
+                context="album"
                 isPlaying={isAlbumCurrentlyPlaying}
                 onPlay={() => {
                   if (trackCount === 0) {
@@ -462,30 +464,6 @@ export default function AlbumPage() {
                   }
                   handleShufflePlay();
                 }}
-                moreItems={[
-                  {
-                    id: "add-queue",
-                    label: "Add to Queue",
-                    onClick: () => {
-                      if (!album?.tracks || album.tracks.length === 0) {
-                        showToast("This album has no tracks", "error");
-                        return;
-                      }
-                      usePlayerStore.getState().addToUserQueue(album.tracks, { contextName: album.title });
-                      showToast("Album added to queue");
-                    },
-                  },
-                  {
-                    id: "share",
-                    label: "Share Album",
-                    onClick: () => {
-                      if (typeof window !== "undefined") {
-                        navigator.clipboard.writeText(window.location.href);
-                        showToast("Album link copied to clipboard");
-                      }
-                    },
-                  },
-                ]}
               />
             </div>
           </div>

@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * TrackActionsDropdown — Apple Music (web) style context menu.
+ * TrackActionsDropdown — compact Apple Music style menu with in-place drill-down.
  *
- * Modelled on the menu in music.apple.com:
- *  • compact dark glass card, ~8-10px radius, hairline border
- *  • label on the LEFT, icon on the RIGHT of every row
- *  • hairline divider between every row, heavier gap between groups
- *  • fast fade + slight scale from the trigger, no bouncy stagger
- *  • phones (< 640px): same rows in a floating glass bottom sheet
+ *  • small, compact rows (32px desktop / 44px phone), ~208px wide
+ *  • rows with more options (Go to ▸, Share ▸, Admin ▸) open a sub-menu IN THE SAME
+ *    PANEL: the content slides, the panel height springs to fit, a back row returns
+ *  • result states on the rows that need them: Plays next · Added to queue · Liked ·
+ *    Link copied · Playing · Shuffling  (icon + label swap with spring physics)
+ *  • lighter glass: less blur, more transparency, so the page behind shows through
+ *  • phones (< 640px): same views in a floating bottom sheet (drag to dismiss)
  *
  * Public props are unchanged, so existing callers keep working.
  */
@@ -45,9 +46,11 @@ import {
   Play,
   Disc,
   FileText,
-  Plus,
-  Edit2,
-  Trash2,
+  Check,
+  ChevronRight,
+  ChevronLeft,
+  Link2,
+  ShieldCheck,
 } from "lucide-react";
 import { SwiftUIHeart, SwiftUIShuffle, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 import { useRouter, usePathname } from "next/navigation";
@@ -82,6 +85,11 @@ export interface MenuItem {
   disabled?: boolean;
   className?: string;
   hint?: string;
+  /** Opens these items in the same panel (drill-down) */
+  children?: MenuItem[];
+  /** After the click, the row shows this text + a check, then the menu closes */
+  doneLabel?: string;
+  doneIcon?: React.ReactNode;
 }
 
 export interface TrackActionsDropdownProps {
@@ -91,7 +99,7 @@ export interface TrackActionsDropdownProps {
   align?: "start" | "center" | "end";
   side?: "top" | "bottom" | "left" | "right";
   size?: number;
-  /** true = clearer glass (more of the background shows through) */
+  /** true = clearer glass (even more of the background shows through) */
   glass?: boolean;
   extraItems?: AnimatedMenuItem[];
   hideItems?: string[];
@@ -113,32 +121,42 @@ const Z = 10050;
 const GAP = 6;
 const MARGIN = 8;
 const SHEET_QUERY = "(max-width: 639px)";
+const DONE_MS = 800;
 
-const SPRING_POP = { type: "spring", stiffness: 520, damping: 38, mass: 0.6 } as const;
+/* Springs */
+const SPRING_POP = { type: "spring", stiffness: 560, damping: 36, mass: 0.6 } as const;
+const SPRING_HEIGHT = { type: "spring", stiffness: 520, damping: 40, mass: 0.7 } as const;
+const SPRING_VIEW = { type: "spring", stiffness: 560, damping: 38, mass: 0.55 } as const;
+const SPRING_ICON = { type: "spring", stiffness: 720, damping: 20, mass: 0.5 } as const;
 const SPRING_SHEET = { type: "spring", stiffness: 380, damping: 38, mass: 0.9 } as const;
 const SPRING_HEART = { type: "spring", stiffness: 520, damping: 13, mass: 0.6 } as const;
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
 /**
- * Apple Music glass: dark translucent grey, strong blur + saturation,
- * 1px light hairline border, soft shadow.
- * clear=true → a touch more transparent (used in dark-on-dark contexts)
+ * Lighter glass: low blur + low opacity so the background shows through.
+ * clear = even lighter.
  */
 function glassSurface(clear: boolean, sheet = false): React.CSSProperties {
-  const blurAmount = sheet ? 32 : 24;
-  const blur = `blur(${blurAmount}px) saturate(200%)`;
+  const blur = sheet
+    ? "blur(12px) saturate(170%)"
+    : clear
+    ? "blur(5px) saturate(160%)"
+    : "blur(8px) saturate(170%)";
   return {
     backgroundColor: clear
-      ? "rgba(32, 32, 34, 0.62)"
-      : "rgba(28, 28, 30, 0.82)",
+      ? "rgba(28, 28, 30, 0.32)"
+      : sheet
+      ? "rgba(28, 28, 30, 0.54)"
+      : "rgba(28, 28, 30, 0.44)",
     backgroundImage:
-      "linear-gradient(180deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0) 50%)",
+      "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 55%)",
     backdropFilter: blur,
     WebkitBackdropFilter: blur,
-    border: "1px solid rgba(255,255,255,0.16)",
+    border: "1px solid rgba(255,255,255,0.18)",
     boxShadow:
-      "0 20px 60px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
+      "0 16px 44px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.12)",
+    textShadow: "0 1px 3px rgba(0,0,0,0.4)",
   };
 }
 
@@ -175,6 +193,8 @@ type Placement = "top" | "bottom" | "left" | "right";
 interface Pos {
   x: number;
   y: number;
+  /** distance from the viewport bottom — used when the menu opens upward */
+  by: number;
   maxH: number;
   originX: number;
   originY: number;
@@ -231,6 +251,7 @@ function computePosition(
   return {
     x,
     y,
+    by: vh - (y + hh),
     maxH,
     place,
     originX: clamp(cx - x, 0, w),
@@ -238,7 +259,7 @@ function computePosition(
   };
 }
 
-function useMenuVariants(reduce: boolean | null, sheet: boolean) {
+function usePanelVariants(reduce: boolean | null, sheet: boolean) {
   return useMemo(() => {
     const panel: Variants = reduce
       ? {
@@ -256,7 +277,7 @@ function useMenuVariants(reduce: boolean | null, sheet: boolean) {
           },
         }
       : {
-          closed: { opacity: 0, scale: 0.94 },
+          closed: { opacity: 0, scale: 0.9 },
           open: {
             opacity: 1,
             scale: 1,
@@ -264,93 +285,199 @@ function useMenuVariants(reduce: boolean | null, sheet: boolean) {
           },
           exit: {
             opacity: 0,
-            scale: 0.97,
+            scale: 0.96,
             transition: { duration: 0.1, ease: [0.4, 0, 1, 1] },
           },
         };
-    return { panel };
+    return panel;
   }, [reduce, sheet]);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Rows  (label left · icon right · hairline between rows)
+   View stack — animates between root / sub-menus inside ONE panel
    ────────────────────────────────────────────────────────────────────────── */
 
-function PopoverRow({
+interface ViewProps {
+  viewKey: string;
+  dir: 1 | -1;
+  title: React.ReactNode;
+  onBack?: () => void;
+  groups: MenuItem[][];
+  doneId: string | null;
+  onSelect: (item: MenuItem) => void;
+}
+
+function Row({
   item,
-  first,
+  sheet,
+  done,
   onSelect,
 }: {
   item: MenuItem;
-  first: boolean;
+  sheet: boolean;
+  done: boolean;
   onSelect: (item: MenuItem) => void;
 }) {
+  const hasSub = Boolean(item.children?.length);
   return (
     <button
       type="button"
       role="menuitem"
       data-menu-item
+      data-sub={hasSub ? "" : undefined}
       tabIndex={-1}
       disabled={item.disabled}
       onClick={() => onSelect(item)}
-      onPointerEnter={(e) => {
-        if (e.pointerType === "mouse" && !item.disabled) {
-          e.currentTarget.focus({ preventScroll: true });
-        }
-      }}
       className={cn(
-        "group relative flex h-10 w-full cursor-pointer select-none items-center justify-between gap-4 px-3.5 text-left",
-        "text-[14.5px] font-normal tracking-[-0.01em] text-white outline-none",
-        "transition-colors duration-100",
-        "hover:bg-white/[0.12] focus-visible:bg-white/[0.12]",
-        "disabled:cursor-not-allowed disabled:opacity-40",
-        // hairline between rows, inset like Apple's
-        !first &&
-          "before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-white/[0.1] hover:before:opacity-0 focus-visible:before:opacity-0",
+        "relative flex w-full cursor-pointer select-none items-center justify-between gap-3 text-left font-medium text-white outline-none transition-colors duration-150",
+        "hover:bg-white/[0.12] active:bg-white/[0.20] focus-visible:bg-white/[0.12]",
+        "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
+        sheet
+          ? "h-11 rounded-[10px] px-3.5 text-[15px] tracking-[-0.011em]"
+          : "h-8 rounded-[7px] px-2.5 text-[13px] tracking-[-0.006em]",
         item.className
       )}
     >
-      <span className="truncate">{item.label}</span>
-      <span className="flex shrink-0 items-center gap-2 text-white/90 [&_svg]:size-[17px] [&_svg]:stroke-[1.7]">
-        {item.hint && <span className="text-[11px] text-white/40">{item.hint}</span>}
-        {item.icon}
+      <span className="relative min-w-0 flex-1">
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={done ? "done" : "idle"}
+            initial={{ opacity: 0, y: 7 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -7 }}
+            transition={SPRING_VIEW}
+            className="block truncate"
+          >
+            {done ? item.doneLabel : item.label}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+
+      <span
+        className={cn(
+          "relative flex shrink-0 items-center gap-1.5 text-white/80",
+          sheet ? "[&_svg]:size-[19px]" : "[&_svg]:size-[15px]",
+          "[&_svg]:stroke-[1.8]"
+        )}
+      >
+        {item.hint && <span className="text-[11px] text-white/45">{item.hint}</span>}
+        {hasSub ? (
+          <ChevronRight className="text-white/55" />
+        ) : (
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={done ? "done" : "idle"}
+              initial={{ scale: 0.3, opacity: 0, rotate: -30 }}
+              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+              exit={{ scale: 0.3, opacity: 0 }}
+              transition={SPRING_ICON}
+              className={cn("flex", done && "text-brand")}
+            >
+              {done ? item.doneIcon ?? <Check strokeWidth={2.6} /> : item.icon}
+            </motion.span>
+          </AnimatePresence>
+        )}
       </span>
     </button>
   );
 }
 
-function SheetRow({
-  item,
-  first,
-  onSelect,
+function ViewStack({
+  view,
+  sheet,
+  maxH,
 }: {
-  item: MenuItem;
-  first: boolean;
-  onSelect: (item: MenuItem) => void;
+  view: ViewProps;
+  sheet: boolean;
+  maxH: number | string;
 }) {
+  const reduce = useReducedMotion();
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState<number | null>(null);
+
+  // Track the natural height of whichever view is showing; the panel springs to it.
+  useIsoLayoutEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    const measure = () => setH(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const viewVariants: Variants = {
+    enter: (d: number) => ({ opacity: 0, x: reduce ? 0 : d * 22 }),
+    center: { opacity: 1, x: 0, transition: reduce ? { duration: 0.1 } : SPRING_VIEW },
+    exit: (d: number) => ({
+      opacity: 0,
+      x: reduce ? 0 : d * -22,
+      transition: { duration: 0.08, ease: [0.4, 0, 1, 1] },
+    }),
+  };
+
   return (
-    <motion.button
-      type="button"
-      role="menuitem"
-      data-menu-item
-      disabled={item.disabled}
-      whileTap={{ backgroundColor: "rgba(255,255,255,0.12)" }}
-      transition={{ duration: 0.08 }}
-      onClick={() => onSelect(item)}
-      className={cn(
-        "flex h-[52px] w-full cursor-pointer select-none items-center justify-between gap-4 px-4 text-left",
-        "text-[16.5px] font-normal tracking-[-0.011em] text-white outline-none",
-        "disabled:cursor-not-allowed disabled:opacity-40",
-        !first && "border-t border-white/[0.1]",
-        item.className
-      )}
+    <motion.div
+      initial={false}
+      animate={h == null ? undefined : { height: h }}
+      transition={reduce ? { duration: 0 } : SPRING_HEIGHT}
+      style={{ overflow: "hidden" }}
     >
-      <span className="truncate">{item.label}</span>
-      <span className="flex shrink-0 items-center gap-2 text-white/90 [&_svg]:size-[21px] [&_svg]:stroke-[1.6]">
-        {item.hint && <span className="text-[13px] text-white/40">{item.hint}</span>}
-        {item.icon}
-      </span>
-    </motion.button>
+      <div ref={innerRef}>
+        <AnimatePresence mode="wait" initial={false} custom={view.dir}>
+          <motion.div
+            key={view.viewKey}
+            custom={view.dir}
+            variants={viewVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            style={{ maxHeight: maxH }}
+            className={cn(
+              "no-scrollbar relative overflow-y-auto overscroll-contain",
+              sheet ? "p-2" : "p-1"
+            )}
+          >
+            {view.onBack && (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-menu-item
+                  tabIndex={-1}
+                  onClick={view.onBack}
+                  className={cn(
+                    "relative flex w-full cursor-pointer select-none items-center gap-1.5 text-left font-semibold text-white outline-none transition-colors duration-150 hover:bg-white/[0.12] active:bg-white/[0.20] focus-visible:bg-white/[0.12]",
+                    sheet
+                      ? "h-11 rounded-[10px] px-2.5 text-[15px]"
+                      : "h-8 rounded-[7px] px-1.5 text-[13px]"
+                  )}
+                >
+                  <ChevronLeft className={sheet ? "size-5" : "size-4"} strokeWidth={2.2} />
+                  <span className="truncate">{view.title}</span>
+                </button>
+                <div className="mx-2 my-1 h-px bg-white/[0.14]" />
+              </>
+            )}
+
+            {view.groups.map((group, gi) => (
+              <React.Fragment key={gi}>
+                {gi > 0 && <div className="mx-2 my-1 h-px bg-white/[0.14]" />}
+                {group.map((item) => (
+                  <Row
+                    key={item.id}
+                    item={item}
+                    sheet={sheet}
+                    done={view.doneId === item.id && Boolean(item.doneLabel)}
+                    onSelect={view.onSelect}
+                  />
+                ))}
+              </React.Fragment>
+            ))}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </motion.div>
   );
 }
 
@@ -359,29 +486,27 @@ function SheetRow({
    ────────────────────────────────────────────────────────────────────────── */
 
 function Popover({
-  groups,
+  view,
   anchorRef,
   side,
   align,
   clear,
   focusFirst,
-  onSelect,
   onClose,
 }: {
-  groups: MenuItem[][];
+  view: ViewProps;
   anchorRef: React.RefObject<HTMLElement | null>;
   side?: Placement;
   align: "start" | "center" | "end";
   clear: boolean;
   focusFirst: boolean;
-  onSelect: (item: MenuItem) => void;
   onClose: (returnFocus?: boolean) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos | null>(null);
   const reduce = useReducedMotion();
-  const { panel } = useMenuVariants(reduce, false);
+  const panel = usePanelVariants(reduce, false);
 
   // Measure before paint so the menu never flashes in the wrong place.
   useIsoLayoutEffect(() => {
@@ -402,30 +527,41 @@ function Popover({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keyboard users: land on the first row of every view
   useEffect(() => {
-    const panelEl = panelRef.current;
-    if (!panelEl) return;
-    if (focusFirst) {
-      panelEl
-        .querySelector<HTMLElement>("[data-menu-item]:not([disabled])")
-        ?.focus({ preventScroll: true });
-    } else {
-      panelEl.focus({ preventScroll: true });
-    }
-  }, [focusFirst]);
+    const el = panelRef.current;
+    if (!el) return;
+    const t = window.setTimeout(() => {
+      if (focusFirst) {
+        el.querySelector<HTMLElement>("[data-menu-item]:not([disabled])")?.focus({ preventScroll: true });
+      } else if (!el.contains(document.activeElement)) {
+        el.focus({ preventScroll: true });
+      }
+    }, view.viewKey === "root" ? 0 : 140);
+    return () => window.clearTimeout(t);
+  }, [focusFirst, view.viewKey]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const els = Array.from(
       panelRef.current?.querySelectorAll<HTMLElement>("[data-menu-item]:not([disabled])") ?? []
     );
     if (!els.length) return;
-    const i = els.indexOf(document.activeElement as HTMLElement);
+    const cur = document.activeElement as HTMLElement;
+    const i = els.indexOf(cur);
     let next: number | null = null;
     if (e.key === "ArrowDown") next = i < 0 ? 0 : (i + 1) % els.length;
     else if (e.key === "ArrowUp") next = i < 0 ? els.length - 1 : (i - 1 + els.length) % els.length;
     else if (e.key === "Home") next = 0;
     else if (e.key === "End") next = els.length - 1;
-    else if (e.key === "Tab") {
+    else if (e.key === "ArrowRight" && cur?.hasAttribute("data-sub")) {
+      e.preventDefault();
+      cur.click();
+      return;
+    } else if (e.key === "ArrowLeft" && view.onBack) {
+      e.preventDefault();
+      view.onBack();
+      return;
+    } else if (e.key === "Tab") {
       e.preventDefault();
       onClose(true);
       return;
@@ -437,14 +573,17 @@ function Popover({
     }
   };
 
+  const up = pos?.place === "top";
+
   return (
     <div
       ref={wrapRef}
       style={{
         position: "fixed",
         left: pos?.x ?? 0,
-        top: pos?.y ?? 0,
-        width: "min(232px, calc(100vw - 16px))",
+        // opening upward? keep the bottom edge fixed so growing views extend up
+        ...(up ? { bottom: pos!.by } : { top: pos?.y ?? 0 }),
+        width: "min(224px, calc(100vw - 16px))",
         zIndex: Z,
         visibility: pos ? "visible" : "hidden",
       }}
@@ -452,29 +591,22 @@ function Popover({
       <motion.div
         ref={panelRef}
         role="menu"
-        aria-label="Track actions"
+        aria-label="Actions"
         tabIndex={-1}
         variants={panel}
         initial="closed"
         animate="open"
         exit="exit"
         onKeyDown={onKeyDown}
-        className="no-scrollbar overflow-y-auto overscroll-contain rounded-[10px] outline-none"
+        className="overflow-hidden rounded-[12px] outline-none"
         style={{
           ...glassSurface(clear),
-          transformOrigin: pos ? `${pos.originX}px ${pos.originY}px` : "top right",
+          transformOrigin: pos ? `${pos.originX}px ${up ? "100%" : pos.originY + "px"}` : "top right",
           maxHeight: pos?.maxH,
           willChange: "transform, opacity",
         }}
       >
-        {groups.map((group, gi) => (
-          // heavier gap between groups, like Apple's sectioned menus
-          <div key={gi} className={cn(gi > 0 && "border-t-[5px] border-black/25")}>
-            {group.map((item, ii) => (
-              <PopoverRow key={item.id} item={item} first={ii === 0} onSelect={onSelect} />
-            ))}
-          </div>
-        ))}
+        <ViewStack view={view} sheet={false} maxH={pos?.maxH ?? "80vh"} />
       </motion.div>
     </div>
   );
@@ -488,8 +620,8 @@ function Artwork({ src }: { src: string | null }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className="flex size-12 shrink-0 items-center justify-center rounded-[8px] bg-white/10 text-white/60">
-        <Music size={20} />
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-[7px] bg-white/10 text-white/60">
+        <Music size={18} />
       </div>
     );
   }
@@ -500,34 +632,32 @@ function Artwork({ src }: { src: string | null }) {
       alt=""
       draggable={false}
       onError={() => setFailed(true)}
-      className="size-12 shrink-0 rounded-[8px] object-cover shadow-[0_4px_14px_rgba(0,0,0,0.4)]"
+      className="size-10 shrink-0 rounded-[7px] object-cover shadow-[0_4px_14px_rgba(0,0,0,0.4)]"
     />
   );
 }
 
 function Sheet({
-  groups,
+  view,
   track,
   clear,
-  onSelect,
   onClose,
 }: {
-  groups: MenuItem[][];
+  view: ViewProps;
   track?: any;
   clear: boolean;
-  onSelect: (item: MenuItem) => void;
   onClose: (returnFocus?: boolean) => void;
 }) {
   const reduce = useReducedMotion();
   const controls: DragControls = useDragControls();
-  const { panel } = useMenuVariants(reduce, true);
+  const panel = usePanelVariants(reduce, true);
   const meta = track ? trackMeta(track) : null;
   const showHeader = Boolean(meta && (meta.title !== "Unknown track" || meta.artist));
 
   return (
     <div className="fixed inset-0" style={{ zIndex: Z }}>
       <motion.div
-        className="absolute inset-0 bg-black/45"
+        className="absolute inset-0 bg-black/35"
         style={{ touchAction: "none" }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -538,7 +668,7 @@ function Sheet({
 
       <motion.div
         role="menu"
-        aria-label="Track actions"
+        aria-label="Actions"
         variants={panel}
         initial="closed"
         animate="open"
@@ -549,50 +679,37 @@ function Sheet({
         dragConstraints={{ top: 0, bottom: 0 }}
         dragElastic={{ top: 0.04, bottom: 0.7 }}
         onDragEnd={(_, info) => {
-          if (info.offset.y > 110 || info.velocity.y > 700) onClose(false);
+          if (info.offset.y > 100 || info.velocity.y > 650) onClose(false);
         }}
-        className="absolute left-2 right-2 flex max-h-[82dvh] flex-col overflow-hidden rounded-[20px]"
+        className="absolute left-2 right-2 mx-auto flex max-h-[80dvh] max-w-[420px] flex-col overflow-hidden rounded-[20px]"
         style={{
           ...glassSurface(clear, true),
           bottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)",
           willChange: "transform",
         }}
       >
-        {/* Drag handle (+ optional track header) */}
+        {/* Drag handle (+ compact track header) */}
         <div
-          className={cn(
-            "shrink-0 cursor-grab touch-none px-4 active:cursor-grabbing",
-            showHeader ? "pb-3 pt-2.5" : "py-3"
-          )}
+          className={cn("shrink-0 cursor-grab touch-none px-4 active:cursor-grabbing", showHeader ? "pb-2.5 pt-2" : "py-2.5")}
           onPointerDown={(e) => controls.start(e)}
         >
-          <div className={cn("mx-auto h-[5px] w-9 rounded-full bg-white/30", showHeader && "mb-3")} />
+          <div className={cn("mx-auto h-[4px] w-9 rounded-full bg-white/35", showHeader && "mb-2.5")} />
           {showHeader && meta && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <Artwork src={meta.cover} />
               <div className="min-w-0">
-                <p className="truncate text-[16px] font-semibold leading-tight tracking-[-0.015em] text-white">
+                <p className="truncate text-[15px] font-semibold leading-tight tracking-[-0.012em] text-white">
                   {meta.title}
                 </p>
-                {meta.artist && (
-                  <p className="mt-0.5 truncate text-[13.5px] text-white/60">{meta.artist}</p>
-                )}
+                {meta.artist && <p className="mt-0.5 truncate text-[12.5px] text-white/65">{meta.artist}</p>}
               </div>
             </div>
           )}
         </div>
 
-        <div className="h-px shrink-0 bg-white/[0.1]" />
+        <div className="h-px shrink-0 bg-white/[0.12]" />
 
-        <div className="no-scrollbar overflow-y-auto overscroll-contain">
-          {groups.map((group, gi) => (
-            <div key={gi} className={cn(gi > 0 && "border-t-[6px] border-black/25")}>
-              {group.map((item, ii) => (
-                <SheetRow key={item.id} item={item} first={ii === 0} onSelect={onSelect} />
-              ))}
-            </div>
-          ))}
-        </div>
+        <ViewStack view={view} sheet maxH="calc(80dvh - 96px)" />
       </motion.div>
     </div>
   );
@@ -632,15 +749,30 @@ export function TrackActionsDropdown({
   const [isSheet, setIsSheet] = useState(false);
   const [openedByKeyboard, setOpenedByKeyboard] = useState(false);
   const [likePop, setLikePop] = useState(0);
+  const [path, setPath] = useState<string[]>([]);
+  const [dir, setDir] = useState<1 | -1>(1);
+  const [doneId, setDoneId] = useState<string | null>(null);
   const anchorRef = useRef<HTMLSpanElement>(null);
+  const timerRef = useRef<number | null>(null);
+  const pathRef = useRef<string[]>([]);
+  pathRef.current = path;
 
   const internalShowToast = (msg: string, type: "success" | "error" = "success") => {
     useUIStore.getState().showToast(msg, type);
   };
   const showToast = externalShowToast ?? internalShowToast;
 
+  const clearTimer = () => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+  useEffect(() => clearTimer, []);
+
   /* ── Open / close ── */
   const close = useCallback((returnFocus = false) => {
+    clearTimer();
     setOpen(false);
     if (returnFocus) {
       requestAnimationFrame(() => {
@@ -651,12 +783,21 @@ export function TrackActionsDropdown({
     }
   }, []);
 
+  const goBack = useCallback(() => {
+    setDir(-1);
+    setPath((p) => p.slice(0, -1));
+  }, []);
+
   const handleTriggerClick = (e: React.MouseEvent) => {
     // Capture phase: runs before parent row/card/link handlers so opening
     // the menu never plays the track or navigates.
     e.preventDefault();
     e.stopPropagation();
     if (!open) {
+      clearTimer();
+      setPath([]);
+      setDoneId(null);
+      setDir(1);
       setIsSheet(window.matchMedia(SHEET_QUERY).matches);
       setOpenedByKeyboard(e.detail === 0);
     }
@@ -669,7 +810,8 @@ export function TrackActionsDropdown({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        close(true);
+        if (pathRef.current.length) goBack();
+        else close(true);
       }
     };
     const onPointerDown = (e: PointerEvent) => {
@@ -695,9 +837,9 @@ export function TrackActionsDropdown({
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
     };
-  }, [open, isSheet, close]);
+  }, [open, isSheet, close, goBack]);
 
-  /* ── Context & Entity Detection ── */
+  /* ── Context & entity detection ── */
   const onArtistPage = pathname.startsWith("/artist");
   const onAlbumPage = pathname.startsWith("/album");
   const onTrackPage = pathname.startsWith("/track");
@@ -727,7 +869,7 @@ export function TrackActionsDropdown({
 
   const isSong = !isArtist && !isAlbum && !isPlaylist;
 
-  /* ── Liked state (for songs) ── */
+  /* ── Liked state (songs) ── */
   const { data: likedTrackIds } = useQuery({
     queryKey: ["liked-track-ids"],
     queryFn: async () => {
@@ -766,77 +908,97 @@ export function TrackActionsDropdown({
     },
   });
 
-  /* ── Share ── */
-  const handleShare = async () => {
-    if (onShare) {
-      await onShare();
-      return;
-    }
-    const shareId = track?.id || track?.name || "";
-    const targetPath = isArtist
-      ? getArtistTarget(track) || `/artist/${encodeURIComponent(shareId)}`
-      : isAlbum
-      ? (track as any)?.href || `/album/${encodeURIComponent(shareId)}`
-      : isPlaylist
-      ? `/playlist/${encodeURIComponent(shareId)}`
-      : `/track/${encodeURIComponent(shareId)}`;
-    const url = `${window.location.origin}${targetPath}`;
-    const title = track?.title || track?.name || "Music on Zenify";
+  /* ── Share helpers ── */
+  const shareId = String(track?.id || track?.name || "");
+  const sharePath = isArtist
+    ? getArtistTarget(track) || `/artist/${encodeURIComponent(shareId)}`
+    : isAlbum
+    ? (track as any)?.href || `/album/${encodeURIComponent(shareId)}`
+    : isPlaylist
+    ? `/playlist/${encodeURIComponent(shareId)}`
+    : `/track/${encodeURIComponent(shareId)}`;
+  const shareTitle = track?.title || track?.name || "Music on Zenify";
+  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, url });
-      } catch (e) {
-        if ((e as Error).name !== "AbortError") showToast("Error sharing", "error");
-      }
-    } else {
-      try {
-        await navigator.clipboard.writeText(url);
-        showToast("Link copied!");
-      } catch {
-        showToast("Failed to copy", "error");
-      }
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${sharePath}`);
+    } catch {
+      showToast("Failed to copy", "error");
+    }
+  };
+  const nativeShare = async () => {
+    try {
+      await navigator.share({ title: shareTitle, url: `${window.location.origin}${sharePath}` });
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") showToast("Error sharing", "error");
     }
   };
 
-  /* ── Go to artist ── */
   const handleGoToArtist = () => {
     const target = getArtistTarget(track);
     if (target) router.push(target);
     else showToast("Artist information not available", "error");
   };
 
-  /* ── Build items ── */
+  /* ── Item builders ── */
   const hide = new Set(hideItems);
   const playerState: any = usePlayerStore.getState();
   const canPlayNext = typeof playerState?.playNext === "function";
 
+  const clean = (arr: (MenuItem | false | null | undefined)[]) => arr.filter(Boolean) as MenuItem[];
+  const sep = (id: string): MenuItem => ({ id, isSeparator: true });
+
+  /** Share row — direct Copy Link or native share. */
+  const shareItem = (): MenuItem | false => {
+    if (hide.has("share")) return false;
+    return {
+      id: "share",
+      icon: <Share2 />,
+      label: "Share",
+      doneLabel: "Link copied",
+      onClick: async () => {
+        if (onShare) {
+          onShare();
+          return;
+        }
+        if (canNativeShare) {
+          await nativeShare();
+        } else {
+          await copyLink();
+        }
+      },
+    };
+  };
+
   let rawItems: (MenuItem | false | null | undefined)[] = [];
 
   if (items && items.length > 0) {
-    rawItems = [...items, ...(extraItems || [])];
+    rawItems = [...items, ...(extraItems as unknown as MenuItem[])];
   } else if (isArtist) {
-    const artistName = track?.name || track?.title || "Artist";
-    const artistId = track?.id || artistName;
+    const artistId = track?.id || track?.name || track?.title || "Artist";
     const artistTarget = getArtistTarget(track) || `/artist/${encodeURIComponent(String(artistId))}`;
+
+    const loadArtistTracks = async () => {
+      const data = track?.topTracks?.length
+        ? track
+        : (await api.get(`/artists/${encodeURIComponent(String(artistId))}`)).data;
+      return [...(data?.topTracks || data?.topSongs || [])];
+    };
 
     rawItems = [
       !hide.has("play") && {
         id: "play-top",
-        icon: <Play size={14} />,
+        icon: <Play />,
         label: "Play Top Songs",
+        doneLabel: "Playing",
         onClick: async () => {
           try {
-            const artistData = track?.topTracks?.length
-              ? track
-              : (await api.get(`/artists/${encodeURIComponent(String(artistId))}`)).data;
-            const tracks = artistData?.topTracks || artistData?.topSongs || [];
-            if (tracks.length > 0) {
+            const tracks = await loadArtistTracks();
+            if (tracks.length) {
               usePlayerStore.getState().setTrack(tracks[0], tracks);
               useUIStore.getState().setPlayerMinimized(false);
-            } else {
-              showToast("No tracks found for this artist", "error");
-            }
+            } else showToast("No tracks found for this artist", "error");
           } catch {
             showToast("Failed to play artist tracks", "error");
           }
@@ -844,42 +1006,31 @@ export function TrackActionsDropdown({
       },
       !hide.has("shuffle") && {
         id: "shuffle-artist",
-        icon: <SwiftUIShuffle size={14} />,
-        label: "Shuffle Songs",
+        icon: <SwiftUIShuffle size={15} />,
+        label: "Shuffle",
+        doneLabel: "Shuffling",
         onClick: async () => {
           try {
-            const artistData = track?.topTracks?.length
-              ? track
-              : (await api.get(`/artists/${encodeURIComponent(String(artistId))}`)).data;
-            const tracks = [...(artistData?.topTracks || artistData?.topSongs || [])];
-            if (tracks.length > 0) {
-              const shuffled = tracks.sort(() => Math.random() - 0.5);
-              usePlayerStore.getState().setTrack(shuffled[0], shuffled);
+            const tracks = (await loadArtistTracks()).sort(() => Math.random() - 0.5);
+            if (tracks.length) {
+              usePlayerStore.getState().setTrack(tracks[0], tracks);
               useUIStore.getState().setPlayerMinimized(false);
-            } else {
-              showToast("No tracks found for this artist", "error");
-            }
+            } else showToast("No tracks found for this artist", "error");
           } catch {
             showToast("Failed to shuffle artist tracks", "error");
           }
         },
       },
-      { id: "sep-artist-1", isSeparator: true },
+      sep("s1"),
       !hide.has("artist") &&
         !onArtistPage && {
           id: "view-artist",
-          icon: <User size={14} />,
+          icon: <User />,
           label: "Go to Artist",
           onClick: () => router.push(artistTarget),
         },
-      { id: "sep-artist-2", isSeparator: true },
-      !hide.has("share") && {
-        id: "share-artist",
-        icon: <Share2 size={14} />,
-        label: "Share Artist",
-        onClick: handleShare,
-      },
-      ...(extraItems || []),
+      ...(extraItems as unknown as MenuItem[]),
+      shareItem(),
     ];
   } else if (isAlbum) {
     const albumTitle = track?.title || track?.name || "Album";
@@ -887,18 +1038,20 @@ export function TrackActionsDropdown({
     const albumTarget = (track as any)?.href || `/album/${encodeURIComponent(String(albumId))}`;
     const artistTarget = getArtistTarget(track);
 
+    const loadAlbum = async () =>
+      track?.tracks?.length ? track : (await api.get(`/albums/${track?.id}`)).data;
+
     rawItems = [
       !hide.has("play") && {
         id: "play-album",
-        icon: <Play size={14} />,
+        icon: <Play />,
         label: "Play Album",
+        doneLabel: "Playing",
         onClick: async () => {
           try {
-            const albumData = track?.tracks?.length
-              ? track
-              : (await api.get(`/albums/${track?.id}`)).data;
+            const albumData = await loadAlbum();
             const albumTracks = (albumData?.tracks || []).filter(Boolean);
-            if (albumTracks.length > 0) {
+            if (albumTracks.length) {
               const first = {
                 ...albumTracks[0],
                 artwork:
@@ -910,9 +1063,7 @@ export function TrackActionsDropdown({
               };
               usePlayerStore.getState().setTrack(first, albumTracks);
               useUIStore.getState().setPlayerMinimized(false);
-            } else {
-              showToast("Album has no tracks", "error");
-            }
+            } else showToast("Album has no tracks", "error");
           } catch {
             showToast("Failed to play album", "error");
           }
@@ -920,80 +1071,56 @@ export function TrackActionsDropdown({
       },
       !hide.has("queue") && {
         id: "queue-album",
-        icon: <ListPlus size={14} />,
+        icon: <ListPlus />,
         label: "Add to Queue",
+        doneLabel: "Added to queue",
         onClick: async () => {
           try {
-            const albumData = track?.tracks?.length
-              ? track
-              : (await api.get(`/albums/${track?.id}`)).data;
+            const albumData = await loadAlbum();
             if (albumData?.tracks?.length) {
               usePlayerStore.getState().addToUserQueue(albumData.tracks, { contextName: albumTitle });
-              showToast("Album added to queue");
-            } else {
-              showToast("Album has no tracks", "error");
-            }
+            } else showToast("Album has no tracks", "error");
           } catch {
             showToast("Failed to queue album", "error");
           }
         },
       },
-      { id: "sep-album-1", isSeparator: true },
+      sep("s1"),
       !hide.has("artist") &&
         artistTarget &&
-        !onArtistPage && {
-          id: "artist",
-          icon: <User size={14} />,
-          label: "Go to Artist",
-          onClick: () => router.push(artistTarget),
-        },
+        !onArtistPage && { id: "artist", icon: <User />, label: "Go to Artist", onClick: () => router.push(artistTarget) },
       !hide.has("view-album") &&
-        !onAlbumPage && {
-          id: "view-album",
-          icon: <Disc size={14} />,
-          label: "View Album",
-          onClick: () => router.push(albumTarget),
-        },
-      { id: "sep-album-2", isSeparator: true },
-      !hide.has("share") && {
-        id: "share-album",
-        icon: <Share2 size={14} />,
-        label: "Share Album",
-        onClick: handleShare,
-      },
-      ...(extraItems || []),
+        !onAlbumPage && { id: "view-album", icon: <Disc />, label: "View Album", onClick: () => router.push(albumTarget) },
+      ...(extraItems as unknown as MenuItem[]),
+      shareItem(),
     ];
   } else if (isPlaylist) {
     const playlistTitle = track?.name || track?.title || "Playlist";
     const playlistId = track?.id;
-    const playlistTarget = `/playlist/${playlistId}`;
+
+    const loadPlaylistTracks = async () => {
+      const pl = track?.tracks?.length ? track : (await api.get(`/playlists/${playlistId}`)).data;
+      return (pl?.tracks || []).map((t: any) => t.track || t).filter(Boolean);
+    };
 
     rawItems = [
       !hide.has("play") && {
         id: "play-playlist",
-        icon: <Play size={14} />,
+        icon: <Play />,
         label: "Play Playlist",
+        doneLabel: "Playing",
         onClick: async () => {
           try {
-            const plData = track?.tracks?.length
-              ? track
-              : (await api.get(`/playlists/${playlistId}`)).data;
-            const tracks = (plData?.tracks || []).map((t: any) => t.track || t).filter(Boolean);
-            if (tracks.length > 0) {
+            const tracks = await loadPlaylistTracks();
+            if (tracks.length) {
               const first = {
                 ...tracks[0],
-                artwork:
-                  tracks[0].artwork ||
-                  tracks[0].coverUrl ||
-                  tracks[0].image ||
-                  getTrackCover(track),
+                artwork: tracks[0].artwork || tracks[0].coverUrl || tracks[0].image || getTrackCover(track),
                 streamUrl: tracks[0].streamUrl || tracks[0].audioUrl,
               };
               usePlayerStore.getState().setTrack(first, tracks);
               useUIStore.getState().setPlayerMinimized(false);
-            } else {
-              showToast("Playlist has no tracks", "error");
-            }
+            } else showToast("Playlist has no tracks", "error");
           } catch {
             showToast("Failed to play playlist", "error");
           }
@@ -1001,44 +1128,32 @@ export function TrackActionsDropdown({
       },
       !hide.has("queue") && {
         id: "queue-playlist",
-        icon: <ListPlus size={14} />,
+        icon: <ListPlus />,
         label: "Add to Queue",
+        doneLabel: "Added to queue",
         onClick: async () => {
           try {
-            const plData = track?.tracks?.length
-              ? track
-              : (await api.get(`/playlists/${playlistId}`)).data;
-            const tracks = (plData?.tracks || []).map((t: any) => t.track || t).filter(Boolean);
-            if (tracks.length > 0) {
-              usePlayerStore.getState().addToUserQueue(tracks, { contextName: playlistTitle });
-              showToast("Playlist added to queue");
-            } else {
-              showToast("Playlist has no tracks", "error");
-            }
+            const tracks = await loadPlaylistTracks();
+            if (tracks.length) usePlayerStore.getState().addToUserQueue(tracks, { contextName: playlistTitle });
+            else showToast("Playlist has no tracks", "error");
           } catch {
             showToast("Failed to queue playlist", "error");
           }
         },
       },
-      { id: "sep-playlist-1", isSeparator: true },
+      sep("s1"),
       !hide.has("view-playlist") &&
         !onPlaylistPage && {
           id: "view-playlist",
-          icon: <ListMusic size={14} />,
+          icon: <ListMusic />,
           label: "View Playlist",
-          onClick: () => router.push(playlistTarget),
+          onClick: () => router.push(`/playlist/${playlistId}`),
         },
-      { id: "sep-playlist-2", isSeparator: true },
-      !hide.has("share") && {
-        id: "share-playlist",
-        icon: <Share2 size={14} />,
-        label: "Share Playlist",
-        onClick: handleShare,
-      },
-      ...(extraItems || []),
+      ...(extraItems as unknown as MenuItem[]),
+      shareItem(),
     ];
   } else {
-    // Song / Track
+    /* Song / track */
     const albumId = track?.album?.id || track?.albumId || track?.collectionId;
     const albumTitle = track?.album?.title || track?.albumTitle || track?.collectionName;
     const albumTarget = albumId
@@ -1050,26 +1165,60 @@ export function TrackActionsDropdown({
       : null;
     const artistTarget = getArtistTarget(track);
 
+    const downloadItem: MenuItem | false = !hide.has("download") && {
+      id: "download",
+      icon: <Download />,
+      label: "Download",
+      onClick: () => openDownloadModal(track),
+    };
+
+    const adminKids = clean([
+      !hide.has("refetch-audio") && {
+        id: "refetch-audio",
+        icon: <RefreshCw className={cn(isRefetching === track?.id && "animate-spin text-brand")} />,
+        label: isRefetching === track?.id ? "Refetching Audio…" : "Refetch Audio",
+        onClick: () => {
+          refetchTrackAudio(track, showToast);
+        },
+      },
+      !hide.has("refetch-lyrics") && {
+        id: "refetch-lyrics",
+        icon: <FileText />,
+        label: "Refetch Lyrics",
+        onClick: () => {
+          refetchTrackLyrics(track, undefined, showToast);
+        },
+      },
+      !hide.has("sync-lyrics") && {
+        id: "sync-lyrics",
+        icon: <Mic className="text-violet-400" />,
+        label: "Sync Lyrics",
+        className: "text-violet-300",
+        onClick: () => router.push(`/admin/lyric-sync?trackId=${track?.id}`),
+      },
+    ]);
+
     rawItems = [
-      /* Group 1 · play */
+      /* play */
       canPlayNext &&
         !hide.has("play-next") && {
           id: "play-next",
-          icon: <SkipForward size={14} />,
+          icon: <SkipForward />,
           label: "Play Next",
+          doneLabel: "Plays next",
           onClick: () => (usePlayerStore.getState() as any).playNext(track),
         },
-
       !hide.has("queue") && {
         id: "queue",
-        icon: <ListPlus size={14} />,
+        icon: <ListPlus />,
         label: "Add to Queue",
+        doneLabel: "Added to queue",
         onClick: () => usePlayerStore.getState().addToUserQueue(track),
       },
 
-      { id: "sep-play", isSeparator: true },
+      sep("s-play"),
 
-      /* Group 2 · library */
+      /* library */
       !hide.has("like") && {
         id: "like",
         icon: (
@@ -1080,11 +1229,7 @@ export function TrackActionsDropdown({
             animate={{ scale: 1 }}
             transition={SPRING_HEART}
           >
-            <SwiftUIHeart
-              size={15}
-              filled={!!isLiked}
-              className={cn(isLiked ? "text-brand" : "text-white/70")}
-            />
+            <SwiftUIHeart size={15} filled={!!isLiked} className={cn(isLiked ? "text-brand" : "text-white/80")} />
           </motion.span>
         ),
         label: isLiked ? "Liked" : "Like",
@@ -1093,21 +1238,20 @@ export function TrackActionsDropdown({
           toggleLikeMutation.mutate();
         },
       },
-
       !hide.has("add-to-playlist") && {
         id: "add-to-playlist",
-        icon: <ListMusic size={14} />,
+        icon: <ListMusic />,
         label: "Add to Playlist",
         onClick: () => openAddToPlaylistModal(track),
       },
 
-      { id: "sep-library", isSeparator: true },
+      sep("s-lib"),
 
-      /* Group 3 · navigate (Strictly suppressed by current location) */
+      /* navigate / details */
       !hide.has("lyrics") &&
         onLyricsToggle && {
           id: "lyrics",
-          icon: <ScrollText size={14} />,
+          icon: <ScrollText />,
           label: isLyricsOpen ? "Close Lyrics" : "View Lyrics",
           onClick: () => {
             const store = usePlayerStore.getState();
@@ -1118,101 +1262,97 @@ export function TrackActionsDropdown({
             onLyricsToggle();
           },
         },
-
       !hide.has("view-details") &&
         context !== "track-page" &&
         !onTrackPage &&
         track?.id && {
           id: "view-details",
-          icon: <Info size={14} />,
+          icon: <Info />,
           label: "View Details",
           onClick: () => router.push(`/track/${track.id}`),
         },
-
+      !hide.has("artist") &&
+        artistTarget &&
+        !onArtistPage && {
+          id: "go-artist",
+          icon: <User />,
+          label: "Go to Artist",
+          onClick: handleGoToArtist,
+        },
       !hide.has("album") &&
         albumTarget &&
         !onAlbumPage && {
-          id: "album",
-          icon: <Disc size={14} />,
+          id: "go-album",
+          icon: <Disc />,
           label: "Go to Album",
           onClick: () => router.push(albumTarget),
         },
 
-      !hide.has("artist") &&
-        artistTarget &&
-        !onArtistPage && {
-          id: "artist",
-          icon: <User size={14} />,
-          label: "Go to Artist",
-          onClick: handleGoToArtist,
-        },
+      /* admin */
+      isAdmin && adminKids.length > 0 && sep("s-admin"),
+      ...(isAdmin ? adminKids : []),
 
-      /* Group 4 · maintenance (Strictly ADMIN only!) */
-      ...(isAdmin
-        ? [
-            { id: "sep-admin", isSeparator: true },
-            !hide.has("refetch-audio") && {
-              id: "refetch-audio",
-              icon: (
-                <RefreshCw
-                  size={14}
-                  className={cn(isRefetching === track?.id && "animate-spin text-brand")}
-                />
-              ),
-              label: isRefetching === track?.id ? "Refetching Audio…" : "Refetch Audio",
-              onClick: () => refetchTrackAudio(track, showToast),
-            },
-            !hide.has("refetch-lyrics") && {
-              id: "refetch-lyrics",
-              icon: <FileText size={14} className="text-brand opacity-90" />,
-              label: "Refetch Lyrics",
-              onClick: () => refetchTrackLyrics(track, undefined, showToast),
-            },
-            !hide.has("sync-lyrics") && {
-              id: "sync-lyrics",
-              icon: <Mic size={14} className="text-violet-400" />,
-              label: "Sync Lyrics",
-              className: "text-violet-400",
-              onClick: () => router.push(`/admin/lyric-sync?trackId=${track?.id}`),
-            },
-          ]
-        : []),
+      sep("s-end"),
+
+      /* download & share */
+      downloadItem,
+      shareItem(),
 
       ...(extraItems && extraItems.length > 0
-        ? [{ id: "sep-extra", isSeparator: true }, ...(extraItems as unknown as MenuItem[])]
+        ? [sep("s-extra"), ...(extraItems as unknown as MenuItem[])]
         : []),
-
-      { id: "sep-end", isSeparator: true },
-
-      /* Last group · share */
-      !hide.has("download") && {
-        id: "download",
-        icon: <Download size={14} />,
-        label: "Download",
-        onClick: () => openDownloadModal(track),
-      },
-
-      !hide.has("share") && {
-        id: "share",
-        icon: <Share2 size={14} />,
-        label: "Share",
-        onClick: handleShare,
-      },
     ];
   }
 
-  const itemsFiltered = rawItems.filter(Boolean) as unknown as MenuItem[];
-  const groups = buildGroups(itemsFiltered);
+  const itemsFiltered = clean(rawItems);
 
+  /* ── Resolve the current view from the drill-down path ── */
+  let currentItems = itemsFiltered;
+  let viewTitle: React.ReactNode = null;
+  const validPath: string[] = [];
+  for (const id of path) {
+    const it = currentItems.find((i) => i.id === id);
+    if (!it?.children?.length) break;
+    currentItems = it.children;
+    viewTitle = it.label;
+    validPath.push(id);
+  }
+  const groups = buildGroups(currentItems);
+
+  /* ── Selecting a row ── */
   const handleSelect = (item: MenuItem) => {
     if (item.disabled) return;
-    if (item.id === "like") {
-      item.onClick?.();
-      window.setTimeout(() => close(false), 240);
+
+    // drill into a sub-menu, in the same panel
+    if (item.children?.length) {
+      setDir(1);
+      setPath((p) => [...p, item.id]);
       return;
     }
-    close(false);
+
     item.onClick?.();
+
+    // rows with a visible result: show it, then close
+    if (item.doneLabel) {
+      setDoneId(item.id);
+      clearTimer();
+      timerRef.current = window.setTimeout(() => close(false), DONE_MS);
+    } else if (item.id === "like") {
+      clearTimer();
+      timerRef.current = window.setTimeout(() => close(false), 650);
+    } else {
+      close(false);
+    }
+  };
+
+  const view: ViewProps = {
+    viewKey: validPath.length ? validPath.join("/") : "root",
+    dir,
+    title: viewTitle,
+    onBack: validPath.length ? goBack : undefined,
+    groups,
+    doneId,
+    onSelect: handleSelect,
   };
 
   /* ── Default trigger ── */
@@ -1222,8 +1362,7 @@ export function TrackActionsDropdown({
       transition={{ type: "spring", stiffness: 420, damping: 22 }}
       className={cn(
         "flex cursor-pointer items-center justify-center rounded-full text-white/70 outline-none transition-colors hover:text-white",
-        triggerClassName ??
-          "h-9 w-9 border border-white/15 bg-white/10 backdrop-blur-md hover:bg-white/20"
+        triggerClassName ?? "h-9 w-9 border border-white/15 bg-white/10 backdrop-blur-md hover:bg-white/20"
       )}
       title="More options"
       type="button"
@@ -1238,10 +1377,9 @@ export function TrackActionsDropdown({
     <>
       <span
         ref={anchorRef}
-        className="inline-flex items-center justify-center cursor-pointer"
+        className="inline-flex cursor-pointer items-center justify-center"
         onClick={handleTriggerClick}
-        onClickCapture={handleTriggerClick}
-        onPointerDownCapture={(e) => {
+        onPointerDown={(e) => {
           e.stopPropagation();
         }}
       >
@@ -1262,22 +1400,15 @@ export function TrackActionsDropdown({
                 onContextMenu={(e) => e.stopPropagation()}
               >
                 {isSheet ? (
-                  <Sheet
-                    groups={groups}
-                    track={track}
-                    clear={glass}
-                    onSelect={handleSelect}
-                    onClose={close}
-                  />
+                  <Sheet view={view} track={track} clear={glass} onClose={close} />
                 ) : (
                   <Popover
-                    groups={groups}
+                    view={view}
                     anchorRef={anchorRef}
                     side={side}
                     align={align}
                     clear={glass}
                     focusFirst={openedByKeyboard}
-                    onSelect={handleSelect}
                     onClose={close}
                   />
                 )}

@@ -474,10 +474,11 @@ export function SwiftUIPlaylists({
       className={className}
       {...props}
     >
-      <path d="M21 15V6a2 2 0 0 0-2-2H9" />
-      <path d="M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
-      <path d="M3 6h12" />
-      <path d="M3 10h12" />
+      <line x1="3" y1="6" x2="13" y2="6" />
+      <line x1="3" y1="12" x2="10" y2="12" />
+      <line x1="3" y1="18" x2="10" y2="18" />
+      <path d="M16 17a2.5 2.5 0 1 0-2.5-2.5" />
+      <path d="M16 14.5V4a1 1 0 0 1 1-1h3" />
     </svg>
   );
 }

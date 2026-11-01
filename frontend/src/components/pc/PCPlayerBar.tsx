@@ -80,7 +80,7 @@ const GAP = 36; // space between the text and its trailing copy while it travels
 
 function Marquee({
   children,
-  rest = 5,
+  rest = 7,
   speed = 42, // px per second
 }: {
   children: React.ReactNode;
@@ -122,7 +122,7 @@ function Marquee({
         { transform: "translate3d(0,0,0)", offset: rest / total, easing: ease },
         { transform: `translate3d(${-distance}px,0,0)`, offset: 1 },
       ],
-      { duration: total * 1000, iterations: 1 }
+      { duration: total * 1000, iterations: Infinity }
     );
     return () => anim.cancel();
   }, [distance, rest, speed]);
@@ -274,7 +274,7 @@ function Seekbar({ onActiveChange }: { onActiveChange: (active: boolean) => void
             style={{ transition: drag ? "none" : "right 280ms linear" }}
           />
         </Slider.Track>
-        <Slider.Thumb className="block w-3 h-3 rounded-full opacity-0 outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-white/70" />
+        <Slider.Thumb className="hidden pointer-events-none opacity-0" />
       </Slider.Root>
     </div>
   );
