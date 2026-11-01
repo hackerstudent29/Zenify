@@ -1352,55 +1352,16 @@ function TempoTab({ fx, live, commit }: TabProps) {
 
 
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Collapsible Section Component (Accordion-style for right-side panel)
-───────────────────────────────────────────────────────────────────────────── */
-interface CollapsibleSectionProps {
-  title: string;
-  icon: LucideIcon;
-  isOpen: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}
+const FX_TABS = [
+  { id: "presets", label: "Presets", icon: Sparkles },
+  { id: "tune", label: "EQ", icon: SlidersHorizontal },
+  { id: "space", label: "Space", icon: Waves },
+  { id: "voice", label: "Voice", icon: Mic },
+  { id: "tempo", label: "Tempo", icon: Repeat },
+  { id: "chain", label: "Chain", icon: SlidersVertical },
+] as const;
 
-function CollapsibleSection({ title, icon: Icon, isOpen, onToggle, children }: CollapsibleSectionProps) {
-  return (
-    <div className="border-b border-white/[0.08] last:border-b-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-2.5 px-4 py-3 text-left outline-none transition-colors hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-brand/60"
-      >
-        <Icon size={16} className="shrink-0 text-white/60" strokeWidth={2} />
-        <span className="flex-1 text-[14px] font-semibold text-white">{title}</span>
-        <motion.span
-          animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={SPRING_UI}
-          className="text-white/40"
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </motion.span>
-      </button>
-      <AnimatePresence initial={false}>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={SPRING_SOFT}
-            className="overflow-hidden"
-          >
-            <div className="px-4 pb-4 space-y-4">
-              {children}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
+type FxTabId = (typeof FX_TABS)[number]["id"];
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Right-Side Glass Panel: matches Queue/Lyrics panel style
@@ -1413,19 +1374,7 @@ export function AudioFxModal() {
   const setFx = usePlayerStore((s) => s.setFx);
   const { fx, live, commit } = useFx();
 
-  // Collapsible sections state
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    presets: true,
-    tune: false,
-    space: false,
-    voice: false,
-    chain: false,
-    tempo: false,
-  });
-
-  const toggleSection = (id: string) => {
-    setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+  const [activeTab, setActiveTab] = useState<FxTabId>("presets");
 
   const close = useCallback(() => setOpen(false), [setOpen]);
 
@@ -1482,8 +1431,11 @@ export function AudioFxModal() {
             <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/[0.08] shrink-0">
               <div className="flex items-baseline gap-2.5 min-w-0">
                 <h2 className="text-[19px] font-bold text-white tracking-tight">Studio FX</h2>
-                <span className="text-[11px] font-medium text-white/40">
-                  {bypass ? "Off" : "On"}
+                <span className={cn(
+                  "text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded",
+                  bypass ? "bg-white/10 text-white/40" : "bg-brand/20 text-brand border border-brand/30"
+                )}>
+                  {bypass ? "Off" : "Active"}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -1499,74 +1451,54 @@ export function AudioFxModal() {
               </div>
             </div>
 
-            {/* Spectrum Visualizer */}
-            <div className="px-4 py-3 border-b border-white/[0.08] shrink-0">
-              <div className="rounded-xl bg-black/25 p-2.5 border border-white/[0.06] backdrop-blur-md shadow-inner">
-                <Spectrum />
-              </div>
+            {/* Compact Spectrum Visualizer */}
+            <div className="px-4 py-2 border-b border-white/[0.06] shrink-0 bg-black/20">
+              <Spectrum />
             </div>
 
-            {/* Scrollable sections */}
-            <div className="flex-1 overflow-y-auto overscroll-contain scrollbar-hide">
-              {/* Presets Section */}
-              <CollapsibleSection
-                title="Presets"
-                icon={Sparkles}
-                isOpen={openSections.presets}
-                onToggle={() => toggleSection("presets")}
-              >
-                <PresetsTab {...tabProps} />
-              </CollapsibleSection>
+            {/* Quick-Access Minimal Segmented Tab Switcher */}
+            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/[0.08] bg-white/[0.02] overflow-x-auto scrollbar-hide shrink-0">
+              {FX_TABS.map((t) => {
+                const active = activeTab === t.id;
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveTab(t.id)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer outline-none select-none",
+                      active
+                        ? "bg-brand text-white shadow-sm ring-1 ring-brand/50"
+                        : "bg-white/[0.05] text-white/60 hover:text-white hover:bg-white/10 border border-white/[0.06]"
+                    )}
+                  >
+                    <Icon size={12} strokeWidth={2.2} />
+                    <span>{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-              {/* Tune Section */}
-              <CollapsibleSection
-                title="Tune"
-                icon={SlidersHorizontal}
-                isOpen={openSections.tune}
-                onToggle={() => toggleSection("tune")}
-              >
-                <TuneTab {...tabProps} />
-              </CollapsibleSection>
-
-              {/* Space Section */}
-              <CollapsibleSection
-                title="Space"
-                icon={Waves}
-                isOpen={openSections.space}
-                onToggle={() => toggleSection("space")}
-              >
-                <SpaceTab {...tabProps} />
-              </CollapsibleSection>
-
-              {/* Voice Section */}
-              <CollapsibleSection
-                title="Voice"
-                icon={Mic}
-                isOpen={openSections.voice}
-                onToggle={() => toggleSection("voice")}
-              >
-                <VoiceTab {...tabProps} />
-              </CollapsibleSection>
-
-              {/* Chain Section */}
-              <CollapsibleSection
-                title="Chain"
-                icon={SlidersVertical}
-                isOpen={openSections.chain}
-                onToggle={() => toggleSection("chain")}
-              >
-                <ChainTab {...tabProps} />
-              </CollapsibleSection>
-
-              {/* Tempo Section */}
-              <CollapsibleSection
-                title="Tempo"
-                icon={Repeat}
-                isOpen={openSections.tempo}
-                onToggle={() => toggleSection("tempo")}
-              >
-                <TempoTab {...tabProps} />
-              </CollapsibleSection>
+            {/* Active Tab Content - Compact, Direct, Scrollable without nested accordions */}
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 scrollbar-hide">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="space-y-4"
+                >
+                  {activeTab === "presets" && <PresetsTab {...tabProps} />}
+                  {activeTab === "tune" && <TuneTab {...tabProps} />}
+                  {activeTab === "space" && <SpaceTab {...tabProps} />}
+                  {activeTab === "voice" && <VoiceTab {...tabProps} />}
+                  {activeTab === "tempo" && <TempoTab {...tabProps} />}
+                  {activeTab === "chain" && <ChainTab {...tabProps} />}
+                </motion.div>
+              </AnimatePresence>
             </div>
 
             {/* Footer */}
@@ -1580,7 +1512,7 @@ export function AudioFxModal() {
               >
                 Reset all
               </button>
-              <span className="text-[11px] font-medium text-white/30">Zenify Engine</span>
+              <span className="text-[11px] font-medium text-white/30">Zenify DSP Engine</span>
             </div>
           </motion.div>
         </div>
