@@ -232,8 +232,9 @@ export default function PlaylistDetailPage() {
  <div className="relative px-6 pt-4 pb-8 md:px-10 md:pt-[110px] md:pb-12 text-center md:text-left flex flex-col items-center md:items-end md:flex-row gap-8">
  {/* Cover Art */}
  <motion.div
- initial={{ opacity: 0, scale: 0.95 }}
- animate={{ opacity: 1, scale: 1 }}
+ initial={{ opacity: 0 }}
+ animate={{ opacity: 1 }}
+ transition={{ duration: 0.3 }}
  className="shrink-0 w-64 h-64 md:w-80 md:h-80 rounded-lg overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] bg-zinc-900 border border-white/10 relative group"
  >
  <UniversalMediaCover track={playlist} />
@@ -283,7 +284,7 @@ export default function PlaylistDetailPage() {
               }
               handlePlayPlaylist();
             }}
-            isShuffled={isShuffled}
+            isShuffled={isPlaylistActive && isShuffled}
             onShuffle={() => {
               if (!playlist || !playlist.tracks || playlist.tracks.length === 0) {
                 showToast("This playlist has no tracks yet", "error");

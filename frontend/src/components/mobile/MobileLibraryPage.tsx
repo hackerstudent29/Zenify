@@ -71,7 +71,6 @@ export function MobileLibraryPage({
  { id: "playlists", label: "Playlists", icon: Library },
  { id: "liked", label: "Liked Songs", icon: SwiftUIHeart },
  { id: "albums", label: "Albums", icon: Disc },
- { id: "artists", label: "Artists", icon: User }
  ];
 
  const { data: playlists, isLoading: isLoadingPlaylists } = useQuery({
@@ -103,14 +102,7 @@ export function MobileLibraryPage({
  enabled: isAuthenticated && activeTab === "albums",
  });
 
- const { data: allArtists, isLoading: isLoadingAllArtists } = useQuery({
- queryKey: ["all-artists"],
- queryFn: async () => {
- const res = await api.get("artists");
- return res.data;
- },
- enabled: isAuthenticated && activeTab === "artists",
- });
+
 
   return (
  <div className="min-h-screen bg-background pb-[180px] pt-4">
@@ -146,7 +138,13 @@ export function MobileLibraryPage({
  {tabs.map((tab) => (
  <button
  key={tab.id}
- onClick={() => setActiveTab(tab.id)}
+ onClick={() => {
+   if (tab.id === "liked") {
+     router.push("/liked");
+   } else {
+     setActiveTab(tab.id);
+   }
+ }}
  className={cn(
  "flex items-center gap-2 px-4 h-8 rounded-full text-xs font-bold whitespace-nowrap transition-all border snap-start",
  activeTab === tab.id
@@ -343,33 +341,8 @@ export function MobileLibraryPage({
  </div>
  )}
 
- {/* Artists List/Grid */}
- {activeTab === "artists" && (
- <div className="flex flex-col gap-4">
- {isLoadingAllArtists ? (
- <div className="py-20 flex justify-center"><ZenLoading size="sm" /></div>
- ) : allArtists?.length > 0 ? (
- allArtists.map((artist: any) => (
- <Link 
- href={`/artist/${artist.id}`} 
- key={artist.id}
- className="flex items-center gap-5 p-2 rounded-2xl hover:bg-white/5 active:bg-white/10 transition-colors group cursor-pointer"
- >
- <div className="w-16 h-16 rounded-full overflow-hidden bg-zinc-900 shrink-0 shadow-lg border-2 border-white/5 group-active:scale-95 transition-transform">
- <img src={getArtistProfileImage(artist)} alt={artist.name || "Artist profile"} width={64} height={64} loading="lazy" decoding="async" className="w-full h-full object-cover" />
- </div>
- <div className="flex-1 min-w-0">
- <h3 className="font-bold text-base text-white truncate">{formatDisplayTitle(artist.name)}</h3>
- <p className="text-xs text-zinc-500 uppercase tracking-widest mt-1">Artist</p>
- </div>
- <ChevronRight size={18} className="text-white/20" />
- </Link>
- ))
- ) : (
- <div className="text-center py-20 text-white/50 text-sm">No artists followed yet.</div>
- )}
- </div>
- )}
+
+
  </motion.div>
  </AnimatePresence>
       </div>

@@ -386,9 +386,9 @@ export default function AlbumPage() {
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8 lg:gap-10 mb-10 md:mb-12 w-full min-w-0 max-w-full">
           {/* Artwork: responsive square, never exceeds viewport */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
             className="w-[min(280px,80vw)] sm:w-[320px] md:w-[338px] aspect-square shrink-0 rounded-lg shadow-2xl overflow-hidden bg-zinc-900 border border-white/10 relative"
           >
             <img
@@ -456,7 +456,7 @@ export default function AlbumPage() {
                   }
                   handlePlayAlbum();
                 }}
-                isShuffled={isShuffled}
+                isShuffled={isAlbumActive && isShuffled}
                 onShuffle={() => {
                   if (trackCount === 0) {
                     showToast("This album has no tracks", "error");

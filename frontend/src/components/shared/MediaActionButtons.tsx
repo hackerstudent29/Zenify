@@ -49,9 +49,9 @@ export function MediaActionButtons({
   extraAction,
 }: MediaActionButtonsProps) {
   const pillBtn =
-    "flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold tracking-[-0.01em] outline-none transition-[background-color,color,transform] duration-200 ease-out active:scale-[0.96]";
+    "flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-full px-4 text-[13px] font-semibold tracking-[-0.01em] outline-none transition-colors duration-150";
   const iconBtn =
-    "flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/85 outline-none transition-[background-color,color,transform] duration-200 ease-out hover:bg-white/[0.18] hover:text-white active:scale-90";
+    "flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white/85 outline-none transition-colors duration-150 hover:bg-white/[0.18] hover:text-white";
 
   return (
     <div className={cn("mt-4 flex flex-wrap items-center justify-center gap-2 md:justify-start", className)}>
