@@ -288,7 +288,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isInfoPage = pathname?.startsWith("/terms") || pathname?.startsWith("/privacy") || pathname?.startsWith("/about") || pathname?.startsWith("/creator");
   const isLyricSyncPage = pathname?.includes("/admin/lyric-sync");
   const hasSidebar = !isMobile && isAuthenticated;
-  const rightPanelOpen = !isMobile && (isLyricsOpen || isQueueOpen);
+  const rightPanelOpen = !isMobile && (isLyricsOpen || isQueueOpen || isAudioFxOpen);
   const layoutVars = {
     "--sb-w": hasSidebar ? `${SIDEBAR_EXPANDED}px` : "0px",
     "--rp-w": rightPanelOpen ? "320px" : "0px",
