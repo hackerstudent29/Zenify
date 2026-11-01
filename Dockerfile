@@ -1,4 +1,4 @@
-FROM node:20-slim AS base
+FROM node:26-slim AS base
 
 # Bust cache to ensure latest yt-dlp is always installed on fresh deployments
 ARG CACHEBUST=1
