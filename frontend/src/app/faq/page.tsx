@@ -2,7 +2,7 @@
 
 import { motion, MotionConfig } from "framer-motion";
 import { SEO } from "@/components/shared/SEO";
-import { PageHeader, BackButton, Section, stagger, rise } from "@/components/shared/PageChrome";
+import { PageHeader, Section, stagger, rise } from "@/components/shared/PageChrome";
 import { FEATURES, HOMEPAGE_FAQS, faqJsonLd } from "@/lib/homeSeo";
 
 const row = "grid gap-1 py-5 sm:grid-cols-[11rem_1fr] sm:gap-8";
@@ -42,9 +42,8 @@ export default function FaqPage() {
             ))}
           </Section>
         </motion.main>
-
-        <BackButton />
       </div>
     </MotionConfig>
   );
 }
+

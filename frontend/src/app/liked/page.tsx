@@ -3,7 +3,7 @@
 /**
  * LikedSongsPage — Apple Music playlist layout for Liked Songs & Library Favorites
  *
- * Reuses canonical components:
+ * Reuses canonical components (unchanged):
  *   • MediaActionButtons   (Play / Shuffle / Add Music)
  *   • JioSaavnSongTable    (Songs table with Recently Added / Newest / A-Z sorting)
  *   • JioSaavnCardSection  (Albums + Artists carousels)
@@ -11,13 +11,20 @@
  *   • AddMusicToLikedModal
  *   • DynamicBackground
  *
- * Design features:
+ * What's new in this version
  *   • Hero: three fanned cover images (center + two slanted sides) that spring open.
  *   • Hero is compact: content starts right under the header (no big top gap).
  *   • Mobile: cover stack on the left, title + buttons on the right.
  *   • Back / Forward arrows removed.
  *   • New glass search bar + sliding segmented List/Cards toggle + small spring details.
  *   • Scroll arrows (◀ ▶) on mobile & tablet for Songs (cards), Albums and Artists.
+ *
+ * ──────────────────────────────────────────────────────────────────────────
+ * REPLACEABLE PLACEHOLDER: <ArrowCarousel> + <ScrollArrows> (bottom of file)
+ *   Local stand-ins for the shared "left / right section arrows" component.
+ *   Swap them for the app's reusable arrows component. The three places they
+ *   are used are marked with  // REUSABLE-ARROWS
+ * ──────────────────────────────────────────────────────────────────────────
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
@@ -46,6 +53,29 @@ const SPRING = { type: "spring", stiffness: 300, damping: 30 } as const;
 const SPRING_SNAPPY = { type: "spring", stiffness: 520, damping: 34, mass: 0.6 } as const;
 const SPRING_PILL = { type: "spring", stiffness: 560, damping: 38, mass: 0.6 } as const;
 const SPRING_FAN = { type: "spring", stiffness: 180, damping: 18, mass: 0.9 } as const;
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ONE LEFT-EDGE RULE for every section
+   ─────────────────────────────────
+   --pad = the app's --row-gutter (clamp(20px, 2.4vw, 40px)). JioSaavnCardSection
+   already pads itself with that same gutter, so:
+
+     • hero, search, Songs title + table → padding-inline: var(--pad)
+     • Albums / Artists                  → no extra padding (the section adds the gutter)
+     • everything sits in a 1400px column centred in the page area
+
+   Result: the hero, search, "Songs", the table, "Albums" and "Artists" all start on the
+   same vertical line. Carousels additionally run off the right edge of the page area.
+   ────────────────────────────────────────────────────────────────────────── */
+const PAD_X: React.CSSProperties = { paddingInline: "var(--pad)" };
+/** Space left of the 1400px column when the page area is wider than that (0 otherwise) */
+const COLUMN_OFFSET = "max(0px, calc((100% - 1400px) / 2))";
+/** Same offset + the gutter: where content starts inside a full-width row */
+const BLEED_LEFT = "max(var(--pad), calc((100% - 1400px) / 2 + var(--pad)))";
+/** Wrapper for JioSaavnCardSection (it adds the gutter itself) */
+const BLEED_OUTER: React.CSSProperties = { paddingLeft: COLUMN_OFFSET };
+/** Keeps the ◀ ▶ arrows on the content column's right edge */
+const BLEED_ARROWS: React.CSSProperties = { right: BLEED_LEFT };
 
 /** Staggered fade-up used by the hero text */
 const rise = (i: number) => ({
@@ -618,9 +648,10 @@ export default function LikedSongsPage() {
       </div>
 
       {/* ── Page Container: starts right under the header (no big gap) ── */}
-      <div className="relative z-10 mx-auto w-full min-w-0 max-w-[1400px] px-4 pb-12 pt-[calc(var(--header-height,64px)+12px)] sm:px-8 sm:pt-[calc(var(--header-height,64px)+18px)] md:px-12">
+      <div className="relative z-10 w-full min-w-0 pb-12 pt-[calc(var(--header-height,64px)+12px)] [--pad:var(--row-gutter,2rem)] sm:pt-[calc(var(--header-height,64px)+18px)]">
+        <div className="mx-auto w-full max-w-[1400px]" style={PAD_X}>
         {/* ── 1. Hero ──
-            @container → sizes react to the hero's own width, so the layout
+            @container → sizes below react to the hero's own width, so the layout
             stays right when the sidebar or the lyrics/queue panel opens. */}
         <div className="@container mb-5 w-full min-w-0 sm:mb-7">
           <div className="flex w-full min-w-0 items-center gap-4 @lg:gap-8">
@@ -741,6 +772,7 @@ export default function LikedSongsPage() {
                 }}
                 placeholder="Search in Liked Songs"
                 aria-label="Search liked songs, albums and artists"
+                // 16px on phones stops iOS from zooming the page when focused
                 className="h-full min-w-0 flex-1 bg-transparent text-[16px] font-medium tracking-[-0.01em] text-white outline-none placeholder:text-white/40 sm:text-[13.5px]"
               />
 
@@ -767,6 +799,7 @@ export default function LikedSongsPage() {
                     exit={{ opacity: 0, scale: 0.4 }}
                     whileTap={{ scale: 0.82 }}
                     transition={SPRING_SNAPPY}
+                    // keep focus in the input while clearing
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => setSearchQuery("")}
                     className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/20 text-white outline-none hover:bg-white/30"
@@ -783,14 +816,20 @@ export default function LikedSongsPage() {
           </div>
         </div>
 
+        </div>
+
         {/* ── 3. Songs ── */}
         <FadeUp className="mb-8 w-full min-w-0">
-          <ArrowCarousel enabled={viewMode === "grid"}>
-            <div className="mb-3 flex h-[30px] items-center gap-2.5">
-              <h2 className="text-[22px] font-bold tracking-[-0.02em] text-white">Songs</h2>
-              {filteredTracks.length > 0 && (
-                <AnimatedCount value={filteredTracks.length} singular="track" plural="tracks" />
-              )}
+          {/* REUSABLE-ARROWS (1/3): cards view scrolls sideways → show arrows.
+              `enabled` is off in list view so the table never gets arrows. */}
+          <ArrowCarousel enabled={viewMode === "grid"} arrowsStyle={BLEED_ARROWS}>
+            <div className="mx-auto w-full max-w-[1400px]" style={PAD_X}>
+              <div className="mb-3 flex h-[30px] items-center gap-2.5">
+                <h2 className="text-[22px] font-bold tracking-[-0.02em] text-white">Songs</h2>
+                {filteredTracks.length > 0 && (
+                  <AnimatedCount value={filteredTracks.length} singular="track" plural="tracks" />
+                )}
+              </div>
             </div>
 
             <AnimatePresence mode="wait" initial={false}>
@@ -801,6 +840,8 @@ export default function LikedSongsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
                   transition={SPRING}
+                  className="mx-auto w-full max-w-[1400px]"
+                  style={PAD_X}
                 >
                   <JioSaavnSongTable
                     tracks={filteredTracks}
@@ -829,7 +870,13 @@ export default function LikedSongsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
                   transition={SPRING}
-                  className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:scroll-pl-8 sm:gap-4 sm:px-8 md:-mx-12 md:scroll-pl-12 md:px-12"
+                  // Full-width scroller: cards start on the content column and run off the right edge
+                  className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:gap-4"
+                  style={{
+                    paddingLeft: BLEED_LEFT,
+                    paddingRight: "var(--pad)",
+                    scrollPaddingLeft: BLEED_LEFT,
+                  }}
                 >
                   {filteredTracks.length === 0 ? (
                     <p className="w-full py-10 text-center text-sm text-white/50">
@@ -854,51 +901,61 @@ export default function LikedSongsPage() {
           </ArrowCarousel>
         </FadeUp>
 
-        {/* ── 4 + 5. Albums & Artists carousels ── */}
+        {/* ── 4 + 5. Albums & Artists carousels (JioSaavnCardSection untouched) ──
+            Wrapper only offsets the 1400px column; the section adds its own gutter,
+            so the "Albums" / "Artists" titles line up with "Songs" and the table. */}
         <AnimatePresence initial={false}>
           {filteredAlbums.length > 0 && (
             <FadeUp key="albums" className="mb-8 w-full min-w-0">
-              <ArrowCarousel hideOnDesktop>
-                <JioSaavnCardSection title="Albums" items={filteredAlbums} />
+              {/* REUSABLE-ARROWS (2/3): hidden ≥lg so the section's own desktop arrows aren't doubled */}
+              <ArrowCarousel hideOnDesktop arrowsStyle={BLEED_ARROWS}>
+                <div style={BLEED_OUTER}>
+                  <JioSaavnCardSection title="Albums" items={filteredAlbums} />
+                </div>
               </ArrowCarousel>
             </FadeUp>
           )}
 
           {filteredArtists.length > 0 && (
             <FadeUp key="artists" className="mb-8 w-full min-w-0">
-              <ArrowCarousel hideOnDesktop>
-                <JioSaavnCardSection title="Artists" items={filteredArtists} />
+              {/* REUSABLE-ARROWS (3/3) */}
+              <ArrowCarousel hideOnDesktop arrowsStyle={BLEED_ARROWS}>
+                <div style={BLEED_OUTER}>
+                  <JioSaavnCardSection title="Artists" items={filteredArtists} />
+                </div>
               </ArrowCarousel>
             </FadeUp>
           )}
         </AnimatePresence>
 
         {/* Empty Search Result Feedback */}
-        <AnimatePresence>
-          {hasQuery && totalMatches === 0 && (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0, y: 14, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={SPRING}
-              className="py-16 text-center text-white/50"
-            >
-              <p className="text-base font-semibold">
-                No liked songs, albums, or artists found for &ldquo;{searchQuery}&rdquo;
-              </p>
-              <motion.button
-                type="button"
-                whileTap={{ scale: 0.94 }}
-                transition={SPRING_SNAPPY}
-                onClick={() => setSearchQuery("")}
-                className="mt-3 cursor-pointer text-sm font-semibold text-brand hover:underline"
+        <div className="mx-auto w-full max-w-[1400px]" style={PAD_X}>
+          <AnimatePresence>
+            {hasQuery && totalMatches === 0 && (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={SPRING}
+                className="py-16 text-center text-white/50"
               >
-                Clear filter
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <p className="text-base font-semibold">
+                  No liked songs, albums, or artists found for &ldquo;{searchQuery}&rdquo;
+                </p>
+                <motion.button
+                  type="button"
+                  whileTap={{ scale: 0.94 }}
+                  transition={SPRING_SNAPPY}
+                  onClick={() => setSearchQuery("")}
+                  className="mt-3 cursor-pointer text-sm font-semibold text-brand hover:underline"
+                >
+                  Clear filter
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* ── Add Music Modal ── */}
@@ -908,8 +965,27 @@ export default function LikedSongsPage() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   REUSABLE-ARROWS: ArrowCarousel + ScrollArrows
-   Horizontally scrollable element detection with scroll position tracking.
+   REPLACEABLE PLACEHOLDER · ArrowCarousel + ScrollArrows
+
+   Local stand-in for the app's shared "section left / right arrows".
+   Swap it for the reusable component. Nothing else in this file depends on
+   its internals.
+
+   How it works
+   • <ArrowCarousel> wraps a section. It finds the horizontally scrollable
+     element inside by itself (works with JioSaavnCardSection without editing
+     it), tracks scroll position, and shows ◀ ▶ at the top-right of the
+     section on every screen size (mobile, tablet, desktop).
+   • Arrows fade out automatically when nothing overflows, and each one
+     dims at the start / end of the scroll.
+
+   Props
+     enabled        false → no arrows (used for the table / list view)
+     hideOnDesktop  true  → arrows hidden at ≥lg (use when the wrapped section
+                            already draws its own desktop arrows)
+     arrowsClassName  tweak position, e.g. "top-1"
+     arrowsStyle      inline position override (the page uses it to keep the arrows
+                      on the content column's right edge while the row bleeds)
    ══════════════════════════════════════════════════════════════════════════ */
 
 function ArrowButton({
@@ -968,12 +1044,14 @@ function ArrowCarousel({
   children,
   className,
   arrowsClassName,
+  arrowsStyle,
   hideOnDesktop = false,
   enabled = true,
 }: {
   children: React.ReactNode;
   className?: string;
   arrowsClassName?: string;
+  arrowsStyle?: React.CSSProperties;
   hideOnDesktop?: boolean;
   enabled?: boolean;
 }) {
@@ -1007,6 +1085,7 @@ function ArrowCarousel({
 
     const ro = new ResizeObserver(update);
 
+    // The horizontally scrollable element inside this section (prefers one that overflows)
     const find = (): HTMLElement | null => {
       let fallback: HTMLElement | null = null;
       const nodes = root.querySelectorAll<HTMLElement>("*");
@@ -1045,7 +1124,7 @@ function ArrowCarousel({
     const mo = new MutationObserver(schedule);
     mo.observe(root, { childList: true, subtree: true });
     window.addEventListener("resize", schedule);
-    root.addEventListener("load", schedule, true);
+    root.addEventListener("load", schedule, true); // images finishing → sizes change
     schedule();
 
     return () => {
@@ -1074,6 +1153,7 @@ function ArrowCarousel({
           hideOnDesktop && "lg:hidden",
           arrowsClassName
         )}
+        style={arrowsStyle}
       >
         <AnimatePresence>
           {enabled && state.show && (

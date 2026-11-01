@@ -362,26 +362,6 @@ export default function AlbumPage() {
       </div>
 
       <div className="w-full relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-10 pt-4 md:pt-8 min-w-0 max-w-full">
-        {/* ── 1. Top Header Navigation (Back / Forward) ────────────────── */}
-        <div className="flex items-center justify-end w-full mb-4">
-          <div className="inline-flex items-center bg-black/30 border border-white/10 rounded-full p-1 gap-1">
-            <button
-              onClick={() => router.back()}
-              className="p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/10 cursor-pointer"
-              title="Back"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              onClick={() => router.forward()}
-              className="p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/10 cursor-pointer"
-              title="Forward"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        </div>
-
         {/* ── 2. Album Hero Header ────────────────────────────────────────── */}
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8 lg:gap-10 mb-10 md:mb-12 w-full min-w-0 max-w-full">
           {/* Artwork: responsive square, never exceeds viewport */}
