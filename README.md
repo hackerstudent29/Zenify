@@ -25,6 +25,11 @@
 
 ---
 
+### 🏷️ Topics & Tags
+`music-streaming` • `music-streaming-app` • `music-app` • `music-player` • `online-music-player` • `free-music` • `spotify-alternative` • `ad-free` • `no-ads` • `open-source` • `audio-streaming` • `synced-lyrics` • `lyrics` • `apple-music-ui` • `playlist` • `equalizer` • `android` • `karaoke` • `local-music-player` • `mp3-player`
+
+---
+
 ## 📸 Screenshot Preview
 
 | 🏠 Home | 🎤 Synced Lyrics | 🎛️ Studio EQ |
