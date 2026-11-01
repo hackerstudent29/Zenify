@@ -18,7 +18,7 @@ export default function Navbar() {
  </Link>
 
  <div className="hidden md:flex items-center gap-8">
- <Link href="/library" className="text-xs font-bold tracking-tight text-zinc-400 hover:text-white transition-colors">Library</Link>
+ <Link href="/liked" className="text-xs font-bold tracking-tight text-zinc-400 hover:text-white transition-colors">Liked Songs</Link>
  <Link href="/search" className="text-xs font-bold tracking-tight text-zinc-400 hover:text-white transition-colors">Search</Link>
  <button
  onClick={() => setPricingModalOpen(true)}

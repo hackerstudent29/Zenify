@@ -84,13 +84,25 @@ export default function LikedSongsPage() {
   /* ─── Liked Albums: Derived from user albums & liked tracks ─── */
   const likedAlbums = useMemo(() => {
     const map = new Map<string, any>();
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+
+    const isUnknownAlbum = (title?: string) => {
+      const t = (title || "").trim().toLowerCase();
+      return !t || t === "unknown" || t === "unknown album";
+    };
 
     for (const alb of userAlbums || []) {
-      if (alb?.id && !map.has(alb.id)) {
-        map.set(alb.id, {
-          id: alb.id,
-          title: alb.title || "Unknown Album",
-          name: alb.title || "Unknown Album",
+      const albId = alb?.id;
+      const title = (alb?.title || "").trim();
+      const normTitle = title.toLowerCase();
+      if (albId && !isUnknownAlbum(title) && !seenIds.has(albId) && !seenTitles.has(normTitle)) {
+        seenIds.add(albId);
+        seenTitles.add(normTitle);
+        map.set(albId, {
+          id: albId,
+          title: alb.title,
+          name: alb.title,
           coverUrl: alb.coverUrl,
           artwork: alb.coverUrl,
           artist: alb.artist || { name: alb.artistName || "Unknown Artist" },
@@ -105,12 +117,16 @@ export default function LikedSongsPage() {
     for (const t of likedTracks || []) {
       const alb = t.album;
       const albId = alb?.id || t.albumId;
-      if (albId) {
-        if (!map.has(albId)) {
+      const title = (alb?.title || (t as any).albumTitle || "").trim();
+      const normTitle = title.toLowerCase();
+      if (albId && !isUnknownAlbum(title)) {
+        if (!seenIds.has(albId) && !seenTitles.has(normTitle)) {
+          seenIds.add(albId);
+          seenTitles.add(normTitle);
           map.set(albId, {
             id: albId,
-            title: alb?.title || (t as any).albumTitle || "Unknown Album",
-            name: alb?.title || (t as any).albumTitle || "Unknown Album",
+            title: title,
+            name: title,
             coverUrl: alb?.coverUrl || t.coverUrl,
             artwork: alb?.coverUrl || t.coverUrl,
             artist: (alb as any)?.artist || t.artist || { name: (t as any).artistName || "Unknown Artist" },
@@ -121,11 +137,13 @@ export default function LikedSongsPage() {
           });
         } else {
           const existing = map.get(albId);
-          if (!existing.coverUrl && t.coverUrl) {
-            existing.coverUrl = t.coverUrl;
-            existing.artwork = t.coverUrl;
+          if (existing) {
+            if (!existing.coverUrl && t.coverUrl) {
+              existing.coverUrl = t.coverUrl;
+              existing.artwork = t.coverUrl;
+            }
+            existing.trackCount += 1;
           }
-          existing.trackCount += 1;
         }
       }
     }
@@ -136,13 +154,35 @@ export default function LikedSongsPage() {
   /* ─── Liked Artists: Derived from top artists & liked tracks ─── */
   const likedArtists = useMemo(() => {
     const map = new Map<string, any>();
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+
+    const isUnknownArtist = (name?: string, id?: string) => {
+      const n = (name || "").toLowerCase().trim();
+      const i = (id || "").toLowerCase().trim();
+      return (
+        !n ||
+        n === "unknown" ||
+        n === "unknown artist" ||
+        n === "various artists" ||
+        i === "artist-unknown-artist" ||
+        i === "unknown" ||
+        i === "unknown-artist"
+      );
+    };
 
     for (const art of overview?.topArtists || []) {
-      if (art?.id && !map.has(art.id)) {
-        map.set(art.id, {
-          id: art.id,
-          name: art.name,
-          title: art.name,
+      const name = (art?.name || "").trim();
+      const id = art?.id || `artist-${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+      const normName = name.toLowerCase();
+
+      if (!isUnknownArtist(name, id) && !seenIds.has(id) && !seenNames.has(normName)) {
+        seenIds.add(id);
+        seenNames.add(normName);
+        map.set(id, {
+          id: id,
+          name: name,
+          title: name,
           imageUrl: art.imageUrl || art.avatarUrl,
           coverUrl: art.imageUrl || art.avatarUrl,
           avatarUrl: art.imageUrl || art.avatarUrl,
@@ -157,13 +197,17 @@ export default function LikedSongsPage() {
     for (const t of likedTracks || []) {
       const art = t.artist;
       const artId = art?.id || t.artistId;
-      const artName = art?.name || (t as any).artistName;
-      if (artName) {
-        const key = artId || artName.toLowerCase();
-        if (!map.has(key)) {
+      const artName = (art?.name || (t as any).artistName || "").trim();
+      const normName = artName.toLowerCase();
+      const computedId = artId || (artName ? `artist-${normName.replace(/[^a-z0-9]/g, "-")}` : "");
+
+      if (!isUnknownArtist(artName, computedId)) {
+        if (!seenIds.has(computedId) && !seenNames.has(normName)) {
+          seenIds.add(computedId);
+          seenNames.add(normName);
           const img = (art as any)?.imageUrl || (art as any)?.image || (t as any).artistImageUrl || t.coverUrl;
-          map.set(key, {
-            id: artId || key,
+          map.set(computedId, {
+            id: computedId,
             name: artName,
             title: artName,
             imageUrl: img,
@@ -175,13 +219,16 @@ export default function LikedSongsPage() {
             type: "artist",
           });
         } else {
-          const existing = map.get(key);
-          if (!existing.imageUrl && t.coverUrl) {
-            existing.imageUrl = t.coverUrl;
-            existing.coverUrl = t.coverUrl;
-            existing.artwork = t.coverUrl;
+          const existing = map.get(computedId) || (Array.from(map.values()).find((a: any) => a.name.toLowerCase() === normName));
+          if (existing) {
+            if (!existing.imageUrl && t.coverUrl) {
+              existing.imageUrl = t.coverUrl;
+              existing.coverUrl = t.coverUrl;
+              existing.avatarUrl = t.coverUrl;
+              existing.artwork = t.coverUrl;
+            }
+            existing.songCount += 1;
           }
-          existing.songCount += 1;
         }
       }
     }
@@ -514,7 +561,7 @@ export default function LikedSongsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
               {filteredTracks.map((track, idx) => (
                 <MediaCard
-                  key={track.id || idx}
+                  key={`liked-song-${track.id || idx}-${idx}`}
                   track={track}
                   index={idx}
                   contextTracks={filteredTracks}

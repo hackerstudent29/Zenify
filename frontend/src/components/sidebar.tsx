@@ -204,8 +204,7 @@ export function Sidebar() {
   if (pathname === "/login" || pathname === "/register" || !isAuthenticated) return null;
 
   const isAlbumPage = pathname.startsWith("/album/");
-  const playlistsActive =
-    (pathname.startsWith("/library") && activeTab === "playlists") || pathname.startsWith("/playlist/");
+  const playlistsActive = pathname.startsWith("/playlist/");
 
   return (
     <>
