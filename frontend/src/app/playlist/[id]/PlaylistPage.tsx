@@ -291,46 +291,26 @@ export default function PlaylistDetailPage() {
               }
               handleShufflePlay();
             }}
-          />
-
-          {isOwner && (
-            <button
-              onClick={() => setIsAddSongsModalOpen(true)}
-              className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-brand h-10 px-5 rounded-full font-bold text-[13px] active:scale-95 transition-all cursor-pointer shadow-none"
-            >
-              <Plus size={16} className="text-brand" strokeWidth={2.5} />
-              <span>Add Songs</span>
-            </button>
-          )}
-
-          {/* Playlist Three-Dot Actions Dropdown */}
-          <TrackActionsDropdown
-            align="start"
-            trigger={
-              <button
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 active:scale-90 cursor-pointer transition-all shadow-none"
-                title="Playlist Options"
-                aria-label="Playlist options"
-              >
-                <SwiftUIEllipsis size={18} fill="currentColor" />
-              </button>
-            }
-            items={[
-              ...(isOwner ? [
-                {
-                  id: "add-songs",
-                  label: "Add Songs to Playlist",
-                  icon: <Plus size={14} className="text-brand" />,
-                  onClick: () => setIsAddSongsModalOpen(true),
-                },
-                {
-                  id: "edit-cover",
-                  label: "Edit Cover Art",
-                  icon: <Edit2 size={14} />,
-                  onClick: () => setIsEditCoverModalOpen(true),
-                },
-                { id: "sep-owner", isSeparator: true },
-              ] : []),
+            track={playlist}
+            context="playlist"
+            moreItems={[
+              ...(isOwner
+                ? [
+                    {
+                      id: "add-songs",
+                      label: "Add Songs to Playlist",
+                      icon: <Plus size={14} className="text-brand" />,
+                      onClick: () => setIsAddSongsModalOpen(true),
+                    },
+                    {
+                      id: "edit-cover",
+                      label: "Edit Cover Art",
+                      icon: <Edit2 size={14} />,
+                      onClick: () => setIsEditCoverModalOpen(true),
+                    },
+                    { id: "sep-owner", isSeparator: true },
+                  ]
+                : []),
               {
                 id: "queue",
                 label: "Add to Queue",
@@ -355,24 +335,26 @@ export default function PlaylistDetailPage() {
                   }
                 },
               },
-              ...(isOwner ? [
-                { id: "sep-delete", isSeparator: true },
-                {
-                  id: "delete",
-                  label: "Delete Playlist",
-                  icon: <Trash2 size={14} className="text-red-400" />,
-                  className: "text-red-400 focus:text-red-400",
-                  onClick: () => {
-                    useUIStore.getState().openConfirmModal({
-                      title: "Delete Playlist?",
-                      message: `This will permanently remove "${playlist.name}" from your library.`,
-                      confirmText: "Erase Playlist",
-                      type: "danger",
-                      onConfirm: () => deletePlaylistMutation.mutate(),
-                    });
-                  },
-                },
-              ] : []),
+              ...(isOwner
+                ? [
+                    { id: "sep-delete", isSeparator: true },
+                    {
+                      id: "delete",
+                      label: "Delete Playlist",
+                      icon: <Trash2 size={14} className="text-red-400" />,
+                      className: "text-red-400 focus:text-red-400",
+                      onClick: () => {
+                        useUIStore.getState().openConfirmModal({
+                          title: "Delete Playlist?",
+                          message: `This will permanently remove "${playlist.name}" from your library.`,
+                          confirmText: "Erase Playlist",
+                          type: "danger",
+                          onConfirm: () => deletePlaylistMutation.mutate(),
+                        });
+                      },
+                    },
+                  ]
+                : []),
             ]}
           />
  </div>

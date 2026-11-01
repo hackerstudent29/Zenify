@@ -312,7 +312,7 @@ const GAP = 36;
 
 export function Marquee({
   children,
-  rest = 5,
+  rest = 7,
   speed = 42,
   align = "center",
   className,
@@ -351,7 +351,7 @@ export function Marquee({
         { transform: "translate3d(0,0,0)", offset: rest / total, easing: ease },
         { transform: `translate3d(${-distance}px,0,0)`, offset: 1 },
       ],
-      { duration: total * 1000, iterations: 1 }
+      { duration: total * 1000, iterations: Infinity }
     );
     return () => anim.cancel();
   }, [distance, rest, speed]);

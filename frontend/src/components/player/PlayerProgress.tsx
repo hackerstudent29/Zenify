@@ -66,17 +66,14 @@ export function MobileScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean }) {
         <Slider.Track className="relative grow rounded-full h-2 bg-white/10 backdrop-blur-md border border-white/5 overflow-hidden">
           <Slider.Range className="opacity-0" />
           <motion.div 
-            className={cn(
-              "absolute top-0 left-0 bottom-0 bg-brand-gradient rounded-full pointer-events-none",
-              !isLyricsOpen && "shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)]"
-            )}
+            className="absolute top-0 left-0 bottom-0 bg-white rounded-full pointer-events-none"
             initial={false}
             animate={isLyricsOpen ? undefined : { width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
             style={isLyricsOpen ? { width: `${(duration ? (localTime / duration) * 100 : 0)}%` } : undefined}
             transition={isLyricsOpen ? undefined : { type: "tween", duration: 0.15, ease: "easeOut" }}
           />
         </Slider.Track>
-        <Slider.Thumb className="block w-4 h-4 opacity-0 pointer-events-none" />
+        <Slider.Thumb className="hidden pointer-events-none opacity-0" />
       </Slider.Root>
       <div className="flex justify-between mt-1 tabular-nums text-[13px] font-bold text-white/80 tracking-wider">
         <span>{formatTime(localTime)}</span>
@@ -93,7 +90,7 @@ export function MiniPlayerProgress() {
   return (
     <div className="absolute bottom-0 left-5 right-5 h-[2px] overflow-hidden z-[11] rounded-full bg-white/20 backdrop-blur-sm border-none">
       <motion.div
-        className="h-full bg-brand-gradient"
+        className="h-full bg-white rounded-full"
         animate={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
         transition={{ duration: 1, ease: "linear" }}
       />
@@ -154,17 +151,14 @@ export function PCFullScreenScrubber({ isLyricsOpen }: { isLyricsOpen?: boolean 
         <Slider.Track className="relative grow rounded-full h-2 bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
           <Slider.Range className="opacity-0" />
           <motion.div 
-            className={cn(
-              "absolute top-0 left-0 bottom-0 bg-brand-gradient rounded-full pointer-events-none",
-              !isLyricsOpen && "group-hover:shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)] transition-shadow"
-            )}
+            className="absolute top-0 left-0 bottom-0 bg-white rounded-full pointer-events-none"
             initial={false}
             animate={isLyricsOpen ? undefined : { width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
             style={isLyricsOpen ? { width: `${(duration ? (localTime / duration) * 100 : 0)}%` } : undefined}
             transition={isLyricsOpen ? undefined : { type: "tween", duration: 0.15, ease: "easeOut" }}
           />
         </Slider.Track>
-        <Slider.Thumb className="block w-4 h-4 opacity-0 pointer-events-none transition-transform" />
+        <Slider.Thumb className="hidden pointer-events-none opacity-0" />
       </Slider.Root>
       <span className="text-[13px] font-bold text-white/80 w-12 tabular-nums tracking-widest">-{formatTime(remaining > 0 ? remaining : 0)}</span>
     </div>
@@ -223,13 +217,13 @@ export function PCPlayerBarScrubber() {
         <Slider.Track className="relative grow rounded-full h-2 bg-white/10 backdrop-blur-sm border border-white/5 overflow-hidden">
           <Slider.Range className="opacity-0" />
           <motion.div 
-            className="absolute top-0 left-0 bottom-0 bg-brand-gradient group-hover:shadow-[0_0_10px_rgba(var(--accent-brand-rgb),0.5)] pointer-events-none rounded-full transition-shadow"
+            className="absolute top-0 left-0 bottom-0 bg-white pointer-events-none rounded-full"
             initial={false}
             animate={{ width: `${(duration ? (localTime / duration) * 100 : 0)}%` }}
             transition={{ type: "tween", duration: 0.15, ease: "easeOut" }}
           />
         </Slider.Track>
-        <Slider.Thumb className="block w-4 h-4 opacity-0 pointer-events-none transition-transform" />
+        <Slider.Thumb className="hidden pointer-events-none opacity-0" />
       </Slider.Root>
       <span className="text-[11px] font-medium text-[#a7a7a7] w-10 tabular-nums">{formatTime(duration)}</span>
     </div>
