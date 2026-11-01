@@ -9,7 +9,7 @@ import { Disc3, Star, Heart, Info, X } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
-import { cn, getMediaUrl, formatDisplayTitle, getArtistProfileImage } from "@/lib/utils";
+import { cn, getMediaUrl, formatDisplayTitle, getArtistProfileImage, CANONICAL_APPLE_ARTISTS } from "@/lib/utils";
 import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
 import { motion, AnimatePresence } from "framer-motion";
 import { SEO } from "@/components/shared/SEO";
@@ -38,6 +38,7 @@ export default function ArtistPage() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [isBioOpen, setIsBioOpen] = useState(false);
   const [currentCollectionId, setCurrentCollectionId] = useState<string | null>(null);
+  const [isWidescreen, setIsWidescreen] = useState<boolean | null>(null);
 
   const { data: artist, isLoading } = useQuery({
     queryKey: ['artist', id],
@@ -46,7 +47,8 @@ export default function ArtistPage() {
       return res.data;
     },
     enabled: !!id,
-    staleTime: 1000 * 60 * 10, // 10 minutes cache
+    staleTime: 0, // Always fetch fresh to eliminate stale browser/DB cache
+    refetchOnMount: true,
   });
 
   // Liked tracks query
@@ -113,13 +115,54 @@ export default function ArtistPage() {
     );
   };
 
-  const avatarUrl = getArtistProfileImage(artist);
+  const normKey = (artist?.name || id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const canonicalVisual = normKey && CANONICAL_APPLE_ARTISTS[normKey] ? CANONICAL_APPLE_ARTISTS[normKey] : null;
+
+  const avatarUrl = canonicalVisual || getArtistProfileImage(artist);
   // Strictly filter out any circular Apple Music _cropped.png or cw.png masks to guarantee full-bleed rectangular artwork
   const cleanCover = artist?.coverUrl && !isCircularMask(artist.coverUrl) ? artist.coverUrl : null;
   const cleanBanner = artist?.bannerUrl && !isCircularMask(artist.bannerUrl) ? artist.bannerUrl : null;
   const cleanImage = artist?.imageUrl && !isCircularMask(artist.imageUrl) ? artist.imageUrl : null;
   const cleanAvatar = avatarUrl && !isCircularMask(avatarUrl) ? avatarUrl : null;
-  const heroImageUrl = cleanCover || cleanBanner || cleanAvatar || cleanImage;
+  const heroImageUrl = canonicalVisual || cleanCover || cleanBanner || cleanAvatar || cleanImage;
+
+  // Aspect ratio detection to determine whether to use widescreen cover or perfectly contained portrait
+  useEffect(() => {
+    if (!heroImageUrl) {
+      setIsWidescreen(false);
+      return;
+    }
+    // Instant checks from known square/portrait dimensions
+    if (
+      heroImageUrl.includes('500x500') ||
+      heroImageUrl.includes('600x600') ||
+      heroImageUrl.includes('640x640') ||
+      heroImageUrl.includes('1000x1000') ||
+      heroImageUrl.includes('1080x1080')
+    ) {
+      setIsWidescreen(false);
+      return;
+    }
+    // Instant checks from known widescreen dimensions
+    if (
+      heroImageUrl.includes('1920x1080') ||
+      heroImageUrl.includes('2560x1440') ||
+      heroImageUrl.includes('1200x630') ||
+      heroImageUrl.includes('headerImage')
+    ) {
+      setIsWidescreen(true);
+      return;
+    }
+    const img = new window.Image();
+    img.src = getMediaUrl(heroImageUrl) || heroImageUrl;
+    img.onload = () => {
+      const ratio = img.naturalWidth / img.naturalHeight;
+      setIsWidescreen(ratio >= 1.35);
+    };
+    img.onerror = () => {
+      setIsWidescreen(false);
+    };
+  }, [heroImageUrl]);
 
   // Artwork tint — multi-source saturation-first loop, isCancelled guard,
   // reset only on page unmount (not on every dep change)
@@ -290,7 +333,7 @@ export default function ArtistPage() {
     >
       <h1
         ref={heroNameRef}
-        className="mb-4 sm:mb-5 max-w-4xl select-text break-words px-2 text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl lg:text-[54px]"
+        className="mb-4 sm:mb-5 max-w-4xl select-text break-words px-2 text-3xl font-bold tracking-tight text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.85)] sm:text-4xl md:text-5xl lg:text-[54px]"
       >
         {displayName}
       </h1>
@@ -385,10 +428,10 @@ export default function ArtistPage() {
         description={artist.bio || `Listen to songs and albums by ${displayName} on Zenify.`}
       />
 
-      {/* ── 1. ARTIST HERO (Clean untouched image banner) ── */}
+      {/* ── 1. ARTIST HERO (Clean untouched full-size image banner) ── */}
       {heroImageUrl ? (
         <div
-          className="relative w-full h-[56vh] sm:h-[60vh] md:h-[62vh] min-h-[400px] max-h-[660px] overflow-hidden select-none am-layout-transition"
+          className="relative w-full h-[62vh] sm:h-[66vh] md:h-[70vh] min-h-[480px] max-h-[760px] overflow-hidden select-none am-layout-transition flex flex-col justify-end"
           style={{
             marginLeft: "calc(var(--sb-w) * -1)",
             marginRight: "calc(var(--rp-w) * -1)",
@@ -400,25 +443,44 @@ export default function ArtistPage() {
             <img
               src={getMediaUrl(heroImageUrl) || undefined}
               alt=""
-              className="w-full h-full object-cover blur-3xl scale-125 opacity-35 brightness-75"
+              className="w-full h-full object-cover blur-3xl scale-125 opacity-40 brightness-75"
               aria-hidden="true"
             />
           </div>
 
-          {/* Full-bleed rectangular portrait without any circular masks or letterboxing */}
-          <img
-            src={getMediaUrl(heroImageUrl) || undefined}
-            alt={displayName}
-            className="absolute inset-0 m-auto w-full h-full object-cover object-center sm:object-[center_20%] filter brightness-95 pointer-events-none"
-            fetchPriority="high"
-            decoding="async"
-          />
+          {/* Foreground Portrait:
+              - If widescreen banner: full-bleed cover
+              - If square/portrait: perfectly contained without aggressive zooming so full face, head & body are completely visible */}
+          {isWidescreen ? (
+            <img
+              src={getMediaUrl(heroImageUrl) || undefined}
+              alt={displayName}
+              className="absolute inset-0 m-auto w-full h-full object-cover object-top sm:object-[center_20%] filter brightness-95 pointer-events-none"
+              fetchPriority="high"
+              decoding="async"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-20 sm:pb-24">
+              <img
+                src={getMediaUrl(heroImageUrl) || undefined}
+                alt={displayName}
+                className="h-full w-auto max-h-[85%] max-w-[850px] object-contain object-center filter brightness-95 drop-shadow-[0_20px_50px_rgba(0,0,0,0.65)]"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </div>
+          )}
 
           {/* Top subtle vignette for header contrast */}
           <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 via-black/15 to-transparent pointer-events-none z-10" />
 
-          {/* Bottom gentle gradient fade into the page background */}
-          <div className="absolute inset-x-0 bottom-0 h-24 sm:h-32 bg-gradient-to-t from-[var(--page,#121214)] to-transparent pointer-events-none z-10" />
+          {/* Bottom gentle transparent gradient: smooth transition so text/buttons are readable, but image is 100% visible behind buttons */}
+          <div className="absolute inset-x-0 bottom-0 h-44 sm:h-52 bg-gradient-to-t from-[var(--page,#121214)] via-[var(--page,#121214)]/40 to-transparent pointer-events-none z-10" />
+
+          {/* Artist title & controls centered on page, docked at the bottom of the hero banner with the image showing behind */}
+          <div className="relative z-20 pb-6 sm:pb-8 flex flex-col items-center justify-center text-center px-4 w-full">
+            {heroHeader}
+          </div>
         </div>
       ) : (
         /* Minimal fallback when no artist artwork is available (Strictly NO circular avatars) */
@@ -442,17 +504,13 @@ export default function ArtistPage() {
                 decoding="async"
               />
             </div>
+            {heroHeader}
           </motion.div>
         </div>
       )}
 
-      {/* ── ARTIST HEADER: Centered on page, moved down below the image banner ── */}
-      <div className="relative z-20 w-full flex flex-col items-center justify-center pt-8 sm:pt-10 pb-6 sm:pb-8 text-center">
-        {heroHeader}
-      </div>
-
-      {/* ── 2. JIOSAAVN REDESIGNED SECTIONS ── */}
-      <div className="relative z-10 pt-2 sm:pt-4 pb-28 w-full text-white min-w-0">
+      {/* ── 2. JIOSAAVN REDESIGNED SECTIONS (The content sheet starts cleanly from section places) ── */}
+      <div className="relative z-10 pt-4 sm:pt-6 pb-28 w-full bg-[var(--page,#121214)] text-white min-w-0 transition-colors duration-500">
         {/* SECTION 1: Top Songs Table with Popular, Date, Name filters & Load more */}
         <div className="px-4 sm:px-8 md:px-12 max-w-[1400px] mx-auto w-full mb-8">
           <JioSaavnSongTable
