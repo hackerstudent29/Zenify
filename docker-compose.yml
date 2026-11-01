@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: zenify-postgres
+    environment:
+      POSTGRES_USER: zenify
+      POSTGRES_PASSWORD: zenify_dev_password
+      POSTGRES_DB: zenify
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zenify"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zenify-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://zenify:zenify_dev_password@postgres:5432/zenify
+      PORT: 3000
+      JWT_SECRET: your_jwt_secret_here_change_in_production
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Frontend Web Server (Development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: zenify-frontend
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:3000
+      NODE_ENV: development
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    command: npm run dev
+
+  # Redis (Optional - for caching/sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: zenify-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: zenify-network
+
+# Usage:
+# ------
+# Start all services:
+#   docker-compose up
+#
+# Start specific service:
+#   docker-compose up postgres backend
+#
+# View logs:
+#   docker-compose logs -f backend
+#
+# Stop all services:
+#   docker-compose down
+#
+# Rebuild images:
+#   docker-compose build --no-cache
+#
+# Access services:
+#   - Backend API: http://localhost:3000
+#   - Frontend: http://localhost:5173
+#   - PostgreSQL: localhost:5432 (user: zenify)
+#   - Redis: localhost:6379
+#
+# Environment Variables:
+#   Copy .env.example to .env in backend/ and frontend/
+#   For API keys, update DEEPGRAM_API_KEY and YOUTUBE_API_KEY
+
