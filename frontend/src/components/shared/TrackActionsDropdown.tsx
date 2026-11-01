@@ -137,7 +137,7 @@ const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min)
  * Lighter glass: low blur + low opacity so the background shows through.
  * clear = even lighter.
  */
-function glassSurface(clear: boolean, sheet = false): React.CSSProperties {
+export function glassSurface(clear: boolean = false, sheet = false): React.CSSProperties {
   const blur = sheet
     ? "blur(12px) saturate(170%)"
     : clear

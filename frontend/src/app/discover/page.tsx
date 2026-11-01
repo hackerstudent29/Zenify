@@ -28,6 +28,7 @@ import { cn, getMediaUrl, getArtistProfileImage } from "@/lib/utils";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { glassSurface } from "@/components/shared/TrackActionsDropdown";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { SEO } from "@/components/shared/SEO";
 
@@ -724,7 +725,7 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
           <div className="relative md:sticky md:top-[calc(64px+env(safe-area-inset-top,0px))] z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2.5 bg-[rgba(28,28,30,0.72)] backdrop-blur-2xl backdrop-saturate-150 border-b border-white/[0.07] space-y-2.5">
             <div className="flex items-center gap-3">
               <div className="relative flex-1 group">
-                <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-white/50 z-10 group-focus-within:text-white/80 transition-colors">
+                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-white/45 group-focus-within:text-white/80 transition-colors">
                   <SearchIcon size={16} strokeWidth={2.2} />
                 </div>
 
@@ -744,7 +745,11 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
                   onBlur={() => setTimeout(() => setIsInputFocused(false), 200)}
                   onKeyDown={handleKeyDown}
                   placeholder={isMobile ? "Artists, Songs, Lyrics, and More" : placeholderText + (cursorBlink ? "|" : "")}
-                  className="w-full h-11 md:h-12 rounded-full bg-black/30 hover:bg-black/25 focus:bg-black/40 backdrop-blur-xl border border-white/15 focus:border-brand/60 focus:ring-4 focus:ring-brand/20 pl-11 pr-24 text-[15px] text-white placeholder:text-white/45 outline-none transition-all duration-300 shadow-[0_8px_24px_-6px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.12)]"
+                  className="w-full h-11 md:h-12 rounded-full pl-11 pr-24 text-[15px] text-white placeholder:text-white/50 outline-none transition-all duration-200 focus:border-white/30 focus:ring-2 focus:ring-brand/20"
+                  style={{
+                    ...glassSurface(false),
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12)",
+                  }}
                 />
 
                 <div className="absolute inset-y-0 right-2 flex items-center gap-1.5">
