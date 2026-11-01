@@ -1240,6 +1240,15 @@ export async function artistRoutes(server: FastifyInstance) {
         return reply.send(response.relatedArtists || []);
     });
 
+    // Liked / followed artists
+    server.get('/liked', {
+        preHandler: [server.authenticate]
+    }, artistController.getLiked);
+
+    server.post('/:id/like', {
+        preHandler: [server.authenticate]
+    }, artistController.toggleLike);
+
     // 1. Get artist by ID or Name
     server.get('/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         const { id } = req.params;

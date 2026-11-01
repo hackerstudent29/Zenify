@@ -6,6 +6,7 @@ import { SwiftUIHeart, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 import { Equalizer } from "@/components/ui/Equalizer";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { useArtistLike } from "@/hooks/useArtistLike";
 import { getRefetchLyricsAnimatedMenuItem } from "@/components/shared/RefetchLyricsSubMenu";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle, formatArtists, getArtistTarget } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
@@ -164,33 +165,39 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  enabled: !isLink
  });
 
- const isLiked = !isLink && likedTrackIds?.includes(track.id);
+  const { isLiked: isArtistLiked, toggleLike: toggleArtistLike } = useArtistLike(
+    isArtist ? track.id : undefined,
+    isArtist ? track : undefined
+  );
 
- const toggleLikeMutation = useMutation({
- mutationFn: async () => {
- await api.post(`tracks/${track.id}/like`);
- },
- onMutate: async () => {
- await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
- const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
- const newLikedIds = previousLikedIds ? (
- previousLikedIds.includes(track.id)
- ? previousLikedIds.filter(id => id !== track.id)
- : [...previousLikedIds, track.id]
- ) : [track.id];
- queryClient.setQueryData(['liked-track-ids'], newLikedIds);
- return { previousLikedIds };
- },
- onError: (err, newTodo, context) => {
- if (context?.previousLikedIds) {
- queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
- }
- },
- onSettled: () => {
- queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
- queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
- }
- });
+  const isLiked = isArtist ? isArtistLiked : (!isLink && likedTrackIds?.includes(track.id));
+
+  const toggleLikeMutation = useMutation({
+    mutationFn: async () => {
+      await api.post(`tracks/${track.id}/like`, track);
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['liked-track-ids'] });
+      const previousLikedIds = queryClient.getQueryData<string[]>(['liked-track-ids']);
+      const newLikedIds = previousLikedIds ? (
+        previousLikedIds.includes(track.id)
+          ? previousLikedIds.filter(id => id !== track.id)
+          : [...previousLikedIds, track.id]
+      ) : [track.id];
+      queryClient.setQueryData(['liked-track-ids'], newLikedIds);
+      return { previousLikedIds };
+    },
+    onError: (err, newTodo, context) => {
+      if (context?.previousLikedIds) {
+        queryClient.setQueryData(['liked-track-ids'], context.previousLikedIds);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['liked-track-ids'] });
+      queryClient.invalidateQueries({ queryKey: ['liked-tracks'] });
+      queryClient.invalidateQueries({ queryKey: ['library-overview'] });
+    }
+  });
 
  const { user, isAuthenticated } = useAuthStore();
  const { data: playlists } = useQuery({
@@ -279,14 +286,22 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  )}
 
  {/* Top-Right Like Button */}
- {!isArtist && !isAlbum && (
+ {!isAlbum && !isPlaylist && (
    <button
      onClick={(e) => {
        e.stopPropagation();
-       toggleLikeMutation.mutate();
+       if (isArtist) {
+         toggleArtistLike(e);
+       } else {
+         toggleLikeMutation.mutate();
+       }
      }}
      aria-label={isLiked ? "Unlike" : "Like"}
-     className="am-glass-chip absolute top-2.5 right-2.5 z-20 flex h-7 w-7 items-center justify-center rounded-full text-white outline-none opacity-0 group-hover/art:opacity-100 transition-opacity hover:bg-white/25 cursor-pointer"
+     className={cn(
+       "am-glass-chip absolute z-20 flex h-7 w-7 items-center justify-center rounded-full text-white outline-none transition-opacity hover:bg-white/25 cursor-pointer",
+       isArtist ? "top-2 right-2" : "top-2.5 right-2.5",
+       isLiked ? "opacity-100" : "opacity-0 group-hover/art:opacity-100"
+     )}
    >
      <motion.div
        whileTap={{ scale: 0.7 }}

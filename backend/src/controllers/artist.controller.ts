@@ -600,4 +600,104 @@ export class ArtistController {
             return reply.status(500).send({ error: 'Failed to delete artist' });
         }
     };
+
+    getLiked = async (request: FastifyRequest, reply: FastifyReply) => {
+        try {
+            const userId = (request.user as any)?.id;
+            if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
+
+            const prefs = await prisma.userPreferences.findUnique({
+                where: { userId }
+            });
+            const favs = Array.isArray(prefs?.favoriteArtists) ? prefs.favoriteArtists : [];
+            return reply.send(favs);
+        } catch (error: any) {
+            request.log.error(error);
+            return reply.status(500).send({ error: 'Failed to get liked artists' });
+        }
+    };
+
+    toggleLike = async (request: FastifyRequest<{ Params: { id: string }; Body?: any }>, reply: FastifyReply) => {
+        try {
+            const userId = (request.user as any)?.id;
+            if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
+
+            const artistId = request.params.id;
+            const body = (request as any).body || {};
+
+            let prefs = await prisma.userPreferences.findUnique({
+                where: { userId }
+            });
+            if (!prefs) {
+                prefs = await prisma.userPreferences.create({
+                    data: { userId, favoriteArtists: [] }
+                });
+            }
+
+            const currentFavorites: any[] = Array.isArray(prefs.favoriteArtists)
+                ? [...(prefs.favoriteArtists as any[])]
+                : [];
+
+            const targetName = (body.name || body.title || '').trim().toLowerCase();
+            const existingIndex = currentFavorites.findIndex((f: any) => {
+                if (f.id === artistId) return true;
+                const fn = (f.name || '').trim().toLowerCase();
+                return targetName && fn === targetName;
+            });
+
+            const dbArtist = await prisma.artist.findFirst({
+                where: {
+                    OR: [
+                        { id: artistId },
+                        ...(targetName ? [{ name: { equals: body.name || body.title, mode: 'insensitive' as const } }] : [])
+                    ]
+                }
+            });
+
+            if (existingIndex >= 0) {
+                currentFavorites.splice(existingIndex, 1);
+                await prisma.userPreferences.update({
+                    where: { userId },
+                    data: { favoriteArtists: currentFavorites }
+                });
+
+                if (dbArtist) {
+                    await prisma.artist.update({
+                        where: { id: dbArtist.id },
+                        data: { follower_count: { decrement: 1 } }
+                    }).catch(() => {});
+                }
+
+                return reply.send({ liked: false, artistId, favoriteArtists: currentFavorites });
+            } else {
+                const resolvedName = (body.name || body.title || dbArtist?.name || 'Artist').trim();
+                const resolvedImage = body.imageUrl || body.coverUrl || body.image || body.avatarUrl || dbArtist?.imageUrl || dbArtist?.coverUrl || '';
+
+                const artistItem = {
+                    id: dbArtist?.id || artistId,
+                    name: resolvedName,
+                    image: resolvedImage,
+                    source: 'user'
+                };
+
+                currentFavorites.unshift(artistItem);
+                await prisma.userPreferences.update({
+                    where: { userId },
+                    data: { favoriteArtists: currentFavorites }
+                });
+
+                if (dbArtist) {
+                    await prisma.artist.update({
+                        where: { id: dbArtist.id },
+                        data: { follower_count: { increment: 1 } }
+                    }).catch(() => {});
+                }
+
+                return reply.send({ liked: true, artistId, artist: artistItem, favoriteArtists: currentFavorites });
+            }
+        } catch (error: any) {
+            request.log.error(error);
+            return reply.status(500).send({ error: 'Failed to toggle artist like' });
+        }
+    };
 }

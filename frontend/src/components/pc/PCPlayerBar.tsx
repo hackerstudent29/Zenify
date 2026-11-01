@@ -345,7 +345,13 @@ export function PCPlayerBar() {
   const toggleLikeMutation = useMutation({
     mutationFn: async () => {
       if (!currentTrack) return;
-      await api.post(`tracks/${currentTrack.id}/like`);
+      const res = await api.post(`tracks/${currentTrack.id}/like`, currentTrack);
+      if (res.data?.trackId && res.data.trackId !== currentTrack.id) {
+        usePlayerStore.setState((s) => ({
+          currentTrack: s.currentTrack && s.currentTrack.id === currentTrack.id ? { ...s.currentTrack, id: res.data.trackId } : s.currentTrack,
+        }));
+      }
+      return res.data;
     },
     onMutate: async () => {
       if (!currentTrack) return;
@@ -367,6 +373,7 @@ export function PCPlayerBar() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
       queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
+      queryClient.invalidateQueries({ queryKey: ["library-overview"] });
     },
   });
 

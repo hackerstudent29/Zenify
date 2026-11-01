@@ -377,14 +377,34 @@ export class PlaylistService {
         return prisma.playlist.delete({ where: { id } });
     }
 
-    async addTrack(playlistId: string, trackId: string, userId: string) {
+    async addTrack(playlistId: string, trackId: string, userId: string, metadata?: any) {
         const playlist = await prisma.playlist.findUnique({ where: { id: playlistId } });
         if (!playlist) throw this.server.httpErrors.notFound('Playlist not found');
         if (playlist.userId !== userId) throw this.server.httpErrors.forbidden('Not your playlist');
 
+        // Ensure track exists in PostgreSQL
+        let realTrackId = trackId;
+        const exists = await prisma.track.findUnique({ where: { id: trackId } });
+        if (!exists) {
+            try {
+                const resolved = await (this.server as any).trackService?.ensureTrack(trackId, metadata);
+                if (resolved?.id) {
+                    realTrackId = resolved.id;
+                }
+            } catch (err: any) {
+                console.warn('[PlaylistService] ensureTrack failed for track:', trackId, err.message);
+            }
+        }
+
         // Check if track already exists in playlist
         const existing = await prisma.playlistTrack.findFirst({
-            where: { playlistId, trackId }
+            where: {
+                playlistId,
+                OR: [
+                    { trackId: realTrackId },
+                    { trackId: trackId }
+                ]
+            }
         });
 
         if (existing) {
@@ -394,7 +414,7 @@ export class PlaylistService {
         return prisma.playlistTrack.create({
             data: {
                 playlistId,
-                trackId,
+                trackId: realTrackId,
             }
         });
     }

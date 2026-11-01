@@ -341,6 +341,19 @@ export default function LikedSongsPage() {
     enabled: isAuthenticated,
   });
 
+  const { data: followedArtists = [] } = useQuery<any[]>({
+    queryKey: ["liked-artists"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("artists/liked");
+        return Array.isArray(res.data) ? res.data : [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: isAuthenticated,
+  });
+
   /* ─── Liked Albums: Derived from user albums & liked tracks ─── */
   const likedAlbums = useMemo(() => {
     const map = new Map<string, any>();
@@ -431,6 +444,30 @@ export default function LikedSongsPage() {
       );
     };
 
+    for (const art of followedArtists || []) {
+      const name = (art?.name || art?.title || "").trim();
+      const id = art?.id || `artist-${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+      const normName = name.toLowerCase();
+
+      if (!isUnknownArtist(name, id) && !seenIds.has(id) && !seenNames.has(normName)) {
+        seenIds.add(id);
+        seenNames.add(normName);
+        const img = art.image || art.imageUrl || art.coverUrl || art.avatarUrl;
+        map.set(id, {
+          id: id,
+          name: name,
+          title: name,
+          imageUrl: img,
+          coverUrl: img,
+          avatarUrl: img,
+          artwork: img,
+          songCount: art.songCount || 0,
+          isArtist: true,
+          type: "artist",
+        });
+      }
+    }
+
     for (const art of overview?.topArtists || []) {
       const name = (art?.name || "").trim();
       const id = art?.id || `artist-${name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
@@ -494,7 +531,7 @@ export default function LikedSongsPage() {
     }
 
     return Array.from(map.values());
-  }, [likedTracks, overview?.topArtists]);
+  }, [likedTracks, overview?.topArtists, followedArtists]);
 
   /* ─── In-Page Search: Strictly filters ONLY the user's liked items ─── */
   const filteredTracks = useMemo(() => {

@@ -14,6 +14,7 @@ import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from
 import { motion, AnimatePresence } from "framer-motion";
 import { SEO } from "@/components/shared/SEO";
 import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
+import { useArtistLike } from "@/hooks/useArtistLike";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 
 import { JioSaavnSongTable } from "./components/JioSaavnSongTable";
@@ -30,7 +31,6 @@ export default function ArtistPage() {
   const { setPlayerMinimized, setStickyPageTitle } = useUIStore();
   const { isAuthenticated } = useAuthStore();
   const heroNameRef = useRef<HTMLHeadingElement>(null);
-  const [isFavorited, setIsFavorited] = useState(false);
   const [isBioOpen, setIsBioOpen] = useState(false);
   const [currentCollectionId, setCurrentCollectionId] = useState<string | null>(null);
   const [isWidescreen, setIsWidescreen] = useState<boolean | null>(null);
@@ -45,6 +45,8 @@ export default function ArtistPage() {
     staleTime: 0, // Always fetch fresh to eliminate stale browser/DB cache
     refetchOnMount: true,
   });
+
+  const { isLiked: isArtistLiked, toggleLike: toggleArtistLike } = useArtistLike(artist?.id || id, artist);
 
   // Liked tracks query
   const { data: likedTrackIds = [] } = useQuery({
@@ -387,8 +389,8 @@ export default function ArtistPage() {
               isShuffled={isArtistActive && isShuffled}
               onShuffle={handleShufflePlay}
               onInfo={() => setIsBioOpen(true)}
-              isLiked={isFavorited}
-              onToggleLike={() => setIsFavorited(!isFavorited)}
+              isLiked={isArtistLiked}
+              onToggleLike={toggleArtistLike}
               track={artist}
               context="artist"
               className="mt-4"
