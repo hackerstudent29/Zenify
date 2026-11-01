@@ -18,13 +18,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { getMediaUrl } from '@/lib/utils';
-import {
- DropdownMenu,
- DropdownMenuContent,
- DropdownMenuItem,
- DropdownMenuSeparator,
- DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { TrackActionsDropdown } from '@/components/shared/TrackActionsDropdown';
 import {
  AlertDialog,
  AlertDialogAction,
@@ -48,36 +42,33 @@ const VerifiedBadge = ({ size = 13 }: { size?: number }) => (
 );
 
 const ArtistActionsDropdown = ({ artist, handleEdit, onDeleteRequest }: {
- artist: any,
- handleEdit: any,
- onDeleteRequest: (id: string, name: string) => void
+  artist: any,
+  handleEdit: any,
+  onDeleteRequest: (id: string, name: string) => void
 }) => (
- <DropdownMenu>
- <DropdownMenuTrigger asChild>
- <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 text-zinc-400 hover:text-white rounded-lg transition-colors">
- <MoreVertical size={14} />
- </Button>
- </DropdownMenuTrigger>
- <DropdownMenuContent
- align="end"
- className="bg-[#111] border border-white/10 text-white min-w-[160px] rounded-xl shadow-2xl p-1"
- >
- <DropdownMenuItem
- onClick={() => handleEdit(artist)}
- className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-zinc-300 hover:text-white focus:text-white focus:bg-white/10 cursor-pointer rounded-lg font-medium transition-colors"
- >
- <Edit2 size={14} className="text-zinc-400" />
- Edit Artist
- </DropdownMenuItem>
- <DropdownMenuItem
- onClick={() => onDeleteRequest(artist.id, artist.name)}
- className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:text-red-300 focus:text-red-300 focus:bg-red-500/10 cursor-pointer rounded-lg font-medium transition-colors"
- >
- <Trash2 size={14} className="text-red-400" />
- Delete Artist
- </DropdownMenuItem>
- </DropdownMenuContent>
- </DropdownMenu>
+  <TrackActionsDropdown
+    align="end"
+    trigger={
+      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10 text-zinc-400 hover:text-white rounded-lg transition-colors cursor-pointer" title="Artist options" aria-label="Artist options">
+        <MoreVertical size={14} />
+      </Button>
+    }
+    items={[
+      {
+        id: "edit",
+        label: "Edit Artist",
+        icon: <Edit2 size={14} />,
+        onClick: () => handleEdit(artist),
+      },
+      {
+        id: "delete",
+        label: "Delete Artist",
+        icon: <Trash2 size={14} className="text-red-400" />,
+        className: "text-red-400 focus:text-red-400",
+        onClick: () => onDeleteRequest(artist.id, artist.name),
+      },
+    ]}
+  />
 );
 
 export default function AdminArtistsPage() {

@@ -69,3 +69,4 @@ export function Equalizer({
 }
 
 export default Equalizer;
+

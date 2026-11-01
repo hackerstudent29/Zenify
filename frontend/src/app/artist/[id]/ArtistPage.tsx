@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
-import { Disc3, Info, X } from "lucide-react";
+import { Disc3, Info, X, Play, Share2, Link2 } from "lucide-react";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
 import { useAuthStore } from "@/store/authStore";
@@ -446,10 +446,11 @@ export default function ArtistPage() {
                   </button>
                 }
                 items={[
-                  { id: "play-all", label: "Play All Songs", onClick: handlePlayTopTracks },
-                  { id: "shuffle", label: isShuffled ? "Shuffle: On" : "Shuffle", onClick: handleShufflePlay },
-                  { id: "share", label: "Share", onClick: handleShare },
-                  { id: "copy-link", label: "Copy Link", onClick: copyLink },
+                  { id: "play-all", label: "Play All Songs", icon: <Play size={14} />, onClick: handlePlayTopTracks },
+                  { id: "shuffle", label: isShuffled ? "Shuffle: On" : "Shuffle", icon: <SwiftUIShuffle size={14} />, onClick: handleShufflePlay },
+                  { id: "sep-share", isSeparator: true },
+                  { id: "share", label: "Share", icon: <Share2 size={14} />, onClick: handleShare },
+                  { id: "copy-link", label: "Copy Link", icon: <Link2 size={14} />, onClick: copyLink },
                 ]}
               />
             </div>

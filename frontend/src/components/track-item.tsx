@@ -6,6 +6,7 @@ import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useUIStore } from "@/store/ui";
+import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";
 import { AnimatedHeartButton } from "@/components/ui/AnimatedHeartButton";
 import { useAuthStore } from "@/store/authStore";
@@ -207,98 +208,23 @@ export function TrackItem({ track, index, contextTracks, hideThumbOnMobile, ...p
     }}
   />
 
-  <AnimatedDropdown
-  align="end"
-  trigger={
-  <motion.button
-  whileTap={{ scale: 0.7, rotate: 90 }}
-  whileHover={{ scale: 1.15 }}
-  transition={{ type: "spring", stiffness: 400, damping: 17 }}
-  className="p-2 text-muted hover:text-foreground transition-colors outline-none rounded-full"
-  onClick={(e) => e.stopPropagation()}
-  >
-  <MoreHorizontal size={14} />
-  </motion.button>
-  }
- items={[
-  {
-  id: 'add-to-queue',
-  icon: <ListPlus size={14} className="opacity-70 text-brand" />,
-  label: "Add to Queue",
-  onClick: (e) => {
-    e?.stopPropagation();
-    usePlayerStore.getState().addToUserQueue(track);
-  }
-  },
-  {
-  id: 'like',
- icon: <SwiftUIHeart size={15} filled={!!isLiked} className={isLiked ? "text-brand" : "opacity-70"} />,
- label: isLiked ? "Liked" : "Add to Favorites",
- onClick: (e) => {
- e?.stopPropagation();
- toggleLikeMutation.mutate();
- }
- },
- {
- id: 'details',
- icon: <Music size={14} className="opacity-70" />,
- label: "View Details",
- onClick: (e) => {
- e?.stopPropagation();
- router.push(`/track/${track.id}`);
- }
- },
- ...(getArtistTarget(track) ? [{
- id: 'artist',
- icon: <User size={14} className="opacity-70" />,
- label: "Go to Artist",
- onClick: (e: any) => {
- e?.stopPropagation();
- const target = getArtistTarget(track);
- if (target) router.push(target);
- }
- }] : []),
- {
-  id: 'playlist',
-  icon: <Plus size={14} className="opacity-70" />,
-  label: "Add to Playlist",
-  onClick: (e) => {
-    e?.stopPropagation();
-    openAddToPlaylistModal(track);
-  }
-  },
-  {
-  id: 'refetch-audio',
-  icon: <RefreshCw size={14} className={cn("opacity-70", isRefetching === track.id && "animate-spin text-brand")} />,
-  label: isRefetching === track.id ? "Refetching Audio..." : "Refetch Audio",
-  onClick: (e) => {
-    e?.stopPropagation();
-    refetchTrackAudio(track, showToast);
-  }
-  },
-  getRefetchLyricsAnimatedMenuItem(track, refetchTrackLyrics, showToast),
- ...(user?.role === 'ADMIN' ? [{
- id: 'sync-lyrics',
- icon: <Mic size={14} className="opacity-70 text-violet-400" />,
- label: "Sync Lyrics",
- className: "text-violet-400 focus:text-violet-300",
- onClick: (e: any) => {
- e?.stopPropagation();
- router.push(`/admin/lyric-sync?trackId=${track.id}`);
- }
- }] : []),
- { id: 'sep1', isSeparator: true },
- {
- id: 'download',
- icon: <Download size={14} className="opacity-70" />,
- label: "Download Track",
- onClick: (e) => {
- e?.stopPropagation();
- openDownloadModal(track);
- }
- }
- ]}
- />
+   <TrackActionsDropdown
+     track={track}
+     align="end"
+     trigger={
+       <motion.button
+         whileTap={{ scale: 0.7, rotate: 90 }}
+         whileHover={{ scale: 1.15 }}
+         transition={{ type: "spring", stiffness: 400, damping: 17 }}
+         className="p-2 text-muted hover:text-foreground transition-colors outline-none rounded-full"
+         onClick={(e) => e.stopPropagation()}
+         title="More options"
+         aria-label="More options"
+       >
+         <MoreHorizontal size={14} />
+       </motion.button>
+     }
+   />
  </div>
 
  {/* Duration */}
