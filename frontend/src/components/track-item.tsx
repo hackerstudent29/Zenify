@@ -5,6 +5,7 @@ import { Play, Plus, Pause, Download, Check, X, User, Music, Mic, RefreshCw, Lis
 import { SwiftUIHeart, SwiftUIEllipsis } from "@/components/ui/SwiftUIIcons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
+import notify from "@/lib/notify";
 import { useUIStore } from "@/store/ui";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 import { AnimatedDropdown } from "@/components/ui/animated-dropdown";

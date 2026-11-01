@@ -22,9 +22,8 @@ export function MobileNav() {
   const navItems = [
     { label: "Home", icon: SwiftUIHome, href: "/" },
     { label: "Discover", icon: SwiftUICompass, href: "/discover" },
-    ...(isAdmin ? [{ label: "Admin", icon: SwiftUIAdmin, href: "/admin" }] : []),
     { label: "Liked", icon: SwiftUIHeart, href: "/liked" },
-    { label: "Device", icon: SwiftUIDevice, href: "/local-library" },
+    { label: "Library", icon: SwiftUIDevice, href: "/local-library" },
   ];
 
   return (

@@ -290,20 +290,6 @@ export const usePlayerStore = create<PlayerState>()(
         const validTracks = rawList.filter(t => t && t.id);
         if (validTracks.length === 0) return;
 
-        // Feedback toast notification
-        if (options?.feedback !== false) {
-          try {
-            // Lazy import UI store for toast
-            import("@/store/ui").then(({ useUIStore }) => {
-              if (validTracks.length === 1) {
-                useUIStore.getState().showToast("Added to queue", "success");
-              } else {
-                useUIStore.getState().showToast(`${validTracks.length} songs added to queue`, "success");
-              }
-            }).catch(() => {});
-          } catch (e) {}
-        }
-
         const { currentTrack, userQueue, contextQueue } = get();
 
         // Edge case: Empty player / nothing playing -> first added item plays immediately, rest are queued

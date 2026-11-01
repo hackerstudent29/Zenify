@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Share2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import notify from "@/lib/notify";
 
 interface AnimatedShareButtonProps {
   onShare?: (e: React.MouseEvent) => void;
@@ -32,9 +33,13 @@ export function AnimatedShareButton({
         navigator.share({
           title: shareTitle || "Zenify Music",
           url: shareUrl,
-        }).catch(() => {});
+        }).catch(() => {
+          navigator.clipboard.writeText(shareUrl);
+          notify("Link copied to clipboard", "success");
+        });
       } else {
         navigator.clipboard.writeText(shareUrl);
+        notify("Link copied to clipboard", "success");
       }
     }
 

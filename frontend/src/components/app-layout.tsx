@@ -46,56 +46,7 @@ const FONT_STACK =
 const SIDEBAR_EXPANDED = 260;
 const SIDEBAR_COLLAPSED = 72;
 
-function GlobalToast() {
- const toast = useUIStore(s => s.toast);
- const hideToast = useUIStore(s => s.hideToast);
-
- return (
- <AnimatePresence>
- {toast && (
- <motion.div
- initial={{ opacity: 0, y: 24, scale: 0.94 }}
- animate={{ opacity: 1, y: 0, scale: 1 }}
- exit={{ opacity: 0, y: 24, scale: 0.94 }}
- transition={SPRING}
- style={{ fontFamily: FONT_STACK }}
- className={cn(
- "fixed bottom-8 right-8 z-[9999] flex items-center gap-3 px-4 py-3 rounded-[16px] border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] min-w-[260px] max-w-[380px] pointer-events-auto",
- toast.type === "error"
- ? "bg-[#2c2c2e]/90 border-brand/40 text-rose-200 shadow-[0_0_35px_rgba(225,29,72,0.25)]"
- : "bg-[#2c2c2e]/85 border-white/10 text-white"
- )}
- >
- <div
- className={cn(
- "p-2 rounded-full shrink-0",
- toast.type === "error" ? "bg-brand/20 text-brand" : "bg-emerald-500/20 text-emerald-400"
- )}
- >
- {toast.type === "error" ? <AlertCircle size={16} /> : <Check size={16} />}
- </div>
- <div className="flex flex-col min-w-0 flex-1">
- <span className="text-[13px] font-semibold tracking-[-0.01em] text-white leading-tight">
- {toast.type === "error" ? "Error" : "Success"}
- </span>
- <span className="text-[12px] text-white/70 font-normal leading-tight truncate">
- {toast.msg}
- </span>
- </div>
- <motion.button
- whileHover={{ scale: 1.1 }}
- whileTap={{ scale: 0.88 }}
- transition={SPRING}
- onClick={hideToast}
- className="text-white/40 hover:text-white transition-colors duration-200 p-1 outline-none"
- >
- <X size={14} />
- </motion.button>
- </motion.div>
- )}
- </AnimatePresence>
- );
-}
+// GlobalNotification is persistently mounted at RootLayout
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
  const pathname = usePathname();
@@ -131,8 +82,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
  const shortcuts = useShortcutStore(state => state.shortcuts);
  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
-  const lastScrollTopRef = React.useRef(0);
 
  // Keyboard Shortcuts
  useEffect(() => {
@@ -331,34 +280,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(handle);
   }, [pathname]);
 
-  // Prevent accidental clicks on buttons/links while scrolling on mobile & handle smart header hide/show
+  // Prevent accidental clicks on buttons/links while scrolling on mobile
   useEffect(() => {
     if (!isMobile) {
       document.body.classList.remove('is-scrolling');
-      setIsHeaderHidden(false);
       return;
     }
     const scrollEl = scrollRef.current;
     if (!scrollEl) return;
 
-    let scrollTimeout: NodeJS.Timeout;
+    let scrollTimeout: any;
     const handleScroll = () => {
       document.body.classList.add('is-scrolling');
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => {
         document.body.classList.remove('is-scrolling');
       }, 150);
-
-      const currentScroll = scrollEl.scrollTop;
-      const diff = currentScroll - lastScrollTopRef.current;
-      if (currentScroll <= 15) {
-        setIsHeaderHidden(false);
-      } else if (diff > 6 && currentScroll > 30) {
-        setIsHeaderHidden(true);
-      } else if (diff < -6) {
-        setIsHeaderHidden(false);
-      }
-      lastScrollTopRef.current = currentScroll;
     };
 
     scrollEl.addEventListener('scroll', handleScroll, { capture: true, passive: true });
@@ -368,11 +305,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       document.body.classList.remove('is-scrolling');
     };
   }, [isMobile]);
-
-  useEffect(() => {
-    setIsHeaderHidden(false);
-    lastScrollTopRef.current = 0;
-  }, [pathname]);
 
     if (isAuthPage || isOnboardingPage) {
     return <div className="h-full w-full bg-[#121214]">{children}</div>;
@@ -417,11 +349,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     className={cn(
     "z-[100] pointer-events-none am-layout-transition absolute top-0 safe-area-top",
     isMobile 
-      ? "bg-[#121214]/95 backdrop-blur-md border-b border-white/5 left-0 right-0 w-full" 
+      ? "fixed left-0 right-0 top-0 w-full bg-[#121214]/90 backdrop-blur-xl border-b border-white/5" 
       : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/") || pathname?.startsWith("/artist/") || pathname === "/liked" || pathname?.startsWith("/liked"))
         ? "bg-transparent"
         : "bg-gradient-to-b from-[#121214]/80 to-transparent",
-    isMobile && isHeaderHidden && "-translate-y-full opacity-0 pointer-events-none"
     )}
   style={{
     left: "var(--sb-w)",
@@ -579,7 +510,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
    <BatchImportToast />
    <CloudSyncSidePopup />
  </React.Suspense>
- <GlobalToast />
  <React.Suspense fallback={null}>
    <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
    <UserOnboardingTour />

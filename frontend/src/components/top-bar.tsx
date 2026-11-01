@@ -1,3 +1,4 @@
+import { GlobalTooltip } from "@/components/shared/GlobalTooltip";
 "use client";
 
 import React, { useState } from "react";
@@ -13,6 +14,7 @@ import {
   FileText,
   Shield,
   Sparkles,
+  Database,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -24,6 +26,7 @@ import { getMediaUrl } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ZenifyLogo } from "./shared/ZenifyLogo";
+import notify from "@/lib/notify";
 
 export function TopBar() {
   const isMobile = useIsMobile();
@@ -32,11 +35,8 @@ export function TopBar() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
-
   const showToast = (msg: string, type: "success" | "error" = "success") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    notify(msg, type);
   };
 
   return (
@@ -162,13 +162,14 @@ export function TopBar() {
         ) : (
           <>
             {/* Local Device Music Quick Button */}
-            <button
-              onClick={() => router.push("/local-library")}
-              className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white active:scale-95 transition-all shadow-sm cursor-pointer"
-              title="Local Device Music"
-            >
-              <HardDrive size={16} />
-            </button>
+            <GlobalTooltip content="Local Device Music" side="bottom">
+              <button
+                onClick={() => router.push("/local-library")}
+                className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white active:scale-95 transition-all shadow-sm cursor-pointer"
+              >
+                <HardDrive size={16} />
+              </button>
+            </GlobalTooltip>
 
             {!user && (
               <button
@@ -252,6 +253,18 @@ export function TopBar() {
               items={
                 user
                   ? [
+                      ...(user?.role === "ADMIN"
+                        ? [
+                            {
+                              id: "admin-database",
+                              label: "Database Console",
+                              icon: <Database size={14} className="text-brand" />,
+                              className: "text-brand hover:text-brand font-semibold",
+                              onClick: () => router.push("/admin"),
+                            },
+                            { id: "divider-admin", isSeparator: true },
+                          ]
+                        : []),
                       { id: "profile", label: "Profile", icon: <UserIcon size={14} />, onClick: () => router.push("/profile") },
                       {
                         id: "notifications",
@@ -309,45 +322,6 @@ export function TopBar() {
           </>
         )}
       </div>
-
-      {/* Toast System */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, x: 50, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 20, scale: 0.95 }}
-            className={`fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl border backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[9999] min-w-[280px] ${
-              toast.type === "error"
-                ? "bg-zinc-950/95 border-brand/50 text-rose-200 shadow-[0_0_35px_rgba(225,29,72,0.3)]"
-                : "bg-zinc-950/95 border-emerald-500/30 text-emerald-300 shadow-[0_0_35px_rgba(16,185,129,0.2)]"
-            }`}
-          >
-            <div
-              className={`p-2 rounded-full ${
-                toast.type === "error" ? "bg-brand/20 text-brand" : "bg-emerald-500/20 text-emerald-400"
-              }`}
-            >
-              {toast.type === "success" ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              )}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[14px] font-bold tracking-tight text-white">
-                {toast.type === "success" ? "Success" : "Error"}
-              </span>
-              <span className="text-[12px] opacity-80 font-medium">{toast.msg}</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

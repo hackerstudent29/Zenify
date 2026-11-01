@@ -57,15 +57,7 @@ const PlaylistPage = lazyWithRetry(() => import('./app/playlist/[id]/page'));
 const TrackPage = lazyWithRetry(() => import('./app/track/[id]/page'));
 const ExplorePage = lazyWithRetry(() => import('./app/explore/[...id]/page'));
 const AdminPage = lazyWithRetry(() => import('./app/admin/page'));
-const AdminTracksPage = lazyWithRetry(() => import('./app/admin/tracks/page'));
-const PlaylistImportPage = lazyWithRetry(() => import('./app/admin/playlist-import/page'));
-const AdminNotificationsPage = lazyWithRetry(() => import('./app/admin/notifications/page'));
-const AdminArtistsPage = lazyWithRetry(() => import('./app/admin/artists/page'));
-const NewArtistPage = lazyWithRetry(() => import('./app/admin/artists/new/page'));
-const AdminArtistDetailPage = lazyWithRetry(() => import('./app/admin/artists/[id]/page'));
 const OnboardingPage = lazyWithRetry(() => import('./app/onboarding/page'));
-const LyricSyncPage = lazyWithRetry(() => import('./app/admin/lyric-sync/page'));
-const AdminSettingsPage = lazyWithRetry(() => import('./app/admin/settings/page'));
 const LocalLibraryPage = lazyWithRetry(() => import('./app/local-library/page'));
 const SectionPage = lazyWithRetry(() => import('./app/section/[type]/page'));
 const PrivacyPage = lazyWithRetry(() => import('./app/privacy/page'));
@@ -116,14 +108,8 @@ export default function AppRouter() {
           <Route path="/track/:id" element={<TrackPage />} />
           <Route path="/explore/*" element={<ExplorePage />} />
           <Route path="/admin" element={<AdminPage />} />
-          <Route path="/admin/settings" element={<AdminSettingsPage />} />
-          <Route path="/admin/tracks" element={<AdminTracksPage />} />
-          <Route path="/admin/playlist-import" element={<PlaylistImportPage />} />
-          <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
-          <Route path="/admin/artists" element={<AdminArtistsPage />} />
-          <Route path="/admin/artists/new" element={<NewArtistPage />} />
-          <Route path="/admin/artists/:id" element={<AdminArtistDetailPage />} />
-          <Route path="/admin/lyric-sync" element={<LyricSyncPage />} />
+          <Route path="/admin/database" element={<AdminPage />} />
+          <Route path="/database-console" element={<Navigate to="/admin" replace />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
 
           {/* Fallback */}
