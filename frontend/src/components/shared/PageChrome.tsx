@@ -33,7 +33,7 @@ export function PageHeader({
 }) {
   const router = useRouter();
   return (
-    <div className="w-full border-b border-white/[0.06] bg-[#0A0A0C]/50 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 w-full border-b border-white/[0.06] bg-[#0A0A0C]/80 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-5">
         <div className="flex items-center gap-3">
           {showBack && (
@@ -50,7 +50,7 @@ export function PageHeader({
           <h1 className="text-[15px] font-semibold tracking-tight text-white">{title}</h1>
         </div>
       </div>
-    </div>
+    </header>
   );
 }
 
@@ -102,3 +102,4 @@ export const Chevron = ({ className }: { className?: string }) => (
     <path d="m9 5 7 7-7 7" />
   </svg>
 );
+

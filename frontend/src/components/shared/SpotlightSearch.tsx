@@ -71,6 +71,10 @@ const CLOSE_SPRING: SpringCfg = { stiffness: 420, damping: 40 };
 const SETTLE_SPRING: SpringCfg = { stiffness: 380, damping: 26 };
 const UI_SPRING = makeSpring({ stiffness: 380, damping: 28 });
 
+// Mobile vertical screen: Apple fluid decelerate (fast, zero bounce, smooth settling without jumping)
+const MOBILE_SHEET_ENTER_EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
+const MOBILE_SHEET_EXIT_EASE = "cubic-bezier(0.4, 0, 0.7, 1)";
+
 const PANEL_RADIUS = 26;
 
 /* -------------------------------------------------------------------------- */
@@ -851,17 +855,20 @@ export function SpotlightSearchOverlay({
 
     const s = springAnim(OPEN_SPRING);
 
-    scrim.animate(
-      [{ opacity: 0 }, { opacity: 1 }],
-      { duration: 320, easing: "ease-out" }
-    );
-
     if (isSheet()) {
+      scrim.animate(
+        [{ opacity: 0 }, { opacity: 1 }],
+        { duration: 260, easing: "ease-out" }
+      );
       panel.animate(
         [{ transform: "translateY(100%)" }, { transform: "translateY(0)" }],
-        { duration: s.duration, easing: s.easing }
+        { duration: 300, easing: MOBILE_SHEET_ENTER_EASE }
       );
     } else {
+      scrim.animate(
+        [{ opacity: 0 }, { opacity: 1 }],
+        { duration: 320, easing: "ease-out" }
+      );
       const m = morphFrom();
 
       panel.animate(
@@ -916,26 +923,33 @@ export function SpotlightSearchOverlay({
     scrim.style.opacity = "";
     panel.style.transform = "";
 
-    scrim.animate(
-      [{ opacity: startOpacity }, { opacity: 0 }],
-      {
-        duration: Math.min(s.duration, 320),
-        easing: "ease-in",
-        fill: "forwards",
-      }
-    );
-
     let main: Animation;
 
     if (isSheet()) {
+      scrim.animate(
+        [{ opacity: startOpacity }, { opacity: 0 }],
+        {
+          duration: 240,
+          easing: "ease-out",
+          fill: "forwards",
+        }
+      );
       main = panel.animate(
         [
           { transform: `translateY(${fromY}px)` },
           { transform: "translateY(100%)" },
         ],
-        { duration: s.duration, easing: s.easing, fill: "forwards" }
+        { duration: 250, easing: MOBILE_SHEET_EXIT_EASE, fill: "forwards" }
       );
     } else {
+      scrim.animate(
+        [{ opacity: startOpacity }, { opacity: 0 }],
+        {
+          duration: Math.min(s.duration, 320),
+          easing: "ease-in",
+          fill: "forwards",
+        }
+      );
       const m = morphFrom();
 
       main = panel.animate(
@@ -1039,12 +1053,12 @@ export function SpotlightSearchOverlay({
         { transform: `translateY(${d.dy}px)` },
         { transform: "translateY(0)" },
       ],
-      { duration: s.duration, easing: s.easing }
+      { duration: 240, easing: isSheet() ? MOBILE_SHEET_ENTER_EASE : s.easing }
     );
 
     scrim.animate(
       [{ opacity: op }, { opacity: 1 }],
-      { duration: 250, easing: "ease-out" }
+      { duration: 220, easing: "ease-out" }
     );
   };
 

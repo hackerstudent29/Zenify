@@ -7,25 +7,33 @@ Zenify offers a seamless, ad-free listening experience directly in the web brows
 
 ## Core Features
 - **Multilingual Synced Lyrics**: Sub-second synchronization with syllable-level timing and automated instrumental gap detection.
-- **StudioFX Multi-Band Equalizer**: Right-side glass panel audio processor with high-precision biquad audio filtering, collapsible FX sections, and quick bypass toggles.
-- **8D Spatial Audio**: Real-time binaural spatial audio panning engine simulating a 360-degree soundstage.
+- **StudioFX Multi-Band Equalizer**: High-precision biquad audio filtering, bass/mids/treble adjustment, and quick bypass toggles.
+- **8D Spatial Audio**: Real-time binaural spatial audio panning engine simulating a 360-degree soundstage around headphones.
 - **DJ Speed & Pitch Warper**: Live DSP pitch and tempo manipulation for nightcore, daycore, and slowed-and-reverb audio.
 - **Local Audio Scanner**: In-browser client-side playback of MP3, FLAC, WAV, and AAC audio files with 100% user privacy.
 - **Offline PWA**: Full progressive web app offline caching with lock-screen MediaSession controls.
+- **Lossless Full-Audio Resolution**: Pristine 320kbps full song playback via clean CDNs with instant playback startup.
+
+## Frequently Asked Questions (FAQ)
+- **What is Zenify?** Zenify is a free, modern web and mobile music player featuring instant audio playback, sub-second synchronized lyrics, 8D spatial audio, and dynamic visualizer themes.
+- **How can I listen to music on Zenify for free?** Stream music on Zenify directly in your web browser at https://listenzenify.vercel.app without paying any subscription fees or encountering audio interruptions.
+- **Does Zenify support synchronized lyrics?** Yes, Zenify includes an AI-powered lyrics alignment engine with syllable-level timing and instrumental solo gap protection across English, Tamil, Tanglish, Hindi, and international tracks.
+- **What audio effects and DSP features are built in?** Zenify includes a studio 3-band equalizer, binaural 8D spatial panning, convolution reverb simulations (hall and cathedral), and nightcore/slowed DJ pitch warper.
+- **Can I play my own local audio files in Zenify?** Yes, Zenify includes an in-browser local audio scanner that parses ID3 tags for MP3, FLAC, WAV, and AAC files directly on your device with 100% privacy.
 
 ## Primary Pages & Resources
 - [Home Page](https://listenzenify.vercel.app/): Main streaming dashboard, search bar, and curated frequency radio.
+- [Features & FAQ](https://listenzenify.vercel.app/faq): Complete overview of DSP audio capabilities and common questions.
+- [About Zenify](https://listenzenify.vercel.app/about-zenify): Architectural principles, open-source mission, and technology overview.
+- [About Creator](https://listenzenify.vercel.app/about): Music producer and developer profile.
 - [Discover Music](https://listenzenify.vercel.app/discover): Trending songs, new releases, top artists, and curated playlists.
 - [Search Songs & Lyrics](https://listenzenify.vercel.app/search): Global smart search across artists, tracks, and lyric keywords.
-- [Zenify Premium Plans](https://listenzenify.vercel.app/pricing): Overview of free and Eclipse high-fidelity audio subscription tiers.
-- [About Zenify](https://listenzenify.vercel.app/about-zenify): Architectural principles, open-source mission, and technology overview.
 - [Radio](https://listenzenify.vercel.app/radio): Continuous automated music streams and mood-based radio channels.
 - [Local Library](https://listenzenify.vercel.app/local-library): Offline device storage music scanner and ID3 tag parser.
 - [Privacy Policy](https://listenzenify.vercel.app/privacy): Information regarding telemetry, cookies, and local session security.
 - [Terms of Service](https://listenzenify.vercel.app/terms): Terms and conditions governing the use of Zenify.
 
-## Developer & API Information
+## Developer & System Specifications
 - Web App URL: https://listenzenify.vercel.app
-- Backend API Host: https://zenify-78e257420386.herokuapp.com
 - Technologies: React 19, TypeScript, Vite, Tailwind CSS, Web Audio API, PWA Workbox
 - GitHub Repository: https://github.com/hackerstudent29/Zenify

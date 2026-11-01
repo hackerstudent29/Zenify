@@ -287,7 +287,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isOnboardingIncomplete, isOnboardingPage, isAuthPage, router]);
   const isAlbumPage = pathname?.startsWith("/album/");
-  const isInfoPage = pathname?.startsWith("/terms") || pathname?.startsWith("/privacy") || pathname?.startsWith("/about") || pathname?.startsWith("/creator");
+  const isInfoPage = pathname?.startsWith("/terms") || pathname?.startsWith("/privacy") || pathname?.startsWith("/about") || pathname?.startsWith("/creator") || pathname?.startsWith("/faq") || pathname?.startsWith("/features");
   const isLyricSyncPage = pathname?.includes("/admin/lyric-sync");
   const hasSidebar = !isMobile && isAuthenticated;
   const rightPanelOpen = !isMobile && (isLyricsOpen || isQueueOpen || isAudioFxOpen || isNotificationsOpen);

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence, LayoutGroup, type Transition } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { X, Bell, Check, ChevronRight } from "lucide-react";
 import { useNotificationStore } from "@/store/notificationStore";
@@ -11,7 +11,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 
-const spring: Transition = { type: "spring", stiffness: 420, damping: 34 };
+const spring = { type: "spring" as const, stiffness: 420, damping: 34 } as const;
 
 const LABELS: Record<string, { text: string; alert?: boolean }> = {
   upload_success: { text: "Upload" },
@@ -322,3 +322,4 @@ export function NotificationsPanel() {
     </AnimatePresence>
   );
 }
+

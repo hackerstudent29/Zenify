@@ -4,18 +4,25 @@
  * LikedSongsPage — Apple Music playlist layout for Liked Songs & Library Favorites
  *
  * Reuses canonical components:
- *   • MediaActionButtons (Play / Shuffle / Add Music)
- *   • JioSaavnSongTable (Editorial songs table with Recently Added / Newest / A-Z sorting)
- *   • JioSaavnCardSection + MediaCard (Horizontal full-bleed snap carousels for Albums and Artists)
- *   • MediaCard (Optional Card/Grid view for Songs)
- *   • AddMusicToLikedModal (Search and add songs/music to favorites)
- *   • DynamicBackground (Artwork ambient glow with --rp-w & --sb-w support)
+ *   • MediaActionButtons   (Play / Shuffle / Add Music)
+ *   • JioSaavnSongTable    (Songs table with Recently Added / Newest / A-Z sorting)
+ *   • JioSaavnCardSection  (Albums + Artists carousels)
+ *   • MediaCard            (Songs card view)
+ *   • AddMusicToLikedModal
+ *   • DynamicBackground
+ *
+ * Design features:
+ *   • Hero: three fanned cover images (center + two slanted sides) that spring open.
+ *   • Hero is compact: content starts right under the header (no big top gap).
+ *   • Mobile: cover stack on the left, title + buttons on the right.
+ *   • Back / Forward arrows removed.
+ *   • New glass search bar + sliding segmented List/Cards toggle + small spring details.
+ *   • Scroll arrows (◀ ▶) on mobile & tablet for Songs (cards), Albums and Artists.
  */
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup, type Variants } from "framer-motion";
 import { Search, X, Plus, ChevronLeft, ChevronRight, ListMusic, LayoutGrid } from "lucide-react";
 import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { DynamicBackground } from "@/components/shared/DynamicBackground";
@@ -32,6 +39,21 @@ import { useAuthStore } from "@/store/authStore";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Motion tokens (springs used across the page)
+   ────────────────────────────────────────────────────────────────────────── */
+const SPRING = { type: "spring", stiffness: 300, damping: 30 } as const;
+const SPRING_SNAPPY = { type: "spring", stiffness: 520, damping: 34, mass: 0.6 } as const;
+const SPRING_PILL = { type: "spring", stiffness: 560, damping: 38, mass: 0.6 } as const;
+const SPRING_FAN = { type: "spring", stiffness: 180, damping: 18, mass: 0.9 } as const;
+
+/** Staggered fade-up used by the hero text */
+const rise = (i: number) => ({
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { type: "spring", stiffness: 260, damping: 26, delay: 0.1 + i * 0.05 } as const,
+});
+
 const shuffleArray = <T,>(arr: T[]): T[] => {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -41,19 +63,227 @@ const shuffleArray = <T,>(arr: T[]): T[] => {
   return a;
 };
 
-export default function LikedSongsPage() {
-  const router = useRouter();
+/* ──────────────────────────────────────────────────────────────────────────
+   Hero cover stack (center + two slanted side covers)
+   Size is driven by --s (center cover size) which grows with the hero's
+   own width (container queries), so it adapts to sidebar / right panel.
+   ────────────────────────────────────────────────────────────────────────── */
+const stackParent: Variants = {
+  hidden: {},
+  rest: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
+  hover: { transition: { staggerChildren: 0 } },
+};
 
+const centerV: Variants = {
+  hidden: { opacity: 0, scale: 0.9, y: 10 },
+  rest: { opacity: 1, scale: 1, y: 0, transition: SPRING_FAN },
+  hover: { opacity: 1, scale: 1.03, y: -4, transition: SPRING_SNAPPY },
+};
+
+const sideV = (dir: -1 | 1): Variants => ({
+  hidden: { opacity: 0, x: "0%", rotate: 0, scale: 0.8 },
+  rest: { opacity: 1, x: `${dir * 62}%`, rotate: dir * 9, scale: 1, transition: SPRING_FAN },
+  hover: { opacity: 1, x: `${dir * 72}%`, rotate: dir * 12, scale: 1.02, transition: SPRING_SNAPPY },
+});
+const leftV = sideV(-1);
+const rightV = sideV(1);
+
+function StackCard({
+  src,
+  variants,
+  scale,
+  top,
+  z,
+  dim,
+  origin = "50% 100%",
+  badge,
+}: {
+  src: string | null;
+  variants: Variants;
+  scale: number;
+  top: number;
+  z: number;
+  dim?: boolean;
+  origin?: string;
+  badge?: React.ReactNode;
+}) {
+  const url = src ? getMediaUrl(src) || src : null;
+  return (
+    <motion.div
+      variants={variants}
+      style={{
+        position: "absolute",
+        width: `calc(var(--s) * ${scale})`,
+        height: `calc(var(--s) * ${scale})`,
+        left: `calc(50% - var(--s) * ${scale / 2})`,
+        top: `calc(var(--s) * ${top})`,
+        zIndex: z,
+        transformOrigin: origin,
+        willChange: "transform",
+      }}
+      className="overflow-hidden rounded-[10px] border border-white/10 bg-gradient-to-br from-[#9E2339] via-[#861E30] to-[#18181B] shadow-[0_18px_40px_rgba(0,0,0,0.5)] @lg:rounded-xl"
+    >
+      {url ? (
+        <img
+          src={url}
+          alt=""
+          draggable={false}
+          decoding="async"
+          className="size-full select-none object-cover"
+        />
+      ) : (
+        <div className="flex size-full items-center justify-center">
+          <SwiftUIHeart size={22} filled={true} className="text-white/80" />
+        </div>
+      )}
+      {dim && <div className="absolute inset-0 bg-black/35" />}
+      {badge}
+    </motion.div>
+  );
+}
+
+function CoverStack({ covers }: { covers: (string | null)[] }) {
+  return (
+    <motion.div
+      variants={stackParent}
+      initial="hidden"
+      animate="rest"
+      whileHover="hover"
+      className="relative shrink-0 [--s:88px] @lg:[--s:140px] @2xl:[--s:170px] @4xl:[--s:200px]"
+      style={{ width: "calc(var(--s) * 1.95)", height: "var(--s)" }}
+    >
+      <StackCard
+        src={covers[0]}
+        variants={centerV}
+        scale={1}
+        top={0}
+        z={3}
+        origin="50% 50%"
+        badge={
+          covers[0] ? (
+            <span className="absolute bottom-1.5 left-1.5 flex size-6 items-center justify-center rounded-full border border-white/20 bg-black/60 backdrop-blur-xl @lg:bottom-3 @lg:left-3 @lg:size-9">
+              <SwiftUIHeart size={13} filled={true} className="text-brand" />
+            </span>
+          ) : null
+        }
+      />
+      <StackCard src={covers[1]} variants={leftV} scale={0.8} top={0.1} z={1} dim />
+      <StackCard src={covers[2]} variants={rightV} scale={0.8} top={0.1} z={2} dim />
+    </motion.div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Small UI pieces
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** List / Cards switch with a pill that glides between options */
+function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: "list" | "grid";
+  onChange: (v: "list" | "grid") => void;
+}) {
+  const opts = [
+    { key: "list" as const, label: "List", Icon: ListMusic },
+    { key: "grid" as const, label: "Cards", Icon: LayoutGrid },
+  ];
+  return (
+    <LayoutGroup id="liked-view-toggle">
+      <div
+        role="tablist"
+        aria-label="View mode"
+        className="relative inline-flex shrink-0 items-center rounded-full bg-white/[0.08] p-1 ring-1 ring-inset ring-white/10 backdrop-blur-xl"
+      >
+        {opts.map(({ key, label, Icon }) => {
+          const active = value === key;
+          return (
+            <motion.button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={`${label} view`}
+              whileTap={{ scale: 0.92 }}
+              transition={SPRING_SNAPPY}
+              onClick={() => onChange(key)}
+              className={cn(
+                "relative flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold outline-none transition-colors duration-200 sm:px-3.5",
+                active ? "text-white" : "text-white/50 hover:text-white/80"
+              )}
+            >
+              {active && (
+                <motion.span
+                  layoutId="liked-view-pill"
+                  transition={SPRING_PILL}
+                  className="absolute inset-0 rounded-full bg-white/[0.2] shadow-[0_2px_10px_rgba(0,0,0,0.25),inset_0_0.5px_0_rgba(255,255,255,0.25)]"
+                />
+              )}
+              <span className="relative z-10 flex items-center gap-1.5">
+                <Icon size={15} />
+                <span className="hidden sm:inline">{label}</span>
+              </span>
+            </motion.button>
+          );
+        })}
+      </div>
+    </LayoutGroup>
+  );
+}
+
+/** "12 tracks" label that rolls when the number changes */
+function AnimatedCount({ value, singular, plural }: { value: number; singular: string; plural: string }) {
+  return (
+    <span className="relative inline-flex overflow-hidden text-[12px] font-medium text-white/40">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={value}
+          initial={{ y: 10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -10, opacity: 0 }}
+          transition={SPRING_SNAPPY}
+        >
+          {value} {value === 1 ? singular : plural}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+/** Section wrapper: fades up when scrolled into view, fades out when removed */
+function FadeUp({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={SPRING}
+      className={className}
+    >
+      {children}
+    </motion.section>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Page
+   ────────────────────────────────────────────────────────────────────────── */
+
+export default function LikedSongsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { user, isAuthenticated } = useAuthStore();
   const { showToast, setPlayerMinimized } = useUIStore();
   const { currentTrack, isPlaying, togglePlay, setTrack, setQueue, isShuffled, toggleShuffle } = usePlayerStore();
 
   /* ─── Data: Liked Tracks, User Albums, Overview ─── */
-  const { data: likedTracks = [], isLoading: isLoadingTracks } = useQuery<Track[]>({
+  const { data: likedTracks = [] } = useQuery<Track[]>({
     queryKey: ["liked-tracks"],
     queryFn: async () => {
       const res = await api.get("tracks/liked");
@@ -320,8 +550,24 @@ export default function LikedSongsPage() {
     [togglePlay, setQueue, setTrack, setPlayerMinimized]
   );
 
+  /* ─── Hero covers: first 3 distinct covers (center + left + right) ─── */
+  const stackCovers = useMemo(() => {
+    const seen = new Set<string>();
+    const out: (string | null)[] = [];
+    for (const t of likedTracks) {
+      const c = t.coverUrl;
+      if (c && !seen.has(c)) {
+        seen.add(c);
+        out.push(c);
+        if (out.length === 3) break;
+      }
+    }
+    while (out.length < 3) out.push(null);
+    return out;
+  }, [likedTracks]);
+  const heroCover = stackCovers[0];
+
   /* ─── Ambient dynamic glow ─── */
-  const heroCover = likedTracks[0]?.coverUrl || null;
   useEffect(() => {
     if (!heroCover) return;
     let cancelled = false;
@@ -348,9 +594,10 @@ export default function LikedSongsPage() {
 
   const ownerName = user?.name || user?.username || "Your Library";
   const hasQuery = searchQuery.trim().length > 0;
+  const totalMatches = filteredTracks.length + filteredAlbums.length + filteredArtists.length;
 
   return (
-    <div className="relative min-h-screen w-full bg-transparent text-white pb-32">
+    <div className="relative min-h-screen w-full bg-transparent pb-32 text-white">
       <SEO
         title="Liked Songs – Zenify"
         description="Listen to your favorite liked songs, saved albums, and followed artists on Zenify."
@@ -370,247 +617,476 @@ export default function LikedSongsPage() {
         <DynamicBackground surface="albumPage" coverUrl={heroCover} />
       </div>
 
-      {/* ── Page Container with clear top padding to never hide behind header bar ── */}
-      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 pb-12 pt-24 sm:px-8 sm:pt-28 md:px-12 md:pt-32 min-w-0">
-        {/* Navigation Arrows (Back / Forward) */}
-        <div className="flex items-center justify-end w-full mb-4">
-          <div className="inline-flex items-center bg-black/30 border border-white/10 rounded-full p-1 gap-1">
-            <button
-              onClick={() => router.back()}
-              className="p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/10 cursor-pointer"
-              title="Back"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              onClick={() => router.forward()}
-              className="p-1.5 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/10 cursor-pointer"
-              title="Forward"
-            >
-              <ChevronRight size={18} />
-            </button>
+      {/* ── Page Container: starts right under the header (no big gap) ── */}
+      <div className="relative z-10 mx-auto w-full min-w-0 max-w-[1400px] px-4 pb-12 pt-[calc(var(--header-height,64px)+12px)] sm:px-8 sm:pt-[calc(var(--header-height,64px)+18px)] md:px-12">
+        {/* ── 1. Hero ──
+            @container → sizes react to the hero's own width, so the layout
+            stays right when the sidebar or the lyrics/queue panel opens. */}
+        <div className="@container mb-5 w-full min-w-0 sm:mb-7">
+          <div className="flex w-full min-w-0 items-center gap-4 @lg:gap-8">
+            <CoverStack covers={stackCovers} />
+
+            <div className="flex min-w-0 flex-1 flex-col justify-center">
+              <motion.p
+                {...rise(0)}
+                className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-brand @lg:text-[12px]"
+              >
+                Playlist<span className="hidden @lg:inline"> Collection</span>
+              </motion.p>
+
+              <motion.h1
+                {...rise(1)}
+                className="mb-1 line-clamp-2 text-[22px] font-black leading-[1.1] tracking-[-0.025em] text-white @lg:mb-2 @lg:text-[34px] @3xl:text-[44px]"
+              >
+                Liked Songs
+              </motion.h1>
+
+              <motion.div
+                {...rise(2)}
+                className="flex flex-wrap items-center gap-x-1.5 text-[12px] font-medium text-white/60 @lg:text-[14px]"
+              >
+                <span className="hidden font-semibold text-white @lg:inline">{ownerName}</span>
+                <span className="hidden @lg:inline">·</span>
+                <span>
+                  {likedTracks.length} {likedTracks.length === 1 ? "song" : "songs"}
+                </span>
+                {totalSec > 0 && (
+                  <>
+                    <span>·</span>
+                    <span>{durationShort}</span>
+                  </>
+                )}
+                <span className="hidden @lg:inline">·</span>
+                <span className="hidden font-semibold text-white/80 @lg:inline">Lossless</span>
+              </motion.div>
+
+              <motion.p
+                {...rise(3)}
+                className="mt-2 hidden max-w-2xl text-[13px] leading-relaxed text-white/50 @2xl:block"
+              >
+                Your favorite tracks, saved albums, and followed artists in one personalized high-fidelity collection.
+              </motion.p>
+
+              <motion.div {...rise(4)} className="mt-3 flex min-w-0 flex-wrap items-center @lg:mt-5">
+                <MediaActionButtons
+                  track={{ id: "liked-songs", title: "Liked Songs" }}
+                  context="playlist"
+                  isPlaying={isLikedCurrentlyPlaying}
+                  onPlay={handlePlayAll}
+                  isShuffled={isLikedActive && isShuffled}
+                  onShuffle={handleShufflePlay}
+                  isLiked={false}
+                  extraAction={
+                    <motion.button
+                      type="button"
+                      aria-label="Add Music"
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.93 }}
+                      transition={SPRING_SNAPPY}
+                      onClick={() => setIsAddModalOpen(true)}
+                      className="flex size-9 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-white/10 text-[13px] font-semibold text-white outline-none transition-colors duration-150 hover:bg-white/[0.18] @lg:w-auto @lg:px-4"
+                    >
+                      <Plus size={16} strokeWidth={2.5} />
+                      <span className="hidden @lg:inline">Add Music</span>
+                    </motion.button>
+                  }
+                />
+              </motion.div>
+            </div>
           </div>
         </div>
 
-        {/* ── 1. Hero Header (Apple Music Layout) ── */}
-        <div className="flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8 lg:gap-10 mb-10 md:mb-12 w-full min-w-0 max-w-full">
-          {/* Square Artwork with Heart Emblem */}
+        {/* ── 2. Search + view toggle ── */}
+        <div className="mb-5 flex items-center gap-2.5 sm:gap-3">
           <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-            className="w-[min(260px,70vw)] sm:w-[280px] md:w-[280px] lg:w-[310px] aspect-square shrink-0 rounded-2xl shadow-2xl overflow-hidden bg-gradient-to-br from-[#9E2339] via-[#861E30] to-[#18181B] border border-white/10 relative flex items-center justify-center"
+            initial={false}
+            animate={{ maxWidth: searchFocused || hasQuery ? 480 : 380 }}
+            transition={SPRING}
+            className="relative min-w-0 flex-1"
           >
-            {heroCover ? (
-              <>
-                <img
-                  src={getMediaUrl(heroCover) || "/logo.png"}
-                  alt="Liked Songs Cover"
-                  className="size-full select-none object-cover"
-                  decoding="async"
-                  fetchPriority="high"
-                />
-                <span className="absolute bottom-3 left-3 flex size-10 items-center justify-center rounded-full border border-white/20 bg-black/60 backdrop-blur-xl">
-                  <SwiftUIHeart size={18} filled={true} className="text-brand" />
-                </span>
-              </>
-            ) : (
-              <span className="flex size-20 items-center justify-center rounded-full border border-white/15 bg-white/10 backdrop-blur-md">
-                <SwiftUIHeart size={38} filled={true} className="text-white drop-shadow-md" />
-              </span>
-            )}
+            <div
+              className={cn(
+                "flex h-10 items-center gap-2 rounded-full pl-3.5 pr-1.5 ring-1 ring-inset backdrop-blur-xl",
+                "transition-[background-color,box-shadow] duration-300",
+                searchFocused
+                  ? "bg-white/[0.14] shadow-[0_10px_34px_rgba(0,0,0,0.3)] ring-white/30"
+                  : "bg-white/[0.08] ring-white/10 hover:bg-white/[0.11]"
+              )}
+            >
+              <motion.span
+                animate={{ scale: searchFocused ? 1.12 : 1, rotate: searchFocused ? -8 : 0 }}
+                transition={SPRING_SNAPPY}
+                className={cn(
+                  "flex shrink-0 transition-colors duration-200",
+                  searchFocused || hasQuery ? "text-white" : "text-white/45"
+                )}
+              >
+                <Search size={16} strokeWidth={2.25} />
+              </motion.span>
+
+              <input
+                ref={searchInputRef}
+                type="text"
+                inputMode="search"
+                enterKeyHint="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    if (searchQuery) setSearchQuery("");
+                    else searchInputRef.current?.blur();
+                  }
+                }}
+                placeholder="Search in Liked Songs"
+                aria-label="Search liked songs, albums and artists"
+                className="h-full min-w-0 flex-1 bg-transparent text-[16px] font-medium tracking-[-0.01em] text-white outline-none placeholder:text-white/40 sm:text-[13.5px]"
+              />
+
+              <AnimatePresence initial={false}>
+                {hasQuery && (
+                  <motion.span
+                    key="count"
+                    initial={{ opacity: 0, scale: 0.8, x: 6 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, x: 6 }}
+                    transition={SPRING_SNAPPY}
+                    className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white/70"
+                  >
+                    {totalMatches} found
+                  </motion.span>
+                )}
+                {hasQuery && (
+                  <motion.button
+                    key="clear"
+                    type="button"
+                    aria-label="Clear search"
+                    initial={{ opacity: 0, scale: 0.4 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.4 }}
+                    whileTap={{ scale: 0.82 }}
+                    transition={SPRING_SNAPPY}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setSearchQuery("")}
+                    className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/20 text-white outline-none hover:bg-white/30"
+                  >
+                    <X size={13} strokeWidth={2.5} />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
           </motion.div>
 
-          {/* Hero Meta & Actions */}
-          <div className="flex flex-col flex-1 min-w-0 w-full text-center md:text-left justify-start overflow-hidden">
-            <p className="text-[12px] font-bold uppercase tracking-wider text-brand mb-1">
-              Playlist Collection
-            </p>
-
-            <h1 className="text-[28px] sm:text-[34px] md:text-[42px] font-black text-white tracking-[-0.025em] leading-tight mb-2">
-              Liked Songs
-            </h1>
-
-            <div className="text-[13px] sm:text-[14px] font-medium text-white/60 mb-2 flex items-center justify-center md:justify-start gap-2 flex-wrap">
-              <span className="text-white font-semibold">{ownerName}</span>
-              <span>·</span>
-              <span>{likedTracks.length} {likedTracks.length === 1 ? "song" : "songs"}</span>
-              {totalSec > 0 && (
-                <>
-                  <span>·</span>
-                  <span>{durationShort}</span>
-                </>
-              )}
-              <span>·</span>
-              <span className="text-white/80 font-semibold">Lossless</span>
-            </div>
-
-            <p className="text-[13px] text-white/50 max-w-2xl mb-5 leading-relaxed">
-              Your favorite tracks, saved albums, and followed artists in one personalized high-fidelity collection.
-            </p>
-
-            {/* Apple Music Hero Action Buttons (Reused MediaActionButtons + Add Music) */}
-            <div className="flex items-center justify-center md:justify-start">
-              <MediaActionButtons
-                track={{ id: "liked-songs", title: "Liked Songs" }}
-                context="playlist"
-                isPlaying={isLikedCurrentlyPlaying}
-                onPlay={handlePlayAll}
-                isShuffled={isLikedActive && isShuffled}
-                onShuffle={handleShufflePlay}
-                isLiked={false}
-                extraAction={
-                  <button
-                    type="button"
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-white/10 px-4 text-[13px] font-semibold text-white outline-none transition-colors duration-150 hover:bg-white/[0.18] hover:text-white"
-                  >
-                    <Plus size={15} strokeWidth={2.5} />
-                    <span>Add Music</span>
-                  </button>
-                }
-              />
-            </div>
+          <div className="ml-auto">
+            <ViewToggle value={viewMode} onChange={setViewMode} />
           </div>
         </div>
 
-        {/* ── 2. In-Page Search & View Filter Bar ── */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
-          {/* Search box strictly filtering liked items */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="size-4 text-white/40 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search in liked songs, albums, and artists..."
-              className="w-full h-10 rounded-full bg-white/[0.07] border border-white/10 pl-10 pr-9 text-[13px] text-white placeholder-white/40 outline-none backdrop-blur-md focus:border-white/25 focus:bg-white/[0.12] transition-all"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white p-0.5 cursor-pointer"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* List vs Grid View Mode Toggle */}
-          <div className="flex items-center justify-end gap-1 bg-white/[0.06] p-1 rounded-xl border border-white/10 shrink-0 self-end sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              title="List View"
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors cursor-pointer",
-                viewMode === "list" ? "bg-white/20 text-white shadow-sm" : "text-white/50 hover:text-white"
+        {/* ── 3. Songs ── */}
+        <FadeUp className="mb-8 w-full min-w-0">
+          <ArrowCarousel enabled={viewMode === "grid"}>
+            <div className="mb-3 flex h-[30px] items-center gap-2.5">
+              <h2 className="text-[22px] font-bold tracking-[-0.02em] text-white">Songs</h2>
+              {filteredTracks.length > 0 && (
+                <AnimatedCount value={filteredTracks.length} singular="track" plural="tracks" />
               )}
-            >
-              <ListMusic size={15} />
-              <span>List</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              title="Card Grid View"
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-colors cursor-pointer",
-                viewMode === "grid" ? "bg-white/20 text-white shadow-sm" : "text-white/50 hover:text-white"
-              )}
-            >
-              <LayoutGrid size={15} />
-              <span>Cards</span>
-            </button>
-          </div>
-        </div>
-
-        {/* ── 3. Songs Section ── */}
-        <section className="mb-12 w-full min-w-0">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[22px] font-bold tracking-[-0.02em] text-white">Songs</h2>
-            {filteredTracks.length > 0 && (
-              <span className="text-[12px] text-white/40 font-medium">
-                {filteredTracks.length} {filteredTracks.length === 1 ? "track" : "tracks"}
-              </span>
-            )}
-          </div>
-
-          {viewMode === "list" ? (
-            <JioSaavnSongTable
-              tracks={filteredTracks}
-              currentTrackId={currentTrack?.id}
-              isPlaying={isPlaying}
-              onPlayTrack={handlePlayRow}
-              showArtist={true}
-              tabs={[
-                { key: "recent", label: "Recently Added" },
-                { key: "newest", label: "Newest" },
-                { key: "az", label: "A–Z" },
-              ]}
-              defaultSort="recent"
-              pageSize={30}
-              emptyMessage={
-                hasQuery
-                  ? `No liked songs matching "${searchQuery}".`
-                  : "No liked songs yet. Click '+ Add Music' to add your favorites."
-              }
-            />
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
-              {filteredTracks.map((track, idx) => (
-                <MediaCard
-                  key={`liked-song-${track.id || idx}-${idx}`}
-                  track={track}
-                  index={idx}
-                  contextTracks={filteredTracks}
-                />
-              ))}
             </div>
+
+            <AnimatePresence mode="wait" initial={false}>
+              {viewMode === "list" ? (
+                <motion.div
+                  key="songs-list"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+                  transition={SPRING}
+                >
+                  <JioSaavnSongTable
+                    tracks={filteredTracks}
+                    currentTrackId={currentTrack?.id}
+                    isPlaying={isPlaying}
+                    onPlayTrack={handlePlayRow}
+                    showArtist={true}
+                    tabs={[
+                      { key: "recent", label: "Recently Added" },
+                      { key: "newest", label: "Newest" },
+                      { key: "az", label: "A–Z" },
+                    ]}
+                    defaultSort="recent"
+                    pageSize={30}
+                    emptyMessage={
+                      hasQuery
+                        ? `No liked songs matching "${searchQuery}".`
+                        : "No liked songs yet. Click '+ Add Music' to add your favorites."
+                    }
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="songs-cards"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.12 } }}
+                  transition={SPRING}
+                  className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:scroll-pl-8 sm:gap-4 sm:px-8 md:-mx-12 md:scroll-pl-12 md:px-12"
+                >
+                  {filteredTracks.length === 0 ? (
+                    <p className="w-full py-10 text-center text-sm text-white/50">
+                      {hasQuery ? `No liked songs matching "${searchQuery}".` : "No liked songs yet."}
+                    </p>
+                  ) : (
+                    filteredTracks.map((track, idx) => (
+                      <motion.div
+                        key={`liked-song-${track.id || idx}-${idx}`}
+                        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ ...SPRING, delay: Math.min(idx, 10) * 0.03 }}
+                        className="w-[148px] shrink-0 snap-start sm:w-[168px] lg:w-[184px]"
+                      >
+                        <MediaCard track={track} index={idx} contextTracks={filteredTracks} />
+                      </motion.div>
+                    ))
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </ArrowCarousel>
+        </FadeUp>
+
+        {/* ── 4 + 5. Albums & Artists carousels ── */}
+        <AnimatePresence initial={false}>
+          {filteredAlbums.length > 0 && (
+            <FadeUp key="albums" className="mb-8 w-full min-w-0">
+              <ArrowCarousel hideOnDesktop>
+                <JioSaavnCardSection title="Albums" items={filteredAlbums} />
+              </ArrowCarousel>
+            </FadeUp>
           )}
-        </section>
 
-        {/* ── 4. Albums Carousel (Reusing JioSaavnCardSection & MediaCard) ── */}
-        {filteredAlbums.length > 0 && (
-          <section className="mb-8 w-full min-w-0">
-            <JioSaavnCardSection
-              title="Albums"
-              items={filteredAlbums}
-            />
-          </section>
-        )}
-
-        {/* ── 5. Artists Carousel (Reusing JioSaavnCardSection & MediaCard) ── */}
-        {filteredArtists.length > 0 && (
-          <section className="mb-8 w-full min-w-0">
-            <JioSaavnCardSection
-              title="Artists"
-              items={filteredArtists}
-            />
-          </section>
-        )}
+          {filteredArtists.length > 0 && (
+            <FadeUp key="artists" className="mb-8 w-full min-w-0">
+              <ArrowCarousel hideOnDesktop>
+                <JioSaavnCardSection title="Artists" items={filteredArtists} />
+              </ArrowCarousel>
+            </FadeUp>
+          )}
+        </AnimatePresence>
 
         {/* Empty Search Result Feedback */}
-        {hasQuery &&
-          filteredTracks.length === 0 &&
-          filteredAlbums.length === 0 &&
-          filteredArtists.length === 0 && (
-            <div className="py-16 text-center text-white/50">
-              <p className="text-base font-semibold">No liked songs, albums, or artists found for "{searchQuery}"</p>
-              <button
+        <AnimatePresence>
+          {hasQuery && totalMatches === 0 && (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, y: 14, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={SPRING}
+              className="py-16 text-center text-white/50"
+            >
+              <p className="text-base font-semibold">
+                No liked songs, albums, or artists found for &ldquo;{searchQuery}&rdquo;
+              </p>
+              <motion.button
                 type="button"
+                whileTap={{ scale: 0.94 }}
+                transition={SPRING_SNAPPY}
                 onClick={() => setSearchQuery("")}
-                className="mt-3 text-sm text-brand font-semibold hover:underline cursor-pointer"
+                className="mt-3 cursor-pointer text-sm font-semibold text-brand hover:underline"
               >
                 Clear filter
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           )}
+        </AnimatePresence>
       </div>
 
       {/* ── Add Music Modal ── */}
       <AddMusicToLikedModal open={isAddModalOpen} onOpenChange={setIsAddModalOpen} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REUSABLE-ARROWS: ArrowCarousel + ScrollArrows
+   Horizontally scrollable element detection with scroll position tracking.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function ArrowButton({
+  dir,
+  disabled,
+  onClick,
+}: {
+  dir: "left" | "right";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const Icon = dir === "left" ? ChevronLeft : ChevronRight;
+  return (
+    <motion.button
+      type="button"
+      aria-label={dir === "left" ? "Scroll left" : "Scroll right"}
+      disabled={disabled}
+      animate={{ opacity: disabled ? 0.35 : 1 }}
+      whileHover={disabled ? undefined : { scale: 1.08 }}
+      whileTap={disabled ? undefined : { scale: 0.86 }}
+      transition={SPRING_SNAPPY}
+      onClick={onClick}
+      className="pointer-events-auto flex size-[30px] cursor-pointer items-center justify-center rounded-full bg-white/10 text-white outline-none ring-1 ring-inset ring-white/10 backdrop-blur-md transition-colors hover:bg-white/[0.2] disabled:cursor-default"
+    >
+      <Icon size={16} strokeWidth={2.5} />
+    </motion.button>
+  );
+}
+
+function ScrollArrows({
+  canPrev,
+  canNext,
+  onPrev,
+  onNext,
+}: {
+  canPrev: boolean;
+  canNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.85 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.85 }}
+      transition={SPRING_SNAPPY}
+      className="flex items-center gap-1.5"
+    >
+      <ArrowButton dir="left" disabled={!canPrev} onClick={onPrev} />
+      <ArrowButton dir="right" disabled={!canNext} onClick={onNext} />
+    </motion.div>
+  );
+}
+
+function ArrowCarousel({
+  children,
+  className,
+  arrowsClassName,
+  hideOnDesktop = false,
+  enabled = true,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  arrowsClassName?: string;
+  hideOnDesktop?: boolean;
+  enabled?: boolean;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLElement | null>(null);
+  const [state, setState] = useState({ show: false, prev: false, next: false });
+
+  useEffect(() => {
+    const root = rootRef.current;
+    const hidden = { show: false, prev: false, next: false };
+
+    if (!enabled || !root) {
+      scrollerRef.current = null;
+      setState((s) => (s.show ? hidden : s));
+      return;
+    }
+
+    let current: HTMLElement | null = null;
+    let raf = 0;
+
+    const update = () => {
+      const el = current;
+      if (!el) {
+        setState((s) => (s.show ? hidden : s));
+        return;
+      }
+      const max = el.scrollWidth - el.clientWidth;
+      const next = { show: max > 2, prev: el.scrollLeft > 2, next: el.scrollLeft < max - 2 };
+      setState((s) => (s.show === next.show && s.prev === next.prev && s.next === next.next ? s : next));
+    };
+
+    const ro = new ResizeObserver(update);
+
+    const find = (): HTMLElement | null => {
+      let fallback: HTMLElement | null = null;
+      const nodes = root.querySelectorAll<HTMLElement>("*");
+      for (let i = 0; i < nodes.length; i++) {
+        const el = nodes[i];
+        const ox = getComputedStyle(el).overflowX;
+        if (ox !== "auto" && ox !== "scroll") continue;
+        if (el.scrollWidth > el.clientWidth + 2) return el;
+        if (!fallback) fallback = el;
+      }
+      return fallback;
+    };
+
+    const attach = () => {
+      const found = find();
+      if (found !== current) {
+        if (current) {
+          current.removeEventListener("scroll", update);
+          ro.unobserve(current);
+        }
+        current = found;
+        scrollerRef.current = found;
+        if (found) {
+          found.addEventListener("scroll", update, { passive: true });
+          ro.observe(found);
+        }
+      }
+      update();
+    };
+
+    const schedule = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(attach);
+    };
+
+    const mo = new MutationObserver(schedule);
+    mo.observe(root, { childList: true, subtree: true });
+    window.addEventListener("resize", schedule);
+    root.addEventListener("load", schedule, true);
+    schedule();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      mo.disconnect();
+      ro.disconnect();
+      window.removeEventListener("resize", schedule);
+      root.removeEventListener("load", schedule, true);
+      if (current) current.removeEventListener("scroll", update);
+      scrollerRef.current = null;
+    };
+  }, [enabled]);
+
+  const scrollByDir = (dir: 1 | -1) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(el.clientWidth * 0.85, 200), behavior: "smooth" });
+  };
+
+  return (
+    <div ref={rootRef} className={cn("relative", className)}>
+      {children}
+      <div
+        className={cn(
+          "pointer-events-none absolute right-0 top-[-1px] z-20",
+          hideOnDesktop && "lg:hidden",
+          arrowsClassName
+        )}
+      >
+        <AnimatePresence>
+          {enabled && state.show && (
+            <ScrollArrows
+              key="arrows"
+              canPrev={state.prev}
+              canNext={state.next}
+              onPrev={() => scrollByDir(-1)}
+              onNext={() => scrollByDir(1)}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

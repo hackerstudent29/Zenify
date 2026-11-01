@@ -39,6 +39,7 @@ const AuthPage = lazyWithRetry(() => import('./app/(auth)/login/page'));
 const RegisterPage = lazyWithRetry(() => import('./app/(auth)/register/page'));
 const AboutPage = lazyWithRetry(() => import('./app/about/page'));
 const AboutZenifyPage = lazyWithRetry(() => import('./app/about-zenify/page'));
+const FaqPage = lazyWithRetry(() => import('./app/faq/page'));
 const SettingsPage = lazyWithRetry(() => import('./app/settings/page'));
 const FilterSettingsPage = lazyWithRetry(() => import('./app/settings/filter/page'));
 const DiscoverPage = lazyWithRetry(() => import('./app/discover/page'));
@@ -88,6 +89,9 @@ export default function AppRouter() {
           <Route path="/about-creator" element={<AboutPage />} />
           <Route path="/about-zenify" element={<AboutZenifyPage />} />
           <Route path="/about/zenify" element={<AboutZenifyPage />} />
+          <Route path="/faq" element={<FaqPage />} />
+          <Route path="/features" element={<FaqPage />} />
+          <Route path="/features-and-faq" element={<FaqPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/local-library" element={<LocalLibraryPage />} />
