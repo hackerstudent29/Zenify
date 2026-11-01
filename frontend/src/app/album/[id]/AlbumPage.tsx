@@ -37,6 +37,8 @@ import { DynamicBackground } from "@/components/shared/DynamicBackground";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from "@/lib/theme";
 import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
+import { useAlbumLike } from "@/hooks/useAlbumLike";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { Equalizer } from "@/components/ui/Equalizer";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -172,6 +174,48 @@ export default function AlbumPage() {
     },
     enabled: !!id,
   });
+
+  const { isLiked: isAlbumLiked, toggleLike: toggleAlbumLike } = useAlbumLike(
+    album?.id || id,
+    album
+  );
+
+  const { data: likedTrackIds = [] } = useQuery<string[]>({
+    queryKey: ["liked-track-ids"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("tracks/liked");
+        const arr = Array.isArray(res.data) ? res.data : res.data?.items || [];
+        return arr.map((t: any) => t.id) as string[];
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const handleToggleTrackLike = async (trackItem: any, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const trackId = trackItem?.id;
+    if (!trackId) return;
+
+    await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
+    const prev = queryClient.getQueryData<string[]>(["liked-track-ids"]) || [];
+    const isCurrentlyLiked = prev.includes(trackId);
+    const updated = isCurrentlyLiked ? prev.filter((i) => i !== trackId) : [...prev, trackId];
+    queryClient.setQueryData(["liked-track-ids"], updated);
+    showToast(isCurrentlyLiked ? "Removed from Liked Songs" : "Added to Liked Songs");
+
+    try {
+      await api.post(`tracks/${trackId}/like`, { ...trackItem, artist: trackItem.artist || album?.artist });
+      queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
+      queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
+      queryClient.invalidateQueries({ queryKey: ["library-overview"] });
+    } catch {
+      queryClient.setQueryData(["liked-track-ids"], prev);
+      showToast("Failed to update liked state", "error");
+    }
+  };
 
   const user = useAuthStore((s) => s.user);
 
@@ -444,6 +488,8 @@ export default function AlbumPage() {
                   }
                   handleShufflePlay();
                 }}
+                isLiked={isAlbumLiked}
+                onToggleLike={toggleAlbumLike}
               />
             </div>
           </div>
@@ -498,16 +544,32 @@ export default function AlbumPage() {
                     </div>
                   </div>
 
-                  {/* Right: Duration + More Dropdown */}
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[12px] sm:text-[13px] text-white/40 font-normal tabular-nums select-none">
+                  {/* Right: Heart + Duration + More Dropdown */}
+                  <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleTrackLike(track, e)}
+                      aria-label={likedTrackIds.includes(track.id) ? "Unlike" : "Like"}
+                      className={cn(
+                        "p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer",
+                        likedTrackIds.includes(track.id) ? "opacity-100" : "md:opacity-0 md:group-hover:opacity-100 opacity-80"
+                      )}
+                    >
+                      <SwiftUIHeart
+                        size={15}
+                        filled={likedTrackIds.includes(track.id)}
+                        className={cn(likedTrackIds.includes(track.id) ? "text-brand" : "text-white/40 hover:text-white")}
+                      />
+                    </button>
+
+                    <span className="text-[12px] sm:text-[13px] text-white/40 font-normal tabular-nums select-none min-w-[34px] text-right">
                       {formatDuration(track.duration)}
                     </span>
 
                     <TrackActionsDropdown
                       track={{ ...track, artist: track.artist || album.artist }}
                       align="end"
-                      context="album"
+                      context="row"
                       triggerClassName="p-1.5 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/10 cursor-pointer"
                       onShare={() => handleShare(track, "track")}
                     />

@@ -19,7 +19,7 @@ import Link from "next/link";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Play, Pause, Disc3, Check, X, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
-import { SwiftUILyrics } from "@/components/ui/SwiftUIIcons";
+import { SwiftUILyrics, SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 
 import api from "@/lib/api";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -373,27 +373,34 @@ export default function TrackPage() {
   );
 
   /* ─── Likes ─── */
-  const { data: likedTrackIds } = useQuery({
+  const { data: likedTrackIds = [] } = useQuery<string[]>({
     queryKey: ["liked-track-ids"],
     queryFn: async () => {
-      const res = await api.get("/tracks/liked");
-      const arr = Array.isArray(res.data) ? res.data : res.data?.items || [];
-      return arr.map((t: any) => t.id);
+      try {
+        const res = await api.get("tracks/liked");
+        const arr = Array.isArray(res.data) ? res.data : res.data?.items || [];
+        return arr.map((t: any) => t.id) as string[];
+      } catch {
+        return [];
+      }
     },
     staleTime: 1000 * 60 * 5,
   });
-  const isLiked = likedTrackIds?.includes(id);
+  const isLiked = likedTrackIds.includes(id) || (track?.id && likedTrackIds.includes(track.id));
 
   const toggleLikeMutation = useMutation({
-    mutationFn: () => api.post(`/tracks/${id}/like`),
+    mutationFn: async () => {
+      const targetId = track?.id || id;
+      const res = await api.post(`tracks/${targetId}/like`, track);
+      return res.data;
+    },
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: ["liked-track-ids"] });
-      const prev = queryClient.getQueryData<string[]>(["liked-track-ids"]);
-      const was = prev?.includes(id);
-      queryClient.setQueryData(
-        ["liked-track-ids"],
-        prev ? (was ? prev.filter((t) => t !== id) : [...prev, id]) : [id]
-      );
+      const prev = queryClient.getQueryData<string[]>(["liked-track-ids"]) || [];
+      const targetId = track?.id || id;
+      const was = prev.includes(targetId) || prev.includes(id);
+      const next = was ? prev.filter((t) => t !== id && t !== targetId) : [...prev, targetId];
+      queryClient.setQueryData(["liked-track-ids"], next);
       showToast(was ? "Removed from Liked Songs" : "Added to Liked Songs");
       return { prev };
     },
@@ -404,6 +411,7 @@ export default function TrackPage() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
       queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
+      queryClient.invalidateQueries({ queryKey: ["library-overview"] });
     },
   });
 
@@ -735,10 +743,31 @@ export default function TrackPage() {
               </div>
             </div>
 
-            {/* Duration */}
-            <span className="w-11 shrink-0 text-right text-[13px] tabular-nums text-white/45">
-              {durationStr}
-            </span>
+            {/* Heart button + Duration */}
+            <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleLikeMutation.mutate();
+                }}
+                aria-label={isLiked ? "Unlike" : "Like"}
+                className={cn(
+                  "p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer",
+                  isLiked ? "opacity-100" : "md:opacity-0 md:group-hover:opacity-100 opacity-80"
+                )}
+              >
+                <SwiftUIHeart
+                  size={15}
+                  filled={!!isLiked}
+                  className={cn(isLiked ? "text-brand" : "text-white/40 hover:text-white")}
+                />
+              </button>
+
+              <span className="w-11 shrink-0 text-right text-[13px] tabular-nums text-white/45">
+                {durationStr}
+              </span>
+            </div>
           </div>
 
           <div className="h-px bg-white/[0.1]" />

@@ -354,7 +354,20 @@ export default function LikedSongsPage() {
     enabled: isAuthenticated,
   });
 
-  /* ─── Liked Albums: Derived from user albums & liked tracks ─── */
+  const { data: followedAlbums = [] } = useQuery<any[]>({
+    queryKey: ["liked-albums"],
+    queryFn: async () => {
+      try {
+        const res = await api.get("albums/liked");
+        return Array.isArray(res.data) ? res.data : [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: isAuthenticated,
+  });
+
+  /* ─── Liked Albums: Derived from user albums, followed albums & liked tracks ─── */
   const likedAlbums = useMemo(() => {
     const map = new Map<string, any>();
     const seenIds = new Set<string>();
@@ -364,6 +377,28 @@ export default function LikedSongsPage() {
       const t = (title || "").trim().toLowerCase();
       return !t || t === "unknown" || t === "unknown album";
     };
+
+    for (const alb of followedAlbums || []) {
+      const albId = alb?.id;
+      const title = (alb?.title || alb?.name || "").trim();
+      const normTitle = title.toLowerCase();
+      if (albId && !isUnknownAlbum(title) && !seenIds.has(albId) && !seenTitles.has(normTitle)) {
+        seenIds.add(albId);
+        seenTitles.add(normTitle);
+        map.set(albId, {
+          id: albId,
+          title: title,
+          name: title,
+          coverUrl: alb.coverUrl || alb.cover || alb.artwork,
+          artwork: alb.coverUrl || alb.cover || alb.artwork,
+          artist: alb.artist || { name: alb.artistName || "Unknown Artist" },
+          subtitle: alb.artist?.name || alb.artistName || "Album",
+          trackCount: alb.trackCount || alb._count?.tracks || alb.tracks?.length || 0,
+          isAlbum: true,
+          type: "album",
+        });
+      }
+    }
 
     for (const alb of userAlbums || []) {
       const albId = alb?.id;
@@ -422,7 +457,7 @@ export default function LikedSongsPage() {
     }
 
     return Array.from(map.values());
-  }, [likedTracks, userAlbums]);
+  }, [likedTracks, userAlbums, followedAlbums]);
 
   /* ─── Liked Artists: Derived from top artists & liked tracks ─── */
   const likedArtists = useMemo(() => {

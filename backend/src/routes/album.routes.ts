@@ -210,6 +210,107 @@ export async function albumRoutes(server: FastifyInstance) {
         return reply.send(data);
     });
 
+    server.get('/liked', { preHandler: [server.authenticate] }, async (req: FastifyRequest, reply: FastifyReply) => {
+        try {
+            const userId = (req.user as any)?.id;
+            if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
+
+            const prefs = await prisma.userPreferences.findUnique({
+                where: { userId }
+            });
+            const favs = Array.isArray((prefs as any)?.favoriteAlbums) ? (prefs as any).favoriteAlbums : [];
+            return reply.send(favs);
+        } catch (error: any) {
+            req.log.error(error);
+            return reply.status(500).send({ error: 'Failed to get liked albums' });
+        }
+    });
+
+    server.post('/:id/like', { preHandler: [server.authenticate] }, async (req: FastifyRequest<{ Params: { id: string }; Body?: any }>, reply: FastifyReply) => {
+        try {
+            const userId = (req.user as any)?.id;
+            if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
+
+            const albumId = req.params.id;
+            const body = (req as any).body || {};
+
+            let prefs = await prisma.userPreferences.findUnique({
+                where: { userId }
+            });
+            if (!prefs) {
+                prefs = await prisma.userPreferences.create({
+                    data: { userId, favoriteAlbums: [] }
+                });
+            }
+
+            const currentFavorites: any[] = Array.isArray((prefs as any)?.favoriteAlbums)
+                ? [...((prefs as any).favoriteAlbums as any[])]
+                : [];
+
+            const targetTitle = (body.title || body.name || '').trim().toLowerCase();
+            const existingIndex = currentFavorites.findIndex((f: any) => {
+                if (f.id === albumId) return true;
+                const ft = (f.title || f.name || '').trim().toLowerCase();
+                return targetTitle && ft === targetTitle;
+            });
+
+            // Find in database if exists
+            const dbAlbum = await prisma.album.findFirst({
+                where: {
+                    OR: [
+                        { id: albumId },
+                        ...(targetTitle ? [{ title: { equals: body.title || body.name, mode: 'insensitive' as const } }] : [])
+                    ]
+                },
+                include: { artist: true }
+            });
+
+            if (existingIndex >= 0) {
+                currentFavorites.splice(existingIndex, 1);
+                await prisma.userPreferences.update({
+                    where: { userId },
+                    data: { favoriteAlbums: currentFavorites }
+                });
+
+                return reply.send({ liked: false, albumId, favoriteAlbums: currentFavorites });
+            } else {
+                const resolvedTitle = (body.title || body.name || dbAlbum?.title || 'Album').trim();
+                const resolvedCover = body.coverUrl || body.cover || body.artwork || body.imageUrl || dbAlbum?.coverUrl || '';
+                const resolvedArtist = (
+                    (typeof body.artist === 'string' ? body.artist : body.artist?.name) ||
+                    body.artistName ||
+                    dbAlbum?.artist?.name ||
+                    'Unknown Artist'
+                ).trim();
+
+                const albumItem = {
+                    id: dbAlbum?.id || albumId,
+                    title: resolvedTitle,
+                    name: resolvedTitle,
+                    coverUrl: resolvedCover,
+                    artist: { name: resolvedArtist },
+                    artistName: resolvedArtist,
+                    year: body.year || body.releaseDate || dbAlbum?.releaseDate || '',
+                    trackCount: body.trackCount || body.tracks?.length || (dbAlbum as any)?.tracks?.length || 0,
+                    isAlbum: true,
+                    type: 'album',
+                    source: 'user'
+                };
+
+                currentFavorites.unshift(albumItem);
+                await prisma.userPreferences.update({
+                    where: { userId },
+                    data: { favoriteAlbums: currentFavorites }
+                });
+
+                return reply.send({ liked: true, albumId, album: albumItem, favoriteAlbums: currentFavorites });
+            }
+        } catch (error: any) {
+            req.log.error(error);
+            return reply.status(500).send({ error: 'Failed to toggle album like' });
+        }
+    });
+
     server.get('/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
         const { id } = req.params;
         const decodedId = decodeURIComponent(id).trim();
