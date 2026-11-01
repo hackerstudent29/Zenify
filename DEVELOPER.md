@@ -73,14 +73,18 @@ flowchart TB
 
 | Domain | Framework / Library | Version | Primary Role & Responsibilities |
 | :--- | :--- | :--- | :--- |
-| **Web Frontend** | `React` / `Vite` | `v19` / `v6` | Single-page application with client-side routing, Web Audio API graph, and offline PWA service workers. |
-| **Mobile App** | `Flutter` / `Dart` | `v3.x` / `v3.3+` | Native Android audio app with background daemon, lock-screen controls, and 3D album flip card. |
-| **UI & Styling** | `Tailwind CSS`, `Framer Motion`, `Radix UI` | `v3.4` | Liquid glassmorphism UI, spring physics micro-interactions, accessible UI components. |
-| **Backend API** | `Fastify`, `TypeScript` | `v5.2` | High-throughput asynchronous REST server with low memory overhead and strict payload schemas. |
-| **Database & ORM** | `PostgreSQL`, `Prisma ORM` | `v14+` / `v5.10` | Strongly typed relational models, migrations, foreign key constraints, and connection pooling. |
-| **Audio Processing** | `HTML5 Web Audio API`, `ffmpeg`, `yt-dlp` | Latest | Dual-buffer gapless crossfading, biquad filter equalization, convolution reverb, and container demuxing. |
-| **Cloud Storage** | `Cloudflare R2`, `Cloudinary` | S3 API | Edge object storage for audio masters, cover artwork, and dynamic transcoding caches. |
-| **Security & Auth** | `Fastify JWT`, `bcrypt`, `Zod`, `Helmet` | Latest | Cookie rotation, timing-safe cryptographic comparisons, strict CORS allowlist, and SSRF prevention. |
+| **Web Frontend** | `React` / `Vite` | `v19` / `v6` | Single-page application with client-side routing, Web Audio API graph, and PWA service workers with offline caching. |
+| **State Management** | `Zustand`, `TanStack Query` | `v5`, `v5` | Global state management with persist middleware and server state synchronization with smart caching. |
+| **UI Components** | `Radix UI`, `Framer Motion`, `GSAP` | Latest, `v12`, `v3` | Accessible component primitives, spring physics animations, and advanced timeline animations. |
+| **Styling** | `Tailwind CSS` | `v4` | Utility-first CSS framework with custom design tokens for glassmorphism and reactive backgrounds. |
+| **Backend API** | `Fastify`, `TypeScript` | `v5.7` | High-throughput asynchronous REST server with low memory overhead and strict Zod payload validation. |
+| **Database & ORM** | `PostgreSQL`, `Prisma ORM` | `v14+` / `v5.10` | Strongly typed relational models, automatic migrations, foreign key constraints, and connection pooling. |
+| **Background Jobs** | `BullMQ`, `Redis` | `v5`, Latest | Job queue system for lyric enrichment, analytics, and scheduled tasks with retry logic and concurrency control. |
+| **AI/ML Services** | `Deepgram`, `OpenAI` | Latest | AI-powered speech-to-text for lyric onset alignment, artist bio generation, and lyrics meaning analysis. |
+| **Audio Processing** | `HTML5 Web Audio API`, `ffmpeg`, `yt-dlp` | Native, Latest | Dual-buffer gapless crossfading, biquad filter DSP, convolution reverb, and audio container demuxing. |
+| **Cloud Storage** | `Cloudflare R2`, `Cloudinary`, `AWS S3` | S3 API | Edge object storage for audio masters (R2/S3), cover artwork CDN (Cloudinary), and dynamic transcoding caches. |
+| **Security & Auth** | `Fastify JWT`, `bcryptjs`, `Helmet` | Latest | JWT with refresh token rotation, timing-safe password comparison, strict CORS allowlist, and SSRF prevention. |
+| **Developer Tools** | `ESLint`, `TypeScript`, `Prettier` | `v9`, `v5`, Latest | Linting, type checking, and code formatting across monorepo with shared configurations. |
 
 ---
 
@@ -88,61 +92,105 @@ flowchart TB
 
 | Capability Domain | Engine Implementation | Technical Specifications |
 | :--- | :--- | :--- |
-| **StudioFX Multi-Band EQ** | `frontend/src/lib/audio-engine.ts` | Hardware-accelerated biquad filters with ±12dB continuous gain range and right-side glass panel interface. |
-| **8D Spatial Audio** | `frontend/src/components/player/audio-fx-menu.tsx` | Binaural `PannerNode` orbiting audio around stereo field with dual LFO oscillators and variable angular velocity. |
-| **DJ Speed & Pitch Warper** | `frontend/src/lib/audio-engine.ts` | Nightcore (1.5x speed + pitch), Daycore (0.75x slowed), and 0.50x–2.00x variable playback slider. |
-| **Convolution Reverb** | `frontend/src/lib/audio-engine.ts` | Impulse response convolution modelling Small Hall and Cathedral spaces with wet/dry balance controls. |
-| **Dynamics Compressor** | `frontend/src/lib/audio-engine.ts` | Peak limiter (-1dB threshold, 10dB knee, 20:1 ratio, 1ms attack) preventing audio clipping and distortion. |
-| **Sub-Second Synced Lyrics** | `backend/src/services/lyrics-sync.service.ts` | Phonetic LRC timestamps (`[mm:ss.xx]`) supporting Tamil, Tanglish, Hindi, Hinglish, Malayalam, and English. |
-| **Instrumental Gap Protection** | `backend/src/services/lyrics-sync.service.ts` | Detects and formats non-vocal intervals (`[BGM]`, `[Guitar Solo]`, `[Interlude]`, `[Outro]`) to prevent display distortion. |
-| **Lyric Sync Studio** | `frontend/src/components/admin/LyricSyncStudio.tsx` | Visual timestamp painter (`KaraokePainterView`) with syllable alignment, tap-to-sync, undo/redo, and `.lrc` import/export. |
-| **In-Browser Local Audio Player** | `frontend/src/app/local-library/page.tsx` | Client-side file scanner parsing local MP3, FLAC, WAV, M4A, OGG, and AAC files; extracts ID3 tags and filters stem audio. |
-| **Dual-Buffer Audio Engine** | `frontend/src/components/player/global-audio.tsx` | Runs dual `<audio>` players in parallel, preloading the next track 1.5s after play start to eliminate buffering latency. |
-| **HTTP 206 Partial Content Proxy** | `backend/src/routes/utils.routes.ts` | Byte-range streaming proxy preserving container headers (`ftyp` for MP4, `EBML` for WebM) for instant seeking. |
+| **Studio FX Glass Panel** | `frontend/src/components/player/audio-fx-modal.tsx` | 320px right-side glass panel with 6 collapsible accordion sections (Presets, Tune, Space, Voice, Chain, Tempo) matching Queue/Lyrics panel design. |
+| **3-Band Parametric EQ** | `frontend/src/lib/audio-engine.ts` | Hardware-accelerated biquad filters at Bass (110Hz), Mid (1.5kHz), Treble (8kHz) with ±12dB continuous gain range. |
+| **Reorderable FX Chain** | `frontend/src/lib/audio-engine.ts` | Drag-and-drop customizable signal routing order: EQ → Filter → Drive → Chorus → Echo → Reverb for creative sound design. |
+| **Native Vocal Isolation** | `frontend/src/lib/audio-engine.ts` | Zero-latency WebAudio Mid-Side processor with no ML model required—extracts or isolates vocals/instruments in real-time. |
+| **8D Spatial Audio** | `frontend/src/lib/audio-engine.ts` | Binaural `PannerNode` with dual LFO oscillators creating bi-directional (clockwise/counter-clockwise) audio orbiting with adjustable speed (0.03-0.30 revolutions/sec). |
+| **DJ-Style Filter** | `frontend/src/lib/audio-engine.ts` | Continuous high-pass/low-pass filter sweep (20Hz-20kHz) with frequency visualization and zero-snap reset at center. |
+| **Speed & Pitch Control** | `frontend/src/lib/audio-engine.ts` | Independent speed (0.5x-2.0x) and pitch shifting (-12 to +12 semitones) for Nightcore, Daycore, and creative remixes. Tape mode links both. |
+| **Advanced Effects Suite** | `frontend/src/lib/audio-engine.ts` | Chorus (BBD emulation), Echo (with feedback and time control), Reverb (Small Hall/Cathedral impulse responses), Warmth/Drive (tube saturation), Stereo Width (0% mono to 200% ultra-wide). |
+| **Night Mode Dynamics** | `frontend/src/lib/audio-engine.ts` | Multiband dynamics compressor with makeup gain, preventing audio clipping and ensuring consistent volume for late-night listening. |
+| **10+ Studio Presets** | `frontend/src/components/player/audio-fx-modal.tsx` | Built-in presets (Original, After Hours, Immersive, Studio Clarity, Headphones, Bass Boost, Vocal Boost, Concert Hall, Lo-Fi, Dream Echo) with custom preset save/load. |
+| **AI-Powered Synced Lyrics** | `backend/src/services/lyric-enrichment.service.ts` | 24/7 autonomous enrichment worker with Deepgram AI onset alignment, multi-source fetching (LRCLib, lrc.red, STT), and sub-second accuracy. |
+| **Word-Level Timing** | `backend/src/services/deepgram-lyrics.service.ts` | Apple Music-style word-by-word synchronization with `<mm:ss.xx>` inline timestamps, enabling karaoke-grade highlighting. |
+| **Instrumental Gap Detection** | `backend/src/services/lyric-enrichment.service.ts` | Automatically inserts `• • •` markers during instrumental breaks >3.2s (intro, interlude, solo, outro) to prevent lyric display glitches. |
+| **Automatic Romanization** | `backend/src/services/romanization.service.ts` | Real-time romanization for Tamil, Hindi, Telugu, Malayalam, Kannada, Bengali, Punjabi, Gujarati—preserving synced timing. |
+| **Intelligent 3-Tier Queue** | `frontend/src/store/player.ts` | User Queue (FIFO, preserved during shuffle) + Context Queue (album/playlist, affected by shuffle) + Play History (last 50 tracks for back navigation). |
+| **Vibe-Based Autoplay** | `backend/src/services/recommendation-engine.service.ts` | AI-powered radio that analyzes track mood, tempo, genre, language, and artist similarity to auto-queue when user queue ends. |
+| **In-Browser Local Player** | `frontend/src/app/local-library/page.tsx` | Client-side MP3, FLAC, WAV, M4A, AAC parser with ID3 tag extraction and embedded cover art—files never leave device. |
+| **Dual-Buffer Gapless Engine** | `frontend/src/lib/audio-engine.ts` | Runs dual `<audio>` elements with intelligent preloading (starts 1.5s after play), enabling seamless crossfade and zero buffering gaps. |
+| **Palette Reactive Backgrounds** | `frontend/src/components/shared/DynamicBackground.tsx` | Canvas-based mesh gradient animation extracting and pulsing dominant colors from album art in sync with music beat. |
+| **HTTP 206 Partial Content** | `backend/src/routes/utils.routes.ts` | Byte-range streaming proxy preserving container headers (`ftyp` for MP4, `EBML` for WebM) for instant seeking and efficient bandwidth usage. |
+| **PWA Offline Support** | `frontend/vite.config.ts` | Service worker with offline caching, lock screen media controls, Bluetooth media button support, and installable on all platforms. |
 
 ---
 
 ## 🎛️ Web Audio DSP Pipeline
 
-The Zenify audio pipeline routes raw audio from dual HTML5 media elements through a chained Web Audio graph:
+The Zenify audio engine routes raw audio through a sophisticated Web Audio graph with reorderable FX chain:
 
 ```
-[Audio Element A / B] 
+[Dual HTML5 Audio Elements A/B]
          │
-         ▼
-  [Source Nodes] ──▶ [Dual Gain Nodes] ──▶ [Input Mixer]
-                                                │
-                                                ▼
-                                    [3-Band Biquad Filter EQ]
-                                    (60Hz / 1000Hz / 12000Hz)
-                                                │
-                       ┌────────────────────────┴────────────────────────┐
-                       ▼                                                 ▼
-                  [Dry Mix Gain]                                 [Convolver Node]
-                       │                                                 │
-                       │                                                 ▼
-                       │                                         [Reverb Wet Gain]
-                       │                                                 │
-                       └────────────────────────┬────────────────────────┘
-                                                │
-                                                ▼
-                                      [Binaural Panner Node]
-                                      (8D Spatial Orbit LFO)
-                                                │
-                                                ▼
-                                   [Dynamics Compressor Node]
-                                   (-1dB Limiter, Anti-Clipping)
-                                                │
-                                                ▼
-                                        [Analyser Node]
-                                        (FFT Frequency Data)
-                                                │
-                                                ▼
-                                        [Master Gain Node]
-                                                │
-                                                ▼
-                                     [AudioContext.destination]
+         ├──▶ [Source Node A] ──▶ [Gain A (volume/crossfade)]
+         └──▶ [Source Node B] ──▶ [Gain B (volume/crossfade)]
+                                            │
+                                            ▼
+                                     [Input Mixer]
+                                            │
+                     ┌──────────────────────┴───────────────────────┐
+                     ▼                                              ▼
+              [Vocal Dry Path]                          [Vocal Isolation Path]
+                     │                                   (Mid-Side Processor)
+                     │                                              │
+                     └──────────────────────┬───────────────────────┘
+                                            ▼
+                                       [Vocal Sum]
+                                            │
+                                            ▼
+                        ╔═══════════════════════════════════╗
+                        ║  REORDERABLE FX CHAIN (6 modules) ║
+                        ║  Default order (user-customizable): ║
+                        ╠═══════════════════════════════════╣
+                        ║  1. EQ (3-band Biquad)           ║
+                        ║  2. Filter (High/Low Pass)       ║
+                        ║  3. Drive (Warmth/Saturation)    ║
+                        ║  4. Chorus (BBD Emulation)       ║
+                        ║  5. Echo (Delay + Feedback)      ║
+                        ║  6. Reverb (Convolver)           ║
+                        ╚═══════════════════════════════════╝
+                                            │
+                                            ▼
+                                      [FX Gate]
+                                  (Bypass Toggle)
+                                            │
+                                            ▼
+                                 [Stereo Width Matrix]
+                             (Splitter → Gain Matrix → Merger)
+                                            │
+                                            ▼
+                                  [8D Panner Node]
+                              (LFO-driven X/Z Position)
+                                            │
+                                            ▼
+                            [Dynamics Compressor (Night Mode)]
+                             (Threshold -24dB, Ratio 12:1)
+                                            │
+                                            ▼
+                                  [Compression Makeup Gain]
+                                            │
+                                            ▼
+                                      [Master Gain Node]
+                                      (User Volume 0-1)
+                                            │
+                    ┌───────────────────────┴────────────────────────┐
+                    ▼                                                ▼
+            [Analyser Node]                               [Viz Analyser Node]
+          (Player FFT 256)                            (Spectrum Display 2048)
+                    │                                                │
+                    └───────────────────────┬────────────────────────┘
+                                            ▼
+                                 [AudioContext.destination]
+                                    (Hardware Output)
 ```
+
+**Key Features:**
+- **Dual-buffer preloading** for gapless playback with crossfade
+- **Native vocal isolation** using Mid-Side stereo processing (zero ML inference latency)
+- **Drag-and-drop FX reordering** for creative signal routing
+- **Live parameter interpolation** (no clicks/pops during adjustment)
+- **Separate analysis paths** for player UI and visual spectrum display
 
 ---
 
@@ -196,16 +244,38 @@ FRONTEND_URL=http://localhost:3001,http://localhost:5173
 
 # Database
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/zenify?schema=public
+DIRECT_URL=postgresql://postgres:postgres@localhost:5432/zenify?schema=public
 
 # Authentication (Must be at least 32 characters long)
-JWT_SECRET=change_this_to_a_secure_jwt_secret_min_32_chars
+JWT_SECRET=change_this_to_a_secure_jwt_secret_min_32_chars_please
 REFRESH_TOKEN_SECRET=change_this_to_a_secure_refresh_secret_min_32_chars
 
-# Cloud Storage (Optional for local development)
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
-R2_ENDPOINT=
-R2_BUCKET_NAME=
+# Cloud Storage (Required for audio/image uploads)
+R2_ACCESS_KEY_ID=your_r2_access_key
+R2_SECRET_ACCESS_KEY=your_r2_secret_key
+R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+R2_BUCKET_NAME=zenify-audio
+R2_PUBLIC_URL=https://your-r2-public-domain.com
+
+# Cloudinary (for image hosting)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# AI Services (Optional - for lyric enrichment and AI features)
+DEEPGRAM_API_KEY=your_deepgram_api_key
+OPENAI_API_KEY=your_openai_api_key
+
+# Redis (Required for background jobs)
+REDIS_URL=redis://localhost:6379
+
+# Rate Limiting
+RATE_LIMIT_MAX=300  # requests per minute per IP
+RATE_LIMIT_WINDOW=60000  # milliseconds
+
+# Optional: Payment Gateway
+ZENPAY_SECRET_KEY=
+ZENPAY_WEBHOOK_SECRET=
 ```
 
 ---
@@ -257,28 +327,73 @@ flutter run
 ## 📡 API Structure & Core Routes
 
 ### Authentication & Sessions (`/api/auth`)
-* `POST /api/auth/register` — User account registration with salted bcrypt hashing.
+* `POST /api/auth/register` — User account registration with salted bcryptjs hashing.
 * `POST /api/auth/login` — Authentication with JWT and HttpOnly refresh token rotation.
 * `POST /api/auth/google` — Secure Google OAuth token verification and account linking.
-* `POST /api/auth/refresh` — Refresh expired access tokens.
-* `POST /api/auth/logout` — Invalidate user sessions.
+* `POST /api/auth/refresh` — Refresh expired access tokens using refresh tokens.
+* `POST /api/auth/logout` — Invalidate user sessions and clear tokens.
 
-### Tracks & Playlists (`/api/tracks`, `/api/playlists`)
-* `GET /api/tracks` — Paginated catalog track search and listing.
-* `GET /api/tracks/:id` — Track details including lyrics, duration, and color aura.
+### Tracks & Albums (`/api/tracks`, `/api/albums`)
+* `GET /api/tracks` — Paginated catalog track search and listing with filters.
+* `GET /api/tracks/:id` — Track details including lyrics, synced_lyrics, duration, palette, and metadata.
+* `POST /api/tracks/upload` — Multi-part track upload with metadata and audio file.
 * `POST /api/tracks/import-instant` — Dynamic on-the-fly audio resolution for search results.
+* `POST /api/tracks/:id/like` — Like/unlike track toggle.
+* `POST /api/tracks/:id/play` — Record track play event for analytics.
+* `GET /api/albums` — Album listing with artist information.
+* `GET /api/albums/:id` — Album details with track listings.
+
+### Artists & Playlists (`/api/artists`, `/api/playlists`)
+* `GET /api/artists` — Artist directory with pagination and search.
+* `GET /api/artists/:id` — Artist profile with discography, related artists, and biography.
 * `GET /api/playlists` — User playlists and featured collections.
 * `POST /api/playlists` — Create user custom playlists.
+* `PUT /api/playlists/:id` — Update playlist metadata.
+* `POST /api/playlists/:id/tracks` — Add track to playlist.
+* `DELETE /api/playlists/:id/tracks/:trackId` — Remove track from playlist.
 
-### Metadata & Lyrics Studio (`/api/metadata`)
-* `GET /api/metadata` — iTunes CDN fast-preview lookup.
-* `POST /api/metadata/sync-lyrics` — AI-assisted syllable-level lyric alignment (Rate limited).
-* `POST /api/metadata/import-lyrics` — Admin-guarded Genius scraper with SSRF protection.
-* `PATCH /api/metadata/save-synced-lyrics` — Admin-guarded Lyric Sync Studio timestamp persister.
+### Search & Discovery (`/api/search`, `/api/discover`)
+* `GET /api/search` — Universal search (tracks, artists, albums, playlists) with instant results.
+* `GET /api/search/suggestions` — Search autocomplete suggestions.
+* `GET /api/discover` — Personalized recommendations based on user profile.
+* `GET /api/discover/radio` — Vibe-based radio for current track.
+
+### Lyrics & Metadata (`/api/metadata`, `/api/lyrics`)
+* `GET /api/metadata/:trackId` — Track metadata including enrichment status.
+* `POST /api/lyrics/enrich/:trackId` — Trigger lyric enrichment for specific track (admin/user-initiated).
+* `GET /api/lyrics/:trackId/romanized` — Get romanized lyrics for Indian language tracks.
+* `POST /api/lyrics/:trackId/offset` — Adjust lyric timing offset.
+
+### User Features (`/api/user`, `/api/preferences`)
+* `GET /api/user/profile` — Current user profile information.
+* `PUT /api/user/profile` — Update user profile (name, avatar, username).
+* `GET /api/user/history` — Listening history with pagination.
+* `GET /api/user/liked` — Liked tracks collection.
+* `GET /api/preferences` — User preferences (audio quality, theme, reactive backgrounds, etc.).
+* `PUT /api/preferences` — Update user preferences.
+* `POST /api/preferences/onboarding` — Complete onboarding with interests.
+
+### Homepage & Analytics (`/api/homepage`, `/api/analytics`)
+* `GET /api/homepage` — Curated homepage sections (featured, trending, new releases).
+* `GET /api/homepage/shelves` — Dynamic content shelves based on user profile.
+* `POST /api/analytics/track-event` — Track user activity events.
+* `GET /api/analytics/stats` — User listening stats (total minutes, favorite genres, top artists).
 
 ### Audio Streaming & Utilities (`/api/utils`)
-* `GET /api/utils/stream-youtube` — Low-latency HTTP 206 Partial Content range stream proxy with container header preservation (`ftyp`/`EBML`).
-* `GET /api/utils/proxy-image` — Secure album artwork cache and proxy.
+* `GET /api/utils/stream-youtube` — Low-latency HTTP 206 Partial Content range stream proxy with container header preservation.
+* `GET /api/utils/proxy-image` — Secure album artwork cache and proxy with Cloudinary fallback.
+* `GET /api/utils/extract-colors` — Extract dominant color palette from image URL.
+
+### Billing & Subscriptions (`/api/billing`, `/webhooks`)
+* `POST /api/billing/create-checkout` — Create subscription checkout session.
+* `GET /api/billing/subscription` — Get current subscription status.
+* `POST /webhooks/payment` — Payment gateway webhooks (ZenPay/ZenWallet).
+
+### Admin Routes (`/api/admin`)
+* `GET /api/admin/database` — Database admin console access.
+* `POST /api/admin/featured` — Manage featured content.
+* `POST /api/admin/notify` — Broadcast notifications to users.
+* `POST /api/admin/metadata/deduplicate` — Run metadata deduplication tasks.
 
 ---
 

@@ -30,27 +30,48 @@
 
 ## ⚡ What is Zenify?
 
-**Zenify** is an **open-source web music player and ad-free Spotify alternative** created for music lovers who appreciate clean visuals, instant playback, and **native synchronized lyrics for Indian and global regional languages**.
+**Zenify** is an **open-source music streaming platform** built for music lovers who value pristine audio quality, comprehensive multilingual synced lyrics, and professional-grade audio customization. Born from the need for better regional language support and transparent audio processing, Zenify combines the best of modern streaming with studio-grade audio tools.
 
-Commercial music apps often treat non-English lyrics as an afterthought—showing unsynced blocks of text or missing romanized words entirely. Zenify features a custom **karaoke-grade lyric alignment engine**, a hardware-accelerated **StudioFX Audio DSP Suite** (right-side glass panel, 10-band EQ, 8D spatial sound, nightcore/slowed modes), an **in-browser local audio player**, and a dynamic liquid glass UI that flows with your album's colors.
+Unlike commercial platforms that treat non-English content as secondary, Zenify provides **karaoke-grade synchronized lyrics** with **Deepgram AI-powered onset alignment** for perfect timing, **automatic romanization** for 9 Indian languages, and **intelligent instrumental gap detection**. The built-in **Studio FX Engine** delivers hardware-accelerated audio DSP (3-band EQ, 8D spatial audio, vocal isolation, reorderable FX chain) alongside **vibe-based smart recommendations**, an **in-browser local file player**, and a stunning **liquid glassmorphism UI** with palette-reactive backgrounds.
 
-> 🎧 **Start listening immediately in your browser:** Visit **[listenzenify.vercel.app](https://listenzenify.vercel.app)** — no account or download required!
+> 🎧 **Start listening immediately:** Visit **[listenzenify.vercel.app](https://listenzenify.vercel.app)** — no account or download required!
 
 ---
 
 ## ✨ Why Listen on Zenify?
 
-* 🎤 **Sub-Second Synced Lyrics:** Real-time karaoke alignment for **Tamil, Tanglish, Hindi, Malayalam, and English** with smart protection during instrumental guitar and violin solos (`[BGM]`, `[Interlude]`).
-* 🎛️ **StudioFX Audio Suite & 8D Sound:**
-  * **Right-Side Glass FX Panel:** Quick right-side collapsible panel interface with smooth animations and bypass toggle.
-  * **Multi-Band Equalizer:** Fine-tune frequencies with instant **Bass Boost** and **Vocal Booster** presets.
-  * **8D Spatial Audio:** Immersive sound that dynamically orbits around your headphones.
-  * **DJ Playback Modes:** One-click **Nightcore** (1.5x speed) and **Daycore / Slowed** (0.75x speed + reverb).
-  * **Acoustic Reverb Spaces:** Simulate Small Hall and Cathedral listening rooms.
-* 📁 **In-Browser Local Audio Player:** Drag and drop your device's **MP3, FLAC, WAV, M4A, or AAC** files directly into Zenify to play them offline with embedded cover art and ID3 tags.
-* 🔮 **Liquid Glassmorphism & Reactive Aura:** Dynamic canvas visualizer that extracts dominant colors from your album art and pulses with the music's bass.
-* 🚀 **Instant Audio Playback:** Dual-buffer streaming preloads upcoming songs for seamless, gapless playback.
-* 📱 **Installable Everywhere (PWA):** Install Zenify directly on Windows, macOS, Android, or iOS with full lock-screen playback controls and Bluetooth media button support.
+* 🎤 **Sub-Second Synced Lyrics with AI Onset Alignment:** Real-time karaoke-grade lyric synchronization powered by **Deepgram AI** for precise onset detection. Supports **Tamil, Tanglish, Hindi, Malayalam, Telugu, Kannabi, Bengali, Punjabi, Gujarati, and English** with automatic romanization. Features intelligent instrumental gap detection (`• • •` markers during breaks >3.2s) and word-level timing.
+
+* 🎛️ **Professional Studio FX Engine (Right-Side Glass Panel):**
+  * **Collapsible Accordion Sections:** Six organized sections (Presets, Tune, Space, Voice, Chain, Tempo) in a 320px glass panel matching Queue/Lyrics style
+  * **3-Band Parametric Equalizer:** Bass (110Hz), Mid (1.5kHz), Treble (8kHz) with ±12dB adjustment
+  * **Reorderable FX Chain:** Customize signal routing order (EQ → Filter → Drive → Chorus → Echo → Reverb)
+  * **Native Vocal Isolation:** Zero-latency WebAudio Mid-Side processor for karaoke and vocal enhancement
+  * **8D Spatial Audio:** Bi-directional panner-based 3D sound with adjustable orbit speed
+  * **DJ-Style Filter:** High-pass/low-pass with frequency visualization (20Hz-20kHz sweep)
+  * **Advanced Effects:** Chorus, Echo (with feedback control), Reverb (Small Hall/Cathedral), Warmth/Drive saturation, Stereo Width (mono to 200%)
+  * **Speed & Pitch Control:** Independent speed (0.5x-2x) and pitch shifting for Nightcore/Daycore
+  * **Night Mode:** Dynamics compression with makeup gain for comfortable late-night listening
+  * **10+ Built-in Presets:** After Hours, Immersive, Studio Clarity, Headphones, Bass Boost, Vocal Boost, Concert Hall, Lo-Fi, Dream Echo
+
+* 📁 **Local Audio Player (Zero Upload):** Drag and drop **MP3, FLAC, WAV, M4A, AAC** files directly into your browser. Zenify extracts embedded cover art and ID3 tags client-side—your files never leave your device.
+
+* 🎵 **Intelligent 3-Tier Queue System:**
+  * **User Queue:** FIFO queue for manually added tracks (preserves order during shuffle)
+  * **Context Queue:** Tracks from album/playlist (affected by shuffle)
+  * **Play History:** Last 50 tracks for seamless backward navigation
+  * **Vibe-Based Autoplay:** Automatically continues with similar tracks when queue ends
+  * **Repeat Modes:** Off, Repeat One (1x), Repeat Two (2x), Repeat All
+
+* 🔮 **Liquid Glassmorphism & Palette Reactive Backgrounds:** Dynamic canvas-based reactive animations extract and pulse dominant colors from your album art in sync with the music's beat. Customizable per surface (Full Player, Track Page, Album Page).
+
+* 🚀 **Gapless Playback with Dual-Buffer Preloading:** Seamless transitions between tracks with intelligent preloading and configurable crossfade (0-10 seconds).
+
+* 📱 **Progressive Web App (PWA):** Install on **Windows, macOS, Linux, Android, and iOS** with native features:
+  - Lock screen media controls
+  - Bluetooth media button support (headphone play/pause, next/prev)
+  - Offline playback capability
+  - App-like experience without app store downloads
 
 ---
 
@@ -92,7 +113,7 @@ Looking to contribute, inspect the Web Audio DSP routing, self-host a backend in
 
 ## 🔍 Topics & Keywords
 
-`spotify-alternative` • `synced-lyrics` • `karaoke-player` • `tamil-lyrics-online` • `tanglish-lyrics` • `hindi-synced-lyrics` • `8d-audio` • `web-equalizer` • `nightcore-player` • `slowed-and-reverb` • `local-music-player` • `flac-player` • `pwa-music-player` • `open-source-music-player` • `free-music-streaming`
+`music-streaming` • `open-source-music-player` • `spotify-alternative` • `synced-lyrics` • `karaoke-player` • `ai-lyrics-alignment` • `deepgram-integration` • `tamil-lyrics` • `hindi-lyrics` • `tanglish-lyrics` • `malayalam-lyrics` • `telugu-lyrics` • `romanization` • `studio-fx` • `audio-equalizer` • `8d-audio` • `spatial-audio` • `vocal-isolation` • `web-audio-api` • `nightcore` • `daycore` • `slowed-reverb` • `local-music-player` • `flac-player` • `mp3-player` • `pwa-music-app` • `glassmorphism-ui` • `react-music-player` • `vite-app` • `fastify-backend` • `prisma-orm` • `postgresql` • `typescript` • `real-time-lyrics` • `music-recommendation` • `playlist-manager` • `free-streaming` • `ad-free-music`
 
 ---
 
