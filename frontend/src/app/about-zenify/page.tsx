@@ -8,35 +8,35 @@ import { PageHeader, BackButton, Section, stagger, rise } from "@/components/sha
 
 const features = [
   {
-    title: "Lossless sound quality",
-    body: "Zenify plays pristine 320kbps streams directly from clean Akamai CDNs and lossless storage without lossy re-encoding or 30-second snippet truncation.",
+    title: "Sound quality",
+    body: "Where possible, Zenify plays the original AAC streams from the iTunes CDN instead of re-encoding them, so the audio isn’t compressed a second time.",
   },
   {
     title: "Recommendations",
-    body: "Suggestions are based on what you listen to, adapting organically to your taste the more you play.",
+    body: "Suggestions are based on what you listen to, so they get better the more you play.",
   },
   {
-    title: "Instant full playback",
-    body: "Direct HTTPS stream resolution provides immediate playback startup and native HTTP 206 range seeking.",
+    title: "Fast playback",
+    body: "Zenify skips extra metadata lookups and goes straight to a direct HTTPS stream, so tracks start quickly and seeking works.",
   },
   {
     title: "Privacy",
-    body: "Zero advertisements, third-party trackers, or marketing cookies. Your profile is stored locally in your browser’s IndexedDB.",
+    body: "No ads, trackers or cookies. Your listening profile is kept in your browser’s local IndexedDB storage.",
   },
 ];
 
 const steps = [
   {
-    title: "Resolve pristine audio",
-    body: "Search extracts high-definition metadata and resolves uncompressed 320kbps full-length tracks via JioSaavn Clean CDN and dedicated endpoints.",
+    title: "Find a preview",
+    body: "Search cleans up track titles by removing video tags and extra text, then checks the iTunes CDN first for a direct AAC preview.",
   },
   {
-    title: "Real-time stream proxy fallback",
-    body: "When direct CDN streams aren’t available, our backend proxy preserves audio container headers (MP4 ftyp / WebM EBML) for gapless seeking.",
+    title: "Fall back to the proxy",
+    body: "If there’s no CDN match, the stream goes through our backend proxy. It keeps the original MP4 or WebM headers so the browser can decode and seek natively.",
   },
   {
     title: "Keep the player mounted",
-    body: "The HTML5 audio element lives at the root of the React tree, ensuring uninterrupted playback across page transitions with zero DOM abort errors.",
+    body: "The audio element lives at the root of the React tree, so moving between pages doesn’t interrupt playback or cause play-abort warnings.",
   },
 ];
 

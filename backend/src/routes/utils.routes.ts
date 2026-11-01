@@ -1052,6 +1052,14 @@ export async function utilsRoutes(server: FastifyInstance) {
         };
         const isPreviewRequested = preview === 'true' || mode === 'preview';
 
+        // ── SCRAPER PROTECTION & BOT FILTERING ──
+        const rawUa = (request.headers['user-agent'] || '').toLowerCase();
+        const isBot = /python|scrapy|bytespider|ccbot|curl\/|wget\/|httpclient|java\/|libwww|aiohttp|urllib/i.test(rawUa);
+        if (isBot) {
+            server.log.warn(`[stream-youtube] Blocked unauthorized media scraper: UA="${rawUa}" IP="${request.ip}"`);
+            return reply.status(403).send({ error: 'Audio stream scraping is strictly prohibited.' });
+        }
+
         if (!url && !trackId && !title) {
             return reply.status(400).send({ error: 'URL or search query is required' });
         }
