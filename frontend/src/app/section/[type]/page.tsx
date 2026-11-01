@@ -5,8 +5,9 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { 
   Play, Pause, Shuffle, ArrowLeft, Search, Music, Sparkles, 
-  TrendingUp, Clock, User, Disc, Heart, Layers, Grid, List, Plus
+  TrendingUp, Clock, User, Disc, Layers, Grid, List, Plus
 } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlayerStore, Track } from "@/store/player";
 import { MediaCard } from "@/components/shared/MediaCard";
@@ -95,7 +96,7 @@ export default function SectionPage() {
         return {
           title: "Made For You",
           subtitle: "BASED ON YOUR SONIC PREFERENCES",
-          icon: Heart,
+          icon: SwiftUIHeart,
           badge: "Personalized",
           endpoint: "/homepage/recommendations",
           fallbackEndpoint: "/homepage/featured"
@@ -253,7 +254,7 @@ export default function SectionPage() {
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-white/5">
           <div>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-none font-brand" style={{ fontFamily: "'Orange Avenue', serif" }}>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-none">
               {sectionInfo.title}
             </h1>
             <p className="text-xs sm:text-sm text-zinc-400 font-medium tracking-wider uppercase mt-2">

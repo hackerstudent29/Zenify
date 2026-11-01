@@ -21,6 +21,8 @@ import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { EditPlaylistCoverModal } from "@/components/shared/EditPlaylistCoverModal";
 import { AddSongsToPlaylistModal } from "@/components/shared/AddSongsToPlaylistModal";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
+import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
+import { Equalizer } from "@/components/ui/Equalizer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -277,69 +279,43 @@ export default function PlaylistDetailPage() {
  </div>
 
  <div className="flex items-center justify-center sm:justify-start gap-4 flex-wrap">
-          {/* Play / Pause pill */}
-          <button
-            onClick={() => {
+          <MediaActionButtons
+            isPlaying={isPlaylistCurrentlyPlaying}
+            onPlay={() => {
               if (!playlist || !playlist.tracks || playlist.tracks.length === 0) {
                 showToast("This playlist has no tracks yet", "error");
                 return;
               }
               handlePlayPlaylist();
             }}
-            className="flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-white h-12 px-8 rounded-full font-bold text-[15px] active:scale-95 transition-all cursor-pointer shadow-none"
-          >
-            {isPlaylistCurrentlyPlaying ? (
-              <>
-                <Pause size={18} className="text-brand" fill="currentColor" />
-                <span>Pause</span>
-              </>
-            ) : (
-              <>
-                <Play size={18} className="text-brand" fill="currentColor" />
-                <span>Play</span>
-              </>
-            )}
-          </button>
-
-          {/* Shuffle (circular) */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
+            isShuffled={isShuffled}
+            onShuffle={() => {
               if (!playlist || !playlist.tracks || playlist.tracks.length === 0) {
                 showToast("This playlist has no tracks yet", "error");
                 return;
               }
               handleShufflePlay();
             }}
-            className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-xl transition-all active:scale-90 cursor-pointer shadow-none",
-              isShuffled ? "text-brand border border-brand/50 bg-brand/20 shadow-[0_0_15px_rgba(225,29,72,0.2)]" : "text-white/80 bg-white/10 hover:bg-white/20 border border-white/15"
-            )}
-            title="Shuffle"
-          >
-            <Shuffle size={18} />
-          </button>
+          />
 
           {isOwner && (
             <button
               onClick={() => setIsAddSongsModalOpen(true)}
-              className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-brand h-12 px-6 rounded-full font-bold text-[14px] md:text-[15px] active:scale-95 transition-all cursor-pointer shadow-none"
+              className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 text-brand h-10 px-5 rounded-full font-bold text-[13px] active:scale-95 transition-all cursor-pointer shadow-none"
             >
-              <Plus size={18} className="text-brand" strokeWidth={2.5} />
+              <Plus size={16} className="text-brand" strokeWidth={2.5} />
               <span>Add Songs</span>
             </button>
           )}
-
-                    
 
           {/* Playlist Three-Dot Actions Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button 
-                className="w-12 h-12 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 active:scale-90 cursor-pointer transition-all shadow-none"
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white/80 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/15 active:scale-90 cursor-pointer transition-all shadow-none"
                 title="Playlist Options"
               >
-                <MoreHorizontal size={20} />
+                <MoreHorizontal size={18} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="start">
@@ -419,16 +395,7 @@ export default function PlaylistDetailPage() {
  {/* Index */}
  <div className="w-6 flex items-center justify-center shrink-0">
  {isTrackPlaying ? (
- <div className="flex items-end gap-[1.5px] h-[12px] mb-0.5">
- {[0.1, 0.4, 0.2, 0.5].map((d, i) => (
- <motion.div
- key={i}
- animate={{ height: ["30%", "100%", "30%"] }}
- transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: "easeInOut", delay: d }}
- className="w-[2.5px] bg-brand rounded-full"
- />
- ))}
- </div>
+ <Equalizer playing size="xs" />
  ) : (
  <span className="text-sm font-bold text-white opacity-40 group-hover:opacity-70">{index + 1}</span>
  )}

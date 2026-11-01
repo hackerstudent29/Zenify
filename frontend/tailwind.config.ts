@@ -34,8 +34,8 @@ const config: Config = {
             fontFamily: {
                 // SF Pro Display loaded via CDN in globals.css, falls back to Inter
                 sans: ['"SF Pro Display"', '-apple-system', 'BlinkMacSystemFont', '"Inter"', 'system-ui', 'sans-serif'],
-                // Orange Avenue — stylized headings, track titles (desktop only)
-                brand: ['"Orange Avenue"', 'serif'],
+                // Apple UI Typography stack
+                brand: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"SF Pro Text"', '"SF Pro"', '"Inter"', 'system-ui', 'sans-serif'],
                 // Hi — EXCLUSIVE to the Zenify logo only
                 zenify: ['"Hi"', 'sans-serif'],
                 cormorant: ['"Cormorant Garamond"', '"Georgia"', 'serif'],

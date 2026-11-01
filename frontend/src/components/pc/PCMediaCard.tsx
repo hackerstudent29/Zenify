@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic, ListPlus, RefreshCw } from "lucide-react";
+import { Play, Pause, MoreHorizontal, ShoppingCart, Plus, Download, Maximize2, User, ArrowRight, Mic, ListPlus, RefreshCw } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
+import { Equalizer } from "@/components/ui/Equalizer";
 import { useRefetchAudio } from "@/hooks/useRefetchAudio";
 import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
 import { getRefetchLyricsAnimatedMenuItem } from "@/components/shared/RefetchLyricsSubMenu";
@@ -295,7 +297,7 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
            : "text-white/80 hover:text-brand"
        )}
      >
-       <Heart size={14} className={cn(isLiked && "fill-current")} />
+       <SwiftUIHeart size={15} filled={!!isLiked} className={cn(isLiked ? "text-brand" : "text-white/80 hover:text-brand")} />
      </motion.div>
    </button>
  )}
@@ -433,7 +435,7 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
            ] : []),
            ...(!isAlbum ? [{
              id: 'favorite',
-             icon: <Heart size={16} className={isLiked ? "fill-current text-[#EF4444]" : "opacity-70"} />,
+             icon: <SwiftUIHeart size={16} filled={!!isLiked} className={isLiked ? "text-brand" : "opacity-70"} />,
              label: isLiked ? "Saved to Library" : "Save to Library",
              onClick: (e: any) => { e.stopPropagation(); toggleLikeMutation.mutate(); }
            }] : []),
@@ -488,16 +490,7 @@ export const PCMediaCard = React.memo(function PCMediaCard({ track, className, i
  <AnimatePresence>
  {isActuallyPlaying && (
  <div className="absolute bottom-3 left-12 pointer-events-none z-20">
- <div className="flex items-end gap-[2px] h-[14px]">
- {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
- <motion.div
- key={i}
- animate={{ height: ["35%", "100%", "35%"] }}
- transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
- className="w-[3px] bg-brand rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
- />
- ))}
- </div>
+ <Equalizer playing size="sm" />
  </div>
  )}
  </AnimatePresence>

@@ -20,17 +20,13 @@ export function ReleaseRowSection({ title, items, seeAllHref }: ReleaseRowSectio
         {seeAllHref ? (
           <Link
             href={seeAllHref}
-            className="group flex items-center gap-1.5 text-xl md:text-2xl font-bold text-white tracking-tight hover:text-white/80 transition-colors font-brand"
-            style={{ fontFamily: "'Orange Avenue', serif" }}
+            className="group flex items-center gap-1.5 text-xl md:text-2xl font-bold text-white tracking-tight hover:text-white/80 transition-colors"
           >
             <span>{title}</span>
             <ChevronRight size={22} className="text-white/40 group-hover:text-white transition-colors group-hover:translate-x-0.5 duration-200" />
           </Link>
         ) : (
-          <div
-            className="flex items-center gap-1.5 text-xl md:text-2xl font-bold text-white tracking-tight font-brand"
-            style={{ fontFamily: "'Orange Avenue', serif" }}
-          >
+          <div className="flex items-center gap-1.5 text-xl md:text-2xl font-bold text-white tracking-tight">
             <span>{title}</span>
             <ChevronRight size={22} className="text-white/40" />
           </div>

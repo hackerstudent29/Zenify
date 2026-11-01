@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, Heart, MoreHorizontal, ShoppingCart, Plus, Download } from "lucide-react";
+import { Play, Pause, MoreHorizontal, ShoppingCart, Plus, Download } from "lucide-react";
+import { Equalizer } from "@/components/ui/Equalizer";
 import { cn, getMediaUrl, getTrackCover, formatDisplayTitle } from "@/lib/utils";
 import { UniversalMediaCover } from "../shared/UniversalMediaCover";
 import { ZenLoading } from "@/components/ui/ZenLoading";
@@ -222,16 +223,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
  exit={{ opacity: 0, scale: 0.8 }}
  className="absolute bottom-3 left-3 flex items-center justify-center pointer-events-none z-20 bg-black/40 backdrop-blur-md p-2 rounded-xl border border-white/10"
  >
- <div className="flex items-end gap-[2px] h-[10px]">
- {[0.2, 0.4, 0.1, 0.5].map((delay, i) => (
- <motion.div
- key={i}
- animate={{ height: ["35%", "100%", "35%"] }}
- transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay }}
- className="w-[2px] bg-brand rounded-full shadow-[0_0_8px_rgba(var(--accent-brand-rgb),0.5)]"
- />
- ))}
- </div>
+ <Equalizer playing size="xs" />
  </motion.div>
  )}
  </AnimatePresence>

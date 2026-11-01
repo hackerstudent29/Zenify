@@ -1,6 +1,6 @@
 import React from "react";
 
-interface IconProps extends React.SVGProps<SVGSVGElement> {
+export interface IconProps extends React.SVGProps<SVGSVGElement> {
   size?: number | string;
   className?: string;
   fill?: string;
@@ -23,6 +23,7 @@ export function SwiftUIPlay({ size = 20, className = "", fill = "currentColor", 
     </svg>
   );
 }
+export const SFPlay = SwiftUIPlay;
 
 /**
  * Apple Music Swift UI (SF Symbols) Pause Icon: `pause.fill`
@@ -42,6 +43,7 @@ export function SwiftUIPause({ size = 20, className = "", fill = "currentColor",
     </svg>
   );
 }
+export const SFPause = SwiftUIPause;
 
 /**
  * Apple Music Swift UI (SF Symbols) Forward / Next Track: `forward.fill`
@@ -60,6 +62,7 @@ export function SwiftUIForward({ size = 20, className = "", fill = "currentColor
     </svg>
   );
 }
+export const SFForward = SwiftUIForward;
 
 /**
  * Apple Music Swift UI (SF Symbols) Backward / Previous Track: `backward.fill`
@@ -78,6 +81,7 @@ export function SwiftUIBackward({ size = 20, className = "", fill = "currentColo
     </svg>
   );
 }
+export const SFBackward = SwiftUIBackward;
 
 /**
  * Apple Music Swift UI (SF Symbols) Shuffle: `shuffle`
@@ -90,20 +94,20 @@ export function SwiftUIShuffle({ size = 20, className = "", stroke = "currentCol
       viewBox="0 0 24 24"
       fill="none"
       stroke={stroke}
-      strokeWidth="2.2"
+      strokeWidth={2.2}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
       {...props}
     >
-      <path d="M16 3h5v5" />
-      <path d="M4 20L21 3" />
-      <path d="M21 16v5h-5" />
-      <path d="M15 15l6 6" />
-      <path d="M4 4l5 5" />
+      <path d="M3 7h2.6c2 0 3.3.9 4.3 2.4l3.2 5.2c1 1.5 2.3 2.4 4.3 2.4H20" />
+      <path d="M3 17h2.6c2 0 3.3-.9 4.3-2.4l3.2-5.2c1-1.5 2.3-2.4 4.3-2.4H20" />
+      <path d="M17.2 4.4L20.2 7l-3 2.6" />
+      <path d="M17.2 14.4L20.2 17l-3 2.6" />
     </svg>
   );
 }
+export const SFShuffle = SwiftUIShuffle;
 
 /**
  * Apple Music Swift UI (SF Symbols) Repeat Loop: `repeat`
@@ -116,19 +120,20 @@ export function SwiftUIRepeat({ size = 20, className = "", stroke = "currentColo
       viewBox="0 0 24 24"
       fill="none"
       stroke={stroke}
-      strokeWidth="2.2"
+      strokeWidth={2.2}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
       {...props}
     >
-      <path d="M17 1l4 4-4 4" />
-      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-      <path d="M7 23l-4-4 4-4" />
-      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+      <path d="M4 11v-1a3 3 0 0 1 3-3h12.2" />
+      <path d="M16.4 4.4L19.4 7l-3 2.6" />
+      <path d="M20 13v1a3 3 0 0 1-3 3H4.8" />
+      <path d="M7.6 14.4L4.6 17l3 2.6" />
     </svg>
   );
 }
+export const SFRepeat = SwiftUIRepeat;
 
 /**
  * Apple Music Swift UI (SF Symbols) Repeat One: `repeat.1`
@@ -141,20 +146,21 @@ export function SwiftUIRepeatOne({ size = 20, className = "", stroke = "currentC
       viewBox="0 0 24 24"
       fill="none"
       stroke={stroke}
-      strokeWidth="2.2"
+      strokeWidth={2.2}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
       {...props}
     >
-      <path d="M17 1l4 4-4 4" />
-      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-      <path d="M7 23l-4-4 4-4" />
-      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+      <path d="M4 11v-1a3 3 0 0 1 3-3h12.2" />
+      <path d="M16.4 4.4L19.4 7l-3 2.6" />
+      <path d="M20 13v1a3 3 0 0 1-3 3H4.8" />
+      <path d="M7.6 14.4L4.6 17l3 2.6" />
       <path d="M11 10.5h1.5v4" strokeWidth="2" />
     </svg>
   );
 }
+export const SFRepeatOne = SwiftUIRepeatOne;
 
 /**
  * Apple Music Swift UI (SF Symbols) Queue: `music.note.list`
@@ -167,7 +173,7 @@ export function SwiftUIQueue({ size = 20, className = "", stroke = "currentColor
       viewBox="0 0 24 24"
       fill="none"
       stroke={stroke}
-      strokeWidth="2.2"
+      strokeWidth={2.2}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -182,6 +188,141 @@ export function SwiftUIQueue({ size = 20, className = "", stroke = "currentColor
     </svg>
   );
 }
+export const SFQueue = SwiftUIQueue;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Lyrics: `quote.bubble`
+ */
+export function SwiftUILyrics({ size = 20, className = "", stroke = "currentColor", ...props }: IconProps & { stroke?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path d="M8 9h8M8 12.5h5" />
+    </svg>
+  );
+}
+export const SFLyrics = SwiftUILyrics;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Studio FX / Equalizer / Sliders: `slider.horizontal.3`
+ */
+export function SwiftUIFx({ size = 20, className = "", stroke = "currentColor", ...props }: IconProps & { stroke?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={2}
+      strokeLinecap="round"
+      className={className}
+      {...props}
+    >
+      <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+      <circle cx="15" cy="7" r="2" />
+      <circle cx="9" cy="17" r="2" />
+    </svg>
+  );
+}
+export const SFFx = SwiftUIFx;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Speaker / Volume: `speaker.wave.2.fill`
+ */
+export function SwiftUISpeaker({
+  size = 20,
+  level = 1,
+  className = "",
+  stroke = "currentColor",
+  fill = "currentColor",
+  ...props
+}: IconProps & { level?: number; stroke?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill={fill} />
+      {level === 0 ? (
+        <path d="M16 9.5l5 5M21 9.5l-5 5" />
+      ) : (
+        <>
+          <path d="M15.5 9a4 4 0 0 1 0 6" />
+          {level > 0.5 && <path d="M18.2 6.5a8 8 0 0 1 0 11" />}
+        </>
+      )}
+    </svg>
+  );
+}
+export const SFSpeaker = SwiftUISpeaker;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Expand / Fullscreen: `arrow.up.left.and.arrow.down.right`
+ */
+export function SwiftUIExpand({ size = 20, className = "", stroke = "currentColor", ...props }: IconProps & { stroke?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
+    </svg>
+  );
+}
+export const SFExpand = SwiftUIExpand;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Info: `info.circle`
+ */
+export function SwiftUIInfo({ size = 20, className = "", stroke = "currentColor", ...props }: IconProps & { stroke?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={stroke}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" strokeWidth={2.5} />
+    </svg>
+  );
+}
+export const SFInfo = SwiftUIInfo;
 
 /**
  * Apple Music Swift UI More Options: `ellipsis`
@@ -202,3 +343,38 @@ export function SwiftUIEllipsis({ size = 20, className = "", fill = "currentColo
     </svg>
   );
 }
+export const SFEllipsis = SwiftUIEllipsis;
+
+/**
+ * Apple Music Swift UI (SF Symbols) Heart: `heart` / `heart.fill`
+ * Universal heart symbol used across the global player and everywhere in Zenify.
+ */
+export function SwiftUIHeart({
+  size = 20,
+  filled,
+  className = "",
+  fill,
+  stroke = "currentColor",
+  strokeWidth = 2,
+  ...props
+}: IconProps & { filled?: boolean; stroke?: string; strokeWidth?: number }) {
+  const isFilled = filled !== undefined ? filled : (fill && fill !== "none") || (className && className.includes("fill-"));
+  const finalFill = isFilled ? (fill && fill !== "none" ? fill : "currentColor") : (fill || "none");
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={finalFill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M12 21s-7-4.35-9.5-9C.9 8.6 2.6 4.5 6.5 4.5c2.1 0 3.9 1.1 5.5 3.2 1.6-2.1 3.4-3.2 5.5-3.2 3.9 0 5.6 4.1 4 7.5-2.5 4.65-9.5 9-9.5 9z" />
+    </svg>
+  );
+}
+export const SFHeart = SwiftUIHeart;

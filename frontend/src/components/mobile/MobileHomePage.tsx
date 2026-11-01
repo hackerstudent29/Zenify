@@ -9,7 +9,8 @@ import { useHomepageData } from "@/hooks/useHomepageData";
 import { Track } from "@/store/player";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
-import { Play, Pause, ChevronRight, Download, Plus, Heart, Sparkles, TrendingUp, Music2, Shuffle, User } from "lucide-react";
+import { Play, Pause, ChevronRight, Download, Plus, Sparkles, TrendingUp, Music2, Shuffle, User } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import { getMediaUrl, cn, getTrackCover, formatDisplayTitle, formatArtists } from "@/lib/utils";
@@ -257,14 +258,14 @@ export function MobileHomePage() {
  {sections?.map((section: any, idx: number) => {
  const icons: any = {
  continue_listening: Music2,
- made_for_you: Heart,
+ made_for_you: SwiftUIHeart,
  popular_artists_lang: User,
  trending_now: Sparkles,
  genre_playlists: Music2,
  most_played: TrendingUp,
  new: Music2,
  trending: Sparkles,
- personalized: Heart,
+ personalized: SwiftUIHeart,
  similar: Music2,
  top_artists: User,
  top_albums: Music2

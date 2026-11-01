@@ -32,7 +32,6 @@ import {
 } from "framer-motion";
 import {
   MoreHorizontal,
-  Heart,
   Download,
   User,
   Music,
@@ -45,6 +44,7 @@ import {
   SkipForward,
   Info,
 } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -786,7 +786,7 @@ export function TrackActionsDropdown({
           animate={{ scale: 1 }}
           transition={SPRING_HEART}
         >
-          <Heart size={14} className={cn(isLiked && "fill-current text-brand")} />
+          <SwiftUIHeart size={15} filled={!!isLiked} className={cn(isLiked ? "text-brand" : "text-white/70")} />
         </motion.span>
       ),
       label: isLiked ? "Liked" : "Like",

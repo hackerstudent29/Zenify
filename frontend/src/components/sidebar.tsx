@@ -7,7 +7,6 @@ import {
   Home as HomeIcon,
   Compass,
   ListMusic,
-  Heart,
   Mic,
   HardDrive,
   Settings,
@@ -16,6 +15,7 @@ import {
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
+import { SwiftUIHeart } from "@/components/ui/SwiftUIIcons";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import { usePlayerStore } from "@/store/player";
@@ -64,7 +64,7 @@ const ROW =
 /* ------------------------------------------------------------------ */
 /* Pieces                                                              */
 /* ------------------------------------------------------------------ */
-function RowIcon({ icon: Icon, active }: { icon: LucideIcon; active?: boolean }) {
+function RowIcon({ icon: Icon, active }: { icon: LucideIcon | React.ComponentType<any>; active?: boolean }) {
   return (
     <span
       className="flex h-5 w-5 shrink-0 items-center justify-center transition-colors duration-200"
@@ -105,7 +105,7 @@ function NavLink({
   onClick,
 }: {
   href: string;
-  icon: LucideIcon;
+  icon: LucideIcon | React.ComponentType<any>;
   label: string;
   active?: boolean;
   collapsed: boolean;
@@ -350,7 +350,7 @@ export function Sidebar() {
 
                 <NavLink
                   href="/library?tab=liked"
-                  icon={Heart}
+                  icon={SwiftUIHeart}
                   label="Liked Songs"
                   active={pathname.startsWith("/library") && activeTab === "liked"}
                   collapsed={collapsed}
