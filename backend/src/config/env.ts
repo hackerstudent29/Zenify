@@ -22,6 +22,7 @@ const envSchema = z.object({
     ZENWALLET_BASE_URL: z.string().default('http://localhost:4000/v1'),
     ZENWALLET_WEBHOOK_SECRET: z.string().optional(),
     FRONTEND_URL: z.string().default('http://localhost:3001'),
+    ADMIN_EMAIL: z.string().optional(),
     SMTP_HOST: z.string().default('smtp.gmail.com'),
     SMTP_PORT: z.coerce.number().default(587),
     SMTP_USER: z.string(),

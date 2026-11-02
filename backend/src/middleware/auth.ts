@@ -11,6 +11,14 @@ declare module 'fastify' {
 
 export const authMiddleware = fp(async (server: FastifyInstance, options: FastifyPluginOptions) => {
     server.decorate('authenticate', async (request: any, reply: any) => {
+        const isAdminPath = request.url.startsWith('/api/admin') || request.url.startsWith('/admin');
+
+        // Helper to hide admin existence: return 404 for unauthenticated admin access
+        const failAuth = (msg: string) => {
+            if (isAdminPath) throw server.httpErrors.notFound();
+            throw server.httpErrors.unauthorized(msg);
+        };
+
         // 1. Try Header
         if (request.headers.authorization) {
             try {
@@ -37,7 +45,7 @@ export const authMiddleware = fp(async (server: FastifyInstance, options: Fastif
         // 3. Try Cookie
         const token = request.cookies?.accessToken;
         if (!token) {
-            throw server.httpErrors.unauthorized('Authentication required: No token found in authorization header, query param, or cookie');
+            failAuth('Authentication required: No token found in authorization header, query param, or cookie');
         }
 
         try {
@@ -45,7 +53,7 @@ export const authMiddleware = fp(async (server: FastifyInstance, options: Fastif
             request.user = decoded;
         } catch (err: any) {
             request.log.error({ err: err.message }, "Cookie verification failed");
-            throw server.httpErrors.unauthorized(`Invalid or expired session: ${err.message}`);
+            failAuth(`Invalid or expired session: ${err.message}`);
         }
     });
 
@@ -86,10 +94,21 @@ export const authMiddleware = fp(async (server: FastifyInstance, options: Fastif
 
     server.decorate('authorize', (roles: string[]) => {
         return async (request: any, reply: any) => {
+            const isAdminCheck = roles.includes('ADMIN');
+
             if (!request.user) {
+                // Return 404 for admin routes to mask existence from unauthenticated callers
+                if (isAdminCheck) {
+                    throw server.httpErrors.notFound();
+                }
                 throw server.httpErrors.unauthorized('Not authenticated');
             }
+
             if (!roles.includes(request.user.role)) {
+                // Return 404 for admin routes to mask existence from non-admin users
+                if (isAdminCheck) {
+                    throw server.httpErrors.notFound();
+                }
                 throw server.httpErrors.forbidden('Insufficient permissions');
             }
         };

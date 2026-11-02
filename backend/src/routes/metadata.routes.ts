@@ -55,7 +55,7 @@ export async function metadataRoutes(server: FastifyInstance) {
         handler: controller.syncLyrics.bind(controller)
     });
 
-    server.post('/refetch-lyrics', async (req, reply) => {
+    server.post('/refetch-lyrics', { preHandler: [server.authenticate] }, async (req, reply) => {
         const body = (req.body || {}) as any;
         const trackId = body.trackId || body.id;
         if (!trackId) {
