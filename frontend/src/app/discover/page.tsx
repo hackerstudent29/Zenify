@@ -24,7 +24,7 @@ import { useDebounce } from "use-debounce";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
 import Link from "next/link";
-import { cn, getMediaUrl, getArtistProfileImage } from "@/lib/utils";
+import { cn, getMediaUrl, getArtistProfileImage, formatArtists, formatDisplayTitle } from "@/lib/utils";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -1110,8 +1110,8 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
                             key={track.id}
                             cover={getMediaUrl(track.coverUrl) || "/logo.png"}
                             alt={track.title || "Track artwork"}
-                            title={track.title}
-                            subtitle={track.artist?.name || "Unknown Artist"}
+                            title={formatDisplayTitle(track.title)}
+                            subtitle={formatArtists(track) || "Unknown Artist"}
                             caption={`${track.countryCode || selectedCountry} · ${track.languageCode || selectedLanguage}`}
                             playable
                             isPlayingNow={currentTrack?.id === track.id && isPlaying}

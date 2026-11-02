@@ -212,15 +212,16 @@ export function TopBar() {
                   <div className="p-1 pointer-events-none select-none">
                     <div className="flex items-center gap-3 p-2.5 rounded-lg bg-white/5 border border-white/10 pointer-events-none w-full">
                       <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                        {user?.avatarUrl ? (
+                        {user?.avatarUrl && !avatarError ? (
                           <img
                             src={getMediaUrl(user.avatarUrl)}
                             className="w-full h-full object-cover"
-                            alt={user.name ? `${user.name} avatar` : "User avatar"}
+                            alt=""
                             width={36}
                             height={36}
                             loading="lazy"
                             decoding="async"
+                            onError={() => setAvatarError(true)}
                           />
                         ) : (
                           <span className="text-xs font-normal text-zinc-300 uppercase">

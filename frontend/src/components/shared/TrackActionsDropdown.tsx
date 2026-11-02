@@ -1166,11 +1166,20 @@ export function TrackActionsDropdown({
     /* Song / track */
     const albumId = track?.album?.id || track?.albumId || track?.collectionId;
     const albumTitle = track?.album?.title || track?.albumTitle || track?.collectionName;
-    const albumTarget = albumId
+    const isSingleOrVirtual =
+      track?.isSingle ||
+      !albumTitle ||
+      albumTitle.toLowerCase() === "single" ||
+      albumTitle.toLowerCase() === "unknown" ||
+      albumTitle.toLowerCase() === "undefined" ||
+      albumTitle.toLowerCase().includes("youtube release") ||
+      (albumId && (String(albumId).startsWith("yt-album-") || String(albumId) === "yt-undefined")) ||
+      albumTitle.toLowerCase().trim() === (track?.title || "").toLowerCase().trim() ||
+      albumTitle.toLowerCase().endsWith(" - single");
+
+    const albumTarget = (!isSingleOrVirtual && albumId)
       ? `/album/${encodeURIComponent(String(albumId))}`
-      : albumTitle &&
-        albumTitle.toLowerCase() !== "unknown" &&
-        albumTitle.toLowerCase() !== track?.title?.toLowerCase()
+      : (!isSingleOrVirtual && albumTitle)
       ? `/album/${encodeURIComponent(String(albumTitle))}`
       : null;
     const artistTarget = getArtistTarget(track);
