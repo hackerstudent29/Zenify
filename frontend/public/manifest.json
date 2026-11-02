@@ -1,7 +1,7 @@
 {
   "name": "Zenify – Free Music Player with Synced Lyrics & 8D Audio",
   "short_name": "Zenify",
-  "description": "Free open-source web music player with sub-second synced lyrics for Tamil, Tanglish, Hindi & English, 8D audio, a 3-band EQ and nightcore/slowed effects.",
+  "description": "Stream millions of songs with sub-second synchronized lyrics in 50+ languages, studio 3-band EQ, 8D spatial audio, and local file playback. Free & ad-free.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#121214",
