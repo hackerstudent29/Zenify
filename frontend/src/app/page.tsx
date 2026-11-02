@@ -46,7 +46,7 @@ export default function Home() {
     <MotionConfig reducedMotion="user">
       <SEO
         title="Zenify – Free Music Player with Synced Lyrics & 8D Audio"
-        description="Free open-source web music player with sub-second synced lyrics for Tamil, Tanglish, Hindi & English, 8D audio, a 3-band EQ and nightcore/slowed effects."
+        description="Stream millions of songs with sub-second synchronized lyrics in 50+ languages, studio 3-band EQ, 8D spatial audio, and local file playback. Free & ad-free."
         path="/"
         jsonLd={homeJsonLd}
       />
@@ -54,7 +54,7 @@ export default function Home() {
       {/* Visually hidden heading and summary: kept for screen readers and crawlers on every viewport. */}
       <h1 className="sr-only">Zenify: free music player with synced lyrics, 8D audio and an equalizer</h1>
       <p className="sr-only">
-        Zenify is a free, open-source web music player. Stream ad-free, tune the sound with a 3-band equalizer, and follow synced lyrics in English, Tamil, Tanglish, Hindi and Malayalam.
+        Zenify is a free, open-source web music player. Stream ad-free, tune the sound with a 3-band equalizer, and follow synced lyrics in 50+ global languages with local file playback.
       </p>
 
       {isError ? (

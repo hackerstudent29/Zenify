@@ -14,7 +14,7 @@ export interface SEOProps {
 const BASE_URL = 'https://listenzenify.vercel.app';
 const DEFAULT_IMAGE = `${BASE_URL}/og-image.png`;
 const DEFAULT_TITLE = 'Zenify – Free Music Player with Synced Lyrics & 8D Audio';
-const DEFAULT_DESCRIPTION = 'Free open-source web music player with sub-second synced lyrics for Tamil, Tanglish, Hindi & English, 8D audio, a 3-band EQ and nightcore/slowed effects.';
+const DEFAULT_DESCRIPTION = 'Stream millions of songs with sub-second synchronized lyrics in 50+ languages, studio 3-band EQ, 8D spatial audio, and local file playback. Free & ad-free.';
 
 export function SEO({
   title,
@@ -69,7 +69,7 @@ export function SEO({
       <meta property="og:image:alt" content={imageAlt} />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
-      <meta property="og:locale" content="en_IN" />
+      <meta property="og:locale" content="en_US" />
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />

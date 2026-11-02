@@ -24,7 +24,7 @@ export const HOMEPAGE_FAQS = [
 export const FEATURES = [
   {
     title: "Synced lyrics",
-    body: "Syllable-level timing for Tamil, Tanglish, Hindi, Malayalam and English songs, with instrumental gaps skipped cleanly.",
+    body: "Syllable-level synchronization in 50+ languages with instrumental solo gaps skipped cleanly.",
   },
   {
     title: "3-band equalizer",
@@ -77,10 +77,23 @@ const softwareAppSchema = {
   ],
 };
 
+const webSiteSchema = {
+  "@type": "WebSite",
+  "@id": "https://listenzenify.vercel.app/#website",
+  name: "Zenify",
+  alternateName: ["Zenify Music", "ListenZenify", "Zenify Web Player"],
+  url: "https://listenzenify.vercel.app/",
+  potentialAction: {
+    "@type": "SearchAction",
+    target: "https://listenzenify.vercel.app/discover?q={search_term_string}",
+    "query-input": "required name=search_term_string",
+  },
+};
+
 /** Home page: describes the app. */
 export const homeJsonLd = {
   "@context": "https://schema.org",
-  "@graph": [softwareAppSchema],
+  "@graph": [webSiteSchema, softwareAppSchema],
 };
 
 /** /faq page: FAQ markup lives where the questions are actually shown. */
