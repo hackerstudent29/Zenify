@@ -24,6 +24,7 @@ const sections = [
 
 /** Mobile: icon-only accordion — tap to expand/collapse each section */
 function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) {
+  const router = useRouter();
  const [openId, setOpenId] = useState<string | null>(null);
  const [avatarError, setAvatarError] = useState(false);
 
@@ -54,7 +55,24 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
  </button>
  </div>
 
- {/* Accordion Sections */}
+ 
+  {/* Admin Console Quick Button (Admins only) */}
+  {user?.role === "ADMIN" && (
+    <button
+      onClick={() => router.push("/admin")}
+      className="w-full mb-3 h-11 px-4 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-brand/30 text-brand text-xs font-bold uppercase tracking-wider flex items-center justify-between transition-all active:scale-[0.98] shadow-lg cursor-pointer"
+    >
+      <div className="flex items-center gap-2.5">
+        <Shield size={16} className="text-brand" />
+        <span className="font-bold">Admin Console</span>
+      </div>
+      <span className="text-[10px] px-2 py-0.5 rounded-md bg-brand/10 border border-brand/20 text-brand font-mono font-bold">
+        ENTER
+      </span>
+    </button>
+  )}
+
+  {/* Accordion Sections */}
  {sections.map((section) => {
  const isOpen = openId === section.id;
  const Comp = section.component;
@@ -137,6 +155,7 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
 
 /** Desktop: original tab layout */
 function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void }) {
+  const router = useRouter();
  const [activeTab, setActiveTab] = useState("profile");
  const [avatarError, setAvatarError] = useState(false);
  const ActiveComponent = sections.find(s => s.id === activeTab)?.component || ProfileSection;
@@ -180,12 +199,24 @@ function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void })
  </div>
  </div>
  </div>
- <button
- onClick={onLogout}
- className="hidden md:flex items-center gap-2 px-5 py-2 rounded-full bg-black hover:bg-rose-500/10 border border-rose-500/20 text-xs font-semibold text-rose-500 transition-all backdrop-blur-sm cursor-pointer"
- >
- <LogOut size={14} /> Log Out
- </button>
+ 
+  <div className="flex items-center gap-3">
+    {user?.role === "ADMIN" && (
+      <button
+        onClick={() => router.push("/admin")}
+        className="flex items-center gap-2 px-5 py-2 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-brand/40 text-xs font-bold text-brand uppercase tracking-wider transition-all cursor-pointer shadow-lg active:scale-95"
+      >
+        <Shield size={14} className="text-brand" /> Admin Console
+      </button>
+    )}
+    <button
+      onClick={onLogout}
+      className="hidden md:flex items-center gap-2 px-5 py-2 rounded-full bg-black hover:bg-rose-500/10 border border-rose-500/20 text-xs font-semibold text-rose-500 transition-all backdrop-blur-sm cursor-pointer"
+    >
+      <LogOut size={14} /> Log Out
+    </button>
+  </div>
+
  </div>
 
  <div className="bg-zinc-950/80 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl shadow-2xl flex items-center gap-1 overflow-x-auto no-scrollbar">
