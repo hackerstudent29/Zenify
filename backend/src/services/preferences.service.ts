@@ -5,6 +5,7 @@ import { prisma } from '../utils/prisma';
 import { SystemSettingsService } from './system-settings.service';
 
 import { MUSIC_LANGUAGES, MUSIC_GENRES, COUNTRIES } from '../constants/metadata.constants';
+import { cleanArtistNames } from '../utils/artist.js';
 
 
 
@@ -370,46 +371,48 @@ export class PreferencesService {
 
       });
 
-      const saavnItems = saavnRes.data?.results || [];
+      let saavnItems = saavnRes.data?.results || [];
+
+      if (saavnItems.length === 0) {
+        const autoRes = await axios.get('https://www.jiosaavn.com/api.php', {
+          params: {
+            __call: 'autocomplete.get',
+            _format: 'json',
+            _marker: '0',
+            api_version: '4',
+            ctx: 'web6dot0',
+            query: cleanQ
+          },
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+          timeout: 3000
+        }).catch(() => null);
+        saavnItems = autoRes?.data?.artists?.data || [];
+      }
 
       for (const item of saavnItems) {
-
         const rawName = item.name || item.title;
-
         if (!rawName || isMultiArtist(rawName, cleanQ)) continue;
 
         const cleanName = cleanArtistNames(rawName);
-
         const norm = normalizeArtistName(cleanName);
-
         if (seenNorm.has(norm)) continue;
 
-
-
         let rawArt = item.image || item.artwork || '';
-
-        if (rawArt.includes('artist-default') || rawArt.includes('placeholder')) continue;
-
-        rawArt = rawArt.replace('150x150', '500x500').replace('50x50', '500x500');
-
-
+        if (!rawArt || rawArt.includes('artist-default') || rawArt.includes('placeholder')) {
+          rawArt = `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=18181b&color=e11d48&size=500`;
+        } else {
+          rawArt = rawArt.replace('150x150', '500x500').replace('50x50', '500x500');
+        }
 
         seenNorm.add(norm);
-
         results.push({
-
           id: `saavn-artist-${item.id || item.artistId}`,
-
           name: cleanName,
-
           image: rawArt,
-
           source: 'jiosaavn'
-
         });
 
         if (results.length >= limit) break;
-
       }
 
     } catch (saavnErr: any) {

@@ -258,10 +258,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  }, [pathname, isLyricSyncPage]);
 
  const showHeader = !isLyricSyncPage;
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const scrollRef = React.useRef<HTMLElement>(null);
   useEffect(() => {
     const resetScroll = () => {
+      setIsScrolled(false);
       if (scrollRef.current) {
         const originalScrollBehavior = scrollRef.current.style.scrollBehavior;
         scrollRef.current.style.scrollBehavior = 'auto';
@@ -278,6 +280,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     resetScroll();
     const handle = requestAnimationFrame(resetScroll);
     return () => cancelAnimationFrame(handle);
+  }, [pathname]);
+
+  // Track scroll position to frosted-glass the top bar on desktop when content scrolls under it
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+
+    const handleScroll = () => {
+      const scrolled = scrollEl.scrollTop > 20;
+      setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+    };
+
+    handleScroll();
+    scrollEl.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollEl.removeEventListener('scroll', handleScroll);
   }, [pathname]);
 
   // Prevent accidental clicks on buttons/links while scrolling on mobile
@@ -347,12 +364,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  {showHeader && (
     <header 
     className={cn(
-    "z-[100] pointer-events-none am-layout-transition absolute top-0 safe-area-top",
+    "z-[100] pointer-events-none am-layout-transition absolute top-0 safe-area-top transition-colors duration-300 ease-out",
     isMobile 
       ? "fixed left-0 right-0 top-0 w-full bg-[#121214]/90 backdrop-blur-xl border-b border-white/5" 
-      : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/") || pathname?.startsWith("/artist/") || pathname === "/liked" || pathname?.startsWith("/liked"))
-        ? "bg-transparent"
-        : "bg-gradient-to-b from-[#121214]/80 to-transparent",
+      : isScrolled
+        ? "bg-[#121214]/85 backdrop-blur-xl border-b border-white/10 shadow-lg"
+        : (pathname?.startsWith("/track/") || pathname?.startsWith("/album/") || pathname?.startsWith("/playlist/") || pathname?.startsWith("/artist/") || pathname === "/liked" || pathname?.startsWith("/liked"))
+          ? "bg-transparent"
+          : "bg-gradient-to-b from-[#121214]/80 to-transparent",
     )}
   style={{
     left: "var(--sb-w)",

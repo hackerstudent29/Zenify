@@ -112,62 +112,60 @@ const fmt = (secs?: number) => {
 
 
 
+function isVirtualOrSingleAlbum(name: string, songTitle: string, id?: any): boolean {
+  if (!name) return true;
+  const nLow = name.toLowerCase().trim();
+  const sLow = songTitle.toLowerCase().trim();
+  if (
+    !nLow ||
+    nLow === "single" ||
+    nLow === "unknown" ||
+    nLow === "undefined" ||
+    nLow.includes("youtube releases") ||
+    nLow.includes("youtube release")
+  ) {
+    return true;
+  }
+  if (id && (String(id).startsWith("yt-album-") || String(id) === "yt-undefined")) {
+    return true;
+  }
+  if (nLow === sLow) return true;
+
+  const cleanSong = sLow.replace(/[^a-z0-9]/gi, "");
+  const cleanAlbum = nLow
+    .replace(/\s*-\s*single$/i, "")
+    .replace(/\s*\(single\)$/i, "")
+    .replace(/\s*\[single\]$/i, "")
+    .replace(/\s*\(from\s+[^)]+\)/gi, "")
+    .replace(/\s*-\s*ep$/i, "")
+    .replace(/[^a-z0-9]/gi, "");
+
+  if (cleanAlbum === cleanSong || nLow.startsWith(sLow)) {
+    if (nLow.includes("single") || nLow.includes("ep")) return true;
+  }
+  return false;
+}
+
 /** Album name + link target (strictly genuine albums with valid albumId) */
-
 function albumInfo(track: any) {
-
   const songTitle = decodeHtmlEntities(String(track?.title || "")).trim().toLowerCase();
-
   const name = decodeHtmlEntities(
-
     String(track?.album?.title || track?.albumTitle || track?.collectionName || "").trim()
-
   );
-
   const id = track?.album?.id || track?.albumId || track?.collectionId;
 
-
-
-  const isDummyAlbum =
-
-    !name ||
-
-    name.toLowerCase() === "single" ||
-
-    name.toLowerCase() === "unknown" ||
-
-    name.toLowerCase() === "undefined";
-
-
-
-  const sameAsSong = name.toLowerCase() === songTitle;
-
-
-
   // If there's no genuine album or ID, do not display album name or broken link
-
-  if (isDummyAlbum || !id || sameAsSong) {
-
+  if (track?.isSingle || !id || isVirtualOrSingleAlbum(name, songTitle, id)) {
     return {
-
       name: null,
-
       href: undefined,
-
     };
-
   }
 
-
-
   return {
-
     name,
-
     href: `/album/${encodeURIComponent(String(id))}`,
-
   };
-
 }
 
 
