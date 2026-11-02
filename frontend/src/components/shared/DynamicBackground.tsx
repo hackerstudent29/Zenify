@@ -41,7 +41,9 @@ export const DynamicBackground = React.memo(function DynamicBackground({
 
   // Track, album, and playlist surfaces use static album color without animation.
   // Fullview player uses fast multi-directional flowing reactive mesh with spring physics.
-  const isStatic = mode === "static" || (!mode && (surface === "albumPage" || surface === "trackPage" || surface === "other"));
+  // Normal browsing surfaces (album, track, artist, login, liked, etc.) use static zero-CPU CSS album gradients.
+  // Only the fullview player runs the liquid reactive mesh background when actively open.
+  const isStatic = mode === "static" || (!mode && surface !== "fullPlayer");
 
   if (isStatic) {
     return <StaticAlbumBackground coverUrl={props.coverUrl} covers={props.covers} palette={palette} className={props.className} />;
