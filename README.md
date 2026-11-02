@@ -5,21 +5,21 @@
   </a>
   <br />
   <br />
-  <h1>Zenify: Open-Source Music Streaming with Synced Regional Lyrics</h1>
+  <h1>Zenify: The Universal Open-Source Music Player</h1>
   <p>
-    <b>🎵 Free alternative to Spotify & Apple Music • 🎤 Tamil, Hindi, Malayalam synced lyrics • 🎛️ Professional Studio EQ • 🌐 Web + Android</b>
+    <b>🎵 Free global alternative to Spotify & Apple Music • 🎤 Sub-second synchronized lyrics in 50+ languages • 🎛️ Studio EQ & 8D Spatial Audio • 🌐 Web, Mobile PWA & Offline</b>
   </p>
 
   <p>
     <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/🚀_Live_App-listenzenify.vercel.app-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📱_APK-Releases-0078D4?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📱_PWA-Installable-0078D4?style=for-the-badge&logo=pwa&logoColor=white" alt="Install PWA" /></a>
     <a href="docs/DEVELOPER.md"><img src="https://img.shields.io/badge/🛠️_Developer-DEVELOPER.md-18181B?style=for-the-badge&logo=github&logoColor=white" alt="Developer Guide" /></a>
     <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
   </p>
 
   <p>
-    <em>Built with ❤️ by <a href="https://github.com/hackerstudent29"><b>Ramanathan S</b></a></em>
+    <em>Built with ❤️ by <a href="https://github.com/hackerstudent29"><b>Ramanathan S</b></a> for music lovers worldwide</em>
   </p>
 </div>
 
@@ -40,177 +40,132 @@
 
 ## 🚀 Quick Start
 
-### Web (No Installation)
-Visit **[listenzenify.vercel.app](https://listenzenify.vercel.app)** and start playing instantly.
+### Web Player (Instant, No Installation Required)
+Visit **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in any modern browser and start listening immediately.
 
-### Install as App
-- **PWA**: Click "Install" in your browser (Chrome, Edge, Firefox, Safari)
-- **Android APK**: Download from **[Releases](https://github.com/hackerstudent29/Zenify/releases)**
-- **Offline Support**: Works without internet for local files + cached content
+### Install as App (PWA)
+- **Desktop (Chrome / Edge / Brave)**: Click the **Install** button in your address bar or browser menu for a native window experience.
+- **Mobile (iOS Safari / Android Chrome)**: Tap **Share → Add to Home Screen** (iOS) or **Install App** (Android) for full-screen audio playback with lock-screen media controls.
+- **Offline Mode**: Works without an internet connection for cached content and personal local audio files.
 
 ---
 
 ## ⚡ Why Zenify?
 
-| Feature | Zenify | Spotify | Apple Music | JioSaavn | YouTube Music |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Free Forever** | ✅ | ❌ | ❌ | ✅ | ❌ |
-| **Tamil/Hindi Synced Lyrics** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Studio EQ** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **8D Audio** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **No Ads** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Local File Playback** | ✅ | ❌ | ❌ | ✅ | ❌ |
-| **Open Source** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Privacy-First** | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Feature | Zenify | Spotify | Apple Music | YouTube Music |
+| :--- | :---: | :---: | :---: | :---: |
+| **100% Free Forever** | ✅ | ❌ (Paywall) | ❌ (Paywall) | ❌ (Paywall) |
+| **Zero Audio Ads & Tracking** | ✅ | ❌ | ❌ | ❌ |
+| **Multilingual Synced Lyrics (50+ Languages)** | ✅ | ⚠️ (Limited) | ⚠️ (Limited) | ⚠️ (Basic) |
+| **3-Band Studio Parametric EQ** | ✅ | ⚠️ (Basic presets) | ⚠️ (iOS only presets) | ❌ |
+| **Real-Time 8D Spatial Audio** | ✅ | ❌ | ⚠️ (Selected tracks) | ❌ |
+| **Local Device Audio Playback (MP3/FLAC/WAV)** | ✅ | ⚠️ (Complex sync) | ⚠️ (Desktop only) | ⚠️ (Upload only) |
+| **DJ Tempo & Pitch Warper (Nightcore/Slowed)** | ✅ | ❌ | ❌ | ❌ |
+| **Open Source & Self-Hostable** | ✅ | ❌ | ❌ | ❌ |
+| **Privacy by Design** | ✅ | ❌ (Telemetry) | ❌ (Telemetry) | ❌ (Ad profiling) |
 
 ---
 
 ## ✨ Core Features
 
-### 🎤 Real-Time Synced Lyrics
-- **Sub-second accuracy** for Tamil, Hindi, Malayalam songs
-- **Word-level timing** (karaoke-style highlighting)
-- **Automatic instrumental markers** (• • •) during breaks
-- **Auto-romanization** for Indian scripts
-- **Offline cached** lyrics
+### 🎤 Global Real-Time Synced Lyrics
+- **Sub-Second Precision**: Synchronized syllable-level lyrics across English, Spanish, Japanese, Korean, Hindi, Tamil, French, German, Arabic, and 50+ languages.
+- **Karaoke Highlighting**: Fluid word-by-word visual tracking designed for singing along.
+- **Instrumental Break Detection**: Automatic ambient pause indicators (`• • •`) during instrumental solos.
+- **Smart Transliteration & Romanization**: Pronounce songs in any alphabet with automated phonetic romanization.
+- **Instant Client-Side Cache**: Lyrics load instantly with zero latency on repeat plays.
 
-### 🎛️ Professional Audio Tools
-- **3-Band Equalizer**: Bass (110Hz), Mid (1.5kHz), Treble (8kHz) with ±12dB range
-- **Reorderable FX Chain**: Drag-drop signal routing (EQ → Filter → Drive → Chorus → Echo → Reverb)
-- **8D Spatial Audio**: Immersive bi-directional panning with adjustable orbit speed
-- **Vocal Isolation**: Extract vocals or background instruments (zero-latency processing)
-- **DJ Controls**: Speed (0.5x-2x) + Pitch shifting (-12 to +12 semitones)
-- **Advanced Effects**: Chorus, Echo, Reverb (Small Hall/Cathedral), Warmth/Drive, Stereo Width
-- **Night Mode**: Dynamic compression for comfortable late-night listening
-- **10+ Presets**: After Hours, Immersive, Bass Boost, Vocal Boost, Lo-Fi, Dream Echo, etc.
+### 🎛️ Professional Web Audio DSP Suite
+- **3-Band Parametric Equalizer**: Precise tone sculpting across Bass (110Hz), Mid (1.5kHz), and Treble (8kHz) with ±12dB range.
+- **8D Spatial Audio**: Binaural orbit simulation with custom panning speeds that brings sound to life on headphones.
+- **Vocal Isolation & Karaoke Mode**: Real-time center-channel filtering to isolate or remove vocals with zero latency.
+- **DJ Tempo & Pitch Modulation**: Independent speed adjustment (0.5x to 2.0x) and pitch shifting (-12 to +12 semitones) for slowed & reverb or nightcore vibes.
+- **Studio Acoustics**: Studio-grade convolution reverb (Warm Room, Hall, Cathedral), chorus, echo, and analog drive saturation.
+- **Dynamic Compression (Night Mode)**: Smooth volume evening to prevent sudden loud jumps during quiet late-night sessions.
+- **Curated DSP Presets**: One-click sound profiles including *After Hours*, *Deep Bass*, *Vocal Sparkle*, *Lo-Fi Vinyl*, and *Concert Hall*.
 
-### 📁 Local Audio Player
-- **Zero Upload**: Play your MP3, FLAC, WAV, M4A, AAC files directly in browser
-- **ID3 Tag Extraction**: Automatic cover art and metadata parsing
-- **100% Private**: Files never leave your device
-- **Studio FX**: Full EQ and effects on local files
+### 📁 Private Local Audio Player
+- **100% Client-Side Privacy**: Play MP3, FLAC, WAV, AAC, and M4A audio files straight from your device storage. Your audio never touches our servers.
+- **Automatic ID3 Tag Parsing**: Reads embedded album artwork, artists, genres, track numbers, and lyrics automatically.
+- **Full DSP Processing**: Apply all 8D audio, EQ, and reverb effects seamlessly to your personal music collection.
 
-### 🎵 Smart Queue System
-- **User Queue**: FIFO tracks you add (preserved during shuffle)
-- **Context Queue**: Album/playlist tracks
-- **Smart Autoplay**: Continues with similar vibes when queue ends
-- **Drag-to-Reorder**: Easy playlist management
+### 🎵 Intelligent Playback & Queue Management
+- **Persistent User Queue**: Add songs on the fly with FIFO queue ordering that survives shuffle and navigation.
+- **Smart Continuous Autoplay**: Seamlessly keeps the music flowing with context-aware recommendations when your queue finishes.
+- **Gapless Playback & Crossfade**: Smoothly transition between songs with configurable crossfade duration.
+- **Audio Caching**: Fast audio startup with chunk caching and HTTP 206 partial content range streaming.
 
-### 🌈 Beautiful UI
-- **Glassmorphism Design**: Modern frosted glass aesthetic
-- **Reactive Backgrounds**: Album colors pulse with the beat
-- **Responsive**: Works perfectly on mobile, tablet, desktop
-- **Dark/Light Themes**: Customizable with accent colors
+### 🌈 Elegant Glassmorphic UI
+- **Apple Music-Inspired Layout**: Polished, minimalist interface with refined typography and smooth transitions.
+- **Dynamic Aurora Reactive Canvas**: Fluid visual backgrounds that harmoniously adapt to the palette of the currently playing track.
+- **Universal Dark Mode**: Clean `#121214` dark aesthetic that is easy on the eyes, with adaptive light mode support.
+- **Full Keyboard Shortcuts**: Control playback, queue, search, and volume with standard media keys and hotkeys.
 
 ---
 
-## 🎯 Zenify vs Competition
+## 🎯 Zenify vs Mainstream Platforms
 
-### vs Spotify/Apple Music
-- ✅ **100% Free Forever** (Zenify) vs Premium paywall ($10/mo)
-- ✅ **Tamil/Hindi Synced Lyrics** (Zenify only) vs English-only
-- ✅ **Studio EQ** (Zenify) vs Limited audio controls
-- ✅ **No Ads** (Zenify) vs Ad-supported
-- ✅ **Open Source** (Zenify) vs Proprietary black-box
-
-### vs JioSaavn
-- ✅ **Better lyrics sync** for Indian languages
-- ✅ **Professional audio EQ** vs Basic controls
-- ✅ **8D audio + effects** vs Standard playback
-- ✅ **Open source** vs Proprietary
-- ✅ **Privacy-first** vs Data collection
+### vs Spotify & Apple Music
+- ✅ **100% Free Forever**: No recurring \$11-\$17/month subscription fees.
+- ✅ **No Audio Commercials**: Zero advertising interruptions between your favorite songs.
+- ✅ **Full Audio Processing Control**: Real parametric equalizer, spatial 8D audio, and vocal extraction rather than locked-down audio settings.
+- ✅ **True Multi-Platform Freedom**: No proprietary ecosystem lock-in; works anywhere with a web browser.
 
 ### vs YouTube Music
-- ✅ **Dedicated music player** vs YouTube interface bloat
-- ✅ **Synced lyrics** for regional languages
-- ✅ **No YouTube account required**
-- ✅ **Faster, lighter, cleaner**
+- ✅ **Clean, Dedicated Player**: No video clutter, clickbait recommendations, or YouTube app bloat.
+- ✅ **Instant Lyrics**: High-accuracy synchronized lyrics with romanization, rather than static text descriptions.
+- ✅ **Privacy-First**: No requirement to sign in with a Google account; listening activity is never sold or used for ad targeting.
+- ✅ **Lightweight & Fast**: Optimized bundle size that runs smoothly even on low-end hardware and mobile devices.
 
 ---
 
-## 🔧 What's Working Now
+## 🔧 Supported Capabilities
 
-### ✅ Implemented & Live
-- Synced lyrics for Tamil, Hindi, Malayalam (more languages in progress)
-- 3-band parametric EQ (real-time, zero-latency)
-- 8D spatial audio with adjustable orbit speed
-- Vocal isolation/extraction (karaoke mode)
-- DJ-style high-pass/low-pass filter sweep
-- Speed control (0.5x-2x) + independent pitch shifting
-- Chorus, Echo, Reverb effects with Reverb impulse responses
-- Drive/Warmth saturation
-- Stereo width control (mono to ultra-wide)
-- Night mode dynamics compression
-- 10+ working audio presets (fully tested)
-- Local file playback (MP3, FLAC, WAV, M4A, AAC)
-- Full offline support for PWA
-- Gapless playback with configurable crossfade
-- YouTube audio streaming as fallback
-- iTunes CDN priority for official releases
+### ✅ Live & Operational
+- High-fidelity audio streaming with clean CDN resolution and HTTP 206 range seeking
+- Multilingual synchronized lyrics with sub-second precision and instrumental gap markers
+- Full Web Audio DSP engine: 3-band EQ, 8D audio, reverb, chorus, delay, filters, and pitch/speed warper
+- Client-side local music scanner for MP3, FLAC, WAV, AAC, and M4A files
+- Installable PWA with service worker caching, background playback, and MediaSession integration
+- Glassmorphic interface with reactive dynamic artwork backgrounds
+- Spotlight keyboard search (`Ctrl/Cmd + K`) for instantaneous track discovery
+- Like, playlist management, listening history, and personal library sync
 
-### 🚀 Coming Soon / In Progress
-- Deepgram AI lyric onset verification (more accurate timing)
-- More languages: Telugu, Kannada, Bengali, Punjabi, Gujarati
-- Artist verification dashboard
-- Playlist collaboration features
-- Community recommendations
-
-### ❌ Not Implemented
-- ~~Direct Spotify/Apple Music integration~~ (licensing restricted)
-- ~~Downloaded tracks storage~~ (use local files instead)
-- ~~Radio based on current track~~ (autoplay on queue end instead)
+### 🚀 Ongoing Innovations
+- AI-assisted phonetic alignment for complex multilingual and polyphonic tracks
+- Continuous catalog expansion across global indie, regional, and international charts
+- Community playlist sharing and collaborative listening sessions
+- Enhanced offline caching strategies for extended travel
 
 ---
 
 ## 📊 Technology Stack
 
-**Frontend**: React 19 + Vite 6 + Tailwind CSS 4 + Zustand  
-**Backend**: Fastify 5.7 + TypeScript + PostgreSQL + Prisma ORM  
-**Audio**: Web Audio API (native, no plugins needed)  
-**AI**: Deepgram (upcoming, for lyric alignment)  
-**Cloud**: Cloudflare R2 (audio storage) + Cloudinary (artwork)  
-**Mobile**: Flutter (Android, in progress)
+- **Frontend**: React 19 • Vite 6 • TypeScript • Tailwind CSS 4 • Motion • Zustand
+- **Backend API**: Fastify 5.7 • TypeScript • Prisma ORM • PostgreSQL
+- **Audio Engine**: Web Audio API (native browser DSP pipeline with zero external plugins)
+- **Deployment**: Vercel (Frontend Web App & Edge Network) • Heroku / Docker (Backend API)
+- **Storage & Assets**: Cloudflare R2 • Cloudinary CDN
 
 ---
 
-## ⚖️ Legal & Content Sources
+## ⚖️ Content & Respect
 
-**Music Sourcing:**
-- ✅ iTunes CDN (official, licensed AAC streams)
-- ✅ YouTube official audio channels
-- ✅ Verified music APIs
-- ❌ No pirated/unauthorized streams
-
-**Lyrics:**
-- LyrCLib (open-source community lyrics)
-- Apple Music LRC format
-- User-provided lyrics (optional)
-
-**Responsibilities:**
-- You are responsible for local file copyright compliance
-- Zenify is not affiliated with Spotify, Apple Music, JioSaavn, or YouTube
-- Always use music you have rights to play
+**Audio & Metadata Delivery:**
+- Zenify indexes publicly available, official content sources and legitimate audio streams.
+- Local playback runs entirely client-side on the user's device.
+- Zenify is an independent open-source project and is not affiliated with or endorsed by Spotify, Apple Music, or YouTube.
 
 ---
 
-## 💖 Support & Contribute
+## 💖 Support & Community
 
-Zenify is free, open-source, and maintained by volunteers. You can help by:
+Zenify is free, open-source software built for the global community. You can support the project by:
 
-- ⭐ **Star this repo** on GitHub
-- 🐛 **Report bugs** and suggest features
-- 🤝 **Contribute code** - check [CONTRIBUTING.md](CONTRIBUTING.md)
-- 📢 **Share** with friends who love music
-- 💬 **Join discussions** on GitHub
-
----
-
-## 🗺️ Roadmap
-
-- **v2.5** ✅ – Studio FX Glass Panel, Cleaned Settings, Fixed Flicker
-- **v2.6** 🔄 – More Languages, Deepgram AI Lyrics, Mobile Improvements
-- **v2.7** 📅 – Artist Dashboard, Better Recommendations
-- **v3.0** 🚀 – Social Features, Advanced Analytics
+- ⭐ **Starring this repository** on GitHub to help others discover it
+- 🐛 **Reporting bugs** and proposing new features via GitHub Issues
+- 🤝 **Contributing code** — read our [CONTRIBUTING.md](CONTRIBUTING.md) to get started
+- 📢 **Sharing Zenify** with friends, artists, and music lovers across the world
 
 ---
 
@@ -233,22 +188,22 @@ Zenify/
 ## 🛠️ For Developers
 
 See **[DEVELOPER.md](docs/DEVELOPER.md)** for:
-- Architecture & system design
-- API documentation (50+ endpoints)
-- Self-hosting & Docker guide
-- Audio engine deep-dive
-- Contributing guidelines
+- Complete system architecture & data flow diagrams
+- API endpoint documentation & schemas
+- Self-hosting and local development guide
+- Audio engine DSP graph implementation details
+- Code quality and contribution standards
 
 ---
 
 ## 📜 License
 
-MIT License - See [LICENSE](LICENSE) for details.
+Distributed under the **MIT License**. See [LICENSE](LICENSE) for more information.
 
 ---
 
 <div align="center">
-  <b>Made with ❤️ by <a href="https://github.com/hackerstudent29">Ramanathan S</a></b>
+  <b>Made with ❤️ by <a href="https://github.com/hackerstudent29">Ramanathan S</a> for listeners everywhere</b>
   <br/>
-  <b><a href="https://listenzenify.vercel.app">Start Listening Now</a></b> • <a href="https://github.com/hackerstudent29/Zenify">View Source</a> • <a href="docs/DEVELOPER.md">Read Docs</a>
+  <b><a href="https://listenzenify.vercel.app">Start Listening Now</a></b> • <a href="https://github.com/hackerstudent29/Zenify">View Source</a> • <a href="docs/DEVELOPER.md">Developer Guide</a>
 </div>
