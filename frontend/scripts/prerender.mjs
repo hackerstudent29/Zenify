@@ -6,7 +6,7 @@ const DIST_DIR = path.resolve('dist');
 const ROUTE_DATA = {
   '/': {
     title: 'Zenify – Free Music Player with Synced Lyrics & 8D Audio',
-    description: 'Free open-source web music player with sub-second synced lyrics for Tamil, Tanglish, Hindi & English, 8D audio, a 3-band EQ and nightcore/slowed effects.',
+    description: 'Stream millions of songs with sub-second synchronized lyrics in 50+ languages, studio 3-band EQ, 8D spatial audio, and local file playback. Free & ad-free.',
     canonical: 'https://listenzenify.vercel.app/',
     content: `
       <script type="application/ld+json">
@@ -47,7 +47,7 @@ const ROUTE_DATA = {
               {
                 "@type": "Question",
                 "name": "Does Zenify support synchronized lyrics?",
-                "acceptedAnswer": { "@type": "Answer", "text": "Yes, Zenify includes an AI-powered lyrics alignment engine with syllable-level timing and instrumental solo gap protection across English, Tamil, Tanglish, Hindi, and international tracks." }
+                "acceptedAnswer": { "@type": "Answer", "text": "Yes, Zenify includes an AI-powered lyrics alignment engine with syllable-level timing and instrumental solo gap protection across 50+ global languages." }
               },
               {
                 "@type": "Question",
@@ -79,7 +79,7 @@ const ROUTE_DATA = {
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
               <h3 class="text-base font-bold text-white mb-2">Multilingual Synced Lyrics</h3>
-              <p class="text-xs sm:text-sm text-zinc-400 leading-relaxed">Sub-second syllable-level lyric synchronization for Tamil, Tanglish, Hindi, Malayalam, and English songs with instrumental gap skip protection.</p>
+              <p class="text-xs sm:text-sm text-zinc-400 leading-relaxed">Sub-second syllable-level lyric synchronization in 50+ languages with instrumental solo gap protection.</p>
             </div>
             <div class="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
               <h3 class="text-base font-bold text-white mb-2">Studio 3-Band Equalizer</h3>

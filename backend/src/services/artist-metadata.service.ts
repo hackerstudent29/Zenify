@@ -98,18 +98,46 @@ export class ArtistMetadataService {
                     api_version: '4',
                     ctx: 'web6dot0',
                     p: 1,
-                    n: 3,
+                    n: 10,
                     q: cleanName
                 },
                 headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
                 timeout: 4500
             }).catch(() => null);
 
-            const match = sRes?.data?.results?.find((r: any) => {
+            const normTarget = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            let match = sRes?.data?.results?.find((r: any) => {
                 const rName = (r.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                const tName = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
-                return rName === tName || rName.includes(tName) || tName.includes(rName);
-            }) || sRes?.data?.results?.[0];
+                return rName === normTarget;
+            });
+
+            if (!match) {
+                match = sRes?.data?.results?.find((r: any) => {
+                    const rWords = (r.name || '').toLowerCase().split(/\s+/).filter(Boolean);
+                    const tWords = cleanName.toLowerCase().split(/\s+/).filter(Boolean);
+                    return tWords.length > 0 && tWords.every((tw: string) => rWords.includes(tw));
+                });
+            }
+
+            if (!match) {
+                const autoRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'autocomplete.get',
+                        _format: 'json',
+                        _marker: '0',
+                        api_version: '4',
+                        ctx: 'web6dot0',
+                        query: cleanName
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 3000
+                }).catch(() => null);
+                const autoArtists = autoRes?.data?.artists?.data || [];
+                match = autoArtists.find((r: any) => {
+                    const rName = (r.name || r.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return rName === normTarget;
+                });
+            }
 
             if (match?.id) {
                 const aRes = await axios.get('https://www.jiosaavn.com/api.php', {
