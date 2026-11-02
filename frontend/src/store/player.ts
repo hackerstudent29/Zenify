@@ -272,6 +272,34 @@ export const usePlayerStore = create<PlayerState>()(
           originalQueue: computeTotalQueue(track, userQueue, newContextQueue),
         });
 
+        // Eager upcoming queue prefill: If user started a standalone song (finalContext is empty),
+        // fetch recommendations immediately so contextQueue is already full BEFORE the song ends!
+        if (finalContext.length === 0) {
+          (async () => {
+            try {
+              const api = (await import("@/lib/api")).default;
+              const vibeParams = extractTrackVibeParams(track, 25);
+              const radioRes = await api.get('/queue/radio', { params: vibeParams });
+              const fresh = (radioRes.data?.tracks || []).filter((t: any) => t.id !== track.id);
+              if (fresh.length > 0) {
+                const state = get();
+                if (state.currentTrack?.id === track.id && state.contextQueue.length === 0) {
+                  const langTitle = vibeParams.language ? (vibeParams.language.charAt(0).toUpperCase() + vibeParams.language.slice(1)) : 'Recommended';
+                  set(s => ({
+                    contextQueue: fresh,
+                    contextOriginalQueue: fresh,
+                    contextName: s.contextName || `${langTitle} Radio`,
+                    queue: computeTotalQueue(track, s.userQueue, fresh),
+                    originalQueue: computeTotalQueue(track, s.userQueue, fresh),
+                  }));
+                }
+              }
+            } catch (err) {
+              console.warn("[PlayerStore] Eager radio queue prefetch notice:", err);
+            }
+          })();
+        }
+
         // Track play persistence: record to local recent plays
         try {
           if (typeof window !== 'undefined' && track && track.id) {
@@ -606,6 +634,31 @@ export const usePlayerStore = create<PlayerState>()(
             queue: computeTotalQueue(nextContextTrack, [], remainingContext),
             originalQueue: computeTotalQueue(nextContextTrack, [], remainingContext),
           });
+
+          // Proactively top-up if remaining upcoming tracks are low (<= 3) so queue never exhausts
+          if (remainingContext.length <= 3) {
+            (async () => {
+              try {
+                const api = (await import("@/lib/api")).default;
+                const vibeParams = extractTrackVibeParams(nextContextTrack, 25);
+                const playedIds = new Set([...(updatedHistory || []).map(t => t.id), nextContextTrack.id, ...remainingContext.map(t => t.id)]);
+                const excludeIdsStr = Array.from(playedIds).slice(-40).join(',');
+                const res = await api.get('/queue/radio', { params: { ...vibeParams, excludeIds: excludeIdsStr } });
+                const more = (res.data?.tracks || []).filter((t: any) => !playedIds.has(t.id));
+                if (more.length > 0) {
+                  set(s => {
+                    const merged = [...s.contextQueue, ...more];
+                    return {
+                      contextQueue: merged,
+                      contextOriginalQueue: [...(s.contextOriginalQueue || []), ...more],
+                      queue: computeTotalQueue(s.currentTrack || nextContextTrack, s.userQueue, merged),
+                      originalQueue: computeTotalQueue(s.currentTrack || nextContextTrack, s.userQueue, merged),
+                    };
+                  });
+                }
+              } catch (e) {}
+            })();
+          }
           return;
         }
 

@@ -176,13 +176,12 @@ export function GlobalAudio() {
           syncTrackDuration(audio.duration);
         }
 
-        // Automatic end-of-track fallback: If currentTime reaches within 400ms of duration,
-        // ensure it cleanly advances to next track even if browser misses the 'ended' event
-        if (audio.duration >= 3 && audio.currentTime >= audio.duration - 0.4) {
+        // Automatic end-of-track fallback: If audio finished or stopped at the duration boundary
+        if (audio.duration >= 3 && (audio.ended || (audio.paused && audio.currentTime >= audio.duration - 0.2))) {
           if (!isSwitchingTrackRef.current) {
-            console.log("[GlobalAudio] End boundary reached via timeupdate. Advancing to next track.");
+            console.log("[GlobalAudio] End boundary reached via timeupdate fallback. Advancing to next track.");
             isSwitchingTrackRef.current = true;
-            setTimeout(() => { isSwitchingTrackRef.current = false; }, 800);
+            setTimeout(() => { isSwitchingTrackRef.current = false; }, 600);
             playNext(false);
             return;
           }
@@ -250,14 +249,12 @@ export function GlobalAudio() {
           }
         }
 
-        // Proactive Radio Queue Refill: when queue is down to its last song and ~18s remain
-        if (audio.duration >= 20) {
-          const timeLeft = audio.duration - audio.currentTime;
-          if (timeLeft <= 18 && timeLeft > 2) {
-            const state = usePlayerStore.getState();
-            const curr = state.currentTrack;
-            const isEndOfQueue = state.contextQueue.length === 0 && (state.userQueue || []).length === 0;
-            if (isEndOfQueue && curr && !isPrefetchingRadioRef.current) {
+        // Proactive Radio Queue Refill: when queue is down to its last songs or empty
+        if (audio.duration >= 10 && audio.currentTime >= 4) {
+          const state = usePlayerStore.getState();
+          const curr = state.currentTrack;
+          const isQueueLow = state.contextQueue.length <= 2 && (state.userQueue || []).length === 0;
+          if (isQueueLow && curr && !isPrefetchingRadioRef.current) {
               let isAutoplay = true;
               try {
                 const localPref = localStorage.getItem("zenify_autoplay");
@@ -292,7 +289,6 @@ export function GlobalAudio() {
             }
           }
         }
-      }
     };
 
     const applyFx = () => {
@@ -301,14 +297,10 @@ export function GlobalAudio() {
     };
 
     const handleEnded = () => {
-      if (isSwitchingTrackRef.current) {
-        console.log("[GlobalAudio] Track ended event ignored - already switching track.");
-        return;
-      }
       console.log("[GlobalAudio] Track ended event fired. Advancing to next track.");
       isSwitchingTrackRef.current = true;
       isSourceChanging.current = false;
-      setTimeout(() => { isSwitchingTrackRef.current = false; }, 800);
+      setTimeout(() => { isSwitchingTrackRef.current = false; }, 600);
       playNext(false);
     };
     const handleLoadedMetadata = () => {
@@ -725,6 +717,7 @@ export function GlobalAudio() {
           audio.crossOrigin = 'anonymous';
         }
         audio.src = targetSrc;
+        audio.load();
 
         // Ensure playback guarantees when media is ready to play
         const handleCanPlay = () => {
