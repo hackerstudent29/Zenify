@@ -1,209 +1,131 @@
 <div align="center">
   <br />
   <a href="https://listenzenify.vercel.app">
-    <img src="assets/images/zenify_logo_animation.gif" alt="Zenify Open Source Music Streaming App Logo Animation" width="600" />
+    <img src="assets/images/zenify_logo_animation.gif" alt="Zenify Free Ad-Free Music Streaming App" width="560" />
   </a>
   <br />
   <br />
-  <h1>Zenify: The Universal Open-Source Music Player</h1>
+  <h1>Zenify: Free Ad-Free Music Streaming App</h1>
   <p>
-    <b>🎵 Free global alternative to Spotify & Apple Music • 🎤 Sub-second synchronized lyrics in 50+ languages • 🎛️ Studio EQ & 8D Spatial Audio • 🌐 Web, Mobile PWA & Offline</b>
+    <b>The beautiful, ad-free music web player with Apple-style design, synchronized lyrics, studio audio effects, and local playback.</b>
   </p>
 
   <p>
     <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/🚀_Live_App-listenzenify.vercel.app-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📱_PWA-Installable-0078D4?style=for-the-badge&logo=pwa&logoColor=white" alt="Install PWA" /></a>
-    <a href="docs/DEVELOPER.md"><img src="https://img.shields.io/badge/🛠️_Developer-DEVELOPER.md-18181B?style=for-the-badge&logo=github&logoColor=white" alt="Developer Guide" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
   </p>
 
   <p>
-    <em>Built with ❤️ by <a href="https://github.com/hackerstudent29"><b>Ramanathan S</b></a> for music lovers worldwide</em>
+    <a href="#try-it-now">Try It Now</a> •
+    <a href="#features">Features</a> •
+    <a href="#screenshots">Screenshots</a> •
+    <a href="#why-zenify">Why Zenify</a> •
+    <a href="#faq">FAQ</a> •
+    <a href="#where-the-music-comes-from">Where the Music Comes From</a>
   </p>
 </div>
 
 ---
 
-### 🏷️ Topics & Tags
-`music-streaming` • `music-streaming-app` • `music-app` • `music-player` • `online-music-player` • `free-music` • `spotify-alternative` • `ad-free` • `no-ads` • `open-source` • `audio-streaming` • `synced-lyrics` • `lyrics` • `apple-music-ui` • `playlist` • `equalizer` • `android` • `karaoke` • `local-music-player` • `mp3-player`
+## 🎧 Hero
+
+<div align="center">
+  <img src="docs/images/zenify_fullview_player.png" alt="Zenify Full-View Music Player with Reactive Dynamic Artwork Background and Studio Equalizer" width="100%" />
+</div>
+
+Zenify is a free, ad-free online music streaming player designed with a refined Apple Music-inspired visual aesthetic. Listen to your favorite songs with real-time synchronized lyrics, fine-tune your sound with a studio equalizer, or play your own local music collection directly in your browser.
 
 ---
 
-## 📸 Screenshot Preview
+## 🚀 Try It Now
 
-| 🏠 Home | 🎤 Synced Lyrics | 🎛️ Studio EQ |
-| :---: | :---: | :---: |
-| <img src="docs/images/zenify_home_dashboard.png" alt="Home" width="100%" /> | <img src="docs/images/zenify_synced_lyrics.png" alt="Lyrics" width="100%" /> | <img src="docs/images/zenify_fullview_player.png" alt="Player" width="100%" /> |
+Start listening immediately — **no sign-up or credit card required**.
+
+* **Web Player**: Open **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in any modern web browser on your phone, tablet, or computer.
+* **Install on Desktop (Windows, macOS, Linux)**: Open the link in Google Chrome, Microsoft Edge, or Brave, and click the **Install** icon in the address bar for a standalone native app experience.
+* **Install on iPhone & iPad**: Open the link in Safari, tap the **Share** button, and select **Add to Home Screen**.
+* **Install on Android**: Open the link in Google Chrome, tap the menu (⋮), and choose **Install App** or **Add to Home Screen**.
 
 ---
 
-## 🚀 Quick Start
+## ✨ Features
 
-### Web Player (Instant, No Installation Required)
-Visit **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in any modern browser and start listening immediately.
+| Feature | What It Does for You |
+|---|---|
+| **100% Free & Ad-Free** | Listen continuously without audio ads, video popups, or paid subscription gates. |
+| **Apple-Inspired Design** | Clean, distraction-free interface with glassmorphic accents and dynamic artwork color themes. |
+| **Real-Time Synced Lyrics** | Sing along with sub-second syllable-level lyric tracking and karaoke highlights in over 50 languages. |
+| **Studio 3-Band Equalizer** | Customize bass, mid, and treble frequencies to fit your headphones or sound system. |
+| **8D Spatial Audio & Audio FX** | Enjoy immersive headphone panning, warm room reverbs, and DJ speed and pitch adjustment. |
+| **Local File Player (MP3 / FLAC)** | Drop in your personal MP3, FLAC, WAV, and M4A audio files to play privately offline without uploading. |
+| **Smart Continuous Autoplay** | Keeps the vibe going automatically with complementary recommendations when your queue ends. |
+| **Instant Keyboard Search** | Press `Ctrl + K` (or `Cmd + K`) anywhere to jump straight to any artist, album, or track. |
 
-### Install as App (PWA)
-- **Desktop (Chrome / Edge / Brave)**: Click the **Install** button in your address bar or browser menu for a native window experience.
-- **Mobile (iOS Safari / Android Chrome)**: Tap **Share → Add to Home Screen** (iOS) or **Install App** (Android) for full-screen audio playback with lock-screen media controls.
-- **Offline Mode**: Works without an internet connection for cached content and personal local audio files.
+---
+
+## 📸 Screenshots
+
+| 🏠 Home Dashboard | 🎛️ Studio Player & Audio Controls |
+| :---: | :---: |
+| <img src="docs/images/zenify_home_dashboard.png" alt="Zenify Home Dashboard with Curated Music Shelves and Charts" width="100%" /> | <img src="docs/images/zenify_fullview_player.png" alt="Zenify Full Screen Player with Studio Controls" width="100%" /> |
+| *Discover trending releases and personalized collections* | *Sculpt your sound with real-time EQ and spatial audio* |
+
+| 🎤 Real-Time Synced Lyrics | 👤 Artist Discography |
+| :---: | :---: |
+| <img src="docs/images/zenify_synced_lyrics.png" alt="Zenify Sub-Second Synchronized Karaoke Lyrics" width="100%" /> | <img src="docs/images/zenify_artist_page.png" alt="Zenify Artist Profile Page with Discography and Top Tracks" width="100%" /> |
+| *Sub-second karaoke lyrics with instrumental pause indicators* | *Explore full discographies, popular songs, and related artists* |
 
 ---
 
 ## ⚡ Why Zenify?
 
-| Feature | Zenify | Spotify | Apple Music | YouTube Music |
-| :--- | :---: | :---: | :---: | :---: |
-| **100% Free Forever** | ✅ | ❌ (Paywall) | ❌ (Paywall) | ❌ (Paywall) |
-| **Zero Audio Ads & Tracking** | ✅ | ❌ | ❌ | ❌ |
-| **Multilingual Synced Lyrics (50+ Languages)** | ✅ | ⚠️ (Limited) | ⚠️ (Limited) | ⚠️ (Basic) |
-| **3-Band Studio Parametric EQ** | ✅ | ⚠️ (Basic presets) | ⚠️ (iOS only presets) | ❌ |
-| **Real-Time 8D Spatial Audio** | ✅ | ❌ | ⚠️ (Selected tracks) | ❌ |
-| **Local Device Audio Playback (MP3/FLAC/WAV)** | ✅ | ⚠️ (Complex sync) | ⚠️ (Desktop only) | ⚠️ (Upload only) |
-| **DJ Tempo & Pitch Warper (Nightcore/Slowed)** | ✅ | ❌ | ❌ | ❌ |
-| **Open Source & Self-Hostable** | ✅ | ❌ | ❌ | ❌ |
-| **Privacy by Design** | ✅ | ❌ (Telemetry) | ❌ (Telemetry) | ❌ (Ad profiling) |
+| Feature | Zenify | Spotify Free | Apple Music | YouTube Music Free |
+|---|:---:|:---:|:---:|:---:|
+| **Price** | Free | Free with ads | Paid subscription required | Free with ads |
+| **Audio Ads Between Songs** | None | Frequent audio ads | None (Paid) | Frequent video/audio ads |
+| **Account Required to Listen** | No | Yes | Yes | Yes |
+| **Real-Time Synced Lyrics** | Included | Included (Limited) | Included (Paid) | Basic text |
+| **Studio Equalizer & 8D Audio** | Included | Basic presets only | Basic presets only | None |
+| **Plays Local Files Privately** | Yes (Client-side) | Complex desktop sync | Desktop only | Upload to cloud |
+| **Pitch & Speed Warper** | Included | None | None | None |
+| **Open Source** | Yes | Closed source | Closed source | Closed source |
 
 ---
 
-## ✨ Core Features
+## ❓ Frequently Asked Questions (FAQ)
 
-### 🎤 Global Real-Time Synced Lyrics
-- **Sub-Second Precision**: Synchronized syllable-level lyrics across English, Spanish, Japanese, Korean, Hindi, Tamil, French, German, Arabic, and 50+ languages.
-- **Karaoke Highlighting**: Fluid word-by-word visual tracking designed for singing along.
-- **Instrumental Break Detection**: Automatic ambient pause indicators (`• • •`) during instrumental solos.
-- **Smart Transliteration & Romanization**: Pronounce songs in any alphabet with automated phonetic romanization.
-- **Instant Client-Side Cache**: Lyrics load instantly with zero latency on repeat plays.
+### 1. Is Zenify really free?
+Yes. Zenify is completely free and open-source. There are no paid subscription plans, no paywalls, and no audio advertisements interrupting your listening sessions.
 
-### 🎛️ Professional Web Audio DSP Suite
-- **3-Band Parametric Equalizer**: Precise tone sculpting across Bass (110Hz), Mid (1.5kHz), and Treble (8kHz) with ±12dB range.
-- **8D Spatial Audio**: Binaural orbit simulation with custom panning speeds that brings sound to life on headphones.
-- **Vocal Isolation & Karaoke Mode**: Real-time center-channel filtering to isolate or remove vocals with zero latency.
-- **DJ Tempo & Pitch Modulation**: Independent speed adjustment (0.5x to 2.0x) and pitch shifting (-12 to +12 semitones) for slowed & reverb or nightcore vibes.
-- **Studio Acoustics**: Studio-grade convolution reverb (Warm Room, Hall, Cathedral), chorus, echo, and analog drive saturation.
-- **Dynamic Compression (Night Mode)**: Smooth volume evening to prevent sudden loud jumps during quiet late-night sessions.
-- **Curated DSP Presets**: One-click sound profiles including *After Hours*, *Deep Bass*, *Vocal Sparkle*, *Lo-Fi Vinyl*, and *Concert Hall*.
+### 2. Do I need an account to listen to music?
+No. You can open Zenify and begin listening to songs, albums, and radios immediately without creating an account or providing an email address. Creating a free account is optional if you wish to sync favorite songs across devices.
 
-### 📁 Private Local Audio Player
-- **100% Client-Side Privacy**: Play MP3, FLAC, WAV, AAC, and M4A audio files straight from your device storage. Your audio never touches our servers.
-- **Automatic ID3 Tag Parsing**: Reads embedded album artwork, artists, genres, track numbers, and lyrics automatically.
-- **Full DSP Processing**: Apply all 8D audio, EQ, and reverb effects seamlessly to your personal music collection.
+### 3. Can I play my own audio files from my computer or phone?
+Yes. The **Local Library** feature allows you to select MP3, FLAC, WAV, and M4A audio files from your device storage. Files play entirely inside your browser using the HTML5 Web Audio API; your files are never uploaded to any remote server.
 
-### 🎵 Intelligent Playback & Queue Management
-- **Persistent User Queue**: Add songs on the fly with FIFO queue ordering that survives shuffle and navigation.
-- **Smart Continuous Autoplay**: Seamlessly keeps the music flowing with context-aware recommendations when your queue finishes.
-- **Gapless Playback & Crossfade**: Smoothly transition between songs with configurable crossfade duration.
-- **Audio Caching**: Fast audio startup with chunk caching and HTTP 206 partial content range streaming.
+### 4. How do the synchronized lyrics work?
+Zenify fetches timestamped lyric files and aligns them in real time with the audio timeline. Syllables and words light up dynamically as the artist sings, with visual pause markers displayed during instrumental interludes.
 
-### 🌈 Elegant Glassmorphic UI
-- **Apple Music-Inspired Layout**: Polished, minimalist interface with refined typography and smooth transitions.
-- **Dynamic Aurora Reactive Canvas**: Fluid visual backgrounds that harmoniously adapt to the palette of the currently playing track.
-- **Universal Dark Mode**: Clean `#121214` dark aesthetic that is easy on the eyes, with adaptive light mode support.
-- **Full Keyboard Shortcuts**: Control playback, queue, search, and volume with standard media keys and hotkeys.
+### 5. Can I install Zenify on my phone as an app?
+Yes. Zenify is built as a Progressive Web App (PWA). You can install it on iOS Safari (via *Share → Add to Home Screen*) or Android Chrome (via *Install App*) for full-screen listening with native lock-screen media controls.
 
 ---
 
-## 🎯 Zenify vs Mainstream Platforms
+## 🌐 Where the Music Comes From
 
-### vs Spotify & Apple Music
-- ✅ **100% Free Forever**: No recurring \$11-\$17/month subscription fees.
-- ✅ **No Audio Commercials**: Zero advertising interruptions between your favorite songs.
-- ✅ **Full Audio Processing Control**: Real parametric equalizer, spatial 8D audio, and vocal extraction rather than locked-down audio settings.
-- ✅ **True Multi-Platform Freedom**: No proprietary ecosystem lock-in; works anywhere with a web browser.
-
-### vs YouTube Music
-- ✅ **Clean, Dedicated Player**: No video clutter, clickbait recommendations, or YouTube app bloat.
-- ✅ **Instant Lyrics**: High-accuracy synchronized lyrics with romanization, rather than static text descriptions.
-- ✅ **Privacy-First**: No requirement to sign in with a Google account; listening activity is never sold or used for ad targeting.
-- ✅ **Lightweight & Fast**: Optimized bundle size that runs smoothly even on low-end hardware and mobile devices.
+* Zenify is a client player interface that discovers and streams publicly available audio streams and catalog metadata from public music indexes.
+* Personal music files are read directly from your device file system on demand and remain 100% private.
+* Zenify does not host or store copyrighted audio files on its application servers and honors content creator rights.
 
 ---
 
-## 🔧 Supported Capabilities
+## 🤝 Contribute & Support
 
-### ✅ Live & Operational
-- High-fidelity audio streaming with clean CDN resolution and HTTP 206 range seeking
-- Multilingual synchronized lyrics with sub-second precision and instrumental gap markers
-- Full Web Audio DSP engine: 3-band EQ, 8D audio, reverb, chorus, delay, filters, and pitch/speed warper
-- Client-side local music scanner for MP3, FLAC, WAV, AAC, and M4A files
-- Installable PWA with service worker caching, background playback, and MediaSession integration
-- Glassmorphic interface with reactive dynamic artwork backgrounds
-- Spotlight keyboard search (`Ctrl/Cmd + K`) for instantaneous track discovery
-- Like, playlist management, listening history, and personal library sync
-
-### 🚀 Ongoing Innovations
-- AI-assisted phonetic alignment for complex multilingual and polyphonic tracks
-- Continuous catalog expansion across global indie, regional, and international charts
-- Community playlist sharing and collaborative listening sessions
-- Enhanced offline caching strategies for extended travel
-
----
-
-## 📊 Technology Stack
-
-- **Frontend**: React 19 • Vite 6 • TypeScript • Tailwind CSS 4 • Motion • Zustand
-- **Backend API**: Fastify 5.7 • TypeScript • Prisma ORM • PostgreSQL
-- **Audio Engine**: Web Audio API (native browser DSP pipeline with zero external plugins)
-- **Deployment**: Vercel (Frontend Web App & Edge Network) • Heroku / Docker (Backend API)
-- **Storage & Assets**: Cloudflare R2 • Cloudinary CDN
-
----
-
-## ⚖️ Content & Respect
-
-**Audio & Metadata Delivery:**
-- Zenify indexes publicly available, official content sources and legitimate audio streams.
-- Local playback runs entirely client-side on the user's device.
-- Zenify is an independent open-source project and is not affiliated with or endorsed by Spotify, Apple Music, or YouTube.
-
----
-
-## 💖 Support & Community
-
-Zenify is free, open-source software built for the global community. You can support the project by:
-
-- ⭐ **Starring this repository** on GitHub to help others discover it
-- 🐛 **Reporting bugs** and proposing new features via GitHub Issues
-- 🤝 **Contributing code** — read our [CONTRIBUTING.md](CONTRIBUTING.md) to get started
-- 📢 **Sharing Zenify** with friends, artists, and music lovers across the world
-
----
-
-## 📁 Project Structure
-
-```
-Zenify/
-├── .agents/       # AI coding guidelines and audio-streaming architectural rules
-├── .github/       # CI/CD workflows (deploy, test, lint, security) and templates
-├── assets/        # Core brand assets (logo, fonts, favicon masters, animations)
-├── backend/       # Fastify 5.7 API server (Prisma ORM, routes, controllers, services)
-├── docs/          # Comprehensive technical documentation, architecture specs, and screenshots
-│   └── images/    # Application screenshots referenced in documentation
-├── frontend/      # Vite + React 19 web streaming application (SPA / PWA)
-└── scripts/       # Deployment and automation scripts (deploy.sh, deploy.ps1)
-```
-
----
-
-## 🛠️ For Developers
-
-See **[DEVELOPER.md](docs/DEVELOPER.md)** for:
-- Complete system architecture & data flow diagrams
-- API endpoint documentation & schemas
-- Self-hosting and local development guide
-- Audio engine DSP graph implementation details
-- Code quality and contribution standards
+Zenify is free and open-source software built for music lovers around the world. If you enjoy listening with Zenify, please **star this repository on GitHub** and share it with your friends!
 
 ---
 
 ## 📜 License
 
-Distributed under the **MIT License**. See [LICENSE](LICENSE) for more information.
-
----
-
-<div align="center">
-  <b>Made with ❤️ by <a href="https://github.com/hackerstudent29">Ramanathan S</a> for listeners everywhere</b>
-  <br/>
-  <b><a href="https://listenzenify.vercel.app">Start Listening Now</a></b> • <a href="https://github.com/hackerstudent29/Zenify">View Source</a> • <a href="docs/DEVELOPER.md">Developer Guide</a>
-</div>
+Distributed under the **MIT License**. Created by [Ramanathan S](https://github.com/hackerstudent29).
