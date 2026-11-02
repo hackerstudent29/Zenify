@@ -1,3 +1,4 @@
+import { config } from '../config/env';
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../utils/prisma.js';
 import { askAI, DEFAULT_MODEL } from '../utils/ai.js';
@@ -6,8 +7,9 @@ export class AnalyticsService {
     constructor(private server: FastifyInstance) { }
 
     async getOverallMetrics(userId: string) {
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-        const isAdmin = user?.email === 'ramzendrum@gmail.com';
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
+        const adminEmail = config.ADMIN_EMAIL ? config.ADMIN_EMAIL.toLowerCase().trim() : 'ramzendrum@gmail.com';
+        const isAdmin = user?.role === 'ADMIN' || user?.email === adminEmail;
 
         if (isAdmin) {
             const totalReleases = await prisma.track.count({
@@ -71,8 +73,9 @@ export class AnalyticsService {
     }
 
     async getTopTracks(userId: string) {
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-        const isAdmin = user?.email === 'ramzendrum@gmail.com';
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
+        const adminEmail = config.ADMIN_EMAIL ? config.ADMIN_EMAIL.toLowerCase().trim() : 'ramzendrum@gmail.com';
+        const isAdmin = user?.role === 'ADMIN' || user?.email === adminEmail;
 
         if (isAdmin) {
             const topTracks = await prisma.track.findMany({
@@ -115,8 +118,9 @@ export class AnalyticsService {
     }
 
     async getActivityTrends(userId: string) {
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-        const isAdmin = user?.email === 'ramzendrum@gmail.com';
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
+        const adminEmail = config.ADMIN_EMAIL ? config.ADMIN_EMAIL.toLowerCase().trim() : 'ramzendrum@gmail.com';
+        const isAdmin = user?.role === 'ADMIN' || user?.email === adminEmail;
 
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -180,8 +184,9 @@ export class AnalyticsService {
     }
 
     async getListenerDemographics(userId: string) {
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-        const isAdmin = user?.email === 'ramzendrum@gmail.com';
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
+        const adminEmail = config.ADMIN_EMAIL ? config.ADMIN_EMAIL.toLowerCase().trim() : 'ramzendrum@gmail.com';
+        const isAdmin = user?.role === 'ADMIN' || user?.email === adminEmail;
 
         if (isAdmin) {
             const listeners = await prisma.user.findMany({

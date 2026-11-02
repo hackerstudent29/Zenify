@@ -93,8 +93,7 @@ function getYtBin(): string {
         path.resolve(process.cwd(), 'backend', 'yt-dlp.exe'),
         path.resolve(__dirname, '..', '..', 'yt-dlp.exe'),
         path.resolve(__dirname, '..', '..', 'backend', 'yt-dlp.exe'),
-        'D:\\.gemini\\Zenify\\backend\\yt-dlp.exe',
-        'D:\\.gemini\\Zenify\\yt-dlp.exe'
+        // Local Windows development binary candidates
     ];
     const candidates = [
         ...localCandidates.filter((p: string) => fs.existsSync(p)),
@@ -1038,7 +1037,14 @@ export async function utilsRoutes(server: FastifyInstance) {
     server.get('/proxy-audio', handleAudioStreamProxy);
     server.get('/stream', handleAudioStreamProxy);
 
-    server.get('/stream-youtube', async (request, reply) => {
+    server.get('/stream-youtube', {
+        config: {
+            rateLimit: {
+                max: 120,
+                timeWindow: '1 minute'
+            }
+        }
+    }, async (request, reply) => {
         let { url, title, artist, album, trackId, preview, mode, language, previewUrl } = request.query as {
             url?: string;
             title?: string;
@@ -1938,7 +1944,7 @@ export async function utilsRoutes(server: FastifyInstance) {
     });
 
     // Reset home section songs for all users (FeaturedContent, History, UserTrackStat, and flush caches)
-    server.post('/reset-home-data', async (request, reply) => {
+    server.post('/reset-home-data', { preHandler: [server.authenticate, server.authorize(['ADMIN'])] }, async (request, reply) => {
         try {
             const { prisma } = await import('../utils/prisma.js');
             const { flushAllCaches } = await import('../utils/cache.js');

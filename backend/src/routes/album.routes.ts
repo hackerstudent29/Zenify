@@ -21,7 +21,7 @@ async function clearAlbumCaches() {
 
 export async function albumRoutes(server: FastifyInstance) {
     // ────────────── APPLE MUSIC ALBUM IMPORT ──────────────
-    server.post('/import', async (req: FastifyRequest<{ Body: { appleMusicUrl: string } }>, reply: FastifyReply) => {
+    server.post('/import', { preHandler: [server.authenticate, server.authorize(['ADMIN'])] }, async (req: FastifyRequest<{ Body: { appleMusicUrl: string } }>, reply: FastifyReply) => {
         try {
             const { appleMusicUrl } = req.body;
             if (!appleMusicUrl) return reply.status(400).send({ message: "appleMusicUrl is required" });
@@ -1025,7 +1025,7 @@ export async function albumRoutes(server: FastifyInstance) {
         }
     });
 
-    server.patch('/:id', async (req: FastifyRequest<{ Params: { id: string }, Body: { title?: string, genre?: string, coverUrl?: string } }>, reply: FastifyReply) => {
+    server.patch('/:id', { preHandler: [server.authenticate, server.authorize(['ADMIN'])] }, async (req: FastifyRequest<{ Params: { id: string }, Body: { title?: string, genre?: string, coverUrl?: string } }>, reply: FastifyReply) => {
         const { id } = req.params;
         const { title, genre, coverUrl } = req.body;
 
