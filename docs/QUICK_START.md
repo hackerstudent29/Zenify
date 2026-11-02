@@ -71,7 +71,7 @@ Download from [GitHub Releases](https://github.com/hackerstudent29/Zenify/releas
 ## 🆘 Need Help?
 
 - **Troubleshooting**: See [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- **Full Docs**: See [README.md](README.md)
+- **Full Docs**: See [README.md](../README.md)
 - **Installation Details**: See [INSTALLATION.md](INSTALLATION.md)
 - **Architecture**: See [ARCHITECTURE.md](ARCHITECTURE.md)
 

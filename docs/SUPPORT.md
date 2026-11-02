@@ -26,7 +26,7 @@ Need help with Zenify? Here's where to get support.
 - [FAQ.md](FAQ.md) - 40+ common questions
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Problem solving guide
 - [INSTALLATION.md](INSTALLATION.md) - Setup help
-- [README.md](README.md) - Features & overview
+- [README.md](../README.md) - Features & overview
 
 ---
 
@@ -131,7 +131,7 @@ Is there a way to add local MP3 files? Or is streaming only?
 
 ## 🤝 Contributing Code
 
-Want to contribute? See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+Want to contribute? See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines.
 
 **Quick start**:
 1. Fork repo
@@ -147,14 +147,14 @@ Want to contribute? See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelin
 
 | Resource | Best For |
 | :--- | :--- |
-| [README.md](README.md) | Overview, features, screenshots |
+| [README.md](../README.md) | Overview, features, screenshots |
 | [QUICK_START.md](QUICK_START.md) | Getting started (5 min) |
 | [INSTALLATION.md](INSTALLATION.md) | Detailed setup guide |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Fixing problems |
 | [FAQ.md](FAQ.md) | Common questions |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How system works |
 | [DEVELOPER.md](DEVELOPER.md) | API reference |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute code |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | How to contribute code |
 
 ---
 
@@ -172,7 +172,7 @@ Email instead: hackerstudent29@gmail.com
 
 **Response**: 48 hours (or faster for critical issues)
 
-See [SECURITY.md](SECURITY.md) for full disclosure policy.
+See [SECURITY.md](../SECURITY.md) for full disclosure policy.
 
 ---
 

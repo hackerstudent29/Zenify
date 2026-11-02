@@ -13,7 +13,7 @@
   <p>
     <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/🚀_Live_App-listenzenify.vercel.app-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
     <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📱_APK-Releases-0078D4?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
-    <a href="DEVELOPER.md"><img src="https://img.shields.io/badge/🛠️_Developer-DEVELOPER.md-18181B?style=for-the-badge&logo=github&logoColor=white" alt="Developer Guide" /></a>
+    <a href="docs/DEVELOPER.md"><img src="https://img.shields.io/badge/🛠️_Developer-DEVELOPER.md-18181B?style=for-the-badge&logo=github&logoColor=white" alt="Developer Guide" /></a>
     <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="MIT License" /></a>
   </p>
@@ -34,7 +34,7 @@
 
 | 🏠 Home | 🎤 Synced Lyrics | 🎛️ Studio EQ |
 | :---: | :---: | :---: |
-| <img src="assets/screenshots/zenify_home_dashboard.png" alt="Home" width="100%" /> | <img src="assets/screenshots/zenify_synced_lyrics.png" alt="Lyrics" width="100%" /> | <img src="assets/screenshots/zenify_fullview_player.png" alt="Player" width="100%" /> |
+| <img src="docs/images/zenify_home_dashboard.png" alt="Home" width="100%" /> | <img src="docs/images/zenify_synced_lyrics.png" alt="Lyrics" width="100%" /> | <img src="docs/images/zenify_fullview_player.png" alt="Player" width="100%" /> |
 
 ---
 
@@ -214,9 +214,25 @@ Zenify is free, open-source, and maintained by volunteers. You can help by:
 
 ---
 
+## 📁 Project Structure
+
+```
+Zenify/
+├── .agents/       # AI coding guidelines and audio-streaming architectural rules
+├── .github/       # CI/CD workflows (deploy, test, lint, security) and templates
+├── assets/        # Core brand assets (logo, fonts, favicon masters, animations)
+├── backend/       # Fastify 5.7 API server (Prisma ORM, routes, controllers, services)
+├── docs/          # Comprehensive technical documentation, architecture specs, and screenshots
+│   └── images/    # Application screenshots referenced in documentation
+├── frontend/      # Vite + React 19 web streaming application (SPA / PWA)
+└── scripts/       # Deployment and automation scripts (deploy.sh, deploy.ps1)
+```
+
+---
+
 ## 🛠️ For Developers
 
-See **[DEVELOPER.md](DEVELOPER.md)** for:
+See **[DEVELOPER.md](docs/DEVELOPER.md)** for:
 - Architecture & system design
 - API documentation (50+ endpoints)
 - Self-hosting & Docker guide
@@ -234,5 +250,5 @@ MIT License - See [LICENSE](LICENSE) for details.
 <div align="center">
   <b>Made with ❤️ by <a href="https://github.com/hackerstudent29">Ramanathan S</a></b>
   <br/>
-  <b><a href="https://listenzenify.vercel.app">Start Listening Now</a></b> • <a href="https://github.com/hackerstudent29/Zenify">View Source</a> • <a href="DEVELOPER.md">Read Docs</a>
+  <b><a href="https://listenzenify.vercel.app">Start Listening Now</a></b> • <a href="https://github.com/hackerstudent29/Zenify">View Source</a> • <a href="docs/DEVELOPER.md">Read Docs</a>
 </div>

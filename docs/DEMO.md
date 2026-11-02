@@ -83,11 +83,11 @@ Access our interactive web demo and start listening immediately:
 ## Learn More
 
 - [Quick Start Guide](QUICK_START.md)
-- [Features & Comparison](COMPARISON.md)
-- [Performance Benchmarks](PERFORMANCE.md)
+- Features & Comparison
+- Performance Benchmarks
 - [FAQ](FAQ.md)
 - [Support & Troubleshooting](SUPPORT.md)
 
 ---
 
-**Next**: Explore [FEATURED_IN.md](FEATURED_IN.md) to see where Zenify is being covered.
+**Next**: Explore FEATURED_IN.md to see where Zenify is being covered.

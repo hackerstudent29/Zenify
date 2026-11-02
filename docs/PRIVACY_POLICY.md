@@ -374,9 +374,9 @@ By continuing to use Zenify after changes, you agree to the updated policy.
 
 ## Additional Resources
 
-- [SECURITY.md](SECURITY.md) — Security vulnerability reporting
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — Community guidelines
-- [README.md](README.md) — Project overview
+- [SECURITY.md](../SECURITY.md) — Security vulnerability reporting
+- [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) — Community guidelines
+- [README.md](../README.md) — Project overview
 - [GitHub Repository](https://github.com/hackerstudent29/Zenify) — Audit our code
 
 ---

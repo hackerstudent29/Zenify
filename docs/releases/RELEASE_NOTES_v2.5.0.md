@@ -178,13 +178,13 @@ Want to help improve Zenify?
 
 - **Report Bugs**: [GitHub Issues](https://github.com/hackerstudent29/Zenify/issues)
 - **Suggest Features**: [GitHub Discussions](https://github.com/hackerstudent29/Zenify/discussions)
-- **Contribute Code**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Contribute Code**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 
 ---
 
 ## 📞 Support
 
-- **Documentation**: [README.md](README.md)
+- **Documentation**: [README.md](../../README.md)
 - **Troubleshooting**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - **Installation**: [INSTALLATION.md](INSTALLATION.md)
 - **Architecture**: [ARCHITECTURE.md](ARCHITECTURE.md)
@@ -193,7 +193,7 @@ Want to help improve Zenify?
 
 ## 📜 License
 
-MIT License - See [LICENSE](LICENSE) for details.
+MIT License - See [LICENSE](../../LICENSE) for details.
 
 ---
 
