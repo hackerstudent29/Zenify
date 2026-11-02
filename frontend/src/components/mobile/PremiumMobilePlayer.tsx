@@ -743,7 +743,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                 className="absolute inset-0 z-0 overflow-hidden bg-[#121214]"
                 style={{ borderTopLeftRadius: radius, borderTopRightRadius: radius }}
               >
-                <DynamicBackground key={session} surface="fullPlayer" coverUrl={shown.cover} />
+                <DynamicBackground key={session} surface="fullPlayer" coverUrl={shown.cover} paused={!isPlaying} />
                 <div
                   className="ps-t-soft absolute inset-0 bg-black/25"
                   style={{ opacity: isLyricsOpen ? 1 : 0 }}

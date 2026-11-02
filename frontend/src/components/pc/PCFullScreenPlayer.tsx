@@ -121,7 +121,7 @@ export function PCFullScreenPlayer() {
         <div className="absolute inset-0 z-0 bg-[#121214]" onClick={close}>
           {showReactiveBg && (
             <>
-              <DynamicBackground surface="fullPlayer" coverUrl={trackCover} />
+              <DynamicBackground surface="fullPlayer" coverUrl={trackCover} paused={!isPlaying} />
               {/* plain alpha veil (the old mix-blend-overlay forced an extra full-screen blend pass) */}
               <div className="ps-t-soft pointer-events-none absolute inset-0 bg-black/20" style={{ opacity: isLyricsOpen ? 1 : 0 }} />
             </>

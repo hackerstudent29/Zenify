@@ -291,7 +291,7 @@ export const ArtworkMeshBackground = React.memo(function ArtworkMeshBackground({
     };
     nodes.forEach((n, i) => retarget(n, NODES[i]));
 
-    const canRun = () => visible && !document.hidden;
+    const canRun = () => visible && !document.hidden && document.visibilityState === "visible" && !pausedRef.current;
     const readIntensity = () => {
       const v = intensityRef.current;
       return clamp(typeof v === "number" ? v : v?.current ?? 0, 0, 1);
@@ -432,19 +432,31 @@ export const ArtworkMeshBackground = React.memo(function ArtworkMeshBackground({
     }, { rootMargin: "120px" });
     io.observe(wrap);
 
-    const onVis = () => (document.hidden ? halt() : wake());
+    const onVis = () => {
+      if (document.hidden || document.visibilityState !== "visible") {
+        halt();
+      } else if (canRun()) {
+        wake();
+      }
+    };
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", halt);
+    window.addEventListener("freeze", halt);
 
     const onReduce = (e: MediaQueryListEvent) => { reduce = e.matches; wake(); };
     mqReduce.addEventListener?.("change", onReduce);
 
+    let lastPointer = 0;
     const onPointer = (e: PointerEvent) => {
-      if (!interactiveRef.current || reduce || pausedRef.current) return;
+      if (!interactiveRef.current || reduce || pausedRef.current || !canRun()) return;
+      const now = performance.now();
+      if (now - lastPointer < 50) return; // throttle pointer sampling
+      lastPointer = now;
       ptx = (e.clientX / window.innerWidth - 0.5) * 2;
       pty = (e.clientY / window.innerHeight - 0.5) * 2;
       wake();
     };
-    window.addEventListener("pointermove", onPointer, { passive: true });
+    wrap.addEventListener("pointermove", onPointer, { passive: true });
 
     // low-battery cap (Chromium only; silently ignored elsewhere)
     let bat: any = null, dead = false;
@@ -467,8 +479,10 @@ export const ArtworkMeshBackground = React.memo(function ArtworkMeshBackground({
       wakeRef.current = () => {};
       ro.disconnect(); io.disconnect();
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", halt);
+      window.removeEventListener("freeze", halt);
       mqReduce.removeEventListener?.("change", onReduce);
-      window.removeEventListener("pointermove", onPointer);
+      wrap.removeEventListener("pointermove", onPointer);
       if (bat) {
         bat.removeEventListener("chargingchange", onBat);
         bat.removeEventListener("levelchange", onBat);
