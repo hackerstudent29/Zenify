@@ -1,12 +1,10 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import path from 'path';
-const execPromise = promisify(exec);
+import { safeExecFile } from './security.js';
 
 let isFfmpegAvailable = false;
 
 // Async check for FFmpeg availability on load
-execPromise('ffmpeg -version')
+safeExecFile('ffmpeg', ['-version'])
   .then(() => {
     isFfmpegAvailable = true;
     console.log('[Transcoder] FFmpeg is available on system. Audio transcoding enabled.');
@@ -33,8 +31,7 @@ export async function transcodeTo128kbps(inputPath: string, outputPath: string):
     // -i: input file
     // -vn: disable video stream (stripping YT video content)
     // -b:a 128k: audio bitrate 128k
-    const cmd = `ffmpeg -y -i "${inputPath}" -vn -b:a 128k "${outputPath}"`;
-    await execPromise(cmd);
+    await safeExecFile('ffmpeg', ['-y', '-i', inputPath, '-vn', '-b:a', '128k', outputPath]);
     console.log(`[Transcoder] Transcode successful: ${outputPath}`);
     return outputPath;
   } catch (err: any) {
@@ -54,7 +51,12 @@ export async function getAudioDuration(filePath: string): Promise<number | null>
   }
   try {
     // Try ffprobe first
-    const { stdout } = await execPromise(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`);
+    const { stdout } = await safeExecFile('ffprobe', [
+      '-v', 'error',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      filePath
+    ]);
     const val = parseFloat(stdout.trim());
     if (!isNaN(val) && val > 0) {
       console.log(`[Transcoder] ffprobe resolved duration: ${val}s`);
@@ -67,8 +69,8 @@ export async function getAudioDuration(filePath: string): Promise<number | null>
   // Fallback: Try running ffmpeg -i and parsing the output
   try {
     // ffmpeg outputs info to stderr when run on a file
-    const res = await execPromise(`ffmpeg -i "${filePath}"`).catch(e => e); 
-    const output = (res.stderr || res.stdout || '') as string;
+    const res = await safeExecFile('ffmpeg', ['-i', filePath]).catch(e => e); 
+    const output = ((res && (res.stderr || res.stdout)) || '') as string;
     const match = /Duration:\s*(\d+):(\d+):(\d+)(?:\.(\d+))?/.exec(output);
     if (match) {
       const hours = parseInt(match[1]);
@@ -103,8 +105,7 @@ export async function compressAudioBuffer(inputBuffer: Buffer): Promise<Buffer> 
 
   try {
     fs.writeFileSync(inPath, inputBuffer);
-    const cmd = `ffmpeg -y -i "${inPath}" -vn -b:a 128k "${outPath}"`;
-    await execPromise(cmd);
+    await safeExecFile('ffmpeg', ['-y', '-i', inPath, '-vn', '-b:a', '128k', outPath]);
     if (fs.existsSync(outPath)) {
       const compressed = fs.readFileSync(outPath);
       console.log(`[Transcoder] Compressed audio buffer: ${inputBuffer.length} bytes -> ${compressed.length} bytes (-${Math.round((1 - compressed.length / inputBuffer.length) * 100)}%)`);

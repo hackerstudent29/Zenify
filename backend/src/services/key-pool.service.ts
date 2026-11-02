@@ -15,49 +15,27 @@ export class KeyPoolService {
   private static defaultKeys: Record<string, string[]> = {
     rapidapi: [
       process.env.RAPIDAPI_KEY || '',
-      ...(process.env.RAPIDAPI_KEYS ? process.env.RAPIDAPI_KEYS.split(',').map(s => s.trim()) : []),
-      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
-      'e9a22f3c78msh7958b19f074d251p1d198ejsn3a1b4d0812cf',
-      '79b4d18ec2msh6345a07e868b94ap104642jsn47b19dc6312a',
-      'bf105d890amsh1258d4477839ec9p1726a2jsnb7c569a35e80',
-      'd4850c4103msh89073e72c842b0fp10e429jsne1a2df335198'
+      ...(process.env.RAPIDAPI_KEYS ? process.env.RAPIDAPI_KEYS.split(',').map(s => s.trim()) : [])
     ].filter(k => k && k.length > 5),
     spotify: [
       process.env.SPOTIFY_API_KEY || '',
-      process.env.RAPIDAPI_KEY || '',
-      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
-      'e9a22f3c78msh7958b19f074d251p1d198ejsn3a1b4d0812cf',
-      '79b4d18ec2msh6345a07e868b94ap104642jsn47b19dc6312a'
+      process.env.RAPIDAPI_KEY || ''
     ].filter(k => k && k.length > 5),
     genius: [
       process.env.GENIUS_API_KEY || '',
-      process.env.RAPIDAPI_KEY || '',
-      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
-      'e9a22f3c78msh7958b19f074d251p1d198ejsn3a1b4d0812cf',
-      '79b4d18ec2msh6345a07e868b94ap104642jsn47b19dc6312a'
+      process.env.RAPIDAPI_KEY || ''
     ].filter(k => k && k.length > 5),
     youtube: [
       process.env.YOUTUBE_API_KEY || '',
-      process.env.RAPIDAPI_KEY || '',
-      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
-      'bf105d890amsh1258d4477839ec9p1726a2jsnb7c569a35e80',
-      'd4850c4103msh89073e72c842b0fp10e429jsne1a2df335198'
+      process.env.RAPIDAPI_KEY || ''
     ].filter(k => k && k.length > 5),
     lyrics: [
       process.env.LYRICS_API_KEY || '',
-      process.env.RAPIDAPI_KEY || '',
-      '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188',
-      'e9a22f3c78msh7958b19f074d251p1d198ejsn3a1b4d0812cf',
-      'bf105d890amsh1258d4477839ec9p1726a2jsnb7c569a35e80'
+      process.env.RAPIDAPI_KEY || ''
     ].filter(k => k && k.length > 5),
     applemusic: [
       process.env.APPLE_MUSIC_DEVELOPER_TOKEN || '',
-      ...(process.env.APPLE_MUSIC_DEVELOPER_TOKENS ? process.env.APPLE_MUSIC_DEVELOPER_TOKENS.split(',').map(s => s.trim()) : []),
-      // Verified Working Apple Music Tokens (Active until 2027)
-      'eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IldlYlBsYXlLaWQifQ.eyJpc3MiOiJBTVBXZWJQbGF5IiwiaWF0IjoxNzkyNTM1Njc2LCJleHAiOjE3OTg1ODM2NzYsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.YpBDqePdK0r_5lxtByqto20zc60FhO1eLoYJ5mrayZ73IYsW4yguaJAFMzud_5FSZ7cjTCdM5ST_MecdbHDA2Q',
-      'eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IkxUMlpEWlNYTlEifQ.eyJpc3MiOiI1SUtQUDJJRUNRIiwiaWF0IjoxNzkyNTM1Njc2LCJleHAiOjE3OTg1ODM2NzYsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.K-C_J9LLy07ZTV_MgoDT5KzJQQIOa8MlquKx919sPI3QbprU1sYc8c2E5fvWZkXA5xlEPyy05SWxSFZBq29xfA',
-      'eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IldlYlBsYXlLaWQifQ.eyJpc3MiOiJBTVBXZWJQbGF5IiwiaWF0IjoxNzkxOTAzMTk0LCJleHAiOjE3OTc5NTExOTQsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.3x-70iwl8xfaZvlRoH-4_Z_kBmfaFrEYW6Pqa9u0vJKZHwq1iYdw_LJs1LA8mxQpyxeHcmuHPXdq6pjBO41_kA',
-      'eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IkxUMlpEWlNYTlEifQ.eyJpc3MiOiI1SUtQUDJJRUNRIiwiaWF0IjoxNzkxOTAzMTk0LCJleHAiOjE3OTc5NTExOTQsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.ennJxL6nOvgRUV1Hcp2Rn-0I7syN0haC_LQnJ2FGvyY9FSqSnsCYvpxGuqM_DnaWs1Gf_3TrkiwAv71BJ6bDow'
+      ...(process.env.APPLE_MUSIC_DEVELOPER_TOKENS ? process.env.APPLE_MUSIC_DEVELOPER_TOKENS.split(',').map(s => s.trim()) : [])
     ].filter(k => k && k.length > 5)
   };
 
@@ -141,7 +119,7 @@ export class KeyPoolService {
       if (poolName === 'applemusic') {
         return this.defaultKeys.applemusic?.[0] || '';
       }
-      return process.env.RAPIDAPI_KEY || '54aa86f9b2msh2700548ef9684acp19b05ajsn76cf3c333188';
+      return process.env.RAPIDAPI_KEY || '';
     }
 
     const now = Date.now();

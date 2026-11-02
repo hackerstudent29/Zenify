@@ -25,7 +25,8 @@ export class AuthService {
         }
 
         const hashedPassword = await hashPassword(data.password.trim());
-        const isAdmin = emailKey === 'ramzendrum@gmail.com';
+        const adminEmail = config.ADMIN_EMAIL ? config.ADMIN_EMAIL.toLowerCase().trim() : 'ramzendrum@gmail.com';
+        const isAdmin = emailKey === adminEmail;
         const role = isAdmin ? 'ADMIN' : 'LISTENER';
 
         let user;
@@ -552,8 +553,8 @@ export class AuthService {
 
         if (!user) {
             isNewUser = true;
-            // Strict role assignment: only ramzendrum@gmail.com can be an admin
-            const role = emailKey === 'ramzendrum@gmail.com' ? 'ADMIN' : 'LISTENER';
+            const adminEmail = config.ADMIN_EMAIL ? config.ADMIN_EMAIL.toLowerCase().trim() : 'ramzendrum@gmail.com';
+            const role = emailKey === adminEmail ? 'ADMIN' : 'LISTENER';
 
             user = await prisma.user.create({
                 data: {

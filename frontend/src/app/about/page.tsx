@@ -10,7 +10,8 @@ import "@fontsource/zalando-sans-semiexpanded/latin-500.css";
 import "@fontsource/zalando-sans-semiexpanded/latin-700.css";
 import "@fontsource/zalando-sans-semiexpanded/latin-900.css";
 
-const UPI_ID = "ramanathanb86@oksbi";
+// Sponsorship and open-source contribution link
+const GITHUB_SPONSOR_URL = "https://github.com/hackerstudent29/Zenify";
 
 const LINKS = [
   {
@@ -43,14 +44,12 @@ export default function AboutPage() {
     setTimeout(() => setIsBurning(false), 3000);
   };
 
-  const copyUpi = async () => {
+  const copySponsorLink = async () => {
     try {
-      await navigator.clipboard.writeText(UPI_ID);
+      await navigator.clipboard.writeText(GITHUB_SPONSOR_URL);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      /* clipboard fallback */
-    }
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
   };
 
   return (
@@ -177,16 +176,16 @@ export default function AboutPage() {
           {/* Support */}
           <Section title="Support Zenify">
             <div className="py-4 text-[15px] leading-relaxed text-white/60">
-              Zenify is free, open source and has no ads. I’m building it on my own (hackerstudent29). Domains and hosting cost money every month, and your support helps cover that and gives me more time to work on it.
+              Zenify is free, open source and has no ads. Built for the community, your support helps maintain the platform, add new features, and cover hosting infrastructure.
             </div>
             <div className="flex items-center justify-between gap-4 py-3.5 border-t border-white/[0.06]">
               <div className="min-w-0">
-                <p className="text-xs text-white/45">UPI ID</p>
-                <p className="select-all break-all font-mono text-[15px] text-white">{UPI_ID}</p>
+                <p className="text-xs text-white/45">Project Repository</p>
+                <p className="select-all break-all font-mono text-[15px] text-white">github.com/hackerstudent29/Zenify</p>
               </div>
               <motion.button
                 type="button"
-                onClick={copyUpi}
+                onClick={copySponsorLink}
                 whileTap={{ scale: 0.94 }}
                 transition={spring}
                 className="relative h-8 min-w-[64px] shrink-0 rounded-full border border-white/15 px-3.5 text-[13px] font-medium outline-none hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/40 cursor-pointer"
