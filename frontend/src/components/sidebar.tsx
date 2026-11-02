@@ -373,6 +373,15 @@ export function Sidebar() {
                 collapsed={collapsed}
                 onClick={() => useUIStore.getState().openSettings()}
               />
+              {user?.role === "ADMIN" && (
+                <NavLink
+                  href="/admin"
+                  icon={SwiftUIAdmin}
+                  label="Admin Console"
+                  active={pathname === "/admin" || pathname.startsWith("/admin")}
+                  collapsed={collapsed}
+                />
+              )}
             </div>
           </nav>
 
