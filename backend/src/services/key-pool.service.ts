@@ -15,49 +15,27 @@ export class KeyPoolService {
   private static defaultKeys: Record<string, string[]> = {
     rapidapi: [
       process.env.RAPIDAPI_KEY || '',
-      ...(process.env.RAPIDAPI_KEYS ? process.env.RAPIDAPI_KEYS.split(',').map(s => s.trim()) : []),
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI'
+      ...(process.env.RAPIDAPI_KEYS ? process.env.RAPIDAPI_KEYS.split(',').map(s => s.trim()) : [])
     ].filter(k => k && k.length > 5),
     spotify: [
       process.env.SPOTIFY_API_KEY || '',
-      process.env.RAPIDAPI_KEY || '',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI'
+      process.env.RAPIDAPI_KEY || ''
     ].filter(k => k && k.length > 5),
     genius: [
       process.env.GENIUS_API_KEY || '',
-      process.env.RAPIDAPI_KEY || '',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI'
+      process.env.RAPIDAPI_KEY || ''
     ].filter(k => k && k.length > 5),
     youtube: [
       process.env.YOUTUBE_API_KEY || '',
-      process.env.RAPIDAPI_KEY || '',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI'
+      process.env.RAPIDAPI_KEY || ''
     ].filter(k => k && k.length > 5),
     lyrics: [
       process.env.LYRICS_API_KEY || '',
-      process.env.RAPIDAPI_KEY || '',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI',
-      'REDACTED_RAPIDAPI'
+      process.env.RAPIDAPI_KEY || ''
     ].filter(k => k && k.length > 5),
     applemusic: [
       process.env.APPLE_MUSIC_DEVELOPER_TOKEN || '',
-      ...(process.env.APPLE_MUSIC_DEVELOPER_TOKENS ? process.env.APPLE_MUSIC_DEVELOPER_TOKENS.split(',').map(s => s.trim()) : []),
-      // Verified Working Apple Music Tokens (Active until 2027)
-      'REDACTED_APPLE_JWT',
-      'REDACTED_APPLE_JWT',
-      'REDACTED_APPLE_JWT',
-      'REDACTED_APPLE_JWT'
+      ...(process.env.APPLE_MUSIC_DEVELOPER_TOKENS ? process.env.APPLE_MUSIC_DEVELOPER_TOKENS.split(',').map(s => s.trim()) : [])
     ].filter(k => k && k.length > 5)
   };
 
@@ -141,7 +119,7 @@ export class KeyPoolService {
       if (poolName === 'applemusic') {
         return this.defaultKeys.applemusic?.[0] || '';
       }
-      return process.env.RAPIDAPI_KEY || 'REDACTED_RAPIDAPI';
+      return process.env.RAPIDAPI_KEY || '';
     }
 
     const now = Date.now();
