@@ -52,6 +52,12 @@ export async function authRoutes(server: FastifyInstance) {
     });
 
     server.post('/refresh', {
+        config: {
+            rateLimit: {
+                max: 30,
+                timeWindow: '1 minute'
+            }
+        },
         handler: authController.refresh.bind(authController)
     });
 
@@ -96,10 +102,22 @@ export async function authRoutes(server: FastifyInstance) {
     });
 
     server.post('/request-otp', {
+        config: {
+            rateLimit: {
+                max: 5,
+                timeWindow: '1 minute'
+            }
+        },
         handler: authController.requestOTP.bind(authController)
     });
 
     server.post('/verify-otp', {
+        config: {
+            rateLimit: {
+                max: 10,
+                timeWindow: '1 minute'
+            }
+        },
         handler: authController.verifyOTP.bind(authController)
     });
 
@@ -108,6 +126,12 @@ export async function authRoutes(server: FastifyInstance) {
     });
 
     server.post('/reset-password', {
+        config: {
+            rateLimit: {
+                max: 5,
+                timeWindow: '1 minute'
+            }
+        },
         handler: authController.resetPassword.bind(authController)
     });
 
