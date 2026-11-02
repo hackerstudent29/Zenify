@@ -52,10 +52,7 @@ server.register(rateLimit, {
     timeWindow: '1 minute',
     allowList: (req) =>
         req.method === 'OPTIONS' ||
-        ['127.0.0.1', '::1'].includes(req.ip) ||
-        req.url.includes('/stream-youtube') ||
-        req.url.includes('/proxy-audio') ||
-        req.url.includes('/proxy-image'),
+        ['127.0.0.1', '::1'].includes(req.ip),
     errorResponseBuilder: (request, context) => ({
         statusCode: 429,
         error: 'Too Many Requests',
@@ -63,28 +60,33 @@ server.register(rateLimit, {
     })
 });
 
+function isOriginAllowed(origin: string | undefined): boolean {
+    if (!origin) return true;
+    const allowedOrigins = [
+        ...config.FRONTEND_URL.split(','),
+        'https://listenzenify.vercel.app',
+        'https://listenzenify.com',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:3001',
+        'http://127.0.0.1:3001',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173'
+    ].map(o => o.trim()).filter(Boolean);
+
+    const isVercel = (
+        origin === 'https://listenzenify.vercel.app' || 
+        origin === 'https://listenzenify.com' ||
+        /^https:\/\/listenzenify[a-z0-9-]*\.vercel\.app$/.test(origin) ||
+        /^https:\/\/zenify[a-z0-9-]*\.vercel\.app$/.test(origin)
+    );
+
+    return allowedOrigins.includes(origin) || isVercel;
+}
+
 server.register(cors, {
     origin: (origin, cb) => {
-        const allowedOrigins = [
-            ...config.FRONTEND_URL.split(','),
-            'https://listenzenify.vercel.app',
-            'https://listenzenify.com',
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
-            'http://localhost:3001',
-            'http://127.0.0.1:3001',
-            'http://localhost:5173',
-            'http://127.0.0.1:5173'
-        ].map(o => o.trim()).filter(Boolean);
-
-        const isVercel = origin ? (
-            origin === 'https://listenzenify.vercel.app' || 
-            origin === 'https://listenzenify.com' ||
-            /^https:\/\/listenzenify[a-z0-9-]*\.vercel\.app$/.test(origin) ||
-            /^https:\/\/zenify[a-z0-9-]*\.vercel\.app$/.test(origin)
-        ) : false;
-
-        if (!origin || allowedOrigins.includes(origin) || isVercel) {
+        if (!origin || isOriginAllowed(origin)) {
             cb(null, true);
             return;
         }
@@ -104,21 +106,46 @@ server.register(helmet, {
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: false, // Allows Google OAuth popup window.closed check
-    crossOriginResourcePolicy: { policy: "cross-origin" }
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    frameguard: { action: 'sameorigin' },
+    noSniff: true,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+});
+
+// CSRF check hook for state-changing browser requests
+server.addHook('onRequest', async (request, reply) => {
+    const method = request.method.toUpperCase();
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        const url = request.url;
+        // Allow public webhooks
+        if (url.startsWith('/webhooks') || url.startsWith('/api/webhooks')) {
+            return;
+        }
+        const origin = request.headers.origin;
+        if (origin && !isOriginAllowed(origin)) {
+            server.log.warn(`[CSRF] Blocked cross-origin request from: ${origin} to ${url}`);
+            return reply.status(403).send({
+                statusCode: 403,
+                error: 'Forbidden',
+                message: 'Cross-origin request blocked.'
+            });
+        }
+    }
 });
 
 server.setErrorHandler((error: any, request, reply) => {
     const origin = request.headers.origin;
-    if (origin) {
+    if (origin && isOriginAllowed(origin)) {
         reply.header('Access-Control-Allow-Origin', origin);
         reply.header('Access-Control-Allow-Credentials', 'true');
     }
     server.log.error(error);
     const statusCode = error.statusCode || 500;
+    const isProd = config.NODE_ENV === 'production';
     reply.status(statusCode).send({
         statusCode,
-        error: error.name || 'Internal Server Error',
-        message: error.message || 'An unexpected error occurred'
+        error: error.name || (statusCode >= 500 ? 'Internal Server Error' : 'Bad Request'),
+        message: isProd && statusCode >= 500 ? 'An unexpected error occurred' : (error.message || 'An unexpected error occurred')
     });
 });
 

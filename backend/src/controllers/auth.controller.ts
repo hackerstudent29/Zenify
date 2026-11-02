@@ -36,7 +36,7 @@ export class AuthController {
                 httpOnly: true,
                 secure: config.NODE_ENV === 'production',
                 sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
-                maxAge: 30 * 24 * 60 * 60
+                maxAge: 60 * 60 // 1 hour access token cookie
             });
 
             return reply.status(201).send({
@@ -66,7 +66,7 @@ export class AuthController {
                 httpOnly: true,
                 secure: config.NODE_ENV === 'production',
                 sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
-                maxAge: 30 * 24 * 60 * 60
+                maxAge: 60 * 60 // 1 hour access token cookie
             });
 
             return reply.send({
@@ -96,7 +96,7 @@ export class AuthController {
                 httpOnly: true,
                 secure: config.NODE_ENV === 'production',
                 sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
-                maxAge: 30 * 24 * 60 * 60
+                maxAge: 60 * 60 // 1 hour access token cookie
             });
 
             return reply.send({
@@ -155,7 +155,7 @@ export class AuthController {
                 httpOnly: true,
                 secure: config.NODE_ENV === 'production',
                 sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
-                maxAge: 30 * 24 * 60 * 60
+                maxAge: 60 * 60 // 1 hour access token cookie
             });
 
             return reply.send({
@@ -269,7 +269,7 @@ export class AuthController {
                 httpOnly: true,
                 secure: config.NODE_ENV === 'production',
                 sameSite: config.NODE_ENV === 'production' ? 'none' : 'lax',
-                maxAge: 30 * 24 * 60 * 60
+                maxAge: 60 * 60 // 1 hour access token cookie
             });
 
             return reply.send({

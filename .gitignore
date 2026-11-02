@@ -14,6 +14,10 @@
 *.jks
 api_keys.txt
 ALL_ENV_KEYS.md
+*scan*output*
+*nmap*.txt
+*openvas*.txt
+*zap*.txt
 credentials.json
 google-services.json
 
