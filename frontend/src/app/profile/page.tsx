@@ -25,6 +25,7 @@ const sections = [
 /** Mobile: icon-only accordion — tap to expand/collapse each section */
 function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) {
  const [openId, setOpenId] = useState<string | null>(null);
+ const [avatarError, setAvatarError] = useState(false);
 
  const toggle = (id: string) => setOpenId(prev => prev === id ? null : id);
 
@@ -34,8 +35,8 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
  {/* User Header */}
  <div className="flex items-center gap-4 mb-6 px-1">
  <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/10 overflow-hidden shrink-0 shadow-lg">
- {user.avatarUrl
- ? <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt={user.name || "User avatar"} width={40} height={40} loading="lazy" decoding="async" />
+ {user.avatarUrl && !avatarError
+ ? <img src={getMediaUrl(user.avatarUrl)} className="w-full h-full object-cover" alt="" width={40} height={40} loading="lazy" decoding="async" onError={() => setAvatarError(true)} />
  : <div className="w-full h-full flex items-center justify-center text-xl font-black text-white">
  {(user.username?.[0] || user.name?.[0] || user.email[0]).toUpperCase()}
  </div>
@@ -137,6 +138,7 @@ function MobileProfile({ user, onLogout }: { user: any; onLogout: () => void }) 
 /** Desktop: original tab layout */
 function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void }) {
  const [activeTab, setActiveTab] = useState("profile");
+ const [avatarError, setAvatarError] = useState(false);
  const ActiveComponent = sections.find(s => s.id === activeTab)?.component || ProfileSection;
 
  return (
@@ -160,8 +162,8 @@ function DesktopProfile({ user, onLogout }: { user: any; onLogout: () => void })
  }} />
  <div className="absolute inset-[2px] rounded-xl bg-zinc-900 border border-white/5 z-10" />
  <div className="absolute inset-0 bg-gradient-to-tr from-[var(--accent)]/10 to-transparent z-10" />
- {user.avatarUrl ? (
- <img src={getMediaUrl(user.avatarUrl)} alt={user.name ? `${user.name} profile portrait` : "User avatar"} width={160} height={160} loading="lazy" decoding="async" className="w-full h-full object-cover rounded-[1.2rem] relative z-20" />
+ {user.avatarUrl && !avatarError ? (
+ <img src={getMediaUrl(user.avatarUrl)} alt="" width={160} height={160} loading="lazy" decoding="async" onError={() => setAvatarError(true)} className="w-full h-full object-cover rounded-[1.2rem] relative z-20" />
  ) : (
  <span className="text-3xl font-semibold text-white/80 relative z-20">
  {(user.username?.[0] || user.name?.[0] || user.email[0]).toUpperCase()}

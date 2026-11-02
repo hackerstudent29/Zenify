@@ -299,7 +299,7 @@ export function MobileMediaCard({ track, className, index = 0, contextTracks }: 
     ['--scroll-distance' as any]: `-${scrollDistance}px`
   }}
   >
-  {formatDisplayTitle(track.title || (track as any).name)}
+  {formatDisplayTitle((track as any).name || (track as any).artistName || track.title || (track as any).artist?.name || (isArtist ? "Artist" : ""))}
   </span>
   </div>
   
