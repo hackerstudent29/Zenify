@@ -294,7 +294,7 @@ psql -h localhost -U zenify -d zenify
 ## 📚 Next Steps
 
 1. **Read [DEVELOPER.md](DEVELOPER.md)** – API documentation & architecture
-2. **Check [CONTRIBUTING.md](CONTRIBUTING.md)** – How to contribute
+2. **Check [CONTRIBUTING.md](../CONTRIBUTING.md)** – How to contribute
 3. **Join discussions** – [GitHub Discussions](https://github.com/hackerstudent29/Zenify/discussions)
 4. **Report issues** – [GitHub Issues](https://github.com/hackerstudent29/Zenify/issues)
 
@@ -302,7 +302,7 @@ psql -h localhost -U zenify -d zenify
 
 ## 🆘 Need Help?
 
-- **Documentation**: [README.md](README.md), [DEVELOPER.md](DEVELOPER.md)
+- **Documentation**: [README.md](../README.md), [DEVELOPER.md](DEVELOPER.md)
 - **Troubleshooting**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - **Issues**: [GitHub Issues](https://github.com/hackerstudent29/Zenify/issues)
 - **Email**: hackerstudent29@gmail.com

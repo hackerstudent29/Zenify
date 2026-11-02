@@ -2,7 +2,7 @@
 
 Welcome to the **Zenify Developer Guide**. This document contains comprehensive technical architecture, data flow diagrams, technology stack specifications, local development setup, API endpoints, and contribution instructions.
 
-If you are a music enthusiast or end-user looking to explore Zenify, please visit the main **[README.md](README.md)** or launch the live app at **[listenzenify.vercel.app](https://listenzenify.vercel.app)**.
+If you are a music enthusiast or end-user looking to explore Zenify, please visit the main **[README.md](../README.md)** or launch the live app at **[listenzenify.vercel.app](https://listenzenify.vercel.app)**.
 
 ---
 
@@ -430,7 +430,7 @@ flutter run
 
 ## 📜 License & Copyright
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for complete legal terms.
+Distributed under the **MIT License**. See [`LICENSE`](../LICENSE) for complete legal terms.
 
 ```
 MIT License

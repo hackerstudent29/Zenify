@@ -172,7 +172,7 @@ Most-requested features:
 
 Zenify is open-source and community-driven. You can help by:
 
-1. **Contributing Code** – See [CONTRIBUTING.md](CONTRIBUTING.md)
+1. **Contributing Code** – See [CONTRIBUTING.md](../CONTRIBUTING.md)
 2. **Reporting Bugs** – [GitHub Issues](https://github.com/hackerstudent29/Zenify/issues)
 3. **Testing Early Builds** – Help us catch bugs before release
 4. **Suggesting Features** – [GitHub Discussions](https://github.com/hackerstudent29/Zenify/discussions)

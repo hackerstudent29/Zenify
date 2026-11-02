@@ -135,7 +135,7 @@
 **A**: Yes, see [DEVELOPER.md](DEVELOPER.md) for 50+ endpoints.
 
 ### Q: How do I contribute?
-**A**: See [CONTRIBUTING.md](CONTRIBUTING.md). All help welcome!
+**A**: See [CONTRIBUTING.md](../CONTRIBUTING.md). All help welcome!
 
 ---
 
@@ -151,7 +151,7 @@
 **A**: You do. Zenify doesn't collect personal data.
 
 ### Q: Is Zenify secure?
-**A**: Yes. Regular security audits, HTTPS enforced, no vulnerabilities. See [SECURITY.md](SECURITY.md).
+**A**: Yes. Regular security audits, HTTPS enforced, no vulnerabilities. See [SECURITY.md](../SECURITY.md).
 
 ### Q: How do I report security issues?
 **A**: Email: hackerstudent29@gmail.com (48-hour response SLA).
@@ -210,7 +210,7 @@
 
 ## 📞 Still Have Questions?
 
-- **Documentation**: [README.md](README.md)
+- **Documentation**: [README.md](../README.md)
 - **Issues**: [GitHub Issues](https://github.com/hackerstudent29/Zenify/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/hackerstudent29/Zenify/discussions)
 - **Email**: hackerstudent29@gmail.com

@@ -401,7 +401,7 @@ Lyrics
 Interested in improving the architecture?
 
 1. See [docs/](docs/) for detailed architecture docs
-2. Check [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
+2. Check [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines
 3. Open a discussion: [GitHub Discussions](https://github.com/hackerstudent29/Zenify/discussions)
 4. Submit a PR with changes
 
