@@ -1,4 +1,6 @@
 
+import { transliterateTextRuleBased } from './indic-transliterator.js';
+
 export const CANONICAL_ARTISTS: Record<string, { name: string; bio?: string; birthDate?: string; imageUrl?: string; coverUrl?: string }> = {
     "a. r. rahman": {
         name: "A. R. Rahman",
@@ -257,7 +259,11 @@ export function splitArtistString(rawArtist: string): string[] {
 export function normalizeArtistName(name: string): string {
     if (!name) return "Unknown Artist";
 
-    let normalized = name.toLowerCase().trim();
+    let cleanInput = name.trim();
+    if (/[\u0900-\u0D7F]/.test(cleanInput)) {
+        cleanInput = transliterateTextRuleBased(cleanInput);
+    }
+    let normalized = cleanInput.toLowerCase().trim();
 
     // Check aliases first (direct match)
     if (ALIASES[normalized]) {
@@ -311,6 +317,9 @@ export function cleanArtistNames(singers?: string | null, music?: string | null)
     for (const p of parts) {
         let norm = p.replace(/^[\s,;&/|•·\-–—]+|[\s,;&/|•·\-–—]+$/g, '').replace(/\s+/g, ' ').trim();
         if (!norm) continue;
+        if (/[\u0900-\u0D7F]/.test(norm)) {
+            norm = transliterateTextRuleBased(norm);
+        }
         // Drop labels, metadata keywords, editors, etc.
         if (/music|records|audio|t-series|sony|speed|entertainment|channel|editor|soundtrack|vevo|topic|official/i.test(norm)) continue;
         // Strip trailing parens like "(Singer)" or "[Composer]"

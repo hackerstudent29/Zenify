@@ -791,7 +791,9 @@ export class HomeSectionsService {
           const image = (taste.favoriteArtistsMap && taste.favoriteArtistsMap[lower]) || await PreferencesService.resolveArtistImage(artistName);
           items.push({
             id: `artist-${artistName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+            title: artistName,
             name: artistName,
+            artistName: artistName,
             imageUrl: image || `https://ui-avatars.com/api/?name=${encodeURIComponent(artistName)}&background=18181b&color=e11d48&size=300`,
             coverUrl: image || `https://ui-avatars.com/api/?name=${encodeURIComponent(artistName)}&background=18181b&color=e11d48&size=300`,
             isArtist: true,
@@ -811,7 +813,9 @@ export class HomeSectionsService {
           const image = await PreferencesService.resolveArtistImage(name);
           items.push({
             id: `artist-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+            title: name,
             name,
+            artistName: name,
             imageUrl: image || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=18181b&color=e11d48&size=300`,
             coverUrl: image || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=18181b&color=e11d48&size=300`,
             isArtist: true,
@@ -882,10 +886,14 @@ export class HomeSectionsService {
                 const norm = albTitle.toLowerCase();
                 const cleanArtist = cleanArtistNames(alb.artist || alb.more_info?.artist_map?.primary_artists?.[0]?.name || alb.primary_artists || artist);
                 if (isFakeOrNumericArtistName(cleanArtist)) continue;
+
+                const count = parseInt(alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
+                const isSingleRelease = count <= 1 || alb.more_info?.is_single === 'true' || alb.is_single === 'true' || norm.endsWith(' - single') || norm.endsWith(' (single)') || norm.endsWith(' single');
+                if (isSingleRelease) continue;
+
                 if (albTitle && !seenAlbumTitles.has(norm)) {
                   seenAlbumTitles.add(norm);
                   const art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
-                  const count = parseInt(alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
                   const albId = `saavn-album-${alb.id}`;
                   items.push({
                     id: albId,
@@ -943,10 +951,14 @@ export class HomeSectionsService {
                 const norm = albTitle.toLowerCase();
                 const cleanArtist = cleanArtistNames(alb.artist || alb.more_info?.artist_map?.primary_artists?.[0]?.name || alb.primary_artists || lang);
                 if (isFakeOrNumericArtistName(cleanArtist)) continue;
+
+                const count = parseInt(alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
+                const isSingleRelease = count <= 1 || alb.more_info?.is_single === 'true' || alb.is_single === 'true' || norm.endsWith(' - single') || norm.endsWith(' (single)') || norm.endsWith(' single');
+                if (isSingleRelease) continue;
+
                 if (albTitle && !seenAlbumTitles.has(norm)) {
                   seenAlbumTitles.add(norm);
                   const art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
-                  const count = parseInt(alb.more_info?.song_pids?.split(',')?.length || '1', 10) || 1;
                   const albId = `saavn-album-${alb.id}`;
                   items.push({
                     id: albId,
