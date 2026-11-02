@@ -154,18 +154,45 @@ export async function artistRoutes(server: FastifyInstance) {
                     api_version: '4',
                     ctx: 'web6dot0',
                     p: 1,
-                    n: 1,
+                    n: 10,
                     q: targetQuery
                 },
                 headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
                 timeout: 3500
             }).catch(() => null);
 
-            const matchedSaavn = (sRes?.data?.results || []).find((r: any) => {
-                const rName = (r.name || '').toLowerCase().trim();
-                const tName = targetQuery.toLowerCase().trim();
-                return rName === tName || rName.replace(/[^a-z0-9]/g, '') === tName.replace(/[^a-z0-9]/g, '');
+            let matchedSaavn = (sRes?.data?.results || []).find((r: any) => {
+                const rClean = (r.name || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+                return rClean === normTarget;
             });
+
+            if (!matchedSaavn) {
+                matchedSaavn = (sRes?.data?.results || []).find((r: any) => {
+                    const rWords = (r.name || '').toLowerCase().split(/\s+/).filter(Boolean);
+                    const tWords = targetQuery.toLowerCase().split(/\s+/).filter(Boolean);
+                    return tWords.length > 0 && tWords.every((tw: string) => rWords.includes(tw));
+                });
+            }
+
+            if (!matchedSaavn) {
+                const autoRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'autocomplete.get',
+                        _format: 'json',
+                        _marker: '0',
+                        api_version: '4',
+                        ctx: 'web6dot0',
+                        query: targetQuery
+                    },
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    timeout: 3000
+                }).catch(() => null);
+                const autoArtists = autoRes?.data?.artists?.data || [];
+                matchedSaavn = autoArtists.find((r: any) => {
+                    const rClean = (r.name || r.title || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+                    return rClean === normTarget;
+                });
+            }
             const sArtistId = matchedSaavn?.id;
             if (sArtistId) {
                 const aRes = await axios.get('https://www.jiosaavn.com/api.php', {
@@ -981,17 +1008,24 @@ export async function artistRoutes(server: FastifyInstance) {
                 const artistTokens = artistLower.split(/\s+/).filter((w: string) => w.length > 1);
 
                 for (const yt of ytResults) {
-                    const cleanTitle = (yt.title || '').trim();
+                    const cleanRawTitle = (yt.title || '').trim();
                     const vId = yt.videoId || yt.id;
-                    if (!cleanTitle || !vId || vId === 'undefined') continue;
+                    if (!cleanRawTitle || !vId || typeof vId !== 'string' || vId === 'undefined' || vId.length < 3) continue;
 
-                    // Strictly verify track belongs to this artist (reject fuzzy mismatches like Rush for Rudh)
-                    const titleLower = cleanTitle.toLowerCase();
+                    // Clean YouTube noise from song titles (removes channel names, [Official Video], etc.)
+                    const cleanTitle = cleanRawTitle
+                        .replace(/\s*\|\s*.*$/i, '')
+                        .replace(/\s*\[(official\s*(video|audio|music\s*video)|lyric\s*video|audio|video|lyrics)\]/gi, '')
+                        .replace(/\s*\((official\s*(video|audio|music\s*video)|lyric\s*video|audio|video|lyrics)\)/gi, '')
+                        .trim();
+
+                    if (!cleanTitle) continue;
+
+                    // Strictly verify track belongs to this artist (word boundary check: reject Rush for Rudh)
                     const uploaderLower = (yt.uploader || yt.channel || yt.artist || '').toLowerCase();
-                    const matchesArtist = artistTokens.length > 0 && artistTokens.some((token: string) => {
-                        const regex = new RegExp(`(^|[^a-z0-9])${token}([^a-z0-9]|$)`, 'i');
-                        return regex.test(titleLower) || regex.test(uploaderLower);
-                    });
+                    const artistLower = (artist.name || '').toLowerCase().trim();
+                    const wordRegex = new RegExp(`\\b${artistLower.replace(/[^a-z0-9]/gi, '\\$&')}\\b`, 'i');
+                    const matchesArtist = wordRegex.test(cleanRawTitle) || wordRegex.test(uploaderLower);
 
                     if (!matchesArtist) {
                         continue;
@@ -1008,7 +1042,8 @@ export async function artistRoutes(server: FastifyInstance) {
                             audioUrl: yt.audioUrl || `https://www.youtube.com/watch?v=${vId}`,
                             artistId: artist.id,
                             artist: { id: artist.id, name: artist.name, imageUrl: artist.imageUrl },
-                            album: { id: `yt-album-${artist.id}`, title: 'YouTube Releases', coverUrl: vThumb },
+                            artists: [{ id: artist.id, name: artist.name, imageUrl: artist.imageUrl }],
+                            album: undefined,
                             isVirtual: true,
                             isYoutube: true,
                             youtubeId: vId,
@@ -1039,10 +1074,10 @@ export async function artistRoutes(server: FastifyInstance) {
             );
         };
 
-        const genuineTopArt = deezerPic || finalTopTracks.find(t => t.coverUrl && !isPlaceholderArt(t.coverUrl))?.coverUrl;
-        if (isPlaceholderArt(artist.imageUrl) && genuineTopArt) {
+        const genuineTopArt = saavnPic || deezerPic || finalTopTracks.find(t => t.coverUrl && !isPlaceholderArt(t.coverUrl))?.coverUrl;
+        if ((isPlaceholderArt(artist.imageUrl) || !artist.imageUrl) && genuineTopArt) {
             artist.imageUrl = genuineTopArt;
-            if (isPlaceholderArt(artist.coverUrl)) artist.coverUrl = genuineTopArt;
+            if (isPlaceholderArt(artist.coverUrl) || !artist.coverUrl) artist.coverUrl = genuineTopArt;
             prisma.artist.update({
                 where: { id: artist.id },
                 data: { imageUrl: genuineTopArt, coverUrl: artist.coverUrl }
@@ -1077,7 +1112,7 @@ export async function artistRoutes(server: FastifyInstance) {
 
                 const canon = getCanonicalArtist(artist.name);
 
-        let finalImageUrl = canon?.imageUrl || artist.imageUrl;
+        let finalImageUrl = canon?.imageUrl || (!isPlaceholderArt(artist.imageUrl) ? artist.imageUrl : null) || saavnPic || deezerPic || genuineTopArt || '';
 
         if (canon?.imageUrl && artist.imageUrl !== canon.imageUrl) {
             finalImageUrl = canon.imageUrl;
