@@ -5,6 +5,7 @@ import { prisma } from '../utils/prisma';
 import { SystemSettingsService } from './system-settings.service';
 
 import { MUSIC_LANGUAGES, MUSIC_GENRES, COUNTRIES } from '../constants/metadata.constants';
+import { cleanArtistNames } from '../utils/artist.js';
 
 
 
