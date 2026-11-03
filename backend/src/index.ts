@@ -9,14 +9,25 @@ import fastifyStatic from '@fastify/static';
 import fastifyMultipart from '@fastify/multipart';
 import path from 'path';
 import { config } from './config/env';
+import { logBuffer } from './utils/log-buffer';
 
 // Global uncaught exceptions and unhandled rejections safety net
 process.on('unhandledRejection', (reason, promise) => {
     console.error('[UNHANDLED REJECTION] Prevented server crash:', reason);
+    logBuffer.add({
+        level: 'ERROR',
+        category: 'SYSTEM',
+        message: `[UNHANDLED REJECTION] ${String(reason)}`
+    });
 });
 
 process.on('uncaughtException', (error) => {
     console.error('[UNCAUGHT EXCEPTION] Prevented server crash:', error);
+    logBuffer.add({
+        level: 'ERROR',
+        category: 'SYSTEM',
+        message: `[UNCAUGHT EXCEPTION] ${error?.message || String(error)}`
+    });
 });
 
 // BigInt Serialization Polyfill
@@ -133,6 +144,36 @@ server.addHook('onRequest', async (request, reply) => {
     }
 });
 
+
+// Real-time backend request and response logging to logBuffer for Admin Telemetry
+server.addHook('onResponse', (request, reply, done) => {
+    const status = reply.statusCode;
+    const method = request.method;
+    const url = request.url;
+    // Filter out internal high-frequency poll/stream/health checks
+    if (url.startsWith('/api/admin/database/logs') || url === '/health') {
+        done();
+        return;
+    }
+    const elapsed = Math.round(reply.elapsedTime);
+    const level = status >= 500 ? 'ERROR' : status >= 400 ? 'WARN' : 'INFO';
+    const category = url.startsWith('/api/auth') ? 'AUTH' : (url.startsWith('/api/admin') ? 'DATABASE' : 'HTTP');
+
+    logBuffer.add({
+        level,
+        category,
+        message: `[${method}] ${url} -> ${status} (${elapsed}ms)`,
+        details: {
+            method,
+            url,
+            statusCode: status,
+            elapsedMs: elapsed,
+            ip: request.ip
+        }
+    });
+    done();
+});
+
 server.setErrorHandler((error: any, request, reply) => {
     const origin = request.headers.origin;
     if (origin && isOriginAllowed(origin)) {
@@ -140,6 +181,12 @@ server.setErrorHandler((error: any, request, reply) => {
         reply.header('Access-Control-Allow-Credentials', 'true');
     }
     server.log.error(error);
+    logBuffer.add({
+        level: 'ERROR',
+        category: 'HTTP',
+        message: `[ERROR ${error.statusCode || 500}] ${request.method} ${request.url} - ${error.message}`,
+        details: { stack: error.stack }
+    });
     const statusCode = error.statusCode || 500;
     const isProd = config.NODE_ENV === 'production';
     reply.status(statusCode).send({
@@ -234,6 +281,7 @@ const start = async () => {
     try {
         await server.listen({ port: config.PORT, host: '0.0.0.0' });
         server.log.info(`Server listening on port ${config.PORT}`);
+        logBuffer.add({ level: 'INFO', category: 'SYSTEM', message: `Zenify API listening on port ${config.PORT} (${config.NODE_ENV})` });
 
         // Run engagement score update on startup + every 3 hours
         HomepageService.updateEngagementScores();
