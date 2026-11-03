@@ -1,3 +1,4 @@
+import { AffinityDecayService } from './affinity-decay.service.js';
 import { prisma } from '../utils/prisma.js';
 import { jiosaavnCatalog } from './jiosaavn-catalog.service.js';
 import { NormalizedTrack, NormalizedArtist, NormalizedAlbum } from './catalog-provider.interface.js';
@@ -30,6 +31,7 @@ export const PERSONALIZATION_CONFIG = {
 };
 
 export interface ListenEventInput {
+  clientEventId?: string;
   userId: string;
   trackId: string;
   artistIds?: string[];
@@ -40,6 +42,7 @@ export interface ListenEventInput {
   completed?: boolean;
   skipped?: boolean;
   source?: string;
+  hour?: number;
 }
 
 export interface UserAffinities {
@@ -68,6 +71,16 @@ export class PersonalizationEngineService {
     if (!input.userId || !input.trackId) return null;
 
     try {
+      // 0. Deduplicate by clientEventId if provided
+      if (input.clientEventId) {
+        const existing = await prisma.listenEvent.findUnique({
+          where: { clientEventId: input.clientEventId }
+        });
+        if (existing) {
+          return existing;
+        }
+      }
+
       // 1. Resolve track metadata if artistIds or language are missing
       let artistIds = input.artistIds || [];
       let language = input.language ? normalizeCatalogLanguage(input.language) : null;
@@ -103,9 +116,33 @@ export class PersonalizationEngineService {
       const completed = Boolean(input.completed);
       const skipped = Boolean(input.skipped);
 
+      // Compute hour in user's timezone (0-23)
+      let hour = input.hour;
+      if (hour === undefined || isNaN(hour) || hour < 0 || hour > 23) {
+        try {
+          const user = await prisma.user.findUnique({
+            where: { id: input.userId },
+            select: { timezone: true }
+          });
+          const tz = user?.timezone || 'UTC';
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz,
+            hour: 'numeric',
+            hour12: false
+          });
+          hour = parseInt(formatter.format(new Date()), 10);
+          if (isNaN(hour) || hour < 0 || hour > 23) {
+            hour = new Date().getUTCHours();
+          }
+        } catch {
+          hour = new Date().getUTCHours();
+        }
+      }
+
       // 2. Persist to ListenEvent table
       const event = await prisma.listenEvent.create({
         data: {
+          clientEventId: input.clientEventId || undefined,
           userId: input.userId,
           trackId: input.trackId,
           artistIds,
@@ -116,10 +153,23 @@ export class PersonalizationEngineService {
           completed,
           skipped,
           source: input.source || 'player',
+          hour,
         }
       });
 
-      // 3. Keep History table in sync for fast "Jump back in" queries
+      // 3. Incrementally update exponential decay user affinities
+      await AffinityDecayService.applyListenEventAffinities({
+        userId: input.userId,
+        artistIds,
+        albumId,
+        language,
+        completed,
+        skipped,
+        msPlayed: input.msPlayed,
+        durationMs: input.durationMs,
+      }).catch((err) => console.error('[PersonalizationEngine] Failed to apply affinities:', err));
+
+      // 4. Keep History table in sync for fast "Jump back in" queries
       if (input.msPlayed >= 5000 || completed) {
         await prisma.history.create({
           data: {
@@ -130,7 +180,7 @@ export class PersonalizationEngineService {
         }).catch(() => {});
       }
 
-      // 4. Invalidate personalized homepage cache
+      // 5. Invalidate personalized homepage cache
       await this.invalidateUserFeedCache(input.userId);
 
       return event;
@@ -830,6 +880,7 @@ export class PersonalizationEngineService {
         prisma.listenEvent.deleteMany({ where: { userId } }),
         prisma.history.deleteMany({ where: { userId } }),
         prisma.userTrackStat.deleteMany({ where: { userId } }),
+        AffinityDecayService.clearAffinities(userId),
       ]);
 
       await this.invalidateUserFeedCache(userId);

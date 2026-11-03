@@ -9,6 +9,7 @@ import { getCachedTrackBlobUrl, getSyncCachedTrackBlobUrl, cacheTrackAudioInBack
 import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
 import api from "@/lib/api";
+import { listenTracker } from "@/lib/listen-tracker";
 
 export function GlobalAudio() {
   const polledTrackIds = useRef<Set<string>>(new Set());
@@ -165,6 +166,7 @@ export function GlobalAudio() {
     };
 
     const handleTimeUpdate = () => {
+      listenTracker.updateProgress(audio.currentTime, !audio.paused);
       const now = Date.now();
       if (now - lastUpdateTime.current > 150) {
         setCurrentTime(audio.currentTime);
@@ -299,6 +301,7 @@ export function GlobalAudio() {
 
     const handleEnded = () => {
       console.log("[GlobalAudio] Track ended event fired. Advancing to next track.");
+      listenTracker.recordCompletion();
       const curr = usePlayerStore.getState().currentTrack;
       if (curr?.id) {
         const artistId = (curr as any).artistId || curr.artist?.id;
@@ -619,6 +622,9 @@ export function GlobalAudio() {
     }
 
     const isNewTrack = currentPlayingTrackIdRef.current !== currentTrack.id;
+    if (isNewTrack) {
+      listenTracker.startTrackSession(currentTrack);
+    }
     const sessionId = ++playbackSessionIdRef.current;
 
     const loadAudio = () => {
