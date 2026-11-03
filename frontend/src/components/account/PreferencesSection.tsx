@@ -244,6 +244,13 @@ export function PreferencesSection() {
       notify("Preferences updated successfully", "success");
       setTimeout(() => setSaveSuccess(false), 3000);
 
+      if (user?.id) {
+        try {
+          localStorage.setItem(`zenify_selected_country_${user.id}`, selectedCountry);
+          if (selectedLanguages[0]) localStorage.setItem(`zenify_selected_language_${user.id}`, selectedLanguages[0]);
+        } catch {}
+      }
+
       queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
       queryClient.invalidateQueries({ queryKey: ['home-featured'] });
       queryClient.invalidateQueries({ queryKey: ['home-top-country'] });
@@ -253,6 +260,9 @@ export function PreferencesSection() {
       queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
       queryClient.invalidateQueries({ queryKey: ['home-recently-played'] });
       window.dispatchEvent(new CustomEvent('zenify:preferences-updated'));
+      window.dispatchEvent(new CustomEvent('zenify:country-language-changed', {
+        detail: { country: selectedCountry, language: selectedLanguages[0] }
+      }));
     } catch (err: any) {
       console.error('Failed to update preferences:', err);
       const errText = err.response?.data?.message || 'Failed to save preferences.';

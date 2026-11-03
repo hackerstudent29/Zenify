@@ -334,8 +334,13 @@ export class RecommendationsService {
     // 3. Multi-Source Search #1: JioSaavn (Fast, high-fidelity licensed streams with native language support)
     if (similar.length < limit) {
       try {
+        const isWestern = !lang || /^(english|en|korean|kpop|k-pop|japanese|spanish|french|german)$/i.test(lang.toLowerCase());
         const saavnQueries: string[] = [];
-        if (lang) {
+        if (isWestern) {
+          if (artName && seedTitle) saavnQueries.push(`${artName} ${seedTitle}`);
+          else if (seedTitle) saavnQueries.push(seedTitle);
+          if (artName) saavnQueries.push(artName);
+        } else if (lang) {
           saavnQueries.push(`${lang} ${vibeKeywords}`);
           if (seedTitle) saavnQueries.push(`${lang} ${seedTitle}`);
           if (artName) saavnQueries.push(`${lang} ${artName} hit songs`);
@@ -411,7 +416,17 @@ export class RecommendationsService {
     if (similar.length < limit) {
       try {
         const itunesQueries: string[] = [];
-        if (lang) {
+        const isEnglish = !lang || lang.toLowerCase() === 'english' || lang.toLowerCase() === 'en';
+        if (isEnglish) {
+          if (artName && seedTitle) itunesQueries.push(`${artName} ${seedTitle}`);
+          else if (seedTitle) itunesQueries.push(seedTitle);
+          if (artName) itunesQueries.push(`${artName} hits`);
+          itunesQueries.push(gen ? `${gen} hits` : 'pop hits');
+        } else if (lang.toLowerCase() === 'korean' || lang.toLowerCase() === 'kpop' || lang.toLowerCase() === 'k-pop') {
+          if (artName) itunesQueries.push(artName);
+          if (seedTitle) itunesQueries.push(seedTitle);
+          itunesQueries.push('k-pop hits');
+        } else if (lang) {
           if (seedTitle) itunesQueries.push(`${lang} ${seedTitle}`);
           itunesQueries.push(`${lang} ${vibeKeywords}`);
           if (artName) itunesQueries.push(`${lang} ${artName}`);
@@ -806,8 +821,32 @@ export class RecommendationsService {
       excludeIds?: Set<string>;
     }
   ) {
-    // Invoke our smart multi-source vibe discovery directly
-    const vibeTracks = await this.getSameVibeTracks(seed.id, size, meta);
+    let resolvedLang = meta?.language;
+    let resolvedCountry = meta?.country;
+    let userFavoriteArtists: string[] = [];
+
+    if (userId) {
+      try {
+        const [prefs, u] = await Promise.all([
+          prisma.userPreferences.findUnique({ where: { userId } }),
+          prisma.user.findUnique({ where: { id: userId }, select: { country: true } })
+        ]);
+        if (prefs) {
+          resolvedLang = prefs.selectedLanguageName || prefs.languages?.[0] || resolvedLang;
+          resolvedCountry = prefs.selectedCountryName || u?.country || resolvedCountry;
+          if (Array.isArray(prefs.favoriteArtists)) {
+            userFavoriteArtists = (prefs.favoriteArtists as any[]).map(a => typeof a === 'string' ? a : a?.name).filter(Boolean);
+          }
+        }
+      } catch {}
+    }
+
+    // Invoke our smart multi-source vibe discovery with user preferences
+    const vibeTracks = await this.getSameVibeTracks(seed.id, size * 2, {
+      ...meta,
+      language: resolvedLang || meta?.language,
+      country: resolvedCountry || meta?.country
+    });
 
     const artistCounts: Record<string, number> = {};
     const seenTitles = new Set<string>();
@@ -815,6 +854,18 @@ export class RecommendationsService {
 
     const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
     const seedTitleNorm = meta?.title ? norm(meta.title) : '';
+
+    // Prioritize favorite artists if present
+    const favSet = new Set(userFavoriteArtists.map(a => a.toLowerCase().trim()));
+
+    // Sort vibeTracks so matching user's favorite artists or matching language come first
+    vibeTracks.sort((a, b) => {
+      const aName = (a.artist?.name || a.artistName || '').toLowerCase().trim();
+      const bName = (b.artist?.name || b.artistName || '').toLowerCase().trim();
+      const aFav = favSet.has(aName) ? 1 : 0;
+      const bFav = favSet.has(bName) ? 1 : 0;
+      return bFav - aFav;
+    });
 
     for (const t of vibeTracks) {
       if (!t || !t.id) continue;

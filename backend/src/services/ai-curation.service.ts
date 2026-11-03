@@ -108,6 +108,41 @@ const DETERMINISTIC_FALLBACKS: Record<string, AICurationResult> = {
     shelves: [
       { title: 'Global Pop Powerhouse', subtitle: 'BILLBOARD HOT 100', query: 'Top global English pop hits' }
     ]
+  },
+  korean: {
+    artists: [
+      'BTS', 'BLACKPINK', 'NewJeans', 'Stray Kids', 'TWICE', 'IU',
+      'SEVENTEEN', 'Jungkook', 'LE SSERAFIM', 'aespa', 'ENHYPEN', 'TOMORROW X TOGETHER'
+    ],
+    trendingSongs: [
+      'Seven Jungkook', 'Supernatural NewJeans', 'Supernova aespa', 'Magnetic ILLIT',
+      'Standing Next to You', 'Dynamite BTS', 'How You Like That BLACKPINK', 'Drama aespa', 'OMG NewJeans', 'Cupid FIFTY FIFTY'
+    ],
+    newReleases: [
+      'Crazy LE SSERAFIM', 'Supernatural NewJeans', 'Mantra JENNIE', 'Whiplash aespa',
+      'Chk Chk Boom Stray Kids', 'Moonlit Floor LISA'
+    ],
+    shelves: [
+      { title: 'K-Pop Global Sensations', subtitle: 'HALLYU HITMAKERS', query: 'Top trending K-Pop hit songs' },
+      { title: 'Korean R&B & Chill', subtitle: 'NIGHT LOFI & SOUL', query: 'Korean indie RnB chill songs' }
+    ]
+  },
+  'k-pop': {
+    artists: [
+      'BTS', 'BLACKPINK', 'NewJeans', 'Stray Kids', 'TWICE', 'IU',
+      'SEVENTEEN', 'Jungkook', 'LE SSERAFIM', 'aespa', 'ENHYPEN', 'TOMORROW X TOGETHER'
+    ],
+    trendingSongs: [
+      'Seven Jungkook', 'Supernatural NewJeans', 'Supernova aespa', 'Magnetic ILLIT',
+      'Standing Next to You', 'Dynamite BTS', 'How You Like That BLACKPINK', 'Drama aespa', 'OMG NewJeans', 'Cupid FIFTY FIFTY'
+    ],
+    newReleases: [
+      'Crazy LE SSERAFIM', 'Supernatural NewJeans', 'Mantra JENNIE', 'Whiplash aespa',
+      'Chk Chk Boom Stray Kids', 'Moonlit Floor LISA'
+    ],
+    shelves: [
+      { title: 'K-Pop Global Sensations', subtitle: 'HALLYU HITMAKERS', query: 'Top trending K-Pop hit songs' }
+    ]
   }
 };
 
@@ -122,9 +157,9 @@ export class AICurationService {
     genres?: string[];
     favoriteArtists?: string[];
   }): Promise<AICurationResult> {
-    const rawLang = (params.language || 'Tamil').trim();
+    const rawLang = (params.language || 'English').trim();
     const langNorm = rawLang.toLowerCase();
-    const country = (params.country || 'India').trim();
+    const country = (params.country || 'United States').trim();
     const genres = (params.genres && params.genres.length > 0) ? params.genres : ['Pop', 'Film Music', 'Melody'];
     const favoriteArtists = (params.favoriteArtists && params.favoriteArtists.length > 0) ? params.favoriteArtists : [];
 
@@ -134,7 +169,7 @@ export class AICurationService {
       return cached as AICurationResult;
     }
 
-    const fallback = DETERMINISTIC_FALLBACKS[langNorm] || DETERMINISTIC_FALLBACKS['tamil'];
+    const fallback = DETERMINISTIC_FALLBACKS[langNorm] || DETERMINISTIC_FALLBACKS['english'] || DETERMINISTIC_FALLBACKS['tamil'];
 
     // If Vercel AI Key is available, invoke AI for bespoke high-fidelity discovery
     const apiKey = config.VERCEL_AI_KEY || process.env.VERCEL_AI_KEY_2 || process.env.AI_GATEWAY_API_KEY;

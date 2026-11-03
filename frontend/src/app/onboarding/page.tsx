@@ -475,6 +475,10 @@ export default function OnboardingPage() {
       localStorage.setItem("zenify_selected_country", cCode);
       if (selectedLanguages[0]) localStorage.setItem("zenify_selected_language", selectedLanguages[0]);
 
+      const uid = useAuthStore.getState().user?.id || 'guest';
+      localStorage.setItem(`zenify_selected_country_${uid}`, selectedCountry);
+      if (selectedLanguages[0]) localStorage.setItem(`zenify_selected_language_${uid}`, selectedLanguages[0]);
+
       [
         "home-featured", "home-made-for-you", "home-top-country", "home-new-releases-lang",
         "home-trending-now", "home-popular-artists-lang", "home-genre-playlists", "home-recently-played",

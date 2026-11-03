@@ -47,7 +47,15 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       accessToken: null,
       login: (user, accessToken) => set({ user, isAuthenticated: true, accessToken }),
-      logout: () => set({ user: null, isAuthenticated: false, accessToken: null }),
+      logout: () => {
+        if (typeof window !== 'undefined') {
+          try {
+            window.dispatchEvent(new CustomEvent('zenify:auth-logout'));
+            window.dispatchEvent(new CustomEvent('zenify:preferences-updated'));
+          } catch {}
+        }
+        set({ user: null, isAuthenticated: false, accessToken: null });
+      },
       updateUser: (userData) => set((state) => ({
         user: state.user ? { ...state.user, ...userData } : null
       })),

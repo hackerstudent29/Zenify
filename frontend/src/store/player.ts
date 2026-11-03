@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { audioEngine, DEFAULT_AUDIO_FX, type AudioFxSettings } from "@/lib/audio-engine";
+import { useAuthStore } from "@/store/authStore";
 
 export interface Artist {
   id: string;
@@ -179,10 +180,14 @@ export function detectTrackLanguage(track: Track): string {
     if (code >= 0x0A80 && code <= 0x0AFF) return 'gujarati';
   }
 
-  // 4. Check user preferences from localStorage
+  // 4. Check user preferences
   try {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('zenify_preferred_language') || localStorage.getItem('zenify_language');
+      const authUser = useAuthStore.getState().user;
+      const userPrefLang = authUser?.preferences?.languages?.[0] || (authUser as any)?.preferences?.selectedLanguageName;
+      if (userPrefLang) return userPrefLang.toLowerCase();
+      const userId = authUser?.id || 'guest';
+      const stored = localStorage.getItem(`zenify_selected_language_${userId}`) || localStorage.getItem('zenify_preferred_language') || localStorage.getItem('zenify_language');
       if (stored) return stored.toLowerCase();
     }
   } catch {}
@@ -191,11 +196,14 @@ export function detectTrackLanguage(track: Track): string {
 }
 
 export function extractTrackVibeParams(track: Track, limit = 25) {
+  const authUser = typeof window !== 'undefined' ? useAuthStore.getState().user : null;
+  const userLangPref = authUser?.preferences?.languages?.[0] || (authUser as any)?.preferences?.selectedLanguageName;
   const trackMood = track.aura_vibe || (track as any).mood || (track as any).vibeProfile?.aura_vibe || (track as any).analysisData?.mood || '';
   const trackMovie = (typeof track.album === 'string' ? track.album : track.album?.title) || (track as any).albumTitle || (track as any).movie || '';
   const trackArtist = track.artist?.name || (track as any).artistName || '';
-  const trackLang = detectTrackLanguage(track);
-  const trackGenre = track.genre || (track as any).vibeProfile?.genre || '';
+  const trackLang = userLangPref || detectTrackLanguage(track);
+  const trackGenre = (authUser?.preferences?.preferredGenres?.[0]) || track.genre || (track as any).vibeProfile?.genre || '';
+  const trackCountry = authUser?.country || (authUser as any)?.preferences?.selectedCountryName || '';
 
   return {
     seedType: 'track',
@@ -204,6 +212,7 @@ export function extractTrackVibeParams(track: Track, limit = 25) {
     artist: trackArtist,
     language: trackLang,
     genre: trackGenre,
+    country: trackCountry,
     album: trackMovie,
     movie: trackMovie,
     mood: trackMood,
@@ -273,8 +282,9 @@ export const usePlayerStore = create<PlayerState>()(
         });
 
         // Eager upcoming queue prefill: If user started a standalone song (finalContext is empty),
-        // fetch recommendations immediately so contextQueue is already full BEFORE the song ends!
-        if (finalContext.length === 0) {
+        // and repeat mode is "off", fetch recommendations immediately so contextQueue is already full BEFORE the song ends!
+        const initialRepeat = get().repeatMode;
+        if (finalContext.length === 0 && initialRepeat === "off") {
           (async () => {
             try {
               const api = (await import("@/lib/api")).default;
@@ -283,7 +293,7 @@ export const usePlayerStore = create<PlayerState>()(
               const fresh = (radioRes.data?.tracks || []).filter((t: any) => t.id !== track.id);
               if (fresh.length > 0) {
                 const state = get();
-                if (state.currentTrack?.id === track.id && state.contextQueue.length === 0) {
+                if (state.currentTrack?.id === track.id && state.contextQueue.length === 0 && state.repeatMode === "off") {
                   const langTitle = vibeParams.language ? (vibeParams.language.charAt(0).toUpperCase() + vibeParams.language.slice(1)) : 'Recommended';
                   set(s => ({
                     contextQueue: fresh,
@@ -300,15 +310,18 @@ export const usePlayerStore = create<PlayerState>()(
           })();
         }
 
-        // Track play persistence: record to local recent plays
+        // Track play persistence: record to user-scoped local recent plays
         try {
           if (typeof window !== 'undefined' && track && track.id) {
-            const RAW = localStorage.getItem('zenify_recently_played_tracks');
+            const authUser = useAuthStore.getState().user;
+            const userId = authUser?.id || 'guest';
+            const storageKey = `zenify_recently_played_tracks_${userId}`;
+            const RAW = localStorage.getItem(storageKey);
             const list = RAW ? JSON.parse(RAW) : [];
             const filtered = Array.isArray(list) ? list.filter((t: any) => t && t.id !== track.id) : [];
-            const updated = [track, ...filtered].slice(0, 10);
-            localStorage.setItem('zenify_recently_played_tracks', JSON.stringify(updated));
-            window.dispatchEvent(new CustomEvent('zenify:track-played', { detail: { track } }));
+            const updated = [track, ...filtered].slice(0, 15);
+            localStorage.setItem(storageKey, JSON.stringify(updated));
+            window.dispatchEvent(new CustomEvent('zenify:track-played', { detail: { track, userId } }));
           }
         } catch (e) {}
       },
@@ -631,12 +644,21 @@ export const usePlayerStore = create<PlayerState>()(
             repeatCounter: 0,
             currentTime: 0,
             duration: nextContextTrack.duration || 0,
-            queue: computeTotalQueue(nextContextTrack, [], remainingContext),
-            originalQueue: computeTotalQueue(nextContextTrack, [], remainingContext),
+            queue: computeTotalQueue(nextContextTrack, userQueue || [], remainingContext),
+            originalQueue: computeTotalQueue(nextContextTrack, userQueue || [], remainingContext),
           });
 
-          // Proactively top-up if remaining upcoming tracks are low (<= 3) so queue never exhausts
-          if (remainingContext.length <= 3) {
+          // Proactively top-up ONLY if repeat is OFF and autoplay is enabled
+          // When repeatMode is "all", NEVER fetch radio tracks, because it must loop the original context!
+          let isAutoplay = true;
+          try {
+            if (typeof window !== "undefined") {
+              const localPref = localStorage.getItem("zenify_autoplay");
+              if (localPref !== null) isAutoplay = localPref === "true";
+            }
+          } catch {}
+
+          if (repeatMode === "off" && isAutoplay && remainingContext.length <= 2) {
             (async () => {
               try {
                 const api = (await import("@/lib/api")).default;
@@ -647,6 +669,7 @@ export const usePlayerStore = create<PlayerState>()(
                 const more = (res.data?.tracks || []).filter((t: any) => !playedIds.has(t.id));
                 if (more.length > 0) {
                   set(s => {
+                    if (s.repeatMode !== "off") return {};
                     const merged = [...s.contextQueue, ...more];
                     return {
                       contextQueue: merged,
@@ -673,13 +696,13 @@ export const usePlayerStore = create<PlayerState>()(
             repeatCounter: 0,
             currentTime: 0,
             duration: firstTrack.duration || 0,
-            queue: computeTotalQueue(firstTrack, [], remainingContext),
-            originalQueue: computeTotalQueue(firstTrack, [], remainingContext),
+            queue: computeTotalQueue(firstTrack, userQueue || [], remainingContext),
+            originalQueue: computeTotalQueue(firstTrack, userQueue || [], remainingContext),
           });
           return;
         }
 
-        // 5. End of queue: Autoplay fallback or stop playback
+        // 5. End of queue: Autoplay fallback (only when repeat is "off")
         let isAutoplay = true;
         try {
           if (typeof window !== "undefined") {
@@ -688,7 +711,7 @@ export const usePlayerStore = create<PlayerState>()(
           }
         } catch {}
 
-        if (isAutoplay && currentTrack) {
+        if (repeatMode === "off" && isAutoplay && currentTrack) {
           (async () => {
             try {
               const api = (await import("@/lib/api")).default;
@@ -807,7 +830,14 @@ export const usePlayerStore = create<PlayerState>()(
         set((state) => {
           const modes: ("off" | "all" | "one")[] = ["off", "all", "one"];
           const nextIndex = (modes.indexOf(state.repeatMode as any) + 1) % modes.length;
-          return { repeatMode: modes[nextIndex], repeatCounter: 0 };
+          const nextMode = modes[nextIndex];
+          // User rule: Loop and Autoplay cannot both be on at the same time!
+          if (nextMode !== "off" && typeof window !== "undefined") {
+            try {
+              localStorage.setItem("zenify_autoplay", "false");
+            } catch {}
+          }
+          return { repeatMode: nextMode, repeatCounter: 0 };
         }),
 
       setVolume: (volume) => set({ volume }),

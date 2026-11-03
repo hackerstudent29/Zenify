@@ -64,35 +64,47 @@ const LANG_MAP: Record<string, { code: string; name: string }> = {
 const COUNTRY_MAP: Record<string, string> = {
   india: 'in',
   in: 'in',
-  china: 'cn',
-  cn: 'cn',
-  taiwan: 'tw',
-  tw: 'tw',
-  'hong kong': 'hk',
-  hk: 'hk',
+  canada: 'ca',
+  ca: 'ca',
   'united states': 'us',
   us: 'us',
   usa: 'us',
   'united kingdom': 'gb',
   uk: 'gb',
   gb: 'gb',
+  australia: 'au',
+  au: 'au',
+  china: 'cn',
+  cn: 'cn',
+  taiwan: 'tw',
+  tw: 'tw',
+  'hong kong': 'hk',
+  hk: 'hk',
   uae: 'ae',
-  korea: 'kr'
+  korea: 'kr',
+  'south korea': 'kr',
+  kr: 'kr'
 };
 
 const COUNTRY_DISPLAY_NAME_MAP: Record<string, string> = {
   in: 'India',
   india: 'India',
-  cn: 'China',
-  china: 'China',
-  tw: 'Taiwan',
-  hk: 'Hong Kong',
+  ca: 'Canada',
+  canada: 'Canada',
   us: 'United States',
   usa: 'United States',
   'united states': 'United States',
   gb: 'United Kingdom',
   uk: 'United Kingdom',
   'united kingdom': 'United Kingdom',
+  au: 'Australia',
+  australia: 'Australia',
+  kr: 'South Korea',
+  korea: 'South Korea',
+  cn: 'China',
+  china: 'China',
+  tw: 'Taiwan',
+  hk: 'Hong Kong',
   ae: 'United Arab Emirates',
   uae: 'United Arab Emirates'
 };
@@ -297,10 +309,10 @@ export class HomeSectionsService {
     }
 
     // 1. Country / Storefront Resolution
-    const userCountryRaw = rawReqCountry || preferences?.selectedCountryCode || preferences?.selectedCountryName || dbUser?.country || 'India';
+    const userCountryRaw = rawReqCountry || preferences?.selectedCountryCode || preferences?.selectedCountryName || dbUser?.country || 'United States';
     const rawCountry = userCountryRaw.trim().toLowerCase();
-    const countryCode = COUNTRY_MAP[rawCountry] || 'in';
-    const countryName = COUNTRY_DISPLAY_NAME_MAP[rawCountry] || COUNTRY_DISPLAY_NAME_MAP[countryCode] || 'India';
+    const countryCode = COUNTRY_MAP[rawCountry] || (rawCountry === 'india' ? 'in' : 'us');
+    const countryName = COUNTRY_DISPLAY_NAME_MAP[rawCountry] || COUNTRY_DISPLAY_NAME_MAP[countryCode] || userCountryRaw;
 
     // 2. Aggregate Listening Signals (Artists, Languages, Genres)
     const artistScores = new Map<string, number>();
@@ -385,8 +397,9 @@ export class HomeSectionsService {
     }
 
     // 3. Strict Language Resolution (Single Selected Language First)
-    let primaryLangName = 'Tamil';
-    let primaryLangCode = 'ta';
+    const isEnglishCountry = /^(us|ca|gb|au|nz|united states|canada|united kingdom|australia)$/i.test(countryCode) || /^(us|ca|gb|au|nz|united states|canada|united kingdom|australia)$/i.test(rawCountry);
+    let primaryLangName = isEnglishCountry ? 'English' : (countryCode === 'in' ? 'Tamil' : 'English');
+    let primaryLangCode = isEnglishCountry ? 'en' : (countryCode === 'in' ? 'ta' : 'en');
 
     if (rawReqLang) {
       const mapped = LANG_MAP[rawReqLang.toLowerCase()];

@@ -4,10 +4,43 @@ import { get, set } from "idb-keyval";
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/authStore";
 
-function getRecentArtistsFromClient(): string[] {
+function detectGuestLocale() {
+  if (typeof window === 'undefined') return { language: 'English', country: 'United States' };
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    let country = 'United States';
+    if (tz.includes('Calcutta') || tz.includes('Kolkata')) country = 'India';
+    else if (tz.includes('Toronto') || tz.includes('Vancouver') || tz.includes('Montreal')) country = 'Canada';
+    else if (tz.includes('London')) country = 'United Kingdom';
+    else if (tz.includes('Sydney') || tz.includes('Melbourne')) country = 'Australia';
+
+    const nav = (navigator.language || 'en').split('-')[0].toLowerCase();
+    const langMap: Record<string, string> = {
+      en: 'English',
+      ta: 'Tamil',
+      hi: 'Hindi',
+      te: 'Telugu',
+      ml: 'Malayalam',
+      kn: 'Kannada',
+      ko: 'Korean',
+      ja: 'Japanese',
+      es: 'Spanish',
+      fr: 'French',
+      zh: 'Mandarin Chinese',
+      pa: 'Punjabi',
+      bn: 'Bengali'
+    };
+    const language = langMap[nav] || (country === 'India' ? 'Tamil' : 'English');
+    return { language, country };
+  } catch {
+    return { language: 'English', country: 'United States' };
+  }
+}
+
+function getRecentArtistsFromClient(userId: string): string[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem('zenify_recently_played_tracks');
+    const raw = localStorage.getItem(`zenify_recently_played_tracks_${userId}`);
     if (!raw) return [];
     const list = JSON.parse(raw);
     if (!Array.isArray(list)) return [];
@@ -31,8 +64,10 @@ export function useHomepageData() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const userId = user?.id || 'guest';
-  const localLang = typeof window !== 'undefined' ? (localStorage.getItem('zenify_selected_language') || localStorage.getItem('zenify_selected_lang')) : null;
-  const localCountry = typeof window !== 'undefined' ? localStorage.getItem('zenify_selected_country') : null;
+  const guestLocale = detectGuestLocale();
+
+  const userScopedLang = typeof window !== 'undefined' ? (localStorage.getItem(`zenify_selected_language_${userId}`) || localStorage.getItem('zenify_selected_language')) : null;
+  const userScopedCountry = typeof window !== 'undefined' ? (localStorage.getItem(`zenify_selected_country_${userId}`) || localStorage.getItem('zenify_selected_country')) : null;
 
   const LANG_CODE_TO_NAME: Record<string, string> = {
     ta: 'Tamil',
@@ -42,38 +77,47 @@ export function useHomepageData() {
     kn: 'Kannada',
     en: 'English',
     pa: 'Punjabi',
-    bn: 'Bengali'
+    bn: 'Bengali',
+    ko: 'Korean',
+    ja: 'Japanese',
+    es: 'Spanish',
+    fr: 'French',
+    zh: 'Mandarin Chinese'
   };
+
+  // Determine Country: user profile > user scoped local > guest detected
+  const userCountry = (user?.country?.trim() || userScopedCountry || (user as any)?.preferences?.selectedCountryName || guestLocale.country).trim();
+
+  // Determine Default Language for Country if not explicitly overridden:
+  // e.g. Canada, US, UK, Australia, New Zealand default to English
+  const isEnglishDefaultCountry = /^(canada|united states|united kingdom|us|usa|uk|gb|australia|au|new zealand|nz)$/i.test(userCountry);
+  const defaultLangForCountry = isEnglishDefaultCountry ? 'English' : (userCountry.toLowerCase() === 'india' ? 'Tamil' : guestLocale.language);
 
   const prefLang = user?.preferences?.languages?.[0];
   const resolvedPrefName = prefLang ? (LANG_CODE_TO_NAME[prefLang.toLowerCase()] || prefLang) : null;
 
   const rawLang = resolvedPrefName ||
                   (user as any)?.preferences?.selectedLanguageName ||
-                  localLang ||
+                  userScopedLang ||
                   (user as any)?.preferences?.selectedLanguageCode ||
-                  'Tamil';
+                  defaultLangForCountry;
 
   const userLang = (LANG_CODE_TO_NAME[rawLang.toLowerCase()] || rawLang).trim();
 
   // Purge any stale client localStorage if user preferences explicitly specify language
   useEffect(() => {
     if (resolvedPrefName && typeof window !== 'undefined') {
-      const currentStored = localStorage.getItem('zenify_selected_language');
+      const currentStored = localStorage.getItem(`zenify_selected_language_${userId}`);
       if (currentStored !== resolvedPrefName) {
-        localStorage.setItem('zenify_selected_language', resolvedPrefName);
-        localStorage.setItem('zenify_selected_lang', resolvedPrefName);
+        localStorage.setItem(`zenify_selected_language_${userId}`, resolvedPrefName);
       }
     }
-  }, [resolvedPrefName]);
-
-  const rawCountry = user?.country?.trim() || localCountry || 'India';
-  const userCountry = rawCountry.trim();
+  }, [resolvedPrefName, userId]);
 
   const fetchSection = async (endpoint: string) => {
     const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const recentArtists = getRecentArtistsFromClient();
-    const cacheKey = `homepage_cache_v5_${userId}_${path}_${recentArtists.slice(0, 2).join('_')}`;
+    const recentArtists = getRecentArtistsFromClient(userId);
+    const cacheKey = `homepage_cache_v6_${userId}_${userCountry}_${userLang}_${path}_${recentArtists.slice(0, 2).join('_')}`;
 
     try {
       const res = await api.get(`/homepage${path}`, {
@@ -157,10 +201,10 @@ export function useHomepageData() {
           if (res?.items && res.items.length > 0) {
             return res;
           }
-          // Fall back to local recently played tracks if remote has no history yet
+          // Fall back to USER-SCOPED local recently played tracks if remote has no history yet
           try {
             if (typeof window !== 'undefined') {
-              const raw = localStorage.getItem('zenify_recently_played_tracks');
+              const raw = localStorage.getItem(`zenify_recently_played_tracks_${userId}`);
               if (raw) {
                 const localTracks = JSON.parse(raw);
                 if (Array.isArray(localTracks) && localTracks.length > 0) {
