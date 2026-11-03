@@ -38,7 +38,7 @@ const formatTime = (duration?: number | null) => {
 
 export function QueuePanel() {
   const router = useRouter();
-  const { isQueueOpen, setIsQueueOpen } = useUIStore();
+  const { isQueueOpen, setIsQueueOpen, showToastWithUndo } = useUIStore();
   const {
     currentTrack,
     userQueue,
@@ -49,6 +49,7 @@ export function QueuePanel() {
     toggleShuffle,
     toggleRepeat,
     addToUserQueue,
+    insertIntoUserQueue,
     removeFromUserQueue,
     playUserQueueItem,
     reorderUserQueue,
@@ -454,11 +455,13 @@ export function QueuePanel() {
                                   e.stopPropagation();
                                   e.preventDefault();
                                   removeFromUserQueue(item.queueId);
+                                  showToastWithUndo(`Removed "${formatDisplayTitle(item.track?.title || "track")}"`, () => { insertIntoUserQueue(index, item); });
                                 }}
                                 onTouchEnd={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();
                                   removeFromUserQueue(item.queueId);
+                                  showToastWithUndo(`Removed "${formatDisplayTitle(item.track?.title || "track")}"`, () => { insertIntoUserQueue(index, item); });
                                 }}
                                 className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 cursor-pointer active:scale-90 group/rm"
                                 title="Remove from queue"

@@ -1,5 +1,9 @@
 "use client";
 
+import { SleepTimerSheet } from "@/components/player/SleepTimerSheet";
+import { CarModeView } from "@/components/player/CarModeView";
+import { ToastCapsule } from "@/components/ui/ToastCapsule";
+
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
@@ -533,6 +537,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
    <ShortcutHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
    <UserOnboardingTour />
     <SettingsModal />
+    <SleepTimerSheet />
+    <CarModeView />
+    <ToastCapsule />
  </React.Suspense>
  </div>
  );

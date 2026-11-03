@@ -11,6 +11,8 @@ export interface ToastNotification {
   type: NotificationType;
   title?: string;
   duration?: number;
+  onUndo?: () => void;
+  undoLabel?: string;
 }
 
 interface UIState {
@@ -19,6 +21,8 @@ interface UIState {
   downloadTrack: Track | null;
   isPlayerMinimized: boolean;
   isFullScreenPlayerOpen: boolean;
+  isCarModeOpen: boolean;
+  setIsCarModeOpen: (open: boolean) => void;
   isAudioFxOpen: boolean;
   isQueueOpen: boolean;
   isLyricsOpen: boolean;
@@ -39,6 +43,7 @@ interface UIState {
   setColoredBackground: (enabled: boolean) => void;
   toast: ToastNotification | null;
   showToast: (msg: string, type?: NotificationType, options?: { title?: string; duration?: number }) => void;
+  showToastWithUndo: (msg: string, onUndo: () => void, undoLabel?: string) => void;
   showNotification: (msg: string, type?: NotificationType, options?: { title?: string; duration?: number }) => void;
   hideToast: () => void;
   /** Title to show in the TopBar when the page hero has scrolled out of view */
@@ -104,6 +109,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   downloadTrack: null,
   isPlayerMinimized: false,
   isFullScreenPlayerOpen: false,
+  isCarModeOpen: false,
+  setIsCarModeOpen: (open) => set({ isCarModeOpen: open }),
   isAudioFxOpen: false,
   isQueueOpen: false,
   isLyricsOpen: false,
@@ -152,7 +159,17 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
   showToast: (msg, type = 'success', options) => {
     get().showNotification(msg, type, options);
+  }, 
+  showToastWithUndo: (msg, onUndo, undoLabel = 'Undo') => {
+    if (!msg) return;
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
+    const duration = 5000;
+    set({ toast: { id, msg, type: 'info', duration, onUndo, undoLabel } });
+    setTimeout(() => {
+      set((state) => (state.toast?.id === id ? { toast: null } : state));
+    }, duration);
   },
+
   hideToast: () => set({ toast: null }),
   stickyPageTitle: null,
   setStickyPageTitle: (title) => set({ stickyPageTitle: title }),
