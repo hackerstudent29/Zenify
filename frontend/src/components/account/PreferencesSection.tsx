@@ -74,6 +74,8 @@ export function PreferencesSection() {
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [personalizationEnabled, setPersonalizationEnabled] = useState(true);
+  const [isClearingHistory, setIsClearingHistory] = useState(false);
 
   // Load Metadata & Current Preferences
   useEffect(() => {
@@ -99,6 +101,9 @@ export function PreferencesSection() {
             setSelectedGenres(prefRes.data.preferredGenres || []);
             setSelectedArtists(prefRes.data.favoriteArtists || []);
             setAge(String(prefRes.data.age || user?.age || '21'));
+            if (typeof prefRes.data.personalizationEnabled === 'boolean') {
+              setPersonalizationEnabled(prefRes.data.personalizationEnabled);
+            }
           }
         }
       } catch (err) {
@@ -130,11 +135,19 @@ export function PreferencesSection() {
   // Handlers for MultiSelectSearchDropdown
   const handleToggleLanguage = (item: DropdownItem) => {
     if (selectedLanguages.includes(item.id)) {
+      if (selectedLanguages.length <= 1) {
+        setErrorMessage('Minimum 1 language required.');
+        return;
+      }
+      setErrorMessage(null);
       setSelectedLanguages(selectedLanguages.filter(c => c !== item.id));
     } else {
-      if (selectedLanguages.length < 5) {
-        setSelectedLanguages([...selectedLanguages, item.id]);
+      if (selectedLanguages.length >= 6) {
+        setErrorMessage('Maximum 6 languages allowed. Please deselect a language to choose another.');
+        return;
       }
+      setErrorMessage(null);
+      setSelectedLanguages([...selectedLanguages, item.id]);
     }
   };
 
@@ -197,8 +210,8 @@ export function PreferencesSection() {
       return;
     }
 
-    if (selectedLanguages.length < 1 || selectedLanguages.length > 5) {
-      setErrorMessage('Please select between 1 and 5 music languages.');
+    if (selectedLanguages.length < 1 || selectedLanguages.length > 6) {
+      setErrorMessage('Please select between 1 and 6 music languages.');
       return;
     }
 
@@ -289,6 +302,33 @@ export function PreferencesSection() {
     }
   };
 
+  // Clear Listening History (Privacy)
+  const handleClearHistory = async () => {
+    setIsClearingHistory(true);
+    try {
+      await api.delete('/activity/history');
+      notify('Listening history cleared', 'success');
+      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
+    } catch (err: any) {
+      notify('Failed to clear listening history', 'error');
+    } finally {
+      setIsClearingHistory(false);
+    }
+  };
+
+  // Toggle Personalization (Privacy)
+  const handleTogglePersonalization = async () => {
+    try {
+      const next = !personalizationEnabled;
+      await api.put('/activity/personalization', { enabled: next });
+      setPersonalizationEnabled(next);
+      notify(next ? 'Personalization enabled' : 'Personalization turned off', 'success');
+      queryClient.invalidateQueries({ queryKey: ['home-feed'] });
+    } catch {
+      notify('Failed to toggle personalization', 'error');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="py-20 flex flex-col items-center justify-center gap-3 text-zinc-500 text-xs">
@@ -328,17 +368,43 @@ export function PreferencesSection() {
           </p>
         </div>
 
-        {/* Reset Personalization Button */}
-        <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-          <DialogTrigger asChild>
-            <button
-              type="button"
-              className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 cursor-pointer shrink-0"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-brand" />
-              Reset Personalization
-            </button>
-          </DialogTrigger>
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {/* Toggle Personalization Button */}
+          <button
+            type="button"
+            onClick={handleTogglePersonalization}
+            className={cn(
+              "h-10 px-4 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 cursor-pointer",
+              personalizationEnabled
+                ? "bg-zinc-900 hover:bg-zinc-800 border-white/10 text-brand"
+                : "bg-zinc-900 hover:bg-zinc-800 border-white/10 text-zinc-500"
+            )}
+          >
+            <span>Personalization: {personalizationEnabled ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {/* Clear History Button */}
+          <button
+            type="button"
+            onClick={handleClearHistory}
+            disabled={isClearingHistory}
+            className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            {isClearingHistory ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5 text-brand" />}
+            Clear History
+          </button>
+
+          {/* Reset Personalization Button */}
+          <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+            <DialogTrigger asChild>
+              <button
+                type="button"
+                className="h-10 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-300 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 cursor-pointer shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-brand" />
+                Reset Profile
+              </button>
+            </DialogTrigger>
           <DialogContent className="bg-[#18181B] border border-white/10 text-white max-w-sm rounded-2xl p-6">
             <DialogHeader className="space-y-2 text-center items-center">
               <div className="w-12 h-12 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
@@ -371,6 +437,7 @@ export function PreferencesSection() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {resetSuccess && (
@@ -391,7 +458,7 @@ export function PreferencesSection() {
           onToggle={handleToggleLanguage}
           onRemove={handleRemoveLanguage}
           minCount={1}
-          maxCount={5}
+          maxCount={6}
           idPrefix="pref-lang"
         />
 

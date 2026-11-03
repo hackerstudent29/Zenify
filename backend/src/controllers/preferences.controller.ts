@@ -177,4 +177,141 @@ export class PreferencesController {
   async getMetadata(req: FastifyRequest, reply: FastifyReply) {
     return reply.send(PreferencesService.getMetadata());
   }
+
+  /**
+   * GET /api/preferences/languages
+   * Get user or guest language preferences with browser pre-selection suggestions
+   */
+  async getLanguages(req: FastifyRequest, reply: FastifyReply) {
+    const { VERIFIED_CATALOG_LANGUAGES, detectLanguagesFromAcceptHeader } = await import('../constants/languages.js');
+    const userId = (req.user as any)?.id;
+    let selectedLanguages: string[] = [];
+
+    if (userId) {
+      const prefs = await prisma.userPreferences.findUnique({
+        where: { userId },
+        select: { languages: true }
+      });
+      if (prefs?.languages && prefs.languages.length > 0) {
+        selectedLanguages = prefs.languages;
+      }
+    }
+
+    const acceptHeader = req.headers['accept-language'];
+    const suggestedLanguages = detectLanguagesFromAcceptHeader(acceptHeader);
+
+    return reply.send({
+      languages: selectedLanguages,
+      verifiedLanguages: VERIFIED_CATALOG_LANGUAGES,
+      suggestedLanguages: suggestedLanguages.length > 0 ? suggestedLanguages : ['english']
+    });
+  }
+
+  /**
+   * PUT /api/preferences/languages
+   * Strict validation: Whitelist, dedupe, 1 to 6 languages. Blocks a 7th.
+   */
+  async updateLanguages(req: FastifyRequest<{ Body: { languages?: string[] } }>, reply: FastifyReply) {
+    const userId = (req.user as any)?.id;
+    if (!userId) throw reply.server.httpErrors.unauthorized();
+
+    const { normalizeCatalogLanguage } = await import('../constants/languages.js');
+    const rawList = Array.isArray(req.body?.languages) ? req.body.languages : [];
+
+    const validated: string[] = [];
+    const seen = new Set<string>();
+
+    for (const item of rawList) {
+      const norm = normalizeCatalogLanguage(String(item));
+      if (norm && !seen.has(norm)) {
+        seen.add(norm);
+        validated.push(norm);
+      }
+    }
+
+    if (validated.length < 1) {
+      return reply.status(400).send({
+        error: 'Select at least 1 language.'
+      });
+    }
+
+    if (validated.length > 6) {
+      return reply.status(400).send({
+        error: 'Maximum 6 languages allowed. Please deselect a language to choose another.'
+      });
+    }
+
+    const updated = await prisma.userPreferences.upsert({
+      where: { userId },
+      update: {
+        languages: validated,
+        updatedAt: new Date()
+      },
+      create: {
+        userId,
+        languages: validated,
+        updatedAt: new Date()
+      }
+    });
+
+    // Invalidate home cache immediately so home updates on next fetch
+    try {
+      await HomeSectionsService.invalidateUserHomeCache(userId);
+    } catch {}
+
+    return reply.send({
+      success: true,
+      languages: updated.languages
+    });
+  }
+
+  /**
+   * POST /api/preferences/languages/merge
+   * Merges guest localStorage languages into user account on login
+   */
+  async mergeGuestLanguages(req: FastifyRequest<{ Body: { languages?: string[] } }>, reply: FastifyReply) {
+    const userId = (req.user as any)?.id;
+    if (!userId) throw reply.server.httpErrors.unauthorized();
+
+    const { normalizeCatalogLanguage } = await import('../constants/languages.js');
+    const guestList = Array.isArray(req.body?.languages) ? req.body.languages : [];
+
+    const existing = await prisma.userPreferences.findUnique({
+      where: { userId },
+      select: { languages: true }
+    });
+
+    const mergedSet = new Set<string>(existing?.languages || []);
+    for (const item of guestList) {
+      const norm = normalizeCatalogLanguage(String(item));
+      if (norm && mergedSet.size < 6) {
+        mergedSet.add(norm);
+      }
+    }
+
+    const finalList = Array.from(mergedSet);
+    if (finalList.length > 0) {
+      await prisma.userPreferences.upsert({
+        where: { userId },
+        update: {
+          languages: finalList,
+          updatedAt: new Date()
+        },
+        create: {
+          userId,
+          languages: finalList,
+          updatedAt: new Date()
+        }
+      });
+
+      try {
+        await HomeSectionsService.invalidateUserHomeCache(userId);
+      } catch {}
+    }
+
+    return reply.send({
+      success: true,
+      languages: finalList
+    });
+  }
 }
