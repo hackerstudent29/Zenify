@@ -27,10 +27,10 @@ const LINKS = [
     external: true,
   },
   {
-    label: "Email",
-    value: "ramzendrum@gmail.com",
-    href: "mailto:ramzendrum@gmail.com",
-    external: false,
+    label: "GitHub",
+    value: "hackerstudent29",
+    href: "https://github.com/hackerstudent29",
+    external: true,
   },
 ];
 
@@ -82,9 +82,9 @@ export default function AboutPage() {
             >
               <div className="relative size-full overflow-hidden rounded-full bg-zinc-900 border border-white/10 shadow-xl">
                 <motion.img
-                  src="/ram_profile.jpg"
-                  alt="Ram"
-                  onError={(e) => ((e.currentTarget as HTMLImageElement).src = "/logo.png")}
+                  src="/creator.webp"
+                  alt="Creator of Zenify"
+                  onError={(e) => ((e.currentTarget as HTMLImageElement).src = "/ram_profile.jpg")}
                   animate={
                     isBurning
                       ? {
@@ -204,7 +204,6 @@ export default function AboutPage() {
                 </AnimatePresence>
               </motion.button>
             </div>
-            <p className="py-3 text-xs text-white/40">Works with GPay, PhonePe, Paytm and BHIM.</p>
           </Section>
 
           <motion.p variants={rise} className="mt-12 text-xs text-white/30">
