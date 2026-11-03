@@ -743,12 +743,46 @@ export class TrackService {
         });
     }
 
-    async incrementStreamCount(id: string, userId?: string, sessionData?: { listenDuration?: number; skipped?: boolean; completionRate?: number }) {
+    async incrementStreamCount(id: string, userId?: string, sessionData?: { listenDuration?: number; skipped?: boolean; completionRate?: number; title?: string; artist?: string; coverUrl?: string; audioUrl?: string; duration?: number; language?: string; genre?: string }) {
         try {
-            const track = await prisma.track.findUnique({
+            let track = await prisma.track.findUnique({
                 where: { id },
                 select: { id: true, artistId: true }
             }).catch(() => null);
+
+            // Upsert track and artist on first play if not in database yet (e.g. played via search / JioSaavn / iTunes)
+            if (!track && sessionData?.title) {
+                const rawArtist = (sessionData.artist || 'Unknown Artist').trim();
+                let artist = await prisma.artist.findFirst({
+                    where: { name: { equals: rawArtist, mode: 'insensitive' } }
+                }).catch(() => null);
+
+                if (!artist) {
+                    artist = await prisma.artist.create({
+                        data: {
+                            name: rawArtist,
+                            imageUrl: sessionData.coverUrl || null
+                        }
+                    }).catch(() => null);
+                }
+
+                if (artist) {
+                    track = await prisma.track.create({
+                        data: {
+                            id,
+                            title: sessionData.title.trim(),
+                            artistId: artist.id,
+                            coverUrl: sessionData.coverUrl || null,
+                            audioUrl: sessionData.audioUrl || '',
+                            duration: sessionData.duration ? Math.round(Number(sessionData.duration)) : 180,
+                            language: sessionData.language || null,
+                            genre: sessionData.genre || null,
+                            streams: 1
+                        },
+                        select: { id: true, artistId: true }
+                    }).catch(() => null);
+                }
+            }
 
             if (track) {
                 prisma.track.update({

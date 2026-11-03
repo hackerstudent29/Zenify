@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { usePlayerStore, extractTrackVibeParams } from "@/store/player";
 import { useAuthStore } from "@/store/authStore";
 import { audioEngine } from "@/lib/audio-engine";
-import { getMediaUrl, getTrackCover, getApiBaseUrl } from "@/lib/utils";
+import { getMediaUrl, getTrackCover, getApiBaseUrl, formatArtists } from "@/lib/utils";
 import { getCachedTrackBlobUrl, getSyncCachedTrackBlobUrl, cacheTrackAudioInBackground } from "@/lib/audio-cache";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
@@ -523,7 +523,7 @@ export function GlobalAudio() {
       
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title,
-        artist: track.artist?.name || 'Unknown Artist',
+        artist: formatArtists(track),
         album: track.album?.title || 'Zenify Single',
         artwork: [
           { src: artworkUrl, sizes: '96x96', type: 'image/png' },
@@ -717,7 +717,6 @@ export function GlobalAudio() {
           audio.crossOrigin = 'anonymous';
         }
         audio.src = targetSrc;
-        audio.load();
 
         // Ensure playback guarantees when media is ready to play
         const handleCanPlay = () => {
@@ -832,7 +831,18 @@ export function GlobalAudio() {
         }
 
         const api = (await import("@/lib/api")).default;
-        await api.post(`tracks/${currentTrack.id}/play`);
+        const currentArtist = currentTrack.artist?.name || (currentTrack as any).artistName || '';
+        const trackLang = (currentTrack as any).language || (currentTrack as any).vibeProfile?.language || '';
+        await api.post(`/tracks/${currentTrack.id}/play`, {
+          title: currentTrack.title,
+          artist: currentArtist,
+          coverUrl: currentTrack.coverUrl,
+          audioUrl: currentTrack.audioUrl,
+          duration: currentTrack.duration,
+          language: trackLang,
+          genre: currentTrack.genre
+        }).catch(() => {});
+
         if (queryClient) {
           queryClient.invalidateQueries({ queryKey: ['artist', 'search-home', 'tracks'] });
           queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
@@ -870,7 +880,7 @@ export function GlobalAudio() {
       try {
         const api = (await import("@/lib/api")).default;
         const progress = audioEngine.getActiveAudioElement()?.currentTime || 0;
-        await api.post(`tracks/${id}/heartbeat`, { duration, progress });
+        await api.post(`/tracks/${id}/heartbeat`, { duration, progress });
       } catch (err) {
         console.error("[Playback] Batched heartbeat failed:", err);
       }

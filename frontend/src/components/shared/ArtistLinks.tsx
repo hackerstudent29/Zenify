@@ -39,7 +39,7 @@ export function extractArtists(source: { track?: any; album?: any; artists?: any
     if (!name || typeof name !== "string") return;
     const parts = splitArtistNames(name);
     for (const p of parts) {
-      const clean = stripHonorifics(p.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, "").trim());
+      const clean = stripHonorifics(p.replace(/^[\s,;&/|•·\-–—]+|[\s,;&/|•·\-–—]+$/g, "").trim());
       if (!clean || clean.length < 2 || /^\d+$/.test(clean) || /^itunes\s*artist\s*\d+/i.test(clean)) continue;
       const lower = clean.toLowerCase();
       if (!seen.has(lower)) {
@@ -57,7 +57,9 @@ export function extractArtists(source: { track?: any; album?: any; artists?: any
   };
 
   // Case A: Explicit artists array passed
-  const rawArtistsList = source.artists || (Array.isArray(source) ? source : null);
+  const rawArtistsList = Array.isArray(source.artists?.items)
+    ? source.artists.items.map((i: any) => i?.profile || i)
+    : (source.artists || (Array.isArray(source) ? source : null));
   if (Array.isArray(rawArtistsList) && rawArtistsList.length > 0) {
     for (const a of rawArtistsList) {
       if (typeof a === "string") {
@@ -146,21 +148,37 @@ export function extractArtists(source: { track?: any; album?: any; artists?: any
     let rawPrimary = "";
     let primaryId: string | undefined = undefined;
 
-    if (track.artist) {
+    if (track.artist && (typeof track.artist === "string" || track.artist.name)) {
       if (typeof track.artist === "string") {
         rawPrimary = track.artist;
       } else if (track.artist.name) {
         rawPrimary = track.artist.name;
         primaryId = track.artist.id || track.artist._id;
       }
-    } else if (track.artistName) {
+    }
+    
+    if (!rawPrimary && track.artistName) {
       rawPrimary = track.artistName;
       primaryId = track.artistId;
-    } else if (track.primaryArtists) {
+    }
+    if (!rawPrimary && track.primaryArtists) {
       rawPrimary = track.primaryArtists;
-    } else if (track.album?.artist?.name) {
+    }
+    if (!rawPrimary && track.album?.artist?.name) {
       rawPrimary = track.album.artist.name;
       primaryId = track.album.artist.id;
+    }
+    if (!rawPrimary && Array.isArray(track.artists?.items) && track.artists.items.length > 0) {
+      const p = track.artists.items[0]?.profile?.name || track.artists.items[0]?.name;
+      if (p) rawPrimary = p;
+    }
+    if (!rawPrimary && track.more_info?.primary_artists) {
+      rawPrimary = track.more_info.primary_artists;
+    }
+    if (!rawPrimary && track.subtitle && typeof track.subtitle === "string") {
+      if (!/^\d{4}\b/i.test(track.subtitle) && !/\bsong\b/i.test(track.subtitle)) {
+        rawPrimary = track.subtitle;
+      }
     }
 
     if (!hasComposer && rawPrimary) {

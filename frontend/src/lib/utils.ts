@@ -563,7 +563,7 @@ export function splitArtistNames(raw: string | string[]): string[] {
   const result: string[] = [];
   for (const item of list) {
     if (typeof item !== 'string') continue;
-    const sanitized = item.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim();
+    const sanitized = item.replace(/^[\s,;&/|•·\-–—]+|[\s,;&/|•·\-–—]+$/g, '').trim();
     if (!sanitized) continue;
 
     const lower = sanitized.toLowerCase();
@@ -574,7 +574,7 @@ export function splitArtistNames(raw: string | string[]): string[] {
 
     const parts = sanitized
       .split(ARTIST_DELIMITER_REGEX)
-      .map(p => p.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim())
+      .map(p => p.replace(/^[\s,;&/|•·\-–—]+|[\s,;&/|•·\-–—]+$/g, '').trim())
       .map(p => stripHonorifics(p))
       .filter(p => p.length > 0 && !/^\d+$/.test(p) && !/^itunes\s*artist/i.test(p));
     result.push(...parts);
@@ -593,10 +593,10 @@ export function formatArtists(track: any, fallback: string = "Unknown Artist"): 
   const parts: string[] = [];
 
   const add = (name: string, role?: string) => {
-    if (!name) return;
+    if (!name || typeof name !== 'string') return;
     const split = splitArtistNames(name);
     for (const item of split) {
-      const clean = item.replace(/^[,s/&·•\-–—|]+|[,s/&·•\-–—|]+$/g, '').trim();
+      const clean = item.replace(/^[\s,;&/|•·\-–—]+|[\s,;&/|•·\-–—]+$/g, '').trim();
       if (!clean || clean.length < 2 || /^\d+$/.test(clean) || /^itunes\s*artist/i.test(clean)) continue;
       const lower = clean.toLowerCase();
       if (!seen.has(lower)) {
@@ -626,19 +626,38 @@ export function formatArtists(track: any, fallback: string = "Unknown Artist"): 
     add(String(rawBgm), "BGM");
   }
 
-  // 2. Fall back to primary artist if composer missing
+  // 2. Primary artist from all metadata shapes
   let rawPrimary = "";
   if (Array.isArray(track.artists) && track.artists.length > 0) {
     const first = track.artists[0];
-    rawPrimary = typeof first === 'string' ? first : first?.name;
-  } else if (track.artist) {
-    rawPrimary = typeof track.artist === 'string' ? track.artist : track.artist.name;
-  } else if (track.artistName) {
+    rawPrimary = typeof first === 'string' ? first : (first?.name || first?.profile?.name || "");
+  }
+  if (!rawPrimary && Array.isArray(track.artists?.items) && track.artists.items.length > 0) {
+    const first = track.artists.items[0];
+    rawPrimary = first?.profile?.name || first?.name || "";
+  }
+  if (!rawPrimary && track.artist) {
+    rawPrimary = typeof track.artist === 'string' ? track.artist : (track.artist.name || "");
+  }
+  if (!rawPrimary && track.artistName) {
     rawPrimary = track.artistName;
-  } else if (track.primaryArtists) {
+  }
+  if (!rawPrimary && track.primaryArtists) {
     rawPrimary = track.primaryArtists;
-  } else if (track.album?.artist?.name) {
+  }
+  if (!rawPrimary && track.more_info?.primary_artists) {
+    rawPrimary = track.more_info.primary_artists;
+  }
+  if (!rawPrimary && track.album?.artist?.name) {
     rawPrimary = track.album.artist.name;
+  }
+  if (!rawPrimary && typeof track.album?.artist === 'string') {
+    rawPrimary = track.album.artist;
+  }
+  if (!rawPrimary && track.subtitle && typeof track.subtitle === 'string') {
+    if (!/^\d{4}\b/i.test(track.subtitle) && !/\bsong\b/i.test(track.subtitle)) {
+      rawPrimary = track.subtitle;
+    }
   }
 
   if (!hasComposer && rawPrimary) {
@@ -669,6 +688,13 @@ export function formatArtists(track: any, fallback: string = "Unknown Artist"): 
   // 5. Featured / other credits
   if (track.featuredArtists) {
     add(String(track.featuredArtists), "Featured");
+  }
+
+  // 6. Explicit artistMap if available
+  if (track.more_info?.artistMap?.primary_artists && Array.isArray(track.more_info.artistMap.primary_artists)) {
+    for (const pa of track.more_info.artistMap.primary_artists) {
+      if (pa?.name) add(pa.name);
+    }
   }
 
   if (parts.length === 0) return fallback;

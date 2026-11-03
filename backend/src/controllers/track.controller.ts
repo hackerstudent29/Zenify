@@ -584,7 +584,7 @@ export class TrackController {
             }
         }
 
-        this.trackService.incrementStreamCount(req.params.id, userId);
+        this.trackService.incrementStreamCount(req.params.id, userId, req.body as any);
 
         // Dynamically trigger background elastic lyrics check / onset calibration
         import('../queues/lyric-enrichment.worker.js').then(({ ElasticLyricWorker }) => {
