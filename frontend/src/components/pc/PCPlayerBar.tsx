@@ -1,3 +1,5 @@
+import { useSleepTimerStore } from '@/store/sleepTimerStore';
+import { Moon, Car } from 'lucide-react';
 import { GlobalTooltip } from "@/components/shared/GlobalTooltip";
 "use client";
 
@@ -581,7 +583,7 @@ export function PCPlayerBar() {
             </div>
 
             {/* 3. Right controls */}
-            <div className="relative flex items-center shrink-0 w-[156px] justify-end" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex items-center shrink-0 w-[230px] justify-end" onClick={(e) => e.stopPropagation()}>
               <div
                 className="flex items-center"
                 style={{

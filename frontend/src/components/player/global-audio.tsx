@@ -1,3 +1,4 @@
+import { useSleepTimerStore } from "@/store/sleepTimerStore";
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -302,6 +303,12 @@ export function GlobalAudio() {
     const handleEnded = () => {
       console.log("[GlobalAudio] Track ended event fired. Advancing to next track.");
       listenTracker.recordCompletion();
+      if (useSleepTimerStore.getState().mode === 'track_end') {
+        setIsPlaying(false);
+        audio.pause();
+        useSleepTimerStore.getState().clearTimer();
+        return;
+      }
       const curr = usePlayerStore.getState().currentTrack;
       if (curr?.id) {
         const artistId = (curr as any).artistId || curr.artist?.id;
@@ -521,6 +528,46 @@ export function GlobalAudio() {
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('seeked', handleSeeked);
     audio.addEventListener('error', handleAudioError);
+
+    
+  // Sleep Timer Watcher
+  useEffect(() => {
+    const timerInterval = setInterval(() => {
+      useSleepTimerStore.getState().tick();
+      const { endTimestamp, remainingSeconds, warnedOneMinute, setWarned } = useSleepTimerStore.getState();
+
+      if (endTimestamp) {
+        if (remainingSeconds <= 60 && remainingSeconds > 0 && !warnedOneMinute) {
+          setWarned(true);
+          useUIStore.getState().showToastWithUndo(
+            "Sleep timer ending in 1 minute",
+            () => useSleepTimerStore.getState().addFiveMinutes(),
+            "+5 Min"
+          );
+        }
+
+        if (remainingSeconds <= 20 && remainingSeconds > 0) {
+          const audio = audioEngine.getActiveAudioElement();
+          if (audio) {
+            const ratio = Math.max(0, remainingSeconds / 20);
+            audio.volume = Math.max(0, ratio * (volumeRef.current ?? 1));
+          }
+        }
+
+        if (remainingSeconds <= 0 && Date.now() >= endTimestamp) {
+          setIsPlaying(false);
+          const audio = audioEngine.getActiveAudioElement();
+          if (audio && !audio.paused) {
+            audio.pause();
+          }
+          audioEngine.setVolume(volumeRef.current ?? 1);
+          useSleepTimerStore.getState().clearTimer();
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [setIsPlaying]);
 
     return () => {
       audio.removeEventListener('play', handlePlay);

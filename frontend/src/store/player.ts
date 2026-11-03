@@ -90,6 +90,7 @@ interface PlayerState {
   // Modern 3-tier queue actions
   setTrack: (track: Track, contextTracks?: Track[], contextName?: string) => void;
   addToUserQueue: (trackOrTracks: Track | Track[], options?: { feedback?: boolean; contextName?: string }) => void;
+  insertIntoUserQueue: (index: number, item: UserQueueItem) => void;
   removeFromUserQueue: (queueId: string) => void;
   playUserQueueItem: (queueId: string) => void;
   reorderUserQueue: (startIndex: number, endIndex: number) => void;
@@ -366,6 +367,17 @@ export const usePlayerStore = create<PlayerState>()(
           userQueue: updatedUserQueue,
           queue: computeTotalQueue(currentTrack, updatedUserQueue, contextQueue),
           originalQueue: computeTotalQueue(currentTrack, updatedUserQueue, contextQueue),
+        });
+      },
+
+      insertIntoUserQueue: (index, item) => {
+        const { userQueue, currentTrack, contextQueue } = get();
+        const next = [...(userQueue || [])];
+        next.splice(Math.max(0, Math.min(index, next.length)), 0, item);
+        set({
+          userQueue: next,
+          queue: computeTotalQueue(currentTrack, next, contextQueue),
+          originalQueue: computeTotalQueue(currentTrack, next, contextQueue),
         });
       },
 

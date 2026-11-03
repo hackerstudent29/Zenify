@@ -1,3 +1,4 @@
+import { useSleepTimerStore } from '@/store/sleepTimerStore';
 "use client";
 
 /**
@@ -41,6 +42,8 @@ import {
   ListMusic,
   ScrollText,
   Share2,
+  Moon,
+  Car,
   SkipForward,
   Info,
   Play,
@@ -895,7 +898,16 @@ export function TrackActionsDropdown({
           : [...prev, track.id]
         : [track.id];
       queryClient.setQueryData(["liked-track-ids"], next);
-      showToast(prev?.includes(track.id) ? "Removed from Liked Songs" : "Added to Liked Songs");
+      if (prev?.includes(track.id)) {
+        useUIStore.getState().showToastWithUndo("Removed from Liked Songs", () => {
+          api.post(`/tracks/${track.id}/like`, track).then(() => {
+            queryClient.invalidateQueries({ queryKey: ["liked-track-ids"] });
+            queryClient.invalidateQueries({ queryKey: ["liked-tracks"] });
+          });
+        });
+      } else {
+        showToast("Added to Liked Songs");
+      }
       return { prev };
     },
     onError: (_err, _v, ctx) => {
