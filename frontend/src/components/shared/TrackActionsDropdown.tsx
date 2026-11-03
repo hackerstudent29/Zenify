@@ -1,3 +1,4 @@
+import { Sparkles } from "lucide-react";
 import { useSleepTimerStore } from '@/store/sleepTimerStore';
 "use client";
 
