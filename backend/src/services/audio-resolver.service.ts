@@ -617,8 +617,24 @@ export class AudioResolverService {
         score += 20;
         reasons.push('+20 Official Artist / Label Channel');
       } else if (candContainsArtist) {
-        score += 5;
-        reasons.push('+5 Mentions artist in title');
+        score += 15;
+        reasons.push('+15 Mentions artist in title');
+      } else if (targetCleanArtist.length > 2) {
+        reasons.push(`Hard reject: Artist mismatch (candidate does not match requested artist "${targetCleanArtist}")`);
+        otherVersions.push({
+          id: cand.id,
+          title: cand.title,
+          uploader: cand.uploader || cand.channel,
+          versionType: 'artist_mismatch'
+        });
+        scored.push({
+          candidate: cand,
+          score: -999,
+          reasons,
+          isHardRejected: true,
+          versionType: 'artist_mismatch'
+        });
+        continue;
       } else {
         score -= 150;
         reasons.push('-150 Channel and title do not match artist or verified label');
@@ -678,15 +694,14 @@ export class AudioResolverService {
       };
     }
 
-    // Candidate failed verified official source threshold: report unverified but provide best candidate watchUrl fallback!
-    const unverifiedLog = `[AudioResolver] UNVERIFIED: No verified clean official audio or official lyric video meeting threshold ${SCORE_THRESHOLD} (Best score ${best?.score || 0}). Falling back to best candidate stream.`;
+    // Candidate failed verified official source threshold: strictly return null to prevent title collision audio hijacking
+    const unverifiedLog = `[AudioResolver] UNVERIFIED: No verified clean official audio or official lyric video meeting threshold ${SCORE_THRESHOLD} (Best score ${best?.score || 0}) for "${rawTitle}" by "${rawArtist}". Rejecting unverified audio to prevent wrong song playback.`;
     console.warn(unverifiedLog);
 
-    const fallbackId = best?.candidate?.id || null;
     return {
-      videoId: fallbackId,
-      watchUrl: fallbackId ? `https://www.youtube.com/watch?v=${fallbackId}` : null,
-      streamUrl: fallbackId ? `/api/utils/stream-youtube?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${fallbackId}`)}&trackId=${canonical.id || ''}&title=${encodeURIComponent(rawTitle)}&artist=${encodeURIComponent(rawArtist)}` : null,
+      videoId: null,
+      watchUrl: null,
+      streamUrl: null,
       score: best?.score || 0,
       verified: false,
       source: 'unverified_fallback',

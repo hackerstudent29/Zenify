@@ -172,7 +172,7 @@ function getCookieArgs(): string[] {
  * immediately falling back to distributed Infinity Gates (RapidAPI, Piped, Invidious, Cobalt)
  * when local IP is throttled or challenged by YouTube bot protection.
  */
-async function resolveDirectStreamUrl(url: string, server: FastifyInstance, queryHint?: string): Promise<string | null> {
+async function resolveDirectStreamUrl(url: string, server: FastifyInstance, queryHint?: string, artistHint?: string, titleHint?: string): Promise<string | null> {
     const videoIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|\/v\/)([a-zA-Z0-9_-]{11})/);
     let videoId = videoIdMatch ? videoIdMatch[1] : null;
 
@@ -186,10 +186,13 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
         const rawClean = url.replace(/^ytsearch[0-9]*:/, '').trim();
         if (rawClean.length > 2) effectiveHint = rawClean;
     }
-    if (effectiveHint) {
+    if (effectiveHint || (titleHint && artistHint)) {
         try {
             const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
-            const cdnResult = await CleanCdnAudioService.resolveAudio(effectiveHint);
+            const cdnResult = await CleanCdnAudioService.resolveAudio({
+                title: titleHint || (queryHint ? queryHint.split(' - ').slice(1).join(' - ').trim() : effectiveHint),
+                primaryArtist: artistHint || (queryHint && queryHint.includes(' - ') ? queryHint.split(' - ')[0].trim() : undefined)
+            });
             if (cdnResult?.url) {
                 server.log.info(`[stream-youtube] Direct media URL resolved via Clean CDN (320kbps): ${cdnResult.url.slice(0, 80)}...`);
                 return cdnResult.url;
@@ -200,8 +203,37 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
     }
 
     // 1. Direct extraction via yt-dlp -g (bypassed if local IP is under active circuit breaker cooldown)
+    // If url is a search query and artistHint is given, verify video candidate first to prevent title collisions
+    let verifiedUrlToExtract = url;
+    if (!videoId && (url.startsWith('ytsearch') || !url.startsWith('http'))) {
+        try {
+            const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
+            const cleanQuery = url.replace(/^ytsearch[0-9]*:/, '').trim();
+            const searchCandidates = await ExternalMetadataService.searchYoutubeDirect(cleanQuery).catch(() => []);
+            if (searchCandidates && searchCandidates.length > 0) {
+                if (artistHint) {
+                    const matched = searchCandidates.find((c: any) => 
+                        CleanCdnAudioService.isArtistMatch(artistHint, `${c.uploader || c.channel || ''} ${c.title || ''}`).match
+                    );
+                    if (matched?.id) {
+                        videoId = matched.id;
+                        verifiedUrlToExtract = `https://www.youtube.com/watch?v=${matched.id}`;
+                        server.log.info(`[stream-youtube] Verified candidate videoId: ${videoId} for artist "${artistHint}"`);
+                    } else {
+                        server.log.warn(`[stream-youtube] No YouTube candidate matched requested artist "${artistHint}". Skipping blind -g.`);
+                        verifiedUrlToExtract = '';
+                    }
+                } else if (searchCandidates[0].id) {
+                    videoId = searchCandidates[0].id;
+                    verifiedUrlToExtract = `https://www.youtube.com/watch?v=${videoId}`;
+                }
+            }
+        } catch {}
+    }
+
     const isLocalBlocked = Date.now() < localYtBlockCooldownUntil;
-    if (ytBin && !isLocalBlocked) {
+    if (ytBin && !isLocalBlocked && verifiedUrlToExtract) {
         // Priority: ios, mweb, web_creator, android, tv_embedded
         const gClients: (string | null)[] = ['ios', 'mweb', 'web_creator', 'android', 'tv_embedded'];
         let botBlockCount = 0;
@@ -222,7 +254,7 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
                     '-f', 'ba/18/b/best',
                     '--no-playlist',
                     '--socket-timeout', '8',
-                    url
+                    verifiedUrlToExtract
                 ];
                 const { stdout } = await safeExecFile(binExecutable, gArgs, { timeout: 9500 });
                 const urls = stdout.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('http'));
@@ -277,16 +309,23 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
             }).catch(() => null);
 
             if (s81Res?.data?.url && !s81Res.data.url.includes('audio-ssl') && !s81Res.data.url.includes('mzstatic')) {
-                server.log.info(`[stream-youtube] Infinity Gate 1 (RapidAPI Spotify81) successfully resolved full audio stream!`);
-                return s81Res.data.url;
+                const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
+                const rapArtist = s81Res.data?.artists || s81Res.data?.artist || '';
+                if (artistHint && rapArtist && !CleanCdnAudioService.isArtistMatch(artistHint, rapArtist).match) {
+                    server.log.warn(`[stream-youtube] RapidAPI Spotify81 artist mismatch: requested "${artistHint}", got "${rapArtist}". Rejecting.`);
+                } else {
+                    server.log.info(`[stream-youtube] Infinity Gate 1 (RapidAPI Spotify81) successfully resolved full audio stream!`);
+                    return s81Res.data.url;
+                }
             }
 
-            // 1b. Fallback to YT MP3 downloader
-            const mp3Res = await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
-                params: { url },
+            // 1b. Fallback to YT MP3 downloader (only for verified videoId / watch URL)
+            const ytTargetUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : (url.includes('youtube.com/watch') || url.includes('youtu.be/') ? url : null);
+            const mp3Res = ytTargetUrl ? await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
+                params: { url: ytTargetUrl },
                 headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com' },
                 timeout: 5000
-            }).catch(() => null);
+            }).catch(() => null) : null;
 
             if (mp3Res?.data?.success && mp3Res?.data?.download) {
                 server.log.info(`[stream-youtube] Infinity Gate 1 (RapidAPI MP3) successfully resolved full audio stream!`);
@@ -301,11 +340,22 @@ async function resolveDirectStreamUrl(url: string, server: FastifyInstance, quer
     if (!videoId && (url.startsWith('ytsearch') || !url.startsWith('http'))) {
         try {
             const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
             const cleanQuery = url.replace(/^ytsearch[0-9]*:/, '').trim();
             const candidates = await ExternalMetadataService.searchYoutubeDirect(cleanQuery).catch(() => []);
-            if (candidates && candidates.length > 0 && candidates[0].id) {
-                videoId = candidates[0].id;
-                server.log.info(`[stream-youtube] Fast-resolved videoId: ${videoId} for query: "${cleanQuery}"`);
+            if (candidates && candidates.length > 0) {
+                if (artistHint) {
+                    const matched = candidates.find((c: any) =>
+                        CleanCdnAudioService.isArtistMatch(artistHint, `${c.uploader || c.channel || ''} ${c.title || ''}`).match
+                    );
+                    if (matched?.id) {
+                        videoId = matched.id;
+                        server.log.info(`[stream-youtube] Fast-resolved verified videoId: ${videoId} for artist "${artistHint}"`);
+                    }
+                } else if (candidates[0].id) {
+                    videoId = candidates[0].id;
+                    server.log.info(`[stream-youtube] Fast-resolved videoId: ${videoId} for query: "${cleanQuery}"`);
+                }
             }
         } catch {}
     }
@@ -1131,6 +1181,35 @@ export async function utilsRoutes(server: FastifyInstance) {
         let cleanCandTitle = candTitle ? candTitle.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').split('|')[0].trim() : '';
         let cleanCandArtist = candArtist ? candArtist.replace(/\(.*?\)/g, '').split(/[,&/|]/)[0].trim() : '';
 
+        // ── 0. FAST CANONICAL JIOSAAVN ID LOOKUP (<100ms) ──────────
+        const rawSaavnId = (candId && candId.startsWith('saavn-')) ? candId.replace(/^saavn-/, '') : (targetUrl.startsWith('saavn-') ? targetUrl.replace(/^saavn-/, '') : null);
+        if (rawSaavnId && !rawSaavnId.includes(' ')) {
+            try {
+                const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
+                const directCdn = await CleanCdnAudioService.resolveById(rawSaavnId);
+                if (directCdn?.url) {
+                    const reqArtist = candArtist || cleanCandArtist;
+                    const artMatch = reqArtist ? CleanCdnAudioService.isArtistMatch(reqArtist, directCdn.artist) : { match: true, score: 1.0 };
+                    if (!reqArtist || artMatch.match) {
+                        server.log.info(`[stream-youtube] Fast Canonical Saavn ID match (320kbps): "${directCdn.title}" by "${directCdn.artist}"`);
+                        const cachePayload = { directUrl: directCdn.url, expiresAt: Date.now() + 6 * 60 * 60 * 1000 };
+                        youtubeStreamCache.set(url, cachePayload);
+                        if (targetUrl) youtubeStreamCache.set(targetUrl, cachePayload);
+                        if (candId) youtubeStreamCache.set(`track:${candId}`, cachePayload);
+
+                        if (directCdn.title) reply.header('x-zenify-track-title', encodeURIComponent(directCdn.title));
+                        if (directCdn.artist) reply.header('x-zenify-track-artist', encodeURIComponent(directCdn.artist));
+                        if (directCdn.album) reply.header('x-zenify-track-album', encodeURIComponent(directCdn.album));
+                        if (directCdn.coverUrl) reply.header('x-zenify-track-cover', encodeURIComponent(directCdn.coverUrl));
+
+                        return await streamProxyUrl(directCdn.url, request, reply);
+                    }
+                }
+            } catch (saavnErr: any) {
+                server.log.warn(`[stream-youtube] Fast Saavn ID resolution error: ${saavnErr.message}`);
+            }
+        }
+
         // ── 0. ULTRA-FAST LOCAL DB PRE-LOOKUP (<5-10ms) ──────────
         // If the track is already in the database (by id, by youtubeId, or by title/artist), use it directly!
         let localTrack: any = null;
@@ -1306,6 +1385,7 @@ export async function utilsRoutes(server: FastifyInstance) {
             try {
                 const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
                 const cdnResult = await CleanCdnAudioService.resolveAudio({
+                    trackId: candId,
                     title: candTitle || cleanCandTitle,
                     primaryArtist: cleanCandArtist || candArtist || '',
                     album: candAlbum,
@@ -1365,11 +1445,11 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 9000));
                 const resolution: any = await Promise.race([resolverPromise, timeoutPromise]);
 
-                if (resolution && resolution.watchUrl) {
+                if (resolution && resolution.watchUrl && resolution.verified) {
                     targetUrl = resolution.watchUrl;
-                    server.log.info(`[stream-youtube] Resolved audio [Score: ${resolution.score}, Verified: ${resolution.verified}]: ${targetUrl}`);
+                    server.log.info(`[stream-youtube] Verified audio match [Score: ${resolution.score}]: ${targetUrl}`);
                 } else {
-                    server.log.warn(`[stream-youtube] AudioResolver found no verified watchUrl for: "${targetUrl}". Falling back to resilient direct search.`);
+                    server.log.warn(`[stream-youtube] AudioResolver found no verified watchUrl for: "${targetUrl}" by "${candArtist || cleanCandArtist}". Rejecting unverified audio.`);
                     const searchArtist = candArtist || cleanCandArtist || (localTrack?.artist?.name || '');
                     const searchTitle = candTitle || cleanCandTitle || targetUrl;
                     const searchAlbum = candAlbum || localTrack?.album?.title;
@@ -1443,7 +1523,7 @@ export async function utilsRoutes(server: FastifyInstance) {
                 const release = await ytdlpSemaphore.acquire();
                 try {
                     const queryHint = cleanCandTitle ? `${cleanCandArtist ? cleanCandArtist + ' - ' : ''}${cleanCandTitle}` : (candTitle || undefined);
-                    return await resolveDirectStreamUrl(url, server, queryHint);
+                    return await resolveDirectStreamUrl(url, server, queryHint, cleanCandArtist || candArtist, cleanCandTitle || candTitle);
                 } finally {
                     release();
                 }
@@ -1510,7 +1590,8 @@ export async function utilsRoutes(server: FastifyInstance) {
         const spawnErrors: string[] = [];
 
         try {
-            if (!ytSpawnBlocked) {
+            const isVerifiedUrl = url.includes('youtube.com/watch') || url.includes('youtu.be/') || /^[a-zA-Z0-9_-]{11}$/.test(url);
+            if (!ytSpawnBlocked && isVerifiedUrl) {
             const { spawn } = await import('child_process');
             const ytBin = getYtBin();
             const cookiesArgs = getCookieArgs();
@@ -1722,8 +1803,14 @@ export async function utilsRoutes(server: FastifyInstance) {
                             timeout: 12000
                         }).catch(() => null);
                         if (rapidRes?.data?.url && !rapidRes.data.url.includes('audio-ssl') && !rapidRes.data.url.includes('mzstatic') && !rapidRes.data.url.includes('itunes.apple.com')) {
-                            server.log.info(`[stream-youtube] RapidAPI Spotify stream fallback resolved full audio: ${rapidRes.data.url}`);
-                            return await streamProxyUrl(rapidRes.data.url, request, reply);
+                            const { CleanCdnAudioService } = await import('../services/clean-cdn-audio.service.js');
+                            const rapArtist = rapidRes.data?.artists || rapidRes.data?.artist || '';
+                            if (searchArtist && rapArtist && !CleanCdnAudioService.isArtistMatch(searchArtist, rapArtist).match) {
+                                server.log.warn(`[stream-youtube] Fallback RapidAPI Spotify artist mismatch: requested "${searchArtist}", got "${rapArtist}". Rejecting.`);
+                            } else {
+                                server.log.info(`[stream-youtube] RapidAPI Spotify stream fallback resolved full audio: ${rapidRes.data.url}`);
+                                return await streamProxyUrl(rapidRes.data.url, request, reply);
+                            }
                         }
                     }
                 } catch (rapidErr: any) {

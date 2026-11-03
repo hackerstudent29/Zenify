@@ -1716,6 +1716,8 @@ export class ExternalMetadataService {
             if (t1 && (t2.includes(t1) || t1.includes(t2))) score += 60;
             
             // 2. Artist Match (Check both title and uploader)
+            const hasArtistMatch = !a1 || (a2.includes(a1) || a1.includes(a2) || up.includes(a1) || a1.includes(up));
+            if (a1 && a1.length > 2 && !hasArtistMatch) return -999; // Reject candidate by different artist
             if (a1 && (a2.includes(a1) || a1.includes(a2))) score += 30;
             if (a1 && (up.includes(a1) || a1.includes(up))) score += 40; // Huge boost if uploader is the artist
             
@@ -1946,7 +1948,7 @@ export class ExternalMetadataService {
 
             const valid = scored.filter(v => v.score >= 45);
 
-            // Pick the best candidate: preferably one that meets the threshold, otherwise the best available
+            // Pick the best candidate: preferably one that meets the threshold
             const best = valid.length > 0 ? valid[0] : (scored.length > 0 ? scored[0] : null);
 
             if (!best) {
@@ -1954,6 +1956,9 @@ export class ExternalMetadataService {
             }
 
             if (valid.length === 0) {
+                if (artist && artist.trim().length > 1) {
+                    throw new Error(`Validation Failed: No verified audio candidate found for "${title}" by "${artist}".`);
+                }
                 console.warn(`[SmartAudio] Top candidate scored low (${best.score}), but using as fallback: "${best.title}"`);
             }
 

@@ -22,7 +22,8 @@ export interface CleanAudioOptions {
     primaryArtist?: string;
     album?: string;
     duration?: number;
-    language?: string;
+    language?: string;
+    trackId?: string;
 }
 
 const SAAVN_RANK_NOISE = /\b(cover|karaoke|tribute|instrumental|remix|live|acoustic|slowed|reverb|sped up|nightcore|lofi|8d|piano version|originally performed|unplugged|mashup)\b/i;
@@ -49,6 +50,176 @@ const CDN_HARD_REJECT_TERMS = [
 ];
 
 export class CleanCdnAudioService {
+    /**
+     * Strict multi-stage artist name matcher.
+     * Prevents false positives where different artists share common words (e.g. John Mayer vs Elton John)
+     * and stops popular songs with identical titles from hijacking indie/regional tracks.
+     */
+    public static isArtistMatch(targetArtist: string, candidateArtists: string | string[]): { match: boolean; score: number } {
+        if (!targetArtist) return { match: true, score: 0.5 };
+        const candStr = Array.isArray(candidateArtists) ? candidateArtists.join(', ') : (candidateArtists || '');
+        if (!candStr) return { match: false, score: 0 };
+
+        const normalize = (s: string) => s.toLowerCase()
+            .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/\(.*?\)|\[.*?\]/g, ' ')
+            .replace(/\b(feat|ft|featuring|with|prod|produced by|presents|presents by|lyrics|music|composer|singer|singers)\b\.?/gi, ' ')
+            .replace(/[^a-z0-9\u0900-\u0D7F\s]/g, ' ')
+            .replace(/\s+/g, ' ').trim();
+
+        const tNorm = normalize(targetArtist);
+        const cNorm = normalize(candStr);
+        if (!cNorm) return { match: false, score: 0 };
+
+        // 1. Exact or whole string word-boundary match
+        if (tNorm === cNorm) return { match: true, score: 1.0 };
+        const tEsc = tNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const cEsc = cNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`\\b${tEsc}\\b`, 'i').test(cNorm)) return { match: true, score: 0.95 };
+        if (new RegExp(`\\b${cEsc}\\b`, 'i').test(tNorm)) return { match: true, score: 0.95 };
+
+        // 2. Token overlap analysis
+        const stopWords = new Set(['the', 'and', 'or', 'a', 'an', 'of', 'in', 'by', 'for', 'to', 'at', 'on', 'with', 'dj', 'band', 'boys', 'music', 'official', 'records', 'single', 'album', 'audio', 'video']);
+        const tTokens = tNorm.split(/\s+/).filter(t => t.length >= 2 && !stopWords.has(t));
+        const cTokens = cNorm.split(/\s+/).filter(t => t.length >= 2 && !stopWords.has(t));
+
+        if (tTokens.length === 0) return { match: false, score: 0 };
+
+        let matched = 0;
+        for (const tt of tTokens) {
+            if (cTokens.some(ct => ct === tt || (ct.length > 3 && (ct.startsWith(tt) || tt.startsWith(ct))))) {
+                matched++;
+            }
+        }
+
+        const ratio = matched / tTokens.length;
+
+        // Single-token target (e.g. "Gengee", "Anirudh", "Adele"):
+        if (tTokens.length === 1) {
+            const isMatch = matched === 1;
+            return { match: isMatch, score: isMatch ? 0.9 : 0 };
+        }
+
+        // Distinctive single candidate token matching target (e.g. "Anirudh" matching "Anirudh Ravichander")
+        if (cTokens.length === 1 && matched === 1 && cTokens[0].length >= 4) {
+            return { match: true, score: 0.85 };
+        }
+
+        // Two-word names divergence check (e.g. "John Mayer" vs "Elton John" -> reject!)
+        if (tTokens.length === 2 && cTokens.length === 2) {
+            const isMatch = matched === 2;
+            return { match: isMatch, score: isMatch ? 1.0 : 0 };
+        }
+
+        const isMatch = ratio >= 0.5;
+        return { match: isMatch, score: isMatch ? ratio : 0 };
+    }
+
+    /**
+     * Directly resolves a JioSaavn song to a high-speed direct 320kbps CDN stream using its canonical ID or perma_url token.
+     * Guarantees 100% exact song matching without search ambiguity or title collision.
+     */
+    public static async resolveById(songIdOrToken: string): Promise<CleanAudioResult | null> {
+        if (!songIdOrToken || typeof songIdOrToken !== 'string') return null;
+        const cleanId = songIdOrToken.replace(/^saavn-/, '').trim();
+        if (!cleanId) return null;
+
+        const cacheKey = `id:::${cleanId}`.toLowerCase();
+        const cached = cdnQueryCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+            return cached.result;
+        }
+
+        const cdnHeaders = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://www.jiosaavn.com/',
+        };
+
+        try {
+            let songData: any = null;
+            // 1. Try song.getDetails (works for alphanumeric JioSaavn pids)
+            const detRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                params: {
+                    __call: 'song.getDetails',
+                    pids: cleanId,
+                    _format: 'json',
+                    _marker: '0',
+                    api_version: '4'
+                },
+                headers: cdnHeaders,
+                timeout: 3500
+            }).catch(() => null);
+
+            songData = detRes?.data?.songs?.[0] || detRes?.data?.[cleanId];
+
+            // 2. Fallback to webapi.get if cleanId was a perma token
+            if (!songData?.encrypted_media_url && !songData?.more_info?.encrypted_media_url) {
+                const webRes = await axios.get('https://www.jiosaavn.com/api.php', {
+                    params: {
+                        __call: 'webapi.get',
+                        token: cleanId,
+                        type: 'song',
+                        _format: 'json',
+                        _marker: '0',
+                        ctx: 'web6dot0'
+                    },
+                    headers: cdnHeaders,
+                    timeout: 3500
+                }).catch(() => null);
+                songData = webRes?.data?.songs?.[0] || webRes?.data;
+            }
+
+            const encUrl = songData?.encrypted_media_url || songData?.more_info?.encrypted_media_url;
+            if (!encUrl) {
+                cdnQueryCache.set(cacheKey, { result: null, expiresAt: Date.now() + 60 * 1000 });
+                return null;
+            }
+
+            const directCdnUrl = this.decryptSaavnMediaUrl(encUrl, '320') || this.decryptSaavnMediaUrl(encUrl, '160');
+            if (!directCdnUrl || !isSafePublicUrl(directCdnUrl)) {
+                cdnQueryCache.set(cacheKey, { result: null, expiresAt: Date.now() + 60 * 1000 });
+                return null;
+            }
+
+            const title = (songData.song || songData.title || '').trim();
+            const artistMapList: string[] = [
+                ...(songData.more_info?.artistMap?.primary_artists?.map((a: any) => a.name) || []),
+                ...(songData.more_info?.artistMap?.artists?.map((a: any) => a.name) || []),
+                ...(songData.more_info?.music && typeof songData.more_info.music === 'string' ? [songData.more_info.music] : []),
+                ...(songData.primary_artists && songData.primary_artists !== 'None' ? [songData.primary_artists] : []),
+                ...(songData.singers && songData.singers !== 'None' ? [songData.singers] : []),
+            ].filter(Boolean);
+            const dedupedArtists = Array.from(new Set(artistMapList.map(a => a.trim())));
+            const artist = dedupedArtists.length > 0 ? dedupedArtists.join(', ') : (songData.more_info?.singers || 'Unknown Artist');
+            const album = (songData.album || songData.more_info?.album || 'Single').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').trim();
+            const cover = (songData.image || songData.more_info?.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
+            const dur = parseInt(songData.duration || songData.more_info?.duration, 10) || 0;
+            const plays = parseInt(songData.play_count || songData.more_info?.play_count || '0', 10);
+
+            console.log(`[CleanCdnAudio] Direct ID match (320k): "${title}" by "${artist}" (ID: ${cleanId})`);
+            const result: CleanAudioResult = {
+                url: directCdnUrl,
+                duration: dur,
+                title,
+                artist,
+                album,
+                albumId: songData.albumid || songData.album_id || songData.more_info?.album_id,
+                coverUrl: cover,
+                playCount: plays,
+                trackId: songData.id || cleanId,
+                bitrate: '320kbps',
+                source: 'saavn_direct_cdn'
+            };
+
+            cdnQueryCache.set(cacheKey, { result, expiresAt: Date.now() + 6 * 60 * 60 * 1000 });
+            return result;
+        } catch (err: any) {
+            console.warn(`[CleanCdnAudio] resolveById error for "${cleanId}": ${err.message}`);
+            return null;
+        }
+    }
+
     public static decryptSaavnMediaUrl(encBase64: string, quality: '96' | '160' | '320' = '160'): string | null {
         try {
             if (!encBase64 || typeof encBase64 !== 'string') return null;
@@ -95,6 +266,19 @@ export class CleanCdnAudioService {
             else if (rawQueryStr.includes('malayalam') || rawQueryStr.includes('(ml)')) detectedLang = 'malayalam';
             else if (rawQueryStr.includes('punjabi') || rawQueryStr.includes('(pa)')) detectedLang = 'punjabi';
 
+            
+            // Step 0: If trackId is provided (or queryOrOpts is a saavn ID), resolve directly by canonical ID first (<150ms)
+            const inputId = (typeof queryOrOpts === 'object' && queryOrOpts.trackId) ? queryOrOpts.trackId : (typeof queryOrOpts === 'string' && queryOrOpts.startsWith('saavn-') ? queryOrOpts : null);
+            if (inputId) {
+                const idResult = await this.resolveById(inputId);
+                if (idResult?.url) {
+                    const reqArtist = typeof queryOrOpts === 'object' ? queryOrOpts.primaryArtist : undefined;
+                    if (!reqArtist || this.isArtistMatch(reqArtist, idResult.artist).match) {
+                        return idResult;
+                    }
+                }
+            }
+
             let opts: CleanAudioOptions;
             let rawQueryInput = '';
             if (typeof queryOrOpts === 'string') {
@@ -277,7 +461,7 @@ export class CleanCdnAudioService {
                     ...(cand.more_info?.singers && cand.more_info.singers !== 'None' ? [cand.more_info.singers] : []),
                 ].filter(Boolean);
 
-                const rawArtists = artistMapList.length > 0 ? artistMapList.join(', ') : (cand.music || '');
+                const rawArtists = Array.from(new Set(artistMapList.map(a => a.trim()))).join(', ') || (cand.music || '');
                 const candArtists = rawArtists.replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&amp;/g, '&').trim();
                 const candArtistsLower = candArtists.toLowerCase();
                 const candLang = (cand.language || cand.more_info?.language || '').toLowerCase().trim();
