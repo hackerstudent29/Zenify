@@ -446,19 +446,27 @@ export function QueuePanel() {
                               !isDragging && !isOver && "hover:bg-white/[0.06] border-b-white/[0.02]"
                             )}
                           >
-                            <div className="flex items-center gap-2.5 min-w-0 pr-1 flex-1">
-                              {/* Apple Music Style: Red circular minus button to remove */}
+                            <div className="flex items-center gap-1 min-w-0 pr-1 flex-1">
+                              {/* 44px Touch Target Remove Button */}
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  e.preventDefault();
                                   removeFromUserQueue(item.queueId);
                                 }}
-                                className="w-5 h-5 rounded-full bg-[#ff3b30] hover:bg-[#ff453a] flex items-center justify-center text-white shrink-0 shadow-sm transition-transform active:scale-90 cursor-pointer"
-                                title="Delete from queue"
-                                aria-label="Delete from queue"
+                                onTouchEnd={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  removeFromUserQueue(item.queueId);
+                                }}
+                                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 cursor-pointer active:scale-90 group/rm"
+                                title="Remove from queue"
+                                aria-label="Remove from queue"
                               >
-                                <Minus size={11} strokeWidth={3} />
+                                <span className="w-5 h-5 rounded-full bg-[#ff3b30] hover:bg-[#ff453a] flex items-center justify-center text-white shadow-sm transition-transform group-hover/rm:scale-110">
+                                  <Minus size={11} strokeWidth={3} />
+                                </span>
                               </button>
 
                               {/* Artwork */}
@@ -470,7 +478,7 @@ export function QueuePanel() {
                               </div>
 
                               {/* Track details */}
-                              <div className="min-w-0 flex-1">
+                              <div className="min-w-0 flex-1 pl-2">
                                 <h4 className="text-[13.5px] font-semibold text-white truncate leading-snug">
                                   {formatDisplayTitle(item.track.title)}
                                 </h4>
@@ -485,102 +493,23 @@ export function QueuePanel() {
                               </div>
                             </div>
 
-                            {/* Right Side: Duration & Fast Move Controls & Delete & Drag Handle */}
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className={cn(
-                                "text-[12px] text-white/45 tabular-nums font-medium",
-                                isMobile ? "hidden" : "group-hover:hidden"
-                              )}>
+                            {/* Right Side: Duration & Drag Handle (Clean without arrow clutter) */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[12px] text-white/45 tabular-nums font-medium">
                                 {formatTime(item.track.duration)}
                               </span>
 
-                              {/* Action controls toolbar */}
-                              <div className={cn(
-                                "items-center gap-0.5",
-                                isMobile ? "flex" : "hidden group-hover:flex"
-                              )}>
-                                {/* Move to first / Play next */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveUserQueueToTop(index);
-                                  }}
-                                  disabled={index === 0}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-brand rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                  title="Move to first / Play next"
-                                  aria-label="Move to top"
-                                >
-                                  <ArrowUpToLine size={13} />
-                                </button>
-
-                                {/* Move Up 1 */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveUserQueueItem(index, 'up');
-                                  }}
-                                  disabled={index === 0}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                  title="Move up one position"
-                                  aria-label="Move up"
-                                >
-                                  <ChevronUp size={14} />
-                                </button>
-
-                                {/* Move Down 1 */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveUserQueueItem(index, 'down');
-                                  }}
-                                  disabled={index === userQueue.length - 1}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                  title="Move down one position"
-                                  aria-label="Move down"
-                                >
-                                  <ChevronDown size={14} />
-                                </button>
-
-                                {/* Move to last / Play at end */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveUserQueueToBottom(index);
-                                  }}
-                                  disabled={index === userQueue.length - 1}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-brand rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                  title="Move to last"
-                                  aria-label="Move to bottom"
-                                >
-                                  <ArrowDownToLine size={13} />
-                                </button>
-
-                                {/* Delete button: clear trash icon */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeFromUserQueue(item.queueId);
-                                  }}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-red-400 rounded hover:bg-red-500/10 transition-colors cursor-pointer"
-                                  title="Delete from queue"
-                                  aria-label="Delete from queue"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-
                               {/* Drag Handle */}
                               <div
-                                onClick={(e) => e.stopPropagation()}
-                                className="p-1 text-white/30 group-hover:text-white/70 cursor-grab active:cursor-grabbing rounded hover:bg-white/10 transition-colors"
-                                title="Drag to move anywhere"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                }}
+                                className="w-9 h-9 flex items-center justify-center text-white/30 hover:text-white/80 cursor-grab active:cursor-grabbing rounded hover:bg-white/10 transition-colors"
+                                title="Drag to reorder"
+                                aria-label="Drag to reorder"
                               >
-                                <GripVertical size={14} />
+                                <GripVertical size={16} />
                               </div>
                             </div>
                           </div>
@@ -688,7 +617,29 @@ export function QueuePanel() {
                               !isDragging && !isOver && "hover:bg-white/[0.06] border-b-white/[0.02]"
                             )}
                           >
-                            <div className="flex items-center gap-3 min-w-0 pr-1 flex-1">
+                            <div className="flex items-center gap-1 min-w-0 pr-1 flex-1">
+                              {/* 44px Touch Target Remove Button (ID-based removal) */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  removeFromContextQueue(track.id);
+                                }}
+                                onTouchEnd={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  removeFromContextQueue(track.id);
+                                }}
+                                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 cursor-pointer active:scale-90 group/rm"
+                                title="Remove from queue"
+                                aria-label="Remove from queue"
+                              >
+                                <span className="w-5 h-5 rounded-full bg-white/10 hover:bg-[#ff3b30] flex items-center justify-center text-white/50 hover:text-white shadow-sm transition-all group-hover/rm:scale-110">
+                                  <Minus size={11} strokeWidth={3} />
+                                </span>
+                              </button>
+
                               {/* Artwork */}
                               <div className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 shadow-md border border-white/5">
                                 <UniversalMediaCover track={track} className="w-full h-full object-cover" />
@@ -698,7 +649,7 @@ export function QueuePanel() {
                               </div>
 
                               {/* Track details */}
-                              <div className="min-w-0 flex-1">
+                              <div className="min-w-0 flex-1 pl-2">
                                 <h4 className="text-[13.5px] font-semibold text-white truncate leading-snug">
                                   {formatDisplayTitle(track.title)}
                                 </h4>
@@ -713,102 +664,23 @@ export function QueuePanel() {
                               </div>
                             </div>
 
-                            {/* Right Side: Duration & Fast Move & Delete Actions & Drag Handle */}
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className={cn(
-                                "text-[12px] text-white/45 tabular-nums font-medium",
-                                isMobile ? "hidden" : "group-hover:hidden"
-                              )}>
+                            {/* Right Side: Duration & Drag Handle (Clean without arrow clutter) */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[12px] text-white/45 tabular-nums font-medium">
                                 {formatTime(track.duration)}
                               </span>
 
-                              {/* Fast Movement Toolbar */}
-                              <div className={cn(
-                                "items-center gap-0.5",
-                                isMobile ? "flex" : "hidden group-hover:flex"
-                              )}>
-                                {/* Move to first / Play next */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveContextQueueToTop(idx);
-                                  }}
-                                  disabled={idx === 0}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-brand rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                  title="Move to first / Play next"
-                                  aria-label="Move to top"
-                                >
-                                  <ArrowUpToLine size={13} />
-                                </button>
-
-                                {/* Move Up 1 */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveContextQueueItem(idx, 'up');
-                                  }}
-                                  disabled={idx === 0}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                  title="Move up one position"
-                                  aria-label="Move up"
-                                >
-                                  <ChevronUp size={14} />
-                                </button>
-
-                                {/* Move Down 1 */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveContextQueueItem(idx, 'down');
-                                  }}
-                                  disabled={idx === contextQueue.length - 1}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-white rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                  title="Move down one position"
-                                  aria-label="Move down"
-                                >
-                                  <ChevronDown size={14} />
-                                </button>
-
-                                {/* Move to last */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveContextQueueToBottom(idx);
-                                  }}
-                                  disabled={idx === contextQueue.length - 1}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-brand rounded hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                  title="Move to last"
-                                  aria-label="Move to bottom"
-                                >
-                                  <ArrowDownToLine size={13} />
-                                </button>
-
-                                {/* Delete button: Trash icon (replaces confusing three-dot button) */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeFromContextQueue(track.id);
-                                  }}
-                                  className="w-6 h-6 flex items-center justify-center text-white/40 hover:text-red-400 rounded-md hover:bg-red-500/10 transition-colors cursor-pointer"
-                                  title="Delete from queue"
-                                  aria-label="Delete from queue"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-
                               {/* Drag Handle */}
                               <div
-                                onClick={(e) => e.stopPropagation()}
-                                className="p-1 text-white/30 group-hover:text-white/70 cursor-grab active:cursor-grabbing rounded hover:bg-white/10 transition-colors"
-                                title="Drag to move anywhere"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                }}
+                                className="w-9 h-9 flex items-center justify-center text-white/30 hover:text-white/80 cursor-grab active:cursor-grabbing rounded hover:bg-white/10 transition-colors"
+                                title="Drag to reorder"
+                                aria-label="Drag to reorder"
                               >
-                                <GripVertical size={14} />
+                                <GripVertical size={16} />
                               </div>
                             </div>
                           </div>
