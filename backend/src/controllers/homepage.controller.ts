@@ -13,6 +13,32 @@ export class HomepageController {
         return reply.send(result);
     }
 
+    /**
+     * GET /api/homepage/feed
+     * Unified 8 canonical sections personalized feed (Desktop & Mobile)
+     */
+    getFeed = async (req: FastifyRequest<{ Querystring: { languages?: string; country?: string } }>, reply: FastifyReply) => {
+        const userId = req.user?.id;
+        const rawLangs = req.query.languages || (req.headers['x-user-languages'] as string) || (req.headers['x-user-language'] as string);
+        const languages = rawLangs ? rawLangs.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+        const country = req.query.country || (req.headers['x-user-country'] as string);
+
+        if (userId) {
+            reply.header('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+        } else {
+            reply.header('Cache-Control', 'public, max-age=60');
+        }
+
+        const { PersonalizationEngineService } = await import('../services/personalization-engine.service.js');
+        const result = await PersonalizationEngineService.getPersonalizedFeed({
+            userId,
+            languages,
+            country
+        });
+
+        return reply.send(result);
+    }
+
     // ── Dedicated Real-Time Section Handlers ──
 
     getMadeForYou = async (req: FastifyRequest<{ Querystring: { language?: string; country?: string; recentArtists?: string } }>, reply: FastifyReply) => {

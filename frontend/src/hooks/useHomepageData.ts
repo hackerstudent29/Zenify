@@ -1,295 +1,151 @@
-import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { get, set } from "idb-keyval";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useAuthStore } from "@/store/authStore";
 
-function detectGuestLocale() {
-  if (typeof window === 'undefined') return { language: 'English', country: 'United States' };
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-    let country = 'United States';
-    if (tz.includes('Calcutta') || tz.includes('Kolkata')) country = 'India';
-    else if (tz.includes('Toronto') || tz.includes('Vancouver') || tz.includes('Montreal')) country = 'Canada';
-    else if (tz.includes('London')) country = 'United Kingdom';
-    else if (tz.includes('Sydney') || tz.includes('Melbourne')) country = 'Australia';
+const GUEST_LANG_KEY = "zenify_guest_languages";
 
-    const nav = (navigator.language || 'en').split('-')[0].toLowerCase();
-    const langMap: Record<string, string> = {
-      en: 'English',
-      ta: 'Tamil',
-      hi: 'Hindi',
-      te: 'Telugu',
-      ml: 'Malayalam',
-      kn: 'Kannada',
-      ko: 'Korean',
-      ja: 'Japanese',
-      es: 'Spanish',
-      fr: 'French',
-      zh: 'Mandarin Chinese',
-      pa: 'Punjabi',
-      bn: 'Bengali'
-    };
-    const language = langMap[nav] || (country === 'India' ? 'Tamil' : 'English');
-    return { language, country };
-  } catch {
-    return { language: 'English', country: 'United States' };
+function getClientLanguages(userLanguages?: string[]): string[] {
+  if (userLanguages && userLanguages.length > 0) {
+    return userLanguages;
   }
-}
 
-function getRecentArtistsFromClient(userId: string): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(`zenify_recently_played_tracks_${userId}`);
-    if (!raw) return [];
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list)) return [];
-    const artists: string[] = [];
-    for (const t of list) {
-      const name = t?.artist?.name || t?.artistName || (typeof t?.artist === 'string' ? t.artist : null);
-      if (name && typeof name === 'string') {
-        const clean = name.trim();
-        if (clean && !artists.includes(clean)) {
-          artists.push(clean);
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem(GUEST_LANG_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
         }
       }
-    }
-    return artists.slice(0, 6);
-  } catch {
-    return [];
+    } catch {}
+
+    // Fallback: detect from browser language without hardcoding country defaults
+    try {
+      const browserCode = (navigator.language || "en").split("-")[0].toLowerCase();
+      const codeMap: Record<string, string> = {
+        ta: "tamil",
+        te: "telugu",
+        hi: "hindi",
+        en: "english",
+        pa: "punjabi",
+        ml: "malayalam",
+        kn: "kannada",
+        bn: "bengali",
+        mr: "marathi",
+        gu: "gujarati",
+        es: "spanish",
+        fr: "french",
+        ur: "urdu",
+        bho: "bhojpuri",
+      };
+      if (codeMap[browserCode]) {
+        return [codeMap[browserCode]];
+      }
+    } catch {}
   }
+
+  return ["english"];
 }
 
 export function useHomepageData() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const userId = user?.id || 'guest';
-  const guestLocale = detectGuestLocale();
+  const userId = user?.id || "guest";
 
-  const userScopedLang = typeof window !== 'undefined' ? (localStorage.getItem(`zenify_selected_language_${userId}`) || localStorage.getItem('zenify_selected_language')) : null;
-  const userScopedCountry = typeof window !== 'undefined' ? (localStorage.getItem(`zenify_selected_country_${userId}`) || localStorage.getItem('zenify_selected_country')) : null;
+  const selectedLanguages = useMemo(() => {
+    return getClientLanguages(user?.preferences?.languages);
+  }, [user?.preferences?.languages]);
 
-  const LANG_CODE_TO_NAME: Record<string, string> = {
-    ta: 'Tamil',
-    te: 'Telugu',
-    hi: 'Hindi',
-    ml: 'Malayalam',
-    kn: 'Kannada',
-    en: 'English',
-    pa: 'Punjabi',
-    bn: 'Bengali',
-    ko: 'Korean',
-    ja: 'Japanese',
-    es: 'Spanish',
-    fr: 'French',
-    zh: 'Mandarin Chinese'
-  };
+  const sortedLangKey = [...selectedLanguages].sort().join("-");
 
-  // Determine Country: user profile > user scoped local > guest detected
-  const userCountry = (user?.country?.trim() || userScopedCountry || (user as any)?.preferences?.selectedCountryName || guestLocale.country).trim();
-
-  // Determine Default Language for Country if not explicitly overridden:
-  // e.g. Canada, US, UK, Australia, New Zealand default to English
-  const isEnglishDefaultCountry = /^(canada|united states|united kingdom|us|usa|uk|gb|australia|au|new zealand|nz)$/i.test(userCountry);
-  const defaultLangForCountry = isEnglishDefaultCountry ? 'English' : (userCountry.toLowerCase() === 'india' ? 'Tamil' : guestLocale.language);
-
-  const prefLang = user?.preferences?.languages?.[0];
-  const resolvedPrefName = prefLang ? (LANG_CODE_TO_NAME[prefLang.toLowerCase()] || prefLang) : null;
-
-  const rawLang = resolvedPrefName ||
-                  (user as any)?.preferences?.selectedLanguageName ||
-                  userScopedLang ||
-                  (user as any)?.preferences?.selectedLanguageCode ||
-                  defaultLangForCountry;
-
-  const userLang = (LANG_CODE_TO_NAME[rawLang.toLowerCase()] || rawLang).trim();
-
-  // Purge any stale client localStorage if user preferences explicitly specify language
-  useEffect(() => {
-    if (resolvedPrefName && typeof window !== 'undefined') {
-      const currentStored = localStorage.getItem(`zenify_selected_language_${userId}`);
-      if (currentStored !== resolvedPrefName) {
-        localStorage.setItem(`zenify_selected_language_${userId}`, resolvedPrefName);
-      }
-    }
-  }, [resolvedPrefName, userId]);
-
-  const fetchSection = async (endpoint: string) => {
-    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    const recentArtists = getRecentArtistsFromClient(userId);
-    const cacheKey = `homepage_cache_v6_${userId}_${userCountry}_${userLang}_${path}_${recentArtists.slice(0, 2).join('_')}`;
-
-    try {
-      const res = await api.get(`/homepage${path}`, {
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch
+  } = useQuery({
+    queryKey: ["home-feed", userId, sortedLangKey],
+    queryFn: async () => {
+      const res = await api.get("/homepage/feed", {
+        params: {
+          languages: selectedLanguages.join(",")
+        },
         headers: {
-          'x-user-language': userLang,
-          'x-user-country': userCountry,
-          'x-user-recent-artists': recentArtists.join(',')
+          "x-user-languages": selectedLanguages.join(",")
         }
       });
-      if (res.data) {
-        await set(cacheKey, res.data); // Save fresh data to local cache
-      }
       return res.data;
-    } catch (error) {
-      // If network fails or is rate-limited, gracefully fall back to offline cache
-      try {
-        const cachedData = await get(cacheKey);
-        if (cachedData) return cachedData;
-      } catch {}
-      console.warn(`[Homepage] Section ${endpoint} failed, falling back to empty shelf:`, error);
-      return null;
-    }
-  };
+    },
+    staleTime: 3 * 60 * 1000, // 3 minutes fresh cache
+    refetchOnWindowFocus: false,
+  });
 
-  // Listen for real-time track and playlist updates across the application
+  // Listen for real-time preferences and playback updates across the application
   useEffect(() => {
     let trackPlayedTimeout: any = null;
 
     const handleInvalidate = () => {
-      queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
-      queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
-      queryClient.invalidateQueries({ queryKey: ['home-popular-artists-lang'] });
-      queryClient.invalidateQueries({ queryKey: ['home-trending-now'] });
-      queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
+      queryClient.invalidateQueries({ queryKey: ["home-feed"] });
     };
 
-    const handleCountryLangChanged = () => {
-      queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
-      queryClient.invalidateQueries({ queryKey: ['home-trending-now'] });
-      queryClient.invalidateQueries({ queryKey: ['home-popular-artists-lang'] });
-      queryClient.invalidateQueries({ queryKey: ['home-genre-playlists'] });
-    };
-
-    // Debounce track played query refetches so that song start and audio buffering get 100% bandwidth
     const handleTrackPlayed = () => {
       if (trackPlayedTimeout) clearTimeout(trackPlayedTimeout);
       trackPlayedTimeout = setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['home-continue-listening'] });
-        queryClient.invalidateQueries({ queryKey: ['home-made-for-you'] });
+        queryClient.invalidateQueries({ queryKey: ["home-feed"] });
       }, 2500);
     };
 
-    window.addEventListener('zenify:track-created', handleInvalidate);
-    window.addEventListener('zenify:track-deleted', handleInvalidate);
-    window.addEventListener('zenify:track-played', handleTrackPlayed);
-    window.addEventListener('zenify:playlist-updated', handleInvalidate);
-    window.addEventListener('zenify:preferences-updated', handleInvalidate);
-    window.addEventListener('zenify:country-language-changed', handleCountryLangChanged);
+    window.addEventListener("zenify:track-created", handleInvalidate);
+    window.addEventListener("zenify:track-deleted", handleInvalidate);
+    window.addEventListener("zenify:track-played", handleTrackPlayed);
+    window.addEventListener("zenify:playlist-updated", handleInvalidate);
+    window.addEventListener("zenify:preferences-updated", handleInvalidate);
+    window.addEventListener("zenify:country-language-changed", handleInvalidate);
 
     return () => {
       if (trackPlayedTimeout) clearTimeout(trackPlayedTimeout);
-      window.removeEventListener('zenify:track-created', handleInvalidate);
-      window.removeEventListener('zenify:track-deleted', handleInvalidate);
-      window.removeEventListener('zenify:track-played', handleTrackPlayed);
-      window.removeEventListener('zenify:playlist-updated', handleInvalidate);
-      window.removeEventListener('zenify:preferences-updated', handleInvalidate);
-      window.removeEventListener('zenify:country-language-changed', handleCountryLangChanged);
+      window.removeEventListener("zenify:track-created", handleInvalidate);
+      window.removeEventListener("zenify:track-deleted", handleInvalidate);
+      window.removeEventListener("zenify:track-played", handleTrackPlayed);
+      window.removeEventListener("zenify:playlist-updated", handleInvalidate);
+      window.removeEventListener("zenify:preferences-updated", handleInvalidate);
+      window.removeEventListener("zenify:country-language-changed", handleInvalidate);
     };
   }, [queryClient]);
 
-  const REFETCH_INTERVAL = false as const;
-  const STALE_TIME = 3 * 60 * 1000; // 3 minutes fresh cache
-
-  const results = useQueries({
-    queries: [
-      // 1. Song Section 1: Continue Listening (Tracks user listened to)
-      {
-        queryKey: ['home-continue-listening', userId],
-        queryFn: async () => {
-          const res = await fetchSection('/continue-listening');
-          if (res?.items && res.items.length > 0) {
-            return res;
-          }
-          // Fall back to USER-SCOPED local recently played tracks if remote has no history yet
-          try {
-            if (typeof window !== 'undefined') {
-              const raw = localStorage.getItem(`zenify_recently_played_tracks_${userId}`);
-              if (raw) {
-                const localTracks = JSON.parse(raw);
-                if (Array.isArray(localTracks) && localTracks.length > 0) {
-                  return {
-                    type: 'continue_listening',
-                    title: 'Continue Listening',
-                    subtitle: 'JUMP BACK IN',
-                    items: localTracks.slice(0, 10)
-                  };
-                }
-              }
-            }
-          } catch (e) {}
-          return res;
-        },
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      },
-      // 2. Song Section 2: Made for You (Personalized songs based on user listening)
-      {
-        queryKey: ['home-made-for-you', userId, userLang, userCountry],
-        queryFn: () => fetchSection(`/made-for-you?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      },
-      // 3. Artists Section: Artists You May Like / Popular Artists (Matching listening context)
-      {
-        queryKey: ['home-popular-artists-lang', userId, userLang, userCountry],
-        queryFn: () => fetchSection(`/popular-artists-lang?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      },
-      // 4. Song Section 3: Trending Hits (Top trending tracks in user's taste and language)
-      {
-        queryKey: ['home-trending-now', userId, userLang, userCountry],
-        queryFn: () => fetchSection(`/trending-now?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      },
-      // 5. Albums Section: Top Albums for You (Authentic albums from listened artists & language)
-      {
-        queryKey: ['home-genre-playlists', userId, userLang, userCountry],
-        queryFn: () => fetchSection(`/genre-playlists?language=${encodeURIComponent(userLang)}&country=${encodeURIComponent(userCountry)}`),
-        staleTime: STALE_TIME,
-        refetchInterval: REFETCH_INTERVAL,
-      }
-    ]
-  });
-
-  const isLoading = results.some(r => r.isLoading);
-  const isError = results.every(r => r.isError);
-
-  const sectionConfigs = [
-    { type: 'continue_listening', title: 'Continue Listening', subtitle: 'JUMP BACK IN' },
-    { type: 'made_for_you', title: 'Made For You', subtitle: 'BASED ON YOUR LISTENING' },
-    { type: 'popular_artists_lang', title: 'Artists You May Like', subtitle: 'VOICES FROM YOUR FREQUENCIES' },
-    { type: 'trending_now', title: 'Trending Hits', subtitle: 'THE PULSE OF YOUR MUSIC' },
-    { type: 'genre_playlists', title: 'Top Albums for You', subtitle: 'ALBUMS MATCHING YOUR TASTE' }
-  ];
-
-  const sections = results.map((r, index) => {
-    const config = sectionConfigs[index];
-    if (!r.data) {
-      return {
-        type: config.type,
-        title: config.title,
-        subtitle: config.subtitle,
-        items: [],
-        isLoading: r.isLoading
-      };
+  // If loading and no cached data, render skeleton row placeholders
+  const sections = useMemo(() => {
+    if (isLoading && !data) {
+      return [
+        { id: "skel-1", type: "tracks", title: "Recommended for You", subtitle: "LOADING YOUR SOUNDS", items: [], isLoading: true },
+        { id: "skel-2", type: "tracks", title: "Trending Now", subtitle: "FETCHING TOP TRACKS", items: [], isLoading: true },
+        { id: "skel-3", type: "artists", title: "Artists You May Like", subtitle: "DISCOVERING ARTISTS", items: [], isLoading: true },
+        { id: "skel-4", type: "tracks", title: "New Releases", subtitle: "LOADING FRESH MUSIC", items: [], isLoading: true },
+      ];
     }
 
-    return {
-      type: r.data.type || config.type,
-      title: r.data.title || config.title,
-      subtitle: r.data.subtitle || config.subtitle,
-      items: r.data.items || [],
+    if (!data?.sections || !Array.isArray(data.sections)) {
+      return [];
+    }
+
+    return data.sections.map((sec: any) => ({
+      id: sec.id,
+      type: sec.type || "tracks",
+      title: sec.title,
+      subtitle: sec.subtitle,
+      items: sec.items || [],
       isLoading: false
-    };
-  });
+    }));
+  }, [data, isLoading]);
 
   return {
     sections,
     isLoading,
     isError,
-    refetchAll: () => results.forEach(r => r.refetch())
+    coldStart: data?.coldStart ?? true,
+    languages: data?.languages || selectedLanguages,
+    refetchAll: refetch,
   };
 }

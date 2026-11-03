@@ -7,6 +7,9 @@ export async function homepageRoutes(server: FastifyInstance) {
     // Main homepage endpoint (monolithic)
     server.get('/', { preHandler: [server.optionalAuthenticate] }, controller.getHomepage);
 
+    // Unified 8-section personalized feed (Desktop & Mobile)
+    server.get('/feed', { preHandler: [server.optionalAuthenticate] }, controller.getFeed);
+
     // Dedicated real-time sections (Parallel fetchable & cached)
     server.get('/made-for-you', { preHandler: [server.optionalAuthenticate] }, controller.getMadeForYou);
     server.get('/top-country', { preHandler: [server.optionalAuthenticate] }, controller.getTopCountry);
