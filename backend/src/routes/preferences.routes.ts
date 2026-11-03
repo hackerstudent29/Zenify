@@ -25,6 +25,22 @@ export async function preferencesRoutes(server: FastifyInstance) {
     handler: controller.getMetadata.bind(controller)
   });
 
+  // 2b. Verified Language Preferences (1 to 6 chips, blocks 7th, home invalidation)
+  server.get('/languages', {
+    preHandler: [server.optionalAuthenticate],
+    handler: controller.getLanguages.bind(controller)
+  });
+
+  server.put('/languages', {
+    preHandler: [server.authenticate],
+    handler: controller.updateLanguages.bind(controller)
+  });
+
+  server.post('/languages/merge', {
+    preHandler: [server.authenticate],
+    handler: controller.mergeGuestLanguages.bind(controller)
+  });
+
   // 3. Artist search (authenticated & rate-limited)
   server.get('/artists/search', {
     preHandler: [server.authenticate],
