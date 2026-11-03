@@ -58,6 +58,9 @@ const ExplorePage = lazyWithRetry(() => import('./app/explore/[...id]/page'));
 const AdminPage = lazyWithRetry(() => import('./app/admin/page'));
 const OnboardingPage = lazyWithRetry(() => import('./app/onboarding/page'));
 const LocalLibraryPage = lazyWithRetry(() => import('./app/local-library/page'));
+const TogetherPage = lazyWithRetry(() => import('./app/together/page'));
+const TogetherRoomPage = lazyWithRetry(() => import('./app/together/[code]/page'));
+const JoinRedirectPage = lazyWithRetry(() => import('./app/j/[code]/page'));
 const SectionPage = lazyWithRetry(() => import('./app/section/[type]/page'));
 const PrivacyPage = lazyWithRetry(() => import('./app/privacy/page'));
 const TermsPage = lazyWithRetry(() => import('./app/terms/page'));
@@ -86,6 +89,9 @@ export default function AppRouter() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/local-library" element={<LocalLibraryPage />} />
+          <Route path="/together" element={<TogetherPage />} />
+          <Route path="/together/:code" element={<TogetherRoomPage />} />
+          <Route path="/j/:code" element={<JoinRedirectPage />} />
 
           {/* Protected Application Routes */}
           <Route path="/settings" element={<SettingsPage />} />

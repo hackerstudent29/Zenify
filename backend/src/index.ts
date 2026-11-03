@@ -7,6 +7,7 @@ import cookie from '@fastify/cookie';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import fastifyStatic from '@fastify/static';
 import fastifyMultipart from '@fastify/multipart';
+import websocket from '@fastify/websocket';
 import path from 'path';
 import { config } from './config/env';
 import { logBuffer } from './utils/log-buffer';
@@ -217,6 +218,8 @@ server.register(fastifyMultipart, {
     }
 });
 
+server.register(websocket);
+
 server.register(jwt, {
     secret: config.JWT_SECRET,
 });
@@ -239,6 +242,8 @@ import { settingsRoutes } from './routes/settings.routes';
 import { preferencesRoutes } from './routes/preferences.routes';
 import { activityRoutes } from './routes/activity.routes';
 import { queueRoutes } from './routes/queue.routes';
+import { togetherRoutes } from './routes/together.routes';
+import { registerTogetherWebSocket } from './websocket/together-ws';
 import { HomepageService } from './services/homepage.service';
 import { ScheduledPublishService } from './services/scheduled-publish.service';
 import { AnalysisSchedulerService } from './services/analysis-scheduler.service';
@@ -262,6 +267,8 @@ server.register(notificationRoutes, { prefix: '/api/notifications' });
 server.register(preferencesRoutes, { prefix: '/api/preferences' });
 server.register(activityRoutes, { prefix: '/api/activity' });
 server.register(queueRoutes, { prefix: '/api/queue' });
+server.register(togetherRoutes, { prefix: '/api/together' });
+registerTogetherWebSocket(server);
 import { discoveryRoutes } from './routes/discovery.routes';
 server.register(discoveryRoutes, { prefix: '/api/discover' });
 import { databaseAdminRoutes } from './routes/database-admin.routes';

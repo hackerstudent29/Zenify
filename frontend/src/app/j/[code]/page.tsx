@@ -1,0 +1,55 @@
+"use client";
+
+import React, { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/authStore';
+import api from '@/lib/api';
+import notify from '@/lib/notify';
+import { Radio } from 'lucide-react';
+
+export default function JoinRedirectPage() {
+  const params = useParams() as any;
+  const router = useRouter();
+  const roomCode = String(params?.code || '').toUpperCase();
+  const { isAuthenticated } = useAuthStore();
+  const [status, setStatus] = useState('Connecting to session...');
+
+  useEffect(() => {
+    if (!roomCode) return;
+
+    if (!isAuthenticated) {
+      sessionStorage.setItem('zenify_redirect_after_login', `/j/${roomCode}`);
+      notify('Please sign in to join Listen Together', 'info');
+      router.push('/login');
+      return;
+    }
+
+    const join = async () => {
+      try {
+        setStatus(`Joining room ${roomCode}...`);
+        const res = await api.post(`/together/rooms/${roomCode}/join`);
+        if (res.data?.success && res.data?.ticket) {
+          sessionStorage.setItem(`zenify_ticket_${roomCode}`, res.data.ticket);
+          router.replace(`/together/${roomCode}`);
+        } else {
+          throw new Error('Could not join room');
+        }
+      } catch (err: any) {
+        notify(err.response?.data?.message || 'Room not found or has expired', 'error');
+        router.replace('/together');
+      }
+    };
+
+    join();
+  }, [roomCode, isAuthenticated, router]);
+
+  return (
+    <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4 space-y-4">
+      <div className="w-16 h-16 rounded-full bg-brand/15 text-brand flex items-center justify-center animate-pulse">
+        <Radio className="w-8 h-8" />
+      </div>
+      <h2 className="text-xl font-bold text-white tracking-wide">{status}</h2>
+      <p className="text-white/50 text-[14px]">Preparing synchronized audio stream...</p>
+    </div>
+  );
+}
