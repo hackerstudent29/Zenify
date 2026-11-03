@@ -68,15 +68,24 @@ export function useHomepageData() {
   } = useQuery({
     queryKey: ["home-feed", userId, sortedLangKey],
     queryFn: async () => {
-      const res = await api.get("/homepage/feed", {
-        params: {
-          languages: selectedLanguages.join(",")
-        },
-        headers: {
-          "x-user-languages": selectedLanguages.join(",")
+      try {
+        const res = await api.get("/homepage/feed", {
+          params: {
+            languages: selectedLanguages.join(",")
+          },
+          headers: {
+            "x-user-languages": selectedLanguages.join(",")
+          }
+        });
+        if (res.data?.sections && Array.isArray(res.data.sections) && res.data.sections.length > 0) {
+          return res.data;
         }
-      });
-      return res.data;
+      } catch (feedErr) {
+        console.warn("[useHomepageData] /homepage/feed failed, attempting fallback:", feedErr?.message);
+      }
+
+      const fallback = await api.get("/homepage");
+      return fallback.data;
     },
     staleTime: 3 * 60 * 1000, // 3 minutes fresh cache
     refetchOnWindowFocus: false,
