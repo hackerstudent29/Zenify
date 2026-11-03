@@ -39,6 +39,7 @@ model User {
   analysisSlot    Int?             @unique
   activityEvents  UserActivityEvent[]
   interestProfile UserInterestProfile?
+  listenEvents    ListenEvent[]
   analysisRuns    AnalysisRun[]
 }
 
@@ -115,6 +116,7 @@ model UserPreferences {
   selectedCountryName  String?  @map("selected_country_name")
   selectedLanguageCode String?  @map("selected_language_code")
   selectedLanguageName String?  @map("selected_language_name")
+  personalizationEnabled Boolean @default(true) @map("personalization_enabled")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -146,9 +148,14 @@ model Artist {
   aura_vibe        String?
   albums           Album[]
   tracks           Track[]
+  providerId       String?                  @map("provider_id")
+  provider         String                   @default("jiosaavn")
   aliases          ArtistAlias[]
+  trackArtists     TrackArtist[]
 
   @@index([name])
+  @@index([providerId])
+  @@index([provider, providerId])
 }
 
 model Album {
@@ -164,15 +171,21 @@ model Album {
   aura_color       String?
   aura_vibe        String?
   palette          Json?   // Stores [{r,g,b},{r,g,b},{r,g,b},{r,g,b}] extracted from coverUrl
+  providerId       String?                  @map("provider_id")
+  provider         String                   @default("jiosaavn")
   artist           Artist                   @relation(fields: [artistId], references: [id])
   tracks           Track[]
 
   @@index([title])
+  @@index([providerId])
+  @@index([provider, providerId])
 }
 
 model Track {
   id               String                   @id @default(uuid())
   title            String
+  providerId       String?                  @map("provider_id")
+  provider         String                   @default("jiosaavn")
   artistId         String
   albumId          String?
   coverUrl         String?
@@ -255,8 +268,12 @@ model Track {
   userStats          UserTrackStat[]
   vibeProfile        TrackVibeProfile?
   lyricJob           LyricEnrichmentJob?
+  trackArtists       TrackArtist[]
+  listenEvents       ListenEvent[]
 
   @@index([title])
+  @@index([providerId])
+  @@index([provider, providerId])
   @@index([artistId])
   @@index([albumId])
   @@index([deletedAt])
@@ -522,4 +539,58 @@ model ArtistAlias {
   @@map("artist_aliases")
   @@index([aliasNormalized])
   @@index([artistId])
+}
+
+
+model TrackArtist {
+  id        String   @id @default(uuid())
+  trackId   String   @map("track_id")
+  artistId  String   @map("artist_id")
+  role      String   @default("primary") // 'primary' | 'featured' | 'music' | 'lyricist' | 'singer' | 'starring'
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@unique([trackId, artistId, role])
+  @@index([trackId])
+  @@index([artistId])
+  @@index([role])
+  @@map("track_artists")
+}
+
+model ProviderCache {
+  key       String   @id
+  provider  String   @default("jiosaavn")
+  data      Json
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@map("provider_cache")
+}
+
+model ListenEvent {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  trackId    String   @map("track_id")
+  artistIds  String[] @map("artist_ids")
+  albumId    String?  @map("album_id")
+  language   String?
+  msPlayed   Int      @map("ms_played")
+  durationMs Int      @map("duration_ms")
+  completed  Boolean  @default(false)
+  skipped    Boolean  @default(false)
+  source     String?  @default("player")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([trackId])
+  @@index([createdAt])
+  @@map("listen_events")
 }

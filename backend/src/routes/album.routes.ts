@@ -315,7 +315,88 @@ export async function albumRoutes(server: FastifyInstance) {
         const { id } = req.params;
         const decodedId = decodeURIComponent(id).trim();
 
-        // 0. Virtual Album Resolution (YouTube Music database MPREb_...)
+        // 0. Canonical Provider ID Resolution (JioSaavn Album ID e.g. "34735026", "saavn-album-34735026", "saavn-34735026")
+        const rawAlbumNumMatch = decodedId.match(/^(?:saavn-album-|saavn-|sp-album-)?(\d{4,})$/);
+        if (rawAlbumNumMatch) {
+            const providerAlbumId = rawAlbumNumMatch[1];
+            try {
+                const { jiosaavnCatalog } = await import('../services/jiosaavn-catalog.service.js');
+                const { DataIdentityService } = await import('../services/data-identity.service.js');
+                const album = await jiosaavnCatalog.getAlbum(providerAlbumId);
+                if (album && album.title && album.tracks.length > 0) {
+                    const dbAlbum = await DataIdentityService.syncAlbum(album);
+
+                    // Fetch more albums by this artist for the carousel
+                    let moreAlbums: any[] = [];
+                    if (album.primaryArtist?.id && !album.primaryArtist.id.startsWith('unknown')) {
+                        const artistData = await jiosaavnCatalog.getArtist(album.primaryArtist.id);
+                        if (artistData?.albums) {
+                            moreAlbums = artistData.albums.filter(a => a.id !== providerAlbumId);
+                        }
+                    }
+
+                    return {
+                        id: dbAlbum.id,
+                        providerId: album.id,
+                        provider: 'jiosaavn',
+                        title: album.title,
+                        coverUrl: album.coverUrl,
+                        releaseDate: album.releaseDate || new Date(),
+                        createdAt: album.releaseDate || new Date(),
+                        year: album.year,
+                        genre: album.genre || 'Soundtrack',
+                        artist: {
+                            id: album.primaryArtist.id,
+                            name: album.primaryArtist.name,
+                            imageUrl: album.primaryArtist.imageUrl || album.coverUrl
+                        },
+                        tracks: album.tracks,
+                        moreAlbumsByArtist: moreAlbums
+                    };
+                }
+            } catch (err: any) {
+                console.warn(`[AlbumRoute] Failed to resolve canonical album ${providerAlbumId}:`, err.message);
+            }
+        }
+
+        // 0.1 Check DB for album with providerId or UUID
+        const existingDbAlbum = await prisma.album.findFirst({
+            where: {
+                OR: [
+                    { id: decodedId },
+                    { providerId: decodedId }
+                ]
+            },
+            include: {
+                artist: true,
+                tracks: {
+                    where: { deletedAt: null },
+                    include: {
+                        artist: true,
+                        trackArtists: { include: { artist: true } }
+                    },
+                    orderBy: { trackNumber: 'asc' }
+                }
+            }
+        });
+
+        if (existingDbAlbum && existingDbAlbum.tracks.length > 0) {
+            return {
+                ...existingDbAlbum,
+                artist: existingDbAlbum.artist,
+                tracks: existingDbAlbum.tracks.map(t => ({
+                    ...t,
+                    artists: t.trackArtists?.map(ta => ({
+                        id: ta.artist.providerId || ta.artist.id,
+                        name: ta.artist.name,
+                        role: ta.role,
+                        imageUrl: ta.artist.imageUrl
+                    })) || [t.artist]
+                }))
+            };
+        }
+
+        // 0.2 Virtual Album Resolution (YouTube Music database MPREb_...)
         if (decodedId.startsWith('yt-album-') || decodedId.startsWith('MPREb_') || decodedId.startsWith('OLAK5uy_')) {
             const browseId = decodedId.replace(/^yt-album-/, '');
             try {

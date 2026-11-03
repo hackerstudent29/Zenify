@@ -303,13 +303,15 @@ export class TrackService {
             }
         }
 
-        // 4. Intercept Virtual JioSaavn IDs and JIT resolve/import into PostgreSQL
-        if (id.startsWith('saavn-') || id.startsWith('jiosaavn-')) {
+        // 4. Intercept Virtual JioSaavn IDs and JIT resolve/import into PostgreSQL with canonical provider IDs and TrackArtist
+        if (id.startsWith('saavn-') || id.startsWith('jiosaavn-') || /^[a-zA-Z0-9_-]{8,12}$/.test(id)) {
             const saavnId = id.replace(/^(jiosaavn-)?saavn-/, '');
             const existing = await prisma.track.findFirst({
                 where: {
                     OR: [
                         { id },
+                        { providerId: id },
+                        { providerId: saavnId },
                         { youtubeId: id },
                         { youtubeId: saavnId },
                         { audioUrl: { contains: saavnId } }
@@ -319,57 +321,37 @@ export class TrackService {
                 include: {
                     artist: true,
                     album: { include: { artist: true } },
+                    trackArtists: { include: { artist: true }, orderBy: { order: 'asc' } }
                 }
             });
             if (existing) return existing;
 
             try {
-                const { default: axios } = await import('axios');
-                const { CleanCdnAudioService } = await import('./clean-cdn-audio.service.js');
-                const res = await axios.get('https://www.jiosaavn.com/api.php', {
-                    params: {
-                        __call: 'song.getDetails',
-                        pids: saavnId,
-                        _format: 'json',
-                        _marker: '0',
-                        ctx: 'web6dot0'
-                    },
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0' },
-                    timeout: 4500
-                }).catch(() => null);
-
-                const songData = res?.data?.[saavnId] || res?.data?.songs?.[0];
-                if (songData && (songData.song || songData.title)) {
-                    const cleanTitle = (songData.song || songData.title || '').trim();
-                    const rawSingers = songData.singers || songData.primary_artists || songData.more_info?.singers || 'Unknown Artist';
-                    const artistName = (typeof rawSingers === 'string' ? rawSingers.split(',')[0] : 'Unknown Artist').trim();
-                    let artwork = songData.image || '';
-                    artwork = artwork.replace('150x150', '500x500').replace('50x50', '500x500');
-                    const duration = parseInt(songData.duration || songData.more_info?.duration, 10) || 180;
-
-                    let cdnAudio = '';
-                    const encUrl = songData.encrypted_media_url || songData.more_info?.encrypted_media_url;
-                    if (encUrl) {
-                        cdnAudio = CleanCdnAudioService.decryptSaavnMediaUrl(encUrl) || '';
-                    }
-
-                    return await this.importExternal({
-                        title: cleanTitle,
-                        artistName,
-                        albumTitle: songData.album || songData.more_info?.album || 'Single',
-                        coverUrl: artwork,
-                        audioUrl: cdnAudio || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${cleanTitle}`)}`,
-                        duration,
+                const { jiosaavnCatalog } = await import('./jiosaavn-catalog.service.js');
+                const { DataIdentityService } = await import('./data-identity.service.js');
+                const normalized = await jiosaavnCatalog.getTrack(saavnId);
+                if (normalized) {
+                    const dbTrack = await DataIdentityService.syncTrack(normalized);
+                    return await prisma.track.findUnique({
+                        where: { id: dbTrack.id },
+                        include: {
+                            artist: true,
+                            album: { include: { artist: true } },
+                            trackArtists: { include: { artist: true }, orderBy: { order: 'asc' } }
+                        }
                     });
                 }
             } catch (saavnErr: any) {
-                console.warn(`[TrackService] JioSaavn lookup failed for ${id}:`, saavnErr.message);
+                console.warn(`[TrackService] JioSaavn canonical lookup failed for ${id}:`, saavnErr.message);
             }
         }
 
         let track = await prisma.track.findFirst({
             where: { 
-                id, 
+                OR: [
+                    { id },
+                    { providerId: id }
+                ], 
                 deletedAt: null,
                 ...(isAdmin ? {} : {
                     OR: [
@@ -381,6 +363,7 @@ export class TrackService {
             include: {
                 artist: true,
                 album: { include: { artist: true } },
+                trackArtists: { include: { artist: true }, orderBy: { order: 'asc' } }
             }
         });
 
@@ -391,7 +374,11 @@ export class TrackService {
                     youtubeId: id,
                     deletedAt: null
                 },
-                include: { artist: true, album: { include: { artist: true } } }
+                include: {
+                    artist: true,
+                    album: { include: { artist: true } },
+                    trackArtists: { include: { artist: true }, orderBy: { order: 'asc' } }
+                }
             });
         }
 
@@ -402,7 +389,11 @@ export class TrackService {
                     audioUrl: { contains: id },
                     deletedAt: null
                 },
-                include: { artist: true, album: { include: { artist: true } } }
+                include: {
+                    artist: true,
+                    album: { include: { artist: true } },
+                    trackArtists: { include: { artist: true }, orderBy: { order: 'asc' } }
+                }
             });
         }
 
