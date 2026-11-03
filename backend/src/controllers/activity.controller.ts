@@ -17,7 +17,8 @@ const batchEventSchema = z.object({
 
 const activityPayloadSchema = z.union([singleEventSchema, batchEventSchema]);
 
-const listenEventSchema = z.object({
+const singleListenEventSchema = z.object({
+  clientEventId: z.string().optional(),
   trackId: z.string().min(1),
   artistIds: z.array(z.string()).optional(),
   albumId: z.string().optional(),
@@ -27,18 +28,29 @@ const listenEventSchema = z.object({
   completed: z.boolean().optional(),
   skipped: z.boolean().optional(),
   source: z.string().optional(),
+  hour: z.number().int().min(0).max(23).optional(),
 });
+
+const batchListenEventSchema = z.object({
+  events: z.array(singleListenEventSchema).min(1).max(50),
+});
+
+const listenEventPayloadSchema = z.union([
+  singleListenEventSchema,
+  batchListenEventSchema,
+  z.array(singleListenEventSchema).min(1).max(50),
+]);
 
 export class ActivityController {
   /**
    * POST /api/activity/listen-event
    * Precise playback signal ingestion for personalization engine
    */
-  async recordListenEvent(req: FastifyRequest<{ Body: z.infer<typeof listenEventSchema> }>, reply: FastifyReply) {
+  async recordListenEvent(req: FastifyRequest<{ Body: any }>, reply: FastifyReply) {
     const userId = (req.user as any)?.id;
     if (!userId) throw reply.server.httpErrors.unauthorized();
 
-    const parseResult = listenEventSchema.safeParse(req.body);
+    const parseResult = listenEventPayloadSchema.safeParse(req.body);
     if (!parseResult.success) {
       return reply.status(400).send({
         error: 'Invalid listen event payload',
@@ -46,12 +58,23 @@ export class ActivityController {
       });
     }
 
-    const event = await PersonalizationEngineService.recordListenEvent({
-      userId,
-      ...parseResult.data
-    });
+    const payload = parseResult.data;
+    const items = Array.isArray(payload) ? payload : ('events' in payload ? payload.events : [payload]);
 
-    return reply.send({ success: true, eventId: event?.id });
+    const results = await Promise.allSettled(
+      items.map(item => PersonalizationEngineService.recordListenEvent({ userId, ...item }))
+    );
+
+    const saved = results
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value !== null)
+      .map(r => r.value);
+
+    return reply.send({
+      success: true,
+      count: saved.length,
+      eventId: saved[0]?.id || null,
+      events: saved
+    });
   }
 
   /**

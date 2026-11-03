@@ -167,7 +167,7 @@ export class AuthService {
         };
     }
 
-    async updateProfile(userId: string, data: { name?: string, username?: string, avatarUrl?: string | null }) {
+    async updateProfile(userId: string, data: { name?: string, username?: string, avatarUrl?: string | null, timezone?: string }) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) throw this.server.httpErrors.notFound('User not found');
 
@@ -181,7 +181,8 @@ export class AuthService {
             data: {
                 name: data.name,
                 username: data.username,
-                ...(finalAvatarUrl !== undefined && { avatarUrl: finalAvatarUrl })
+                ...(finalAvatarUrl !== undefined && { avatarUrl: finalAvatarUrl }),
+                ...(data.timezone !== undefined && { timezone: data.timezone })
             }
         });
 

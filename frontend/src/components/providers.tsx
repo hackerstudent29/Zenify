@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/authStore";
 import api from "@/lib/api";
 
 import { applyAccentColor } from "@/lib/accent-colors";
+import { syncUserTimezone } from "@/lib/timezone";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -26,6 +27,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     const accent = user?.preferences?.accentColor || "rose";
     applyAccentColor(accent);
   }, [user?.preferences?.accentColor]);
+
+  // Sync browser IANA timezone to user profile
+  useEffect(() => {
+    if (isAuthenticated) {
+      syncUserTimezone();
+    }
+  }, [isAuthenticated, user?.id]);
+
 
   
   return (

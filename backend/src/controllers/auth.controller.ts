@@ -176,7 +176,7 @@ export class AuthController {
         }
     }
 
-    updateProfile = async (req: FastifyRequest<{ Body: { name: string, username: string } }>, reply: FastifyReply) => {
+    updateProfile = async (req: FastifyRequest<{ Body: { name?: string, username?: string, avatarUrl?: string | null, timezone?: string } }>, reply: FastifyReply) => {
         // @ts-ignore
         const userId = req.user.id;
         const result = await this.authService.updateProfile(userId, req.body);

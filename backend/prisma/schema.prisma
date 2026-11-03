@@ -23,6 +23,7 @@ model User {
   country       String?
   username      String?          @unique
   isVerified    Boolean          @default(false)
+  timezone      String?          @default("UTC")
   history       History[]
   likes         Like[]
   playlists     Playlist[]
@@ -41,6 +42,7 @@ model User {
   interestProfile UserInterestProfile?
   listenEvents    ListenEvent[]
   analysisRuns    AnalysisRun[]
+  affinities      UserAffinity[]
 }
 
 model Subscription {
@@ -573,24 +575,43 @@ model ProviderCache {
 }
 
 model ListenEvent {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  trackId    String   @map("track_id")
-  artistIds  String[] @map("artist_ids")
-  albumId    String?  @map("album_id")
-  language   String?
-  msPlayed   Int      @map("ms_played")
-  durationMs Int      @map("duration_ms")
-  completed  Boolean  @default(false)
-  skipped    Boolean  @default(false)
-  source     String?  @default("player")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  clientEventId  String?  @unique @map("client_event_id")
+  userId         String   @map("user_id")
+  trackId        String   @map("track_id")
+  artistIds      String[] @map("artist_ids")
+  albumId        String?  @map("album_id")
+  language       String?
+  msPlayed       Int      @map("ms_played")
+  durationMs     Int      @map("duration_ms")
+  completed      Boolean  @default(false)
+  skipped        Boolean  @default(false)
+  source         String?  @default("player")
+  hour           Int?     // 0-23 in user local time
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track          Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
+  @@index([userId, createdAt])
+  @@index([userId, trackId])
   @@index([userId])
   @@index([trackId])
   @@index([createdAt])
   @@map("listen_events")
+}
+
+model UserAffinity {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  kind      String   // 'artist' | 'language' | 'album' | 'genre'
+  key       String   // e.g. provider artistId or language code
+  score     Float    @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, key])
+  @@index([userId, kind, score])
+  @@map("user_affinities")
 }

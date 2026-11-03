@@ -29,6 +29,7 @@ import {
   Repeat,
   Keyboard,
   RotateCcw,
+  Trash2,
   Waves,
   Disc3,
   Maximize2,
@@ -105,9 +106,35 @@ export function SettingsModal({
     playlistUpdates: false,
     weeklySummaryEmail: false,
     listeningActivity: true,
+    personalizationEnabled: true,
   });
 
   const [isSaving, setIsSaving] = useState(false);
+
+  const [isClearingHistory, setIsClearingHistory] = useState(false);
+
+  const handleTogglePersonalization = async (enabled: boolean) => {
+    handleToggle("personalizationEnabled", enabled);
+    try {
+      await api.put("/activity/personalization", { enabled });
+      useUIStore.getState().showToast(enabled ? "Personalization enabled" : "Personalization turned off", "info");
+    } catch (e) {
+      console.warn("[Settings] Personalization toggle sync error:", e);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    setIsClearingHistory(true);
+    try {
+      await api.delete("/activity/history");
+      useUIStore.getState().showToast("Listening history and taste affinities cleared", "success");
+    } catch (err: any) {
+      useUIStore.getState().showToast("Failed to clear listening history", "error");
+    } finally {
+      setIsClearingHistory(false);
+    }
+  };
+
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [lastSavedKey, setLastSavedKey] = useState<string | null>(null);
@@ -442,10 +469,52 @@ export function SettingsModal({
 
       {/* ── PRIVACY ─── */}
       {activeSection === "privacy" && (
-        <Section key="privacy" title="Privacy" subtitle="Social visibility and profile activity">
-          <Group>
-            <Row label="Show Activity" icon={Activity} tint={TINT.blue} description="Display what you're currently playing on your public profile" {...pref("listeningActivity")}>
-              <Toggle label="Show Activity" checked={preferences.listeningActivity} onCheckedChange={(v) => handleToggle("listeningActivity", v)} disabled={isSaving} />
+        <Section key="privacy" title="Privacy" subtitle="Listening data, personalization, and social controls">
+          <Group header="Recommendations & Personalization">
+            <Row
+              label="Personalized Experience"
+              icon={Sparkles}
+              tint={TINT.purple}
+              description="Use your listening history and affinities to power personalized home shelves and mixes"
+              {...pref("personalizationEnabled")}
+            >
+              <Toggle
+                label="Personalization"
+                checked={preferences.personalizationEnabled ?? true}
+                onCheckedChange={handleTogglePersonalization}
+                disabled={isSaving}
+              />
+            </Row>
+            <Row
+              label="Show Activity"
+              icon={Activity}
+              tint={TINT.blue}
+              description="Display what you're currently playing on your public profile"
+              {...pref("listeningActivity")}
+            >
+              <Toggle
+                label="Show Activity"
+                checked={preferences.listeningActivity}
+                onCheckedChange={(v) => handleToggle("listeningActivity", v)}
+                disabled={isSaving}
+              />
+            </Row>
+          </Group>
+
+          <Group header="Listening History Data">
+            <Row
+              label="Clear Listening History"
+              icon={RotateCcw}
+              tint={TINT.red}
+              description="Permanently delete all personal listening events, history records, and learned affinities"
+            >
+              <AppButton
+                className="bg-red-500/20 text-red-400 hover:bg-red-500/30 hover:text-red-300 border border-red-500/30"
+                onClick={handleClearHistory}
+                disabled={isClearingHistory}
+              >
+                {isClearingHistory ? "Clearing..." : "Clear History"}
+              </AppButton>
             </Row>
           </Group>
         </Section>
