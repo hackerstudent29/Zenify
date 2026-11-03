@@ -8,6 +8,7 @@ import { getMediaUrl, getTrackCover, getApiBaseUrl, formatArtists } from "@/lib/
 import { getCachedTrackBlobUrl, getSyncCachedTrackBlobUrl, cacheTrackAudioInBackground } from "@/lib/audio-cache";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUIStore } from "@/store/ui";
+import api from "@/lib/api";
 
 export function GlobalAudio() {
   const polledTrackIds = useRef<Set<string>>(new Set());
@@ -298,6 +299,23 @@ export function GlobalAudio() {
 
     const handleEnded = () => {
       console.log("[GlobalAudio] Track ended event fired. Advancing to next track.");
+      const curr = usePlayerStore.getState().currentTrack;
+      if (curr?.id) {
+        const artistId = (curr as any).artistId || curr.artist?.id;
+        const artistIds = artistId ? [artistId] : [];
+        const durMs = Math.round((curr.duration || audio.duration || 0) * 1000);
+        api.post('/activity/listen-event', {
+          trackId: curr.id,
+          artistIds,
+          albumId: curr.album?.id,
+          language: (curr as any).language,
+          msPlayed: durMs,
+          durationMs: durMs,
+          completed: true,
+          skipped: false,
+          source: 'player'
+        }).catch(() => {});
+      }
       isSwitchingTrackRef.current = true;
       isSourceChanging.current = false;
       setTimeout(() => { isSwitchingTrackRef.current = false; }, 600);
@@ -861,6 +879,20 @@ export function GlobalAudio() {
           },
           sourceType: (currentTrack as any).sourceType || 'recommendation',
           seedId: currentTrack.id
+        }).catch(() => {});
+
+        // Record ListenEvent for Personalization Engine
+        const aId = (currentTrack as any).artistId || currentTrack.artist?.id;
+        api.post('/activity/listen-event', {
+          trackId: currentTrack.id,
+          artistIds: aId ? [aId] : [],
+          albumId: currentTrack.album?.id,
+          language: trackLang,
+          msPlayed: 5000,
+          durationMs: Math.round((currentTrack.duration || 0) * 1000),
+          completed: false,
+          skipped: false,
+          source: (currentTrack as any).sourceType || 'player'
         }).catch(() => {});
       } catch (err) {
         console.error("[Playback] Failed to report play:", err);
