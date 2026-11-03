@@ -49,6 +49,7 @@
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/sensible": "^6.0.4",
     "@fastify/static": "^9.0.0",
+    "@fastify/websocket": "^11.3.6",
     "@prisma/client": "5.10.2",
     "@supabase/supabase-js": "^2.97.0",
     "ai": "^6.0.203",
