@@ -19,4 +19,26 @@ export async function activityRoutes(server: FastifyInstance) {
     preHandler: [server.authenticate],
     handler: controller.resetPersonalization.bind(controller)
   });
+
+  // Personalization Engine: ListenEvent ingestion & privacy controls
+  server.post('/listen-event', {
+    preHandler: [server.authenticate],
+    config: {
+      rateLimit: {
+        max: 180,
+        timeWindow: '1 minute'
+      }
+    },
+    handler: controller.recordListenEvent.bind(controller)
+  });
+
+  server.delete('/history', {
+    preHandler: [server.authenticate],
+    handler: controller.clearHistory.bind(controller)
+  });
+
+  server.put('/personalization', {
+    preHandler: [server.authenticate],
+    handler: controller.togglePersonalization.bind(controller)
+  });
 }
