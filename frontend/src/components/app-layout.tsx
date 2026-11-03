@@ -3,6 +3,7 @@
 import { SleepTimerSheet } from "@/components/player/SleepTimerSheet";
 import { CarModeView } from "@/components/player/CarModeView";
 import { ToastCapsule } from "@/components/ui/ToastCapsule";
+import { ShareSheet } from "@/components/shared/ShareSheet";
 
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { usePathname, useRouter } from "next/navigation";
@@ -540,6 +541,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <SleepTimerSheet />
     <CarModeView />
     <ToastCapsule />
+    <ShareSheet />
  </React.Suspense>
  </div>
  );

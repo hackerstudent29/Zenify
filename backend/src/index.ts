@@ -269,6 +269,8 @@ server.register(activityRoutes, { prefix: '/api/activity' });
 server.register(queueRoutes, { prefix: '/api/queue' });
 server.register(togetherRoutes, { prefix: '/api/together' });
 registerTogetherWebSocket(server);
+import { shareRoutes } from './routes/share.routes';
+server.register(shareRoutes);
 import { discoveryRoutes } from './routes/discovery.routes';
 server.register(discoveryRoutes, { prefix: '/api/discover' });
 import { databaseAdminRoutes } from './routes/database-admin.routes';

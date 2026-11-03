@@ -5,6 +5,15 @@ import { Track } from './player';
 
 export type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
+export interface ShareCardPayload {
+  track?: any;
+  album?: any;
+  artist?: any;
+  playlist?: any;
+  lyricsLines?: string[];
+  type: 'track' | 'album' | 'artist' | 'playlist' | 'lyrics';
+}
+
 export interface ToastNotification {
   id: string;
   msg: string;
@@ -23,6 +32,10 @@ interface UIState {
   isFullScreenPlayerOpen: boolean;
   isCarModeOpen: boolean;
   setIsCarModeOpen: (open: boolean) => void;
+  isShareSheetOpen: boolean;
+  sharePayload: ShareCardPayload | null;
+  openShareSheet: (payload: ShareCardPayload) => void;
+  closeShareSheet: () => void;
   isAudioFxOpen: boolean;
   isQueueOpen: boolean;
   isLyricsOpen: boolean;
@@ -111,6 +124,10 @@ export const useUIStore = create<UIState>((set, get) => ({
   isFullScreenPlayerOpen: false,
   isCarModeOpen: false,
   setIsCarModeOpen: (open) => set({ isCarModeOpen: open }),
+  isShareSheetOpen: false,
+  sharePayload: null,
+  openShareSheet: (payload) => set({ isShareSheetOpen: true, sharePayload: payload }),
+  closeShareSheet: () => set({ isShareSheetOpen: false, sharePayload: null }),
   isAudioFxOpen: false,
   isQueueOpen: false,
   isLyricsOpen: false,
