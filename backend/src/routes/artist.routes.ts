@@ -34,6 +34,49 @@ export async function artistRoutes(server: FastifyInstance) {
     async function resolveArtistWithFullCatalog(idOrName: string) {
         const decoded = decodeURIComponent(idOrName).trim();
 
+        // 0. Canonical Provider ID Resolution (JioSaavn Artist ID, e.g. "455663" or "saavn-artist-455663")
+        const rawNumMatch = decoded.match(/^(?:saavn-artist-|artist-)?(\d{3,})$/);
+        if (rawNumMatch) {
+            const providerArtistId = rawNumMatch[1];
+            try {
+                const { jiosaavnCatalog } = await import('../services/jiosaavn-catalog.service.js');
+                const { DataIdentityService } = await import('../services/data-identity.service.js');
+                const providerArtist = await jiosaavnCatalog.getArtist(providerArtistId);
+                if (providerArtist && providerArtist.name && providerArtist.imageUrl) {
+                    const dbArtist = await DataIdentityService.syncArtist({
+                        id: providerArtist.id,
+                        name: providerArtist.name,
+                        imageUrl: providerArtist.imageUrl,
+                        role: 'primary'
+                    }, providerArtist.bio);
+
+                    // Sync top songs in background
+                    if (providerArtist.topSongs && providerArtist.topSongs.length > 0) {
+                        Promise.all(providerArtist.topSongs.slice(0, 20).map(t => DataIdentityService.syncTrack(t))).catch(() => {});
+                    }
+
+                    return {
+                        id: dbArtist.id,
+                        providerId: providerArtist.id,
+                        provider: 'jiosaavn',
+                        name: providerArtist.name,
+                        imageUrl: providerArtist.imageUrl,
+                        coverUrl: providerArtist.imageUrl,
+                        bio: providerArtist.bio,
+                        follower_count: providerArtist.followerCount || 500000,
+                        topTracks: providerArtist.topSongs,
+                        topSongs: providerArtist.topSongs,
+                        topAlbums: providerArtist.albums,
+                        albums: providerArtist.albums,
+                        singles: providerArtist.singles,
+                        relatedArtists: providerArtist.relatedArtists
+                    };
+                }
+            } catch (err: any) {
+                console.warn(`[ArtistRoute] Failed to resolve canonical artist ${providerArtistId}:`, err.message);
+            }
+        }
+
         // 1. Try finding by ID
         let artist = await prisma.artist.findUnique({
             where: { id: decoded },
@@ -48,6 +91,32 @@ export async function artistRoutes(server: FastifyInstance) {
             }
         }).catch(() => null);
 
+        // If artist has providerId, enrich from canonical provider
+        if (artist?.providerId) {
+            try {
+                const { jiosaavnCatalog } = await import('../services/jiosaavn-catalog.service.js');
+                const providerArtist = await jiosaavnCatalog.getArtist(artist.providerId);
+                if (providerArtist && providerArtist.name) {
+                    return {
+                        id: artist.id,
+                        providerId: artist.providerId,
+                        provider: 'jiosaavn',
+                        name: artist.name || providerArtist.name,
+                        imageUrl: providerArtist.imageUrl || artist.imageUrl,
+                        coverUrl: providerArtist.imageUrl || artist.coverUrl,
+                        bio: providerArtist.bio || artist.bio,
+                        follower_count: providerArtist.followerCount || artist.follower_count || 500000,
+                        topTracks: providerArtist.topSongs,
+                        topSongs: providerArtist.topSongs,
+                        topAlbums: providerArtist.albums,
+                        albums: providerArtist.albums,
+                        singles: providerArtist.singles,
+                        relatedArtists: providerArtist.relatedArtists
+                    };
+                }
+            } catch {}
+        }
+
         // 2. If not found by ID, try finding by Name / Slug (case-insensitive & space-normalized)
         let cleanName = decoded
             .replace(/^itunes-artist-/, '')
@@ -59,6 +128,55 @@ export async function artistRoutes(server: FastifyInstance) {
             .replace(/[-_]+/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
+
+        // Try searching provider by artist name first to resolve canonical ID
+        if (cleanName.length >= 2 && !isFakeOrNumericArtistName(cleanName)) {
+            try {
+                const { jiosaavnCatalog } = await import('../services/jiosaavn-catalog.service.js');
+                const { DataIdentityService } = await import('../services/data-identity.service.js');
+                const searchRes = await jiosaavnCatalog.search(cleanName, 'in', 5);
+                const targetNorm = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const matchedArtist = searchRes.artists.find(a => {
+                    const aNorm = a.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return aNorm === targetNorm || aNorm.includes(targetNorm) || targetNorm.includes(aNorm);
+                });
+
+                if (matchedArtist && matchedArtist.id) {
+                    const fullArtist = await jiosaavnCatalog.getArtist(matchedArtist.id);
+                    if (fullArtist && fullArtist.name && fullArtist.imageUrl) {
+                        const dbArtist = await DataIdentityService.syncArtist({
+                            id: fullArtist.id,
+                            name: fullArtist.name,
+                            imageUrl: fullArtist.imageUrl,
+                            role: 'primary'
+                        }, fullArtist.bio);
+
+                        if (fullArtist.topSongs && fullArtist.topSongs.length > 0) {
+                            Promise.all(fullArtist.topSongs.slice(0, 20).map(t => DataIdentityService.syncTrack(t))).catch(() => {});
+                        }
+
+                        return {
+                            id: dbArtist.id,
+                            providerId: fullArtist.id,
+                            provider: 'jiosaavn',
+                            name: fullArtist.name,
+                            imageUrl: fullArtist.imageUrl,
+                            coverUrl: fullArtist.imageUrl,
+                            bio: fullArtist.bio,
+                            follower_count: fullArtist.followerCount || 500000,
+                            topTracks: fullArtist.topSongs,
+                            topSongs: fullArtist.topSongs,
+                            topAlbums: fullArtist.albums,
+                            albums: fullArtist.albums,
+                            singles: fullArtist.singles,
+                            relatedArtists: fullArtist.relatedArtists
+                        };
+                    }
+                }
+            } catch (err: any) {
+                console.warn(`[ArtistRoute] JioSaavn name lookup warn for "${cleanName}":`, err.message);
+            }
+        }
 
                 const canonical = getCanonicalArtist(cleanName) || getCanonicalArtist(decoded) || getCanonicalArtist(decoded.replace(/^artist-/, ''));
 
