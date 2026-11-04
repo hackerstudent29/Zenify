@@ -320,6 +320,29 @@ export default function AboutZenifyPage() {
             </div>
           </Section>
 
+          {/* Lyrics & Data Attribution */}
+          <Section title="Lyrics & Metadata Attribution">
+            <div className="space-y-3">
+              <p className="text-[15px] leading-relaxed text-white/60">
+                Zenify indexes and streams synchronized word-by-word and line-by-line lyrics powered by open community databases and speech models:
+              </p>
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between py-2 border-b border-white/5 text-[14px]">
+                  <span className="text-white/80 font-medium">Word-by-word Synchronized Lyrics</span>
+                  <a href="https://lrc.red" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">lrc.red & Unison</a>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-white/5 text-[14px]">
+                  <span className="text-white/80 font-medium">Community Synced & Plain Lyrics</span>
+                  <a href="https://lrclib.net" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">LRCLIB</a>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b border-white/5 text-[14px]">
+                  <span className="text-white/80 font-medium">AI Speech-to-Text Transcription</span>
+                  <span className="text-white/50">Deepgram Nova-3 / Nova-2</span>
+                </div>
+              </div>
+            </div>
+          </Section>
+
           {/* Why Zenify */}
           <Section title="Why Choose Zenify?">
             <div className="space-y-5">

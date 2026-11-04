@@ -723,3 +723,45 @@ model BlendSnapshot {
   @@index([sessionId])
   @@map("blend_snapshots")
 }
+
+
+// ==========================================
+// MULTI-PROVIDER LYRICS PIPELINE (PHASE 5)
+// ==========================================
+
+model Lyrics {
+  id          String    @id @default(uuid())
+  trackId     String    @unique @map("track_id")
+  syncLevel   String    @map("sync_level")
+  provider    String
+  providerRef String?   @map("provider_ref")
+  language    String?
+  script      String?
+  instrumental Boolean  @default(false)
+  aiGenerated Boolean   @default(false) @map("ai_generated")
+  aiSynced    Boolean   @default(false) @map("ai_synced")
+  contentJson Json      @map("content_json")
+  fetchedAt   DateTime  @default(now()) @map("fetched_at")
+  recheckAt   DateTime? @map("recheck_at")
+  expiresAt   DateTime? @map("expires_at")
+
+  @@index([trackId])
+  @@index([syncLevel])
+  @@index([provider])
+  @@index([expiresAt])
+  @@map("lyrics_documents")
+}
+
+model LyricsAttempt {
+  id        String   @id @default(uuid())
+  trackId   String   @map("track_id")
+  provider  String
+  outcome   String
+  ms        Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([trackId])
+  @@index([provider])
+  @@index([createdAt])
+  @@map("lyrics_attempts")
+}

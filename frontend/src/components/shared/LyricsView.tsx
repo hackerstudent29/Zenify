@@ -86,6 +86,58 @@ export function LyricsView({
     queryFn: async ({ signal }) => {
       if (!title) return { syncedTokens: [], source: undefined as string | undefined, status: "not_found" as const };
       try {
+        // 1. Try canonical multi-provider pipeline endpoint
+        if (trackId) {
+          try {
+            const pipeRes = await api.get(`lyrics/${encodeURIComponent(trackId)}`, { signal });
+            if (pipeRes?.data) {
+              const { status, doc } = pipeRes.data;
+              if (status === "pending") {
+                return {
+                  status: "processing" as const,
+                  syncedTokens: [],
+                  qualityBadge: "AI-generated" as const,
+                  isAiGenerated: true,
+                  syncLevel: "ai-word" as const
+                };
+              }
+              if (status === "ready" && doc) {
+                const lines = (doc.lines || []).map((l: any) => ({
+                  time: (l.startMs || 0) / 1000,
+                  endTime: (l.endMs || (l.startMs + 3000)) / 1000,
+                  text: l.text,
+                  words: l.words?.map((w: any) => ({
+                    word: w.text,
+                    time: (w.startMs || 0) / 1000,
+                    endTime: (w.endMs || (w.startMs + 300)) / 1000
+                  })),
+                  isBackground: l.isBackground,
+                  agent: l.agent
+                }));
+
+                let qualityBadge: "Word by word" | "Synced" | "Unsynced" | "AI-generated" = "Synced";
+                if (doc.aiGenerated) qualityBadge = "AI-generated";
+                else if (doc.syncLevel === "word" || doc.syncLevel === "ai-word") qualityBadge = "Word by word";
+                else if (doc.syncLevel === "plain") qualityBadge = "Unsynced";
+
+                return {
+                  status: "available" as const,
+                  syncedTokens: lines,
+                  syncLevel: doc.syncLevel,
+                  qualityBadge,
+                  isAiGenerated: Boolean(doc.aiGenerated),
+                  isAiSynced: Boolean(doc.aiSynced),
+                  isInstrumental: Boolean(doc.instrumental),
+                  source: doc.instrumental ? "INSTRUMENTAL" : doc.providerId
+                };
+              }
+            }
+          } catch (e: any) {
+            if (signal?.aborted) throw e;
+          }
+        }
+
+        // 2. Resilient fallback to legacy metadata sync-lyrics
         const res = await api.post(`metadata/sync-lyrics`, { 
           trackId, 
           title, 
@@ -100,10 +152,20 @@ export function LyricsView({
           return { syncedTokens: [], source: undefined, status: "cancelled" as const };
         }
 
+        const tokens = res.data?.syncedTokens || [];
+        const hasWords = tokens.some((t: any) => Array.isArray(t.words) && t.words.length > 0);
+        const isAi = res.data?.source === "DEEPGRAM" || res.data?.source === "DEEPGRAM_STT" || res.data?.source === "DEEPGRAM_AI";
+        let badge: "Word by word" | "Synced" | "Unsynced" | "AI-generated" = "Synced";
+        if (isAi) badge = "AI-generated";
+        else if (hasWords) badge = "Word by word";
+        else if (tokens.length === 0) badge = "Unsynced";
+
         return {
           status: (res.data?.status || "available") as string,
           message: res.data?.message as string | undefined,
-          syncedTokens: res.data?.syncedTokens || [],
+          syncedTokens: tokens,
+          qualityBadge: badge,
+          isAiGenerated: isAi,
           source: res.data?.source as string | undefined,
           romanizedLyrics: res.data?.romanizedLyrics as string | undefined,
           romanizedSyncedLyrics: res.data?.romanizedSyncedLyrics as any[] | undefined,
@@ -251,6 +313,19 @@ export function LyricsView({
     return [];
   }, [isRomanized, romanizedSynced, romanizedPlain, data?.syncedTokens, currentTrack?.synced_lyrics]);
 
+  const [isPlainMode, setIsPlainMode] = React.useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return localStorage.getItem("zenify_lyrics_plain_mode") === "true"; } catch { return false; }
+  });
+
+  const togglePlainMode = () => {
+    setIsPlainMode((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("zenify_lyrics_plain_mode", String(next)); } catch {}
+      return next;
+    });
+  };
+
   const activePlainLyrics = React.useMemo(() => {
     if (!isRomanized) return rawLyrics;
     if (typeof romanizedPlain === "string" && romanizedPlain.trim().length > 0) return romanizedPlain;
@@ -261,6 +336,15 @@ export function LyricsView({
   const processedLines = React.useMemo(() => {
     if (data?.source === "INSTRUMENTAL" || activePlainLyrics?.trim().toLowerCase() === "instrumental") {
       return [{ time: 0, text: "• • •", isInstrumental: true }] as any[];
+    }
+
+    if (isPlainMode && activeData && activeData.length > 0) {
+      return activeData.map((line: any) => ({
+        time: -999999,
+        text: cleanLyricText(line.text),
+        isUnsynced: true,
+        isBackground: line.isBackground
+      })).filter((l: any) => l.text.length > 0);
     }
 
     if ((!activeData || activeData.length === 0) && activePlainLyrics && activePlainLyrics.trim() !== "") {
@@ -725,6 +809,9 @@ export function LyricsView({
       onOffset={handleOffsetChange}
       onClose={!isMobile && !isSidebar && !isFullscreen ? onClose : undefined}
       hidden={isUserScrolling || !!isIdle}
+      qualityBadge={data?.qualityBadge}
+      isPlainMode={isPlainMode}
+      onTogglePlainMode={togglePlainMode}
     />
   );
 
@@ -790,6 +877,13 @@ export function LyricsView({
           <style dangerouslySetInnerHTML={{ __html: ".scrollbar-none::-webkit-scrollbar{display:none!important}" }} />
           <div className={cn("relative flex w-full flex-col items-start text-left", isFullscreen ? "w-full max-w-3xl px-4 lg:px-6" : isSidebar ? "px-5" : isMobile ? "px-4" : "px-6")}>
             <div className="w-full shrink-0" style={{ height: topSpacer }} />
+
+            {/* AI notice */}
+            {data?.isAiGenerated && (
+              <div className="mx-auto mb-6 flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[11px] font-medium text-amber-300">
+                <span>AI-generated, may contain errors</span>
+              </div>
+            )}
 
             {processedLines.map((line: any, idx: number) => {
               const dist = idx - activeIndex;
