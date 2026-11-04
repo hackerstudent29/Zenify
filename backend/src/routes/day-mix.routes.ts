@@ -14,3 +14,4 @@ export async function dayMixRoutes(server: FastifyInstance) {
     DayMixController.getSlotsMeta
   );
 }
+
