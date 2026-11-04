@@ -16,8 +16,10 @@ export class PlainTextParser {
       let line = rawLine.trim();
       if (!line) continue;
 
-      // Remove HTML comments and markup
-      line = line.replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, '').trim();
+      // Drop HTML comment lines or tags
+      if (line.includes('<!--') || line.includes('-->') || (line.startsWith('<') && line.endsWith('>')) || line.includes('<script')) {
+        continue;
+      }
       // Remove trailing Embed digits
       line = line.replace(/\d*Embed$/i, '').trim();
       line = line.replace(/\*{5,}.*?\*{5,}/g, '').trim();
