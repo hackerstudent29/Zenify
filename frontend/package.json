@@ -29,7 +29,8 @@
     "prebuild": "node scripts/generate-sitemap.mjs",
     "build": "tsc && vite build && node scripts/prerender.mjs",
     "preview": "vite preview --port 3001",
-    "lint": "eslint"
+    "lint": "tsc --noEmit",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.2.11",

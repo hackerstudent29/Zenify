@@ -37,7 +37,7 @@ export class LrcLibBase {
       });
 
       if (sRes.ok) {
-        const list: any[] = await sRes.json();
+        const list = (await sRes.json()) as any[];
         if (Array.isArray(list) && list.length > 0) {
           const candidates = list.map(item => ({
             title: item.trackName || item.name,

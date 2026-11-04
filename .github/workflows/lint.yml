@@ -2,9 +2,9 @@ name: Lint & Format
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, feat/social-and-extras]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 jobs:
   lint:
@@ -19,7 +19,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-          cache: 'npm'
 
       # Backend linting
       - name: Install backend dependencies
@@ -28,11 +27,7 @@ jobs:
 
       - name: Lint backend
         working-directory: ./backend
-        run: npm run lint || true
-
-      - name: Format check (Prettier)
-        working-directory: ./backend
-        run: npm run format:check || npm run format
+        run: npm run lint
 
       # Frontend linting
       - name: Install frontend dependencies
@@ -41,13 +36,8 @@ jobs:
 
       - name: Lint frontend
         working-directory: ./frontend
-        run: npm run lint || true
+        run: npm run lint
 
       - name: Type check frontend
         working-directory: ./frontend
-        run: npm run type-check || true
-
-      - name: Format check (Prettier)
-        working-directory: ./frontend
-        run: npm run format:check || npm run format
-
+        run: npm run type-check

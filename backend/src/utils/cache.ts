@@ -40,7 +40,7 @@ if (shouldUseRedis) {
  * Fetches a parsed JSON value from cache.
  * @param key Unique key
  */
-export async function getCacheVal(key: string): Promise<any | null> {
+export async function getCacheVal<T = any>(key: string): Promise<T | null> {
   if (redisClient && redisClient.status === 'ready') {
     try {
       const val = await redisClient.get(key);

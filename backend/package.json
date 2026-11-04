@@ -11,7 +11,8 @@
     "check:r2": "node scripts/check-cloudflare-storage.js",
     "check:cloudinary": "node scripts/check-cloudinary-storage.js",
     "check:db": "node scripts/check-heroku-db-storage.js",
-    "check:all": "node scripts/check-cloudflare-storage.js && node scripts/check-cloudinary-storage.js && node scripts/check-heroku-db-storage.js"
+    "check:all": "node scripts/check-cloudflare-storage.js && node scripts/check-cloudinary-storage.js && node scripts/check-heroku-db-storage.js",
+    "lint": "tsc --noEmit"
   },
   "keywords": [
     "music-streaming",
