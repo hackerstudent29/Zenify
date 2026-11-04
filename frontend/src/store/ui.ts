@@ -11,7 +11,8 @@ export interface ShareCardPayload {
   artist?: any;
   playlist?: any;
   lyricsLines?: string[];
-  type: 'track' | 'album' | 'artist' | 'playlist' | 'lyrics';
+  replayData?: any;
+  type: 'track' | 'album' | 'artist' | 'playlist' | 'lyrics' | 'replay';
 }
 
 export interface ToastNotification {

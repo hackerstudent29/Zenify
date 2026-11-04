@@ -273,6 +273,8 @@ import { shareRoutes } from './routes/share.routes';
 server.register(shareRoutes);
 import { followRoutes } from './routes/follow.routes';
 server.register(followRoutes, { prefix: '/api/me' });
+import { replayRoutes } from './routes/replay.routes';
+server.register(replayRoutes, { prefix: '/api/me' });
 import { discoveryRoutes } from './routes/discovery.routes';
 server.register(discoveryRoutes, { prefix: '/api/discover' });
 import { databaseAdminRoutes } from './routes/database-admin.routes';
