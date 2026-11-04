@@ -268,7 +268,7 @@ server.register(preferencesRoutes, { prefix: '/api/preferences' });
 server.register(activityRoutes, { prefix: '/api/activity' });
 server.register(queueRoutes, { prefix: '/api/queue' });
 server.register(togetherRoutes, { prefix: '/api/together' });
-registerTogetherWebSocket(server);
+server.register(registerTogetherWebSocket);
 import { shareRoutes } from './routes/share.routes';
 server.register(shareRoutes);
 import { followRoutes } from './routes/follow.routes';

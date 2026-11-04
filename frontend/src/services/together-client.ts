@@ -133,6 +133,9 @@ class TogetherClient {
       case 'INIT_STATE': {
         useTogetherStore.getState().setRoom(data.room);
         useTogetherStore.getState().setSelfRole(data.self.role);
+        if (data.self?.userId) {
+          useTogetherStore.getState().setSelfId(data.self.userId);
+        }
         break;
       }
 
@@ -391,6 +394,27 @@ class TogetherClient {
       const nextItem = queue[0];
       this.play(nextItem.track, 0);
       this.removeQueue(nextItem.id);
+    }
+  }
+
+  public moveQueue(itemId: string, targetIdx: number) {
+    const queue = useTogetherStore.getState().room?.queue || [];
+    const currentIdx = queue.findIndex((q: any) => q.id === itemId);
+    if (currentIdx === -1 || targetIdx < 0 || targetIdx >= queue.length || currentIdx === targetIdx) return;
+    this.reorderQueue(currentIdx, targetIdx);
+  }
+
+  public requestSync() {
+    this.runInitialClockSync();
+  }
+
+  public async transferHost(newHostUserId: string) {
+    if (!this.roomCode) return;
+    try {
+      const api = (await import('@/lib/api')).default;
+      await api.post(`/together/rooms/${this.roomCode}/transfer`, { newHostUserId });
+    } catch (e) {
+      console.warn('[TogetherClient] transferHost failed:', e);
     }
   }
 

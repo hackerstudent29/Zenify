@@ -32,7 +32,7 @@ function broadcastToRoom(roomCode: string, payload: any, excludeUserId?: string)
   }
 }
 
-export function registerTogetherWebSocket(server: FastifyInstance) {
+export async function registerTogetherWebSocket(server: FastifyInstance) {
   // 25-second server-initiated heartbeat ping to satisfy Heroku 55-second router timeout
   const heartbeatInterval = setInterval(() => {
     const now = Date.now();

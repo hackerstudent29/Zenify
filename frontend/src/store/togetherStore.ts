@@ -68,6 +68,7 @@ interface TogetherStore {
   isConnected: boolean;
   room: TogetherRoomState | null;
   selfRole: 'host' | 'listener' | null;
+  selfId: string | null;
   clockOffsetMs: number;
   driftMs: number;
   latencyMs: number;
@@ -79,6 +80,7 @@ interface TogetherStore {
   setRoom: (room: TogetherRoomState | null) => void;
   updateRoom: (partial: Partial<TogetherRoomState>) => void;
   setSelfRole: (role: 'host' | 'listener' | null) => void;
+  setSelfId: (id: string | null) => void;
   setClockOffset: (offset: number) => void;
   setDrift: (drift: number) => void;
   setLatency: (latency: number) => void;
@@ -94,6 +96,7 @@ export const useTogetherStore = create<TogetherStore>((set) => ({
   isConnected: false,
   room: null,
   selfRole: null,
+  selfId: null,
   clockOffsetMs: 0,
   driftMs: 0,
   latencyMs: 0,
@@ -108,6 +111,7 @@ export const useTogetherStore = create<TogetherStore>((set) => ({
       room: state.room ? { ...state.room, ...partial } : null,
     })),
   setSelfRole: (role) => set({ selfRole: role }),
+  setSelfId: (id) => set({ selfId: id }),
   setClockOffset: (offset) => set({ clockOffsetMs: offset }),
   setDrift: (drift) => set({ driftMs: drift }),
   setLatency: (latency) => set({ latencyMs: latency }),
@@ -135,6 +139,7 @@ export const useTogetherStore = create<TogetherStore>((set) => ({
       isConnected: false,
       room: null,
       selfRole: null,
+  selfId: null,
       clockOffsetMs: 0,
       driftMs: 0,
       latencyMs: 0,

@@ -1,14 +1,11 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTogetherStore } from '@/store/togetherStore';
 import { togetherClient } from '@/services/together-client';
 import { usePlayerStore } from '@/store/player';
-import { GlassCard } from '@/components/ui/GlassCard';
-import { AvatarStack } from '@/components/ui/AvatarStack';
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Equalizer } from '@/components/ui/Equalizer';
 import { SEO } from '@/components/shared/SEO';
 import { ArtistLinks } from '@/components/shared/ArtistLinks';
@@ -18,50 +15,83 @@ import { useQuery } from '@tanstack/react-query';
 import * as Slider from '@radix-ui/react-slider';
 import api from '@/lib/api';
 import notify from '@/lib/notify';
+import { FONT, SURFACE, FIELD, spring, softSpring, press, Segmented } from '@/components/together/kit';
 import {
-  Play,
-  Pause,
-  SkipForward,
-  SkipBack,
-  Share2,
-  Copy,
-  Users,
-  MessageSquare,
-  ListMusic,
-  Radio,
-  Crown,
-  Volume2,
-  VolumeX,
-  Send,
-  X,
-  Disc3,
-  LogOut,
-  Search,
-  Plus,
-  Check,
-  ShieldCheck,
-  Sparkles,
+  Play, Pause, SkipForward, SkipBack, Share2, Users, MessageSquare, ListMusic, Crown,
+  Volume1, Volume2, VolumeX, Send, X, LogOut, Search, Plus, Check, RefreshCw, WifiOff,
+  ChevronUp, ChevronDown, UserX, MoreHorizontal, ChevronLeft, ArrowDown,
 } from 'lucide-react';
 
+/* ───────────────────────── constants & helpers ───────────────────────── */
+
 const REACTION_EMOJIS = ['❤️', '🔥', '👏', '😭', '💃', '🎧'];
+const CHAT_MAX = 200;
+const CHAT_COOLDOWN_MS = 700;
+const REACTION_COOLDOWN_MS = 350;
+const MAX_VISIBLE_REACTIONS = 24; // keeps 50+ listener rooms smooth
+const PLACEHOLDER = '/logo.png';
+
+type Tab = 'queue' | 'chat' | 'people';
+
+/** Optional server features: call them if the client implements them, tell the user if not. */
+const clientHas = (name: string) => typeof (togetherClient as any)?.[name] === 'function';
+const clientCall = (name: string, ...args: any[]) => {
+  const fn = (togetherClient as any)?.[name];
+  if (typeof fn === 'function') {
+    fn.apply(togetherClient, args);
+    return true;
+  }
+  notify('This action isn’t available yet', 'info');
+  return false;
+};
+
+/** Only allow http(s)/relative/data-image avatar URLs. */
+const safeSrc = (src?: string | null) =>
+  src && /^(https?:\/\/|\/|data:image\/)/i.test(src) ? src : undefined;
+
+const initials = (name?: string) => (name?.trim()[0] || '?').toUpperCase();
+
+function Avatar({ name, src, size = 32 }: { name?: string; src?: string | null; size?: number }) {
+  const url = safeSrc(src);
+  const [hasError, setHasError] = useState(false);
+  return (
+    <span
+      className="inline-grid shrink-0 place-items-center overflow-hidden rounded-full bg-[#3a3a3c] font-semibold text-white"
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+      aria-hidden
+    >
+      {url && !hasError ? (
+        <img
+          src={url}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setHasError(true)}
+        />
+      ) : (
+        initials(name)
+      )}
+    </span>
+  );
+}
+
+/* ───────────────────────── page ───────────────────────── */
 
 export default function TogetherRoomPage() {
   const params = useParams() as any;
   const router = useRouter();
   const roomCode = String(params?.code || '').toUpperCase();
 
-  const {
-    room,
-    isConnected,
-    selfRole,
-    clockOffsetMs,
-    driftMs,
-    latencyMs,
-    reactions,
-    needsTapToPlay,
-    setNeedsTapToPlay,
-    removeReaction,
-  } = useTogetherStore();
+  const room = useTogetherStore((s) => s.room);
+  const isConnected = useTogetherStore((s) => s.isConnected);
+  const selfRole = useTogetherStore((s) => s.selfRole);
+  const selfId = useTogetherStore((s) => s.selfId);
+  const driftMs = useTogetherStore((s) => s.driftMs);
+  const latencyMs = useTogetherStore((s) => s.latencyMs);
+  const reactions = useTogetherStore((s) => s.reactions);
+  const needsTapToPlay = useTogetherStore((s) => s.needsTapToPlay);
+  const setNeedsTapToPlay = useTogetherStore((s) => s.setNeedsTapToPlay);
+  const removeReaction = useTogetherStore((s) => s.removeReaction);
 
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const currentTrack = usePlayerStore((s) => s.currentTrack);
@@ -70,135 +100,280 @@ export default function TogetherRoomPage() {
   const volume = usePlayerStore((s) => s.volume);
   const setVolume = usePlayerStore((s) => s.setVolume);
 
-  const [activeTab, setActiveTab] = useState<'queue' | 'chat'>('queue');
+  const [activeTab, setActiveTab] = useState<Tab>('queue');
   const [chatInput, setChatInput] = useState('');
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery] = useDebounce(searchQuery, 350);
+  const [peopleFilter, setPeopleFilter] = useState('');
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubValue, setScrubValue] = useState(0);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [seenChatCount, setSeenChatCount] = useState(0);
+  const [stickToBottom, setStickToBottom] = useState(true);
+  const [showSync, setShowSync] = useState(false);
+  const [lastVolume, setLastVolume] = useState(0.8);
 
-  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const lastChatAt = useRef(0);
+  const lastReactAt = useRef(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Connect on mount using ticket or join room
+  const routerRef = useRef(router);
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
+
+  /* ── connection lifecycle ── */
   useEffect(() => {
     if (!roomCode) return;
+    let cancelled = false;
 
-    const connectToRoom = async () => {
-      let ticket = sessionStorage.getItem(`zenify_ticket_${roomCode}`);
+    const connect = async () => {
+      let ticket: string | null = null;
+      try { ticket = sessionStorage.getItem(`zenify_ticket_${roomCode}`); } catch { /* blocked */ }
+
       if (!ticket) {
         try {
-          const guestId = sessionStorage.getItem('zenify_guest_id');
-          const res = await api.post(`/together/rooms/${roomCode}/join`, {
-            guestId,
-          });
+          const guestId = (() => { try { return sessionStorage.getItem('zenify_guest_id'); } catch { return null; } })();
+          const res = await api.post(`/together/rooms/${roomCode}/join`, { guestId });
           ticket = res.data?.ticket;
         } catch (err: any) {
-          notify(err.response?.data?.message || 'Could not join session', 'error');
-          router.push('/together');
+          if (cancelled) return;
+          notify(err?.response?.data?.message || 'Couldn’t join this session', 'error');
+          routerRef.current.replace('/together');
           return;
         }
       }
-
-      if (ticket) {
-        togetherClient.connect(roomCode, ticket);
-      }
+      if (!cancelled && ticket) togetherClient.connect(roomCode, ticket);
     };
 
-    connectToRoom();
-
+    connect();
     return () => {
+      cancelled = true;
       togetherClient.disconnect();
     };
-  }, [roomCode, router]);
+  }, [roomCode]);
 
-  // Auto-scroll chat on new message
+  /* ── derived state ── */
+  const members: any[] = room?.members || [];
+  const hostMember = members.find((m) => m.role === 'host');
+  const isHost = selfRole === 'host' || (!!selfId && hostMember?.userId === selfId);
+  const settings: any = (room as any)?.settings || {};
+  const maxListeners: number | undefined = (room as any)?.maxListeners ?? settings.maxListeners;
+  const canControl = isHost || room?.mode === 'collab';
+  const canQueue = isHost || settings.guestCanQueue !== false;
+  const canChat = isHost || settings.guestCanChat !== false;
+  const canReact = isHost || settings.guestCanReact !== false;
+  const roomName: string = (room as any)?.name || `Session ${roomCode}`;
+  const trackToDisplay = room?.player?.track || currentTrack;
+  const cover = trackToDisplay ? getTrackCover(trackToDisplay) : PLACEHOLDER;
+  const queue = room?.queue || [];
+  const chat = room?.chat || [];
+
+  const sortedMembers = useMemo(() => {
+    const q = peopleFilter.trim().toLowerCase();
+    return [...members]
+      .filter((m) => !q || m.username?.toLowerCase().includes(q))
+      .sort((a, b) => (a.role === 'host' ? -1 : b.role === 'host' ? 1 : (a.username || '').localeCompare(b.username || '')));
+  }, [members, peopleFilter]);
+
+  const displayDuration = duration || trackToDisplay?.duration || 0;
+  const displayTime = isScrubbing ? scrubValue : currentTime;
+  const remaining = Math.max(0, displayDuration - displayTime);
+  const unread = activeTab === 'chat' ? 0 : Math.max(0, chat.length - seenChatCount);
+  const syncState = !isConnected ? 'offline' : Math.abs(driftMs) < 100 ? 'good' : 'drift';
+
+  /* ── chat scroll behaviour: only follow if the reader is at the bottom ── */
   useEffect(() => {
-    if (activeTab === 'chat') {
-      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [room?.chat, activeTab]);
+    if (activeTab !== 'chat') return;
+    setSeenChatCount((prev) => (prev !== chat.length ? chat.length : prev));
+    const el = chatScrollRef.current;
+    if (el && stickToBottom) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [chat.length, activeTab, stickToBottom]);
 
-  // Live Track Search for Queue
-  const { data: searchResults, isLoading: isSearching } = useQuery({
+  const onChatScroll = () => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    setStickToBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+  };
+
+  /* ── catalog search for queue ── */
+  const { data: searchResults, isLoading: isSearching, isError: searchFailed } = useQuery({
     queryKey: ['together-queue-search', debouncedQuery],
     queryFn: async () => {
-      if (!debouncedQuery.trim()) return [];
-      const res = await api.get('search', { params: { q: debouncedQuery.trim(), limit: 12 } });
+      const q = debouncedQuery.trim();
+      if (!q) return [];
+      const res = await api.get('search', { params: { q, limit: 12 } });
       return res.data?.tracks || [];
     },
     enabled: !!debouncedQuery.trim(),
+    staleTime: 60_000,
   });
 
-  const handleCopyLink = () => {
-    const inviteUrl = `${window.location.origin}/j/${roomCode}`;
-    navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    notify('Invite link copied to clipboard!', 'success');
-    setTimeout(() => setCopied(false), 2000);
+  /* ── actions ── */
+  const handleShare = async () => {
+    const url = `${window.location.origin}/j/${roomCode}`;
+    try {
+      if (navigator.share && /Mobi|Android|iPad/i.test(navigator.userAgent)) {
+        await navigator.share({ title: roomName, text: 'Listen with me on Zenify', url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      notify('Invite link copied', 'success');
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* user dismissed share sheet */ }
   };
 
-  const handleLeaveRoom = () => {
+  const leaveRoom = () => {
     togetherClient.disconnect();
-    notify('Left session', 'info');
     router.push('/together');
   };
 
-  const handleSendChat = (e: React.FormEvent) => {
+  const sendChat = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim()) return;
-    togetherClient.sendChatMessage(chatInput.trim());
+    const text = chatInput.trim();
+    if (!text || !canChat) return;
+    const now = Date.now();
+    if (now - lastChatAt.current < CHAT_COOLDOWN_MS) {
+      notify('You’re sending messages too fast', 'info');
+      return;
+    }
+    lastChatAt.current = now;
+    togetherClient.sendChatMessage(text.slice(0, CHAT_MAX));
     setChatInput('');
+    setStickToBottom(true);
   };
 
-  const handleReactionClick = (emoji: string) => {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(12);
+  const sendReaction = (emoji: string) => {
+    if (!canReact) return;
+    const now = Date.now();
+    if (now - lastReactAt.current < REACTION_COOLDOWN_MS) return;
+    lastReactAt.current = now;
+    if (navigator.vibrate) navigator.vibrate(10);
     togetherClient.sendReaction(emoji);
   };
 
-  const handleTapToSync = () => {
-    const audio = (window as any)._zenifyAudio || document.querySelector('audio');
-    if (audio) {
-      audio.play().catch(() => {});
-    }
+  const tapToSync = () => {
+    const audio: HTMLAudioElement | null = (window as any)._zenifyAudio || document.querySelector('audio');
+    audio?.play().catch(() => {});
     setNeedsTapToPlay(false);
   };
 
-  const handleAddTrackToQueue = (track: any) => {
+  const togglePlay = useCallback(() => {
+    if (!canControl) return;
+    if (isPlaying) togetherClient.pause();
+    else if (trackToDisplay) togetherClient.play(trackToDisplay);
+    else if (queue[0]) {
+      togetherClient.play(queue[0].track, 0);
+      togetherClient.removeQueue(queue[0].id);
+    }
+  }, [canControl, isPlaying, trackToDisplay, queue]);
+
+  const addToQueue = (track: any) => {
+    if (!canQueue) return;
     togetherClient.addQueue(track);
-    notify(`Queued "${track.title}"`, 'success');
+    notify(`Added “${track.title}”`, 'success');
     setSearchQuery('');
   };
 
-  const isHost = selfRole === 'host' || room?.hostId === room?.members.find((m) => m.role === 'host')?.userId;
-  const canControl = isHost || room?.mode === 'collab';
-  const trackToDisplay = room?.player?.track || currentTrack;
-  const members = room?.members || [];
+  const playNow = (item: any) => {
+    togetherClient.play(item.track, 0);
+    togetherClient.removeQueue(item.id);
+  };
 
-  const displayTime = isScrubbing ? scrubValue : currentTime;
-  const displayDuration = duration || trackToDisplay?.duration || 0;
-  const remainingTime = Math.max(0, displayDuration - displayTime);
+  const toggleMute = () => {
+    if (volume > 0) { setLastVolume(volume); setVolume(0); }
+    else setVolume(lastVolume || 0.8);
+  };
 
+  const resync = () => {
+    if (clientHas('requestSync')) clientCall('requestSync');
+    else {
+      togetherClient.disconnect();
+      setTimeout(() => {
+        try {
+          const t = sessionStorage.getItem(`zenify_ticket_${roomCode}`);
+          if (t) togetherClient.connect(roomCode, t);
+        } catch { /* blocked */ }
+      }, 250);
+    }
+    notify('Resyncing…', 'info');
+    setShowSync(false);
+  };
+
+  /* ── keyboard shortcuts (Space, ←/→ seek, M mute, / search) ── */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t?.closest('input, textarea, [contenteditable="true"], [role="slider"]')) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+      else if (e.key === 'ArrowRight' && canControl) togetherClient.seek(Math.min(displayDuration, currentTime + 5));
+      else if (e.key === 'ArrowLeft' && canControl) togetherClient.seek(Math.max(0, currentTime - 5));
+      else if (e.key.toLowerCase() === 'm') toggleMute();
+      else if (e.key === '/') { e.preventDefault(); setActiveTab('queue'); setTimeout(() => searchInputRef.current?.focus(), 50); }
+      else if (e.key === 'Escape') { setMenuFor(null); setShowSync(false); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canControl, displayDuration, currentTime, togglePlay]);
+
+  /* ── lock screen / headset controls ── */
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator) || !trackToDisplay) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: formatDisplayTitle(trackToDisplay.title),
+        artist: formatArtists((trackToDisplay as any).artists || (trackToDisplay as any).artist),
+        album: roomName,
+        artwork: [{ src: cover, sizes: '512x512' }],
+      });
+      navigator.mediaSession.setActionHandler('play', canControl ? togglePlay : null);
+      navigator.mediaSession.setActionHandler('pause', canControl ? togglePlay : null);
+      navigator.mediaSession.setActionHandler('nexttrack', canControl ? () => togetherClient.skipNext() : null);
+    } catch { /* unsupported */ }
+  }, [trackToDisplay, cover, roomName, canControl, togglePlay]);
+
+  /* warn before accidentally closing the tab mid-session */
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => { if (isConnected && members.length > 1) e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isConnected, members.length]);
+
+  const VolIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  const visibleReactions = reactions.slice(-MAX_VISIBLE_REACTIONS);
+  const requestLeave = () => (members.length > 1 ? setConfirmLeave(true) : leaveRoom());
+
+  const iconBtn = 'grid h-9 w-9 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white';
+
+  /* ───────────── render ───────────── */
   return (
-    <div className="min-h-screen pt-24 sm:pt-28 pb-32 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 relative overflow-hidden select-none">
-      <SEO title={`Session ${roomCode} – Listen Together – Zenify`} path={`/together/${roomCode}`} />
+    <div
+      style={{ fontFamily: FONT }}
+      className="relative min-h-[100dvh] select-none overflow-hidden bg-black pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(4.5rem,env(safe-area-inset-top))] text-white antialiased sm:pt-20"
+    >
+      <SEO title={`${roomName} – Listen Together – Zenify`} path={`/together/${roomCode}`} />
 
-      {/* Floating Reactions Overlay */}
-      <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+      {/* Floating reactions */}
+      <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" aria-hidden>
         <AnimatePresence>
-          {reactions.map((r) => (
+          {visibleReactions.map((r: any) => (
             <motion.div
               key={r.id}
               initial={{ opacity: 0, y: '85vh', scale: 0.6 }}
-              animate={{ opacity: 1, y: '18vh', scale: 1.3 }}
+              animate={{ opacity: 1, y: '20vh', scale: 1.2 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 2.2, ease: 'easeOut' }}
               onAnimationComplete={() => removeReaction(r.id)}
-              style={{ left: `${Math.max(10, Math.min(85, r.xPercent))}%` }}
-              className="absolute text-4xl select-none drop-shadow-2xl flex flex-col items-center pointer-events-none"
+              style={{ left: `${Math.max(8, Math.min(88, r.xPercent))}%` }}
+              className="absolute flex flex-col items-center"
             >
-              <span className="filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">{r.emoji}</span>
-              <span className="block mt-1 text-[9px] text-white/80 font-bold bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-full text-center border border-white/10">
+              <span className="text-4xl">{r.emoji}</span>
+              <span className="mt-1 max-w-[90px] truncate rounded-full bg-[#2c2c2e] px-2 py-0.5 text-[10px] font-medium text-white/85">
                 {r.username}
               </span>
             </motion.div>
@@ -206,450 +381,620 @@ export default function TogetherRoomPage() {
         </AnimatePresence>
       </div>
 
-      {/* Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-lg">
-        {/* Left: Leave Button & Room Code */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleLeaveRoom}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.08] hover:bg-rose-500/20 hover:text-rose-400 text-white/80 text-[12px] font-semibold transition-all active:scale-95 cursor-pointer border border-white/10"
-            title="Leave Session"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Leave</span>
-          </button>
-
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-brand/15 border border-brand/30 text-brand">
-            <Radio className="w-3.5 h-3.5 animate-pulse" />
-            <span className="font-mono font-bold tracking-widest text-[13px] sm:text-[14px]">{roomCode}</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-white text-[12px] font-semibold transition-all active:scale-95 cursor-pointer border border-white/10"
-            title="Share Room Link"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-            <span>{copied ? 'Copied' : 'Share'}</span>
-          </button>
-        </div>
-
-        {/* Right: Mode & NTP Status */}
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-[11px] font-bold uppercase tracking-wider text-white/70">
-            {room?.mode === 'collab' ? 'Collaborative' : 'DJ Mode'}
-          </span>
-
-          <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/[0.06] border border-white/10 text-[11px] font-medium text-white/70">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isConnected
-                  ? Math.abs(driftMs) < 100
-                    ? 'bg-emerald-400 shadow-sm shadow-emerald-400/80 animate-pulse'
-                    : 'bg-amber-400'
-                  : 'bg-rose-500'
-              }`}
-            />
-            <span className="hidden sm:inline">{isConnected ? 'In Sync' : 'Connecting...'}</span>
-            <span className="text-white/30 hidden sm:inline">|</span>
-            <span className="font-mono text-white/50">{latencyMs || 0}ms</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Autoplay Unlock Banner (when browser blocks auto sound) */}
-      {needsTapToPlay && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-2xl bg-gradient-to-r from-brand via-rose-600 to-brand text-white flex items-center justify-between shadow-xl cursor-pointer border border-white/20"
-          onClick={handleTapToSync}
-        >
-          <div className="flex items-center gap-3">
-            <Volume2 className="w-5 h-5 animate-bounce" />
-            <div>
-              <div className="font-bold text-[14px]">Audio is muted by your browser</div>
-              <div className="text-[12px] text-white/85">Tap here to sync audio with the room immediately.</div>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="px-4 py-2 rounded-xl bg-white text-brand font-bold text-[12px] uppercase tracking-wider active:scale-95 shadow"
-          >
-            Tap to Sync
-          </button>
-        </motion.div>
-      )}
-
-      {/* Main Grid: Player Stage on Left (7 cols), Queue & Chat on Right (5 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Player Stage */}
-        <GlassCard className="lg:col-span-7 p-6 sm:p-8 flex flex-col items-center text-center space-y-6 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
-          {/* Ambient Glow */}
-          <div className="absolute -top-32 inset-x-0 h-64 bg-brand/20 blur-[90px] pointer-events-none" />
-
-          {/* Vinyl & Artwork Showcase */}
-          <div className="relative w-44 h-44 sm:w-56 sm:h-56 md:w-60 md:h-60 mt-2 shrink-0">
-            {/* Spinning Vinyl behind cover */}
-            <div
-              className={`absolute -right-4 inset-y-2 w-full rounded-full bg-black/90 border border-white/20 shadow-2xl flex items-center justify-center transition-all duration-700 ${
-                isPlaying ? 'rotate-180 scale-100 opacity-95' : 'scale-90 opacity-40'
-              }`}
+      <div className="mx-auto max-w-[1100px] space-y-3 px-3 sm:px-6 lg:px-8">
+        {/* Connection banner */}
+        <AnimatePresence>
+          {!isConnected && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={softSpring}
+              role="status"
+              className="overflow-hidden rounded-xl bg-[#2c2c2e] text-amber-300"
             >
-              <div className="w-16 h-16 rounded-full bg-zinc-950 border border-brand/50 flex items-center justify-center">
-                <Disc3 className="w-6 h-6 text-brand animate-spin" style={{ animationDuration: '4s' }} />
+              <div className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium">
+                <WifiOff className="h-4 w-4" /> Reconnecting to the session…
               </div>
-            </div>
-
-            {/* Front Cover Art */}
-            <div className="relative z-10 w-full h-full rounded-2xl overflow-hidden shadow-2xl border border-white/15 bg-zinc-900">
-              <img
-                src={trackToDisplay ? getTrackCover(trackToDisplay) : '/images/placeholder.png'}
-                alt="Track Cover"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </div>
-
-          {/* Track Info */}
-          <div className="space-y-1.5 max-w-md w-full px-2">
-            <h2 className="text-xl sm:text-2xl font-bold font-oswald uppercase text-white truncate tracking-wide">
-              {trackToDisplay ? formatDisplayTitle(trackToDisplay.title) : 'Waiting for track...'}
-            </h2>
-            <div className="text-white/60 font-libre text-[13px] sm:text-[14px] truncate">
-              {trackToDisplay ? (
-                <ArtistLinks track={trackToDisplay} linkClassName="hover:underline text-white/70 hover:text-white" />
-              ) : (
-                'Select a song from the queue to start playing'
-              )}
-            </div>
-          </div>
-
-          {/* Equalizer Indicator */}
-          {isPlaying && (
-            <div className="h-5 flex items-center justify-center">
-              <Equalizer playing={isPlaying} />
-            </div>
+            </motion.div>
           )}
+        </AnimatePresence>
 
-          {/* Scrubber / Progress Bar */}
-          <div className="w-full max-w-md space-y-1 pt-1">
-            <Slider.Root
-              className="relative flex items-center select-none touch-none w-full h-5 cursor-pointer"
-              value={[Math.min(displayTime, displayDuration || 1)]}
-              max={displayDuration || 1}
-              step={0.5}
-              disabled={!canControl}
-              onValueChange={([val]) => {
-                if (!canControl) return;
-                setIsScrubbing(true);
-                setScrubValue(val);
-              }}
-              onValueCommit={([val]) => {
-                if (!canControl) return;
-                setIsScrubbing(false);
-                togetherClient.seek(val);
-              }}
-            >
-              <Slider.Track className="relative grow rounded-full overflow-hidden h-[5px] bg-white/20">
-                <Slider.Range className="absolute h-full rounded-full bg-brand" />
-              </Slider.Track>
-              {canControl && (
-                <Slider.Thumb className="block w-3 h-3 rounded-full bg-white shadow-md outline-none hover:scale-125 transition-transform" />
-              )}
-            </Slider.Root>
-
-            <div className="flex items-center justify-between text-[11px] font-mono text-white/50 px-0.5">
-              <span>{formatDuration(displayTime)}</span>
-              <span>-{formatDuration(remainingTime)}</span>
+        {/* Toolbar */}
+        <header className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1">
+            <motion.button {...press} type="button" onClick={requestLeave} className={iconBtn} aria-label="Leave session">
+              <ChevronLeft className="h-5 w-5" />
+            </motion.button>
+            <div className="min-w-0">
+              <h1 className="truncate text-[15px] font-semibold leading-tight">{roomName}</h1>
+              <p className="truncate text-[12px] leading-tight text-white/45">
+                {roomCode} · {room?.mode === 'collab' ? 'Everyone controls' : 'DJ mode'}
+              </p>
             </div>
           </div>
 
-          {/* Playback Controls (Host / Collab) */}
-          <div className="flex items-center justify-center gap-5 pt-1">
-            {canControl && (
-              <button
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <motion.button
+                {...press}
                 type="button"
-                onClick={() => togetherClient.seek(0)}
-                className="p-2 text-white/70 hover:text-white active:scale-90 transition-transform cursor-pointer"
-                title="Rewind to start"
+                onClick={() => setShowSync((v) => !v)}
+                className="flex h-9 items-center gap-2 rounded-full bg-[#1c1c1e] px-3 text-[12px] font-medium text-white/80 hover:bg-[#2c2c2e]"
+                aria-haspopup="dialog"
+                aria-expanded={showSync}
               >
-                <SkipBack className="w-5 h-5 fill-current" />
-              </button>
-            )}
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    syncState === 'good' ? 'bg-emerald-400' : syncState === 'drift' ? 'bg-amber-400' : 'bg-rose-500'
+                  }`}
+                />
+                <span className="hidden sm:inline">
+                  {syncState === 'good' ? 'In sync' : syncState === 'drift' ? 'Adjusting' : 'Offline'}
+                </span>
+              </motion.button>
+              <AnimatePresence>
+                {showSync && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.92, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.94 }}
+                    transition={spring}
+                    role="dialog"
+                    aria-label="Sync details"
+                    className="absolute right-0 top-11 z-30 w-56 origin-top-right rounded-2xl bg-[#2c2c2e] p-4 shadow-2xl"
+                  >
+                    <dl className="space-y-2 text-[13px]">
+                      <div className="flex justify-between"><dt className="text-white/50">Latency</dt><dd className="tabular-nums">{latencyMs || 0} ms</dd></div>
+                      <div className="flex justify-between"><dt className="text-white/50">Drift</dt><dd className="tabular-nums">{Math.round(driftMs || 0)} ms</dd></div>
+                    </dl>
+                    <motion.button
+                      {...press}
+                      type="button"
+                      onClick={resync}
+                      className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-white/10 text-[13px] font-semibold hover:bg-white/15"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" /> Resync now
+                    </motion.button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-            {canControl && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (isPlaying) {
-                    togetherClient.pause();
-                  } else if (trackToDisplay) {
-                    togetherClient.play(trackToDisplay);
+            <motion.button
+              {...press}
+              type="button"
+              onClick={handleShare}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-brand px-4 text-[13px] font-semibold text-white"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+              {copied ? 'Copied' : 'Invite'}
+            </motion.button>
+
+            <motion.button
+              {...press}
+              type="button"
+              onClick={requestLeave}
+              className={`${iconBtn} hidden hover:!bg-rose-500/15 hover:!text-rose-300 sm:grid`}
+              aria-label="Leave session"
+            >
+              <LogOut className="h-4 w-4" />
+            </motion.button>
+          </div>
+        </header>
+
+        {/* Autoplay unlock */}
+        {needsTapToPlay && (
+          <motion.button
+            {...press}
+            type="button"
+            onClick={tapToSync}
+            className="flex w-full items-center justify-between gap-3 rounded-2xl bg-brand p-4 text-left"
+          >
+            <span className="flex items-center gap-3">
+              <Volume2 className="h-5 w-5 shrink-0" />
+              <span>
+                <span className="block text-[14px] font-semibold">Your browser muted the audio</span>
+                <span className="block text-[12px] text-white/85">Tap to join the room’s sound.</span>
+              </span>
+            </span>
+            <span className="rounded-full bg-white px-4 py-2 text-[12px] font-semibold text-brand">Tap to sync</span>
+          </motion.button>
+        )}
+
+        {/* Layout: stacked (phone) → 2-col (tablet) → player + side panel (desktop) */}
+        <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-4">
+          {/* ───── Now playing ───── */}
+          <section className={`${SURFACE} flex flex-col items-center gap-4 p-5 sm:p-6`} aria-label="Now playing">
+            <motion.div
+              key={cover}
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: isPlaying ? 1 : 0.9 }}
+              transition={softSpring}
+              className="aspect-square w-full max-w-[min(100%,320px)] overflow-hidden rounded-xl bg-[#2c2c2e] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.6)]"
+            >
+              <img
+                src={cover}
+                alt={trackToDisplay ? `${formatDisplayTitle(trackToDisplay.title)} cover art` : 'No track playing'}
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  const target = e.currentTarget as HTMLImageElement;
+                  if (!target.src.endsWith('/logo.png')) {
+                    target.src = PLACEHOLDER;
                   }
                 }}
-                className="w-14 h-14 rounded-full bg-white hover:bg-white/90 text-black flex items-center justify-center shadow-2xl active:scale-95 transition-all cursor-pointer"
-                title={isPlaying ? 'Pause' : 'Play'}
-              >
-                {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
-              </button>
-            )}
+              />
+            </motion.div>
 
-            {canControl && (
-              <button
-                type="button"
-                onClick={() => togetherClient.skipNext()}
-                className="p-2 text-white/70 hover:text-white active:scale-90 transition-transform cursor-pointer"
-                title="Skip to next queued track"
-              >
-                <SkipForward className="w-5 h-5 fill-current" />
-              </button>
-            )}
-          </div>
-
-          {/* Reaction Bar */}
-          <div className="pt-3 border-t border-white/10 w-full flex items-center justify-between sm:justify-center gap-1.5 sm:gap-3">
-            {REACTION_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => handleReactionClick(emoji)}
-                className="w-10 h-10 rounded-xl bg-white/[0.06] hover:bg-white/[0.14] active:scale-125 transition-all flex items-center justify-center text-xl cursor-pointer border border-white/5"
-                title={`Send ${emoji}`}
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-
-          {/* Connected Listeners Footer */}
-          <div className="w-full pt-2 flex items-center justify-between text-left border-t border-white/5">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-brand" />
-              <span className="text-[12px] font-bold text-white/80 uppercase tracking-wider">
-                {members.length} {members.length === 1 ? 'Listener' : 'Listeners'}
-              </span>
-            </div>
-            <AvatarStack
-              avatars={members.map((m) => ({
-                id: m.userId,
-                name: m.role === 'host' ? `${m.username} (Host)` : m.username,
-                src: m.avatar,
-              }))}
-              max={6}
-            />
-          </div>
-        </GlassCard>
-
-        {/* Right Column: Shared Queue & Live In-Room Chat */}
-        <GlassCard className="lg:col-span-5 p-5 flex flex-col h-[520px] sm:h-[580px] lg:h-[620px] rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
-          {/* Segmented Control Tabs */}
-          <div className="mb-3.5">
-            <SegmentedControl
-              id="together-room-tabs"
-              options={[
-                { value: 'queue', label: `Queue (${room?.queue?.length || 0})` },
-                { value: 'chat', label: `Live Chat (${room?.chat?.length || 0})` },
-              ]}
-              value={activeTab}
-              onChange={(val) => setActiveTab(val as 'queue' | 'chat')}
-            />
-          </div>
-
-          {/* TAB 1: SHARED QUEUE */}
-          {activeTab === 'queue' && (
-            <div className="flex-1 flex flex-col min-h-0 space-y-3">
-              {/* In-Queue Live Song Search & Add */}
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search song to add to queue..."
-                  className="w-full h-10 pl-9 pr-8 rounded-xl bg-white/[0.06] border border-white/10 text-white text-[13px] placeholder:text-white/35 focus:outline-none focus:border-brand transition-colors"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white p-0.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+            <div className="w-full max-w-[320px] space-y-0.5 text-left">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="truncate text-[19px] font-semibold tracking-tight">
+                  {trackToDisplay ? formatDisplayTitle(trackToDisplay.title) : 'Nothing playing'}
+                </h2>
+                {isPlaying && <Equalizer playing={isPlaying} />}
               </div>
+              <div className="truncate text-[15px] text-white/55">
+                {trackToDisplay ? (
+                  <ArtistLinks track={trackToDisplay} linkClassName="hover:underline text-white/60 hover:text-white" />
+                ) : canQueue ? 'Search for a song to start' : 'Waiting for the host'}
+              </div>
+            </div>
 
-              {/* Search Results Dropdown Overlay */}
-              {searchQuery.trim() && (
-                <div className="max-h-56 overflow-y-auto rounded-xl bg-zinc-900 border border-white/15 p-2 space-y-1 shadow-2xl z-20">
-                  {isSearching ? (
-                    <div className="p-3 text-center text-xs text-white/50">Searching music catalog...</div>
-                  ) : searchResults && searchResults.length > 0 ? (
-                    searchResults.map((track: any) => (
-                      <div
-                        key={track.id}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-white/[0.08] transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+            {/* Scrubber */}
+            <div className="w-full max-w-[320px]">
+              <Slider.Root
+                className="group relative flex h-5 w-full touch-none select-none items-center"
+                value={[Math.min(displayTime, displayDuration || 1)]}
+                max={displayDuration || 1}
+                step={0.5}
+                disabled={!canControl || !trackToDisplay}
+                aria-label="Playback position"
+                onValueChange={([v]) => { setIsScrubbing(true); setScrubValue(v); }}
+                onValueCommit={([v]) => { setIsScrubbing(false); togetherClient.seek(v); }}
+              >
+                <Slider.Track className="relative h-1.5 grow overflow-hidden rounded-full bg-white/20 transition-all group-hover:h-2">
+                  <Slider.Range className="absolute h-full rounded-full bg-white/90" />
+                </Slider.Track>
+                {canControl && <Slider.Thumb className="block h-3.5 w-3.5 rounded-full bg-white shadow outline-none focus-visible:ring-2 focus-visible:ring-brand" />}
+              </Slider.Root>
+              <div className="mt-0.5 flex justify-between text-[11px] font-medium tabular-nums text-white/45">
+                <span>{formatDuration(displayTime)}</span>
+                <span>-{formatDuration(remaining)}</span>
+              </div>
+            </div>
+
+            {/* Transport */}
+            <div className="flex items-center justify-center gap-8">
+              <motion.button
+                {...press}
+                type="button"
+                disabled={!canControl}
+                onClick={() => togetherClient.seek(0)}
+                className="p-2 text-white/80 hover:text-white disabled:opacity-30"
+                aria-label="Restart track"
+              >
+                <SkipBack className="h-7 w-7 fill-current" />
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                transition={spring}
+                type="button"
+                disabled={!canControl}
+                onClick={togglePlay}
+                className="grid h-16 w-16 place-items-center rounded-full bg-white text-black disabled:opacity-40"
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isPlaying ? <Pause className="h-7 w-7 fill-current" /> : <Play className="ml-1 h-7 w-7 fill-current" />}
+              </motion.button>
+              <motion.button
+                {...press}
+                type="button"
+                disabled={!canControl}
+                onClick={() => togetherClient.skipNext()}
+                className="p-2 text-white/80 hover:text-white disabled:opacity-30"
+                aria-label="Next track"
+              >
+                <SkipForward className="h-7 w-7 fill-current" />
+              </motion.button>
+            </div>
+
+            {!canControl && <p className="text-[12px] text-white/45">Only the host controls playback in this room.</p>}
+
+            {/* Volume */}
+            <div className="flex w-full max-w-[320px] items-center gap-3">
+              <button type="button" onClick={toggleMute} className="p-1 text-white/60 hover:text-white" aria-label={volume === 0 ? 'Unmute' : 'Mute'}>
+                <VolIcon className="h-4 w-4" />
+              </button>
+              <Slider.Root
+                className="group relative flex h-5 flex-1 touch-none select-none items-center"
+                value={[volume]}
+                max={1}
+                step={0.01}
+                aria-label="Volume"
+                onValueChange={([v]) => setVolume(v)}
+              >
+                <Slider.Track className="relative h-1.5 grow overflow-hidden rounded-full bg-white/20">
+                  <Slider.Range className="absolute h-full rounded-full bg-white/70" />
+                </Slider.Track>
+                <Slider.Thumb className="block h-3 w-3 rounded-full bg-white opacity-0 shadow outline-none transition group-hover:opacity-100 focus-visible:opacity-100" />
+              </Slider.Root>
+              <Volume2 className="h-4 w-4 text-white/40" aria-hidden />
+            </div>
+
+            {/* Reactions */}
+            {canReact && (
+              <div className="flex w-full max-w-[320px] items-center justify-between rounded-full bg-[#2c2c2e] p-1">
+                {REACTION_EMOJIS.map((emoji) => (
+                  <motion.button
+                    key={emoji}
+                    whileTap={{ scale: 1.35 }}
+                    transition={spring}
+                    type="button"
+                    onClick={() => sendReaction(emoji)}
+                    className="grid h-10 w-10 place-items-center rounded-full text-xl hover:bg-white/10"
+                    aria-label={`Send ${emoji}`}
+                  >
+                    {emoji}
+                  </motion.button>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* ───── Side panel: Queue / Chat / People ───── */}
+          <section
+            className={`${SURFACE} flex h-[520px] flex-col p-3 sm:h-[580px] md:h-[640px] lg:h-[calc(100dvh-9.5rem)] lg:min-h-[480px]`}
+            aria-label="Room panel"
+          >
+            <div className="relative mb-3">
+              <Segmented<Tab>
+                id="room-tabs"
+                value={activeTab}
+                onChange={setActiveTab}
+                options={[
+                  { value: 'queue', label: `Up next${queue.length ? ` · ${queue.length}` : ''}` },
+                  { value: 'chat', label: 'Chat' },
+                  { value: 'people', label: `People · ${members.length}` },
+                ]}
+              />
+              <AnimatePresence>
+                {unread > 0 && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    transition={spring}
+                    className="absolute -top-1.5 left-1/2 grid h-5 min-w-5 -translate-x-1/2 place-items-center rounded-full bg-brand px-1.5 text-[11px] font-bold"
+                  >
+                    {unread > 99 ? '99+' : unread}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* UP NEXT */}
+            {activeTab === 'queue' && (
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
+                {canQueue ? (
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                    <input
+                      ref={searchInputRef}
+                      type="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search songs  ( / )"
+                      aria-label="Search songs to add"
+                      className={`${FIELD} h-10 pl-10 pr-9`}
+                    />
+                    {searchQuery && (
+                      <button type="button" onClick={() => setSearchQuery('')} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-white/50 hover:text-white">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="rounded-xl bg-[#2c2c2e] px-3 py-2 text-[12px] text-white/50">The host turned off adding songs.</p>
+                )}
+
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {searchQuery.trim() && canQueue ? (
+                    <ul>
+                      {isSearching && <li className="p-6 text-center text-[13px] text-white/50">Searching…</li>}
+                      {searchFailed && <li className="p-6 text-center text-[13px] text-rose-300">Search failed. Try again.</li>}
+                      {!isSearching && !searchFailed && searchResults?.length === 0 && (
+                        <li className="p-6 text-center text-[13px] text-white/50">No results for “{searchQuery.trim()}”.</li>
+                      )}
+                      {searchResults?.map((track: any) => (
+                        <li key={track.id} className="flex items-center gap-3 rounded-xl p-2 hover:bg-white/[0.05]">
                           <img
                             src={getTrackCover(track)}
-                            alt="Cover"
-                            className="w-8 h-8 rounded-md object-cover bg-zinc-800 shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <div className="text-[12px] font-semibold text-white truncate">
-                              {formatDisplayTitle(track.title)}
-                            </div>
-                            <div className="text-[10px] text-white/50 truncate">
-                              {formatArtists(track.artists || track.artist)}
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleAddTrackToQueue(track)}
-                          className="px-2.5 py-1 rounded-lg bg-brand/20 hover:bg-brand text-brand hover:text-white text-[11px] font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Queue</span>
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-3 text-center text-xs text-white/50">No matching songs found.</div>
-                  )}
-                </div>
-              )}
-
-              {/* Shared Queue List */}
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1 no-scrollbar">
-                {room?.queue && room.queue.length > 0 ? (
-                  room.queue.map((item, idx) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] transition-colors border border-white/5 group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 pr-2">
-                        <span className="text-[11px] font-mono text-white/40 w-4 shrink-0">{idx + 1}</span>
-                        <img
-                          src={getTrackCover(item.track)}
-                          alt="Art"
-                          className="w-10 h-10 rounded-lg object-cover bg-zinc-800 shrink-0 border border-white/10"
-                        />
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold text-white truncate">
-                            {formatDisplayTitle(item.track.title)}
-                          </div>
-                          <div className="text-[11px] text-white/50 truncate">
-                            Added by <span className="text-white/70">{item.addedByName}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        {canControl && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              togetherClient.play(item.track, 0);
-                              togetherClient.removeQueue(item.id);
+                            alt=""
+                            loading="lazy"
+                            className="h-11 w-11 shrink-0 rounded-md bg-[#2c2c2e] object-cover"
+                            onError={(e) => {
+                              const t = e.currentTarget as HTMLImageElement;
+                              if (!t.src.endsWith('/logo.png')) t.src = '/logo.png';
                             }}
-                            className="p-1.5 rounded-lg text-white/60 hover:text-brand hover:bg-brand/10 transition-colors"
-                            title="Play now"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                          </button>
-                        )}
-
-                        {canControl && (
-                          <button
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[14px] font-medium">{formatDisplayTitle(track.title)}</p>
+                            <p className="truncate text-[12px] text-white/50">{formatArtists(track.artists || track.artist)}</p>
+                          </div>
+                          <motion.button
+                            {...press}
                             type="button"
-                            onClick={() => togetherClient.removeQueue(item.id)}
-                            className="p-1.5 rounded-lg text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                            title="Remove from queue"
+                            onClick={() => addToQueue(track)}
+                            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#2c2c2e] text-brand hover:bg-brand hover:text-white"
+                            aria-label={`Add ${track.title} to queue`}
                           >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-6 text-white/40 space-y-2.5">
-                    <ListMusic className="w-10 h-10 opacity-30 text-brand" />
-                    <p className="text-[13px] font-medium text-white/60">The shared queue is empty.</p>
-                    <p className="text-[11px] text-white/40 max-w-xs">
-                      Search any track above to queue up your circle's playlist.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: LIVE IN-ROOM CHAT */}
-          {activeTab === 'chat' && (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 no-scrollbar">
-                {room?.chat && room.chat.length > 0 ? (
-                  room.chat.map((msg) => (
-                    <div key={msg.id} className="flex items-start gap-2.5 text-[13px]">
-                      <div className="w-7 h-7 rounded-full bg-brand/20 border border-brand/40 flex items-center justify-center shrink-0 text-[11px] font-bold text-white uppercase overflow-hidden">
-                        {msg.avatar ? (
-                          <img src={msg.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                          msg.username[0]
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-white/90 text-[12px]">{msg.username}</span>
-                          <span className="text-[10px] text-white/40">
-                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className="text-white/75 leading-relaxed break-words mt-0.5 bg-white/[0.04] p-2 rounded-xl rounded-tl-none border border-white/5 inline-block max-w-full">
-                          {msg.text}
+                            <Plus className="h-4 w-4" />
+                          </motion.button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : queue.length > 0 ? (
+                    <ul>
+                      <AnimatePresence initial={false}>
+                        {queue.map((item: any, idx: number) => (
+                          <motion.li
+                            key={item.id}
+                            layout
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, x: -24 }}
+                            transition={spring}
+                            className="group flex items-center gap-3 rounded-xl p-2 hover:bg-white/[0.05]"
+                          >
+                            <img
+                              src={getTrackCover(item.track)}
+                              alt=""
+                              loading="lazy"
+                              className="h-12 w-12 shrink-0 rounded-md bg-[#2c2c2e] object-cover"
+                              onError={(e) => {
+                                const t = e.currentTarget as HTMLImageElement;
+                                if (!t.src.endsWith('/logo.png')) t.src = '/logo.png';
+                              }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[14px] font-medium">{formatDisplayTitle(item.track.title)}</p>
+                              <p className="truncate text-[12px] text-white/50">
+                                {formatArtists(item.track.artists || item.track.artist)} · {item.addedByName}
+                              </p>
+                            </div>
+                            {canControl && (
+                              <div className="flex shrink-0 items-center opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                                {isHost && clientHas('moveQueue') && (
+                                  <>
+                                    <button type="button" disabled={idx === 0} onClick={() => clientCall('moveQueue', item.id, idx - 1)} className="p-1.5 text-white/50 hover:text-white disabled:opacity-20" aria-label="Move up"><ChevronUp className="h-4 w-4" /></button>
+                                    <button type="button" disabled={idx === queue.length - 1} onClick={() => clientCall('moveQueue', item.id, idx + 1)} className="p-1.5 text-white/50 hover:text-white disabled:opacity-20" aria-label="Move down"><ChevronDown className="h-4 w-4" /></button>
+                                  </>
+                                )}
+                                <button type="button" onClick={() => playNow(item)} className="p-1.5 text-white/70 hover:text-brand" aria-label="Play now"><Play className="h-4 w-4 fill-current" /></button>
+                                <button type="button" onClick={() => togetherClient.removeQueue(item.id)} className="p-1.5 text-white/50 hover:text-rose-400" aria-label="Remove from queue"><X className="h-4 w-4" /></button>
+                              </div>
+                            )}
+                          </motion.li>
+                        ))}
+                      </AnimatePresence>
+                    </ul>
+                  ) : (
+                    <div className="grid h-full place-items-center p-6 text-center">
+                      <div className="space-y-2">
+                        <ListMusic className="mx-auto h-9 w-9 text-white/25" />
+                        <p className="text-[15px] font-medium text-white/70">Nothing queued</p>
+                        <p className="mx-auto max-w-[220px] text-[13px] text-white/40">
+                          {canQueue ? 'Search above to add the first song.' : 'Songs the host adds will show up here.'}
                         </p>
                       </div>
                     </div>
-                  ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* CHAT */}
+            {activeTab === 'chat' && (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="relative min-h-0 flex-1">
+                  <div
+                    ref={chatScrollRef}
+                    onScroll={onChatScroll}
+                    role="log"
+                    aria-live="polite"
+                    className="h-full space-y-2 overflow-y-auto overscroll-contain pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    {chat.length === 0 ? (
+                      <div className="grid h-full place-items-center p-6 text-center">
+                        <div className="space-y-2">
+                          <MessageSquare className="mx-auto h-9 w-9 text-white/25" />
+                          <p className="text-[15px] font-medium text-white/70">No messages yet</p>
+                          <p className="text-[13px] text-white/40">Say hello to the room.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      chat.map((msg: any) => {
+                        const mine = !!selfId && msg.userId === selfId;
+                        return (
+                          <motion.div
+                            key={msg.id}
+                            initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={spring}
+                            className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}
+                          >
+                            {!mine && <Avatar name={msg.username} src={msg.avatar} size={28} />}
+                            <div className={`flex max-w-[80%] flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                              {!mine && <span className="mb-0.5 px-1 text-[11px] font-medium text-white/50">{msg.username}</span>}
+                              <p
+                                className={`break-words rounded-[18px] px-3.5 py-2 text-[14px] leading-snug ${
+                                  mine ? 'rounded-br-md bg-brand text-white' : 'rounded-bl-md bg-[#2c2c2e] text-white/90'
+                                }`}
+                                title={new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              >
+                                {msg.text}
+                              </p>
+                            </div>
+                          </motion.div>
+                        );
+                      })
+                    )}
+                  </div>
+                  <AnimatePresence>
+                    {!stickToBottom && chat.length > 0 && (
+                      <motion.button
+                        initial={{ opacity: 0, y: 8, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={spring}
+                        type="button"
+                        onClick={() => { setStickToBottom(true); chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' }); }}
+                        className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#3a3a3c] px-3 py-1.5 text-[12px] font-medium shadow-lg"
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" /> Latest
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {canChat ? (
+                  <form onSubmit={sendChat} className="mt-3 flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder="Message"
+                        maxLength={CHAT_MAX}
+                        aria-label="Chat message"
+                        enterKeyHint="send"
+                        className={`${FIELD} h-10 rounded-full pl-4 pr-12`}
+                      />
+                      {chatInput.length > CHAT_MAX - 40 && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-white/40">{CHAT_MAX - chatInput.length}</span>
+                      )}
+                    </div>
+                    <motion.button {...press} type="submit" disabled={!chatInput.trim()} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand disabled:opacity-30" aria-label="Send message">
+                      <Send className="h-4 w-4" />
+                    </motion.button>
+                  </form>
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-6 text-white/40 space-y-2">
-                    <MessageSquare className="w-10 h-10 opacity-30 text-brand" />
-                    <p className="text-[13px] text-white/60 font-medium">Say hello to the room!</p>
-                    <p className="text-[11px] text-white/40">Send live reactions and messages while listening.</p>
+                  <p className="mt-3 rounded-xl bg-[#2c2c2e] px-3 py-2 text-center text-[12px] text-white/50">Chat is turned off in this room.</p>
+                )}
+              </div>
+            )}
+
+            {/* PEOPLE */}
+            {activeTab === 'people' && (
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
+                <div className="flex items-center justify-between px-1 text-[12px] text-white/50">
+                  <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {members.length}{maxListeners ? ` of ${maxListeners}` : ''} listening</span>
+                  {maxListeners && members.length >= maxListeners && <span className="font-medium text-amber-300">Room full</span>}
+                </div>
+
+                {members.length > 8 && (
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                    <input
+                      type="search"
+                      value={peopleFilter}
+                      onChange={(e) => setPeopleFilter(e.target.value)}
+                      placeholder="Find a listener"
+                      aria-label="Find a listener"
+                      className={`${FIELD} h-10 pl-10 pr-3`}
+                    />
                   </div>
                 )}
-                <div ref={chatBottomRef} />
-              </div>
 
-              {/* Chat Input Bar */}
-              <form onSubmit={handleSendChat} className="pt-3 border-t border-white/10 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Say something to the room..."
-                  maxLength={200}
-                  className="flex-1 h-10 px-3.5 rounded-xl bg-white/[0.06] border border-white/10 text-white text-[13px] placeholder:text-white/30 focus:outline-none focus:border-brand transition-colors"
-                />
-                <button
-                  type="submit"
-                  disabled={!chatInput.trim()}
-                  className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all cursor-pointer shrink-0 shadow-lg"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
-            </div>
-          )}
-        </GlassCard>
+                <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {sortedMembers.length === 0 && <li className="p-6 text-center text-[13px] text-white/45">No one matches “{peopleFilter}”.</li>}
+                  {sortedMembers.map((m) => {
+                    const isSelf = !!selfId && m.userId === selfId;
+                    const showMenu = isHost && !isSelf && m.role !== 'host' && (clientHas('kickMember') || clientHas('transferHost'));
+                    return (
+                      <li key={m.userId} className="relative flex items-center gap-3 rounded-xl p-2 hover:bg-white/[0.05]">
+                        <Avatar name={m.username} src={m.avatar} size={36} />
+                        <div className="min-w-0 flex-1">
+                          <p className="flex items-center gap-1.5 truncate text-[14px] font-medium">
+                            {m.username}{isSelf && <span className="text-white/40">(you)</span>}
+                            {m.role === 'host' && <Crown className="h-3.5 w-3.5 shrink-0 text-amber-300" aria-label="Host" />}
+                          </p>
+                          <p className="text-[12px] text-white/40">{m.role === 'host' ? 'Host' : 'Listener'}</p>
+                        </div>
+                        {showMenu && (
+                          <>
+                            <button type="button" onClick={() => setMenuFor(menuFor === m.userId ? null : m.userId)} className="grid h-8 w-8 place-items-center rounded-full text-white/50 hover:bg-white/10 hover:text-white" aria-label={`Actions for ${m.username}`} aria-haspopup="menu">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                            <AnimatePresence>
+                              {menuFor === m.userId && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.94 }}
+                                  transition={spring}
+                                  role="menu"
+                                  className="absolute right-2 top-11 z-20 w-48 origin-top-right overflow-hidden rounded-xl bg-[#3a3a3c] p-1 shadow-2xl"
+                                >
+                                  {clientHas('transferHost') && (
+                                    <button role="menuitem" type="button" onClick={() => { clientCall('transferHost', m.userId); setMenuFor(null); }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] hover:bg-brand">
+                                      <Crown className="h-4 w-4" /> Make host
+                                    </button>
+                                  )}
+                                  {clientHas('kickMember') && (
+                                    <button role="menuitem" type="button" onClick={() => { clientCall('kickMember', m.userId); setMenuFor(null); notify(`Removed ${m.username}`, 'info'); }} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-rose-300 hover:bg-rose-500 hover:text-white">
+                                      <UserX className="h-4 w-4" /> Remove from session
+                                    </button>
+                                  )}
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </section>
+        </div>
       </div>
+
+      {/* Leave confirmation (iOS alert style) */}
+      <AnimatePresence>
+        {confirmLeave && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4"
+            onClick={() => setConfirmLeave(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
+              transition={spring}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="leave-title"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-[290px] rounded-[20px] bg-[#2c2c2e] p-5 text-center"
+            >
+              <h3 id="leave-title" className="text-[16px] font-semibold">Leave this session?</h3>
+              <p className="mt-1.5 text-[13px] text-white/55">
+                {isHost && room?.mode === 'dj'
+                  ? 'You’re the DJ. Playback may stop for everyone.'
+                  : 'You can rejoin anytime with the code.'}
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <motion.button {...press} type="button" autoFocus onClick={() => setConfirmLeave(false)} className="h-10 rounded-xl bg-white/10 text-[14px] font-semibold hover:bg-white/15">Stay</motion.button>
+                <motion.button {...press} type="button" onClick={leaveRoom} className="h-10 rounded-xl bg-rose-500 text-[14px] font-semibold hover:bg-rose-400">Leave</motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
