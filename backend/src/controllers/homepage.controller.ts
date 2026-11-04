@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { HomepageService } from '../services/homepage.service';
 import { HomeSectionsService } from '../services/home-sections.service';
+import { PersonalizationEngineService } from '../services/personalization-engine.service';
 
 export class HomepageController {
     private homepageService = new HomepageService();
@@ -29,7 +30,6 @@ export class HomepageController {
             reply.header('Cache-Control', 'public, max-age=60');
         }
 
-        const { PersonalizationEngineService } = await import('../services/personalization-engine.service.js');
         const result = await PersonalizationEngineService.getPersonalizedFeed({
             userId,
             languages,

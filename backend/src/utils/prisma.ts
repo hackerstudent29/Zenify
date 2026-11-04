@@ -18,12 +18,12 @@ function getOptimizedDatabaseUrl(): string | undefined {
             parsed.searchParams.set('sslmode', 'no-verify');
         }
 
-        // Ensure connection limit is sufficiently high to avoid pool starvation
+        // Heroku Essential tier has a hard ceiling of 20 connections across all clients.
+        // Cap each node process to 5 (prod) or 3 (dev) so multiple dynos and local dev never trigger FATAL: too many connections.
+        const maxSafeLimit = config.NODE_ENV === 'production' ? 5 : 3;
         const currentLimit = parseInt(parsed.searchParams.get('connection_limit') || '0', 10);
-        if (currentLimit > 0 && currentLimit < 10) {
-            parsed.searchParams.set('connection_limit', '10');
-        } else if (!parsed.searchParams.has('connection_limit')) {
-            parsed.searchParams.set('connection_limit', '10');
+        if (currentLimit <= 0 || currentLimit > maxSafeLimit) {
+            parsed.searchParams.set('connection_limit', String(maxSafeLimit));
         }
 
         // Increase pool timeout to 30s to allow brief traffic spikes without failing requests
