@@ -71,7 +71,10 @@ class ListenTrackerService {
     }
 
     this.currentTrackId = track.id;
-    this.activeSessionId = `evt_${track.id}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const randPart = typeof crypto !== 'undefined' && crypto.getRandomValues
+      ? Array.from(crypto.getRandomValues(new Uint8Array(4)), b => b.toString(16).padStart(2, '0')).join('')
+      : Date.now().toString(36);
+    this.activeSessionId = `evt_${track.id}_${Date.now()}_${randPart}`;
     this.accumulatedMs = 0;
     this.lastUpdateTime = Date.now();
     this.thresholdReported = false;

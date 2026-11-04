@@ -75,9 +75,16 @@ const activeTickets = new Map<string, TogetherTicket>();
 
 function generateCrockfordCode(length = 6): string {
   let result = '';
-  const bytes = crypto.randomBytes(length);
-  for (let i = 0; i < length; i++) {
-    result += CROCKFORD_ALPHABET[bytes[i] % CROCKFORD_ALPHABET.length];
+  const alphabetLen = CROCKFORD_ALPHABET.length;
+  // Use rejection sampling to eliminate modulo bias
+  const limit = Math.floor(256 / alphabetLen) * alphabetLen;
+  while (result.length < length) {
+    const bytes = crypto.randomBytes(length);
+    for (let i = 0; i < bytes.length && result.length < length; i++) {
+      if (bytes[i] < limit) {
+        result += CROCKFORD_ALPHABET[bytes[i] % alphabetLen];
+      }
+    }
   }
   return result;
 }

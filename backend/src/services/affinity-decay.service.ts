@@ -108,7 +108,7 @@ export class AffinityDecayService {
 
       return newScore;
     } catch (error) {
-      console.error(`[AffinityDecayService] Error updating affinity for ${userId} (${kind}:${key}):`, error);
+      console.error('[AffinityDecayService] Error updating affinity for user:', userId, kind, key, error);
       return 0;
     }
   }
