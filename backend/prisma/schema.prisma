@@ -47,6 +47,8 @@ model User {
   pushSubscriptions PushSubscription[]
   notificationPreference NotificationPreference?
   replays         ReplaySnapshot[]
+  blendSessionsA  BlendSession[] @relation("BlendUserA")
+  blendSessionsB  BlendSession[] @relation("BlendUserB")
 }
 
 model Subscription {
@@ -686,4 +688,38 @@ model ReplaySnapshot {
   @@unique([userId, year])
   @@index([userId])
   @@map("replay_snapshots")
+}
+
+model BlendSession {
+  id              String         @id @default(uuid())
+  userAId         String         @map("user_a_id")
+  userBId         String?        @map("user_b_id")
+  inviteTokenHash String         @unique @map("invite_token_hash")
+  status          String         @default("PENDING") // PENDING | ACTIVE | ARCHIVED
+  expiresAt       DateTime       @map("expires_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  userA           User           @relation("BlendUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB           User?          @relation("BlendUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  snapshot        BlendSnapshot?
+
+  @@index([userAId])
+  @@index([userBId])
+  @@index([status])
+  @@map("blend_sessions")
+}
+
+model BlendSnapshot {
+  id            String       @id @default(uuid())
+  sessionId     String       @unique @map("session_id")
+  tracks        Json
+  matchScore    Float        @default(0) @map("match_score")
+  sharedArtists Json?        @map("shared_artists")
+  generatedAt   DateTime     @default(now()) @map("generated_at")
+
+  session       BlendSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("blend_snapshots")
 }

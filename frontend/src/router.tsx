@@ -61,6 +61,9 @@ const LocalLibraryPage = lazyWithRetry(() => import('./app/local-library/page'))
 const FollowingPage = lazyWithRetry(() => import('./app/following/page'));
 const DayMixPage = lazyWithRetry(() => import('./app/day-mix/page'));
 const ReplayPage = lazyWithRetry(() => import('./app/replay/page'));
+const BlendHubPage = lazyWithRetry(() => import('./app/blend/page'));
+const BlendDetailPage = lazyWithRetry(() => import('./app/blend/[id]/page'));
+const BlendJoinPage = lazyWithRetry(() => import('./app/blend/join/[token]/page'));
 const TogetherPage = lazyWithRetry(() => import('./app/together/page'));
 const TogetherRoomPage = lazyWithRetry(() => import('./app/together/[code]/page'));
 const JoinRedirectPage = lazyWithRetry(() => import('./app/j/[code]/page'));
@@ -95,6 +98,9 @@ export default function AppRouter() {
           <Route path="/following" element={<FollowingPage />} />
           <Route path="/day-mix" element={<DayMixPage />} />
           <Route path="/replay" element={<ReplayPage />} />
+          <Route path="/blend" element={<BlendHubPage />} />
+          <Route path="/blend/:id" element={<BlendDetailPage />} />
+          <Route path="/blend/join/:token" element={<BlendJoinPage />} />
           <Route path="/together" element={<TogetherPage />} />
           <Route path="/together/:code" element={<TogetherRoomPage />} />
           <Route path="/j/:code" element={<JoinRedirectPage />} />
