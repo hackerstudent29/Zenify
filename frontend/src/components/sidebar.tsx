@@ -178,6 +178,8 @@ export function Sidebar() {
   const { user, isAuthenticated } = useAuthStore();
   const collapsed = false;
   const currentTrack = usePlayerStore((s) => s.currentTrack);
+  const isSettingsOpen = useUIStore((s) => s.isSettingsOpen);
+  const openSettings = useUIStore((s) => s.openSettings);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [playlistsExpanded, setPlaylistsExpanded] = useState(true);
@@ -409,9 +411,9 @@ export function Sidebar() {
                 href="#"
                 icon={SwiftUISettings}
                 label="Settings"
-                active={useUIStore((s) => s.isSettingsOpen)}
+                active={isSettingsOpen}
                 collapsed={collapsed}
-                onClick={() => useUIStore.getState().openSettings()}
+                onClick={() => openSettings()}
               />
               {user?.role === "ADMIN" && (
                 <NavLink

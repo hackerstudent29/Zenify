@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { EventEmitter } from 'events';
-
-const prisma = new PrismaClient();
+import { prisma } from '../utils/prisma';
 
 // Global EventEmitter for SSE
 export const notificationEmitter = new EventEmitter();
