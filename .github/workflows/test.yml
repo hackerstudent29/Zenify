@@ -10,21 +10,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: zenify
-          POSTGRES_PASSWORD: zenify_test
-          POSTGRES_DB: zenify_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,7 +19,7 @@ jobs:
         with:
           node-version: '20.x'
 
-      # Backend tests
+      # Backend
       - name: Install backend dependencies
         working-directory: ./backend
         run: npm ci
@@ -45,12 +30,6 @@ jobs:
           DATABASE_URL: postgresql://zenify:zenify_test@localhost:5432/zenify_test
         run: npx prisma generate
 
-      - name: Run database migrations
-        working-directory: ./backend
-        env:
-          DATABASE_URL: postgresql://zenify:zenify_test@localhost:5432/zenify_test
-        run: npx prisma db push --skip-generate
-
       - name: Lint backend code
         working-directory: ./backend
         run: npm run lint
@@ -59,7 +38,7 @@ jobs:
         working-directory: ./backend
         run: npm run build
 
-      # Frontend tests
+      # Frontend
       - name: Install frontend dependencies
         working-directory: ./frontend
         run: npm ci
