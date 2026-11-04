@@ -59,6 +59,7 @@ const AdminPage = lazyWithRetry(() => import('./app/admin/page'));
 const OnboardingPage = lazyWithRetry(() => import('./app/onboarding/page'));
 const LocalLibraryPage = lazyWithRetry(() => import('./app/local-library/page'));
 const FollowingPage = lazyWithRetry(() => import('./app/following/page'));
+const DayMixPage = lazyWithRetry(() => import('./app/day-mix/page'));
 const ReplayPage = lazyWithRetry(() => import('./app/replay/page'));
 const TogetherPage = lazyWithRetry(() => import('./app/together/page'));
 const TogetherRoomPage = lazyWithRetry(() => import('./app/together/[code]/page'));
@@ -92,6 +93,7 @@ export default function AppRouter() {
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/local-library" element={<LocalLibraryPage />} />
           <Route path="/following" element={<FollowingPage />} />
+          <Route path="/day-mix" element={<DayMixPage />} />
           <Route path="/replay" element={<ReplayPage />} />
           <Route path="/together" element={<TogetherPage />} />
           <Route path="/together/:code" element={<TogetherRoomPage />} />
