@@ -6,6 +6,11 @@ import { cn } from "@/lib/utils";
 import {
   Plus,
   ChevronRight,
+  Sun,
+  Users,
+  HeartHandshake,
+  Radio,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -362,6 +367,41 @@ export function Sidebar() {
                   icon={SwiftUIDevice}
                   label="My Library"
                   active={pathname.startsWith("/local-library")}
+                  collapsed={collapsed}
+                />
+                <NavLink
+                  href="/day-mix"
+                  icon={Sun}
+                  label="Day Mix"
+                  active={pathname.startsWith("/day-mix")}
+                  collapsed={collapsed}
+                />
+                <NavLink
+                  href="/following"
+                  icon={Users}
+                  label="Following"
+                  active={pathname.startsWith("/following")}
+                  collapsed={collapsed}
+                />
+                <NavLink
+                  href="/blend"
+                  icon={HeartHandshake}
+                  label="Blend"
+                  active={pathname.startsWith("/blend")}
+                  collapsed={collapsed}
+                />
+                <NavLink
+                  href="/together"
+                  icon={Radio}
+                  label="Together"
+                  active={pathname.startsWith("/together") || pathname.startsWith("/j/")}
+                  collapsed={collapsed}
+                />
+                <NavLink
+                  href="/replay"
+                  icon={Sparkles}
+                  label="Replay"
+                  active={pathname.startsWith("/replay")}
                   collapsed={collapsed}
                 />
               </div>
