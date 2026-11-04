@@ -1,319 +1,442 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { motion, AnimatePresence } from 'framer-motion';
 import { BottomSheet } from '@/components/ui/BottomSheet';
-import { IosToggle } from '@/components/ui/IosToggle';
 import { SEO } from '@/components/shared/SEO';
-import {
-  Radio,
-  Users,
-  Sparkles,
-  ArrowRight,
-  Music2,
-  ShieldCheck,
-  Play,
-  Share2,
-  Headphones,
-  Check,
-  Disc3,
-  Sliders
-} from 'lucide-react';
+import { Radio, Play, ArrowRight, X, Zap, Music2, MessageCircle } from 'lucide-react';
 import api from '@/lib/api';
 import notify from '@/lib/notify';
 import { useAuthStore } from '@/store/authStore';
+import { FONT, SURFACE, FIELD, spring, press, Group, SettingRow, Segmented } from '@/components/together/kit';
+
+/* ───────────────────────── constants & helpers ───────────────────────── */
+
+const CODE_LENGTH = 6;
+const CAPACITY_OPTIONS = [10, 25, 50, 100] as const;
+const RECENT_KEY = 'zenify_recent_rooms';
+const NAME_KEY = 'zenify_display_name';
+
+type Capacity = (typeof CAPACITY_OPTIONS)[number];
+type RecentRoom = { code: string; name?: string; at: number };
+
+const safeStorage = {
+  get(store: 'local' | 'session', key: string): string | null {
+    try { return (store === 'local' ? localStorage : sessionStorage).getItem(key); } catch { return null; }
+  },
+  set(store: 'local' | 'session', key: string, value: string) {
+    try { (store === 'local' ? localStorage : sessionStorage).setItem(key, value); } catch { /* storage blocked */ }
+  },
+};
+
+function getGuestId(): string {
+  const existing = safeStorage.get('session', 'zenify_guest_id');
+  if (existing) return existing;
+  const id =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? `guest_${crypto.randomUUID().slice(0, 12)}`
+      : `guest_${Math.random().toString(36).slice(2, 14)}`;
+  safeStorage.set('session', 'zenify_guest_id', id);
+  return id;
+}
+
+/** Accepts "abc123", "ABC-123", or a full invite link like https://site/j/ABC123 */
+function extractRoomCode(raw: string): string {
+  const fromUrl = raw.match(/\/(?:j|together)\/([A-Za-z0-9]{6})/i)?.[1];
+  const source = fromUrl ?? raw;
+  return source.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH);
+}
+
+function timeAgo(ts: number) {
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return 'Just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hr ago`;
+  return `${Math.floor(h / 24)} d ago`;
+}
+
+const MODE_HELP = {
+  dj: 'Only you can play, pause, seek and skip.',
+  collab: 'Anyone in the room can play, pause, seek and skip.',
+} as const;
+
+const FEATURES = [
+  { icon: Zap, title: 'In sync', body: 'Everyone hears the same moment of the song.' },
+  { icon: Music2, title: 'Shared queue', body: 'Add songs together or let one DJ pick.' },
+  { icon: MessageCircle, title: 'Chat and reactions', body: 'Talk and react while the music plays.' },
+];
+
+/* ───────────────────────── page ───────────────────────── */
 
 export default function TogetherHubPage() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuthStore();
+
   const [joinCode, setJoinCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
+  const [recent, setRecent] = useState<RecentRoom[]>([]);
+  const [displayName, setDisplayName] = useState('');
 
-  // Room creation settings
-  const [sessionMode, setSessionMode] = useState<'dj' | 'collab'>('dj');
+  // Room settings
+  const [roomName, setRoomName] = useState('');
+  const [sessionMode, setSessionMode] = useState<'dj' | 'collab'>('collab');
+  const [capacity, setCapacity] = useState<Capacity>(50);
   const [guestCanQueue, setGuestCanQueue] = useState(true);
   const [guestCanChat, setGuestCanChat] = useState(true);
+  const [guestCanReact, setGuestCanReact] = useState(true);
+
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  const inFlight = useRef(false); // hard guard against double submits
+
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(safeStorage.get('local', RECENT_KEY) || '[]');
+      if (Array.isArray(parsed)) setRecent(parsed.slice(0, 4));
+    } catch { /* corrupted – ignore */ }
+    setDisplayName(safeStorage.get('local', NAME_KEY) || '');
+  }, []);
+
+  const resolvedName = useMemo(
+    () => user?.name || user?.username || displayName.trim(),
+    [user, displayName],
+  );
+
+  const rememberRoom = useCallback((code: string, name?: string) => {
+    setRecent((prev) => {
+      const next = [{ code, name, at: Date.now() }, ...prev.filter((r) => r.code !== code)].slice(0, 4);
+      safeStorage.set('local', RECENT_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const forgetRoom = (code: string) => {
+    setRecent((prev) => {
+      const next = prev.filter((r) => r.code !== code);
+      safeStorage.set('local', RECENT_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const persistName = () => {
+    if (!isAuthenticated && displayName.trim()) safeStorage.set('local', NAME_KEY, displayName.trim());
+  };
+
+  const joinRoom = useCallback(
+    async (rawCode: string) => {
+      const code = extractRoomCode(rawCode);
+      if (code.length < CODE_LENGTH) {
+        notify(`Enter the ${CODE_LENGTH}-character room code`, 'error');
+        return;
+      }
+      if (inFlight.current) return;
+      inFlight.current = true;
+      setIsJoining(true);
+      persistName();
+      try {
+        const res = await api.post(`/together/rooms/${code}/join`, {
+          guestId: !isAuthenticated ? getGuestId() : undefined,
+          guestName: resolvedName || `Listener ${Math.floor(100 + Math.random() * 900)}`,
+        });
+        if (res.data?.success && res.data?.ticket) {
+          safeStorage.set('session', `zenify_ticket_${code}`, res.data.ticket);
+          rememberRoom(code, res.data?.roomName);
+          router.push(`/together/${code}`);
+        } else {
+          notify('Could not join this session', 'error');
+        }
+      } catch (err: any) {
+        const status = err?.response?.status;
+        const fallback =
+          status === 404 ? 'No session with that code. It may have ended.'
+          : status === 403 ? 'You can’t join this session.'
+          : status === 409 || status === 429 ? 'This session is full.'
+          : 'Couldn’t connect. Check your connection and try again.';
+        notify(err?.response?.data?.message || fallback, 'error');
+      } finally {
+        inFlight.current = false;
+        setIsJoining(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isAuthenticated, resolvedName, router, rememberRoom],
+  );
 
   const handleCreateSession = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setIsCreating(true);
+    persistName();
     try {
-      const guestId = !isAuthenticated
-        ? (sessionStorage.getItem('zenify_guest_id') || `guest_${Math.random().toString(36).slice(2, 9)}`)
-        : undefined;
-      if (guestId) sessionStorage.setItem('zenify_guest_id', guestId);
-
       const res = await api.post('/together/rooms', {
+        name: roomName.trim() || undefined,
         mode: sessionMode,
+        maxListeners: capacity,
         guestCanQueue,
         guestCanChat,
-        guestId,
-        guestName: user?.name || user?.username || 'Host DJ',
+        guestCanReact,
+        guestId: !isAuthenticated ? getGuestId() : undefined,
+        guestName: resolvedName || 'Host',
       });
-
       if (res.data?.success && res.data?.roomCode) {
-        notify('Session created! Connecting...', 'success');
-        sessionStorage.setItem(`zenify_ticket_${res.data.roomCode}`, res.data.ticket);
-        router.push(`/together/${res.data.roomCode}`);
+        const code = String(res.data.roomCode).toUpperCase();
+        safeStorage.set('session', `zenify_ticket_${code}`, res.data.ticket);
+        rememberRoom(code, roomName.trim() || undefined);
+        notify('Session ready', 'success');
+        setCreateSheetOpen(false);
+        router.push(`/together/${code}`);
+      } else {
+        notify('Couldn’t start the session. Try again.', 'error');
       }
     } catch (err: any) {
-      notify(err.response?.data?.message || 'Failed to create session', 'error');
+      notify(err?.response?.data?.message || 'Couldn’t start the session. Try again.', 'error');
     } finally {
+      inFlight.current = false;
       setIsCreating(false);
-      setCreateSheetOpen(false);
     }
   };
 
-  const handleJoinSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanCode = joinCode.trim().toUpperCase();
-    if (cleanCode.length < 6) {
-      notify('Please enter a 6-character room code', 'error');
-      return;
-    }
+  const onCodeChange = (value: string) => setJoinCode(extractRoomCode(value));
 
-    setIsJoining(true);
-    try {
-      const guestId = !isAuthenticated
-        ? (sessionStorage.getItem('zenify_guest_id') || `guest_${Math.random().toString(36).slice(2, 9)}`)
-        : undefined;
-      if (guestId) sessionStorage.setItem('zenify_guest_id', guestId);
-
-      const res = await api.post(`/together/rooms/${cleanCode}/join`, {
-        guestId,
-        guestName: user?.name || user?.username || `Listener ${Math.floor(100 + Math.random() * 900)}`,
-      });
-
-      if (res.data?.success && res.data?.ticket) {
-        sessionStorage.setItem(`zenify_ticket_${cleanCode}`, res.data.ticket);
-        router.push(`/together/${cleanCode}`);
-      }
-    } catch (err: any) {
-      notify(err.response?.data?.message || 'Session not found or has expired', 'error');
-    } finally {
-      setIsJoining(false);
-    }
-  };
+  /* ───────────── render ───────────── */
 
   return (
-    <div className="min-h-screen pt-24 sm:pt-28 md:pt-32 pb-32 px-4 sm:px-6 md:px-8 max-w-5xl mx-auto space-y-8 sm:space-y-12 select-none">
+    <div
+      style={{ fontFamily: FONT }}
+      className="mx-auto min-h-screen max-w-4xl select-none px-4 pb-32 pt-20 text-white antialiased sm:px-6 sm:pt-24"
+    >
       <SEO
         title="Listen Together – Zenify"
-        description="Stream in real-time synchronization with friends. Sub-millisecond NTP audio lockstep, shared queue, live chat and emoji bursts."
+        description="Listen in sync with up to 100 friends. Shared queue, live chat and reactions."
         path="/together"
       />
 
-      {/* Hero Showcase Card */}
-      <GlassCard className="p-6 sm:p-10 md:p-12 relative overflow-hidden rounded-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-        {/* Ambient Gradient Glow */}
-        <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-brand/20 blur-[100px] pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-purple-600/15 blur-[100px] pointer-events-none" />
+      <header className="mb-6">
+        <h1 className="text-[32px] font-bold tracking-tight sm:text-[40px]">Listen Together</h1>
+        <p className="mt-1 max-w-md text-[15px] leading-snug text-white/55">
+          Play the same music in sync with friends. Share a queue, chat and react live.
+        </p>
+      </header>
 
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12 text-center md:text-left">
-          <div className="space-y-4 max-w-xl">
-            {/* Pill Header Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/15 border border-brand/30 text-brand text-[11px] sm:text-[12px] font-bold uppercase tracking-widest">
-              <Radio className="w-3.5 h-3.5 animate-pulse" />
-              <span>Real-Time Audio Sync</span>
-            </div>
+      {/* Start + Join */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <section className={`${SURFACE} flex flex-col p-5`}>
+          <h2 className="text-[17px] font-semibold">Start a session</h2>
+          <p className="mt-1 text-[14px] leading-snug text-white/50">
+            Create a room for up to 100 listeners and share the code.
+          </p>
+          <motion.button
+            {...press}
+            type="button"
+            onClick={() => setCreateSheetOpen(true)}
+            className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand text-[15px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 md:mt-auto"
+          >
+            <Play className="h-4 w-4 fill-current" />
+            New session
+          </motion.button>
+        </section>
 
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-oswald uppercase text-white tracking-tight leading-none">
-              Listen Together. <br className="hidden sm:inline" />
-              <span className="text-brand">Sync Every Beat.</span>
-            </h1>
+        <section className={`${SURFACE} p-5`}>
+          <h2 className="text-[17px] font-semibold">Join with a code</h2>
+          <p className="mt-1 text-[14px] leading-snug text-white/50">Type the code or paste an invite link.</p>
 
-            <p className="text-white/65 font-libre text-sm sm:text-base leading-relaxed max-w-lg">
-              Stream music with friends in sub-millisecond synchronization. Take the aux as a solo DJ or collaborate in real-time with a live shared queue and instant chat.
-            </p>
-
-            {/* Action Buttons Row */}
-            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3 justify-center md:justify-start">
-              <button
-                type="button"
-                onClick={() => setCreateSheetOpen(true)}
-                disabled={isCreating}
-                className="w-full sm:w-auto h-12 px-7 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[11px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 shadow-xl"
-              >
-                <Sparkles className="w-4 h-4 text-brand" />
-                <span>Start a Session</span>
-              </button>
-
-              <a
-                href="#join-section"
-                className="w-full sm:w-auto h-12 px-6 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-white text-[11px] font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>Enter Room Code</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </a>
-            </div>
-          </div>
-
-          {/* Vinyl & Visual Stage Graphic */}
-          <div className="relative w-44 h-44 sm:w-56 sm:h-56 shrink-0 flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-brand/30 to-purple-500/20 blur-2xl animate-pulse" />
-            <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-full bg-zinc-900/90 border border-white/15 flex items-center justify-center shadow-2xl">
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-zinc-950 border border-brand/40 flex items-center justify-center relative">
-                <Disc3 className="w-10 h-10 sm:w-12 sm:h-12 text-brand animate-spin" style={{ animationDuration: '6s' }} />
-                <div className="absolute inset-0 rounded-full border border-dashed border-white/15" />
+          <form onSubmit={(e) => { e.preventDefault(); joinRoom(joinCode); }} className="mt-4 space-y-3">
+            {/* One real input, six visual cells: paste, autofill and screen readers all work. */}
+            <label className="relative block cursor-text">
+              <span className="sr-only">Room code</span>
+              <input
+                ref={codeInputRef}
+                value={joinCode}
+                onChange={(e) => onCodeChange(e.target.value)}
+                onPaste={(e) => { e.preventDefault(); onCodeChange(e.clipboardData.getData('text')); }}
+                inputMode="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={120}
+                aria-label="Room code"
+                className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
+              />
+              <div className="grid grid-cols-6 gap-2">
+                {Array.from({ length: CODE_LENGTH }).map((_, i) => {
+                  const active = i === Math.min(joinCode.length, CODE_LENGTH - 1);
+                  return (
+                    <motion.div
+                      key={i}
+                      animate={{ scale: active ? 1.04 : 1 }}
+                      transition={spring}
+                      className={`flex h-12 items-center justify-center rounded-xl bg-[#2c2c2e] text-xl font-semibold tabular-nums ring-2 transition-shadow sm:h-14 sm:text-2xl ${
+                        active ? 'ring-brand/70' : 'ring-transparent'
+                      }`}
+                    >
+                      {joinCode[i] || <span className="text-white/15">•</span>}
+                    </motion.div>
+                  );
+                })}
               </div>
-            </div>
-          </div>
-        </div>
-      </GlassCard>
+            </label>
 
-      {/* Join Session Section */}
-      <div id="join-section" className="scroll-mt-28">
-        <GlassCard className="p-6 sm:p-8 rounded-3xl border border-white/10 relative overflow-hidden">
-          <div className="max-w-2xl">
-            <h2 className="text-xl sm:text-2xl font-bold font-oswald uppercase text-white tracking-wide mb-2 flex items-center gap-2.5">
-              <Headphones className="w-5 h-5 text-brand" />
-              <span>Have an Invite Code?</span>
-            </h2>
-            <p className="text-white/55 font-libre text-sm mb-6 leading-relaxed">
-              Enter the 6-character room code shared by your friend to jump straight into their synchronized audio stream.
-            </p>
+            {!isAuthenticated && (
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value.slice(0, 24))}
+                placeholder="Your name (optional)"
+                aria-label="Your display name"
+                className={FIELD}
+              />
+            )}
 
-            <form onSubmit={handleJoinSession} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="relative flex-1 sm:max-w-xs">
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                  placeholder="ABC123"
-                  className="w-full h-12 px-4 rounded-xl bg-white/[0.06] border border-white/15 text-white font-mono text-center text-xl sm:text-2xl uppercase tracking-[0.25em] placeholder:text-white/20 focus:outline-none focus:border-brand transition-colors shadow-inner"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isJoining || joinCode.length < 6}
-                className="h-12 px-7 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer shadow-lg"
-              >
-                <span>{isJoining ? 'Connecting...' : 'Join Session'}</span>
-                <ArrowRight className="w-4 h-4 text-brand" />
-              </button>
-            </form>
-          </div>
-        </GlassCard>
+            <motion.button
+              {...press}
+              type="submit"
+              disabled={isJoining || joinCode.length < CODE_LENGTH}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-semibold text-black transition-opacity disabled:pointer-events-none disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              {isJoining ? 'Joining…' : 'Join session'}
+              {!isJoining && <ArrowRight className="h-4 w-4" />}
+            </motion.button>
+          </form>
+        </section>
       </div>
 
-      {/* Feature Highlights Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-        <GlassCard className="p-6 rounded-2xl border border-white/10 space-y-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold font-oswald uppercase text-white text-[16px] tracking-wide">
-            Sub-Millisecond NTP Sync
-          </h3>
-          <p className="text-white/55 font-libre text-xs sm:text-sm leading-relaxed">
-            Continuous round-trip ping calculations and micro-drift adjustment keep every device in exact musical lockstep.
-          </p>
-        </GlassCard>
-
-        <GlassCard className="p-6 rounded-2xl border border-white/10 space-y-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center">
-            <Music2 className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold font-oswald uppercase text-white text-[16px] tracking-wide">
-            Collaborative Aux
-          </h3>
-          <p className="text-white/55 font-libre text-xs sm:text-sm leading-relaxed">
-            Host as a solo DJ or let everyone search and queue their favorite tracks with real-time shared playback control.
-          </p>
-        </GlassCard>
-
-        <GlassCard className="p-6 rounded-2xl border border-white/10 space-y-3">
-          <div className="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <h3 className="font-bold font-oswald uppercase text-white text-[16px] tracking-wide">
-            Reactions & Live Chat
-          </h3>
-          <p className="text-white/55 font-libre text-xs sm:text-sm leading-relaxed">
-            Send floating emoji bursts and real-time room messages as the songs play without interrupting the stream.
-          </p>
-        </GlassCard>
+      {/* Recent */}
+      <div className="mt-6">
+        <Group title="Recent sessions">
+          {recent.length === 0 ? (
+            <p className="px-4 py-4 text-[14px] text-white/45">
+              Sessions you start or join will show up here.
+            </p>
+          ) : (
+            <AnimatePresence initial={false}>
+              {recent.map((r) => (
+                <motion.div
+                  key={r.code}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, x: -24 }}
+                  transition={spring}
+                  className="flex items-center gap-1 pr-2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => joinRoom(r.code)}
+                    disabled={isJoining}
+                    className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.04] active:bg-white/[0.08] disabled:opacity-50"
+                  >
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand/15 text-brand">
+                      <Radio className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[15px] font-medium">{r.name || `Session ${r.code}`}</span>
+                      <span className="block text-[12.5px] text-white/45">{r.code} · {timeAgo(r.at)}</span>
+                    </span>
+                  </button>
+                  <motion.button
+                    {...press}
+                    type="button"
+                    onClick={() => forgetRoom(r.code)}
+                    aria-label={`Remove ${r.code} from recent`}
+                    className="grid h-8 w-8 place-items-center rounded-full text-white/35 hover:bg-white/10 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </motion.button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          )}
+        </Group>
       </div>
 
-      {/* Create Session Bottom Sheet / Modal */}
+      {/* What you get */}
+      <div className="mt-6">
+        <Group title="What you get">
+          {FEATURES.map(({ icon: Icon, title, body }) => (
+            <div key={title} className="flex items-center gap-3 px-4 py-3">
+              <Icon className="h-5 w-5 shrink-0 text-brand" />
+              <div className="min-w-0">
+                <p className="text-[15px] font-medium leading-tight">{title}</p>
+                <p className="mt-0.5 text-[12.5px] text-white/45">{body}</p>
+              </div>
+            </div>
+          ))}
+        </Group>
+      </div>
+
+      {/* Create sheet */}
       <BottomSheet
         isOpen={createSheetOpen}
-        onClose={() => setCreateSheetOpen(false)}
-        title="Start Listen Together"
-        subtitle="Configure your synchronized audio space"
+        onClose={() => !isCreating && setCreateSheetOpen(false)}
+        title="New session"
+        subtitle="Choose how your room works"
       >
-        <div className="space-y-6 py-2">
-          {/* Mode Selector */}
-          <div className="space-y-2.5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-white/50">
-              Session Mode
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setSessionMode('dj')}
-                className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                  sessionMode === 'dj'
-                    ? 'bg-brand/15 border-brand text-white shadow-lg shadow-brand/10'
-                    : 'bg-white/[0.04] border-white/10 text-white/70 hover:bg-white/[0.08]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="font-bold text-[14px] text-white">DJ Mode</div>
-                  {sessionMode === 'dj' && <Check className="w-4 h-4 text-brand" />}
-                </div>
-                <div className="text-[12px] text-white/50 mt-1 leading-relaxed">
-                  Only you (the host) control play, pause, seek, and track selection.
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSessionMode('collab')}
-                className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
-                  sessionMode === 'collab'
-                    ? 'bg-brand/15 border-brand text-white shadow-lg shadow-brand/10'
-                    : 'bg-white/[0.04] border-white/10 text-white/70 hover:bg-white/[0.08]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="font-bold text-[14px] text-white">Collaborative</div>
-                  {sessionMode === 'collab' && <Check className="w-4 h-4 text-brand" />}
-                </div>
-                <div className="text-[12px] text-white/50 mt-1 leading-relaxed">
-                  All listeners can queue, skip, and vote on upcoming songs together.
-                </div>
-              </button>
+        <div className="space-y-5 py-2">
+          <Group>
+            <div className="p-3">
+              <label htmlFor="room-name" className="sr-only">Session name</label>
+              <input
+                id="room-name"
+                value={roomName}
+                onChange={(e) => setRoomName(e.target.value.slice(0, 40))}
+                placeholder="Session name (Friday night queue)"
+                className={FIELD}
+              />
             </div>
+            {!isAuthenticated && (
+              <div className="p-3">
+                <label htmlFor="host-name" className="sr-only">Your name</label>
+                <input
+                  id="host-name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value.slice(0, 24))}
+                  placeholder="Your name"
+                  className={FIELD}
+                />
+              </div>
+            )}
+          </Group>
+
+          <div>
+            <h3 className="mb-1.5 px-4 text-[12.5px] font-medium text-white/45">Who controls playback</h3>
+            <Segmented<'dj' | 'collab'>
+              id="mode"
+              value={sessionMode}
+              onChange={setSessionMode}
+              options={[{ value: 'dj', label: 'DJ only' }, { value: 'collab', label: 'Everyone' }]}
+            />
+            <p className="mt-1.5 px-4 text-[12px] text-white/40">{MODE_HELP[sessionMode]}</p>
           </div>
 
-          {/* Permissions Toggles */}
-          <div className="space-y-4 pt-3 border-t border-white/10">
-            <IosToggle
-              checked={guestCanQueue}
-              onCheckedChange={setGuestCanQueue}
-              label="Allow listeners to add tracks to queue"
+          <div>
+            <h3 className="mb-1.5 px-4 text-[12.5px] font-medium text-white/45">Room size</h3>
+            <Segmented<Capacity>
+              id="size"
+              value={capacity}
+              onChange={setCapacity}
+              options={CAPACITY_OPTIONS.map((n) => ({ value: n, label: String(n) }))}
             />
-            <IosToggle
-              checked={guestCanChat}
-              onCheckedChange={setGuestCanChat}
-              label="Enable live in-room chat"
-            />
+            <p className="mt-1.5 px-4 text-[12px] text-white/40">Maximum listeners, including you.</p>
           </div>
 
-          <button
+          <Group title="What listeners can do">
+            <SettingRow title="Add songs" description="Let listeners add songs to the queue." checked={guestCanQueue} onChange={setGuestCanQueue} />
+            <SettingRow title="Chat" description="Let listeners send messages in the room." checked={guestCanChat} onChange={setGuestCanChat} />
+            <SettingRow title="Reactions" description="Let listeners send emoji reactions." checked={guestCanReact} onChange={setGuestCanReact} />
+          </Group>
+
+          <motion.button
+            {...press}
             type="button"
             onClick={handleCreateSession}
             disabled={isCreating}
-            className="w-full h-12 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50 mt-4 shadow-xl"
+            className="flex h-12 w-full items-center justify-center rounded-xl bg-brand text-[15px] font-semibold text-white disabled:opacity-50"
           >
-            <Play className="w-4 h-4 fill-current text-brand" />
-            <span>{isCreating ? 'Creating Room...' : 'Launch Session'}</span>
-          </button>
+            {isCreating ? 'Starting…' : 'Start session'}
+          </motion.button>
         </div>
       </BottomSheet>
     </div>
