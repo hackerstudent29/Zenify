@@ -119,7 +119,42 @@ export default function Home() {
                 )}
               </motion.div>
             ) : (
-              sections?.map(
+              <>
+                <motion.div
+                  variants={reveal}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true }}
+                  className="px-4 sm:px-6 md:px-8"
+                >
+                  <div
+                    onClick={() => router.push('/day-mix')}
+                    className="group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 p-6 backdrop-blur-xl transition-all duration-300 hover:border-white/20 active:scale-[0.99]"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold tracking-widest text-brand uppercase">
+                          MADE FOR YOU • FRESH DAILY
+                        </span>
+                        <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                          Your Daily Flow
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/10 border border-white/10 text-white/80">
+                            Day Mix
+                          </span>
+                        </h3>
+                        <p className="text-xs sm:text-sm text-white/60">
+                          Personalized soundtrack adapting to your morning, afternoon, evening, and late night cadence.
+                        </p>
+                      </div>
+                      <Button
+                        className="h-10 px-5 rounded-xl bg-zinc-900 group-hover:bg-zinc-800 border border-white/10 text-brand text-[10px] font-bold uppercase tracking-widest transition-all shrink-0 cursor-pointer"
+                      >
+                        Listen Now
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+                {sections?.map(
                 (section: any) =>
                   (section.isLoading || (section.items && section.items.length > 0)) && (
                     <motion.div
@@ -138,7 +173,8 @@ export default function Home() {
                       />
                     </motion.div>
                   )
-              )
+                )}
+              </>
             )}
           </div>
 
