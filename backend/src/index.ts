@@ -283,6 +283,8 @@ import { discoveryRoutes } from './routes/discovery.routes';
 server.register(discoveryRoutes, { prefix: '/api/discover' });
 import { databaseAdminRoutes } from './routes/database-admin.routes';
 server.register(databaseAdminRoutes, { prefix: '/api/admin/database' });
+import { lyricsPipelineRoutes } from './routes/lyrics-pipeline.routes';
+server.register(lyricsPipelineRoutes, { prefix: '/api' });
 
 server.get('/health', async () => {
     return { status: 'ok' };

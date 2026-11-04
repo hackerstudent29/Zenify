@@ -35,6 +35,11 @@ export interface LyricsToolbarProps {
   hidden?: boolean;
   /** smaller capsule used by the sidebar lyrics */
   compact?: boolean;
+  /** Quality badge: "Word by word" | "Synced" | "Unsynced" | "AI-generated" */
+  qualityBadge?: string;
+  /** Plain text view toggle for accessibility */
+  isPlainMode?: boolean;
+  onTogglePlainMode?: () => void;
 }
 
 /**
@@ -110,6 +115,32 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
                 : "gap-1 p-[3px]"
             )}
           >
+            {/* Quality Badge */}
+            {p.qualityBadge && (
+              <span className={cn("px-2 font-bold uppercase tracking-wider text-white/50 select-none", compact ? "text-[9px]" : "text-[10px]")}>
+                {p.qualityBadge}
+              </span>
+            )}
+
+            {p.qualityBadge && (p.canTranslate || p.onTogglePlainMode || p.showOffset) && (
+              <span className={cn("mx-0.5 w-px bg-white/20", compact ? "h-3" : "h-4")} />
+            )}
+
+            {/* Plain / Synced Mode Toggle for Accessibility */}
+            {p.onTogglePlainMode && (
+              <SpringButton
+                onClick={p.onTogglePlainMode}
+                title={p.isPlainMode ? "Switch to Synced View" : "Switch to Plain Text View"}
+                className={cn("relative rounded-full font-semibold transition-colors", btnH, segPad, fontSz, p.isPlainMode ? "text-brand font-bold bg-white/10" : "text-white/60 hover:text-white")}
+              >
+                {p.isPlainMode ? "Plain" : "Sync"}
+              </SpringButton>
+            )}
+
+            {p.onTogglePlainMode && p.canTranslate && (
+              <span className={cn("mx-0.5 w-px bg-white/20", compact ? "h-3" : "h-4")} />
+            )}
+
             {/* Language */}
             {p.canTranslate && (
               <motion.div layout="position" className="relative flex items-center" role="group" aria-label="Lyrics language">
