@@ -441,10 +441,10 @@ export function PCPlayerBar() {
             transition={{ scale: SPRING_SOFT, opacity: { duration: 0.2 } }}
             onClick={handleHidePlayer}
             style={{ fontFamily: FONT_STACK, WebkitFontSmoothing: "antialiased" }}
-            className="w-full h-full px-4 flex items-center justify-between gap-2.5 relative select-none bg-transparent border-none"
+            className="w-full h-full px-3 sm:px-4 flex items-center justify-between gap-1.5 sm:gap-2.5 relative select-none bg-transparent border-none"
           >
             {/* 1. Left transport */}
-            <div className="relative flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex items-center gap-1 sm:gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
               <SpringButton
                 onClick={toggleShuffle}
                 className={cn("p-1", isShuffled ? activeBtn : inactiveBtn)}
@@ -509,7 +509,7 @@ export function PCPlayerBar() {
             </div>
 
             {/* 2. Middle: track info on top, seekbar anchored at the bottom */}
-            <div className="relative shrink-0 w-[270px] h-[50px]" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex-1 min-w-[120px] max-w-[270px] h-[50px] mx-1 sm:mx-2" onClick={(e) => e.stopPropagation()}>
               {/* Track info: springs out/in on every song change, and dims + blurs behind the seekbar */}
               <div
                 className="absolute inset-x-0 top-0 h-[37px] min-w-0 overflow-hidden"
@@ -583,7 +583,7 @@ export function PCPlayerBar() {
             </div>
 
             {/* 3. Right controls */}
-            <div className="relative flex items-center shrink-0 w-[230px] justify-end" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex items-center shrink-0 w-[172px] justify-end" onClick={(e) => e.stopPropagation()}>
               <div
                 className="flex items-center"
                 style={{
@@ -643,7 +643,7 @@ export function PCPlayerBar() {
               <div
                 className="absolute inset-y-0 my-auto right-0 h-[38px] flex items-center justify-end rounded-full overflow-hidden"
                 style={{
-                  width: volExpanded ? 166 : 38,
+                  width: volExpanded ? 168 : 38,
                   backgroundColor: volExpanded ? "rgba(22,22,24,0.55)" : "rgba(22,22,24,0)",
                   transition: `width 400ms ${EASE}, background-color 300ms ${EASE}`,
                   willChange: "width",
