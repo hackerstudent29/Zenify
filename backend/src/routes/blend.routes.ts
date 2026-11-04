@@ -38,3 +38,4 @@ export async function blendRoutes(server: FastifyInstance) {
     BlendController.leaveBlend
   );
 }
+

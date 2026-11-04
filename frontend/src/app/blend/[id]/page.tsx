@@ -291,3 +291,4 @@ export default function BlendDetailPage() {
     </div>
   );
 }
+

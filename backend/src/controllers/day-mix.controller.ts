@@ -35,3 +35,4 @@ export class DayMixController {
     return reply.status(200).send({ slots });
   }
 }
+

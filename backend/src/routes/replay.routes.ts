@@ -14,3 +14,4 @@ export async function replayRoutes(server: FastifyInstance) {
     ReplayController.refreshReplay
   );
 }
+
