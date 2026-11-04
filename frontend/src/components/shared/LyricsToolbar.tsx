@@ -88,7 +88,7 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
           ? compact
             ? "left-3 top-3 justify-start"
             : "left-4 top-3 justify-start"
-          : "right-24 top-0.5 justify-end"
+          : "right-28 top-2 justify-end max-w-[calc(100%-120px)]"
       )}
     >
       <motion.div
@@ -104,136 +104,272 @@ export function LyricsToolbar(p: LyricsToolbarProps) {
         onPointerDown={(e) => e.stopPropagation()}
       >
         <LayoutGroup id={uid}>
-          <motion.div
-            layout
-            transition={{ layout: springSoft }}
-            style={{ borderRadius: 999 }}
-            className={cn(
-              "flex items-center rounded-full border border-white/20 bg-white/10 dark:bg-black/25 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)]",
-              compact
-                ? "gap-0.5 p-[2px]"
-                : "gap-1 p-[3px]"
-            )}
-          >
-            {/* Quality Badge */}
-            {p.qualityBadge && (
-              <span className={cn("px-2 font-bold uppercase tracking-wider text-white/50 select-none", compact ? "text-[9px]" : "text-[10px]")}>
-                {p.qualityBadge}
-              </span>
-            )}
-
-            {p.qualityBadge && (p.canTranslate || p.onTogglePlainMode || p.showOffset) && (
-              <span className={cn("mx-0.5 w-px bg-white/20", compact ? "h-3" : "h-4")} />
-            )}
-
-            {/* Plain / Synced Mode Toggle for Accessibility */}
-            {p.onTogglePlainMode && (
-              <SpringButton
-                onClick={p.onTogglePlainMode}
-                title={p.isPlainMode ? "Switch to Synced View" : "Switch to Plain Text View"}
-                className={cn("relative rounded-full font-semibold transition-colors", btnH, segPad, fontSz, p.isPlainMode ? "text-brand font-bold bg-white/10" : "text-white/60 hover:text-white")}
+          {compact && p.canTranslate ? (
+            /* Compact / Sidebar mode: Language button moved UP to top tier */
+            <div className="flex flex-col items-start gap-1.5">
+              {/* Row 1 (UP): Language toggle */}
+              <motion.div
+                layout
+                transition={{ layout: springSoft }}
+                style={{ borderRadius: 999 }}
+                className="flex items-center rounded-full border border-white/20 bg-white/10 dark:bg-black/25 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] gap-0.5 p-[2px]"
               >
-                {p.isPlainMode ? "Plain" : "Sync"}
-              </SpringButton>
-            )}
-
-            {p.onTogglePlainMode && p.canTranslate && (
-              <span className={cn("mx-0.5 w-px bg-white/20", compact ? "h-3" : "h-4")} />
-            )}
-
-            {/* Language */}
-            {p.canTranslate && (
-              <motion.div layout="position" className="relative flex items-center" role="group" aria-label="Lyrics language">
-                {[
-                  { k: false, label: "Original" },
-                  { k: true, label: p.romanizedLabel || "English" },
-                ].map((o) => {
-                  const active = p.isRomanized === o.k;
-                  return (
-                    <SpringButton
-                      key={String(o.k)}
-                      onClick={() => p.onModeChange(o.k)}
-                      className={cn("relative rounded-full font-semibold tracking-[-0.01em]", btnH, segPad, fontSz)}
-                    >
-                      {active && (
-                        <motion.span
-                          layoutId="lyr-seg"
-                          transition={springMain}
-                          style={{ borderRadius: 999 }}
-                          className="absolute inset-0 bg-white/20 backdrop-blur-md shadow-sm"
-                        />
-                      )}
-                      <span className={cn("relative transition-colors duration-200", active ? "text-white font-bold" : "text-white/60 hover:text-white")}>{o.label}</span>
-                    </SpringButton>
-                  );
-                })}
-              </motion.div>
-            )}
-
-            {p.canTranslate && p.showOffset && <span className={cn("mx-0.5 w-px bg-white/20", compact ? "h-3" : "h-4")} />}
-
-            {/* Timing */}
-            {p.showOffset && (
-              <motion.div layout="position" className="flex items-center">
-                <SpringButton
-                  onClick={() => { setOpen((o) => !o); arm(); }}
-                  title="Adjust lyrics timing"
-                  className={cn(
-                    "gap-1.5 rounded-full font-semibold tabular-nums transition-colors duration-200",
-                    btnH,
-                    fontSz,
-                    compact ? "px-2" : "px-2.5",
-                    open ? "bg-white/20 text-white" : offsetActive ? "text-brand bg-white/10" : "text-white/70 hover:text-white hover:bg-white/10"
-                  )}
-                >
-                  <SFTiming size={iconSz} />
-                  {!open && offsetActive && <span>{fmt(p.offsetMs)}</span>}
-                </SpringButton>
-
-                <AnimatePresence initial={false}>
-                  {open && (
-                    <motion.div
-                      key="stepper"
-                      initial={{ width: 0, opacity: 0 }}
-                      animate={{ width: "auto", opacity: 1 }}
-                      exit={{ width: 0, opacity: 0 }}
-                      transition={{ width: springSoft, opacity: { duration: 0.18 } }}
-                      className="flex items-center overflow-hidden"
-                    >
-                      <SpringButton onClick={() => step(-500)} title="Lyrics earlier −0.5s" className={cn("ml-1 rounded-full text-white/80 hover:bg-white/15", iconBtn)}>
-                        <SFMinus size={stepIconSz} />
-                      </SpringButton>
+                <motion.div layout="position" className="relative flex items-center" role="group" aria-label="Lyrics language">
+                  {[
+                    { k: false, label: "Original" },
+                    { k: true, label: p.romanizedLabel || "English" },
+                  ].map((o) => {
+                    const active = p.isRomanized === o.k;
+                    return (
                       <SpringButton
-                        onClick={() => { p.onOffset(0); arm(); }}
-                        title="Reset"
-                        className={cn(
-                          "rounded-full px-1 font-bold tabular-nums hover:bg-white/15 transition-colors",
-                          btnH,
-                          fontSz,
-                          compact ? "min-w-[40px]" : "min-w-[46px]",
-                          offsetActive ? "text-brand" : "text-white/70"
-                        )}
+                        key={String(o.k)}
+                        onClick={() => p.onModeChange(o.k)}
+                        className={cn("relative rounded-full font-semibold tracking-[-0.01em]", btnH, segPad, fontSz)}
                       >
-                        {fmt(p.offsetMs)}
+                        {active && (
+                          <motion.span
+                            layoutId="lyr-seg"
+                            transition={springMain}
+                            style={{ borderRadius: 999 }}
+                            className="absolute inset-0 bg-white/20 backdrop-blur-md shadow-sm"
+                          />
+                        )}
+                        <span className={cn("relative transition-colors duration-200", active ? "text-white font-bold" : "text-white/60 hover:text-white")}>{o.label}</span>
                       </SpringButton>
-                      <SpringButton onClick={() => step(500)} title="Lyrics later +0.5s" className={cn("rounded-full text-white/80 hover:bg-white/15", iconBtn)}>
-                        <SFPlus size={stepIconSz} />
-                      </SpringButton>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    );
+                  })}
+                </motion.div>
               </motion.div>
-            )}
 
-            {p.onClose && (
-              <motion.div layout="position" className="flex items-center">
-                <span className="mx-0.5 h-4 w-px bg-white/20" />
-                <SpringButton onClick={p.onClose} title="Close lyrics" className="h-7 w-7 rounded-full text-white/70 hover:bg-white/10 hover:text-white">
-                  <SFClose size={13} />
-                </SpringButton>
+              {/* Row 2: Quality badge, Synced/Plain mode, timing */}
+              <motion.div
+                layout
+                transition={{ layout: springSoft }}
+                style={{ borderRadius: 999 }}
+                className="flex items-center rounded-full border border-white/20 bg-white/10 dark:bg-black/25 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] gap-0.5 p-[2px]"
+              >
+                {/* Quality Badge */}
+                {p.qualityBadge && (
+                  <span className={cn("px-2 font-bold uppercase tracking-wider text-white/50 select-none", "text-[9px]")}>
+                    {p.qualityBadge}
+                  </span>
+                )}
+
+                {p.qualityBadge && (p.onTogglePlainMode || p.showOffset) && (
+                  <span className="mx-0.5 h-3 w-px bg-white/20" />
+                )}
+
+                {/* Plain / Synced Mode Toggle */}
+                {p.onTogglePlainMode && (
+                  <SpringButton
+                    onClick={p.onTogglePlainMode}
+                    title={p.isPlainMode ? "Switch to Synced View" : "Switch to Plain Text View"}
+                    className={cn("relative rounded-full font-semibold transition-colors", btnH, segPad, fontSz, p.isPlainMode ? "text-brand font-bold bg-white/10" : "text-white/60 hover:text-white")}
+                  >
+                    {p.isPlainMode ? "Plain" : "Sync"}
+                  </SpringButton>
+                )}
+
+                {p.onTogglePlainMode && p.showOffset && (
+                  <span className="mx-0.5 h-3 w-px bg-white/20" />
+                )}
+
+                {/* Timing */}
+                {p.showOffset && (
+                  <motion.div layout="position" className="flex items-center">
+                    <SpringButton
+                      onClick={() => { setOpen((o) => !o); arm(); }}
+                      title="Adjust lyrics timing"
+                      className={cn(
+                        "gap-1.5 rounded-full font-semibold tabular-nums transition-colors duration-200",
+                        btnH,
+                        fontSz,
+                        "px-2",
+                        open ? "bg-white/20 text-white" : offsetActive ? "text-brand bg-white/10" : "text-white/70 hover:text-white hover:bg-white/10"
+                      )}
+                    >
+                      <SFTiming size={iconSz} />
+                      {!open && offsetActive && <span>{fmt(p.offsetMs)}</span>}
+                    </SpringButton>
+
+                    <AnimatePresence initial={false}>
+                      {open && (
+                        <motion.div
+                          key="stepper"
+                          initial={{ width: 0, opacity: 0 }}
+                          animate={{ width: "auto", opacity: 1 }}
+                          exit={{ width: 0, opacity: 0 }}
+                          transition={{ width: springSoft, opacity: { duration: 0.18 } }}
+                          className="flex items-center overflow-hidden"
+                        >
+                          <SpringButton onClick={() => step(-500)} title="Lyrics earlier −0.5s" className={cn("ml-1 rounded-full text-white/80 hover:bg-white/15", iconBtn)}>
+                            <SFMinus size={stepIconSz} />
+                          </SpringButton>
+                          <SpringButton
+                            onClick={() => { p.onOffset(0); arm(); }}
+                            title="Reset"
+                            className={cn(
+                              "rounded-full px-1 font-bold tabular-nums hover:bg-white/15 transition-colors",
+                              btnH,
+                              fontSz,
+                              "min-w-[40px]",
+                              offsetActive ? "text-brand" : "text-white/70"
+                            )}
+                          >
+                            {fmt(p.offsetMs)}
+                          </SpringButton>
+                          <SpringButton onClick={() => step(500)} title="Lyrics later +0.5s" className={cn("rounded-full text-white/80 hover:bg-white/15", iconBtn)}>
+                            <SFPlus size={stepIconSz} />
+                          </SpringButton>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                )}
+
+                {p.onClose && (
+                  <motion.div layout="position" className="flex items-center">
+                    <span className="mx-0.5 h-3 w-px bg-white/20" />
+                    <SpringButton onClick={p.onClose} title="Close lyrics" className="h-6 w-6 rounded-full text-white/70 hover:bg-white/10 hover:text-white">
+                      <SFClose size={12} />
+                    </SpringButton>
+                  </motion.div>
+                )}
               </motion.div>
-            )}
-          </motion.div>
+            </div>
+          ) : (
+            /* Standard single capsule layout */
+            <motion.div
+              layout
+              transition={{ layout: springSoft }}
+              style={{ borderRadius: 999 }}
+              className={cn(
+                "flex items-center rounded-full border border-white/20 bg-white/10 dark:bg-black/25 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)]",
+                compact
+                  ? "gap-0.5 p-[2px]"
+                  : "gap-1 p-[3px]"
+              )}
+            >
+              {/* Quality Badge */}
+              {p.qualityBadge && (
+                <span className={cn("px-2 font-bold uppercase tracking-wider text-white/50 select-none", compact ? "text-[9px]" : "text-[10px]")}>
+                  {p.qualityBadge}
+                </span>
+              )}
+
+              {p.qualityBadge && (p.canTranslate || p.onTogglePlainMode || p.showOffset) && (
+                <span className={cn("mx-0.5 w-px bg-white/20", compact ? "h-3" : "h-4")} />
+              )}
+
+              {/* Plain / Synced Mode Toggle for Accessibility */}
+              {p.onTogglePlainMode && (
+                <SpringButton
+                  onClick={p.onTogglePlainMode}
+                  title={p.isPlainMode ? "Switch to Synced View" : "Switch to Plain Text View"}
+                  className={cn("relative rounded-full font-semibold transition-colors", btnH, segPad, fontSz, p.isPlainMode ? "text-brand font-bold bg-white/10" : "text-white/60 hover:text-white")}
+                >
+                  {p.isPlainMode ? "Plain" : "Sync"}
+                </SpringButton>
+              )}
+
+              {p.onTogglePlainMode && p.canTranslate && (
+                <span className={cn("mx-0.5 w-px bg-white/20", compact ? "h-3" : "h-4")} />
+              )}
+
+              {/* Language */}
+              {p.canTranslate && (
+                <motion.div layout="position" className="relative flex items-center" role="group" aria-label="Lyrics language">
+                  {[
+                    { k: false, label: "Original" },
+                    { k: true, label: p.romanizedLabel || "English" },
+                  ].map((o) => {
+                    const active = p.isRomanized === o.k;
+                    return (
+                      <SpringButton
+                        key={String(o.k)}
+                        onClick={() => p.onModeChange(o.k)}
+                        className={cn("relative rounded-full font-semibold tracking-[-0.01em]", btnH, segPad, fontSz)}
+                      >
+                        {active && (
+                          <motion.span
+                            layoutId="lyr-seg"
+                            transition={springMain}
+                            style={{ borderRadius: 999 }}
+                            className="absolute inset-0 bg-white/20 backdrop-blur-md shadow-sm"
+                          />
+                        )}
+                        <span className={cn("relative transition-colors duration-200", active ? "text-white font-bold" : "text-white/60 hover:text-white")}>{o.label}</span>
+                      </SpringButton>
+                    );
+                  })}
+                </motion.div>
+              )}
+
+              {p.canTranslate && p.showOffset && <span className={cn("mx-0.5 w-px bg-white/20", compact ? "h-3" : "h-4")} />}
+
+              {/* Timing */}
+              {p.showOffset && (
+                <motion.div layout="position" className="flex items-center">
+                  <SpringButton
+                    onClick={() => { setOpen((o) => !o); arm(); }}
+                    title="Adjust lyrics timing"
+                    className={cn(
+                      "gap-1.5 rounded-full font-semibold tabular-nums transition-colors duration-200",
+                      btnH,
+                      fontSz,
+                      compact ? "px-2" : "px-2.5",
+                      open ? "bg-white/20 text-white" : offsetActive ? "text-brand bg-white/10" : "text-white/70 hover:text-white hover:bg-white/10"
+                    )}
+                  >
+                    <SFTiming size={iconSz} />
+                    {!open && offsetActive && <span>{fmt(p.offsetMs)}</span>}
+                  </SpringButton>
+
+                  <AnimatePresence initial={false}>
+                    {open && (
+                      <motion.div
+                        key="stepper"
+                        initial={{ width: 0, opacity: 0 }}
+                        animate={{ width: "auto", opacity: 1 }}
+                        exit={{ width: 0, opacity: 0 }}
+                        transition={{ width: springSoft, opacity: { duration: 0.18 } }}
+                        className="flex items-center overflow-hidden"
+                      >
+                        <SpringButton onClick={() => step(-500)} title="Lyrics earlier −0.5s" className={cn("ml-1 rounded-full text-white/80 hover:bg-white/15", iconBtn)}>
+                          <SFMinus size={stepIconSz} />
+                        </SpringButton>
+                        <SpringButton
+                          onClick={() => { p.onOffset(0); arm(); }}
+                          title="Reset"
+                          className={cn(
+                            "rounded-full px-1 font-bold tabular-nums hover:bg-white/15 transition-colors",
+                            btnH,
+                            fontSz,
+                            compact ? "min-w-[40px]" : "min-w-[46px]",
+                            offsetActive ? "text-brand" : "text-white/70"
+                          )}
+                        >
+                          {fmt(p.offsetMs)}
+                        </SpringButton>
+                        <SpringButton onClick={() => step(500)} title="Lyrics later +0.5s" className={cn("rounded-full text-white/80 hover:bg-white/15", iconBtn)}>
+                          <SFPlus size={stepIconSz} />
+                        </SpringButton>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+
+              {p.onClose && (
+                <motion.div layout="position" className="flex items-center">
+                  <span className="mx-0.5 h-4 w-px bg-white/20" />
+                  <SpringButton onClick={p.onClose} title="Close lyrics" className="h-7 w-7 rounded-full text-white/70 hover:bg-white/10 hover:text-white">
+                    <SFClose size={13} />
+                  </SpringButton>
+                </motion.div>
+              )}
+            </motion.div>
+          )}
         </LayoutGroup>
       </motion.div>
     </div>

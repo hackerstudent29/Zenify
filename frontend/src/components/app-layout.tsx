@@ -437,7 +437,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     id="tour-player"
     data-tour="player"
     // Pill: sleek compact 660x66, lifted with mb-8
-    className="pointer-events-auto relative mx-auto w-[660px] max-w-[calc(100%-2rem)] mb-8 rounded-full h-[66px]"
+    className="pointer-events-auto relative mx-auto w-[min(680px,calc(100%-1.5rem))] mb-8 rounded-full h-[66px]"
     >
       <div 
         className="absolute inset-0 pointer-events-none rounded-full overflow-hidden backdrop-blur-lg bg-black/10 border border-white/10"

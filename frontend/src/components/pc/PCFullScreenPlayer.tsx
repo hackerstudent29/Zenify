@@ -151,13 +151,13 @@ export function PCFullScreenPlayer() {
               Every child uses framer layout, so position AND artwork size resolve with the same spring. */}
           <div
             className="flex h-full items-center"
-            style={{ paddingLeft: isLyricsOpen ? LEFT_GUTTER : 0, justifyContent: isLyricsOpen ? "flex-start" : "center" }}
+            style={{ paddingLeft: isLyricsOpen ? (LEFT_GUTTER - 24) : 0, justifyContent: isLyricsOpen ? "flex-start" : "center" }}
           >
             <motion.div
               layout="position"
               transition={{ layout: SHEET_SPRING }}
               className="pointer-events-auto flex flex-col items-stretch"
-              style={{ width: `min(${PANEL_W}px, 86vw)` }}
+              style={{ width: isLyricsOpen ? `min(440px, 42vw)` : `min(${PANEL_W}px, 86vw)` }}
             >
               {/* Artwork — same layoutId as the PC player bar thumbnail, so the bar art grows into this and back */}
               <div className="flex justify-center">
@@ -280,12 +280,12 @@ export function PCFullScreenPlayer() {
                   marginTop: { type: "spring", stiffness: 300, damping: 30 },
                   layout: SHEET_SPRING,
                 }}
-                className="mx-auto w-full max-w-[460px] overflow-hidden"
+                className="mx-auto w-full max-w-[460px] px-2 overflow-hidden"
                 style={{ pointerEvents: idle ? "none" : "auto" }}
               >
                 <div className="grid h-14 w-full grid-cols-[1fr_auto_1fr] items-center">
                   {/* Left: Like (Heart), Shuffle, Repeat */}
-                  <div className="flex items-center justify-end gap-1.5">
+                  <div className="flex items-center justify-end gap-1 sm:gap-1.5">
                     <LikeButton liked={liked} onToggle={toggleLike} size={18} className="h-9 w-9 !p-0" />
                     <PlateButton size={36} active={isShuffled} onClick={toggleShuffle} title={`Shuffle: ${isShuffled ? "On" : "Off"}`}>
                       <SFShuffle size={17} />
@@ -309,7 +309,7 @@ export function PCFullScreenPlayer() {
                   </div>
 
                   {/* Center: Prev, Play/Pause, Next */}
-                  <div className="flex items-center justify-center gap-3 px-4">
+                  <div className="flex items-center justify-center gap-2 sm:gap-3 px-2 sm:px-4">
                     <SpringButton onClick={handlePrev} className="p-1 text-white/90 transition-colors hover:text-white" title="Previous">
                       <SwiftUIBackward size={26} fill="currentColor" />
                     </SpringButton>
@@ -320,7 +320,7 @@ export function PCFullScreenPlayer() {
                   </div>
 
                   {/* Right: Studio FX, Lyrics, Queue */}
-                  <div className="flex items-center justify-start gap-1.5">
+                  <div className="flex items-center justify-start gap-1 sm:gap-1.5">
                     <PlateButton size={36} active={isAudioFxOpen} onClick={() => setAudioFxOpen(!isAudioFxOpen)} title="Studio FX">
                       <SFFx size={18} />
                     </PlateButton>
@@ -372,7 +372,7 @@ export function PCFullScreenPlayer() {
                 exit={{ opacity: 0, x: 36 }}
                 transition={{ x: SPRING_SOFT, opacity: { duration: 0.3 } }}
                 className="pointer-events-auto absolute bottom-8 right-8 top-7 max-w-4xl overflow-hidden"
-                style={{ left: `${LEFT_GUTTER + PANEL_W + 64}px` }}
+                style={{ left: `min(calc(${48 + 440}px + 4vw), 48vw)` }}
               >
                 <LyricsView
                   trackId={currentTrack.id}

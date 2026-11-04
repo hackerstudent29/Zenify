@@ -824,7 +824,7 @@ export function LyricsView({
         <div
           className={cn(
             "relative z-10 h-full min-h-0 w-full select-text overflow-y-auto scrollbar-none",
-            isSidebar ? "px-4 pb-4 pt-14" : isMobile ? "p-4" : "p-6"
+            isSidebar ? "px-4 pb-4 pt-20" : isMobile ? "p-4" : "p-6"
           )}
           style={{ msOverflowStyle: "none", scrollbarWidth: "none", overscrollBehavior: "contain" }}
         >
