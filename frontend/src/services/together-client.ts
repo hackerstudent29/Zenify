@@ -24,8 +24,17 @@ class TogetherClient {
 
   private getWsUrl(ticket: string): string {
     const apiBase = getApiBaseUrl();
-    const wsProto = apiBase.startsWith('https') ? 'wss:' : 'ws:';
-    const host = apiBase.replace(/^https?:\/\//, '').replace(/\/api$/, '');
+    let wsProto = 'wss:';
+    let host = 'zenify-78e257420386.herokuapp.com';
+
+    if (apiBase.startsWith('http://') || apiBase.startsWith('https://')) {
+      wsProto = apiBase.startsWith('https') ? 'wss:' : 'ws:';
+      host = apiBase.replace(/^https?:\/\//, '').replace(/\/api\/?$/, '');
+    } else if (typeof window !== 'undefined') {
+      wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      host = window.location.host;
+    }
+
     return `${wsProto}//${host}/ws/together?ticket=${encodeURIComponent(ticket)}`;
   }
 
@@ -374,6 +383,15 @@ class TogetherClient {
   public sendChatMessage(text: string) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     this.ws.send(JSON.stringify({ type: 'CHAT_MESSAGE', text }));
+  }
+
+  public skipNext() {
+    const queue = useTogetherStore.getState().room?.queue || [];
+    if (queue.length > 0) {
+      const nextItem = queue[0];
+      this.play(nextItem.track, 0);
+      this.removeQueue(nextItem.id);
+    }
   }
 
   public disconnect() {

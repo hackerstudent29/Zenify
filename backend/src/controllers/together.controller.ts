@@ -11,12 +11,14 @@ export class TogetherController {
       return reply.status(403).send({ error: 'Feature disabled', message: 'Listen Together is currently disabled.' });
     }
 
-    const user = (request as any).user;
+    let user = (request as any).user;
+    const body = (request.body as any) || {};
     if (!user) {
-      return reply.status(401).send({ error: 'Unauthorized', message: 'Authentication required' });
+      const guestId = body.guestId || `guest_${Math.random().toString(36).slice(2, 9)}`;
+      const guestName = body.guestName || 'Host DJ';
+      user = { id: guestId, userId: guestId, name: guestName, image: null };
     }
 
-    const body = (request.body as any) || {};
     const { room, ticket } = await TogetherRoomService.createRoom(
       {
         id: user.userId || user.id,
@@ -70,9 +72,12 @@ export class TogetherController {
       return reply.status(403).send({ error: 'Feature disabled', message: 'Listen Together is currently disabled.' });
     }
 
-    const user = (request as any).user;
+    let user = (request as any).user;
+    const body = (request.body as any) || {};
     if (!user) {
-      return reply.status(401).send({ error: 'Unauthorized', message: 'Authentication required' });
+      const guestId = body.guestId || `guest_${Math.random().toString(36).slice(2, 9)}`;
+      const guestName = body.guestName || `Listener ${Math.floor(100 + Math.random() * 900)}`;
+      user = { id: guestId, userId: guestId, name: guestName, image: null };
     }
 
     const { code } = request.params;
