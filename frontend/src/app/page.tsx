@@ -155,10 +155,10 @@ export default function Home() {
                   </div>
                 </motion.div>
                 {sections?.map(
-                (section: any) =>
+                (section: any, idx: number) =>
                   (section.isLoading || (section.items && section.items.length > 0)) && (
                     <motion.div
-                      key={section.type}
+                      key={section.id || `${section.type}-${section.title || idx}`}
                       variants={reveal}
                       initial="hidden"
                       whileInView="show"

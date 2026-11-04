@@ -529,7 +529,17 @@ export function GlobalAudio() {
     audio.addEventListener('seeked', handleSeeked);
     audio.addEventListener('error', handleAudioError);
 
-    
+    return () => {
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('seeked', handleSeeked);
+      audio.removeEventListener('error', handleAudioError);
+    };
+  }, [playNext, isPlaying, setIsPlaying, setCurrentTime, setDuration, queryClient]);
+
   // Sleep Timer Watcher
   useEffect(() => {
     const timerInterval = setInterval(() => {
@@ -568,17 +578,6 @@ export function GlobalAudio() {
 
     return () => clearInterval(timerInterval);
   }, [setIsPlaying]);
-
-    return () => {
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('seeked', handleSeeked);
-      audio.removeEventListener('error', handleAudioError);
-    };
-  }, [playNext, isPlaying, setIsPlaying, setCurrentTime, setDuration, queryClient]);
 
   // Media Session Implementation (Notification UI)
   useEffect(() => {
