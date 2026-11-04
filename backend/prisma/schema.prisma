@@ -46,6 +46,7 @@ model User {
   followedArtists ArtistFollow[]
   pushSubscriptions PushSubscription[]
   notificationPreference NotificationPreference?
+  replays         ReplaySnapshot[]
 }
 
 model Subscription {
@@ -672,4 +673,17 @@ model NotificationPreference {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_preferences")
+}
+
+model ReplaySnapshot {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  year        Int
+  data        Json
+  generatedAt DateTime @default(now()) @map("generated_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, year])
+  @@index([userId])
+  @@map("replay_snapshots")
 }
