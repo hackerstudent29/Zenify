@@ -277,6 +277,8 @@ import { replayRoutes } from './routes/replay.routes';
 server.register(replayRoutes, { prefix: '/api/me' });
 import { dayMixRoutes } from './routes/day-mix.routes';
 server.register(dayMixRoutes, { prefix: '/api/me' });
+import { blendRoutes } from './routes/blend.routes';
+server.register(blendRoutes, { prefix: '/api/me' });
 import { discoveryRoutes } from './routes/discovery.routes';
 server.register(discoveryRoutes, { prefix: '/api/discover' });
 import { databaseAdminRoutes } from './routes/database-admin.routes';
