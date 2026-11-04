@@ -46,7 +46,7 @@ export async function getCacheVal<T = any>(key: string): Promise<T | null> {
       const val = await redisClient.get(key);
       return val ? JSON.parse(val) : null;
     } catch (err: any) {
-      console.warn(`[Cache] Redis get failed for ${key}:`, err.message);
+      console.warn('[Cache] Redis get failed for key:', key, err.message);
     }
   }
 
@@ -72,7 +72,7 @@ export async function setCacheVal(key: string, data: any, ttlSeconds: number): P
       await redisClient.set(key, JSON.stringify(data), 'EX', ttlSeconds);
       return;
     } catch (err: any) {
-      console.warn(`[Cache] Redis set failed for ${key}:`, err.message);
+      console.warn('[Cache] Redis set failed for key:', key, err.message);
     }
   }
 
