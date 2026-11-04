@@ -17,12 +17,9 @@ export default function JoinRedirectPage() {
   useEffect(() => {
     if (!roomCode) return;
 
-    if (!isAuthenticated) {
-      sessionStorage.setItem('zenify_redirect_after_login', `/j/${roomCode}`);
-      notify('Please sign in to join Listen Together', 'info');
-      router.push('/login');
-      return;
-    }
+    // Allow guest listeners or signed-in listeners
+    const guestId = !isAuthenticated ? (sessionStorage.getItem('zenify_guest_id') || `guest_${Math.random().toString(36).slice(2, 9)}`) : undefined;
+    if (guestId) sessionStorage.setItem('zenify_guest_id', guestId);
 
     const join = async () => {
       try {

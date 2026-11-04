@@ -2,10 +2,11 @@ import { FastifyInstance } from 'fastify';
 import { TogetherController } from '../controllers/together.controller';
 
 export async function togetherRoutes(server: FastifyInstance) {
-  // Create room
+  // Create room (supports signed in users or guest hosts)
   server.post(
     '/rooms',
     {
+      preHandler: [server.optionalAuthenticate],
       config: {
         rateLimit: { max: 30, timeWindow: '1 minute' },
       },
@@ -24,10 +25,11 @@ export async function togetherRoutes(server: FastifyInstance) {
     TogetherController.getRoom
   );
 
-  // Join room & get WS ticket
+  // Join room & get WS ticket (supports signed in users or guest listeners)
   server.post(
     '/rooms/:code/join',
     {
+      preHandler: [server.optionalAuthenticate],
       config: {
         rateLimit: { max: 30, timeWindow: '1 minute' },
       },
@@ -39,6 +41,7 @@ export async function togetherRoutes(server: FastifyInstance) {
   server.patch(
     '/rooms/:code/settings',
     {
+      preHandler: [server.authenticate],
       config: {
         rateLimit: { max: 30, timeWindow: '1 minute' },
       },
@@ -50,6 +53,7 @@ export async function togetherRoutes(server: FastifyInstance) {
   server.post(
     '/rooms/:code/transfer',
     {
+      preHandler: [server.authenticate],
       config: {
         rateLimit: { max: 10, timeWindow: '1 minute' },
       },
@@ -61,6 +65,7 @@ export async function togetherRoutes(server: FastifyInstance) {
   server.delete(
     '/rooms/:code',
     {
+      preHandler: [server.authenticate],
       config: {
         rateLimit: { max: 10, timeWindow: '1 minute' },
       },
@@ -68,4 +73,3 @@ export async function togetherRoutes(server: FastifyInstance) {
     TogetherController.closeRoom
   );
 }
-

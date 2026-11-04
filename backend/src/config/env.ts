@@ -52,11 +52,11 @@ const envSchema = z.object({
     AI_GATEWAY_MODEL: z.string().optional().default('openai/gpt-4o-mini'),
     DEEPGRAM_API_KEY: z.string().optional(),
     APIFY_API_TOKEN: z.string().optional(),
-    FEATURE_TOGETHER: z.string().optional().default(process.env.NODE_ENV === 'production' ? 'false' : 'true').transform(v => v === 'true' || v === '1'),
-    FEATURE_FOLLOW: z.string().optional().default(process.env.NODE_ENV === 'production' ? 'false' : 'true').transform(v => v === 'true' || v === '1'),
-    FEATURE_REPLAY: z.string().optional().default(process.env.NODE_ENV === 'production' ? 'false' : 'true').transform(v => v === 'true' || v === '1'),
-    FEATURE_DAY_MIX: z.string().optional().default(process.env.NODE_ENV === 'production' ? 'false' : 'true').transform(v => v === 'true' || v === '1'),
-    FEATURE_BLEND: z.string().optional().default(process.env.NODE_ENV === 'production' ? 'false' : 'true').transform(v => v === 'true' || v === '1'),
+    FEATURE_TOGETHER: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
+    FEATURE_FOLLOW: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
+    FEATURE_REPLAY: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
+    FEATURE_DAY_MIX: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
+    FEATURE_BLEND: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
 });
 
 const _env = envSchema.safeParse(process.env);
