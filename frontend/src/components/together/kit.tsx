@@ -108,3 +108,4 @@ export function Segmented<T extends string | number>({
     </div>
   );
 }
+
