@@ -9,6 +9,7 @@ import { useShortcutStore } from "@/store/shortcuts";
 import { useUIStore } from "@/store/ui";
 import { useReactiveBgStore } from "@/store/reactiveBgStore";
 import { usePlayerPrefs } from "@/store/playerPrefs";
+import { useSleepTimerStore } from "@/store/sleepTimerStore";
 import { applyAccentColor } from "@/lib/accent-colors";
 import { reapplyArtworkTheme } from "@/lib/theme";
 import {
