@@ -14,6 +14,7 @@ import { applyArtworkTheme, resetArtworkTheme, extractArtworkAverageColor } from
 import { motion, AnimatePresence } from "framer-motion";
 import { SEO } from "@/components/shared/SEO";
 import { MediaActionButtons } from "@/components/shared/MediaActionButtons";
+import { FollowButton } from "@/components/shared/FollowButton";
 import { useArtistLike } from "@/hooks/useArtistLike";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
 
