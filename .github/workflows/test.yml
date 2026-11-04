@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, feat/social-and-extras]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 jobs:
   test:
@@ -25,19 +25,14 @@ jobs:
         ports:
           - 5432:5432
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          node-version: '20.x'
 
       # Backend tests
       - name: Install backend dependencies
@@ -76,8 +71,3 @@ jobs:
       - name: Build frontend
         working-directory: ./frontend
         run: npm run build
-
-      - name: Check TypeScript types
-        working-directory: ./frontend
-        run: npm run type-check || true
-

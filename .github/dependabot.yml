@@ -1,77 +1,30 @@
 version: 2
 
 updates:
-  # Backend dependencies
+  # Backend dependencies (automated version bump PRs disabled)
   - package-ecosystem: "npm"
     directory: "/backend"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "03:00"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "hackerstudent29"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: "chore(backend):"
-    allow:
-      - dependency-type: "all"
-    ignore:
-      # Ignore major version bumps for critical dependencies
-      - dependency-name: "prisma"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "fastify"
-        update-types: ["version-update:semver-major"]
+      interval: "monthly"
+    open-pull-requests-limit: 0
 
-  # Frontend dependencies
+  # Frontend dependencies (automated version bump PRs disabled)
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "03:00"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "hackerstudent29"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: "chore(frontend):"
-    allow:
-      - dependency-type: "all"
-    ignore:
-      # Ignore major version bumps for critical dependencies
-      - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major"]
+      interval: "monthly"
+    open-pull-requests-limit: 0
 
-  # GitHub Actions
+  # GitHub Actions (automated version bump PRs disabled)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "03:00"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "hackerstudent29"
-    labels:
-      - "ci/cd"
-    commit-message:
-      prefix: "ci:"
+      interval: "monthly"
+    open-pull-requests-limit: 0
 
-  # Docker
+  # Docker (automated version bump PRs disabled)
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "03:00"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "hackerstudent29"
-    labels:
-      - "docker"
-
+      interval: "monthly"
+    open-pull-requests-limit: 0
