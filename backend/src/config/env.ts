@@ -54,7 +54,6 @@ const envSchema = z.object({
     APIFY_API_TOKEN: z.string().optional(),
     FEATURE_TOGETHER: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
     FEATURE_FOLLOW: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
-    FEATURE_REPLAY: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
     FEATURE_DAY_MIX: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
     FEATURE_BLEND: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
 });

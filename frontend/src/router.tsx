@@ -60,7 +60,6 @@ const OnboardingPage = lazyWithRetry(() => import('./app/onboarding/page'));
 const LocalLibraryPage = lazyWithRetry(() => import('./app/local-library/page'));
 const FollowingPage = lazyWithRetry(() => import('./app/following/page'));
 const DayMixPage = lazyWithRetry(() => import('./app/day-mix/page'));
-const ReplayPage = lazyWithRetry(() => import('./app/replay/page'));
 const BlendHubPage = lazyWithRetry(() => import('./app/blend/page'));
 const BlendDetailPage = lazyWithRetry(() => import('./app/blend/[id]/page'));
 const BlendJoinPage = lazyWithRetry(() => import('./app/blend/join/[token]/page'));
@@ -97,7 +96,7 @@ export default function AppRouter() {
           <Route path="/local-library" element={<LocalLibraryPage />} />
           <Route path="/following" element={<FollowingPage />} />
           <Route path="/day-mix" element={<DayMixPage />} />
-          <Route path="/replay" element={<ReplayPage />} />
+          <Route path="/replay" element={<Navigate to="/" replace />} />
           <Route path="/blend" element={<BlendHubPage />} />
           <Route path="/blend/:id" element={<BlendDetailPage />} />
           <Route path="/blend/join/:token" element={<BlendJoinPage />} />

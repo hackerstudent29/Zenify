@@ -399,13 +399,6 @@ export function Sidebar() {
                   active={pathname.startsWith("/together") || pathname.startsWith("/j/")}
                   collapsed={collapsed}
                 />
-                <NavLink
-                  href="/replay"
-                  icon={Sparkles}
-                  label="Replay"
-                  active={pathname.startsWith("/replay")}
-                  collapsed={collapsed}
-                />
               </div>
               <NavLink
                 href="#"

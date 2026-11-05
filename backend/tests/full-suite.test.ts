@@ -9,7 +9,6 @@ const testSuites = [
   { name: 'Phase 3: Listen Together & NTP Drift Sync', file: 'backend/tests/listen-together-phase3.test.ts' },
   { name: 'Phase 4: Share Cards & Link Previews', file: 'backend/tests/share-phase4.test.ts' },
   { name: 'Phase 5: Follow Artists & Web Push Notifications', file: 'backend/tests/follow-phase5.test.ts' },
-  { name: 'Phase 6: Replay & Listener Persona Engine', file: 'backend/tests/replay-phase6.test.ts' },
   { name: 'Phase 7: Day Mixes & Daylight Time-Slot Engine', file: 'backend/tests/day-mix-phase7.test.ts' },
   { name: 'Phase 8: Blend Sessions & Taste Match Engine', file: 'backend/tests/blend-phase8.test.ts' },
 ];

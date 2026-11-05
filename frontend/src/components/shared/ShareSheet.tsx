@@ -31,7 +31,7 @@ export function ShareSheet() {
   const entityType = sharePayload.type === 'lyrics' ? 'track' : sharePayload.type;
   const entityId = track?.id || album?.id || artist?.id || 'featured';
   const shareLink = typeof window !== 'undefined'
-    ? (sharePayload.type === 'replay' ? `${window.location.origin}/replay` : `${window.location.origin}/s/${entityType}/${entityId}`)
+    ? `${window.location.origin}/s/${entityType}/${entityId}`
     : '';
 
   const handleCopyLink = () => {
