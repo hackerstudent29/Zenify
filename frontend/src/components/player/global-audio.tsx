@@ -43,6 +43,8 @@ export function GlobalAudio() {
   audioFxRef.current = audioFx;
   const volumeRef = useRef(volume);
   volumeRef.current = volume;
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
   const prefetchedTrackIds = useRef<Set<string>>(new Set());
   const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
   const audioRecoveryAttempts = useRef<Record<string, number>>({});
@@ -341,7 +343,7 @@ export function GlobalAudio() {
           syncTrackDuration(audio.duration);
         }
       }
-      if (isPlaying && audio.paused) {
+      if (usePlayerStore.getState().isPlaying && audio.paused && !isSourceChanging.current) {
         audioEngine.resume();
         audio.play().catch(err => {
           if (err?.name === 'AbortError' || err?.message?.includes('interrupted')) return;
@@ -518,10 +520,45 @@ export function GlobalAudio() {
       audioEngine.setVolume(targetVol);
     };
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      if (isSwitchingTrackRef.current || isSourceChanging.current) return;
+      if (!usePlayerStore.getState().isPlaying) {
+        setIsPlaying(true);
+      }
+    };
+
+    const handlePlaying = () => {
+      isSourceChanging.current = false;
+      isSwitchingTrackRef.current = false;
+      if (!usePlayerStore.getState().isPlaying) {
+        setIsPlaying(true);
+      }
+    };
+
+    const handlePause = () => {
+      // 1. Never toggle isPlaying to false if changing tracks or source
+      if (isSwitchingTrackRef.current || isSourceChanging.current) return;
+
+      const audioEl = audioEngine.getActiveAudioElement();
+      if (!audioEl) return;
+
+      // 2. If track ended, handleEnded advances the queue; do not toggle isPlaying
+      if (audioEl.ended) return;
+
+      // 3. If audio is actively seeking, browser temporarily pauses decoding; do not toggle isPlaying
+      if (audioEl.seeking) return;
+
+      // 4. If audio is buffering/loading (readyState < 3) and user intends to play, do not toggle isPlaying
+      if (audioEl.readyState < 3 && usePlayerStore.getState().isPlaying) return;
+
+      // 5. Only sync if the user's intended state was playing, but audio was genuinely paused by OS/hardware
+      if (usePlayerStore.getState().isPlaying) {
+        setIsPlaying(false);
+      }
+    };
 
     audio.addEventListener('play', handlePlay);
+    audio.addEventListener('playing', handlePlaying);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
@@ -531,6 +568,7 @@ export function GlobalAudio() {
 
     return () => {
       audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('playing', handlePlaying);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
@@ -538,7 +576,7 @@ export function GlobalAudio() {
       audio.removeEventListener('seeked', handleSeeked);
       audio.removeEventListener('error', handleAudioError);
     };
-  }, [playNext, isPlaying, setIsPlaying, setCurrentTime, setDuration, queryClient]);
+  }, [playNext, setIsPlaying, setCurrentTime, setDuration, queryClient]);
 
   // Sleep Timer Watcher
   useEffect(() => {
@@ -831,13 +869,18 @@ export function GlobalAudio() {
         setTimeout(() => {
           isSwitchingTrackRef.current = false;
           isSourceChanging.current = false;
-        }, 300);
+        }, 1200);
       } 
       // ── CASE 2: SAME TRACK (PLAY / PAUSE TOGGLE OR RESUME) ──────────────
       else {
         currentTrackIdRef.current = currentTrack.id;
         currentTrackTitleRef.current = currentTrack.title;
         currentTrackArtistRef.current = currentArtist;
+
+        // If source is still loading or track is switching, do not disrupt with pause/play
+        if (isSourceChanging.current || isSwitchingTrackRef.current) {
+          return;
+        }
 
         if (isPlaying && audio.paused) {
           const curr = usePlayerStore.getState().currentTrack;
