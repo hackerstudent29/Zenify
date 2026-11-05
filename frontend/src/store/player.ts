@@ -582,6 +582,7 @@ export const usePlayerStore = create<PlayerState>()(
       },
 
       setIsPlaying: (isPlaying) => {
+        if (get().isPlaying === isPlaying) return;
         if (isPlaying) try { audioEngine.resume(); } catch (e) {}
         set({ isPlaying });
       },
