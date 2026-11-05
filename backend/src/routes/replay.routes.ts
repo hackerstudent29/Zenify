@@ -4,14 +4,13 @@ import { ReplayController } from '../controllers/replay.controller';
 export async function replayRoutes(server: FastifyInstance) {
   server.get(
     '/replay',
-    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    { preHandler: [server.authenticate], config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
     ReplayController.getReplay
   );
 
   server.post(
     '/replay/refresh',
-    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    { preHandler: [server.authenticate], config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
     ReplayController.refreshReplay
   );
 }
-

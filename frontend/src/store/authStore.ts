@@ -46,7 +46,11 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       accessToken: null,
-      login: (user, accessToken) => set({ user, isAuthenticated: true, accessToken }),
+      login: (user, accessToken) => set((state) => ({
+        user: { ...state.user, ...user, preferences: user.preferences ?? state.user?.preferences },
+        isAuthenticated: true,
+        accessToken,
+      })),
       logout: () => {
         if (typeof window !== 'undefined') {
           try {
