@@ -59,7 +59,7 @@ export default function FollowingPage() {
   };
 
   return (
-    <div className="min-h-screen px-4 sm:px-8 py-8 max-w-6xl mx-auto space-y-10">
+    <div className="min-h-screen px-4 sm:px-8 pt-24 sm:pt-28 md:pt-32 pb-32 max-w-6xl mx-auto space-y-10">
       <SEO title="Following – Zenify" description="Artists you follow and their latest releases." path="/following" />
 
       {/* Page Header */}
@@ -103,7 +103,7 @@ export default function FollowingPage() {
               >
                 <div className="w-full aspect-square rounded-xl overflow-hidden bg-zinc-900 shadow-md relative">
                   <img
-                    src={release.coverUrl || '/images/placeholder.png'}
+                    src={release.coverUrl || '/logo.png'}
                     alt={release.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
@@ -152,7 +152,7 @@ export default function FollowingPage() {
               >
                 <div className="w-24 h-24 rounded-full overflow-hidden bg-zinc-800 shadow-lg border border-white/10 shrink-0">
                   <img
-                    src={artist.artistImage || '/images/placeholder.png'}
+                    src={artist.artistImage || '/logo.png'}
                     alt={artist.artistName}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />

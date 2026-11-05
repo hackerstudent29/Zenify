@@ -232,7 +232,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAuthPage = pathname?.startsWith("/login") || pathname?.startsWith("/register");
   const isOnboardingPage = pathname?.startsWith("/onboarding");
   const isOnboardingIncomplete = Boolean(
-    user && (!user.preferences?.onboardingCompletedAt || !user.preferences?.onboardingCompleted)
+    user && user.preferences && user.preferences.onboardingCompleted === false
   );
 
   React.useEffect(() => {

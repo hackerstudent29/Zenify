@@ -135,7 +135,7 @@ export class AuthService {
         const tokenHash = hashToken(refreshToken);
         const storedToken = await prisma.refreshToken.findUnique({
             where: { tokenHash: tokenHash },
-            include: { user: true }
+            include: { user: { include: { preferences: true } } }
         });
 
         if (!storedToken || storedToken.revoked || storedToken.expiresAt < new Date()) {
@@ -163,7 +163,7 @@ export class AuthService {
         return {
             accessToken: newAccessToken,
             refreshToken: newRefreshToken,
-            user: { id: storedToken.user.id, email: storedToken.user.email, role: storedToken.user.role, name: storedToken.user.name, username: storedToken.user.username, avatarUrl: storedToken.user.avatarUrl }
+            user: { id: storedToken.user.id, email: storedToken.user.email, role: storedToken.user.role, name: storedToken.user.name, username: storedToken.user.username, avatarUrl: storedToken.user.avatarUrl, preferences: (storedToken.user as any).preferences }
         };
     }
 
