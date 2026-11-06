@@ -33,6 +33,8 @@ export interface Track {
   genre?: string;
   lyrics?: string;
   synced_lyrics?: any;
+  syncedLyrics?: any;
+  sync_source?: string;
   raw_lrc?: string;
   lyricsOffset?: number;
   romanizedLyrics?: string;

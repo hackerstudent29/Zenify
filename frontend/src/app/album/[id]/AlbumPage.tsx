@@ -353,9 +353,9 @@ export default function AlbumPage() {
     );
   }
 
-  const rawDate = album.releaseDate || album.year || album.createdAt;
-  let releaseYear = "2026";
-  let formattedReleaseDate = "2026";
+  const rawDate = album.releaseDate || (album.year ? `${album.year}-01-01` : null);
+  let releaseYear = album.year ? String(album.year) : "";
+  let formattedReleaseDate = "";
   if (rawDate) {
     const d = new Date(rawDate);
     if (!isNaN(d.getTime())) {
@@ -589,12 +589,12 @@ export default function AlbumPage() {
 
         {/* ── 4. Album Details ─────────────────────────────────────────────── */}
         <div className="mb-14 pt-2 text-[13px] text-white/50 space-y-1">
-          <p className="font-semibold text-white/70">{formattedReleaseDate}</p>
+          {formattedReleaseDate && <p className="font-semibold text-white/70">{formattedReleaseDate}</p>}
           <p>
             {trackCount} {trackCount === 1 ? "song" : "songs"}, {totalDurationStr}
           </p>
           <p className="text-white/40 text-[12px] pt-1">
-            ℗ {releaseYear} {album.artist?.name || "Zenify"}
+            {album.copyright ? album.copyright : (releaseYear ? `℗ ${releaseYear} ${album.artist?.name || "Zenify"}` : `℗ ${album.artist?.name || "Zenify"}`)}
           </p>
           <div className="pt-2">
             <a

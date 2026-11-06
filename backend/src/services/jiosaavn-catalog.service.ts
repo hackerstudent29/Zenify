@@ -67,7 +67,19 @@ export class JioSaavnCatalogService implements ICatalogProvider {
     const albumTitle = this.cleanString(moreInfo.album || raw.album || 'Single');
     const coverUrl = this.cleanImage(raw.image || moreInfo.image);
     const duration = parseInt(moreInfo.duration || raw.duration || '180', 10) || 180;
-    const year = parseInt(raw.year || moreInfo.release_date?.slice(0, 4) || '0', 10) || undefined;
+    const rawYear = parseInt(raw.year || moreInfo.release_date?.slice(0, 4) || '0', 10) || undefined;
+    const year = rawYear && rawYear > 1900 && rawYear < 2100 ? rawYear : undefined;
+
+    let releaseDate: Date | undefined;
+    const rawRelDate = moreInfo.release_date || raw.release_date;
+    if (rawRelDate && !isNaN(new Date(rawRelDate).getTime())) {
+      releaseDate = new Date(rawRelDate);
+    } else if (year) {
+      releaseDate = new Date(`${year}-01-01`);
+    }
+
+    const copyright = this.cleanString(moreInfo.copyright_text || raw.copyright_text);
+    const label = this.cleanString(moreInfo.label || raw.label);
     const playCount = parseInt(raw.play_count || moreInfo.play_count || '0', 10) || 0;
     const hasLyrics = moreInfo.has_lyrics === 'true' || Boolean(moreInfo.lyrics_id);
 
@@ -166,6 +178,9 @@ export class JioSaavnCatalogService implements ICatalogProvider {
       primaryArtist,
       language: raw.language ? this.cleanString(raw.language).toLowerCase() : undefined,
       year,
+      releaseDate,
+      copyright: copyright || undefined,
+      label: label || undefined,
       playCount,
       hasLyrics,
       genre: moreInfo.label ? `${this.cleanString(moreInfo.label)}` : undefined
@@ -242,11 +257,27 @@ export class JioSaavnCatalogService implements ICatalogProvider {
 
       const title = this.cleanString(data.title || data.name);
       const coverUrl = this.cleanImage(data.image);
-      const year = parseInt(data.year || (data.release_date ? data.release_date.slice(0, 4) : '0'), 10) || undefined;
-      const releaseDate = data.release_date ? new Date(data.release_date) : (year ? new Date(`${year}-01-01`) : undefined);
-      const language = data.language ? this.cleanString(data.language).toLowerCase() : undefined;
-
       const rawSongs = data.list || data.songs || [];
+
+      // Extract year & releaseDate accurately from album or first song
+      const firstSongDate = rawSongs[0]?.more_info?.release_date || rawSongs[0]?.release_date;
+      const rawYear = parseInt(data.year || (data.release_date ? data.release_date.slice(0, 4) : '') || (firstSongDate ? firstSongDate.slice(0, 4) : '') || rawSongs[0]?.year || '0', 10) || undefined;
+      const year = rawYear && rawYear > 1900 && rawYear < 2100 ? rawYear : undefined;
+
+      let releaseDate: Date | undefined;
+      const rawRelDate = data.release_date || data.more_info?.release_date || firstSongDate;
+      if (rawRelDate && !isNaN(new Date(rawRelDate).getTime())) {
+        releaseDate = new Date(rawRelDate);
+      } else if (year) {
+        releaseDate = new Date(`${year}-01-01`);
+      }
+
+      const copyright = this.cleanString(data.more_info?.copyright_text || rawSongs[0]?.more_info?.copyright_text);
+      const label = this.cleanString(data.more_info?.label || rawSongs[0]?.more_info?.label);
+      const language = data.language ? this.cleanString(data.language).toLowerCase() : undefined;
+      const songCount = parseInt(data.more_info?.song_count || data.song_count || String(rawSongs.length || 1), 10) || Math.max(rawSongs.length, 1);
+      const isSingle = songCount <= 1 || rawSongs.length <= 1;
+
       const tracks: NormalizedTrack[] = [];
       const albumArtistsMap = new Map<string, NormalizedArtistRef>();
 
@@ -281,6 +312,13 @@ export class JioSaavnCatalogService implements ICatalogProvider {
         year,
         language,
         genre: language ? `${language.charAt(0).toUpperCase() + language.slice(1)} Soundtrack` : 'Soundtrack',
+        copyright: copyright || undefined,
+        label: label || undefined,
+        trackCount: songCount,
+        songCount: songCount,
+        isSingle,
+        subtitle: data.subtitle || data.header_desc,
+        description: data.header_desc || data.description,
         primaryArtist,
         artists: Array.from(albumArtistsMap.values()),
         tracks
@@ -327,7 +365,13 @@ export class JioSaavnCatalogService implements ICatalogProvider {
       const name = this.cleanString(data.name);
       const imageUrl = this.cleanImage(data.image);
       const bio = this.parseBio(data.bio);
-      const followerCount = parseInt(data.follower_count || '0', 10) || 0;
+      const followerCount = parseInt(data.follower_count || data.fan_count || '0', 10) || 0;
+      const fanCount = parseInt(data.fan_count || '0', 10) || 0;
+      const isVerified = Boolean(data.isVerified === true || data.isVerified === 'true');
+      const dob = data.dob ? this.cleanString(data.dob) : undefined;
+      const wiki = data.wiki ? this.cleanString(data.wiki) : undefined;
+      const fb = data.fb ? this.cleanString(data.fb) : undefined;
+      const twitter = data.twitter ? this.cleanString(data.twitter) : undefined;
 
       // Parse top songs
       const rawTopSongs = data.topSongs || [];
@@ -345,27 +389,134 @@ export class JioSaavnCatalogService implements ICatalogProvider {
         const albTitle = this.cleanString(alb.title || alb.name);
         if (!albTitle) continue;
         const albCover = this.cleanImage(alb.image);
-        const albYear = parseInt(alb.year || '0', 10) || undefined;
+        const albYear = parseInt(alb.year || alb.more_info?.release_date?.slice(0, 4) || '0', 10) || undefined;
+        let albRelDate: Date | undefined;
+        const rawDate = alb.more_info?.release_date || alb.release_date;
+        if (rawDate && !isNaN(new Date(rawDate).getTime())) {
+          albRelDate = new Date(rawDate);
+        } else if (albYear) {
+          albRelDate = new Date(`${albYear}-01-01`);
+        }
+        const sCount = parseInt(alb.more_info?.song_count || alb.song_count || '10', 10) || 10;
         albums.push({
           id: String(alb.id),
           provider: 'jiosaavn',
           title: albTitle,
           coverUrl: albCover,
           year: albYear,
-          releaseDate: albYear ? new Date(`${albYear}-01-01`) : undefined,
+          releaseDate: albRelDate,
+          trackCount: sCount,
+          songCount: sCount,
+          isSingle: sCount <= 1,
+          type: 'album',
+          subtitle: alb.subtitle,
+          language: alb.language ? this.cleanString(alb.language).toLowerCase() : undefined,
+          genre: alb.language ? `${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)} Soundtrack` : 'Soundtrack',
           primaryArtist: { id: cleanId, name, imageUrl },
           artists: [{ id: cleanId, name, imageUrl }],
           tracks: []
         });
       }
 
-      // Parse singles
+      // Parse singles (in JioSaavn, singles are single-track albums / EPs)
       const rawSingles = data.singles || [];
-      const singles: NormalizedTrack[] = [];
-      for (const s of rawSingles) {
-        const t = this.normalizeTrack(s);
-        if (t) singles.push(t);
+      const singles: NormalizedAlbum[] = [];
+      for (const sg of rawSingles) {
+        if (!sg.id) continue;
+        const sgTitle = this.cleanString(sg.title || sg.name);
+        if (!sgTitle) continue;
+        const sgCover = this.cleanImage(sg.image);
+        const sgYear = parseInt(sg.year || sg.more_info?.release_date?.slice(0, 4) || '0', 10) || undefined;
+        let sgRelDate: Date | undefined;
+        const rawDate = sg.more_info?.release_date || sg.release_date;
+        if (rawDate && !isNaN(new Date(rawDate).getTime())) {
+          sgRelDate = new Date(rawDate);
+        } else if (sgYear) {
+          sgRelDate = new Date(`${sgYear}-01-01`);
+        }
+        singles.push({
+          id: `saavn-album-${sg.id}`,
+          provider: 'jiosaavn',
+          title: sgTitle,
+          coverUrl: sgCover,
+          year: sgYear,
+          releaseDate: sgRelDate,
+          trackCount: 1,
+          songCount: 1,
+          isSingle: true,
+          type: 'album',
+          subtitle: sgYear ? `Single • ${sgYear}` : (sg.subtitle || 'Single'),
+          primaryArtist: { id: cleanId, name, imageUrl },
+          artists: [{ id: cleanId, name, imageUrl }],
+          tracks: []
+        });
       }
+
+      // Parse dedicated artist playlists ("Just [Artist]")
+      const rawDedicated = data.dedicated_artist_playlist || [];
+      const dedicatedPlaylists = rawDedicated.map((pl: any, idx: number) => {
+        const plTitle = this.cleanString(pl.title || pl.name);
+        const plCover = this.cleanImage(pl.image);
+        const count = parseInt(pl.more_info?.song_count || '50', 10) || 50;
+        return {
+          id: `saavn-playlist-${pl.id || idx}`,
+          title: plTitle,
+          name: plTitle,
+          subtitle: pl.subtitle || `${count} Songs`,
+          coverUrl: plCover,
+          image: plCover,
+          trackCount: count,
+          type: 'playlist',
+          isVirtual: true
+        };
+      }).filter((p: any) => p.title && p.coverUrl);
+
+      // Parse featured playlists ("Featured In")
+      const rawFeatured = data.featured_artist_playlist || [];
+      const featuredInPlaylists = rawFeatured.map((pl: any, idx: number) => {
+        const plTitle = this.cleanString(pl.title || pl.name);
+        const plCover = this.cleanImage(pl.image);
+        const count = parseInt(pl.more_info?.song_count || '50', 10) || 50;
+        return {
+          id: `saavn-playlist-${pl.id || idx}`,
+          title: plTitle,
+          name: plTitle,
+          subtitle: pl.subtitle || `${count} Songs`,
+          coverUrl: plCover,
+          image: plCover,
+          trackCount: count,
+          type: 'playlist',
+          isVirtual: true
+        };
+      }).filter((p: any) => p.title && p.coverUrl);
+
+      // Parse latest releases
+      const rawLatest = data.latest_release || [];
+      const latestReleases = rawLatest.map((lr: any, idx: number) => {
+        const lrTitle = this.cleanString(lr.title || lr.name);
+        const lrCover = this.cleanImage(lr.image);
+        const lrYear = parseInt(lr.year || '0', 10) || undefined;
+        let lrRelDate: Date | undefined;
+        const rawDate = lr.more_info?.release_date || lr.release_date;
+        if (rawDate && !isNaN(new Date(rawDate).getTime())) {
+          lrRelDate = new Date(rawDate);
+        } else if (lrYear) {
+          lrRelDate = new Date(`${lrYear}-01-01`);
+        }
+        return {
+          id: `saavn-album-${lr.id || lr.albumid || idx}`,
+          title: lrTitle,
+          name: lrTitle,
+          subtitle: lr.subtitle || lr.description || (lrYear ? `Released ${lrYear}` : 'Latest Release'),
+          coverUrl: lrCover,
+          image: lrCover,
+          year: lrYear ? String(lrYear) : '',
+          releaseDate: lrRelDate,
+          trackCount: parseInt(lr.more_info?.song_count || '1', 10) || 1,
+          type: 'album',
+          isVirtual: true
+        };
+      }).filter((lr: any) => lr.title && lr.coverUrl);
 
       // Parse similar / related artists
       const rawSimilar = data.similarArtists || [];
@@ -388,11 +539,21 @@ export class JioSaavnCatalogService implements ICatalogProvider {
         provider: 'jiosaavn',
         name,
         imageUrl,
+        coverUrl: imageUrl,
         bio,
         followerCount,
+        fanCount,
+        isVerified,
+        dob,
+        fb,
+        twitter,
+        wiki,
         topSongs,
         albums,
         singles,
+        dedicatedPlaylists,
+        featuredInPlaylists,
+        latestReleases,
         relatedArtists
       };
 

@@ -20,8 +20,13 @@ export interface NormalizedTrack {
   primaryArtist: NormalizedArtistRef;
   language?: string;
   year?: number;
+  releaseDate?: Date;
+  copyright?: string;
+  label?: string;
   playCount?: number;
   hasLyrics?: boolean;
+  lyrics?: string;
+  syncedLyrics?: any[];
   trackNumber?: number;
   genre?: string;
 }
@@ -35,6 +40,14 @@ export interface NormalizedAlbum {
   year?: number;
   language?: string;
   genre?: string;
+  copyright?: string;
+  label?: string;
+  trackCount?: number;
+  songCount?: number;
+  isSingle?: boolean;
+  type?: string;
+  subtitle?: string;
+  description?: string;
   primaryArtist: NormalizedArtistRef;
   artists: NormalizedArtistRef[];
   tracks: NormalizedTrack[];
@@ -45,11 +58,21 @@ export interface NormalizedArtist {
   provider: string; // e.g. "jiosaavn"
   name: string;
   imageUrl?: string;
+  coverUrl?: string;
   bio?: string;
   followerCount?: number;
+  fanCount?: number;
+  isVerified?: boolean;
+  dob?: string;
+  fb?: string;
+  twitter?: string;
+  wiki?: string;
   topSongs: NormalizedTrack[];
   albums: NormalizedAlbum[];
-  singles: NormalizedTrack[];
+  singles: NormalizedAlbum[];
+  dedicatedPlaylists?: any[];
+  featuredInPlaylists?: any[];
+  latestReleases?: any[];
   relatedArtists: NormalizedArtistRef[];
 }
 

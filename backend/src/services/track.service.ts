@@ -419,6 +419,29 @@ export class TrackService {
 
         if (!track) throw this.server.httpErrors.notFound('Track not found');
 
+        // Dynamically enrich missing releaseDate, copyrightLabel, or albumId for canonical tracks
+        if (track && track.providerId && (!track.releaseDate || !track.copyrightLabel || !track.albumId)) {
+            try {
+                const { jiosaavnCatalog } = await import('./jiosaavn-catalog.service.js');
+                const { DataIdentityService } = await import('./data-identity.service.js');
+                const normalized = await jiosaavnCatalog.getTrack(track.providerId);
+                if (normalized) {
+                    await DataIdentityService.syncTrack(normalized);
+                    const enriched = await prisma.track.findUnique({
+                        where: { id: track.id },
+                        include: {
+                            artist: true,
+                            album: { include: { artist: true } },
+                            trackArtists: { include: { artist: true }, orderBy: { order: 'asc' } }
+                        }
+                    });
+                    if (enriched) track = enriched;
+                }
+            } catch (enrichErr: any) {
+                // Non-blocking enrichment
+            }
+        }
+
         // Dynamically trigger background elastic lyrics check / onset calibration for the fetched track
         const hasVerifiedLyrics = track.synced_lyrics && 
             Array.isArray(track.synced_lyrics) && 
