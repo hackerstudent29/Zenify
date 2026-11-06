@@ -17,16 +17,56 @@ export class LyricsPipelineController {
       return reply.code(400).send({ error: 'Missing trackId' });
     }
 
+    const queryLang = ((req.query as any)?.language || '').toLowerCase().trim();
+    const force = (req.query as any)?.force === 'true' || (req.query as any)?.force === true;
+
     reply.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
 
-    // 1. Check database cache (lyrics table)
+    // 1. Resolve track metadata from DB to determine target language
+    const track = await prisma.track.findUnique({
+      where: { id: trackId },
+      include: { artist: true, album: true }
+    });
+
+    const titleLower = (track?.title || '').toLowerCase();
+    const albumLower = (track?.album?.title || '').toLowerCase();
+
+    let targetLanguage: string | undefined = queryLang;
+    if (!targetLanguage || targetLanguage === 'english' || targetLanguage === 'other') {
+      if (track?.language && track.language !== 'english' && track.language !== 'other') {
+        targetLanguage = track.language.toLowerCase().trim();
+      } else if (titleLower.includes('tamil') || albumLower.includes('tamil')) {
+        targetLanguage = 'tamil';
+      } else if (titleLower.includes('telugu') || albumLower.includes('telugu')) {
+        targetLanguage = 'telugu';
+      } else if (titleLower.includes('hindi') || albumLower.includes('hindi')) {
+        targetLanguage = 'hindi';
+      } else if (titleLower.includes('malayalam') || albumLower.includes('malayalam')) {
+        targetLanguage = 'malayalam';
+      } else if (titleLower.includes('kannada') || albumLower.includes('kannada')) {
+        targetLanguage = 'kannada';
+      } else if (titleLower.includes('punjabi') || albumLower.includes('punjabi')) {
+        targetLanguage = 'punjabi';
+      }
+    }
+
+    const { MatchingGuard } = await import('../lyrics/matching-guard.js');
+
+    // 2. Check database cache (lyrics table) with language verification
     const cached = await prisma.lyrics.findUnique({
       where: { trackId }
     });
 
-    if (cached) {
+    if (cached && !force) {
       const isExpired = cached.expiresAt && cached.expiresAt.getTime() < Date.now();
-      if (!isExpired) {
+      const contentLines = (cached.contentJson as any)?.lines || [];
+      const sampleText = contentLines.map((l: any) => l.text).join(' ');
+      const isMismatch = targetLanguage && MatchingGuard.isLyricsLanguageMismatch(sampleText, targetLanguage);
+
+      if (isMismatch) {
+        console.log(`[LyricsPipeline] Discarding mismatched cached lyrics in prisma.lyrics for track ${trackId} (target: ${targetLanguage})`);
+        await prisma.lyrics.delete({ where: { trackId } }).catch(() => {});
+      } else if (!isExpired) {
         const doc: LyricsDoc = {
           syncLevel: cached.syncLevel as any,
           providerId: cached.provider,
@@ -36,41 +76,46 @@ export class LyricsPipelineController {
           instrumental: cached.instrumental,
           aiGenerated: cached.aiGenerated,
           aiSynced: cached.aiSynced,
-          lines: (cached.contentJson as any)?.lines || []
+          lines: contentLines
         };
         return reply.send({ status: 'ready', doc });
       }
     }
 
-    // 2. Resolve track metadata from DB
-    const track = await prisma.track.findUnique({
-      where: { id: trackId },
-      include: { artist: true, album: true }
-    });
+    // 2b. Check if track in DB already has synced_lyrics with language verification
+    if (track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0 && !force) {
+      const sampleText = (track.synced_lyrics as any[]).map((l: any) => l.text).join(' ');
+      const isMismatch = targetLanguage && MatchingGuard.isLyricsLanguageMismatch(sampleText, targetLanguage);
 
-    // 2b. Check if track in DB already has synced_lyrics or plain lyrics cached
-    if (track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
-      const lines = (track.synced_lyrics as any[]).map(l => ({
-        startMs: Math.round((l.time || 0) * 1000),
-        endMs: Math.round((l.endTime || (l.time + 3)) * 1000),
-        text: l.text || '',
-        words: Array.isArray(l.words) ? l.words.map((w: any) => ({
-          text: w.word || w.text || '',
-          startMs: Math.round((w.time || 0) * 1000),
-          endMs: Math.round((w.endTime || (w.time + 0.3)) * 1000)
-        })) : undefined
-      }));
-      const hasWordGranularity = lines.some(l => l.words && l.words.length > 0);
-      const doc: LyricsDoc = {
-        syncLevel: hasWordGranularity ? 'word' : 'line',
-        providerId: track.sync_source || 'DATABASE_CACHE',
-        language: track.language || undefined,
-        instrumental: false,
-        aiGenerated: track.sync_source === 'DEEPGRAM_AI',
-        aiSynced: false,
-        lines
-      };
-      return reply.send({ status: 'ready', doc });
+      if (isMismatch) {
+        console.log(`[LyricsPipeline] Discarding mismatched track.synced_lyrics for track ${track.id} (target: ${targetLanguage})`);
+        await prisma.track.update({
+          where: { id: track.id },
+          data: { synced_lyrics: null as any, lyrics: null, sync_source: null }
+        }).catch(() => {});
+      } else {
+        const lines = (track.synced_lyrics as any[]).map(l => ({
+          startMs: Math.round((l.time || 0) * 1000),
+          endMs: Math.round((l.endTime || (l.time + 3)) * 1000),
+          text: l.text || '',
+          words: Array.isArray(l.words) ? l.words.map((w: any) => ({
+            text: w.word || w.text || '',
+            startMs: Math.round((w.time || 0) * 1000),
+            endMs: Math.round((w.endTime || (w.time + 0.3)) * 1000)
+          })) : undefined
+        }));
+        const hasWordGranularity = lines.some(l => l.words && l.words.length > 0);
+        const doc: LyricsDoc = {
+          syncLevel: hasWordGranularity ? 'word' : 'line',
+          providerId: track.sync_source || 'DATABASE_CACHE',
+          language: track.language || undefined,
+          instrumental: false,
+          aiGenerated: track.sync_source === 'DEEPGRAM_AI',
+          aiSynced: false,
+          lines
+        };
+        return reply.send({ status: 'ready', doc });
+      }
     }
 
     // 3. Check if Tier A job is actively pending
@@ -85,11 +130,13 @@ export class LyricsPipelineController {
       album: track.album?.title,
       duration: track.duration,
       isrc: track.isrc || undefined,
-      language: track.language || undefined
+      language: targetLanguage,
+      providerId: track.providerId || undefined
     } : {
       trackId,
       title: trackId,
-      artist: 'Unknown'
+      artist: 'Unknown',
+      language: targetLanguage
     };
 
     const startTime = Date.now();
@@ -159,7 +206,8 @@ export class LyricsPipelineController {
           data: {
             synced_lyrics: syncedTokens,
             lyrics: doc.lines.map(l => l.text).join('\n'),
-            sync_source: doc.providerId
+            sync_source: doc.providerId,
+            language: targetLanguage || track.language || undefined
           }
         }).catch(() => {});
       }

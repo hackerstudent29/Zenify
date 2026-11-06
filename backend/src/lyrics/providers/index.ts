@@ -5,4 +5,5 @@ export * from './better-lyrics.provider';
 export * from './simpmusic.provider';
 export * from './netease.provider';
 export * from './lyrics-ovh.provider';
+export * from './jiosaavn.provider';
 

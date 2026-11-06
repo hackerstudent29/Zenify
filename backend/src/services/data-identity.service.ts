@@ -168,6 +168,7 @@ export class DataIdentityService {
           trackNumber: track.trackNumber || dbTrack.trackNumber,
           releaseDate: track.releaseDate || dbTrack.releaseDate || null,
           genre: track.genre || dbTrack.genre || 'Soundtrack',
+          language: track.language || dbTrack.language || undefined,
           copyrightLabel: track.copyright || track.label || dbTrack.copyrightLabel || null
         },
         include: {
@@ -189,6 +190,7 @@ export class DataIdentityService {
           trackNumber: track.trackNumber || 1,
           releaseDate: track.releaseDate || null,
           genre: track.genre || 'Soundtrack',
+          language: track.language || undefined,
           copyrightLabel: track.copyright || track.label || null
         },
         include: {

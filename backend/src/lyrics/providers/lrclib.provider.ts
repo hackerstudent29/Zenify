@@ -14,7 +14,7 @@ export class LrcLibBase {
       const cleanTitle = MatchingGuard.normalizeTitle(query.title);
       const cleanArtist = MatchingGuard.normalizeArtist(query.artist);
 
-      // Strategy 1: Direct /api/get with duration
+      // Strategy 1: Direct /api/get with duration (only accept if no language conflict)
       let getUrl = `${LrcLibBase.BASE_URL}/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
       if (query.duration && query.duration > 0) {
         getUrl += `&duration=${Math.round(query.duration)}`;
@@ -26,31 +26,64 @@ export class LrcLibBase {
       });
 
       if (res.ok) {
-        return await res.json();
+        const data = (await res.json()) as any;
+        const candLyrics = data?.syncedLyrics || data?.plainLyrics || '';
+        const candAlbum = (data?.albumName || '').toLowerCase();
+        const candTitle = (data?.trackName || '').toLowerCase();
+
+        const hasConflict = query.language && (
+          MatchingGuard.isLanguageConflicted(candAlbum, query.language) ||
+          MatchingGuard.isLanguageConflicted(candTitle, query.language) ||
+          MatchingGuard.isLyricsLanguageMismatch(candLyrics, query.language)
+        );
+
+        if (!hasConflict) {
+          return data;
+        }
+        console.log(`[LRCLib] Strategy 1 direct match rejected due to language conflict with "${query.language}". Searching candidates...`);
       }
 
-      // Strategy 2: Fallback search
-      const searchUrl = `${LrcLibBase.BASE_URL}/api/search?q=${encodeURIComponent(`${cleanTitle} ${cleanArtist}`)}`;
-      const sRes = await fetch(searchUrl, {
-        headers: { 'User-Agent': LrcLibBase.USER_AGENT },
-        signal: signal || AbortSignal.timeout(3000)
-      });
+      // Strategy 2: Multi-query Search with Language Scoring
+      const searchUrls: string[] = [];
+      if (query.language && query.language !== 'english' && query.language !== 'other') {
+        searchUrls.push(`${LrcLibBase.BASE_URL}/api/search?q=${encodeURIComponent(`${cleanTitle} ${query.language}`)}`);
+      }
+      searchUrls.push(`${LrcLibBase.BASE_URL}/api/search?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`);
+      searchUrls.push(`${LrcLibBase.BASE_URL}/api/search?q=${encodeURIComponent(`${cleanTitle} ${cleanArtist}`)}`);
 
-      if (sRes.ok) {
-        const list = (await sRes.json()) as any[];
-        if (Array.isArray(list) && list.length > 0) {
-          const candidates = list.map(item => ({
-            title: item.trackName || item.name,
-            artist: item.artistName,
-            album: item.albumName,
-            duration: item.duration,
-            isrc: item.isrc,
-            raw: item
-          }));
-          const best = MatchingGuard.pickBestCandidate(query, candidates);
-          if (best && best.raw) {
-            return best.raw;
+      const candidateMap = new Map<number | string, any>();
+
+      await Promise.allSettled(searchUrls.map(async (url) => {
+        try {
+          const sRes = await fetch(url, {
+            headers: { 'User-Agent': LrcLibBase.USER_AGENT },
+            signal: signal || AbortSignal.timeout(3000)
+          });
+          if (sRes.ok) {
+            const list = (await sRes.json()) as any[];
+            if (Array.isArray(list)) {
+              for (const item of list) {
+                if (item?.id && !candidateMap.has(item.id)) {
+                  candidateMap.set(item.id, item);
+                }
+              }
+            }
           }
+        } catch {}
+      }));
+
+      if (candidateMap.size > 0) {
+        const candidates = Array.from(candidateMap.values()).map(item => ({
+          title: item.trackName || item.name,
+          artist: item.artistName,
+          album: item.albumName,
+          duration: item.duration,
+          isrc: item.isrc,
+          raw: item
+        }));
+        const best = MatchingGuard.pickBestCandidate(query, candidates);
+        if (best && best.raw) {
+          return best.raw;
         }
       }
     } catch (err) {}

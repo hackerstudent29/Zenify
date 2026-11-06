@@ -96,6 +96,120 @@ export class MatchingGuard {
   }
 
   /**
+   * Detects whether candidate title or album explicitly indicates another conflicting language.
+   */
+  static isLanguageConflicted(text: string, expectedLang: string): boolean {
+    if (!text || !expectedLang) return false;
+    const lowerText = text.toLowerCase();
+    const lang = expectedLang.toLowerCase().trim();
+
+    const allLanguages = [
+      'tamil', 'telugu', 'hindi', 'malayalam', 'kannada',
+      'punjabi', 'bengali', 'marathi', 'bhojpuri', 'gujarati', 'urdu'
+    ];
+
+    for (const other of allLanguages) {
+      if (other === lang) continue;
+      // If other language is explicitly indicated in the text (e.g. "(Telugu)", "[Telugu]", " Telugu ")
+      const regex = new RegExp(`[\\(\\[\\s\\-_]${other}[\\)\\]\\s\\-_]|^${other}[\\s\\-_]|[\\s\\-_]${other}$`, 'i');
+      if (regex.test(lowerText)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Checks if candidate lyrics content contradicts the expected language
+   * using both native script ranges and Romanized tokens.
+   */
+  static isLyricsLanguageMismatch(lyricsText: string, expectedLang?: string): boolean {
+    if (!lyricsText || !expectedLang) return false;
+    const lang = expectedLang.toLowerCase().trim();
+    if (lang === 'instrumental' || lang === 'other' || lang === 'universal') return false;
+
+    // 1. Native script detection (Unicode ranges)
+    const teluguChars = (lyricsText.match(/[\u0c00-\u0c7f]/g) || []).length;
+    const tamilChars = (lyricsText.match(/[\u0b80-\u0bff]/g) || []).length;
+    const hindiChars = (lyricsText.match(/[\u0900-\u097f]/g) || []).length;
+    const malayalamChars = (lyricsText.match(/[\u0d00-\u0d7f]/g) || []).length;
+    const kannadaChars = (lyricsText.match(/[\u0c80-\u0cff]/g) || []).length;
+
+    if (lang === 'tamil') {
+      if (teluguChars >= 3 && teluguChars > tamilChars) return true;
+      if (hindiChars >= 5 && hindiChars > tamilChars) return true;
+      if (malayalamChars >= 5 && malayalamChars > tamilChars) return true;
+      if (kannadaChars >= 5 && kannadaChars > tamilChars) return true;
+    } else if (lang === 'telugu') {
+      if (tamilChars >= 3 && tamilChars > teluguChars) return true;
+      if (hindiChars >= 5 && hindiChars > teluguChars) return true;
+      if (malayalamChars >= 5 && malayalamChars > teluguChars) return true;
+      if (kannadaChars >= 5 && kannadaChars > teluguChars) return true;
+    } else if (lang === 'hindi') {
+      if (tamilChars >= 3 || teluguChars >= 3 || malayalamChars >= 3 || kannadaChars >= 3) return true;
+    } else if (lang === 'malayalam') {
+      if (tamilChars >= 5 && tamilChars > malayalamChars) return true;
+      if (teluguChars >= 3) return true;
+    } else if (lang === 'kannada') {
+      if (tamilChars >= 3 || teluguChars >= 5 || hindiChars >= 5) return true;
+    }
+
+    // 2. Romanized / Latin vocabulary detection
+    const lower = lyricsText.toLowerCase();
+
+    const teluguTokens = [
+      'nuvvu', 'nuvve', 'nenu', 'meeru', 'chala', 'ledu', 'ledhu', 'undhi', 'undi',
+      'chesi', 'cheppina', 'unnanu', 'kavali', 'raavali', 'raavayya', 'raavaiyya', 'chudu',
+      'ammai', 'abbayi', 'vachave', 'vachava', 'ledhaiyya', 'chebutha', 'manasulo',
+      'cheyyi', 'cheppave', 'ekkada', 'endhuku', 'chusthe', 'chusa', 'kalisi', 'pillada',
+      'ippudu', 'anukunna', 'telusa', 'ippude', 'naatho', 'neetho', 'nannu', 'ninnu', 'gunde'
+    ];
+
+    const tamilTokens = [
+      'machan', 'machatha', 'achatha', 'naan', 'nee', 'enakku', 'unakku', 'enna',
+      'edhu', 'epdi', 'solla', 'sonna', 'kooda', 'mattum', 'thaan', 'dhaan', 'uyire',
+      'podhum', 'vandhaaye', 'paathu', 'theriyum', 'illai', 'illa', 'illama', 'azhaga',
+      'azhage', 'pesum', 'kadhal', 'manasu', 'nillu', 'vaada', 'vaadi', 'aachu', 'pochu',
+      'vandha', 'serndha', 'paarvai', 'siricha', 'nenjukulle', 'nenjil', 'kannukulla',
+      'kanna', 'kannu', 'vazha', 'therinja', 'irukku', 'irukken', 'vandhuten'
+    ];
+
+    const hindiTokens = [
+      'mera', 'meri', 'mere', 'tere', 'teri', 'tera', 'hum', 'tum', 'aap', 'kya',
+      'kyun', 'nahi', 'nahin', 'hoga', 'hogi', 'karna', 'karo', 'dekha', 'zindagi',
+      'ishq', 'pyar', 'baat', 'kuch', 'saath', 'raha', 'rahi', 'karte', 'chahiye',
+      'chal', 'bolo', 'aankhon', 'muskuraye', 'dilbar', 'duniya'
+    ];
+
+    const countTokens = (tokens: string[]) => {
+      let count = 0;
+      for (const token of tokens) {
+        const regex = new RegExp(`\\b${token}\\b`, 'gi');
+        const m = lower.match(regex);
+        if (m) count += m.length;
+      }
+      return count;
+    };
+
+    const teluguCount = countTokens(teluguTokens);
+    const tamilCount = countTokens(tamilTokens);
+    const hindiCount = countTokens(hindiTokens);
+
+    if (lang === 'tamil') {
+      if (teluguCount >= 3 && teluguCount > tamilCount * 1.5) return true;
+      if (hindiCount >= 4 && hindiCount > tamilCount * 1.5) return true;
+    } else if (lang === 'telugu') {
+      if (tamilCount >= 3 && tamilCount > teluguCount * 1.5) return true;
+      if (hindiCount >= 4 && hindiCount > teluguCount * 1.5) return true;
+    } else if (lang === 'hindi') {
+      if (tamilCount >= 3 && tamilCount > hindiCount) return true;
+      if (teluguCount >= 3 && teluguCount > hindiCount) return true;
+    }
+
+    return false;
+  }
+
+  /**
    * String similarity using Dice's Coefficient (bigram matching).
    */
   static stringSimilarity(str1: string, str2: string): number {
@@ -148,6 +262,26 @@ export class MatchingGuard {
       return -9999;
     }
 
+    // 2b. Language conflict rejection
+    if (query.language) {
+      const targetLang = query.language.toLowerCase().trim();
+      if (targetLang && targetLang !== 'instrumental' && targetLang !== 'other' && targetLang !== 'universal') {
+        const cTitle = (candidate.title || '').toLowerCase();
+        const cAlbum = (candidate.album || '').toLowerCase();
+
+        if (MatchingGuard.isLanguageConflicted(cTitle, targetLang) || MatchingGuard.isLanguageConflicted(cAlbum, targetLang)) {
+          return -9999; // Explicit language conflict (e.g. Telugu version when looking for Tamil)
+        }
+
+        const candLyrics = candidate.raw?.syncedLyrics || candidate.raw?.plainLyrics || candidate.raw?.lyrics;
+        if (candLyrics && typeof candLyrics === 'string') {
+          if (MatchingGuard.isLyricsLanguageMismatch(candLyrics, targetLang)) {
+            return -9999; // Candidate lyrics text is in the wrong language
+          }
+        }
+      }
+    }
+
     // 3. Duration closeness verification
     if (query.duration && candidate.duration) {
       const diffSec = Math.abs(query.duration - candidate.duration);
@@ -188,6 +322,25 @@ export class MatchingGuard {
     // Prefer human sync over AI sync
     if (candidate.byModel === false) {
       score += 300;
+    }
+
+    // Language fidelity bonus
+    if (query.language) {
+      const targetLang = query.language.toLowerCase().trim();
+      const cTitle = (candidate.title || '').toLowerCase();
+      const cAlbum = (candidate.album || '').toLowerCase();
+      if (cTitle.includes(targetLang) || cAlbum.includes(targetLang)) {
+        score += 2500;
+      }
+
+      const candLyrics = candidate.raw?.syncedLyrics || candidate.raw?.plainLyrics || candidate.raw?.lyrics;
+      if (candLyrics && typeof candLyrics === 'string') {
+        if (targetLang === 'tamil' && /[\u0b80-\u0bff]/.test(candLyrics)) score += 4000;
+        else if (targetLang === 'telugu' && /[\u0c00-\u0c7f]/.test(candLyrics)) score += 4000;
+        else if (targetLang === 'hindi' && /[\u0900-\u097f]/.test(candLyrics)) score += 4000;
+        else if (targetLang === 'malayalam' && /[\u0d00-\u0d7f]/.test(candLyrics)) score += 4000;
+        else if (targetLang === 'kannada' && /[\u0c80-\u0cff]/.test(candLyrics)) score += 4000;
+      }
     }
 
     return score;

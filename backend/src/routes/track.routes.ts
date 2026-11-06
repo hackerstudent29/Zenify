@@ -384,7 +384,10 @@ export async function trackRoutes(server: FastifyInstance) {
         }
 
         const artistName = track.artist?.name || '';
-        const targetLanguage = track.language || (
+        const bodyLang = ((req.body as any)?.language || '').toLowerCase().trim();
+        const targetLanguage = (
+            (bodyLang && bodyLang !== 'english' && bodyLang !== 'other') ? bodyLang :
+            (track.language && track.language !== 'english' && track.language !== 'other') ? track.language :
             track.title.toLowerCase().includes('tamil') ? 'tamil' :
             track.title.toLowerCase().includes('telugu') ? 'telugu' :
             track.title.toLowerCase().includes('hindi') ? 'hindi' :

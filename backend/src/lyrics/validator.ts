@@ -1,4 +1,5 @@
 import { LyricsDoc, LyricsLine } from './types';
+import { MatchingGuard } from './matching-guard';
 
 export interface ValidationResult {
   valid: boolean;
@@ -8,11 +9,16 @@ export interface ValidationResult {
 
 export class LyricsValidator {
   /**
-   * Validates and normalizes a LyricsDoc against strict timing and structure rules.
+   * Validates and normalizes a LyricsDoc against strict timing, structure, and language fidelity rules.
    * @param doc The parsed candidate lyrics document
    * @param trackDurationSeconds Track duration in seconds (optional)
+   * @param targetLanguage Expected song language (optional)
    */
-  static validate(doc: LyricsDoc | null | undefined, trackDurationSeconds?: number): ValidationResult {
+  static validate(
+    doc: LyricsDoc | null | undefined,
+    trackDurationSeconds?: number,
+    targetLanguage?: string
+  ): ValidationResult {
     if (!doc) {
       return { valid: false, reason: 'Document is null or undefined' };
     }
@@ -35,6 +41,14 @@ export class LyricsValidator {
 
     if (!Array.isArray(doc.lines) || doc.lines.length === 0) {
       return { valid: false, reason: 'Non-instrumental document contains no lyric lines' };
+    }
+
+    // Language fidelity check: Discard candidate if lyrics text conflicts with target song language
+    if (targetLanguage) {
+      const sampleText = doc.lines.map(l => l.text).join(' ');
+      if (MatchingGuard.isLyricsLanguageMismatch(sampleText, targetLanguage)) {
+        return { valid: false, reason: `Lyrics content language does not match expected language "${targetLanguage}"` };
+      }
     }
 
     if (doc.lines.length > 1500) {
