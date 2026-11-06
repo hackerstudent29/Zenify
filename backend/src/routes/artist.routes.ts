@@ -64,11 +64,22 @@ export async function artistRoutes(server: FastifyInstance) {
                         coverUrl: providerArtist.imageUrl,
                         bio: providerArtist.bio,
                         follower_count: providerArtist.followerCount || 500000,
+                        fan_count: providerArtist.fanCount || 0,
+                        isVerified: providerArtist.isVerified ?? true,
+                        dob: providerArtist.dob,
+                        wiki: providerArtist.wiki,
                         topTracks: providerArtist.topSongs,
                         topSongs: providerArtist.topSongs,
                         topAlbums: providerArtist.albums,
+                        studioAlbums: providerArtist.albums,
                         albums: providerArtist.albums,
                         singles: providerArtist.singles,
+                        singlesAndEPs: providerArtist.singles,
+                        dedicatedPlaylists: providerArtist.dedicatedPlaylists || [],
+                        featuredInPlaylists: providerArtist.featuredInPlaylists || [],
+                        latestReleases: providerArtist.latestReleases || [],
+                        latestRelease: providerArtist.latestReleases?.[0] || providerArtist.albums?.[0] || null,
+                        playlists: providerArtist.dedicatedPlaylists || [],
                         relatedArtists: providerArtist.relatedArtists
                     };
                 }
@@ -91,30 +102,70 @@ export async function artistRoutes(server: FastifyInstance) {
             }
         }).catch(() => null);
 
-        // If artist has providerId, enrich from canonical provider
-        if (artist?.providerId) {
-            try {
-                const { jiosaavnCatalog } = await import('../services/jiosaavn-catalog.service.js');
-                const providerArtist = await jiosaavnCatalog.getArtist(artist.providerId);
-                if (providerArtist && providerArtist.name) {
-                    return {
-                        id: artist.id,
-                        providerId: artist.providerId,
-                        provider: 'jiosaavn',
-                        name: artist.name || providerArtist.name,
-                        imageUrl: providerArtist.imageUrl || artist.imageUrl,
-                        coverUrl: providerArtist.imageUrl || artist.coverUrl,
-                        bio: providerArtist.bio || artist.bio,
-                        follower_count: providerArtist.followerCount || artist.follower_count || 500000,
-                        topTracks: providerArtist.topSongs,
-                        topSongs: providerArtist.topSongs,
-                        topAlbums: providerArtist.albums,
-                        albums: providerArtist.albums,
-                        singles: providerArtist.singles,
-                        relatedArtists: providerArtist.relatedArtists
-                    };
+        // If artist found in DB, resolve or enrich from canonical JioSaavn provider
+        if (artist) {
+            let providerIdToUse = artist.providerId;
+            const { jiosaavnCatalog } = await import('../services/jiosaavn-catalog.service.js');
+
+            // If providerId is null, search by artist name to resolve and persist canonical providerId
+            if (!providerIdToUse && artist.name && !isFakeOrNumericArtistName(artist.name)) {
+                try {
+                    const searchRes = await jiosaavnCatalog.search(artist.name, 'in', 5);
+                    const targetNorm = artist.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const matched = searchRes.artists.find(a => {
+                        const aNorm = a.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        return aNorm === targetNorm || aNorm.includes(targetNorm) || targetNorm.includes(aNorm);
+                    });
+                    if (matched?.id) {
+                        providerIdToUse = matched.id;
+                        prisma.artist.update({
+                            where: { id: artist.id },
+                            data: {
+                                providerId: matched.id,
+                                imageUrl: matched.imageUrl || artist.imageUrl,
+                                bio: matched.bio || artist.bio
+                            }
+                        }).catch(() => {});
+                    }
+                } catch (searchErr: any) {
+                    console.warn(`[ArtistRoute] JioSaavn match error for DB artist ${artist.name}:`, searchErr.message);
                 }
-            } catch {}
+            }
+
+            if (providerIdToUse) {
+                try {
+                    const providerArtist = await jiosaavnCatalog.getArtist(providerIdToUse);
+                    if (providerArtist && providerArtist.name) {
+                        return {
+                            id: artist.id,
+                            providerId: providerIdToUse,
+                            provider: 'jiosaavn',
+                            name: artist.name || providerArtist.name,
+                            imageUrl: providerArtist.imageUrl || artist.imageUrl,
+                            coverUrl: providerArtist.imageUrl || artist.coverUrl,
+                            bio: providerArtist.bio || artist.bio,
+                            follower_count: providerArtist.followerCount || artist.follower_count || 500000,
+                            fan_count: providerArtist.fanCount || 0,
+                            isVerified: providerArtist.isVerified ?? true,
+                            dob: providerArtist.dob,
+                            wiki: providerArtist.wiki,
+                            topTracks: providerArtist.topSongs,
+                            topSongs: providerArtist.topSongs,
+                            topAlbums: providerArtist.albums,
+                            studioAlbums: providerArtist.albums,
+                            albums: providerArtist.albums,
+                            singles: providerArtist.singles,
+                            singlesAndEPs: providerArtist.singles,
+                            dedicatedPlaylists: providerArtist.dedicatedPlaylists || [],
+                            featuredInPlaylists: providerArtist.featuredInPlaylists || [],
+                            latestReleases: providerArtist.latestReleases || [],
+                            latestRelease: providerArtist.latestReleases?.[0] || providerArtist.albums?.[0] || null,
+                            playlists: providerArtist.dedicatedPlaylists || [],
+                            relatedArtists: providerArtist.relatedArtists
+                        };
+                    }
+                } catch {}
+            }
         }
 
         // 2. If not found by ID, try finding by Name / Slug (case-insensitive & space-normalized)
@@ -164,11 +215,22 @@ export async function artistRoutes(server: FastifyInstance) {
                             coverUrl: fullArtist.imageUrl,
                             bio: fullArtist.bio,
                             follower_count: fullArtist.followerCount || 500000,
+                            fan_count: fullArtist.fanCount || 0,
+                            isVerified: fullArtist.isVerified ?? true,
+                            dob: fullArtist.dob,
+                            wiki: fullArtist.wiki,
                             topTracks: fullArtist.topSongs,
                             topSongs: fullArtist.topSongs,
                             topAlbums: fullArtist.albums,
+                            studioAlbums: fullArtist.albums,
                             albums: fullArtist.albums,
                             singles: fullArtist.singles,
+                            singlesAndEPs: fullArtist.singles,
+                            dedicatedPlaylists: fullArtist.dedicatedPlaylists || [],
+                            featuredInPlaylists: fullArtist.featuredInPlaylists || [],
+                            latestReleases: fullArtist.latestReleases || [],
+                            latestRelease: fullArtist.latestReleases?.[0] || fullArtist.albums?.[0] || null,
+                            playlists: fullArtist.dedicatedPlaylists || [],
                             relatedArtists: fullArtist.relatedArtists
                         };
                     }
@@ -874,10 +936,12 @@ export async function artistRoutes(server: FastifyInstance) {
                     continue;
                 }
 
-                let albRelDate = alb.year ? new Date(`${alb.year}-01-01`) : new Date();
+                let albRelDate: Date | null = null;
                 const rawRelDate = alb.more_info?.release_date || alb.release_date;
                 if (rawRelDate && !isNaN(new Date(rawRelDate).getTime())) {
                     albRelDate = new Date(rawRelDate);
+                } else if (alb.year) {
+                    albRelDate = new Date(`${alb.year}-01-01`);
                 }
 
                 if (isComposerOrPrimary) {
@@ -938,8 +1002,8 @@ export async function artistRoutes(server: FastifyInstance) {
                         artistName: albArtist,
                         coverUrl: albArt,
                         artistId: artist.id,
-                        releaseDate: alb.releaseDate ? new Date(alb.releaseDate) : new Date(),
-                        createdAt: alb.releaseDate ? new Date(alb.releaseDate) : new Date(),
+                        releaseDate: alb.releaseDate ? new Date(alb.releaseDate) : null,
+                        createdAt: alb.releaseDate ? new Date(alb.releaseDate) : null,
                         trackCount: count,
                         genre: alb.primaryGenreName || 'Soundtrack',
                         isSingle,
@@ -958,7 +1022,7 @@ export async function artistRoutes(server: FastifyInstance) {
                         artistName: albArtist,
                         coverUrl: albArt,
                         artistId: artist.id,
-                        releaseDate: alb.releaseDate ? new Date(alb.releaseDate) : new Date(),
+                        releaseDate: alb.releaseDate ? new Date(alb.releaseDate) : null,
                         trackCount: count,
                         isSingle,
                         isVirtual: true
@@ -1005,14 +1069,16 @@ export async function artistRoutes(server: FastifyInstance) {
                     continue;
                 }
 
+                const saRelDate = sa.more_info?.release_date ? new Date(sa.more_info.release_date) : (sa.year ? new Date(`${sa.year}-01-01`) : null);
+
                 finalAlbums.push({
                     id: saId,
                     title: saTitle,
                     artistName: sa.subtitle || artist.name,
                     coverUrl: saArt,
                     artistId: artist.id,
-                    releaseDate: sa.year ? new Date(`${sa.year}-01-01`) : new Date(),
-                    createdAt: sa.year ? new Date(`${sa.year}-01-01`) : new Date(),
+                    releaseDate: saRelDate,
+                    createdAt: saRelDate,
                     trackCount: saCount,
                     genre: sa.language ? `${sa.language.charAt(0).toUpperCase() + sa.language.slice(1)} Soundtrack` : 'Soundtrack',
                     isSingle: (saCount <= 1),

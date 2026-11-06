@@ -501,13 +501,13 @@ export default function TrackPage() {
   const albumHref = hasRealAlbum ? `/album/${encodeURIComponent(String(rawAlbumId))}` : undefined;
   const hasAlbum = !!albumDisplay && !!albumHref;
 
-  const dateSrc = track.releaseDate || track.createdAt;
+  const dateSrc = track.releaseDate || track.album?.releaseDate || (track.album?.year ? `${track.album.year}-01-01` : null);
   const parsedDate = dateSrc ? new Date(dateSrc) : null;
   const validDate = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null;
   const releaseDate = validDate
     ? validDate.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })
     : "";
-  const year = validDate ? String(validDate.getFullYear()) : "";
+  const year = validDate ? String(validDate.getFullYear()) : (track.album?.year ? String(track.album.year) : "");
   const genre: string =
     typeof (track as any).genre === "string" ? (track as any).genre : (track as any).genre?.name || "";
 
@@ -779,7 +779,7 @@ export default function TrackPage() {
             1 song, {totalMins} minute{totalMins !== 1 ? "s" : ""}
           </p>
           <p>
-            ℗ {year} {artistName || <span className="font-zenify">zenify</span>}
+            {(track as any).copyrightLabel || (track as any).copyright || (year ? `℗ ${year} ${artistName || "zenify"}` : `℗ ${artistName || "zenify"}`)}
           </p>
           <div className="pt-2">
             <a

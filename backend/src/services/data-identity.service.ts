@@ -90,7 +90,7 @@ export class DataIdentityService {
         data: {
           providerId: providerId && !providerId.startsWith('unknown') ? providerId : dbAlbum.providerId,
           coverUrl: album.coverUrl || dbAlbum.coverUrl,
-          releaseDate: album.releaseDate || dbAlbum.releaseDate
+          releaseDate: album.releaseDate || dbAlbum.releaseDate || null
         }
       });
     } else {
@@ -101,7 +101,7 @@ export class DataIdentityService {
           provider: 'jiosaavn',
           artistId: dbPrimaryArtist.id,
           coverUrl: album.coverUrl,
-          releaseDate: album.releaseDate || new Date()
+          releaseDate: album.releaseDate || null
         }
       });
     }
@@ -165,7 +165,10 @@ export class DataIdentityService {
           coverUrl: track.coverUrl || dbTrack.coverUrl,
           audioUrl: track.audioUrl || dbTrack.audioUrl,
           duration: track.duration || dbTrack.duration,
-          trackNumber: track.trackNumber || dbTrack.trackNumber
+          trackNumber: track.trackNumber || dbTrack.trackNumber,
+          releaseDate: track.releaseDate || dbTrack.releaseDate || null,
+          genre: track.genre || dbTrack.genre || 'Soundtrack',
+          copyrightLabel: track.copyright || track.label || dbTrack.copyrightLabel || null
         },
         include: {
           artist: true,
@@ -184,7 +187,9 @@ export class DataIdentityService {
           audioUrl: track.audioUrl || '',
           duration: track.duration,
           trackNumber: track.trackNumber || 1,
-          genre: track.genre || 'Soundtrack'
+          releaseDate: track.releaseDate || null,
+          genre: track.genre || 'Soundtrack',
+          copyrightLabel: track.copyright || track.label || null
         },
         include: {
           artist: true,

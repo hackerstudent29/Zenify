@@ -74,7 +74,7 @@ export function LyricsView({
   isFullscreen, transparent, onUserScrollChange, onClose,
 }: LyricsViewProps) {
   const queryClient = useQueryClient();
-  const [refetchInterval, setRefetchInterval] = React.useState<number | false>(5000);
+  const [refetchInterval, setRefetchInterval] = React.useState<number | false>(false);
   const currentTrack = usePlayerStore((s) => s.currentTrack);
 
   const albumName = (typeof currentTrack?.album === 'string' ? currentTrack?.album : currentTrack?.album?.title) || (currentTrack as any)?.albumTitle;
@@ -83,8 +83,44 @@ export function LyricsView({
   /* ───────────────────────── data ───────────────────────── */
   const { data, isLoading } = useQuery({
     queryKey: ["lyrics", trackId, title, artist, trackLang, albumName],
+    initialData: () => {
+      const current = usePlayerStore.getState().currentTrack;
+      const memTokens = current?.synced_lyrics || current?.syncedLyrics;
+      if (Array.isArray(memTokens) && memTokens.length > 0 && (!trackId || current?.id === trackId)) {
+        const hasWords = memTokens.some((t: any) => Array.isArray(t.words) && t.words.length > 0);
+        return {
+          status: "available" as const,
+          syncedTokens: memTokens,
+          qualityBadge: (hasWords ? "Word by word" : "Synced") as "Word by word" | "Synced" | "Unsynced" | "AI-generated",
+          isAiGenerated: current?.sync_source === "DEEPGRAM_AI",
+          source: current?.sync_source || "DATABASE_CACHE",
+          romanizedLyrics: current?.romanizedLyrics,
+          romanizedSyncedLyrics: current?.romanizedSyncedLyrics,
+          romanizedLang: current?.romanizedLang,
+        };
+      }
+      return undefined;
+    },
     queryFn: async ({ signal }) => {
       if (!title) return { syncedTokens: [], source: undefined as string | undefined, status: "not_found" as const };
+
+      // 0. Instant Cache Check: If currentTrack already has synced lyrics in state, return immediately (0ms, 0 network requests)
+      const current = usePlayerStore.getState().currentTrack;
+      const inMemoryTokens = current?.synced_lyrics || current?.syncedLyrics;
+      if (Array.isArray(inMemoryTokens) && inMemoryTokens.length > 0 && (!trackId || current?.id === trackId)) {
+        const hasWords = inMemoryTokens.some((t: any) => Array.isArray(t.words) && t.words.length > 0);
+        return {
+          status: "available" as const,
+          syncedTokens: inMemoryTokens,
+          qualityBadge: (hasWords ? "Word by word" : "Synced") as "Word by word" | "Synced" | "Unsynced" | "AI-generated",
+          isAiGenerated: current?.sync_source === "DEEPGRAM_AI",
+          source: current?.sync_source || "DATABASE_CACHE",
+          romanizedLyrics: current?.romanizedLyrics,
+          romanizedSyncedLyrics: current?.romanizedSyncedLyrics,
+          romanizedLang: current?.romanizedLang,
+        };
+      }
+
       try {
         // 1. Try canonical multi-provider pipeline endpoint
         if (trackId) {
@@ -181,7 +217,10 @@ export function LyricsView({
       }
     },
     enabled: isLyricsOpen && !!title,
-    staleTime: 60000,
+    staleTime: Infinity,
+    gcTime: 1000 * 60 * 60 * 24, // 24 hours
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
     refetchInterval,
   });
 

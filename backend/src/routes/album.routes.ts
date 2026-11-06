@@ -335,16 +335,21 @@ export async function albumRoutes(server: FastifyInstance) {
                         }
                     }
 
+                    const albRelDate = album.releaseDate || (album.year ? new Date(`${album.year}-01-01`) : null);
                     return {
                         id: dbAlbum.id,
                         providerId: album.id,
                         provider: 'jiosaavn',
                         title: album.title,
                         coverUrl: album.coverUrl,
-                        releaseDate: album.releaseDate || new Date(),
-                        createdAt: album.releaseDate || new Date(),
+                        releaseDate: albRelDate,
+                        createdAt: albRelDate,
                         year: album.year,
+                        copyright: album.copyright,
+                        label: album.label,
+                        trackCount: album.tracks.length,
                         genre: album.genre || 'Soundtrack',
+                        description: album.description || album.subtitle,
                         artist: {
                             id: album.primaryArtist.id,
                             name: album.primaryArtist.name,
@@ -475,12 +480,33 @@ export async function albumRoutes(server: FastifyInstance) {
                         };
                     });
 
+                    const firstSongDate = songsList[0]?.more_info?.release_date || songsList[0]?.release_date;
+                    const rawYear = parseInt(albData.year || (albData.release_date ? albData.release_date.slice(0, 4) : '') || (firstSongDate ? firstSongDate.slice(0, 4) : '') || songsList[0]?.year || '0', 10) || undefined;
+                    const year = rawYear && rawYear > 1900 && rawYear < 2100 ? rawYear : undefined;
+
+                    let releaseDate: Date | null = null;
+                    const rawRelDate = albData.release_date || albData.more_info?.release_date || firstSongDate;
+                    if (rawRelDate && !isNaN(new Date(rawRelDate).getTime())) {
+                        releaseDate = new Date(rawRelDate);
+                    } else if (year) {
+                        releaseDate = new Date(`${year}-01-01`);
+                    }
+
+                    const copyright = albData.more_info?.copyright_text || songsList[0]?.more_info?.copyright_text;
+                    const label = albData.more_info?.label || songsList[0]?.more_info?.label;
+                    const desc = albData.header_desc || albData.description || albData.subtitle;
+
                     return {
                         id: decodedId,
                         title: albTitle,
                         coverUrl: artwork,
-                        releaseDate: albData.release_date ? new Date(albData.release_date) : (albData.year ? new Date(`${albData.year}-01-01`) : new Date()),
-                        createdAt: albData.release_date ? new Date(albData.release_date) : new Date(),
+                        releaseDate,
+                        createdAt: releaseDate,
+                        year,
+                        copyright,
+                        label,
+                        trackCount: tracks.length,
+                        description: desc,
                         genre: albData.language ? `${albData.language.charAt(0).toUpperCase() + albData.language.slice(1)} Soundtrack` : 'Soundtrack',
                         artist: {
                             id: `artist-${encodeURIComponent(cleanMainArtist.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
@@ -520,7 +546,10 @@ export async function albumRoutes(server: FastifyInstance) {
                     }
                     const finalAudioUrl = directAudioUrl || `/api/utils/stream-youtube?url=${encodeURIComponent(`${trackArtist} - ${songTitle}`)}&title=${encodeURIComponent(songTitle)}&artist=${encodeURIComponent(trackArtist)}&album=${encodeURIComponent(albTitle)}`;
 
-                    const relDate = songObj.release_date ? new Date(songObj.release_date) : (songObj.year ? new Date(`${songObj.year}-01-01`) : new Date());
+                    const rawSongRelDate = songObj.more_info?.release_date || songObj.release_date;
+                    const relDate = rawSongRelDate && !isNaN(new Date(rawSongRelDate).getTime())
+                        ? new Date(rawSongRelDate)
+                        : (songObj.year ? new Date(`${songObj.year}-01-01`) : null);
 
                     return {
                         id: decodedId,

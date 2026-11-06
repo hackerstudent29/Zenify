@@ -19,7 +19,7 @@ export class LyricsPipelineController {
 
     reply.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
 
-    // 1. Check database cache
+    // 1. Check database cache (lyrics table)
     const cached = await prisma.lyrics.findUnique({
       where: { trackId }
     });
@@ -42,16 +42,41 @@ export class LyricsPipelineController {
       }
     }
 
-    // 2. Check if Tier A job is actively pending
-    if (this.pendingTrackJobs.has(trackId)) {
-      return reply.send({ status: 'pending' });
-    }
-
-    // 3. Resolve track metadata
+    // 2. Resolve track metadata from DB
     const track = await prisma.track.findUnique({
       where: { id: trackId },
       include: { artist: true, album: true }
     });
+
+    // 2b. Check if track in DB already has synced_lyrics or plain lyrics cached
+    if (track && track.synced_lyrics && Array.isArray(track.synced_lyrics) && track.synced_lyrics.length > 0) {
+      const lines = (track.synced_lyrics as any[]).map(l => ({
+        startMs: Math.round((l.time || 0) * 1000),
+        endMs: Math.round((l.endTime || (l.time + 3)) * 1000),
+        text: l.text || '',
+        words: Array.isArray(l.words) ? l.words.map((w: any) => ({
+          text: w.word || w.text || '',
+          startMs: Math.round((w.time || 0) * 1000),
+          endMs: Math.round((w.endTime || (w.time + 0.3)) * 1000)
+        })) : undefined
+      }));
+      const hasWordGranularity = lines.some(l => l.words && l.words.length > 0);
+      const doc: LyricsDoc = {
+        syncLevel: hasWordGranularity ? 'word' : 'line',
+        providerId: track.sync_source || 'DATABASE_CACHE',
+        language: track.language || undefined,
+        instrumental: false,
+        aiGenerated: track.sync_source === 'DEEPGRAM_AI',
+        aiSynced: false,
+        lines
+      };
+      return reply.send({ status: 'ready', doc });
+    }
+
+    // 3. Check if Tier A job is actively pending
+    if (this.pendingTrackJobs.has(trackId)) {
+      return reply.send({ status: 'pending' });
+    }
 
     const query = track ? {
       trackId: track.id,
@@ -118,6 +143,27 @@ export class LyricsPipelineController {
         }
       }).catch(() => {});
 
+      if (track) {
+        const syncedTokens = doc.lines.map(l => ({
+          time: l.startMs / 1000,
+          endTime: l.endMs / 1000,
+          text: l.text,
+          words: l.words?.map(w => ({
+            word: w.text,
+            time: w.startMs / 1000,
+            endTime: w.endMs / 1000
+          }))
+        }));
+        prisma.track.update({
+          where: { id: track.id },
+          data: {
+            synced_lyrics: syncedTokens,
+            lyrics: doc.lines.map(l => l.text).join('\n'),
+            sync_source: doc.providerId
+          }
+        }).catch(() => {});
+      }
+
       return reply.send({ status: 'ready', doc });
     }
 
@@ -151,7 +197,28 @@ export class LyricsPipelineController {
                 aiGenerated: true,
                 aiSynced: true
               }
-            });
+            }).catch(() => {});
+
+            if (track) {
+              const dgTokens = dgDoc.lines.map(l => ({
+                time: l.startMs / 1000,
+                endTime: l.endMs / 1000,
+                text: l.text,
+                words: l.words?.map(w => ({
+                  word: w.text,
+                  time: w.startMs / 1000,
+                  endTime: w.endMs / 1000
+                }))
+              }));
+              prisma.track.update({
+                where: { id: track.id },
+                data: {
+                  synced_lyrics: dgTokens,
+                  lyrics: dgDoc.lines.map(l => l.text).join('\n'),
+                  sync_source: dgDoc.providerId
+                }
+              }).catch(() => {});
+            }
           }
         } finally {
           LyricsPipelineController.pendingTrackJobs.delete(trackId);

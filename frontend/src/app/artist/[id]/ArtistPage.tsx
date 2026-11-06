@@ -440,7 +440,7 @@ export default function ArtistPage() {
         {((artist.topAlbums && artist.topAlbums.length > 0) || (artist.albums && artist.albums.length > 0)) && (
           <JioSaavnCardSection
             title="Top Albums"
-            items={(artist.topAlbums || artist.albums || []).filter((a: any) => (a.trackCount || a.songCount || 0) > 1 && !a.isSingle)}
+            items={(artist.topAlbums || artist.albums || []).filter((a: any) => !a.isSingle && ((a.trackCount ?? a.songCount ?? 2) > 1))}
             onPlayItem={handlePlayCollection}
             currentCollectionId={currentCollectionId || undefined}
             isPlaying={isPlaying}
