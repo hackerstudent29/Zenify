@@ -2577,11 +2577,12 @@ export class ExternalMetadataService {
     public static async searchYoutubeMusicInnertube(query: string): Promise<any[]> {
         try {
             const { default: axios } = await import('axios');
+            const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
             const postData = {
                 context: {
                     client: {
                         clientName: 'WEB_REMIX',
-                        clientVersion: '1.20240101.01.00',
+                        clientVersion: `1.${ymd}.01.00`,
                         hl: 'en',
                         gl: 'IN'
                     }
@@ -2726,11 +2727,12 @@ export class ExternalMetadataService {
 
         try {
             const { default: axios } = await import('axios');
+            const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
             const res = await axios.post('https://music.youtube.com/youtubei/v1/browse', {
                 context: {
                     client: {
                         clientName: 'WEB_REMIX',
-                        clientVersion: '1.20240101.01.00',
+                        clientVersion: `1.${ymd}.01.00`,
                         hl: 'en',
                         gl: 'IN'
                     }

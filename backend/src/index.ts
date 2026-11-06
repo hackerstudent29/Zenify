@@ -74,6 +74,10 @@ server.register(rateLimit, {
 
 function isOriginAllowed(origin: string | undefined): boolean {
     if (!origin) return true;
+    // Allow all local development origins (Flutter Chrome :8085, Preview :8080, Vite :5173, etc.)
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return true;
+    }
     const allowedOrigins = [
         ...config.FRONTEND_URL.split(','),
         'https://listenzenify.vercel.app',

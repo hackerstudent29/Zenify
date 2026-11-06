@@ -78,7 +78,7 @@ export class LyricsPipelineController {
           aiSynced: cached.aiSynced,
           lines: contentLines
         };
-        return reply.send({ status: 'ready', doc });
+        return reply.send({ status: 'ready', doc, lines: doc.lines });
       }
     }
 
@@ -114,29 +114,29 @@ export class LyricsPipelineController {
           aiSynced: false,
           lines
         };
-        return reply.send({ status: 'ready', doc });
+        return reply.send({ status: 'ready', doc, lines: doc.lines });
       }
     }
 
     // 3. Check if Tier A job is actively pending
-    if (this.pendingTrackJobs.has(trackId)) {
+    if (LyricsPipelineController.pendingTrackJobs.has(trackId)) {
       return reply.send({ status: 'pending' });
     }
 
-    const query = track ? {
-      trackId: track.id,
-      title: track.title,
-      artist: track.artist?.name || track.primaryArtists || 'Unknown',
-      album: track.album?.title,
-      duration: track.duration,
-      isrc: track.isrc || undefined,
+    const queryTitle = (req.query as any)?.title || track?.title || trackId;
+    const queryArtist = (req.query as any)?.artist || track?.artist?.name || track?.primaryArtists || 'Unknown';
+    const queryAlbum = (req.query as any)?.album || track?.album?.title;
+    const queryDuration = Number((req.query as any)?.duration) || track?.duration;
+
+    const query = {
+      trackId: track ? track.id : trackId,
+      title: queryTitle,
+      artist: queryArtist,
+      album: queryAlbum,
+      duration: queryDuration,
+      isrc: track?.isrc || undefined,
       language: targetLanguage,
-      providerId: track.providerId || undefined
-    } : {
-      trackId,
-      title: trackId,
-      artist: 'Unknown',
-      language: targetLanguage
+      providerId: track?.providerId || undefined
     };
 
     const startTime = Date.now();
@@ -212,12 +212,12 @@ export class LyricsPipelineController {
         }).catch(() => {});
       }
 
-      return reply.send({ status: 'ready', doc });
+      return reply.send({ status: 'ready', doc, lines: doc.lines });
     }
 
     // 4. If all W, L, P fail and needsTierA, trigger async Deepgram worker
     if (needsTierA && track?.audioUrl) {
-      this.pendingTrackJobs.add(trackId);
+      LyricsPipelineController.pendingTrackJobs.add(trackId);
 
       // Fire and forget background transcription
       (async () => {

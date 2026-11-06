@@ -867,6 +867,87 @@ export async function searchRoutes(server: FastifyInstance) {
   });
 
   /**
+   * DIRECT YOUTUBE MUSIC INNERTUBE SEARCH
+   * Direct high-speed YouTube Music Innertube search without server rate-limiting
+   */
+  server.get('/youtube', {
+    schema: { querystring: searchSchema }
+  }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
+    const { q } = req.query;
+    const cleanQ = q.trim();
+    if (!cleanQ) return reply.send({ tracks: [] });
+
+    try {
+      const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+      const ytRaw = await ExternalMetadataService.searchYoutubeMusic(cleanQ);
+      const tracks = ytRaw.map((item: any) => {
+        const videoId = item.videoId || item.id?.replace(/^yt-/, '');
+        const artistName = item.artist?.name || item.artist || 'YouTube Artist';
+        const cover = item.thumbnail || item.coverUrl || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '');
+        const title = item.title || 'YouTube Track';
+        const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${title}`)}&trackId=yt-${videoId}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artistName)}`;
+        return {
+          id: `yt-${videoId}`,
+          title,
+          artist: { id: '', name: artistName },
+          album: { id: `yt-alb-${videoId}`, title: item.album?.title || 'YouTube Music', coverUrl: cover },
+          coverUrl: cover,
+          audioUrl: streamUrl,
+          duration: item.duration || 210,
+          source: 'youtube'
+        };
+      });
+
+      return reply.send({ tracks });
+    } catch (err: any) {
+      server.log.warn(`[Search] YouTube direct search error: ${err.message}`);
+      return reply.status(500).send({ error: 'Failed to search YouTube Music', tracks: [] });
+    }
+  });
+
+  /**
+   * DIRECT YOUTUBE MUSIC EXPLORE & TRENDING FEED
+   */
+  server.get('/youtube/trending', async (req: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+      const ytmHits = await ExternalMetadataService.searchYoutubeMusicInnertube('Trending Hits India').catch(() => []);
+      const exploreTrending = await ExternalMetadataService.fetchYoutubeMusicExploreTrending().catch(() => []);
+      const combined = [...ytmHits, ...exploreTrending];
+      const seen = new Set<string>();
+      const tracks: any[] = [];
+
+      for (const item of combined) {
+        const videoId = item.videoId || item.id?.replace(/^yt-/, '');
+        const title = item.title;
+        if (!videoId || !title || seen.has(videoId)) continue;
+        seen.add(videoId);
+
+        const artistName = item.artist?.name || item.artist || 'YouTube Artist';
+        const cover = item.thumbnail || item.coverUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+        const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${title}`)}&trackId=yt-${videoId}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artistName)}`;
+
+        tracks.push({
+          id: `yt-${videoId}`,
+          title: title.trim(),
+          artist: { id: '', name: typeof artistName === 'string' ? artistName.trim() : 'YouTube Artist' },
+          album: { id: `yt-alb-${videoId}`, title: item.album?.title || 'YouTube Music', coverUrl: cover },
+          coverUrl: cover,
+          audioUrl: streamUrl,
+          duration: item.duration || 210,
+          source: 'youtube'
+        });
+        if (tracks.length >= 25) break;
+      }
+
+      return reply.send({ tracks });
+    } catch (err: any) {
+      server.log.warn(`[Search] YouTube trending feed error: ${err.message}`);
+      return reply.send({ tracks: [] });
+    }
+  });
+
+  /**
    * 2. LIVE SUGGESTIONS & SEARCH HINTS (Provider Hints, 250-300ms debounce)
    * Returns rich categorized autocomplete: Artists (with avatar), Tracks (with play trigger), Albums & Hints.
    */
