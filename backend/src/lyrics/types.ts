@@ -35,6 +35,7 @@ export interface TrackMetadataQuery {
   duration?: number; // in seconds
   isrc?: string;
   language?: string;
+  providerId?: string;
 }
 
 export interface LyricsProvider {

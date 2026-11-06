@@ -78,7 +78,42 @@ export function LyricsView({
   const currentTrack = usePlayerStore((s) => s.currentTrack);
 
   const albumName = (typeof currentTrack?.album === 'string' ? currentTrack?.album : currentTrack?.album?.title) || (currentTrack as any)?.albumTitle;
-  const trackLang = (currentTrack as any)?.language || (currentTrack as any)?.vibeProfile?.language || (currentTrack as any)?.languageName;
+  const rawLang = ((currentTrack as any)?.language || (currentTrack as any)?.vibeProfile?.language || (currentTrack as any)?.languageName || '').toLowerCase().trim();
+  const titleLower = (currentTrack?.title || title || '').toLowerCase();
+  const albumLower = (typeof currentTrack?.album === 'string' ? currentTrack?.album : currentTrack?.album?.title || albumName || '').toLowerCase();
+
+  const detectedTitleLang = 
+    titleLower.includes('tamil') || albumLower.includes('tamil') ? 'tamil' :
+    titleLower.includes('telugu') || albumLower.includes('telugu') ? 'telugu' :
+    titleLower.includes('hindi') || albumLower.includes('hindi') ? 'hindi' :
+    titleLower.includes('malayalam') || albumLower.includes('malayalam') ? 'malayalam' :
+    titleLower.includes('kannada') || albumLower.includes('kannada') ? 'kannada' :
+    titleLower.includes('punjabi') || albumLower.includes('punjabi') ? 'punjabi' : undefined;
+
+  const trackLang = (rawLang && rawLang !== 'english' && rawLang !== 'other') ? rawLang : detectedTitleLang;
+
+  const isLanguageMismatched = (tokens: any[], targetLang?: string): boolean => {
+    if (!targetLang || !Array.isArray(tokens) || tokens.length === 0) return false;
+    const sampleText = tokens.map((t: any) => t.text || '').join(' ');
+    const teluguChars = (sampleText.match(/[\u0c00-\u0c7f]/g) || []).length;
+    const tamilChars = (sampleText.match(/[\u0b80-\u0bff]/g) || []).length;
+    const hindiChars = (sampleText.match(/[\u0900-\u097f]/g) || []).length;
+    const malayalamChars = (sampleText.match(/[\u0d00-\u0d7f]/g) || []).length;
+    const kannadaChars = (sampleText.match(/[\u0c80-\u0cff]/g) || []).length;
+
+    if (targetLang === 'tamil') {
+      return (teluguChars >= 3 && teluguChars > tamilChars) || (hindiChars >= 5 && hindiChars > tamilChars) || (malayalamChars >= 5 && malayalamChars > tamilChars) || (kannadaChars >= 5 && kannadaChars > tamilChars);
+    } else if (targetLang === 'telugu') {
+      return (tamilChars >= 3 && tamilChars > teluguChars) || (hindiChars >= 5 && hindiChars > teluguChars) || (malayalamChars >= 5 && malayalamChars > teluguChars) || (kannadaChars >= 5 && kannadaChars > teluguChars);
+    } else if (targetLang === 'hindi') {
+      return (tamilChars >= 3 || teluguChars >= 3 || malayalamChars >= 3 || kannadaChars >= 3);
+    } else if (targetLang === 'malayalam') {
+      return (tamilChars >= 5 && tamilChars > malayalamChars) || teluguChars >= 3;
+    } else if (targetLang === 'kannada') {
+      return (tamilChars >= 3 || teluguChars >= 5 || hindiChars >= 5);
+    }
+    return false;
+  };
 
   /* ───────────────────────── data ───────────────────────── */
   const { data, isLoading } = useQuery({
@@ -87,6 +122,9 @@ export function LyricsView({
       const current = usePlayerStore.getState().currentTrack;
       const memTokens = current?.synced_lyrics || current?.syncedLyrics;
       if (Array.isArray(memTokens) && memTokens.length > 0 && (!trackId || current?.id === trackId)) {
+        if (isLanguageMismatched(memTokens, trackLang)) {
+          return undefined; // Language conflict: do not render mismatched cached lyrics
+        }
         const hasWords = memTokens.some((t: any) => Array.isArray(t.words) && t.words.length > 0);
         return {
           status: "available" as const,
@@ -104,28 +142,31 @@ export function LyricsView({
     queryFn: async ({ signal }) => {
       if (!title) return { syncedTokens: [], source: undefined as string | undefined, status: "not_found" as const };
 
-      // 0. Instant Cache Check: If currentTrack already has synced lyrics in state, return immediately (0ms, 0 network requests)
+      // 0. Instant Cache Check: If currentTrack already has synced lyrics in state, verify language before returning
       const current = usePlayerStore.getState().currentTrack;
       const inMemoryTokens = current?.synced_lyrics || current?.syncedLyrics;
       if (Array.isArray(inMemoryTokens) && inMemoryTokens.length > 0 && (!trackId || current?.id === trackId)) {
-        const hasWords = inMemoryTokens.some((t: any) => Array.isArray(t.words) && t.words.length > 0);
-        return {
-          status: "available" as const,
-          syncedTokens: inMemoryTokens,
-          qualityBadge: (hasWords ? "Word by word" : "Synced") as "Word by word" | "Synced" | "Unsynced" | "AI-generated",
-          isAiGenerated: current?.sync_source === "DEEPGRAM_AI",
-          source: current?.sync_source || "DATABASE_CACHE",
-          romanizedLyrics: current?.romanizedLyrics,
-          romanizedSyncedLyrics: current?.romanizedSyncedLyrics,
-          romanizedLang: current?.romanizedLang,
-        };
+        if (!isLanguageMismatched(inMemoryTokens, trackLang)) {
+          const hasWords = inMemoryTokens.some((t: any) => Array.isArray(t.words) && t.words.length > 0);
+          return {
+            status: "available" as const,
+            syncedTokens: inMemoryTokens,
+            qualityBadge: (hasWords ? "Word by word" : "Synced") as "Word by word" | "Synced" | "Unsynced" | "AI-generated",
+            isAiGenerated: current?.sync_source === "DEEPGRAM_AI",
+            source: current?.sync_source || "DATABASE_CACHE",
+            romanizedLyrics: current?.romanizedLyrics,
+            romanizedSyncedLyrics: current?.romanizedSyncedLyrics,
+            romanizedLang: current?.romanizedLang,
+          };
+        }
       }
 
       try {
-        // 1. Try canonical multi-provider pipeline endpoint
+        // 1. Try canonical multi-provider pipeline endpoint with target language
         if (trackId) {
           try {
-            const pipeRes = await api.get(`lyrics/${encodeURIComponent(trackId)}`, { signal });
+            const langParam = trackLang ? `?language=${encodeURIComponent(trackLang)}` : '';
+            const pipeRes = await api.get(`lyrics/${encodeURIComponent(trackId)}${langParam}`, { signal });
             if (pipeRes?.data) {
               const { status, doc } = pipeRes.data;
               if (status === "pending") {

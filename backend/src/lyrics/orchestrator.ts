@@ -10,7 +10,8 @@ import {
   BetterLyricsProvider,
   SimpMusicProvider,
   NetEaseProvider,
-  LyricsOvhProvider
+  LyricsOvhProvider,
+  JioSaavnLyricsProvider
 } from './providers';
 
 interface CircuitBreakerState {
@@ -42,6 +43,7 @@ export class LyricsOrchestrator {
     this.registerProvider(new NetEaseProvider());
 
     this.registerProvider(new LrcLibPlainProvider());
+    this.registerProvider(new JioSaavnLyricsProvider());
     this.registerProvider(new LyricsOvhProvider());
   }
 
@@ -79,6 +81,7 @@ export class LyricsOrchestrator {
       'lrclib-line',
       'simpmusic',
       'lrclib-plain',
+      'jiosaavn',
       'lyrics.ovh'
     ]);
 
@@ -156,7 +159,7 @@ export class LyricsOrchestrator {
       this.initialize();
     }
 
-    const trackKey = (query.isrc || `${query.title}:${query.artist}`).toLowerCase().trim();
+    const trackKey = (query.isrc || `${query.title}:${query.artist}:${query.language || 'any'}`).toLowerCase().trim();
 
     // In-flight deduplication
     const existing = this.inFlightLookups.get(trackKey);
@@ -222,7 +225,7 @@ export class LyricsOrchestrator {
           clearTimeout(callTimer);
 
           if (doc) {
-            const validation = LyricsValidator.validate(doc, query.duration);
+            const validation = LyricsValidator.validate(doc, query.duration, query.language);
             if (validation.valid && validation.doc) {
               this.recordSuccess(provider.id);
               return { provider, doc: validation.doc };

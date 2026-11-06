@@ -31,6 +31,7 @@ export interface Track {
   audioUrl: string;
   duration: number;
   genre?: string;
+  language?: string;
   lyrics?: string;
   synced_lyrics?: any;
   syncedLyrics?: any;
