@@ -16,7 +16,7 @@ export class LrcLibBase {
 
       // Strategy 1: Direct /api/get with duration (only accept if no language conflict)
       let getUrl = `${LrcLibBase.BASE_URL}/api/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`;
-      if (query.duration && query.duration > 0) {
+      if (query.duration && query.duration > 0 && query.duration !== 210) {
         getUrl += `&duration=${Math.round(query.duration)}`;
       }
 
@@ -50,6 +50,7 @@ export class LrcLibBase {
       }
       searchUrls.push(`${LrcLibBase.BASE_URL}/api/search?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`);
       searchUrls.push(`${LrcLibBase.BASE_URL}/api/search?q=${encodeURIComponent(`${cleanTitle} ${cleanArtist}`)}`);
+      searchUrls.push(`${LrcLibBase.BASE_URL}/api/search?q=${encodeURIComponent(cleanTitle)}`);
 
       const candidateMap = new Map<number | string, any>();
 

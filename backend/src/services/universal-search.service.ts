@@ -484,14 +484,11 @@ export class UniversalSearchService {
       }
     })();
 
-    await Promise.allSettled([dbPromise, saavnPromise, itunesPromise]);
-
-    // 4. YouTube Music Supplement (If results are scarce < 8 or niche query)
-    if (resultMap.size < 8) {
+    const ytPromise = (async () => {
       try {
         const { ExternalMetadataService } = await import('./external-metadata.service.js');
         const ytResults = await ExternalMetadataService.searchYoutubeMusic(cleanQ).catch(() => []);
-        for (const v of ytResults.slice(0, 10)) {
+        for (const v of ytResults.slice(0, 12)) {
           const parsed = ExternalMetadataService.parseYoutubeVideoToTrack(v);
           const key = dedupeKey(parsed.title, parsed.artist?.name || '');
           if (resultMap.has(key)) continue;
@@ -523,9 +520,11 @@ export class UniversalSearchService {
           });
         }
       } catch (err: any) {
-        console.warn('[UniversalSearch] YouTube fallback warning:', err.message);
+        console.warn('[UniversalSearch] YouTube search warning:', err.message);
       }
-    }
+    })();
+
+    await Promise.allSettled([dbPromise, saavnPromise, itunesPromise, ytPromise]);
 
     // 5. Cross-reference all items with local DB to flag existing tracks as isZenify
     try {

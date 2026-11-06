@@ -11,7 +11,7 @@ export interface CandidateMetadata {
 }
 
 export class MatchingGuard {
-  public static readonly DEFAULT_DURATION_TOLERANCE_SEC = 3;
+  public static readonly DEFAULT_DURATION_TOLERANCE_SEC = 18;
   public static readonly MIN_TITLE_SCORE = 0.75;
   public static readonly MIN_ARTIST_SCORE = 0.70;
 
@@ -282,8 +282,8 @@ export class MatchingGuard {
       }
     }
 
-    // 3. Duration closeness verification
-    if (query.duration && candidate.duration) {
+    // 3. Duration closeness verification (skip if query duration is unknown or fallback 210)
+    if (query.duration && candidate.duration && query.duration > 0 && query.duration !== 210) {
       const diffSec = Math.abs(query.duration - candidate.duration);
       if (diffSec > durationToleranceSec) {
         return -9999; // Hard rejection: duration drift exceeds tolerance

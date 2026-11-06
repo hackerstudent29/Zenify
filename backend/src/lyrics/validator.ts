@@ -55,8 +55,8 @@ export class LyricsValidator {
       return { valid: false, reason: `Excessive line count (${doc.lines.length} > 1500)` };
     }
 
-    const maxAllowedMs = trackDurationSeconds && trackDurationSeconds > 0
-      ? (trackDurationSeconds + 2) * 1000
+    const maxAllowedMs = trackDurationSeconds && trackDurationSeconds > 0 && trackDurationSeconds !== 210
+      ? (trackDurationSeconds + 25) * 1000
       : Number.MAX_SAFE_INTEGER;
 
     // Check lines sorting and bounds
