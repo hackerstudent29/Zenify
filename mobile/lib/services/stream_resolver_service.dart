@@ -96,28 +96,28 @@ class StreamResolverService {
     try {
       StreamManifest? manifest;
 
-      // 1. Primary: androidSdkless with requireWatchPage: false (fastest ~500ms on mobile IP, no PO Token)
+      // 1. Primary: iOS client without watch page (clean AAC audio, NO PoToken, NO 403 on GoogleVideo)
       try {
         manifest = await _yt.videos.streamsClient.getManifest(
           videoId,
-          ytClients: [YoutubeApiClient.androidSdkless],
+          ytClients: [YoutubeApiClient.ios],
           requireWatchPage: false,
         ).timeout(const Duration(seconds: 8));
       } catch (e) {
-        if (kDebugMode) debugPrint('[StreamResolver] androidSdkless notice: $e');
+        if (kDebugMode) debugPrint('[StreamResolver] ios client notice: $e');
         manifest = null;
       }
 
-      // 2. Secondary fallback: iOS client without watch page (~1s, clean AAC audio)
+      // 2. Secondary fallback: androidSdkless with requireWatchPage: false
       if (manifest == null || manifest.audioOnly.isEmpty) {
         try {
           manifest = await _yt.videos.streamsClient.getManifest(
             videoId,
-            ytClients: [YoutubeApiClient.ios],
+            ytClients: [YoutubeApiClient.androidSdkless],
             requireWatchPage: false,
           ).timeout(const Duration(seconds: 8));
         } catch (e) {
-          if (kDebugMode) debugPrint('[StreamResolver] ios client notice: $e');
+          if (kDebugMode) debugPrint('[StreamResolver] androidSdkless notice: $e');
         }
       }
 
@@ -161,9 +161,15 @@ class StreamResolverService {
         }
       }
 
+      const streamHeaders = {
+        'User-Agent':
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        'Referer': 'https://music.youtube.com/',
+      };
+
       final resolved = ResolvedStream(
         url: url,
-        headers: const {},
+        headers: streamHeaders,
         expiresAt: expiresAt,
         bitrate: chosen.bitrate.bitsPerSecond,
       );

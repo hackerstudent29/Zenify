@@ -13,6 +13,7 @@ import '../../design_system/zen.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_state.dart';
+import '../../services/cache_service.dart';
 import '../../services/settings_service.dart';
 import '../auth/welcome_screen.dart';
 import '../player/studio_fx_sheet.dart';
@@ -393,6 +394,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       max: 10.0,
                       divisions: 19,
                       onChanged: settings.setMaxCacheGb,
+                    ),
+                    _buildDivider(),
+                    _buildActionRow(
+                      title: 'Clear Media & Search Cache',
+                      subtitle: 'Purge cached streams, artwork, and search history',
+                      icon: CupertinoIcons.trash,
+                      isDestructive: false,
+                      onTap: () async {
+                        await CacheService.clearAllMediaAndArtworkCache();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('All caches cleared successfully',
+                                  style: TextStyle(color: Colors.white, fontSize: 13)),
+                              backgroundColor: const Color(0xFF18181B),
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                        }
+                      },
                     ),
                   ]),
                   const SizedBox(height: 28),
