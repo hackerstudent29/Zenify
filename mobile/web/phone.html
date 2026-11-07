@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zenify Mobile - Phone Preview Shell</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #0c0c0e;
+      color: #ffffff;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 20% 20%, rgba(225, 29, 72, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 80% 80%, rgba(158, 35, 57, 0.08) 0%, transparent 40%);
+    }
+
+    .preview-container {
+      display: flex;
+      align-items: center;
+      gap: 48px;
+      padding: 32px;
+      max-width: 1200px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* iPhone 16 Pro Chassis */
+    .phone-chassis {
+      position: relative;
+      width: 412px;
+      height: 870px;
+      background: #1a1a1e;
+      border-radius: 54px;
+      padding: 12px;
+      box-shadow: 
+        0 0 0 2px #2d2d34,
+        0 0 0 4px #121214,
+        0 25px 60px -15px rgba(0, 0, 0, 0.8),
+        0 0 40px rgba(225, 29, 72, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Side Buttons */
+    .phone-chassis::before {
+      content: '';
+      position: absolute;
+      left: -4px;
+      top: 140px;
+      width: 4px;
+      height: 48px;
+      background: #2d2d34;
+      border-radius: 4px 0 0 4px;
+      box-shadow: 0 60px 0 #2d2d34, 0 120px 0 #2d2d34;
+    }
+
+    .phone-chassis::after {
+      content: '';
+      position: absolute;
+      right: -4px;
+      top: 180px;
+      width: 4px;
+      height: 72px;
+      background: #2d2d34;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .phone-screen {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #121214;
+      border-radius: 44px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Dynamic Island */
+    .dynamic-island {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 110px;
+      height: 28px;
+      background: #000000;
+      border-radius: 20px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .camera-dot {
+      width: 10px;
+      height: 10px;
+      background: #0a0a18;
+      border-radius: 50%;
+      border: 1px solid #1c1c2e;
+    }
+
+    .sensor-dot {
+      width: 7px;
+      height: 7px;
+      background: #070712;
+      border-radius: 50%;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 90;
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+      pointer-events: none;
+    }
+
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Home Indicator */
+    .home-indicator {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 134px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.4);
+      border-radius: 10px;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    /* Flutter Frame */
+    .flutter-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #121214;
+    }
+
+    /* Side Control Panel */
+    .side-panel {
+      width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-badge {
+      width: 36px;
+      height: 36px;
+      background: #E11D48;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+    }
+
+    .card {
+      background: #18181b;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 18px;
+    }
+
+    .card h3 {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 12px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      flex: 1;
+      height: 38px;
+      background: #27272a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: #3f3f46;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn.active {
+      background: #E11D48;
+      border-color: #E11D48;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background: #10b981;
+      border-radius: 50%;
+    }
+
+    @media (max-width: 900px) {
+      .preview-container {
+        flex-direction: column;
+      }
+      .side-panel {
+        width: 100%;
+        max-width: 412px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="preview-container">
+    <!-- Phone Chassis (Apple iPhone 16 Pro) -->
+    <div class="phone-chassis" id="chassis">
+      <div class="phone-screen">
+        <!-- Dynamic Island -->
+        <div class="dynamic-island">
+          <div class="camera-dot"></div>
+          <div class="sensor-dot"></div>
+        </div>
+
+        <!-- iOS Status Bar -->
+        <div class="status-bar">
+          <span id="clock">9:41</span>
+          <div class="status-icons">
+            <span>5G</span>
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor">
+              <path d="M0 2C2.5 0 5.5 0 8 0C10.5 0 13.5 0 16 2L8 12L0 2Z"/>
+            </svg>
+            <svg width="22" height="12" viewBox="0 0 22 12" fill="currentColor">
+              <rect x="0" y="1" width="18" height="10" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="2" y="3" width="12" height="6" rx="1.5"/>
+              <path d="M20 4.5V7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Embedded Flutter App -->
+        <iframe src="http://localhost:8085/?raw=true" class="flutter-frame" id="flutterFrame"></iframe>
+
+        <!-- iOS Home Indicator -->
+        <div class="home-indicator"></div>
+      </div>
+    </div>
+
+    <!-- Side Control Panel -->
+    <div class="side-panel">
+      <div class="brand-header">
+        <div class="brand-badge">Z</div>
+        <div>
+          <h2 style="font-size: 18px; font-weight: 800; letter-spacing: -0.3px;">Zenify Mobile</h2>
+          <p style="font-size: 12px; color: rgba(255, 255, 255, 0.5);">Apple Music Architecture • Flutter</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Display Scale</h3>
+        <div class="btn-group">
+          <button class="btn" onclick="setScale(0.85)">85%</button>
+          <button class="btn active" id="btn100" onclick="setScale(1.0)">100%</button>
+          <button class="btn" onclick="setScale(1.05)">105%</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>App Source Mode</h3>
+        <div class="btn-group">
+          <button class="btn active" id="btnLive" onclick="setSource('http://localhost:8085/?raw=true')">Live Dev (8085)</button>
+          <button class="btn" id="btnBuild" onclick="setSource('/index.html?raw=true')">Built App (8080)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Device Controls</h3>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button class="btn" onclick="reloadFrame()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
+            Reload Flutter App
+          </button>
+          <a id="fullWindowLink" href="http://localhost:8085/" target="_blank" class="btn" style="text-decoration: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
+            Open Full Chrome Tab
+          </a>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Environment Telemetry</h3>
+        <div class="info-row">
+          <span style="color: rgba(255, 255, 255, 0.6);">Flutter Engine</span>
+          <span class="status-pill"><span class="status-dot"></span> Chrome Web</span>
+        </div>
+        <div class="info-row">
+          <span style="color: rgba(255, 255, 255, 0.6);">Fastify Backend</span>
+          <span class="status-pill"><span class="status-dot"></span> Port 3000 Active</span>
+        </div>
+        <div class="info-row">
+          <span style="color: rgba(255, 255, 255, 0.6);">Audio Stream</span>
+          <span style="font-weight: 600; color: #E11D48;">YouTube Music Innertube</span>
+        </div>
+        <div class="info-row">
+          <span style="color: rgba(255, 255, 255, 0.6);">Design System</span>
+          <span style="font-weight: 600; color: #ffffff;">Spring Physics + Liquid Sheet</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours();
+      let minutes = now.getMinutes().toString().padLeft ? now.getMinutes().toString().padStart(2, '0') : now.getMinutes();
+      document.getElementById('clock').innerText = hours + ':' + (minutes < 10 && typeof minutes === 'number' ? '0' + minutes : minutes);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function setScale(scale) {
+      document.getElementById('chassis').style.transform = 'scale(' + scale + ')';
+      document.querySelectorAll('.btn-group .btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+
+    let currentSource = 'http://localhost:8085/?raw=true';
+
+    function setSource(src) {
+      currentSource = src;
+      document.getElementById('flutterFrame').src = src + (src.includes('?') ? '&' : '?') + 't=' + Date.now();
+      document.getElementById('fullWindowLink').href = src.split('?')[0];
+      if (src.includes('8085')) {
+        document.getElementById('btnLive').classList.add('active');
+        document.getElementById('btnBuild').classList.remove('active');
+      } else {
+        document.getElementById('btnBuild').classList.add('active');
+        document.getElementById('btnLive').classList.remove('active');
+      }
+    }
+
+    function reloadFrame() {
+      document.getElementById('flutterFrame').src = currentSource + (currentSource.includes('?') ? '&' : '?') + 't=' + Date.now();
+    }
+  </script>
+</body>
+</html>
+

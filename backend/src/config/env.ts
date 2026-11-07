@@ -56,6 +56,7 @@ const envSchema = z.object({
     FEATURE_FOLLOW: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
     FEATURE_DAY_MIX: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
     FEATURE_BLEND: z.string().optional().default('true').transform(v => v === 'true' || v === '1'),
+    ALLOW_DEV_OTP: z.string().optional().default('false'),
 });
 
 const _env = envSchema.safeParse(process.env);
@@ -66,3 +67,7 @@ if (!_env.success) {
 }
 
 export const config = _env.data;
+
+if (config.NODE_ENV === 'production' && config.ALLOW_DEV_OTP === 'true') {
+    throw new Error('FATAL SECURITY VIOLATION: ALLOW_DEV_OTP must be false in production environments');
+}

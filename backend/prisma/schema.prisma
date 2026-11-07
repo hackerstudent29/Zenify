@@ -24,6 +24,10 @@ model User {
   username      String?          @unique
   isVerified    Boolean          @default(false)
   timezone      String?          @default("UTC")
+  isGuest       Boolean          @default(false) @map("is_guest")
+  deletedAt     DateTime?        @map("deleted_at")
+  displayName   String?          @map("display_name")
+  bio           String?
   history       History[]
   likes         Like[]
   playlists     Playlist[]
@@ -49,6 +53,12 @@ model User {
   replays         ReplaySnapshot[]
   blendSessionsA  BlendSession[] @relation("BlendUserA")
   blendSessionsB  BlendSession[] @relation("BlendUserB")
+  identities      AuthIdentity[]
+  activeSessions  Session[]
+  listeningEvents ListeningEvent[]
+  listeningEventArtists ListeningEventArtist[]
+  userArtistStats UserArtistStat[]
+  userHourlyStats UserHourlyStat[]
 }
 
 model Subscription {
@@ -125,6 +135,17 @@ model UserPreferences {
   selectedLanguageCode String?  @map("selected_language_code")
   selectedLanguageName String?  @map("selected_language_name")
   personalizationEnabled Boolean @default(true) @map("personalization_enabled")
+  cellularQuality     String   @default("high") @map("cellular_quality")
+  downloadQuality     String   @default("lossless") @map("download_quality")
+  gaplessPlayback     Boolean  @default(true) @map("gapless_playback")
+  lyricsDefaultScript String   @default("original") @map("lyrics_default_script")
+  saveListeningHistory Boolean @default(true) @map("save_listening_history")
+  profileVisibility   String   @default("public") @map("profile_visibility")
+  showTopArtists      Boolean  @default(true) @map("show_top_artists")
+  defaultRoomMode     String   @default("dj") @map("default_room_mode")
+  whoCanInvite        String   @default("everyone") @map("who_can_invite")
+  autoHideDetails     Boolean  @default(true) @map("auto_hide_details")
+  syncTimestamps      Json?    @map("sync_timestamps")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -626,6 +647,8 @@ model ArtistFollow {
   id               String   @id @default(uuid())
   userId           String   @map("user_id")
   artistProviderId String   @map("artist_provider_id")
+  artistKey        String?  @map("artist_key")
+  browseId         String?  @map("browse_id")
   artistName       String   @map("artist_name")
   artistImage      String?  @map("artist_image")
   createdAt        DateTime @default(now())
@@ -634,6 +657,7 @@ model ArtistFollow {
   @@unique([userId, artistProviderId])
   @@index([userId])
   @@index([artistProviderId])
+  @@index([userId, artistKey])
   @@map("artist_follows")
 }
 
@@ -764,4 +788,138 @@ model LyricsAttempt {
   @@index([provider])
   @@index([createdAt])
   @@map("lyrics_attempts")
+}
+
+// ==========================================
+// AUTH & MULTI-IDENTITY (PHASE 11)
+// ==========================================
+
+model AuthIdentity {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  provider       String   // 'google' | 'email'
+  providerUserId String   @map("provider_user_id")
+  email          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([email])
+  @@map("auth_identities")
+}
+
+model OtpCode {
+  id            String    @id @default(uuid())
+  email         String
+  codeHash      String    @map("code_hash")
+  expiresAt     DateTime  @map("expires_at")
+  attempts      Int       @default(0)
+  consumedAt    DateTime? @map("consumed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  requestIpHash String?   @map("request_ip_hash")
+
+  @@index([email, createdAt(sort: Desc)])
+  @@map("otp_codes")
+}
+
+model Session {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  refreshHash String    @unique @map("refresh_hash")
+  familyId    String    @map("family_id")
+  deviceId    String?   @map("device_id")
+  deviceName  String?   @map("device_name")
+  platform    String?   @map("platform")
+  appVersion  String?   @map("app_version")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastUsedAt  DateTime  @default(now()) @map("last_used_at")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("sessions")
+}
+
+// ==========================================
+// LISTENING TRACKING & INSIGHTS (PHASE 13)
+// ==========================================
+
+model ListeningEvent {
+  userId          String   @map("user_id")
+  eventId         String   @map("event_id")
+  startedAt       DateTime @map("started_at")
+  endedAt         DateTime @map("ended_at")
+  tzOffsetMin     Int      @map("tz_offset_min")
+  listenedMs      Int      @map("listened_ms")
+  trackDurationMs Int      @map("track_duration_ms")
+  endReason       String   @map("end_reason")
+  trackSource     String   @default("youtube") @map("track_source")
+  trackId         String   @map("track_id")
+  trackTitle      String   @map("track_title")
+  trackAlbum      String?  @map("track_album")
+  language        String?  @map("language")
+  genre           String?  @map("genre")
+  contextType     String?  @map("context_type")
+  contextId       String?  @map("context_id")
+  offline         Boolean  @default(false)
+  quality         Int      @default(256)
+  deviceId        String?  @map("device_id")
+  qualified       Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, eventId])
+  @@index([userId, startedAt(sort: Desc)])
+  @@index([userId, trackId])
+  @@map("listening_events")
+}
+
+model ListeningEventArtist {
+  userId     String   @map("user_id")
+  eventId    String   @map("event_id")
+  artistKey  String   @map("artist_key")
+  artistName String   @map("artist_name")
+  isPrimary  Boolean  @default(true) @map("is_primary")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, eventId, artistKey])
+  @@index([userId, artistKey])
+  @@map("listening_event_artists")
+}
+
+model UserArtistStat {
+  userId      String    @map("user_id")
+  artistKey   String    @map("artist_key")
+  artistName  String    @map("artist_name")
+  artistImage String?   @map("artist_image")
+  plays       Int       @default(0)
+  listenedMs  BigInt    @default(0) @map("listened_ms")
+  firstPlayed DateTime  @default(now()) @map("first_played")
+  lastPlayed  DateTime  @default(now()) @map("last_played")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, artistKey])
+  @@index([userId, plays(sort: Desc)])
+  @@index([userId, listenedMs(sort: Desc)])
+  @@map("user_artist_stats")
+}
+
+model UserHourlyStat {
+  userId     String @map("user_id")
+  dow        Int
+  hour       Int
+  listenedMs BigInt @default(0) @map("listened_ms")
+
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, dow, hour])
+  @@map("user_hourly_stats")
 }

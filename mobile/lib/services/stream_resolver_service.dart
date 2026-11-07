@@ -1,0 +1,180 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+
+import '../models/track.dart';
+import 'innertube_service.dart';
+
+class ResolvedStream {
+  ResolvedStream({
+    required this.url,
+    required this.headers,
+    required this.expiresAt,
+    required this.bitrate,
+  });
+
+  final String url;
+  final Map<String, String> headers;
+  final DateTime expiresAt;
+  final int bitrate;
+
+  bool get isFresh => DateTime.now().isBefore(expiresAt.subtract(const Duration(minutes: 10)));
+}
+
+/// On-Device Direct Stream Resolver for Zenify.
+/// Resolves direct audio streams (googlevideo.com) straight on the user's phone
+/// from the user's own IP address.
+/// Eliminates dependency on backend proxy servers, Heroku, or USB cables.
+class StreamResolverService {
+  StreamResolverService._();
+  static final StreamResolverService instance = StreamResolverService._();
+
+  final YoutubeExplode _yt = YoutubeExplode();
+  final Map<String, ResolvedStream> _cache = {};
+  final Map<String, Future<ResolvedStream?>> _inflight = {};
+
+  /// Resolves direct audio stream for a track, either by video ID or by direct on-device search.
+  Future<ResolvedStream?> resolveTrack(Track track) async {
+    // 1. Direct YouTube video ID (yt-XXXXX or 11 chars)
+    var videoId = track.id.replaceFirst('yt-', '').trim();
+    if (videoId.length == 11 && !videoId.contains(' ') && !videoId.startsWith('http')) {
+      final direct = await resolveStream(videoId);
+      if (direct != null && direct.url.isNotEmpty) return direct;
+    }
+
+    // 2. Search on-device directly via InnerTube for this track title & artist
+    try {
+      final String q;
+      if (track.artist.isNotEmpty && track.artist != 'Unknown Artist') {
+        q = '${track.title} ${track.artist}'.trim();
+      } else {
+        q = track.title.trim();
+      }
+      final results = await InnerTubeService.instance.search(q).timeout(const Duration(seconds: 10));
+      if (results.isNotEmpty) {
+        final topId = results.first.id.replaceFirst('yt-', '').trim();
+        if (topId.length == 11) {
+          final direct = await resolveStream(topId);
+          if (direct != null && direct.url.isNotEmpty) return direct;
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  Future<String?> resolveAudioUrl(String rawVideoId) async {
+    final stream = await resolveStream(rawVideoId);
+    return stream?.url;
+  }
+
+  Future<ResolvedStream?> resolveStream(String rawVideoId) async {
+    final cleanId = rawVideoId.replaceFirst('yt-', '').trim();
+    if (cleanId.isEmpty) return null;
+
+    final cached = _cache[cleanId];
+    if (cached != null && cached.isFresh) {
+      return cached;
+    }
+
+    final running = _inflight[cleanId];
+    if (running != null) {
+      return running;
+    }
+
+    final future = _resolve(cleanId);
+    _inflight[cleanId] = future;
+
+    try {
+      return await future;
+    } finally {
+      _inflight.remove(cleanId);
+    }
+  }
+
+  Future<ResolvedStream?> _resolve(String videoId) async {
+    try {
+      StreamManifest? manifest;
+
+      // 1. Primary: androidSdkless with requireWatchPage: false (fastest ~500ms on mobile IP, no PO Token)
+      try {
+        manifest = await _yt.videos.streamsClient.getManifest(
+          videoId,
+          ytClients: [YoutubeApiClient.androidSdkless],
+          requireWatchPage: false,
+        ).timeout(const Duration(seconds: 8));
+      } catch (e) {
+        if (kDebugMode) debugPrint('[StreamResolver] androidSdkless notice: $e');
+        manifest = null;
+      }
+
+      // 2. Secondary fallback: iOS client without watch page (~1s, clean AAC audio)
+      if (manifest == null || manifest.audioOnly.isEmpty) {
+        try {
+          manifest = await _yt.videos.streamsClient.getManifest(
+            videoId,
+            ytClients: [YoutubeApiClient.ios],
+            requireWatchPage: false,
+          ).timeout(const Duration(seconds: 8));
+        } catch (e) {
+          if (kDebugMode) debugPrint('[StreamResolver] ios client notice: $e');
+        }
+      }
+
+      // 3. Tertiary fallback: default client without watch page
+      if (manifest == null || manifest.audioOnly.isEmpty) {
+        try {
+          manifest = await _yt.videos.streamsClient.getManifest(
+            videoId,
+            requireWatchPage: false,
+          ).timeout(const Duration(seconds: 8));
+        } catch (e) {
+          if (kDebugMode) debugPrint('[StreamResolver] default client notice: $e');
+        }
+      }
+
+      if (manifest == null) return null;
+
+      final audioStreams = manifest.audioOnly.toList();
+      final StreamInfo chosen;
+      if (audioStreams.isNotEmpty) {
+        // Sort descending by bitrate (highest audio fidelity: 160kbps Opus / 128kbps AAC)
+        audioStreams.sort((a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond));
+        chosen = audioStreams.first;
+      } else if (manifest.muxed.isNotEmpty) {
+        final muxed = manifest.muxed.toList();
+        muxed.sort((a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond));
+        chosen = muxed.first;
+      } else {
+        return null;
+      }
+
+      final url = chosen.url.toString();
+      DateTime expiresAt = DateTime.now().add(const Duration(hours: 5));
+
+      final uri = Uri.tryParse(url);
+      final expireSec = uri?.queryParameters['expire'];
+      if (expireSec != null) {
+        final sec = int.tryParse(expireSec);
+        if (sec != null) {
+          expiresAt = DateTime.fromMillisecondsSinceEpoch(sec * 1000);
+        }
+      }
+
+      final resolved = ResolvedStream(
+        url: url,
+        headers: const {},
+        expiresAt: expiresAt,
+        bitrate: chosen.bitrate.bitsPerSecond,
+      );
+
+      _cache[videoId] = resolved;
+      return resolved;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[StreamResolver] resolve error for $videoId: $e');
+      return null;
+    }
+  }
+
+  void clearCache() => _cache.clear();
+}

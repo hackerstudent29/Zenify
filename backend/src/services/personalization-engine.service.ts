@@ -878,6 +878,10 @@ export class PersonalizationEngineService {
     try {
       await Promise.all([
         prisma.listenEvent.deleteMany({ where: { userId } }),
+        prisma.listeningEvent.deleteMany({ where: { userId } }),
+        prisma.listeningEventArtist.deleteMany({ where: { userId } }),
+        prisma.userArtistStat.deleteMany({ where: { userId } }),
+        prisma.userHourlyStat.deleteMany({ where: { userId } }),
         prisma.history.deleteMany({ where: { userId } }),
         prisma.userTrackStat.deleteMany({ where: { userId } }),
         AffinityDecayService.clearAffinities(userId),
