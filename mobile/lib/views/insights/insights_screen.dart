@@ -460,7 +460,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: artists.length.clamp(0, 5),
-            separatorBuilder: (_, _) => Divider(
+            separatorBuilder: (_, __) => Divider(
               color: Colors.white.withValues(alpha: 0.06),
               height: 1,
               indent: 64,
@@ -586,7 +586,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: tracks.length.clamp(0, 5),
-            separatorBuilder: (_, _) => Divider(
+            separatorBuilder: (_, __) => Divider(
               color: Colors.white.withValues(alpha: 0.06),
               height: 1,
               indent: 48,

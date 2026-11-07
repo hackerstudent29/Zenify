@@ -124,6 +124,10 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
   }
 
   void _openInActiveTab(Widget page) {
+    final player = _playerShellKey.currentState;
+    if (player != null && player.isOpen) {
+      player.closeSheet();
+    }
     _navKeys[_currentIndex].currentState?.push(
       MaterialPageRoute(builder: (_) => page),
     );

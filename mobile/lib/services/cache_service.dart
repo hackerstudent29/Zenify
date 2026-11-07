@@ -7,6 +7,7 @@ import '../views/search/search_data_service.dart';
 import 'api_service.dart';
 import 'artist_service.dart';
 import 'innertube_service.dart';
+import 'stream_resolver_service.dart';
 
 class CacheService {
   CacheService._();
@@ -17,6 +18,7 @@ class CacheService {
     // 1. Clear in-memory service caches
     ArtistService.clearCache();
     ApiService.clearCache();
+    StreamResolverService.instance.clearCache();
     InnerTubeService.instance.clearCache();
     ExploreDataService.instance.clearCache();
     CatalogDataSource.clear();

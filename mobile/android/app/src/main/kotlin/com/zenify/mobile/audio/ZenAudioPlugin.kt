@@ -158,7 +158,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private fun play(url: String, headers: Map<String, String>) {
         android.util.Log.i("ZenAudioPlugin", "play called for: ${url.take(80)}...")
         val p = ensurePlayer()
-        val defaultUa = "com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip"
+        val defaultUa = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
         val http = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
             .setKeepPostFor302Redirects(true)
