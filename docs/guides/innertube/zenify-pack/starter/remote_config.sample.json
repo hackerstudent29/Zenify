@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "streamMode": "device",
+  "minAppVersion": "2.5.0",
+  "latestAppVersion": "2.5.3",
+  "updateUrl": "https://github.com/YOUR_USER/zenify/releases/latest",
+  "message": null,
+  "resolver": {
+    "preResolveCount": 2,
+    "maxConcurrentResolves": 2,
+    "urlSafetyMarginSec": 120
+  },
+  "innertube": {
+    "clientVersion": null,
+    "bucketCapacity": 6,
+    "refillPerSecond": 2.5,
+    "maxAttempts": 3,
+    "breakerThreshold": 4,
+    "breakerBaseCooldownSec": 15,
+    "breakerMaxCooldownSec": 300
+  },
+  "cacheTtlSec": {
+    "search": 600,
+    "suggest": 300,
+    "home": 600,
+    "charts": 1800,
+    "releases": 1800,
+    "artistCard": 86400,
+    "artistPage": 1800,
+    "next": 300
+  },
+  "killSwitches": {
+    "cloudFallback": false,
+    "remoteSuggestions": false,
+    "charts": false,
+    "newReleases": false,
+    "preResolve": false,
+    "homeFeed": false
+  }
+}

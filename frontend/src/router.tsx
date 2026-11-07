@@ -69,6 +69,7 @@ const JoinRedirectPage = lazyWithRetry(() => import('./app/j/[code]/page'));
 const SectionPage = lazyWithRetry(() => import('./app/section/[type]/page'));
 const PrivacyPage = lazyWithRetry(() => import('./app/privacy/page'));
 const TermsPage = lazyWithRetry(() => import('./app/terms/page'));
+const DownloadPage = lazyWithRetry(() => import('./app/download/page'));
 const NotFoundPage = lazyWithRetry(() => import('./app/not-found/page'));
 
 export default function AppRouter() {
@@ -93,6 +94,9 @@ export default function AppRouter() {
           <Route path="/features-and-faq" element={<FaqPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/download" element={<DownloadPage />} />
+          <Route path="/download-app" element={<Navigate to="/download" replace />} />
+          <Route path="/app" element={<Navigate to="/download" replace />} />
           <Route path="/local-library" element={<LocalLibraryPage />} />
           <Route path="/following" element={<FollowingPage />} />
           <Route path="/day-mix" element={<DayMixPage />} />

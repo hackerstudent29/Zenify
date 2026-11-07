@@ -47,6 +47,31 @@ export async function authRoutes(server: FastifyInstance) {
         handler: authController.googleLogin.bind(authController),
     });
 
+    server.post('/guest', {
+        config: {
+            rateLimit: {
+                max: 30,
+                timeWindow: '1 minute'
+            }
+        },
+        handler: async (req, reply) => {
+            const guestId = `guest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const guestUser = {
+                id: guestId,
+                email: `${guestId}@zenify.guest`,
+                name: 'Guest Listener',
+                isGuest: true,
+                role: 'LISTENER' as const,
+            };
+            const token = server.jwt.sign(guestUser, { expiresIn: '7d' });
+            return reply.status(200).send({
+                user: guestUser,
+                accessToken: token,
+                token,
+            });
+        }
+    });
+
     server.post('/logout', {
         handler: authController.logout.bind(authController)
     });
@@ -138,5 +163,41 @@ export async function authRoutes(server: FastifyInstance) {
     server.delete('/account', {
         preHandler: [server.authenticate],
         handler: authController.deleteAccount.bind(authController)
+    });
+
+    // Canonical prompt endpoints per 17-AUTH-SETTINGS-INSIGHTS-PROMPT.md
+    server.post('/otp/request', {
+        config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+        handler: authController.requestOTP.bind(authController)
+    });
+
+    server.post('/otp/verify', {
+        config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
+        handler: authController.verifyOTP.bind(authController)
+    });
+
+    server.post('/upgrade', {
+        preHandler: [server.authenticate],
+        handler: authController.upgrade.bind(authController)
+    });
+
+    server.post('/logout-all', {
+        preHandler: [server.authenticate],
+        handler: authController.logoutAll.bind(authController)
+    });
+
+    server.delete('/sessions/:id', {
+        preHandler: [server.authenticate],
+        handler: authController.revokeSession.bind(authController)
+    });
+
+    server.get('/export', {
+        preHandler: [server.authenticate],
+        handler: authController.exportData.bind(authController)
+    });
+
+    server.delete('/identities/google', {
+        preHandler: [server.authenticate],
+        handler: authController.disconnectGoogle.bind(authController)
     });
 }

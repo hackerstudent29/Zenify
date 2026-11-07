@@ -106,6 +106,7 @@ flutter_app/.dart_tool/
 mobile/build/
 mobile/.dart_tool/
 *.apk
+!frontend/public/downloads/zenify.apk
 *.aab
 *.ipa
 

@@ -15,6 +15,7 @@ import {
   Shield,
   Sparkles,
   Database,
+  Smartphone,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/ui";
@@ -132,6 +133,7 @@ export function TopBar() {
                       onClick: () => useUIStore.getState().toggleNotifications(),
                     },
                     { id: "settings", label: "Settings", icon: <Settings size={16} />, onClick: () => useUIStore.getState().openSettings() },
+                    { id: "download-app", label: "Download App (APK)", icon: <Smartphone size={16} className="text-brand" />, onClick: () => router.push("/download") },
                     { id: "about-creator", label: "About Creator", icon: <Info size={16} />, onClick: () => router.push("/about") },
                     { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push("/about-zenify") },
                     { id: "terms", label: "Terms of Service", icon: <FileText size={16} />, onClick: () => router.push("/terms") },
@@ -149,6 +151,7 @@ export function TopBar() {
                     },
                   ]
                 : [
+                    { id: "download-app", label: "Download App (APK)", icon: <Smartphone size={16} className="text-brand" />, onClick: () => router.push("/download") },
                     { id: "about-creator", label: "About Creator", icon: <Info size={16} />, onClick: () => router.push("/about") },
                     { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={16} className="text-white" />, onClick: () => router.push("/about-zenify") },
                     { id: "terms", label: "Terms of Service", icon: <FileText size={16} />, onClick: () => router.push("/terms") },
@@ -160,6 +163,17 @@ export function TopBar() {
           />
         ) : (
           <>
+            {/* Download Mobile App Quick Button */}
+            <GlobalTooltip content="Download Mobile App (APK)" side="bottom">
+              <button
+                onClick={() => router.push("/download")}
+                className="flex items-center gap-1.5 px-3 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white active:scale-95 transition-all shadow-sm cursor-pointer"
+              >
+                <Smartphone size={14} className="text-brand" />
+                <span className="hidden xl:inline text-[11px] font-bold uppercase tracking-wider text-zinc-300">Get App</span>
+              </button>
+            </GlobalTooltip>
+
             {/* Local Device Music Quick Button */}
             <GlobalTooltip content="Local Device Music" side="bottom">
               <button
@@ -279,6 +293,7 @@ export function TopBar() {
                         onClick: () => useUIStore.getState().toggleNotifications(),
                       },
                       { id: "settings", label: "Settings", icon: <Settings size={14} />, onClick: () => useUIStore.getState().openSettings() },
+                      { id: "download-app", label: "Download App (APK)", icon: <Smartphone size={14} className="text-brand" />, onClick: () => router.push("/download") },
                       { id: "about-creator", label: "About Creator", icon: <Info size={14} />, onClick: () => router.push("/about") },
                       { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push("/about-zenify") },
                       { id: "terms", label: "Terms of Service", icon: <FileText size={14} />, onClick: () => router.push("/terms") },
@@ -296,6 +311,7 @@ export function TopBar() {
                       },
                     ]
                   : [
+                      { id: "download-app", label: "Download App (APK)", icon: <Smartphone size={14} className="text-brand" />, onClick: () => router.push("/download") },
                       { id: "about-creator", label: "About Creator", icon: <Info size={14} />, onClick: () => router.push("/about") },
                       { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push("/about-zenify") },
                       { id: "terms", label: "Terms of Service", icon: <FileText size={14} />, onClick: () => router.push("/terms") },

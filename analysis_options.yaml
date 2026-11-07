@@ -1,0 +1,13 @@
+analyzer:
+  exclude:
+    - "assets/**"
+    - "backend/**"
+    - "claude creator and notify page design/**"
+    - "docs/**"
+    - "frontend/**"
+    - "innertube_guide/**"
+    - "scratch/**"
+    - "scripts/**"
+    - "studio_fx_guide/**"
+    - "zenify-pack/**"
+    - "**/node_modules/**"

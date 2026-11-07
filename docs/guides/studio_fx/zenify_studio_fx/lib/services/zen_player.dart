@@ -1,0 +1,124 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
+import 'studio_fx_state.dart';
+
+/// Drop-in replacement for the small part of `audioplayers` that PlayerState
+/// uses. In player_state.dart change only the import:
+///
+///   import 'package:audioplayers/audioplayers.dart' as ap;
+///   ->
+///   import 'zen_player.dart' as ap;
+///
+/// Playback runs in a native ExoPlayer whose audio path goes through the
+/// Studio FX DSP (EQ, reverb, echo, chorus, 8D, vocal isolator, ...).
+enum PlayerState { stopped, playing, paused, completed, disposed }
+
+class UrlSource {
+  const UrlSource(this.url, {this.headers = const {}});
+  final String url;
+  final Map<String, String> headers;
+}
+
+class AudioPlayer implements FxEngine {
+  AudioPlayer() {
+    _sub = _events.receiveBroadcastStream().listen(_onEvent, onError: (_) {});
+  }
+
+  static const MethodChannel _method = MethodChannel('zenify/audio');
+  static const EventChannel _events = EventChannel('zenify/audio/events');
+  static const EventChannel _spectrumCh = EventChannel('zenify/audio/spectrum');
+
+  StreamSubscription<dynamic>? _sub;
+  PlayerState _state = PlayerState.stopped;
+
+  final _stateC = StreamController<PlayerState>.broadcast();
+  final _posC = StreamController<Duration>.broadcast();
+  final _durC = StreamController<Duration>.broadcast();
+  final _doneC = StreamController<void>.broadcast();
+
+  Stream<PlayerState> get onPlayerStateChanged => _stateC.stream;
+  Stream<Duration> get onPositionChanged => _posC.stream;
+  Stream<Duration> get onDurationChanged => _durC.stream;
+  Stream<void> get onPlayerComplete => _doneC.stream;
+  PlayerState get state => _state;
+
+  void _onEvent(dynamic e) {
+    if (e is! Map) return;
+    switch (e['type']) {
+      case 'state':
+        final s = switch (e['value']) {
+          'playing' => PlayerState.playing,
+          'paused' => PlayerState.paused,
+          'completed' => PlayerState.completed,
+          _ => PlayerState.stopped,
+        };
+        _state = s;
+        _stateC.add(s);
+        if (s == PlayerState.completed) _doneC.add(null);
+      case 'position':
+        _posC.add(Duration(milliseconds: (e['ms'] as num).toInt()));
+      case 'duration':
+        _durC.add(Duration(milliseconds: (e['ms'] as num).toInt()));
+      case 'error':
+        if (kDebugMode) debugPrint('ZenPlayer error: ${e['message']}');
+        _state = PlayerState.stopped;
+        _stateC.add(_state);
+    }
+  }
+
+  Future<void> _call(String m, [Object? args]) async {
+    try {
+      await _method.invokeMethod<void>(m, args);
+    } on MissingPluginException {
+      if (kDebugMode) debugPrint('ZenPlayer: native engine missing (Android only). Call: $m');
+    }
+  }
+
+  Future<void> play(UrlSource source) =>
+      _call('play', {'url': source.url, 'headers': source.headers});
+  Future<void> pause() => _call('pause');
+  Future<void> resume() => _call('resume');
+  Future<void> stop() => _call('stop');
+  Future<void> seek(Duration p) => _call('seek', {'ms': p.inMilliseconds});
+  Future<void> setVolume(double v) => _call('setVolume', {'v': v});
+  Future<void> setPlaybackRate(double rate) => _call('setFx', {'speed': rate});
+  Future<void> setBalance(double balance) async {}
+
+  Future<void> dispose() async {
+    _state = PlayerState.disposed;
+    _fxTimer?.cancel();
+    await _sub?.cancel();
+    await _call('dispose');
+    for (final c in [_stateC, _posC, _durC]) {
+      await c.close();
+    }
+    await _doneC.close();
+  }
+
+  // ---- FxEngine --------------------------------------------------------------
+  Timer? _fxTimer;
+  FxMap? _pendingFx;
+
+  @override
+  bool get isAvailable => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  /// Latest-wins throttle (about 60 Hz) so dragging sliders never floods the channel.
+  @override
+  void applyFx(FxMap fx) {
+    _pendingFx = fx;
+    _fxTimer ??= Timer(const Duration(milliseconds: 16), () {
+      _fxTimer = null;
+      final p = _pendingFx;
+      _pendingFx = null;
+      if (p != null) unawaited(_call('setFx', p));
+    });
+  }
+
+  @override
+  Stream<List<double>> get spectrum => _spectrumCh
+      .receiveBroadcastStream()
+      .map((e) => (e as List).map((x) => (x as num).toDouble()).toList());
+}

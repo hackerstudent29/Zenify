@@ -11,6 +11,7 @@ import {
   HeartHandshake,
   Radio,
   Sparkles,
+  Smartphone,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -401,6 +402,13 @@ export function Sidebar() {
                 />
               </div>
               <NavLink
+                href="/download"
+                icon={Smartphone}
+                label="Get Mobile App"
+                active={pathname === "/download"}
+                collapsed={collapsed}
+              />
+              <NavLink
                 href="#"
                 icon={SwiftUISettings}
                 label="Settings"
@@ -427,7 +435,7 @@ export function Sidebar() {
               collapsed && "opacity-0"
             )}
           >
-            <span className="font-zenify not-italic">zenify</span> v2.5.3
+            <span className="font-zenify not-italic">zenify</span> v2.6.0
           </div>
         </div>
       </aside>

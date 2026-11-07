@@ -299,120 +299,8 @@ export class UniversalSearchService {
       }
     })();
 
-    // 2. JioSaavn Official Engine (Unmatched Bollywood/Kollywood/Tollywood + Global Western 320k)
-    const saavnPromise = (async () => {
-      try {
-        const [p1, autoRes] = await Promise.all([
-          axios.get('https://www.jiosaavn.com/api.php', {
-            params: { __call: 'search.getResults', q: cleanQ, p: 1, n: 50, _format: 'json', ctx: 'web6dot0' },
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-            timeout: 3200
-          }).catch(() => null),
-          axios.get('https://www.jiosaavn.com/api.php', {
-            params: { __call: 'autocomplete.get', query: cleanQ, _format: 'json', ctx: 'web6dot0' },
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-            timeout: 2500
-          }).catch(() => null)
-        ]);
-
-        const rawList = [
-          ...(p1?.data?.results || []),
-          ...(autoRes?.data?.songs?.data || [])
-        ];
-
-        const seenIds = new Set<string>();
-        const dedupedList = rawList.filter(s => {
-          const sid = s?.id || s?.perma_url;
-          if (sid && !seenIds.has(sid)) {
-            seenIds.add(sid);
-            return true;
-          }
-          return false;
-        });
-
-        for (const s of dedupedList) {
-          const title = cleanEntity(s.song || s.title);
-          const dur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
-          
-          // Strict: Compilations and playlists belong in playlists, not songs
-          if (isCompilationOrPlaylist(title, dur)) continue;
-
-          const rawSingers = cleanEntity(s.more_info?.singers || s.singers || s.primary_artists || s.more_info?.primary_artists);
-          const rawMusic = cleanEntity(s.more_info?.music || s.music);
-          const artist = cleanArtistNames(rawSingers, rawMusic);
-          const album = cleanEntity(s.album || s.more_info?.album || 'Single');
-          if (!title || !artist) continue;
-
-          const playCount = parseInt(s.play_count || s.more_info?.play_count || '0', 10);
-          const year = parseInt(s.year || s.more_info?.year || s.release_date?.slice(0, 4) || '0', 10);
-
-          const key = dedupeKey(title, artist);
-          let cover = s.image || s.more_info?.image || '';
-          cover = cover.replace('150x150', '500x500').replace('50x50', '500x500');
-          const candLang = (s.language || s.more_info?.language || '').toLowerCase().trim();
-          let score = scoreTrack(title, artist, cleanQ, 'jiosaavn', album, playCount, year);
-          const preferredLang = (options.language || '').toLowerCase().trim();
-          if (preferredLang) {
-            if (candLang === preferredLang) score += 200;
-            else if (candLang && candLang !== 'unknown') score -= 150;
-          }
-
-          const existing = resultMap.get(key);
-          if (existing) {
-            if (score > (existing.score || 0)) {
-              existing.score = score;
-              existing.playCount = playCount;
-              existing.streams = playCount || 0;
-              existing.year = year;
-              if (cover) {
-                existing.coverUrl = cover;
-                existing.artworkUrl100 = cover;
-              }
-              if (s.id) {
-                (existing as any).id = `saavn-${s.id}`;
-                const encMedia = s.encrypted_media_url || s.more_info?.encrypted_media_url;
-                if (encMedia) {
-                  existing.audioUrl = CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '320') || CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '160') || existing.audioUrl;
-                }
-              }
-            }
-            continue;
-          }
-
-          const encMedia = s.encrypted_media_url || s.more_info?.encrypted_media_url;
-          const directAudio = encMedia ? (CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '320') || CleanCdnAudioService.decryptSaavnMediaUrl(encMedia, '160') || undefined) : undefined;
-          const fallbackAudio = directAudio || `/api/utils/stream-youtube?url=${encodeURIComponent(`${artist} - ${title}`)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}&trackId=saavn-${s.id}`;
-
-          resultMap.set(key, {
-            id: `saavn-${s.id}`,
-            name: title,
-            trackName: title,
-            artistName: artist,
-            artists: { items: [{ profile: { name: artist } }] },
-            collectionName: album,
-            albumOfTrack: {
-              name: album,
-              coverArt: { sources: [{ url: cover, width: 500 }] }
-            },
-            artworkUrl100: cover,
-            coverUrl: cover,
-            duration: { totalMilliseconds: dur * 1000 },
-            duration_ms: dur * 1000,
-            trackTimeMillis: dur * 1000,
-            audioUrl: directAudio || fallbackAudio,
-            isZenify: false,
-            isImported: false,
-            source: 'jiosaavn',
-            score,
-            playCount,
-            streams: playCount || 0,
-            year
-          });
-        }
-      } catch (err: any) {
-        console.warn('[UniversalSearch] JioSaavn search error:', err.message);
-      }
-    })();
+    // 2. JioSaavn disabled - Pure YouTube Music InnerTube pipeline enforced
+    const saavnPromise = Promise.resolve();
 
     // 3. iTunes Multi-Storefront (User Country Storefront + US Global in parallel)
     const itunesPromise = (async () => {
@@ -577,49 +465,20 @@ export class UniversalSearchService {
     const cleanQ = (query || '').trim();
     if (!cleanQ) return { tracks: [], artists: [], albums: [] };
 
-    // Parallel multi-engine fetch: tracks + dedicated artist searches + dedicated album searches + playlists
-    const [tracks, externalArtistsSettled, externalAlbumsSettled, externalPlaylistsSettled] = await Promise.all([
+    // Parallel multi-engine fetch: tracks + iTunes metadata
+    const [tracks, externalArtistsSettled, externalAlbumsSettled] = await Promise.all([
       this.searchTracks(cleanQ, { country: storefront, limit }),
       Promise.allSettled([
-        // 1. JioSaavn Primary Artist Search (Authentic portraits, real official names, CTR popularity)
-        axios.get('https://www.jiosaavn.com/api.php', {
-          params: { __call: 'search.getArtistResults', q: cleanQ, p: 1, n: 10, _format: 'json', ctx: 'web6dot0' },
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-          timeout: 2800
-        }).then(r => r.data?.results || []).catch(() => []),
-        // 2. JioSaavn Artist Auto-Suggest & Top Query
-        axios.get('https://www.jiosaavn.com/api.php', {
-          params: { __call: 'autocomplete.get', query: cleanQ, _format: 'json', ctx: 'web6dot0' },
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-          timeout: 2800
-        }).then(r => [
-          ...(r.data?.topquery?.data?.filter((x: any) => x.type === 'artist') || []),
-          ...(r.data?.artists?.data || [])
-        ]).catch(() => []),
-        // 3. iTunes Artist Lookup (Fallback for Western indie)
+        // iTunes Artist Lookup
         axios.get('https://itunes.apple.com/search', {
-          params: { term: cleanQ, entity: 'musicArtist', country: storefront, limit: 6 },
+          params: { term: cleanQ, entity: 'musicArtist', country: storefront, limit: 10 },
           timeout: 2800
         }).then(r => r.data?.results || []).catch(() => [])
       ]),
       Promise.allSettled([
-        // 1. JioSaavn Album Search (Authentic regional posters & multi-language versions)
-        axios.get('https://www.jiosaavn.com/api.php', {
-          params: { __call: 'search.getAlbumResults', q: cleanQ, p: 1, n: 12, _format: 'json', ctx: 'web6dot0' },
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-          timeout: 2800
-        }).then(r => r.data?.results || []).catch(() => []),
-        // 2. iTunes Album Search
+        // iTunes Album Search
         axios.get('https://itunes.apple.com/search', {
-          params: { term: cleanQ, entity: 'album', country: storefront, limit: 10 },
-          timeout: 2800
-        }).then(r => r.data?.results || []).catch(() => [])
-      ]),
-      Promise.allSettled([
-        // JioSaavn Curated Playlists Search (For movies, OST collections & genres)
-        axios.get('https://www.jiosaavn.com/api.php', {
-          params: { __call: 'search.getPlaylistResults', q: cleanQ, p: 1, n: 10, _format: 'json', ctx: 'web6dot0' },
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+          params: { term: cleanQ, entity: 'album', country: storefront, limit: 12 },
           timeout: 2800
         }).then(r => r.data?.results || []).catch(() => [])
       ])
@@ -629,32 +488,8 @@ export class UniversalSearchService {
     const artistsMap = new Map<string, CatalogArtist>();
     const albumsMap = new Map<string, CatalogAlbum>();
 
-    // 1. Ingest dedicated artists (JioSaavn artists FIRST with authentic 500x500 portraits and CTR)
-    const saavnArtistResults = externalArtistsSettled[0].status === 'fulfilled' ? externalArtistsSettled[0].value : [];
-    const saavnAutoArtists = externalArtistsSettled[1].status === 'fulfilled' ? externalArtistsSettled[1].value : [];
-    const itunesArtists = externalArtistsSettled[2].status === 'fulfilled' ? externalArtistsSettled[2].value : [];
-
-    for (const a of [...saavnArtistResults, ...saavnAutoArtists]) {
-      const name = cleanEntity(a.name || a.title);
-      const norm = name.toLowerCase().trim();
-      if (!norm) continue;
-      let img = (a.image || '').replace('50x50', '500x500').replace('150x150', '500x500');
-      if (img.includes('artist-default')) img = '';
-      const ctr = parseInt(a.ctr || '0', 10);
-
-      if (!artistsMap.has(norm)) {
-        artistsMap.set(norm, {
-          id: `artist-${encodeURIComponent(norm.replace(/[^a-z0-9]/g, '-'))}`,
-          source: 'jiosaavn',
-          sourceId: String(a.id || norm),
-          name,
-          imageUrl: img || undefined,
-          follower_count: ctr
-        });
-      } else if (img && !artistsMap.get(norm)!.imageUrl) {
-        artistsMap.get(norm)!.imageUrl = img;
-      }
-    }
+    // 1. Ingest artists from search results and iTunes
+    const itunesArtists = externalArtistsSettled[0].status === 'fulfilled' ? externalArtistsSettled[0].value : [];
 
     for (const a of itunesArtists) {
       const name = cleanEntity(a.artistName);
@@ -669,37 +504,8 @@ export class UniversalSearchService {
       });
     }
 
-    // 2. Ingest dedicated albums (JioSaavn albums FIRST with authentic high-res covers and saavn-album- IDs)
-    const saavnAlbums = externalAlbumsSettled[0].status === 'fulfilled' ? externalAlbumsSettled[0].value : [];
-    const itunesAlbums = externalAlbumsSettled[1].status === 'fulfilled' ? externalAlbumsSettled[1].value : [];
-
-    for (const alb of saavnAlbums) {
-      const title = cleanEntity(alb.title || alb.name);
-      const rawMusic = cleanEntity(alb.music);
-      const rawSingers = cleanEntity(alb.primary_artists || alb.more_info?.primary_artists);
-      const artistName = cleanArtistNames(rawSingers, rawMusic);
-      const albId = alb.albumid || alb.id;
-      const normKey = `${title.toLowerCase().trim()}::${alb.language || ''}::${albId || ''}`;
-      if (!title || albumsMap.has(normKey)) continue;
-
-      let art = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
-      albumsMap.set(normKey, {
-        id: `saavn-album-${albId}`,
-        source: 'jiosaavn',
-        sourceId: String(albId),
-        title: alb.language ? `${title} (${alb.language.charAt(0).toUpperCase() + alb.language.slice(1)})` : title,
-        artist: {
-          id: `artist-${encodeURIComponent(artistName.toLowerCase().replace(/[^a-z0-9]/g, '-'))}`,
-          name: artistName,
-          imageUrl: art
-        },
-        coverUrl: art,
-        genre: alb.language ? `${alb.language} Soundtrack` : 'Soundtrack',
-        releaseDate: alb.year ? `${alb.year}-01-01` : undefined,
-        year: alb.year || undefined,
-        trackCount: parseInt(alb.more_info?.song_count || alb.song_count || (alb.more_info?.song_pids ? alb.more_info.song_pids.split(',').length : 0) || alb.numsongs || 1, 10) || 1
-      });
-    }
+    // 2. Ingest albums from iTunes
+    const itunesAlbums = externalAlbumsSettled[0].status === 'fulfilled' ? externalAlbumsSettled[0].value : [];
 
     for (const alb of itunesAlbums) {
       const title = cleanEntity(alb.collectionName);
@@ -726,77 +532,7 @@ export class UniversalSearchService {
       });
     }
 
-    // Ingest songs from top matching movie albums so full soundtracks & BGMs appear under tracks
-    let topMovieAlbums: any[] = [];
-    try {
-      topMovieAlbums = saavnAlbums.filter((a: any) => {
-        const at = cleanEntity(a.title || a.name).toLowerCase().trim();
-        const ql = cleanQ.toLowerCase();
-        return at === ql || at.startsWith(ql) || ql.startsWith(at) || at.includes(ql);
-      }).slice(0, 3);
-
-      if (topMovieAlbums.length > 0) {
-        const albSongResults = await Promise.allSettled(
-          topMovieAlbums.map((a: any) => {
-            const albId = a.albumid || a.id;
-            if (!albId) return Promise.resolve(null);
-            return axios.get('https://www.jiosaavn.com/api.php', {
-              params: { __call: 'content.getAlbumDetails', albumid: albId, _format: 'json', ctx: 'web6dot0' },
-              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-              timeout: 2500
-            }).then(r => ({ album: a, songs: r.data?.songs || [] })).catch(() => null);
-          })
-        );
-
-        for (const res of albSongResults) {
-          if (res.status === 'fulfilled' && res.value?.songs?.length) {
-            const alb = res.value.album;
-            const albTitle = cleanEntity(alb.title || alb.name);
-            for (const s of res.value.songs) {
-              const sTitle = cleanEntity(s.song || s.title);
-              const sDur = parseInt(s.duration || s.more_info?.duration, 10) || 180;
-              const sSingers = cleanEntity(s.more_info?.singers || s.singers || s.primary_artists || s.more_info?.primary_artists);
-              const sMusic = cleanEntity(s.more_info?.music || s.music);
-              const sArtist = cleanArtistNames(sSingers, sMusic);
-              if (!sTitle || !sArtist) continue;
-
-              const sKey = dedupeKey(sTitle, sArtist);
-              if (tracks.some(tr => dedupeKey(tr.name, tr.artistName) === sKey)) continue;
-
-              let sCover = (s.image || s.more_info?.image || alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
-              const sScore = scoreTrack(sTitle, sArtist, cleanQ, 'jiosaavn', albTitle);
-
-              tracks.push({
-                id: `saavn-${s.id}`,
-                name: sTitle,
-                trackName: sTitle,
-                artistName: sArtist,
-                artists: { items: [{ profile: { name: sArtist } }] },
-                collectionName: albTitle,
-                albumOfTrack: {
-                  name: albTitle,
-                  coverArt: { sources: [{ url: sCover, width: 500 }] }
-                },
-                artworkUrl100: sCover,
-                coverUrl: sCover,
-                duration: { totalMilliseconds: sDur * 1000 },
-                duration_ms: sDur * 1000,
-                trackTimeMillis: sDur * 1000,
-                audioUrl: (s.encrypted_media_url || s.more_info?.encrypted_media_url) ? (CleanCdnAudioService.decryptSaavnMediaUrl(s.encrypted_media_url || s.more_info?.encrypted_media_url) || undefined) : undefined,
-                isZenify: false,
-                isImported: false,
-                source: 'jiosaavn',
-                score: sScore
-              });
-            }
-          }
-        }
-      }
-    } catch (err: any) {
-      console.warn('[UniversalSearch] Album songs ingestion warning:', err.message);
-    }
-
-    // Sort all tracks by calculated relevance score so movie OST tracks and BGMs rank at the top
+    // Sort all tracks by calculated relevance score
     tracks.sort((a, b) => (b.score || 0) - (a.score || 0));
 
     // 3. Map tracks and extract remaining secondary artists/albums
@@ -873,53 +609,7 @@ export class UniversalSearchService {
       }
     }
 
-        // Extract curated playlists
-    const saavnPlaylists = (externalPlaylistsSettled && externalPlaylistsSettled[0]?.status === 'fulfilled')
-      ? externalPlaylistsSettled[0].value
-      : [];
     const playlistsMap = new Map<string, any>();
-    for (const p of saavnPlaylists) {
-      const pName = cleanEntity(p.listname || p.title || p.name);
-      if (!pName) continue;
-      const norm = pName.toLowerCase().trim();
-      if (playlistsMap.has(norm)) continue;
-      const pCover = (p.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
-      playlistsMap.set(norm, {
-        id: `saavn-playlist-${p.listid || p.id}`,
-        name: pName,
-        title: pName,
-        coverUrl: pCover,
-        description: `${p.count || '50'} songs • ${cleanEntity(p.firstname || '')} ${cleanEntity(p.lastname || '')}`.trim(),
-        trackCount: parseInt(p.count || '50', 10) || 50,
-        creator: `${cleanEntity(p.firstname || '')} ${cleanEntity(p.lastname || '')}`.trim() || p.username || 'Curator',
-        isPlaylist: true,
-        type: 'playlist',
-        isLocal: false
-      });
-    }
-
-    // Surface movie soundtrack playlist for top movie albums
-    for (const alb of topMovieAlbums) {
-      const albTitle = cleanEntity(alb.title || alb.name);
-      const albId = alb.albumid || alb.id;
-      if (!albId) continue;
-      const pCover = (alb.image || '').replace('150x150', '500x500').replace('50x50', '500x500');
-      const norm = `${albTitle.toLowerCase().trim()} ost`;
-      if (!playlistsMap.has(norm)) {
-        playlistsMap.set(norm, {
-          id: `saavn-playlist-album-${albId}`,
-          name: `${albTitle} - OST & Soundtracks`,
-          title: `${albTitle} - OST & Soundtracks`,
-          coverUrl: pCover,
-          description: `Official Soundtrack & Instrumental BGMs • ${cleanEntity(alb.music || 'Original Motion Picture Soundtrack')}`,
-          trackCount: parseInt(alb.more_info?.song_pids ? alb.more_info.song_pids.split(',').length : 10, 10) || 10,
-          creator: cleanEntity(alb.music || 'Soundtrack Curator'),
-          isPlaylist: true,
-          type: 'playlist',
-          isLocal: false
-        });
-      }
-    }
 
     return {
       tracks: catalogTracks,

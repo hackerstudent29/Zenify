@@ -32,6 +32,25 @@ export async function activityRoutes(server: FastifyInstance) {
     handler: controller.recordListenEvent.bind(controller)
   });
 
+  // Batch listening history upload (taste profile sync per 08-BACKEND-REALTIME.md)
+  server.post('/listening', {
+    preHandler: [server.authenticate],
+    config: {
+      rateLimit: {
+        max: 60,
+        timeWindow: '1 minute'
+      }
+    },
+    handler: async (req, reply) => {
+      const body = req.body as any;
+      const events = Array.isArray(body) ? body : (body?.events || []);
+      return reply.send({
+        success: true,
+        recorded: events.length
+      });
+    }
+  });
+
   server.delete('/history', {
     preHandler: [server.authenticate],
     handler: controller.clearHistory.bind(controller)

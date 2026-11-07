@@ -1,0 +1,33 @@
+{
+  "artists": [
+    {"id":"a1","name":"Nova Lane","verified":true,"monthlyListeners":482113,"bio":"Indie electronic project used for testing.","imageUrl":null,"similar":[{"id":"a2","name":"Kiran Vale"}]},
+    {"id":"a2","name":"Kiran Vale","verified":true,"monthlyListeners":913440,"bio":"Tamil-language pop test artist.","imageUrl":null,"similar":[{"id":"a1","name":"Nova Lane"}]},
+    {"id":"a3","name":"आरव शर्मा","verified":false,"monthlyListeners":120500,"bio":"Hindi test artist for font checks.","imageUrl":null,"similar":[]}
+  ],
+  "albums": [
+    {"id":"al1","title":"City Lights","artistId":"a1","year":2024,"genre":"Indie","label":"Zenify Test Records","copyright":"© 2024 Test","trackIds":["t1","t2","t3"],"artUrl":null},
+    {"id":"al2","title":"மழை நேரம்","artistId":"a2","year":2023,"genre":"Tamil Pop","label":"Zenify Test Records","copyright":"© 2023 Test","trackIds":["t4","t5"],"artUrl":null},
+    {"id":"al3","title":"Singles Vol. 1","artistId":"a3","year":2025,"genre":"Hindi","label":"Zenify Test Records","copyright":"© 2025 Test","trackIds":["t6"],"artUrl":null}
+  ],
+  "tracks": [
+    {"id":"t1","title":"Midnight Drive","artistIds":["a1"],"albumId":"al1","durationMs":214000,"explicit":false,"genres":["Indie"],"slot":"night","lrc":"lrc/t1.lrc"},
+    {"id":"t2","title":"Neon Rain","artistIds":["a1"],"albumId":"al1","durationMs":198000,"explicit":false,"genres":["Indie"],"slot":"night"},
+    {"id":"t3","title":"A Very Long Track Title That Should Trigger The Marquee Animation On Overflow","artistIds":["a1","a2"],"albumId":"al1","durationMs":240000,"explicit":true,"genres":["Indie"],"slot":"afternoon"},
+    {"id":"t4","title":"மழை நேரம்","artistIds":["a2"],"albumId":"al2","durationMs":205000,"explicit":false,"genres":["Tamil Pop"],"slot":"sunset"},
+    {"id":"t5","title":"காலை வணக்கம்","artistIds":["a2"],"albumId":"al2","durationMs":187000,"explicit":false,"genres":["Tamil Pop"],"slot":"morning"},
+    {"id":"t6","title":"सुबह की धूप","artistIds":["a3"],"albumId":"al3","durationMs":176000,"explicit":false,"genres":["Hindi"],"slot":"morning"}
+  ],
+  "playlists": [
+    {"id":"p1","title":"Late Night","creator":"You","isPublic":false,"trackIds":["t1","t2","t4"]}
+  ],
+  "categories": ["Pop","Hip-Hop","Indie","Classical","Rock","Tamil","Telugu","Hindi","Punjabi","EDM"],
+  "moods": ["Chill","Workout","Focus","Commute","Party","Sleep"],
+  "home": {
+    "hero": ["al1","al2","p1"],
+    "quickPicks": ["t1","t2","t4","t5","t6","t3","t1","t2"],
+    "mixes": ["p1"],
+    "trending": ["al1","al2","al3"],
+    "topArtists": ["a1","a2","a3"],
+    "recent": ["al1","p1"]
+  }
+}

@@ -9,6 +9,7 @@ import fastifyStatic from '@fastify/static';
 import fastifyMultipart from '@fastify/multipart';
 import websocket from '@fastify/websocket';
 import path from 'path';
+import fs from 'fs';
 import { config } from './config/env';
 import { logBuffer } from './utils/log-buffer';
 
@@ -281,6 +282,8 @@ import { dayMixRoutes } from './routes/day-mix.routes';
 server.register(dayMixRoutes, { prefix: '/api/me' });
 import { blendRoutes } from './routes/blend.routes';
 server.register(blendRoutes, { prefix: '/api/me' });
+import { meRoutes } from './routes/me.routes';
+server.register(meRoutes, { prefix: '/api/me' });
 import { discoveryRoutes } from './routes/discovery.routes';
 server.register(discoveryRoutes, { prefix: '/api/discover' });
 import { databaseAdminRoutes } from './routes/database-admin.routes';
@@ -290,6 +293,87 @@ server.register(lyricsPipelineRoutes, { prefix: '/api' });
 
 server.get('/health', async () => {
     return { status: 'ok' };
+});
+
+server.get('/time', async () => {
+    return { serverNowMs: Date.now() };
+});
+
+server.get('/api/time', async () => {
+    return { serverNowMs: Date.now() };
+});
+
+server.post('/api/diag', async (request, reply) => {
+    const body = request.body as any;
+    if (body) {
+        server.log.warn({ diag: body }, '[Diagnostics] Device playback failure reported');
+        logBuffer.add({
+            level: 'WARN',
+            category: 'SYSTEM',
+            message: `[DIAG] ${body.code || 'UNKNOWN'} (${body.layer || 'unknown'}) - ${body.httpStatus || ''}`,
+            details: body,
+        });
+    }
+    return { ok: true };
+});
+
+const defaultRemoteConfig = {
+    version: 2,
+    streamMode: 'device',
+    resolver: {
+        maxConcurrentResolves: 2,
+        urlSafetyMarginSec: 600,
+        breakerThreshold: 5,
+        baseCooldownSec: 30,
+        maxCooldownSec: 1800,
+        preResolveCount: 1,
+    },
+    innertube: {
+        clientVersion: '1.20241101.01.00',
+        maxAttempts: 3,
+        bucketCapacity: 6,
+        refillPerSecond: 2.5,
+    },
+    killSwitches: {
+        cloudFallback: false,
+        remoteSuggestions: false,
+        charts: false,
+        newReleases: false,
+        preResolve: false,
+        homeFeed: false,
+    },
+    minAppVersion: '1.0.0',
+    latestAppVersion: '2.6.0',
+    updateUrl: 'https://listenzenify.com/download',
+    message: null,
+};
+
+server.get('/download/app', async (request, reply) => {
+    const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
+    if (fs.existsSync(apkPath)) {
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.0.apk"');
+        reply.header('Content-Type', 'application/vnd.android.package-archive');
+        return reply.sendFile('downloads/zenify.apk');
+    }
+    return reply.redirect('https://listenzenify.com/downloads/zenify.apk');
+});
+
+server.get('/api/download/app', async (request, reply) => {
+    const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
+    if (fs.existsSync(apkPath)) {
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.0.apk"');
+        reply.header('Content-Type', 'application/vnd.android.package-archive');
+        return reply.sendFile('downloads/zenify.apk');
+    }
+    return reply.redirect('https://listenzenify.com/downloads/zenify.apk');
+});
+
+server.get('/remote_config.json', async () => {
+    return defaultRemoteConfig;
+});
+
+server.get('/api/config', async () => {
+    return defaultRemoteConfig;
 });
 
 server.get('/', async () => {

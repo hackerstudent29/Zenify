@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { ZenifyLogo } from "./shared/ZenifyLogo";
-import { Globe } from "lucide-react";
+import { Globe, Smartphone } from "lucide-react";
 import { LanguagePickerModal } from "./shared/LanguagePickerModal";
 import { useLanguagePreferences } from "@/hooks/useLanguagePreferences";
 
@@ -26,6 +26,7 @@ export default function Footer() {
           <div className="space-y-6">
             <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Explore</h4>
             <ul className="space-y-4 text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <li><Link href="/download" className="hover:text-brand transition-colors text-brand flex items-center gap-1.5"><Smartphone size={13} className="text-brand shrink-0" /> Download App (APK)</Link></li>
               <li><Link href="/liked" className="hover:text-brand transition-colors">Liked Songs</Link></li>
               <li><Link href="/search" className="hover:text-brand transition-colors">Search</Link></li>
               <li><Link href="/about-zenify" className="hover:text-brand transition-colors">About Zenify</Link></li>

@@ -231,7 +231,7 @@ export class ArtistController {
             const { SystemSettingsService } = await import('../services/system-settings.service.js');
             const rapidApiKey = await SystemSettingsService.getSpotifyApiKey();
 
-            const [itunesAlbumsInRes, itunesAlbumsGlobalRes, itunesSongsInRes, itunesSongsGlobalRes, saavnAlbumsRes, spotifyPlaylistsRes] = await Promise.allSettled([
+            const [itunesAlbumsInRes, itunesAlbumsGlobalRes, itunesSongsInRes, itunesSongsGlobalRes, spotifyPlaylistsRes] = await Promise.allSettled([
                 // 1. Regional albums and soundtracks from iTunes India
                 axios.get(`https://itunes.apple.com/search`, {
                     params: { term: artist.name, entity: 'album', country: 'IN', limit: 50 },
@@ -256,22 +256,7 @@ export class ArtistController {
                     timeout: 4500
                 }).then(r => r.data?.results || []).catch(() => []),
 
-                // 5. Regional Indian multi-language albums from JioSaavn
-                axios.get('https://www.jiosaavn.com/api.php', {
-                    params: {
-                        __call: 'search.getAlbumResults',
-                        q: artist.name,
-                        _format: 'json',
-                        _marker: '0',
-                        api_version: '4',
-                        ctx: 'web6dot0',
-                        n: 50
-                    },
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-                    timeout: 4500
-                }).then(r => r.data?.results || []).catch(() => []),
-
-                // 6. Spotify Playlists for this artist
+                // 5. Spotify Playlists for this artist
                 rapidApiKey ? axios.get('https://spotify81.p.rapidapi.com/search', {
                     params: { q: artist.name, type: 'playlists', limit: 25 },
                     headers: { 'x-rapidapi-key': rapidApiKey, 'x-rapidapi-host': 'spotify81.p.rapidapi.com' },
@@ -287,7 +272,6 @@ export class ArtistController {
                 ...(itunesSongsInRes.status === 'fulfilled' ? itunesSongsInRes.value : []),
                 ...(itunesSongsGlobalRes.status === 'fulfilled' ? itunesSongsGlobalRes.value : [])
             ];
-            const saavnAlbums = saavnAlbumsRes.status === 'fulfilled' ? saavnAlbumsRes.value : [];
             const rawPlaylists = spotifyPlaylistsRes.status === 'fulfilled' ? spotifyPlaylistsRes.value : [];
 
             // Map and merge authentic albums (retaining all language releases & distinct collections)
@@ -325,44 +309,6 @@ export class ArtistController {
                     genre: col.primaryGenreName || 'Soundtrack',
                     artistId: artist.id,
                     isSingle: count <= 1 || albTitle.toLowerCase().includes('single'),
-                    isVirtual: true
-                } as any);
-            }
-
-            // Also merge regional multi-language albums from JioSaavn with strict verification
-            for (const sa of saavnAlbums) {
-                const saTitle = (sa.title || '').trim();
-                const saId = `saavn-album-${sa.id}`;
-                if (!saTitle || seenCollectionIds.has(saId)) continue;
-
-                const saArtistStr = [
-                    sa.subtitle || '',
-                    sa.music || '',
-                    ...(sa.more_info?.artistMap?.primary_artists?.map((x: any) => x.name) || []),
-                    ...(sa.more_info?.artistMap?.artists?.map((x: any) => x.name) || [])
-                ].join(', ');
-
-                if (!isAuthenticArtistRelease(saArtistStr, artist.name)) continue;
-                
-                const dedupKey = `${saTitle.toLowerCase()}:::${sa.language || ''}`;
-                if (seenAlbumKeys.has(dedupKey)) continue;
-                seenAlbumKeys.add(dedupKey);
-                seenCollectionIds.add(saId);
-
-                let saArt = sa.image || '';
-                saArt = saArt.replace('150x150', '500x500').replace('50x50', '500x500');
-                const count = parseInt(sa.more_info?.song_count || '1', 10) || 1;
-
-                enrichedAlbums.push({
-                    id: saId,
-                    title: saTitle,
-                    coverUrl: saArt,
-                    artistId: artist.id,
-                    releaseDate: sa.year ? new Date(`${sa.year}-01-01`) : new Date(),
-                    createdAt: sa.year ? new Date(`${sa.year}-01-01`) : new Date(),
-                    trackCount: count,
-                    genre: sa.language ? `${sa.language.charAt(0).toUpperCase() + sa.language.slice(1)} Soundtrack` : 'Soundtrack',
-                    isSingle: count <= 1,
                     isVirtual: true
                 } as any);
             }
