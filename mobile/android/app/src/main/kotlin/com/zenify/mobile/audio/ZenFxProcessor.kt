@@ -128,8 +128,9 @@ private class Biquad {
 
     fun run(x: Float): Float {
         val y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
-        x2 = x1; x1 = x; y2 = y1; y1 = y
-        return y
+        val safeY = if (y.isNaN() || y.isInfinite()) 0f else y
+        x2 = x1; x1 = x; y2 = y1; y1 = safeY
+        return safeY
     }
 
     fun clear() { x1 = 0f; x2 = 0f; y1 = 0f; y2 = 0f }
@@ -213,7 +214,8 @@ private class EqMod(val fs: Float) : Mod() {
             bq[1][c].set(PEAK, fs, 1500f, 0.8f, g[1])
             bq[2][c].set(HSHELF, fs, 8000f, 0.8f, g[2])
         }
-        trim = 1f // Maintain 100% full volume with zero internal volume drop
+        val maxBoost = max(0f, max(g[0], max(g[1], g[2])))
+        trim = if (maxBoost > 0.1f) dbToLin(-maxBoost * 0.70f) else 1f
     }
 
     override fun process(io: FloatArray) {
@@ -253,9 +255,9 @@ private class DriveMod(val fs: Float) : Mod() {
     }
 
     override fun process(io: FloatArray) {
-        val pre = 1f + 3f * d
-        val wetG = d * 0.8f / sqrt(pre)
-        val dryG = 1f // Maintain 100% full core volume
+        val pre = 1f + 2f * d
+        val wetG = d * 0.45f / sqrt(pre)
+        val dryG = 1f - d * 0.30f
         for (c in 0..1) {
             val x = io[c]
             val sat = tanh(2.5f * x * pre) / tanhK
@@ -283,8 +285,10 @@ private class ChorusMod(val fs: Float) : Mod() {
         pa += TWO_PI * 0.55f / fs; if (pa > TWO_PI) pa -= TWO_PI
         pb += TWO_PI * 0.73f / fs; if (pb > TWO_PI) pb -= TWO_PI
         lines[0].write(io[0]); lines[1].write(io[1])
-        io[0] += lines[0].read((0.020f + depth * sin(pa)) * fs) * amt * 0.8f
-        io[1] += lines[1].read((0.026f + depth * sin(pb)) * fs) * amt * 0.8f
+        val dry = 1f - amt * 0.25f
+        val wet = amt * 0.50f
+        io[0] = io[0] * dry + lines[0].read((0.020f + depth * sin(pa)) * fs) * wet
+        io[1] = io[1] * dry + lines[1].read((0.026f + depth * sin(pb)) * fs) * wet
     }
 
     override fun clear() { lines.forEach { it.clear() } }
@@ -306,14 +310,15 @@ private class EchoMod(val fs: Float) : Mod() {
     }
 
     override fun process(io: FloatArray) {
-        val fb = 0.28f + 0.32f * amt
-        val wet = amt * 0.85f
+        val fb = 0.25f + 0.30f * amt
+        val wet = amt * 0.45f
+        val dry = 1f - amt * 0.20f
         val send = if (amt > 0.003f) 1f else 0f
         for (c in 0..1) {
             val d = lines[c].read(time * fs)
             tone[c] += toneA * (d - tone[c])
             lines[c].write(io[c] * send + tone[c] * fb)
-            io[c] += tone[c] * wet
+            io[c] = io[c] * dry + tone[c] * wet
         }
     }
 
@@ -388,8 +393,8 @@ private class ReverbMod(val fs: Float) : Mod() {
         val fb = room * 0.28f + 0.7f
         val d1 = damp * 0.4f
         val d2 = 1f - d1
-        val dry = 1f // Maintain 100% full core volume without attenuation
-        val wetG = amt * 1.5f
+        val dry = 1f - amt * 0.30f
+        val wetG = amt * 0.55f
         for (c in 0..1) {
             var s = 0f
             for (cb in combs[c]) s += cb.run(x, fb, d1, d2)
@@ -489,8 +494,8 @@ private class Spatial(val fs: Float) {
         val rightNear = s >= 0f
         lp[0] += (if (rightNear) aFar else aNear) * ((if (rightNear) far else mono) - lp[0])
         lp[1] += (if (rightNear) aNear else aFar) * ((if (rightNear) mono else far) - lp[1])
-        val l = (lp[0] * (if (rightNear) gFar else gNear) + side * 0.6f) * 1.45f
-        val r = (lp[1] * (if (rightNear) gNear else gFar) - side * 0.6f) * 1.45f
+        val l = (lp[0] * (if (rightNear) gFar else gNear) + side * 0.6f) * 1.05f
+        val r = (lp[1] * (if (rightNear) gNear else gFar) - side * 0.6f) * 1.05f
         io[0] += (l - io[0]) * mix
         io[1] += (r - io[1]) * mix
     }
@@ -505,7 +510,7 @@ private class Comp(val fs: Float) {
     private var th = -14f
     private var ratio = 2.2f
     private var knee = 10f
-    private var makeup = 1.9f
+    private var makeup = 1.15f
     private var attC = exp(-1f / (fs * 0.01f))
     private var relC = exp(-1f / (fs * 0.18f))
 
@@ -519,7 +524,7 @@ private class Comp(val fs: Float) {
         th = smooth(th, -14f, k)
         ratio = smooth(ratio, 2.2f, k)
         knee = smooth(knee, 10f, k)
-        makeup = smooth(makeup, 1.9f, k)
+        makeup = smooth(makeup, 1.15f, k)
         relC = exp(-1f / (fs * 0.18f))
     }
 
@@ -643,10 +648,16 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
     private val io = FloatArray(2)
     private var width = 1f
     private var bypassMix = 1f
+    private var limPeak = 0f
+    private var limGain = 1f
+    private val limAtt = exp(-1f / (fs * 0.001f))
+    private val limRel = exp(-1f / (fs * 0.060f))
 
     fun clear() {
         mods.values.forEach { it.clear() }
         vocal.clear(); spatial.clear(); comp.clear()
+        limPeak = 0f
+        limGain = 1f
     }
 
     private fun update(p: FxParams, n: Int) {
@@ -677,12 +688,27 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
         }
         spatial.process(io)
         comp.run(io)
-        io[0] = soft(io[0]); io[1] = soft(io[1])
+        limit(io)
+    }
+
+    private fun limit(io: FloatArray) {
+        val peak = max(abs(io[0]), abs(io[1]))
+        limPeak = if (peak > limPeak) limAtt * limPeak + (1f - limAtt) * peak
+                  else limRel * limPeak + (1f - limRel) * peak
+        val target = if (limPeak > 0.95f) 0.95f / limPeak else 1f
+        limGain += (target - limGain) * (if (target < limGain) 0.25f else 0.005f)
+
+        io[0] *= limGain
+        io[1] *= limGain
+
+        io[0] = soft(io[0])
+        io[1] = soft(io[1])
     }
 
     private fun soft(x: Float): Float {
         val a = abs(x)
-        return if (a < 0.98f) x else sign(x) * (0.98f + 0.02f * tanh((a - 0.98f) / 0.02f))
+        if (a <= 0.85f) return x
+        return sign(x) * (0.85f + 0.14f * tanh((a - 0.85f) / 0.35f))
     }
 
     private fun toShort(x: Float): Short = (x.coerceIn(-1f, 1f) * 32767f).toInt().toShort()
