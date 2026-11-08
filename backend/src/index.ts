@@ -343,16 +343,16 @@ const defaultRemoteConfig = {
         homeFeed: false,
     },
     minAppVersion: '1.0.0',
-    latestAppVersion: '2.6.5',
+    latestAppVersion: '2.6.6',
     updateUrl: 'https://listenzenify.com/download/app',
-    releaseNotes: '• Native InnerTube audio streaming: Sub-300ms instant playback without 403 errors\n• Universal Media Normalizer: Clean album/track titles & accurate artist names across Home, Explore & Search\n• High-definition artist artwork upscaled across all search cards and recent history\n• Fixed marquee title left-edge clipping and improved docked player clearance\n• Enhanced stability & Android 14+ navigation performance',
+    releaseNotes: '• StudioFX DSP Engine overhaul: Zero digital clipping & distortion across all volume levels\n• Dynamic headroom auto-trim for EQ with broadcast-grade peak limiter & silky soft knee\n• Balanced acoustic presets: Studio Clarity, Bass Boost, Concert Hall, and calibrated AutoEq curves\n• Instant native InnerTube streaming with clean playback reliability',
     message: null,
 };
 
 server.get('/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.5.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.6.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
@@ -362,7 +362,7 @@ server.get('/download/app', async (request, reply) => {
 server.get('/api/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.5.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.6.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }

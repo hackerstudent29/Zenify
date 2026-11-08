@@ -119,7 +119,7 @@ class FxSettings {
   String canon() {
     double r(double v) => double.parse(v.toStringAsFixed(2));
     return jsonEncode({
-      'eq': eq.map((v) => v.round()).toList(),
+      'eq': eq.map((v) => r(v)).toList(),
       'reverb': reverb,
       'reverbAmount': reverb == 'none' ? 0 : r(reverbAmount),
       'echo': r(echo),
@@ -158,21 +158,21 @@ class StudioFxState extends ChangeNotifier {
   static const List<FxPreset> builtIn = [
     FxPreset('Original', 'No processing', {}),
     FxPreset('After Hours', 'Warm and soft', {
-      'eq': [3.0, -1.0, -2.0], 'reverb': 'warehouse', 'reverbAmount': 0.25, 'chorus': 0.2, 'filter': -0.12, 'drive': 0.15,
+      'eq': [3.0, -1.0, -1.5], 'reverb': 'warehouse', 'reverbAmount': 0.20, 'chorus': 0.15, 'filter': -0.10, 'drive': 0.10,
     }),
     FxPreset('Immersive', '8D orbit, wide', {
-      'eq': [2.0, 0.0, 2.0], 'reverb': 'warehouse', 'reverbAmount': 0.3, 'chorus': 0.25, 'width': 1.3, 'is8D': true, 'speed8D': 0.1,
+      'eq': [2.0, 0.0, 2.0], 'reverb': 'warehouse', 'reverbAmount': 0.22, 'chorus': 0.18, 'width': 1.25, 'is8D': true, 'speed8D': 0.1,
     }),
-    FxPreset('Studio Clarity', 'Balanced, crisp', {'eq': [-1.0, 2.0, 3.0]}),
-    FxPreset('Headphones', 'Wide, intimate', {'eq': [2.0, 1.0, 1.0], 'chorus': 0.3, 'width': 1.35}),
-    FxPreset('Bass Boost', 'Deep low end', {'eq': [7.0, 1.0, 2.0], 'drive': 0.2}),
-    FxPreset('Vocal Boost', 'Voices up front', {'eq': [-2.0, 5.0, 2.0]}),
-    FxPreset('Concert Hall', 'Live room feel', {'eq': [1.0, 0.0, 1.0], 'reverb': 'cathedral', 'reverbAmount': 0.4}),
+    FxPreset('Studio Clarity', 'Balanced, crisp', {'eq': [-1.0, 2.0, 2.5]}),
+    FxPreset('Headphones', 'Wide, intimate', {'eq': [2.0, 0.5, 1.0], 'chorus': 0.2, 'width': 1.25}),
+    FxPreset('Bass Boost', 'Deep low end', {'eq': [5.5, 0.5, 1.0], 'drive': 0.10}),
+    FxPreset('Vocal Boost', 'Voices up front', {'eq': [-2.0, 4.0, 1.5]}),
+    FxPreset('Concert Hall', 'Live room feel', {'eq': [1.0, 0.0, 1.0], 'reverb': 'cathedral', 'reverbAmount': 0.30}),
     FxPreset('Lo-Fi', 'Dusty, mellow', {
-      'eq': [3.0, 0.0, -3.0], 'filter': -0.3, 'chorus': 0.15, 'drive': 0.3, 'reverb': 'warehouse', 'reverbAmount': 0.2,
+      'eq': [2.5, 0.0, -2.5], 'filter': -0.22, 'chorus': 0.12, 'drive': 0.20, 'reverb': 'warehouse', 'reverbAmount': 0.18,
     }),
     FxPreset('Dream Echo', 'Floaty repeats', {
-      'echo': 0.35, 'echoTime': 0.38, 'reverb': 'cathedral', 'reverbAmount': 0.25, 'chorus': 0.2,
+      'echo': 0.28, 'echoTime': 0.38, 'reverb': 'cathedral', 'reverbAmount': 0.20, 'chorus': 0.15,
     }),
     // ── AutoEq Parametric Acoustic Calibrations (Jaakko Pasanen AutoEq) ──
     FxPreset('Harman In-Ear (AutoEq)', 'Harman IEM Target curve', {
