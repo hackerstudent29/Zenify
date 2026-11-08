@@ -2,9 +2,9 @@
   "version": 2,
   "streamMode": "device",
   "minAppVersion": "1.0.0",
-  "latestAppVersion": "2.6.4",
+  "latestAppVersion": "2.6.5",
   "updateUrl": "https://listenzenify.com/download/app",
-  "releaseNotes": "• Multi-tier karaoke lyrics: Tier 1 Word-by-Word (WBW) fill animation via lrc.red & backend\n• Direct on-device audio streaming restored with ExoPlayer header protection\n• Auto-purge stale plain lyrics so tracks upgrade to glowing fill effect\n• Dock auto-hide on auth, settings, and profile screens",
+  "releaseNotes": "• Native InnerTube audio streaming: Sub-300ms instant playback without 403 errors\n• Universal Media Normalizer: Clean album/track titles & accurate artist names across Home, Explore & Search\n• High-definition artist artwork upscaled across all search cards and recent history\n• Fixed marquee title left-edge clipping and improved docked player clearance\n• Enhanced stability & Android 14+ navigation performance",
   "message": null
 }
 

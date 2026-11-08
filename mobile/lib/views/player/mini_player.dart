@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../design_system/tokens/app_colors.dart';
@@ -8,6 +9,7 @@ import '../../design_system/widgets/glass_surface.dart';
 import '../../design_system/widgets/marquee_text.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../services/player_state.dart';
+import '../../utils/media_normalizer.dart';
 
 /// Floating Glass Mini Player anchored 12pt above the bottom tab bar.
 class MiniPlayer extends StatelessWidget {
@@ -77,13 +79,13 @@ class MiniPlayer extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             MarqueeText(
-                              track.title,
+                              MediaNormalizer.cleanCompactTitle(track.title),
                               active: player.isPlaying,
                               style: AppTypography.headline.copyWith(fontSize: 14),
                             ),
                             const SizedBox(height: 2),
                             MarqueeText(
-                              track.artist,
+                              MediaNormalizer.formatArtists(track.artist),
                               active: player.isPlaying,
                               style: AppTypography.subhead.copyWith(fontSize: 12),
                             ),
@@ -91,18 +93,20 @@ class MiniPlayer extends StatelessWidget {
                         ),
                       ),
 
-                      // Play / Pause Button with Snappy Spring
+                      // Play / Pause Button with Snappy Spring & Buffering Spinner
                       PressableScale(
                         onTap: () => player.togglePlay(),
                         child: Container(
                           width: 40,
                           height: 40,
                           alignment: Alignment.center,
-                          child: Icon(
-                            player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
+                          child: player.isBuffering
+                              ? const CupertinoActivityIndicator(color: Colors.white, radius: 10)
+                              : Icon(
+                                  player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
                         ),
                       ),
 

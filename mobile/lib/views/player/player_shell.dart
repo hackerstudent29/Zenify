@@ -75,7 +75,7 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
   late final AnimationController _dock = AnimationController.unbounded(vsync: this, value: 0);
   late final AnimationController _artX = AnimationController.unbounded(vsync: this, value: 0);
   late final AnimationController _miniX = AnimationController.unbounded(vsync: this, value: 0);
-  late final Ticker _probe = createTicker((_) => _measure());
+  late final Ticker _probe;
 
   final ValueNotifier<Rect?> _bigRect = ValueNotifier(null);
   final GlobalKey _regionKey = GlobalKey();
@@ -108,6 +108,12 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
   _Axis _artAxis = _Axis.none;
   Offset _artAcc = Offset.zero;
   bool _artDragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _probe = createTicker((_) => _measure());
+  }
 
   @override
   void dispose() {

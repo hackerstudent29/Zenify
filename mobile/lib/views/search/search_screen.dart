@@ -19,6 +19,7 @@ import '../../design_system/widgets/song_tile.dart';
 import '../../design_system/zen.dart';
 import '../../models/track.dart';
 import '../../services/player_state.dart';
+import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
 import '../details/artist_screen.dart';
 import 'search_data_service.dart';
@@ -95,35 +96,35 @@ const List<String> _kTrendingPills = [
 const List<Map<String, String>> _kDefaultPopularArtists = [
   {
     'name': 'Anirudh Ravichander',
-    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+    'photo': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&h=500&fit=crop',
   },
   {
     'name': 'A. R. Rahman',
-    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+    'photo': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&h=500&fit=crop',
   },
   {
     'name': 'Taylor Swift',
-    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+    'photo': 'https://images.unsplash.com/photo-1526478806334-5fd488fcaabc?w=500&h=500&fit=crop',
   },
   {
     'name': 'The Weeknd',
-    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+    'photo': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&h=500&fit=crop',
   },
   {
     'name': 'Sid Sriram',
-    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+    'photo': 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500&h=500&fit=crop',
   },
   {
     'name': 'Coldplay',
-    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+    'photo': 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&h=500&fit=crop',
   },
   {
     'name': 'Billie Eilish',
-    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+    'photo': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&h=500&fit=crop',
   },
   {
     'name': 'Harris Jayaraj',
-    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+    'photo': 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=500&fit=crop',
   },
 ];
 
@@ -131,32 +132,32 @@ const List<Map<String, String>> _kDefaultPopularAlbums = [
   {
     'title': 'Leo',
     'artist': 'Anirudh Ravichander',
-    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+    'cover': 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&h=500&fit=crop',
   },
   {
     'title': 'Jailer',
     'artist': 'Anirudh Ravichander',
-    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+    'cover': 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&h=500&fit=crop',
   },
   {
     'title': 'Starboy',
     'artist': 'The Weeknd',
-    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+    'cover': 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500&h=500&fit=crop',
   },
   {
     'title': '1989 (Taylor\'s Version)',
     'artist': 'Taylor Swift',
-    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+    'cover': 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&h=500&fit=crop',
   },
   {
     'title': 'After Hours',
     'artist': 'The Weeknd',
-    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+    'cover': 'https://images.unsplash.com/photo-1511735111819-9a3f7709049c?w=500&h=500&fit=crop',
   },
   {
     'title': 'Ponniyin Selvan Part-1',
     'artist': 'A. R. Rahman',
-    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+    'cover': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&h=500&fit=crop',
   },
 ];
 
@@ -396,35 +397,71 @@ class _SearchScreenState extends State<SearchScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  for (final item in recents.take(5))
-                    InkWell(
-                      onTap: () => _submitSearch(item),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.history_rounded, size: 18, color: AppColors.textTertiary),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                item,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
+                  for (final item in recents.take(5)) ...[
+                    Builder(
+                      builder: (context) {
+                        final matchedArtist = popularArtists.firstWhere(
+                          (a) => a['name']?.toLowerCase() == item.toLowerCase(),
+                          orElse: () => _kDefaultPopularArtists.firstWhere(
+                            (a) => a['name']?.toLowerCase() == item.toLowerCase(),
+                            orElse: () => const {},
+                          ),
+                        );
+                        final artistPhoto = matchedArtist['photo'];
+
+                        return InkWell(
+                          onTap: () => _submitSearch(item),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Row(
+                              children: [
+                                if (artistPhoto != null && artistPhoto.isNotEmpty)
+                                  ClipOval(
+                                    child: CachedNetworkImage(
+                                      imageUrl: MediaNormalizer.upgradeArtworkUrl(artistPhoto),
+                                      width: 28,
+                                      height: 28,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => Container(
+                                        width: 28,
+                                        height: 28,
+                                        color: AppColors.surface2,
+                                        child: const Icon(Icons.person_rounded, size: 16, color: AppColors.textTertiary),
+                                      ),
+                                      errorWidget: (context, url, error) => Container(
+                                        width: 28,
+                                        height: 28,
+                                        color: AppColors.surface2,
+                                        child: const Icon(Icons.history_rounded, size: 16, color: AppColors.textTertiary),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  const Icon(Icons.history_rounded, size: 20, color: AppColors.textTertiary),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    item,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textTertiary),
+                                  onPressed: () => _dataService.removeRecent(item),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textTertiary),
-                              onPressed: () => _dataService.removeRecent(item),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      },
                     ),
+                  ],
                   const SizedBox(height: 16),
                 ],
               );
@@ -501,7 +538,7 @@ class _SearchScreenState extends State<SearchScreen>
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 145,
+              height: 165,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -516,9 +553,10 @@ class _SearchScreenState extends State<SearchScreen>
                     child: MediaCard(
                       title: name,
                       subtitle: 'Artist',
-                      imageUrl: (photo != null && photo.isNotEmpty) ? photo : null,
+                      imageUrl: (photo != null && photo.isNotEmpty) ? MediaNormalizer.upgradeArtworkUrl(photo) : null,
                       isCircular: true,
-                      width: 90,
+                      width: 104,
+                      twoLineTitle: true,
                       onTap: () {
                         HapticFeedback.lightImpact();
                         Navigator.push(
@@ -660,7 +698,7 @@ class _SearchScreenState extends State<SearchScreen>
           ),
 
           // Bottom clearance
-          const SizedBox(height: 140),
+          SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
         ],
       ),
     );
@@ -789,7 +827,7 @@ class _SearchScreenState extends State<SearchScreen>
             _buildFullPlaylistsList(_searchResults.playlists),
           ],
 
-          const SizedBox(height: 140),
+          SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
         ],
       ),
     );

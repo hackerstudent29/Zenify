@@ -14,6 +14,7 @@ import '../../models/track.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
+import '../../utils/media_normalizer.dart';
 import 'artist_screen.dart';
 
 /* ------------------------------------------------------------------ */
@@ -470,7 +471,7 @@ class _AlbumScreenState extends State<AlbumScreen> {
                           child: Column(
                             children: [
                               Text(
-                                widget.albumTitle,
+                                MediaNormalizer.cleanTitle(widget.albumTitle),
                                 textAlign: TextAlign.center,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -481,14 +482,14 @@ class _AlbumScreenState extends State<AlbumScreen> {
                                 scale: 0.94,
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => ArtistScreen(artistName: widget.artistName)),
+                                  MaterialPageRoute(builder: (_) => ArtistScreen(artistName: MediaNormalizer.formatArtists(widget.artistName))),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Flexible(
                                       child: Text(
-                                        widget.artistName,
+                                        MediaNormalizer.formatArtists(widget.artistName),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(color: AppColors.accent, fontSize: 20, fontWeight: FontWeight.w500),
@@ -648,7 +649,7 @@ class _AlbumScreenState extends State<AlbumScreen> {
                           offset: Offset(0, (1 - t) * 8),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 64),
-                            child: Text(widget.albumTitle,
+                            child: Text(MediaNormalizer.cleanTitle(widget.albumTitle),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),

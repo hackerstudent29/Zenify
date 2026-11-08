@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../../utils/media_normalizer.dart';
 import '../tokens/app_colors.dart';
 import '../tokens/app_spacing.dart';
 import '../tokens/app_typography.dart';
@@ -16,6 +17,7 @@ class MediaCard extends StatelessWidget {
     this.imageUrl,
     this.isCircular = false,
     this.width = 150.0,
+    this.twoLineTitle = false,
     this.onTap,
   });
 
@@ -24,13 +26,15 @@ class MediaCard extends StatelessWidget {
   final String? imageUrl;
   final bool isCircular;
   final double width;
+  final bool twoLineTitle;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final imageWidget = imageUrl != null && imageUrl!.startsWith('http')
+    final cleanImg = MediaNormalizer.upgradeArtworkUrl(imageUrl);
+    final imageWidget = cleanImg.isNotEmpty && cleanImg.startsWith('http')
         ? CachedNetworkImage(
-            imageUrl: imageUrl!,
+            imageUrl: cleanImg,
             fit: BoxFit.cover,
             width: width,
             height: width,
@@ -85,11 +89,19 @@ class MediaCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.s8),
 
             // Title
-            MarqueeText(
-              title,
-              textAlign: isCircular ? TextAlign.center : TextAlign.left,
-              style: AppTypography.headline.copyWith(fontSize: 14),
-            ),
+            twoLineTitle
+                ? Text(
+                    title,
+                    textAlign: isCircular ? TextAlign.center : TextAlign.left,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.headline.copyWith(fontSize: 14),
+                  )
+                : MarqueeText(
+                    title,
+                    textAlign: isCircular ? TextAlign.center : TextAlign.left,
+                    style: AppTypography.headline.copyWith(fontSize: 14),
+                  ),
 
             // Subtitle
             if (subtitle != null) ...[

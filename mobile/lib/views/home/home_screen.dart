@@ -24,6 +24,7 @@ import '../../services/country_service.dart';
 import '../../services/listening_history_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/update_service.dart';
+import '../../utils/media_normalizer.dart';
 
 /* ------------------------------------------------------------------ */
 /*  Physics primitives                                                  */
@@ -176,7 +177,7 @@ class _Img extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final img = CachedNetworkImage(
-      imageUrl: url,
+      imageUrl: MediaNormalizer.upgradeArtworkUrl(url),
       fit: BoxFit.cover,
       fadeInDuration: const Duration(milliseconds: 220),
       placeholder: (context, url) => Container(color: AppColors.surface2),
@@ -383,7 +384,7 @@ class _CoverCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            title,
+            MediaNormalizer.cleanCompactTitle(title),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: circular ? TextAlign.center : TextAlign.start,
@@ -399,7 +400,7 @@ class _CoverCard extends StatelessWidget {
             behavior: HitTestBehavior.opaque,
             onTap: onSubtitleTap,
             child: Text(
-              subtitle,
+              MediaNormalizer.formatArtists(subtitle),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: circular ? TextAlign.center : TextAlign.start,
@@ -476,7 +477,7 @@ class _SongRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        track.title,
+                        MediaNormalizer.cleanCompactTitle(track.title),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -495,11 +496,11 @@ class _SongRow extends StatelessWidget {
                               onTap: () {
                                 HapticFeedback.lightImpact();
                                 Navigator.of(context).push(
-                                  CupertinoPageRoute(builder: (_) => ArtistScreen(artistName: track.artist)),
+                                  CupertinoPageRoute(builder: (_) => ArtistScreen(artistName: MediaNormalizer.formatArtists(track.artist))),
                                 );
                               },
                               child: Text(
-                                track.artist,
+                                MediaNormalizer.formatArtists(track.artist),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
@@ -516,15 +517,15 @@ class _SongRow extends StatelessWidget {
                                   Navigator.of(context).push(
                                     CupertinoPageRoute(
                                       builder: (_) => AlbumScreen(
-                                        albumTitle: track.album,
-                                        artistName: track.artist,
+                                        albumTitle: MediaNormalizer.cleanTitle(track.album),
+                                        artistName: MediaNormalizer.formatArtists(track.artist),
                                         coverUrl: track.coverUrl,
                                       ),
                                     ),
                                   );
                                 },
                                 child: Text(
-                                  track.album,
+                                  MediaNormalizer.cleanCompactTitle(track.album),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(color: AppColors.textTertiary, fontSize: 14),
@@ -1135,8 +1136,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // 5. Albums for you (extracted from real releases)
     final albumMap = <String, Track>{};
     for (final t in [..._newReleases, ..._quickPicks, ..._chartTracks]) {
-      if (t.album.isNotEmpty && t.album != 'Single') {
-        albumMap.putIfAbsent(t.album, () => t);
+      final alb = MediaNormalizer.cleanTitle(t.album);
+      if (alb.isNotEmpty && alb.toLowerCase() != 'single' && !MediaNormalizer.isMetadataNoise(alb)) {
+        albumMap.putIfAbsent(alb, () => t);
       }
     }
     final albums = albumMap.values.take(10).toList();
@@ -1441,7 +1443,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
 
                 // clearance for floating mini player + persistent tab bar
-                SliverToBoxAdapter(child: SizedBox(height: 170 + MediaQuery.paddingOf(context).bottom)),
+                SliverToBoxAdapter(child: SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom)),
               ],
             ),
     );

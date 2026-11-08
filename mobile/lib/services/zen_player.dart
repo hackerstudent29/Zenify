@@ -35,12 +35,14 @@ class AudioPlayer implements FxEngine {
   PlayerState _state = PlayerState.stopped;
 
   final _stateC = StreamController<PlayerState>.broadcast();
+  final _bufferingC = StreamController<bool>.broadcast();
   final _posC = StreamController<Duration>.broadcast();
   final _durC = StreamController<Duration>.broadcast();
   final _doneC = StreamController<void>.broadcast();
   final _errorC = StreamController<String>.broadcast();
 
   Stream<PlayerState> get onPlayerStateChanged => _stateC.stream;
+  Stream<bool> get onBufferingChanged => _bufferingC.stream;
   Stream<Duration> get onPositionChanged => _posC.stream;
   Stream<Duration> get onDurationChanged => _durC.stream;
   Stream<void> get onPlayerComplete => _doneC.stream;
@@ -59,6 +61,9 @@ class AudioPlayer implements FxEngine {
         };
         _state = s;
         _stateC.add(s);
+        if (e['buffering'] is bool) {
+          _bufferingC.add(e['buffering'] as bool);
+        }
         if (s == PlayerState.completed) _doneC.add(null);
       case 'position':
         _posC.add(Duration(milliseconds: (e['ms'] as num).toInt()));
@@ -97,7 +102,7 @@ class AudioPlayer implements FxEngine {
         'title': title ?? '',
         'artist': artist ?? '',
         'artworkUrl': artworkUrl ?? '',
-        'startMs': ?startMs,
+        'startMs': startMs,
       });
 
   Future<void> setNext(String? mediaId) =>
@@ -125,7 +130,7 @@ class AudioPlayer implements FxEngine {
     _fxTimer?.cancel();
     await _sub?.cancel();
     await _call('dispose');
-    for (final c in [_stateC, _posC, _durC, _errorC]) {
+    for (final c in [_stateC, _bufferingC, _posC, _durC, _errorC]) {
       await c.close();
     }
     await _doneC.close();

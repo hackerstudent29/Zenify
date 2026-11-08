@@ -68,7 +68,7 @@ export default function DownloadPage() {
           <motion.div variants={rise} className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/20 text-brand text-[11px] font-bold uppercase tracking-wider">
               <Sparkles size={13} className="text-brand" />
-              <span>Mobile Release v2.6.0 Available</span>
+              <span>Mobile Release v2.6.5 Available</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-sans uppercase tracking-tight text-white leading-tight">
@@ -129,7 +129,7 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-zinc-400">
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Version</span>
-                    <span className="text-white font-medium">v2.6.0 (Build 1)</span>
+                    <span className="text-white font-medium">v2.6.5 (Build 47)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Package Size</span>
