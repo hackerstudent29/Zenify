@@ -109,7 +109,7 @@ class ArtistService {
       String? targetBrowseId = browseId;
       YTArtistCard? ytCard;
 
-      // 1. Resolve artist via YouTube Music InnerTube directly (no JioSaavn pollution)
+      // 1. Resolve artist via YouTube Music InnerTube directly
       if (targetBrowseId == null || targetBrowseId.isEmpty) {
         ytCard = await InnerTubeService.instance.searchArtist(cleanName);
         targetBrowseId = ytCard?.browseId;

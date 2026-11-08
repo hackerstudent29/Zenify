@@ -1,24 +1,27 @@
 package com.zenify.mobile.audio
 
 import android.content.Context
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import com.zenify.mobile.yt.YtDataSource
+import com.zenify.mobile.yt.YtEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -26,8 +29,8 @@ import io.flutter.plugin.common.MethodChannel
 
 /**
  * Channels:
- *  - MethodChannel  zenify/audio           play / pause / resume / stop / seek / setVolume / setFx / dispose
- *  - EventChannel   zenify/audio/events    {type: state|position|duration|error, ...}
+ *  - MethodChannel  zenify/audio           play / setNext / prefetch / prewarm / clearAllCaches / pause / resume / stop / seek / setVolume / setFx / dispose
+ *  - EventChannel   zenify/audio/events    {type: state|position|duration|resolved|error, ...}
  *  - EventChannel   zenify/audio/spectrum  List<double>(36) at about 30 fps
  */
 @OptIn(UnstableApi::class)
@@ -68,6 +71,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
     override fun onAttachedToEngine(b: FlutterPlugin.FlutterPluginBinding) {
         ctx = b.applicationContext
+        YtEngine.init(ctx)
+
         MethodChannel(b.binaryMessenger, "zenify/audio").setMethodCallHandler(this)
         EventChannel(b.binaryMessenger, "zenify/audio/events").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(args: Any?, sink: EventChannel.EventSink?) { events = sink }
@@ -100,7 +105,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         val s = when {
             p.playbackState == Player.STATE_ENDED -> "completed"
             p.playbackState == Player.STATE_IDLE -> "stopped"
-            p.playWhenReady -> "playing" // buffering still counts as playing, so the UI does not flicker
+            p.playWhenReady -> "playing" // buffering still counts as playing, so UI does not flicker
             else -> "paused"
         }
         emit(mapOf("type" to "state", "value" to s))
@@ -108,7 +113,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
     private fun ensurePlayer(): ExoPlayer {
         player?.let { return it }
-        val factory = object : DefaultRenderersFactory(ctx) {
+        val renderersFactory = object : DefaultRenderersFactory(ctx) {
             override fun buildAudioSink(
                 context: Context,
                 enableFloatOutput: Boolean,
@@ -116,12 +121,28 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             ): AudioSink? {
                 return DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(false)
-                    .setEnableAudioTrackPlaybackParams(false) // speed and pitch use Sonic, after our FX
+                    .setEnableAudioTrackPlaybackParams(false) // speed and pitch use Sonic, after FX
                     .setAudioProcessors(arrayOf<AudioProcessor>(processor))
                     .build()
             }
         }
-        val p = ExoPlayer.Builder(ctx, factory)
+
+        val dataSourceFactory = YtDataSource.createDataSourceFactory(ctx) { videoId, resolved ->
+            main.post {
+                emit(mapOf(
+                    "type" to "resolved",
+                    "id" to videoId,
+                    "client" to resolved.client,
+                    "ms" to (resolved.expiresInSec * 1000),
+                    "fromCache" to false
+                ))
+            }
+        }
+
+        val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
+
+        val p = ExoPlayer.Builder(ctx, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 true,
@@ -129,25 +150,24 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+
         p.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                val stateName = when (state) {
-                    Player.STATE_IDLE -> "IDLE"
-                    Player.STATE_BUFFERING -> "BUFFERING"
-                    Player.STATE_READY -> "READY"
-                    Player.STATE_ENDED -> "ENDED"
-                    else -> "UNKNOWN($state)"
-                }
-                android.util.Log.d("ZenAudioPlugin", "onPlaybackStateChanged: $stateName, playWhenReady=${p.playWhenReady}")
                 emitState()
             }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                android.util.Log.d("ZenAudioPlugin", "onPlayWhenReadyChanged: $playWhenReady (reason=$reason)")
                 emitState()
             }
             override fun onPlayerError(error: PlaybackException) {
-                android.util.Log.e("ZenAudioPlugin", "ExoPlayer playback error: ${error.errorCodeName} (code=${error.errorCode}) - ${error.message}", error)
-                emit(mapOf("type" to "error", "message" to (error.message ?: "playback error")))
+                val is403 = error.message?.contains("403") == true || error.errorCodeName.contains("BAD_HTTP_STATUS")
+                Log.e("ZenAudioPlugin", "ExoPlayer playback error: ${error.errorCodeName} (code=${error.errorCode}, is403=$is403) - ${error.message}", error)
+                emit(mapOf(
+                    "type" to "error",
+                    "message" to (error.message ?: "playback error"),
+                    "errorCode" to error.errorCode,
+                    "errorCodeName" to error.errorCodeName,
+                    "is403" to is403
+                ))
             }
         })
         p.playbackParameters = pending
@@ -155,25 +175,63 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         return p
     }
 
-    private fun play(url: String, headers: Map<String, String>) {
-        android.util.Log.i("ZenAudioPlugin", "play called for: ${url.take(80)}...")
+    private fun playMediaId(
+        mediaId: String,
+        title: String?,
+        artist: String?,
+        artworkUrl: String?,
+        startMs: Long?
+    ) {
         val p = ensurePlayer()
-        val defaultUa = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
-        val http = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setKeepPostFor302Redirects(true)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(30_000)
-            .setUserAgent(headers["User-Agent"] ?: defaultUa)
-        if (headers.isNotEmpty()) {
-            http.setDefaultRequestProperties(headers)
-        }
-        val src = ProgressiveMediaSource.Factory(DefaultDataSource.Factory(ctx, http))
-            .createMediaSource(MediaItem.fromUri(url))
+        val uri = Uri.parse("zenify://media/$mediaId")
+        val metadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .setArtworkUri(if (!artworkUrl.isNullOrBlank()) Uri.parse(artworkUrl) else null)
+            .build()
+
+        val mediaItem = MediaItem.Builder()
+            .setMediaId(mediaId)
+            .setCustomCacheKey(mediaId)
+            .setUri(uri)
+            .setMediaMetadata(metadata)
+            .build()
+
         lastDuration = -1L
-        p.setMediaSource(src)
+        p.setMediaItem(mediaItem, startMs ?: 0L)
         p.prepare()
         p.playWhenReady = true
+    }
+
+    private fun playUrl(url: String) {
+        val p = ensurePlayer()
+        val mediaItem = MediaItem.fromUri(url)
+        lastDuration = -1L
+        p.setMediaItem(mediaItem)
+        p.prepare()
+        p.playWhenReady = true
+    }
+
+    private fun setNextMediaId(mediaId: String?) {
+        val p = player ?: return
+        if (mediaId.isNullOrBlank()) {
+            if (p.mediaItemCount > 1) {
+                p.removeMediaItems(1, p.mediaItemCount)
+            }
+        } else {
+            val uri = Uri.parse("zenify://media/$mediaId")
+            val mediaItem = MediaItem.Builder()
+                .setMediaId(mediaId)
+                .setCustomCacheKey(mediaId)
+                .setUri(uri)
+                .build()
+            if (p.mediaItemCount > 1) {
+                p.replaceMediaItem(1, mediaItem)
+            } else {
+                p.addMediaItem(mediaItem)
+            }
+            YtEngine.prefetch(listOf(mediaId))
+        }
     }
 
     private fun setFx(m: Map<String, Any?>) {
@@ -190,7 +248,40 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         try {
             when (call.method) {
                 "play" -> {
-                    play(call.argument<String>("url")!!, call.argument<Map<String, String>>("headers") ?: emptyMap())
+                    val mediaId = call.argument<String>("mediaId")
+                    if (!mediaId.isNullOrBlank()) {
+                        playMediaId(
+                            mediaId = mediaId,
+                            title = call.argument<String>("title"),
+                            artist = call.argument<String>("artist"),
+                            artworkUrl = call.argument<String>("artworkUrl"),
+                            startMs = call.argument<Number>("startMs")?.toLong()
+                        )
+                    } else {
+                        val url = call.argument<String>("url")
+                        if (!url.isNullOrBlank()) {
+                            playUrl(url)
+                        }
+                    }
+                    result.success(null)
+                }
+                "setNext" -> {
+                    val mediaId = call.argument<String>("mediaId")
+                    setNextMediaId(mediaId)
+                    result.success(null)
+                }
+                "prefetch" -> {
+                    val mediaIds = call.argument<List<String>>("mediaIds") ?: emptyList()
+                    YtEngine.prefetch(mediaIds)
+                    result.success(null)
+                }
+                "prewarm" -> {
+                    YtEngine.prewarm()
+                    result.success(null)
+                }
+                "clearAllCaches" -> {
+                    YtEngine.clearAll(ctx)
+                    YtDataSource.clearCache(ctx)
                     result.success(null)
                 }
                 "pause" -> { player?.pause(); result.success(null) }

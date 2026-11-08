@@ -199,6 +199,16 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       }
     }));
     _subs.add(_audioPlayer.onPlayerComplete.listen((_) => _onComplete()));
+    _subs.add(_audioPlayer.onError.listen(_onEngineError));
+  }
+
+  void _onEngineError(String message) {
+    if (_isTransitioning || _pausing) return;
+    if (kDebugMode) debugPrint('[PlayerState] Native engine playback error: $message');
+    _isPlaying = false;
+    _isBuffering = false;
+    _lastError = 'Playback error: $message';
+    notifyListeners();
   }
 
   void _onEngineState(ap.PlayerState state) {
@@ -428,9 +438,14 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   }
 
   Future<void> _playWithFallback(Track track, int token) async {
+    if (token != _playToken) return;
+    _isPlaying = true;
+    _isBuffering = true;
+    notifyListeners();
+
     Object? error;
 
-    // 1. TOP PRIORITY: Direct High-Fidelity On-Device Resolution (Echo Music model)
+    // 1. TOP PRIORITY: Direct High-Fidelity On-Device Resolution (Echo Music / YouTubeExplode model)
     // Connects directly from the user's phone IP to Google Video CDN.
     // Eliminates server proxies, Heroku 403 blocks, and USB cable requirements.
     try {
@@ -463,12 +478,36 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       }
     }
 
+    // 3. Fallback: Zenify Backend Stream Proxy (/stream-youtube?v=)
+    try {
+      final videoId = track.id.replaceFirst('yt-', '').trim();
+      if (videoId.isNotEmpty) {
+        final proxyUrl = '${ApiService.baseUrl}/stream-youtube?v=$videoId';
+        if (token != _playToken) return;
+        await _audioPlayer.play(ap.UrlSource(proxyUrl));
+        return;
+      }
+    } catch (e) {
+      error = e;
+    }
+
     throw error ?? StateError('Unable to resolve audio stream for "${track.title}"');
   }
 
   void _prefetchNext() {
     final n = _currentIndex + 1;
-    if (n < _queue.length) unawaited(ApiService.prefetchLyrics(_queue[n]));
+    if (n < _queue.length) {
+      final nextTrack = _queue[n];
+      unawaited(ApiService.prefetchLyrics(nextTrack));
+      // Gapless next track setup & native engine prefetch
+      unawaited(_audioPlayer.setNext(nextTrack.id));
+      final lookahead = _queue.skip(n).take(2).map((t) => t.id).toList();
+      unawaited(_audioPlayer.prefetch(lookahead));
+    }
+  }
+
+  void prewarm() {
+    unawaited(_audioPlayer.prewarm());
   }
 
   void _pushHistory(Track t) {
@@ -768,8 +807,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     notifyListeners();
 
     var lines = <Map<String, dynamic>>[];
+    LyricsResult? lyricsRes;
     try {
-      final lyricsRes = await LyricsService.instance.fetchLyrics(track);
+      lyricsRes = await LyricsService.instance.fetchLyrics(track);
       if (token != _playToken) return; // a newer track took over
       if (lyricsRes != null && lyricsRes.lines.isNotEmpty) {
         lines = lyricsRes.lines;
@@ -778,14 +818,15 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       if (token != _playToken) return;
     }
 
-    final synced = lines.isNotEmpty && lines.any((l) => l['timeMs'] is num && (l['timeMs'] as num) > 0);
+    final synced = lyricsRes?.synced ??
+        (lines.isNotEmpty && lines.any((l) => (l['timeMs'] ?? l['startMs']) is num));
     if (synced) {
-      lines.sort((a, b) => ((a['timeMs'] ?? 0) as num).compareTo(((b['timeMs'] ?? 0) as num)));
+      lines.sort((a, b) => (((a['timeMs'] ?? a['startMs']) ?? 0) as num).compareTo(((b['timeMs'] ?? b['startMs']) ?? 0) as num));
     }
 
     _lyricsLines = lines;
     _lyricsSynced = synced;
-    _lyricTimes = synced ? lines.map((l) => ((l['timeMs'] ?? 0) as num).toInt()).toList() : <int>[];
+    _lyricTimes = synced ? lines.map((l) => (((l['timeMs'] ?? l['startMs']) ?? 0) as num).toInt()).toList() : <int>[];
     _isLoadingLyrics = false;
     _updateLyricIndex(positionNotifier.value);
     notifyListeners();

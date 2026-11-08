@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../design_system/widgets/zen_button.dart';
 import '../../design_system/zen.dart';
 import '../../services/auth_state.dart';
+import '../../services/dock_visibility.dart';
 
 Future<void> showLoginModal(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -22,7 +23,7 @@ class LoginModal extends StatefulWidget {
   State<LoginModal> createState() => _LoginModalState();
 }
 
-class _LoginModalState extends State<LoginModal> {
+class _LoginModalState extends State<LoginModal> with HideDocksMixin {
   bool _isRegister = false;
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();

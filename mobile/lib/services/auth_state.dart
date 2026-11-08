@@ -93,7 +93,7 @@ class AuthState extends ChangeNotifier {
 
   UserProfile? _user;
   bool _isLoading = false;
-  String _audioQuality = '320k';
+  String _audioQuality = 'high';
   bool _enableMeshBackground = true;
 
   UserProfile? get user => _user;
@@ -107,7 +107,8 @@ class AuthState extends ChangeNotifier {
     try {
       await SecureStorageService.instance.init();
       final prefs = await SharedPreferences.getInstance();
-      _audioQuality = prefs.getString(_kQualityKey) ?? '320k';
+      final rawQuality = prefs.getString(_kQualityKey);
+      _audioQuality = (rawQuality == '320k' || rawQuality == 'yt-direct' || rawQuality == null) ? 'high' : rawQuality;
       _enableMeshBackground = prefs.getBool(_kMeshKey) ?? true;
 
       final token = SecureStorageService.instance.accessToken;

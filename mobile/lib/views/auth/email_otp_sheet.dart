@@ -9,6 +9,7 @@ import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/spring_kit.dart';
 import '../../services/auth_state.dart';
+import '../../services/dock_visibility.dart';
 
 class EmailOtpSheet extends StatefulWidget {
   const EmailOtpSheet({
@@ -23,7 +24,7 @@ class EmailOtpSheet extends StatefulWidget {
 }
 
 class _EmailOtpSheetState extends State<EmailOtpSheet>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, HideDocksMixin {
   int _step = 0; // 0 = email, 1 = otp
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _otpCtrl = TextEditingController();

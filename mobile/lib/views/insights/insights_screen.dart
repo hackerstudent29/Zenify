@@ -10,6 +10,7 @@ import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/zen.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/dock_visibility.dart';
 
 class InsightsScreen extends StatefulWidget {
   const InsightsScreen({super.key});
@@ -18,7 +19,7 @@ class InsightsScreen extends StatefulWidget {
   State<InsightsScreen> createState() => _InsightsScreenState();
 }
 
-class _InsightsScreenState extends State<InsightsScreen> {
+class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   String _selectedRange = 'all'; // week, month, year, all
   bool _isLoading = true;
   String? _error;
@@ -460,7 +461,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: artists.length.clamp(0, 5),
-            separatorBuilder: (_, __) => Divider(
+            separatorBuilder: (_, _) => Divider(
               color: Colors.white.withValues(alpha: 0.06),
               height: 1,
               indent: 64,
@@ -586,7 +587,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: tracks.length.clamp(0, 5),
-            separatorBuilder: (_, __) => Divider(
+            separatorBuilder: (_, _) => Divider(
               color: Colors.white.withValues(alpha: 0.06),
               height: 1,
               indent: 48,

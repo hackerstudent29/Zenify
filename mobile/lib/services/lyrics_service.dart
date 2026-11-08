@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,14 +49,14 @@ class LrcParser {
 
       final matches = _tagRegex.allMatches(line);
       if (matches.isNotEmpty) {
-        // Strip timestamps to obtain pure lyric line text
+        // Strip line timestamps to obtain pure line text + word tags
         var text = line.replaceAll(_tagRegex, '').trim();
 
-        // Extract word-level timestamps if present
+        // Extract word-level timestamps if present (<mm:ss.xx>)
         List<Map<String, dynamic>>? words;
         if (_wordTagRegex.hasMatch(text)) {
           words = _parseWordLevel(text);
-          text = text.replaceAll(_wordTagRegex, '').trim();
+          text = text.replaceAll(_wordTagRegex, '').replaceAll(RegExp(r'\s+'), ' ').trim();
         }
 
         if (text.isEmpty && matches.length == 1) {
@@ -85,7 +86,15 @@ class LrcParser {
       for (var i = 0; i < timedList.length; i++) {
         final cur = timedList[i];
         final nextStart = (i + 1 < timedList.length) ? timedList[i + 1].startMs : (cur.startMs + 3500);
-        final endMs = nextStart > cur.startMs ? nextStart : (cur.startMs + 3500);
+        int endMs = nextStart > cur.startMs ? nextStart : (cur.startMs + 3500);
+
+        // If word-level timing is present, align line end with the last word
+        if (cur.words != null && cur.words!.isNotEmpty) {
+          final lastWordEnd = cur.words!.last['endMs'];
+          if (lastWordEnd is int && lastWordEnd > cur.startMs) {
+            endMs = math.min(nextStart, math.max(lastWordEnd, cur.startMs + 500));
+          }
+        }
 
         lines.add({
           'text': cur.text,
@@ -130,7 +139,7 @@ class LrcParser {
         final wordText = line.substring(wordStart, wordEnd).trim();
 
         if (wordText.isNotEmpty) {
-          int endMs = startMs + 300;
+          int endMs = startMs + 320;
           if (i + 1 < matches.length) {
             final nextM = matches[i + 1];
             final nMin = int.tryParse(nextM.group(1) ?? '0') ?? 0;
@@ -142,12 +151,33 @@ class LrcParser {
             if (nextTotal > startMs) endMs = nextTotal;
           }
 
-          words.add({
-            'text': wordText,
-            'timeMs': startMs,
-            'startMs': startMs,
-            'endMs': endMs,
-          });
+          final subTokens = wordText.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+          if (subTokens.length <= 1) {
+            words.add({
+              'text': wordText,
+              'word': wordText,
+              'timeMs': startMs,
+              'startMs': startMs,
+              'endMs': endMs,
+            });
+          } else {
+            // Distribute duration proportionally across whitespace-separated sub-words
+            final totalChars = subTokens.fold<int>(0, (sum, w) => sum + w.length);
+            final dur = endMs - startMs;
+            var curStart = startMs;
+            for (final sub in subTokens) {
+              final subDur = math.max(60, ((sub.length / math.max(1, totalChars)) * dur).round());
+              final subEnd = curStart + subDur;
+              words.add({
+                'text': sub,
+                'word': sub,
+                'timeMs': curStart,
+                'startMs': curStart,
+                'endMs': subEnd,
+              });
+              curStart = subEnd;
+            }
+          }
         }
       }
       return words.isNotEmpty ? words : null;
@@ -159,10 +189,10 @@ class LrcParser {
 
 /// Robust Multi-Stage Lyrics Retrieval Engine.
 ///
-/// Ensures zero-failure lyrics by querying across 3 resilient tiers:
-/// 1. Zenify Cloud Backend (Cached Word-Synced Lyrics)
-/// 2. Direct LRCLIB API (Pristine open community-synced & plain lyrics)
-/// 3. Direct YouTube Music InnerTube Lyrics (Official catalog metadata)
+/// Multi-tier pipeline strictly ordered:
+/// 1. TIER 1 (PRIORITY #1): Word-by-Word (WBW) Synced Lyrics (lrc.red & Zenify Backend)
+/// 2. TIER 2 (PRIORITY #2): Line-by-Line Synced Lyrics (lrc.red line, LRCLIB syncedLyrics, Backend line)
+/// 3. TIER 3 (FALLBACK ONLY): Plain Lyrics (LRCLIB plain, YouTube Music InnerTube, Backend plain)
 class LyricsService {
   LyricsService._();
   static final LyricsService instance = LyricsService._();
@@ -183,25 +213,51 @@ class LyricsService {
     return artist.split(RegExp(r'[,&/|]|\bfeat\.?\b|\bft\.?\b', caseSensitive: false)).first.trim();
   }
 
-  /// Fetches lyrics using the complete multi-stage pipeline.
+  /// Purges old unsynced (plain) lyrics from SharedPreferences disk cache.
+  Future<void> purgeUnsyncedCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((k) => k.startsWith('lyrics_cache_')).toList();
+      for (final k in keys) {
+        final raw = prefs.getString(k);
+        if (raw != null) {
+          try {
+            final json = jsonDecode(raw);
+            if (json is Map && json['synced'] != true) {
+              await prefs.remove(k);
+            }
+          } catch (_) {
+            await prefs.remove(k);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Fetches lyrics using the strict multi-tier hierarchy:
+  /// Tier 1 (WBW) -> Tier 2 (Line-by-Line) -> Tier 3 (Plain Fallback).
   Future<LyricsResult?> fetchLyrics(Track track) async {
     final cacheKey = track.id;
     if (_memCache.containsKey(cacheKey)) {
-      return _memCache[cacheKey];
+      final mem = _memCache[cacheKey]!;
+      // Return synced immediately from memory
+      if (mem.synced) return mem;
     }
 
-    // Check SharedPreferences offline cache
+    // Check SharedPreferences offline cache (ONLY accept if synced)
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedStr = prefs.getString('lyrics_cache_$cacheKey');
       if (cachedStr != null) {
         final json = jsonDecode(cachedStr) as Map<String, dynamic>;
         final lines = (json['lines'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-        if (lines.isNotEmpty) {
+        final isSynced = json['synced'] == true;
+        if (lines.isNotEmpty && isSynced) {
           final result = LyricsResult(
             lines: lines,
-            synced: json['synced'] == true,
+            synced: true,
             source: json['source'] ?? 'offline_cache',
+            rawLrc: json['rawLrc'] as String?,
           );
           _memCache[cacheKey] = result;
           return result;
@@ -212,31 +268,170 @@ class LyricsService {
     final cleanT = cleanTitle(track.title);
     final cleanA = cleanArtist(track.artist);
 
-    // ──────────────────────── Stage 1: YouTube Music InnerTube (Direct on-device) ─────────────────
+    // =========================================================================
+    // TIER 1 (PRIORITY #1): WORD-BY-WORD (WBW) SYNCED LYRICS
+    // =========================================================================
+
+    // 1a. Query lrc.red for Word-by-Word Enhanced LRC
+    LyricsResult? lrcRedLineCandidate;
+    try {
+      final lrcRed = await _fetchLrcRed(cleanT, cleanA);
+      if (lrcRed.wbw != null && lrcRed.wbw!.isNotEmpty) {
+        return _saveAndReturn(cacheKey, lrcRed.wbw!.lines, true, 'lrc_red_wbw', rawLrc: lrcRed.wbw!.rawLrc);
+      }
+      lrcRedLineCandidate = lrcRed.line;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[LyricsService] Tier 1 (lrc.red) error: $e');
+    }
+
+    // 1b. Query Zenify Backend for Word-by-Word Synced Lyrics
+    LyricsResult? backendCandidate;
+    try {
+      backendCandidate = await _fetchBackendLyrics(track, cleanT, cleanA);
+      if (backendCandidate != null &&
+          backendCandidate.synced &&
+          backendCandidate.lines.any((l) => l['words'] != null && (l['words'] as List).isNotEmpty)) {
+        return _saveAndReturn(cacheKey, backendCandidate.lines, true, backendCandidate.source, rawLrc: backendCandidate.rawLrc);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[LyricsService] Tier 1 (Backend) error: $e');
+    }
+
+    // =========================================================================
+    // TIER 2 (PRIORITY #2): LINE-BY-LINE SYNCED LYRICS
+    // =========================================================================
+
+    // 2a. Use lrc.red line-synced result if found during Tier 1
+    if (lrcRedLineCandidate != null && lrcRedLineCandidate.isNotEmpty && lrcRedLineCandidate.synced) {
+      return _saveAndReturn(cacheKey, lrcRedLineCandidate.lines, true, 'lrc_red_line', rawLrc: lrcRedLineCandidate.rawLrc);
+    }
+
+    // 2b. Query LRCLIB STRICTLY for syncedLyrics (reject plain lyrics in this tier)
+    try {
+      final lrclibSynced = await _fetchLrclibSynced(cleanT, cleanA, track.album, track.durationSeconds);
+      if (lrclibSynced != null && lrclibSynced.isNotEmpty && lrclibSynced.synced) {
+        return _saveAndReturn(cacheKey, lrclibSynced.lines, true, 'lrclib_synced', rawLrc: lrclibSynced.rawLrc);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[LyricsService] Tier 2 (LRCLIB synced) error: $e');
+    }
+
+    // 2c. Use Zenify Backend line-synced lyrics if available
+    if (backendCandidate != null && backendCandidate.isNotEmpty && backendCandidate.synced) {
+      return _saveAndReturn(cacheKey, backendCandidate.lines, true, backendCandidate.source, rawLrc: backendCandidate.rawLrc);
+    }
+
+    // =========================================================================
+    // TIER 3 (FALLBACK / LAST RESORT ONLY): PLAIN UNSYNCED LYRICS
+    // =========================================================================
+
+    // 3a. LRCLIB plainLyrics
+    try {
+      final lrclibPlain = await _fetchLrclibPlain(cleanT, cleanA, track.album, track.durationSeconds);
+      if (lrclibPlain != null && lrclibPlain.isNotEmpty) {
+        return _returnPlainMemoryOnly(cacheKey, lrclibPlain.lines, 'lrclib_plain');
+      }
+    } catch (_) {}
+
+    // 3b. YouTube Music InnerTube Official Plain Lyrics
     try {
       final videoId = track.id.startsWith('yt-') ? track.id.substring(3) : track.id;
       final ytLyrics = await InnerTubeService.instance.getLyrics(videoId);
       if (ytLyrics != null && ytLyrics.trim().isNotEmpty) {
         final parsed = LrcParser.parse(ytLyrics);
         if (parsed.lines.isNotEmpty) {
-          return _saveAndReturn(cacheKey, parsed.lines, parsed.synced, 'innertube_official');
+          if (parsed.synced) {
+            return _saveAndReturn(cacheKey, parsed.lines, true, 'innertube_official_synced');
+          } else {
+            return _returnPlainMemoryOnly(cacheKey, parsed.lines, 'innertube_official_plain');
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3c. Zenify Backend plain lyrics
+    if (backendCandidate != null && backendCandidate.isNotEmpty) {
+      return _returnPlainMemoryOnly(cacheKey, backendCandidate.lines, backendCandidate.source);
+    }
+
+    return null;
+  }
+
+  // ───────────────────────── Tier 1: lrc.red Provider ───────────────────────
+
+  Future<({LyricsResult? wbw, LyricsResult? line})> _fetchLrcRed(String title, String artist) async {
+    try {
+      final q = Uri.encodeComponent('$title $artist'.trim());
+      final searchUri = Uri.parse('https://lrc.red/search.json?q=$q');
+      final searchRes = await _client.get(searchUri, headers: {
+        'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)',
+      }).timeout(const Duration(seconds: 4));
+
+      if (searchRes.statusCode != 200) return (wbw: null, line: null);
+
+      final searchJson = jsonDecode(utf8.decode(searchRes.bodyBytes)) as Map<String, dynamic>;
+      final hits = (searchJson['hits'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (hits.isEmpty) return (wbw: null, line: null);
+
+      // Check top 3 hits for matching ISRC
+      for (final hit in hits.take(3)) {
+        final isrc = (hit['isrc'] ?? '').toString().trim();
+        if (isrc.isEmpty) continue;
+
+        final metaUri = Uri.parse('https://lrc.red/s/$isrc.json');
+        final metaRes = await _client.get(metaUri, headers: {
+          'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)',
+        }).timeout(const Duration(seconds: 3));
+
+        if (metaRes.statusCode != 200) continue;
+        final metaJson = jsonDecode(utf8.decode(metaRes.bodyBytes)) as Map<String, dynamic>;
+        final syncType = (metaJson['sync'] ?? '').toString().toLowerCase();
+        final lrcUrl = metaJson['files']?['lrc']?.toString();
+
+        if (lrcUrl != null && lrcUrl.isNotEmpty) {
+          final lrcRes = await _client.get(Uri.parse(lrcUrl), headers: {
+            'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)',
+          }).timeout(const Duration(seconds: 4));
+
+          if (lrcRes.statusCode == 200) {
+            final lrcContent = utf8.decode(lrcRes.bodyBytes);
+            final parsed = LrcParser.parse(lrcContent);
+            if (parsed.lines.isNotEmpty && parsed.synced) {
+              final hasWordTimings = parsed.lines.any((l) => l['words'] != null && (l['words'] as List).isNotEmpty);
+              if (syncType == 'word' || hasWordTimings) {
+                return (
+                  wbw: LyricsResult(
+                    lines: parsed.lines,
+                    synced: true,
+                    source: 'lrc_red_wbw',
+                    rawLrc: lrcContent,
+                  ),
+                  line: null,
+                );
+              } else {
+                return (
+                  wbw: null,
+                  line: LyricsResult(
+                    lines: parsed.lines,
+                    synced: true,
+                    source: 'lrc_red_line',
+                    rawLrc: lrcContent,
+                  ),
+                );
+              }
+            }
+          }
         }
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[LyricsService] Stage 1 (InnerTube) failed: $e');
+      if (kDebugMode) debugPrint('[LyricsService] lrc.red error: $e');
     }
+    return (wbw: null, line: null);
+  }
 
-    // ──────────────────────── Stage 2: Direct LRCLIB API (Direct on-device) ───────────────────────
-    try {
-      final lrclibResult = await _fetchLrclib(cleanT, cleanA, track.album, track.durationSeconds);
-      if (lrclibResult != null && lrclibResult.isNotEmpty) {
-        return _saveAndReturn(cacheKey, lrclibResult.lines, lrclibResult.synced, 'lrclib', rawLrc: lrclibResult.rawLrc);
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('[LyricsService] Stage 2 (LRCLIB) failed: $e');
-    }
+  // ───────────────────────── Backend Provider ───────────────────────────────
 
-    // ──────────────────────── Stage 3: Zenify Backend (Fallback) ───────────────────
+  Future<LyricsResult?> _fetchBackendLyrics(Track track, String cleanT, String cleanA) async {
     try {
       final queryParams = <String, String>{
         'title': cleanT,
@@ -285,8 +480,13 @@ class LyricsService {
             }
           }
           if (lines.isNotEmpty) {
-            final synced = lines.any((l) => l['timeMs'] is num && (l['timeMs'] as num) > 0);
-            return _saveAndReturn(cacheKey, lines, synced, 'zenify_backend');
+            final synced = lines.any((l) => (l['timeMs'] ?? l['startMs']) is num);
+            final hasWbw = lines.any((l) => l['words'] != null && (l['words'] as List).isNotEmpty);
+            return LyricsResult(
+              lines: lines,
+              synced: synced,
+              source: hasWbw ? 'zenify_backend_wbw' : 'zenify_backend',
+            );
           }
         }
 
@@ -295,21 +495,26 @@ class LyricsService {
         if (rawLrc is String && rawLrc.trim().isNotEmpty) {
           final parsed = LrcParser.parse(rawLrc);
           if (parsed.lines.isNotEmpty) {
-            return _saveAndReturn(cacheKey, parsed.lines, parsed.synced, 'zenify_backend_lrc', rawLrc: rawLrc);
+            final hasWbw = parsed.lines.any((l) => l['words'] != null && (l['words'] as List).isNotEmpty);
+            return LyricsResult(
+              lines: parsed.lines,
+              synced: parsed.synced,
+              source: hasWbw ? 'zenify_backend_wbw_lrc' : 'zenify_backend_lrc',
+              rawLrc: rawLrc,
+            );
           }
         }
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[LyricsService] Stage 3 (Backend) failed: $e');
+      if (kDebugMode) debugPrint('[LyricsService] Backend error: $e');
     }
-
     return null;
   }
 
-  // ───────────────────────── Helper: LRCLIB ─────────────────────────────────
+  // ───────────────────────── Tier 2: LRCLIB Synced Provider ─────────────────
 
-  Future<LyricsResult?> _fetchLrclib(String title, String artist, String album, int durationSeconds) async {
-    // 1. Direct match with GET
+  Future<LyricsResult?> _fetchLrclibSynced(String title, String artist, String album, int durationSeconds) async {
+    // 1. Direct match with GET /api/get
     try {
       final uri = Uri.https('lrclib.net', '/api/get', {
         'track_name': title,
@@ -319,24 +524,17 @@ class LyricsService {
       });
 
       final res = await _client.get(uri, headers: {
-        'User-Agent': 'Zenify Mobile App v1.0 (https://github.com/zenify)',
-      }).timeout(const Duration(seconds: 5));
+        'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+      }).timeout(const Duration(seconds: 4));
 
       if (res.statusCode == 200) {
         final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
         final syncedLyrics = json['syncedLyrics'] as String?;
-        final plainLyrics = json['plainLyrics'] as String?;
 
         if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
           final parsed = LrcParser.parse(syncedLyrics);
-          if (parsed.lines.isNotEmpty) {
+          if (parsed.lines.isNotEmpty && parsed.synced) {
             return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_synced', rawLrc: syncedLyrics);
-          }
-        }
-        if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
-          final parsed = LrcParser.parse(plainLyrics);
-          if (parsed.lines.isNotEmpty) {
-            return LyricsResult(lines: parsed.lines, synced: false, source: 'lrclib_plain');
           }
         }
       }
@@ -349,37 +547,21 @@ class LyricsService {
       });
 
       final searchRes = await _client.get(searchUri, headers: {
-        'User-Agent': 'Zenify Mobile App v1.0 (https://github.com/zenify)',
-      }).timeout(const Duration(seconds: 5));
+        'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+      }).timeout(const Duration(seconds: 4));
 
       if (searchRes.statusCode == 200) {
         final list = jsonDecode(utf8.decode(searchRes.bodyBytes));
         if (list is List && list.isNotEmpty) {
-          // Look for synced item first
-          Map<String, dynamic>? best;
           for (final item in list) {
             if (item is Map) {
-              if (item['syncedLyrics'] != null && (item['syncedLyrics'] as String).trim().isNotEmpty) {
-                best = Map<String, dynamic>.from(item);
-                break;
+              final syncedLyrics = item['syncedLyrics'] as String?;
+              if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
+                final parsed = LrcParser.parse(syncedLyrics);
+                if (parsed.lines.isNotEmpty && parsed.synced) {
+                  return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_search_synced', rawLrc: syncedLyrics);
+                }
               }
-            }
-          }
-          best ??= Map<String, dynamic>.from(list.first as Map);
-
-          final syncedLyrics = best['syncedLyrics'] as String?;
-          final plainLyrics = best['plainLyrics'] as String?;
-
-          if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
-            final parsed = LrcParser.parse(syncedLyrics);
-            if (parsed.lines.isNotEmpty) {
-              return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_search_synced', rawLrc: syncedLyrics);
-            }
-          }
-          if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
-            final parsed = LrcParser.parse(plainLyrics);
-            if (parsed.lines.isNotEmpty) {
-              return LyricsResult(lines: parsed.lines, synced: false, source: 'lrclib_search_plain');
             }
           }
         }
@@ -388,6 +570,65 @@ class LyricsService {
 
     return null;
   }
+
+  // ───────────────────────── Tier 3: LRCLIB Plain Provider ──────────────────
+
+  Future<LyricsResult?> _fetchLrclibPlain(String title, String artist, String album, int durationSeconds) async {
+    try {
+      final uri = Uri.https('lrclib.net', '/api/get', {
+        'track_name': title,
+        'artist_name': artist,
+        if (album.isNotEmpty && album != 'Single') 'album_name': album,
+        if (durationSeconds > 0 && durationSeconds != 210) 'duration': durationSeconds.toString(),
+      });
+
+      final res = await _client.get(uri, headers: {
+        'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+      }).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+        final plainLyrics = json['plainLyrics'] as String?;
+        if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
+          final parsed = LrcParser.parse(plainLyrics);
+          if (parsed.lines.isNotEmpty) {
+            return LyricsResult(lines: parsed.lines, synced: false, source: 'lrclib_plain');
+          }
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final searchUri = Uri.https('lrclib.net', '/api/search', {
+        'q': '$title $artist'.trim(),
+      });
+
+      final searchRes = await _client.get(searchUri, headers: {
+        'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+      }).timeout(const Duration(seconds: 4));
+
+      if (searchRes.statusCode == 200) {
+        final list = jsonDecode(utf8.decode(searchRes.bodyBytes));
+        if (list is List && list.isNotEmpty) {
+          for (final item in list) {
+            if (item is Map) {
+              final plainLyrics = item['plainLyrics'] as String?;
+              if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
+                final parsed = LrcParser.parse(plainLyrics);
+                if (parsed.lines.isNotEmpty) {
+                  return LyricsResult(lines: parsed.lines, synced: false, source: 'lrclib_search_plain');
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  // ───────────────────────── Storage Helpers ────────────────────────────────
 
   LyricsResult _saveAndReturn(
     String cacheKey,
@@ -399,20 +640,32 @@ class LyricsService {
     final result = LyricsResult(lines: lines, synced: synced, source: source, rawLrc: rawLrc);
     _memCache[cacheKey] = result;
 
-    // Cache persistently
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString(
-        'lyrics_cache_$cacheKey',
-        jsonEncode({
-          'lines': lines,
-          'synced': synced,
-          'source': source,
-          'rawLrc': rawLrc,
-        }),
-      );
-    }).catchError((_) {});
+    // Cache persistently on disk only when synced
+    if (synced) {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setString(
+          'lyrics_cache_$cacheKey',
+          jsonEncode({
+            'lines': lines,
+            'synced': true,
+            'source': source,
+            'rawLrc': rawLrc,
+          }),
+        );
+      }).catchError((_) {});
+    }
 
     return result;
   }
-}
 
+  LyricsResult _returnPlainMemoryOnly(
+    String cacheKey,
+    List<Map<String, dynamic>> lines,
+    String source,
+  ) {
+    final result = LyricsResult(lines: lines, synced: false, source: source);
+    // In-memory cache only; do NOT lock disk into plain lyrics permanently!
+    _memCache[cacheKey] = result;
+    return result;
+  }
+}

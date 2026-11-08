@@ -10,7 +10,6 @@ import '../models/track.dart';
 import 'artist_service.dart';
 import 'innertube_service.dart';
 import 'lyrics_service.dart';
-import 'stream_resolver_service.dart';
 
 /// A horizontal "shelf" on the Listen Now / Browse screens (Apple Music style).
 class Shelf {
@@ -147,39 +146,9 @@ class ApiService {
   // Streaming + artwork helpers
   // ---------------------------------------------------------------------------
 
-  /// How YouTube tracks get their audio URL:
-  ///  - 'device' (default): the native engine resolves on the phone using user IP.
-  ///  - 'cloud': through cloud stream endpoint.
-  static const String streamMode =
-      String.fromEnvironment('ZENIFY_STREAM_MODE', defaultValue: 'device');
-  static bool get resolveOnDevice => streamMode == 'device';
-
-  /// Resolves a playable URL for [track] against [base] (defaults to [baseUrl]).
+  /// Resolves a playable media ID for [track].
   static String resolveStreamUrl(Track track, {String? base}) {
-    if (resolveOnDevice && (track.source == 'youtube' || track.id.startsWith('yt-'))) {
-      return 'zenify-yt://${track.id.replaceFirst('yt-', '')}';
-    }
-
-    final b = base ?? baseUrl;
-    final url = track.streamUrl;
-
-    if (url == null || url.isEmpty) {
-      final q = Uri.encodeComponent('${track.artist} - ${track.title}');
-      final t = Uri.encodeComponent(track.title);
-      final a = Uri.encodeComponent(track.artist);
-      final alb = Uri.encodeComponent(track.album);
-      return '$b/api/utils/stream-youtube?url=$q&trackId=${track.id}&title=$t&artist=$a&album=$alb';
-    }
-    if (url.startsWith('/')) return '$b$url';
-    // Re-point localhost or legacy Heroku URLs to active base so it never breaks without USB
-    if (url.contains('localhost:3000') && b != 'http://localhost:3000') {
-      return url.replaceFirst('http://localhost:3000', b);
-    }
-    if (url.contains('zenify-app-f99a38548ef6.herokuapp.com')) {
-      return url.replaceFirst('https://zenify-app-f99a38548ef6.herokuapp.com', b);
-    }
-    if (b != baseUrl && url.startsWith(baseUrl)) return '$b${url.substring(baseUrl.length)}';
-    return url;
+    return track.id.replaceFirst('yt-', '');
   }
 
   /// Right-sized artwork: small for list rows / mini player, large for Now Playing.
@@ -417,7 +386,6 @@ class ApiService {
   /// Flushes all memory and persistent caches across all services.
   static Future<void> clearAllCaches() async {
     clearCache();
-    StreamResolverService.instance.clearCache();
     ArtistService.clearCache();
     InnerTubeService.instance.clearCache();
     try {

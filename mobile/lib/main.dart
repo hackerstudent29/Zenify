@@ -13,6 +13,7 @@ import 'services/country_service.dart';
 import 'services/listening_history_service.dart';
 import 'services/listening_tracker_service.dart';
 import 'services/settings_service.dart';
+import 'services/cache_migration.dart';
 import 'services/library_store.dart';
 import 'services/zenify_audio_handler.dart';
 import 'views/shell_screen.dart';
@@ -20,6 +21,7 @@ import 'views/splash/zenify_splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await runCacheMigration();
   await CountryService.instance.init();
   await ListeningHistoryService.instance.init();
   await SettingsState.instance.initialize();
@@ -55,6 +57,10 @@ void main() async {
 
   final bool enableDevicePreview = kIsWeb &&
       !Uri.base.queryParameters.containsKey('raw');
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    playerState.prewarm();
+  });
 
   runApp(
     DevicePreview(
@@ -93,7 +99,7 @@ class ZenifyMobileApp extends StatelessWidget {
         ChangeNotifierProvider<SettingsState>.value(value: SettingsState.instance),
       ],
       child: MaterialApp(
-        title: 'Zenify 1',
+        title: 'Zenify',
         debugShowCheckedModeBanner: false,
         locale: DevicePreview.locale(context),
         theme: _theme,

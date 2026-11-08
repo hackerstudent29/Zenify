@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../design_system/widgets/pressable_scale.dart';
 import '../design_system/zen.dart';
 import '../models/track.dart';
+import '../services/dock_visibility.dart';
 import 'details/album_screen.dart';
 import 'details/artist_screen.dart';
 import 'explore/explore_screen.dart';
@@ -221,46 +222,62 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
       child: Scaffold(
         resizeToAvoidBottomInset: false,
         backgroundColor: Zen.bg,
-        body: AnimatedBuilder(
-          animation: _dockController,
-          builder: (context, _) {
-            final dockProgress = _dockController.value;
-            final miniBottom = (_navHeight + _navMargin) * dockProgress + 8;
+        body: ValueListenableBuilder<bool>(
+          valueListenable: DockVisibility.hideDocksNotifier,
+          builder: (context, hideDocks, _) {
+            return AnimatedBuilder(
+              animation: _dockController,
+              builder: (context, _) {
+                final dockProgress = _dockController.value;
+                final miniBottom = (_navHeight + _navMargin) * dockProgress + 8;
 
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                // 1. Tab views in IndexedStack with persistent nested Navigators.
-                Positioned.fill(
-                  child: IndexedStack(
-                    index: _currentIndex,
-                    children: _tabNavigators,
-                  ),
-                ),
-
-                // 2. Floating frosted-glass tab bar with synchronized slide & fade.
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: safeBottom + _navMargin,
-                  child: Transform.translate(
-                    offset: Offset(0, (_navHeight + safeBottom + 24) * (1 - dockProgress)),
-                    child: Opacity(
-                      opacity: (dockProgress * 1.6).clamp(0.0, 1.0),
-                      child: _FloatingNavBar(
-                        height: _navHeight,
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 1. Tab views in IndexedStack with persistent nested Navigators.
+                    Positioned.fill(
+                      child: IndexedStack(
                         index: _currentIndex,
-                        onSelect: _select,
+                        children: _tabNavigators,
                       ),
                     ),
-                  ),
-                ),
 
-                // 3. Fluid single-controller morphing PlayerShell with dynamic bottom clearance.
-                Positioned.fill(
-                  child: PlayerShell(
-                    key: _playerShellKey,
-                    miniBottomOffset: miniBottom,
+                    // 2. Floating frosted-glass tab bar with synchronized slide & fade.
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: safeBottom + _navMargin,
+                      child: AnimatedSlide(
+                        offset: hideDocks ? const Offset(0, 2.0) : Offset.zero,
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeInOutCubic,
+                        child: AnimatedOpacity(
+                          opacity: hideDocks ? 0.0 : 1.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: IgnorePointer(
+                            ignoring: hideDocks,
+                            child: Transform.translate(
+                              offset: Offset(0, (_navHeight + safeBottom + 24) * (1 - dockProgress)),
+                              child: Opacity(
+                                opacity: (dockProgress * 1.6).clamp(0.0, 1.0),
+                                child: _FloatingNavBar(
+                                  height: _navHeight,
+                                  index: _currentIndex,
+                                  onSelect: _select,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // 3. Fluid single-controller morphing PlayerShell with dynamic bottom clearance.
+                    Positioned.fill(
+                      child: PlayerShell(
+                        key: _playerShellKey,
+                        hideMini: hideDocks,
+                        miniBottomOffset: miniBottom,
                     onGoToArtist: (track) {
                       final artist = track is Track ? track.artist : track?.artist ?? track?.toString();
                       if (artist != null && artist.isNotEmpty) {
@@ -293,9 +310,11 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
               ],
             );
           },
-        ),
-      ),
-    );
+        );
+      },
+    ),
+  ),
+);
   }
 }
 

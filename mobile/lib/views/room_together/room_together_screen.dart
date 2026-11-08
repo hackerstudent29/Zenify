@@ -8,6 +8,7 @@ import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_button.dart';
 import '../../design_system/zen.dart';
 import '../../models/track.dart';
+import '../../services/dock_visibility.dart';
 import '../../services/player_state.dart';
 
 class RoomTogetherScreen extends StatefulWidget {
@@ -29,7 +30,8 @@ class _FloatingEmoji {
   double opacity;
 }
 
-class _RoomTogetherScreenState extends State<RoomTogetherScreen> with SingleTickerProviderStateMixin {
+class _RoomTogetherScreenState extends State<RoomTogetherScreen>
+    with SingleTickerProviderStateMixin, HideDocksMixin {
   bool _inRoom = true;
   String _roomCode = 'ZEN-8921';
   int _activeTab = 0; // 0: Queue, 1: Chat, 2: People

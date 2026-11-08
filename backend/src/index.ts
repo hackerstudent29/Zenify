@@ -343,15 +343,16 @@ const defaultRemoteConfig = {
         homeFeed: false,
     },
     minAppVersion: '1.0.0',
-    latestAppVersion: '2.6.0',
-    updateUrl: 'https://listenzenify.com/download',
+    latestAppVersion: '2.6.4',
+    updateUrl: 'https://listenzenify.com/download/app',
+    releaseNotes: '• Multi-tier karaoke lyrics: Tier 1 Word-by-Word (WBW) fill animation via lrc.red & backend\n• Direct on-device audio streaming restored with ExoPlayer header protection\n• Auto-purge stale plain lyrics so tracks upgrade to glowing fill effect\n• Dock auto-hide on auth, settings, and profile screens',
     message: null,
 };
 
 server.get('/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.0.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.2.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
@@ -361,7 +362,7 @@ server.get('/download/app', async (request, reply) => {
 server.get('/api/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.0.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.2.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }

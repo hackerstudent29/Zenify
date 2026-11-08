@@ -431,9 +431,9 @@ private class VocalStage(val fs: Float) {
         mix = smooth(mix, 1f, k * 2f)
         val tb: Float; val ts: Float; val tl: Float; val th: Float
         if (p.vocalMode == "karaoke") {
-            tb = max(0f, 1f - a * 1.15f); ts = 1f + 0.15f * a; tl = 1f; th = 1f
+            tb = max(0f, 1f - a * 1.15f); ts = 1f + 0.25f * a; tl = 1f; th = 1f
         } else {
-            tb = 1.3f * a; ts = max(0.4f, 1f - a * 0.8f); tl = max(0.4f, 1f - a * 0.6f); th = tl
+            tb = 1.6f * a; ts = max(0.5f, 1f - a * 0.7f); tl = max(0.5f, 1f - a * 0.5f); th = tl
         }
         gBand = smooth(gBand, tb, k); gSide = smooth(gSide, ts, k)
         gBass = smooth(gBass, tl, k); gHigh = smooth(gHigh, th, k)
@@ -502,10 +502,10 @@ private class Comp(val fs: Float) {
     var active = false
     private var env = 0f
     private var gain = 1f
-    private var th = -20f
-    private var ratio = 3.5f
-    private var knee = 14f
-    private var makeup = 1.4f
+    private var th = -14f
+    private var ratio = 2.2f
+    private var knee = 10f
+    private var makeup = 1.9f
     private var attC = exp(-1f / (fs * 0.01f))
     private var relC = exp(-1f / (fs * 0.18f))
 
@@ -516,10 +516,10 @@ private class Comp(val fs: Float) {
             env = 0f
             return
         }
-        th = smooth(th, -20f, k)
-        ratio = smooth(ratio, 3.5f, k)
-        knee = smooth(knee, 14f, k)
-        makeup = smooth(makeup, 1.4f, k)
+        th = smooth(th, -14f, k)
+        ratio = smooth(ratio, 2.2f, k)
+        knee = smooth(knee, 10f, k)
+        makeup = smooth(makeup, 1.9f, k)
         relC = exp(-1f / (fs * 0.18f))
     }
 

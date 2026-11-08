@@ -1,11 +1,11 @@
 {
-    "name": "mobile",
-    "short_name": "mobile",
+    "name": "Zenify",
+    "short_name": "Zenify",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#000000",
+    "theme_color": "#000000",
+    "description": "Zenify Mobile - The free, ad-free, lossless music streaming application.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
