@@ -35,6 +35,11 @@ import io.flutter.plugin.common.MethodChannel
  */
 @OptIn(UnstableApi::class)
 class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
+    companion object {
+        @Volatile
+        var activeHeaders: Map<String, String> = emptyMap()
+    }
+
     private lateinit var ctx: Context
     private val main = Handler(Looper.getMainLooper())
     private val processor = ZenFxProcessor()
@@ -203,8 +208,11 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         p.playWhenReady = true
     }
 
-    private fun playUrl(url: String) {
+    private fun playUrl(url: String, headers: Map<String, String>? = null) {
         val p = ensurePlayer()
+        if (headers != null) {
+            activeHeaders = headers
+        }
         val mediaItem = MediaItem.fromUri(url)
         lastDuration = -1L
         p.setMediaItem(mediaItem)
@@ -259,8 +267,10 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         )
                     } else {
                         val url = call.argument<String>("url")
+                        val rawHeaders = call.argument<Map<String, Any?>>("headers")
+                        val headersMap = rawHeaders?.mapNotNull { (k, v) -> if (v != null) k to v.toString() else null }?.toMap()
                         if (!url.isNullOrBlank()) {
-                            playUrl(url)
+                            playUrl(url, headersMap)
                         }
                     }
                     result.success(null)

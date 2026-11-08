@@ -4,65 +4,34 @@ import React, {
   useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from "react";
 import {
-  AnimatePresence, MotionConfig, animate, motion, motionValue,
-  useMotionValue, useMotionValueEvent,
-  type PanInfo,
+  AnimatePresence, LayoutGroup, MotionConfig, animate, motion, motionValue,
+  useMotionValue, useMotionValueEvent, useTransform,
+  type MotionValue, type PanInfo,
 } from "framer-motion";
+import { ListPlus, RefreshCw, User, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { usePlayerStore } from "@/store/player";
 import { useUIStore } from "@/store/ui";
+import { useAuthStore } from "@/store/authStore";
+import { useRefetchAudio } from "@/hooks/useRefetchAudio";
+import { useRefetchLyrics } from "@/hooks/useRefetchLyrics";
+import { RefetchLyricsSubMenu } from "@/components/shared/RefetchLyricsSubMenu";
 import { SwiftUIForward, SwiftUIBackward, SwiftUIQueue } from "@/components/ui/SwiftUIIcons";
 import { ArtistLinks } from "@/components/shared/ArtistLinks";
 import { TrackActionsDropdown } from "@/components/shared/TrackActionsDropdown";
-import { cn, getTrackCover } from "@/lib/utils";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuPortal,
+} from "@/components/ui/dropdown-menu";
+import { cn, getTrackCover, getArtistTarget } from "@/lib/utils";
 import { MobileScrubber, MiniPlayerProgress } from "./../player/PlayerProgress";
 import { DynamicBackground } from "../shared/DynamicBackground";
 import { LyricsView } from "../shared/LyricsView";
 import {
-  FONT_STACK, SPRING, SPRING_SOFT,
+  FONT_STACK, SHEET_SPRING, SPRING, SPRING_SOFT,
   GlassButton, LikeButton, Marquee, PlateButton, PlayPauseButton, PlayerStyles, SpringButton,
   SFFx, SFLyrics, SFMore, SFRepeat, SFShuffle,
   useAutoHideIdle, useTrackLike,
 } from "@/components/player/PlayerKit";
-
-const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
-
-/* ------------------------------------------------------------------ */
-/*  Math helpers                                                       */
-/* ------------------------------------------------------------------ */
-const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-/** 0 below `a`, 1 above `b`, smooth S-curve in between */
-const smooth = (a: number, b: number, x: number) => {
-  const t = clamp((x - a) / (b - a));
-  return t * t * (3 - 2 * t);
-};
-
-/* ------------------------------------------------------------------ */
-/*  Tunables                                                           */
-/* ------------------------------------------------------------------ */
-const PAUSED = 0.86;        // artwork scale while paused
-const ART_BASE = 420;       // artwork is laid out at max size and only ever scaled DOWN (stays crisp)
-const BIG_R = 14;
-const HEAD_R = 10;
-const MINI_R = 8;
-const PILL_R = 31;          // mini player is 62px tall -> fully round
-const PILL_H = 62;
-const PILL_SIDE = 12;
-const HEADER_H = 68;        // compact lyrics header height (inside the middle region)
-const HEAD_ART = 56;
-
-/** Swipe-up feel. The sheet moves OPEN_GAIN px for every 1px of finger travel,
- *  so you only have to drag ~60% of the distance. Release uses velocity projection (iOS style). */
-const OPEN_GAIN = 1.65;
-const PROJECT = 0.2;        // seconds of velocity "coasting" used to decide where the sheet would land
-const OPEN_AT = 0.62;       // projected position (fraction of travel) below which the sheet opens
-const CLOSE_AT = 0.28;      // projected position (fraction of travel) above which the sheet closes
-
-// One spring drives open / close / release. Almost critically damped: fast, no visible bounce.
-const SHEET = { type: "spring", stiffness: 360, damping: 34, mass: 0.9, restDelta: 0.3, restSpeed: 0.3 } as const;
-const LYRICS_SPRING = { type: "spring", stiffness: 260, damping: 30, mass: 1 } as const;
-const PAUSE_SPRING = { type: "spring", stiffness: 300, damping: 22, mass: 0.6 } as const;
 
 /* ------------------------------------------------------------------ */
 /*  Cover: swap only once decoded                                      */
@@ -88,9 +57,256 @@ function useShownCover(track: any) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  MorphWrap — pixel-exact artwork travel between mini player & sheet */
+/*                                                                      */
+/*  Coordinates and scale are derived from sheetY so dragging, opening, */
+/*  and closing share the exact same mathematical trajectory.          */
+/* ------------------------------------------------------------------ */
+const PAUSED = 0.86;
+const BIG_R = 14;
+const MINI_R = 8;
+
+interface GeoRect {
+  fullLeft: number;
+  fullTop: number;
+  fullSize: number;
+  miniLeft: number;
+  miniTop: number;
+  miniSize: number;
+}
+
+function MorphWrap({
+  sheetY, miniRef, H, paused, children,
+}: {
+  sheetY: MotionValue<number>;
+  miniRef: React.RefObject<HTMLDivElement>;
+  H: number;
+  paused: boolean;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const geo = useRef<GeoRect | null>(null);
+
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const s = useMotionValue(1);
+  const radius = useMotionValue(BIG_R);
+  const pause = useMotionValue(paused ? PAUSED : 1);
+
+  const update = useCallback(() => {
+    const g = geo.current;
+    if (!g) return;
+    const v = sheetY.get();
+    const q = Math.min(1, Math.max(0, v / H)); // 0 = fully open, 1 = docked in mini player
+    const k0 = pause.get(); // 0.86 when paused, 1 when playing
+
+    if (!g.miniSize || !g.fullSize) {
+      const sh = (g.fullSize - g.fullSize * k0) / 2;
+      x.set(sh);
+      y.set(sh);
+      s.set(k0);
+      radius.set(BIG_R / k0);
+      return;
+    }
+
+    // Geometry scaling
+    const sGeo = 1 + (g.miniSize / g.fullSize - 1) * q;
+    // Paused shrink fades smoothly as the artwork docks
+    const kEffective = 1 - (1 - k0) * (1 - q);
+    const sTotal = sGeo * kEffective;
+    // Center offset so pause shrink centers itself around the box
+    const pauseShift = (g.fullSize * sGeo - g.fullSize * sTotal) / 2;
+
+    // Translation targeting the mini player bounding rect
+    const targetX = (g.miniLeft - g.fullLeft) * q + pauseShift;
+    // - v cancels the parent sheet translateY
+    const targetY = (g.miniTop - g.fullTop) * q - v + pauseShift;
+
+    x.set(targetX);
+    y.set(targetY);
+    s.set(sTotal);
+    radius.set((BIG_R + (MINI_R - BIG_R) * q) / sTotal);
+  }, [H, sheetY, pause, x, y, s, radius]);
+
+  useMotionValueEvent(sheetY, "change", update);
+  useMotionValueEvent(pause, "change", update);
+
+  const measure = useCallback(() => {
+    const el = ref.current;
+    const mini = miniRef.current;
+    if (!el || !mini) return;
+
+    // Reset values to get un-transformed reference box
+    const curX = x.get();
+    const curY = y.get();
+    const curS = s.get();
+    x.set(0);
+    y.set(0);
+    s.set(1);
+
+    const r = el.getBoundingClientRect();
+    const m = mini.getBoundingClientRect();
+
+    x.set(curX);
+    y.set(curY);
+    s.set(curS);
+
+    if (!r.width || !m.width) return;
+
+    geo.current = {
+      fullLeft: r.left,
+      fullTop: r.top - sheetY.get(),
+      fullSize: r.width,
+      miniLeft: m.left,
+      miniTop: m.top,
+      miniSize: m.width,
+    };
+
+    update();
+  }, [sheetY, update, x, y, s, miniRef]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure]);
+
+  useEffect(() => {
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
+
+  useEffect(() => {
+    const c = animate(pause, paused ? PAUSED : 1, {
+      type: "spring",
+      stiffness: 300,
+      damping: 22,
+      mass: 0.6,
+    });
+    return () => c.stop();
+  }, [paused, pause]);
+
+  return (
+    <motion.div
+      ref={ref}
+      className="h-full w-full bg-zinc-800"
+      style={{
+        x,
+        y,
+        scale: s,
+        borderRadius: radius,
+        overflow: "hidden",
+        transformOrigin: "0 0",
+        boxShadow: "0 0 0 1px rgba(255,255,255,0.1), 0 24px 48px rgba(0,0,0,0.5)",
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  HeaderMorphWrap — Smooth morph from Lyrics Compact Header to Mini  */
+/* ------------------------------------------------------------------ */
+function HeaderMorphWrap({
+  sheetY,
+  miniRef,
+  H,
+  children,
+}: {
+  sheetY: MotionValue<number>;
+  miniRef: React.RefObject<HTMLDivElement>;
+  H: number;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const geo = useRef<{
+    headerLeft: number;
+    headerTop: number;
+    headerSize: number;
+    miniLeft: number;
+    miniTop: number;
+    miniSize: number;
+  } | null>(null);
+
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const s = useMotionValue(1);
+
+  const update = useCallback(() => {
+    const g = geo.current;
+    if (!g || !g.miniSize) return;
+    const v = sheetY.get();
+    const q = Math.min(1, Math.max(0, v / H)); // 0 = open, 1 = closed (docked)
+    if (q <= 0) {
+      x.set(0);
+      y.set(0);
+      s.set(1);
+      return;
+    }
+    const sGeo = 1 + (g.miniSize / g.headerSize - 1) * q;
+    x.set((g.miniLeft - g.headerLeft) * q);
+    y.set((g.miniTop - g.headerTop) * q - v);
+    s.set(sGeo);
+  }, [H, sheetY, x, y, s]);
+
+  useMotionValueEvent(sheetY, "change", update);
+
+  const measure = useCallback(() => {
+    const el = ref.current;
+    const mini = miniRef.current;
+    if (!el || !mini) return;
+    const curX = x.get();
+    const curY = y.get();
+    const curS = s.get();
+    x.set(0);
+    y.set(0);
+    s.set(1);
+    const r = el.getBoundingClientRect();
+    const m = mini.getBoundingClientRect();
+    x.set(curX);
+    y.set(curY);
+    s.set(curS);
+    if (!r.width || !m.width) return;
+    geo.current = {
+      headerLeft: r.left,
+      headerTop: r.top - sheetY.get(),
+      headerSize: r.width,
+      miniLeft: m.left,
+      miniTop: m.top,
+      miniSize: m.width,
+    };
+    update();
+  }, [sheetY, update, x, y, s, miniRef]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure]);
+
+  useEffect(() => {
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
+
+  return (
+    <motion.div
+      ref={ref}
+      className="relative shrink-0"
+      style={{ x, y, scale: s, transformOrigin: "0 0" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Track menu (⋯)                                                     */
 /* ------------------------------------------------------------------ */
-function TrackMenu({ track }: { track: any; onLeave?: (to: string) => void }) {
+function TrackMenu({ track, onLeave }: { track: any; onLeave: (to: string) => void }) {
+  const { refetchTrackAudio, isRefetching } = useRefetchAudio();
+  const { refetchTrackLyrics } = useRefetchLyrics();
+  const openDownloadModal = useUIStore((s) => s.openDownloadModal);
+  const showToast = (msg: string, type: "success" | "error" = "success") =>
+    useUIStore.getState().showToast(msg, type);
+
   return (
     <TrackActionsDropdown
       track={track}
@@ -116,34 +332,7 @@ const textSlide = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Geometry                                                           */
-/* ------------------------------------------------------------------ */
-interface MiniGeo {
-  W: number;
-  H: number;
-  mini: { left: number; top: number; w: number; h: number };
-  miniArt: { left: number; rel: number; size: number }; // rel = top offset inside the pill
-}
-interface Geo extends MiniGeo {
-  big: { left: number; top: number; size: number };   // inside sheet content coordinates
-  head: { left: number; top: number; size: number };
-}
-
-/* ------------------------------------------------------------------ */
 /*  Main                                                               */
-/*                                                                     */
-/*  ONE source of truth: sheetY (0 = fully open, travel = docked).     */
-/*  Shell rect, corner radius, artwork, every text block and the       */
-/*  mini-player handoff are all derived from it in `apply()`.          */
-/*                                                                     */
-/*  Apple-Music-style morph:                                           */
-/*   - the shell's top edge follows the finger                         */
-/*   - content is anchored to that top edge, so the artwork rides      */
-/*     INSIDE the tab (and is additionally clamped inside it)          */
-/*   - the shell stays OPAQUE (mesh) the whole way down, and only in   */
-/*     the last few % does it dissolve to reveal the REAL mini player  */
-/*     that has already faded in underneath it. There is never a       */
-/*     frame where translucent glass shows the page through the shell. */
 /* ------------------------------------------------------------------ */
 export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boolean }) {
   const router = useRouter();
@@ -168,6 +357,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const isLyricsOpen = useUIStore((s) => s.isLyricsOpen);
   const setIsLyricsOpen = useUIStore((s) => s.setIsLyricsOpen);
 
+  // Mobile player always uses glass style
+  const isGlass = true;
+
   const { liked, toggle: toggleLike } = useTrackLike(currentTrack?.id);
   const shown = useShownCover(currentTrack);
 
@@ -175,250 +367,50 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const [isUserScrollingLyrics, setIsUserScrollingLyrics] = useState(false);
   const idle = useAutoHideIdle(isOpen, 5000);
   const showLyrics = useDeferredValue(isLyricsOpen);
-  const [vp, setVp] = useState({ w: 0, h: 0 });
 
-  /* ── refs ── */
-  const miniShellRef = useRef<HTMLDivElement>(null);
-  const miniArtRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const regionRef = useRef<HTMLDivElement>(null);
-  const slotRef = useRef<HTMLDivElement>(null);
+  const handleNext = useCallback(() => {
+    dirRef.current = 1;
+    playNext(true);
+  }, [playNext]);
 
-  const miniGeo = useRef<MiniGeo | null>(null);
-  const geo = useRef<Geo | null>(null);
-  const travel = useRef(800);
-  const isOpenRef = useRef(isOpen);
-  isOpenRef.current = isOpen;
-  const hidePlayerRef = useRef(hidePlayer);
-  hidePlayerRef.current = hidePlayer;
-  const dragOpen = useRef(false);
-  const anim = useRef<{ stop: () => void } | null>(null);
-  const panBase = useRef(0);
+  const handlePrev = useCallback(() => {
+    dirRef.current = -1;
+    playPrev();
+  }, [playPrev]);
 
-  /* ── motion values ── */
-  const sheetY = useMotionValue(900);          // 0 = open, travel = docked
-  const L = useMotionValue(isLyricsOpen ? 1 : 0); // lyrics-mode progress
-  const pause = useMotionValue(isPlaying ? 1 : PAUSED);
-  const artX = useMotionValue(0);              // horizontal swipe on artwork
-  const miniOp = useMotionValue(1);            // real mini player visibility (handoff)
-
-  const m = useMemo(
-    () => ({
-      // shell
-      top: motionValue(0), left: motionValue(0), right: motionValue(0), bottom: motionValue(0),
-      rTop: motionValue(0), rBot: motionValue(0),
-      shellOp: motionValue(1), shadowOp: motionValue(0),
-      meshOp: motionValue(1), cx: motionValue(0),
-      // content groups
-      grabOp: motionValue(1), grabPE: motionValue("auto"),
-      metaOp: motionValue(1), metaY: motionValue(0),
-      scrubOp: motionValue(1), scrubY: motionValue(0),
-      transOp: motionValue(1), transY: motionValue(0),
-      lyricsOp: motionValue(1), lyricsY: motionValue(0),
-      headOp: motionValue(0), headY: motionValue(8),
-      ghostOp: motionValue(1), ghostY: motionValue(0),
-      // artwork
-      artX: motionValue(0), artY: motionValue(0), artS: motionValue(1),
-      artR: motionValue(BIG_R), artShadow: motionValue("none"), artOp: motionValue(1),
-    }),
-    []
-  );
-
-  /* ------------------------------------------------------------------ */
-  /*  apply(): derive every visual from sheetY / L / pause / artX        */
-  /* ------------------------------------------------------------------ */
-  const apply = useCallback(() => {
-    const g = geo.current;
-    if (!g) return;
-
-    const D = Math.max(1, g.mini.top);
-    const v = clamp(sheetY.get(), 0, D);
-    const q = v / D;              // 0 = open, 1 = docked
-    const p = 1 - q;
-    const r = smooth(0.2, 1, q);  // shell narrows toward the pill (starts early so it feels like one card shrinking)
-    const Lv = L.get();
-    const Lc = clamp(Lv);
-
-    /* shell: top edge = sheet position; sides/bottom/radius morph to the pill */
-    m.top.set(v);
-    m.left.set(g.mini.left * r);
-    m.right.set((g.W - g.mini.left - g.mini.w) * r);
-    const bottomInset = (g.H - g.mini.top - g.mini.h) * r;
-    m.bottom.set(bottomInset);
-    m.rTop.set(PILL_R * clamp(v / 100));
-    m.rBot.set(PILL_R * r);
-    m.cx.set(-g.mini.left * r); // keeps content screen-aligned while the shell narrows
-    m.shellOp.set(hidePlayerRef.current ? 1 - smooth(0.7, 1, q) : 1);
-    m.shadowOp.set(smooth(0.5, 0.9, q) * (1 - smooth(0.95, 1, q)));
-
-    /* HANDOFF — the important part.
-       1. The real mini fades in UNDER the opaque shell (q .82 → .96): invisible, shell covers it.
-       2. Only then (q .93 → 1) the shell's opaque mesh dissolves, revealing the real mini.
-       Result: coverage is never partial, so the page can never show through the shell. */
-    miniOp.set(smooth(0.82, 0.96, q));
-    m.meshOp.set(1 - smooth(0.93, 1, q));
-
-    /* text / controls: each group rises from below + fades, staggered. Closing is the exact reverse. */
-    const grab = smooth(0.55, 0.95, p);
-    m.grabOp.set(grab);
-    m.grabPE.set(p > 0.5 ? "auto" : "none");
-
-    const meta = smooth(0.3, 0.7, p);
-    m.metaOp.set(meta);
-    m.metaY.set((1 - meta) * 36);
-
-    const scrub = smooth(0.38, 0.78, p);
-    m.scrubOp.set(scrub);
-    m.scrubY.set((1 - scrub) * 44);
-
-    const trans = smooth(0.46, 0.88, p);
-    m.transOp.set(trans);
-    m.transY.set((1 - trans) * 52);
-
-    const lyr = smooth(0.34, 0.74, p);
-    m.lyricsOp.set(lyr);
-    m.lyricsY.set((1 - lyr) * 28);
-
-    const head = smooth(0.3, 0.7, p) * smooth(0.25, 0.8, Lc);
-    m.headOp.set(head);
-    m.headY.set((1 - smooth(0.25, 0.8, Lc)) * 8 + (1 - smooth(0.3, 0.7, p)) * 14);
-
-    /* mini-player ghost row (title / artist / buttons) arrives late, rising into place,
-       and leaves again at the very end so it never doubles over the real mini */
-    const ghost = smooth(0.78, 0.93, q) * (1 - smooth(0.95, 1, q));
-    m.ghostOp.set(ghost);
-    m.ghostY.set((1 - smooth(0.78, 0.93, q)) * 12);
-
-    /* artwork: big ⇄ compact (lyrics) blended by L, then → mini by q, all in sheet-content space */
-    const k = pause.get();
-    let size = lerp(g.big.size, g.head.size, Lc);
-    let x = lerp(g.big.left, g.head.left, Lc);
-    let y = lerp(g.big.top, g.head.top, Lc);
-
-    // paused shrink only applies to the big, fully-open state and fades as it docks
-    const kk = 1 - (1 - k) * (1 - Lc) * (1 - q);
-    const ks = size * kk;
-    x += (size - ks) / 2;
-    y += (size - ks) / 2;
-    size = ks;
-
-    x += artX.get() * (1 - Lc) * (1 - q); // swipe-to-skip nudge
-
-    // art rides inside the tab: linear in q, so it can't outrun the shell
-    x = lerp(x, g.miniArt.left, q);
-    y = lerp(y, g.miniArt.rel, q);
-    size = lerp(size, g.miniArt.size, q);
-
-    // hard guarantee: the artwork never leaves the shell (top or bottom edge)
-    const shellH = g.H - v - bottomInset;
-    y = Math.max(0, Math.min(y, shellH - size - 4));
-
-    const s = Math.max(0.01, size / ART_BASE);
-    m.artX.set(x);
-    m.artY.set(y);
-    m.artS.set(s);
-    m.artOp.set(1 - smooth(0.96, 1, q));
-    m.artR.set(lerp(lerp(BIG_R, HEAD_R, Lc), MINI_R, q) / s);
-    m.artShadow.set(
-      `0 0 0 1px rgba(255,255,255,0.1), 0 ${(24 * (1 - q)).toFixed(1)}px ${(48 * (1 - q)).toFixed(1)}px rgba(0,0,0,${(
-        0.5 * (1 - q) * (1 - 0.5 * Lc)
-      ).toFixed(3)})`
-    );
-  }, [sheetY, L, pause, artX, miniOp, m]);
-
-  useMotionValueEvent(sheetY, "change", apply);
-  useMotionValueEvent(L, "change", apply);
-  useMotionValueEvent(pause, "change", apply);
-  useMotionValueEvent(artX, "change", apply);
-
-  /* ------------------------------------------------------------------ */
-  /*  Measuring                                                          */
-  /* ------------------------------------------------------------------ */
-  const measureMini = useCallback(() => {
-    const W = window.innerWidth;
-    const Hh = window.innerHeight;
-    let mini = { left: PILL_SIDE, top: Hh - 76 - PILL_H, w: W - PILL_SIDE * 2, h: PILL_H };
-    let art = { left: mini.left + 14, rel: (PILL_H - 44) / 2, size: 44 };
-    const el = miniShellRef.current;
-    if (el) {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0) {
-        mini = { left: r.left, top: r.top, w: r.width, h: r.height };
-        const a = miniArtRef.current?.getBoundingClientRect();
-        if (a && a.width > 0) art = { left: a.left, rel: a.top - r.top, size: a.width };
-      }
-    }
-    miniGeo.current = { W, H: Hh, mini, miniArt: art };
-    travel.current = mini.top;
-    if (!isOpenRef.current && !dragOpen.current) sheetY.set(mini.top);
-  }, [sheetY]);
-
-  const measureAll = useCallback(() => {
-    measureMini();
-    const content = contentRef.current;
-    const slot = slotRef.current;
-    const region = regionRef.current;
-    const mg = miniGeo.current;
-    if (!content || !slot || !region || !mg) return;
-
-    const c = content.getBoundingClientRect();
-    const s = slot.getBoundingClientRect();
-    const r = region.getBoundingClientRect();
-    if (!s.width) return;
-
-    geo.current = {
-      ...mg,
-      big: { left: s.left - c.left, top: s.top - c.top, size: s.width },
-      head: { left: r.left - c.left + 24, top: r.top - c.top + 4, size: HEAD_ART },
-    };
-    apply();
-  }, [measureMini, apply]);
-
-  useIsoLayoutEffect(() => {
-    const update = () => setVp({ w: window.innerWidth, h: window.innerHeight });
-    update();
-    measureMini();
-    const onResize = () => { update(); measureMini(); if (isOpenRef.current) measureAll(); };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [measureMini, measureAll]);
-
-  // Measure before first paint of the sheet so there is never an un-morphed frame
-  useIsoLayoutEffect(() => {
-    if (isOpen) measureAll();
-  }, [isOpen, measureAll]);
-
-  // Layout moves (idle collapse, lyrics toggle) → keep artwork glued to its slot
   useEffect(() => {
-    if (!isOpen || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => measureAll());
-    if (regionRef.current) ro.observe(regionRef.current);
-    if (slotRef.current) ro.observe(slotRef.current);
-    return () => ro.disconnect();
-  }, [isOpen, measureAll]);
+    dirRef.current = 1;
+  }, [currentTrack?.id]);
 
-  /* ------------------------------------------------------------------ */
-  /*  Sheet motion                                                       */
-  /* ------------------------------------------------------------------ */
-  const stopAnim = useCallback(() => {
-    anim.current?.stop();
-    anim.current = null;
-  }, []);
+  useEffect(() => {
+    if (currentTrack?.id) setIsLyricsOpen(false);
+  }, [currentTrack?.id, setIsLyricsOpen]);
 
-  const runTo = useCallback(
-    (to: number, velocity = 0, done?: () => void) => {
-      stopAnim();
-      anim.current = animate(sheetY, to, { ...SHEET, velocity, onComplete: done });
-    },
-    [sheetY, stopAnim]
-  );
+  /* ── sheet motion values & drag physics ── */
+  const H = useRef(typeof window !== "undefined" ? window.innerHeight : 900).current;
+  const sessionRef = useRef(0);
+  const wasOpen = useRef(false);
+  if (isOpen && !wasOpen.current) sessionRef.current++;
+  wasOpen.current = isOpen;
+  const session = sessionRef.current;
 
+  const sheetY = useMemo(() => motionValue(H), [session, H]);
+  const sheetYRef = useRef(sheetY);
+  sheetYRef.current = sheetY;
+  const radius = useTransform(sheetY, [0, 140], [0, 32], { clamp: true });
+  const miniArtRef = useRef<HTMLDivElement>(null);
+  const isClosingRef = useRef(false);
+  const dragOpen = useRef(false);
+
+  // Close sheet with spring animation down to mini player
   const closeSheet = useCallback(() => {
-    runTo(travel.current, 0, () => {
-      anim.current = null;
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    animate(sheetY, H, SHEET_SPRING).then(() => {
       setOpen(false);
+      isClosingRef.current = false;
     });
-  }, [runTo, setOpen]);
+  }, [H, sheetY, setOpen]);
 
   const leaveTo = useCallback(
     (to: string) => {
@@ -428,38 +420,12 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     [router, closeSheet]
   );
 
-  // Open by tap / programmatic trigger. Closed state parks sheetY at the dock position.
+  // Opening by tap / programmatic trigger
   useEffect(() => {
-    if (!isOpen) {
-      stopAnim();
-      sheetY.set(travel.current);
-      miniOp.set(1); // real mini fully visible whenever the sheet is gone
-      return;
-    }
-    if (dragOpen.current) return;
-    runTo(0);
-    return () => stopAnim();
-  }, [isOpen, runTo, stopAnim, sheetY, miniOp]);
-
-  // Lyrics mode: artwork glides between big ⇄ compact header
-  useEffect(() => {
-    const c = animate(L, isLyricsOpen ? 1 : 0, LYRICS_SPRING);
+    if (!isOpen || dragOpen.current) return;
+    const c = animate(sheetY, 0, SHEET_SPRING);
     return () => c.stop();
-  }, [isLyricsOpen, L]);
-
-  // Pause → artwork breathes
-  useEffect(() => {
-    const c = animate(pause, isPlaying ? 1 : PAUSED, PAUSE_SPRING);
-    return () => c.stop();
-  }, [isPlaying, pause]);
-
-  useEffect(() => {
-    dirRef.current = 1;
-  }, [currentTrack?.id]);
-
-  useEffect(() => {
-    if (currentTrack?.id) setIsLyricsOpen(false);
-  }, [currentTrack?.id, setIsLyricsOpen]);
+  }, [isOpen, sheetY]);
 
   // Strictly prevent mobile browser pull-to-refresh while fullview player is open
   useEffect(() => {
@@ -488,14 +454,23 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
-      const deltaY = e.touches[0].clientY - touchStartY;
-      const deltaX = e.touches[0].clientX - touchStartX;
+      const touchY = e.touches[0].clientY;
+      const touchX = e.touches[0].clientX;
+      const deltaY = touchY - touchStartY;
+      const deltaX = touchX - touchStartX;
 
+      // Downward pull gesture
       if (deltaY > 0 && Math.abs(deltaY) > Math.abs(deltaX)) {
         const target = e.target as HTMLElement | null;
         const scrollable = target?.closest?.(".overflow-y-auto, .overflow-auto") as HTMLElement | null;
-        if (scrollable && scrollable.scrollTop > 0) return; // let lyrics scroll
-        if (e.cancelable) e.preventDefault();
+        if (scrollable && scrollable.scrollTop > 0) {
+          // Allow normal internal scrolling inside lyrics when not at top
+          return;
+        }
+        // At the top of lyrics or anywhere else on the sheet: cancel pull-to-refresh!
+        if (e.cancelable) {
+          e.preventDefault();
+        }
       }
     };
 
@@ -512,45 +487,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     };
   }, [isOpen]);
 
-  /* ------------------------------------------------------------------ */
-  /*  Gestures                                                           */
-  /* ------------------------------------------------------------------ */
-  const handleNext = useCallback(() => {
-    dirRef.current = 1;
-    playNext(true);
-  }, [playNext]);
-
-  const handlePrev = useCallback(() => {
-    dirRef.current = -1;
-    playPrev();
-  }, [playPrev]);
-
-  const beginSheetDrag = () => {
-    stopAnim();
-    panBase.current = sheetY.get();
-  };
-  const dragSheet = (dy: number) => {
-    sheetY.set(clamp(panBase.current + dy, 0, travel.current));
-  };
-
-  /** Release the open sheet. Decision uses where the sheet would COAST to (position + velocity),
-   *  so a short flick closes it and a slow small drag springs back. */
-  const releaseSheet = (vy: number) => {
-    const D = travel.current;
-    const v = sheetY.get();
-    const projected = v + vy * PROJECT;
-    const shouldClose = vy > 300 || (projected > D * CLOSE_AT && vy > -300);
-    if (shouldClose) {
-      runTo(D, vy, () => {
-        anim.current = null;
-        setOpen(false);
-      });
-    } else {
-      runTo(0, vy);
-    }
-  };
-
-  /* mini player: swipe up opens sheet (finger-tracked, geared); swipe horizontal skips */
+  /* ── mini player gestures: swipe up opens sheet; swipe horizontal skips ── */
   const miniX = useMotionValue(0);
   const gesture = useRef<"none" | "x" | "y">("none");
   const panned = useRef(false);
@@ -562,23 +499,18 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
   const miniPan = (_: PointerEvent, i: PanInfo) => {
     if (gesture.current === "none") {
-      if (Math.hypot(i.offset.x, i.offset.y) < 4) return;
-      // bias toward vertical so a slightly diagonal swipe up still opens the player
-      gesture.current = Math.abs(i.offset.x) > Math.abs(i.offset.y) * 1.2 ? "x" : "y";
+      if (Math.hypot(i.offset.x, i.offset.y) < 6) return;
+      gesture.current = Math.abs(i.offset.x) > Math.abs(i.offset.y) ? "x" : "y";
       panned.current = true;
+      if (gesture.current === "y" && i.offset.y < 0 && !isOpen) {
+        dragOpen.current = true;
+        setOpen(true);
+      }
     }
     if (gesture.current === "x") {
       miniX.set(i.offset.x * 0.8);
-      return;
-    }
-    if (gesture.current === "y") {
-      if (!dragOpen.current && !isOpenRef.current && i.offset.y < -2) {
-        dragOpen.current = true;
-        stopAnim();
-        panBase.current = travel.current;
-        setOpen(true);
-      }
-      if (dragOpen.current) dragSheet(i.offset.y * OPEN_GAIN);
+    } else if (dragOpen.current) {
+      sheetYRef.current.set(Math.max(0, Math.min(H, H + i.offset.y)));
     }
   };
 
@@ -589,66 +521,84 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
       animate(miniX, 0, SPRING_SOFT);
     } else if (dragOpen.current) {
       dragOpen.current = false;
-      const D = travel.current;
-      const v = sheetY.get();
-      const vy = i.velocity.y * OPEN_GAIN; // finger velocity → sheet velocity
-      const projected = v + vy * PROJECT;
-      const shouldOpen = vy < -250 || (projected < D * OPEN_AT && vy < 400);
-      if (shouldOpen) runTo(0, vy);
-      else
-        runTo(D, vy, () => {
-          anim.current = null;
-          setOpen(false);
-        });
+      const sy = sheetYRef.current;
+      if (i.velocity.y < -280 || -i.offset.y > H * 0.2) {
+        animate(sy, 0, { ...SHEET_SPRING, velocity: i.velocity.y });
+      } else {
+        animate(sy, H, SHEET_SPRING).then(() => setOpen(false));
+      }
     }
     gesture.current = "none";
   };
 
-  /* grabber / compact header: drag down to close */
-  const sheetPanStart = () => beginSheetDrag();
-  const sheetPan = (_: PointerEvent, i: PanInfo) => dragSheet(i.offset.y);
-  const sheetPanEnd = (_: PointerEvent, i: PanInfo) => releaseSheet(i.velocity.y);
+  /* ── full sheet drag down to close (works in both Artwork and Lyrics mode) ── */
+  const sheetPan = (_: PointerEvent, i: PanInfo) => {
+    if (i.offset.y > 0) {
+      sheetYRef.current.set(Math.min(H, i.offset.y));
+    }
+  };
 
-  /* artwork area: drag down closes, swipe up opens lyrics, horizontal swipe skips */
+  const sheetPanEnd = (_: PointerEvent, i: PanInfo) => {
+    const sy = sheetYRef.current;
+    if (i.offset.y > 90 || i.velocity.y > 320) {
+      isClosingRef.current = true;
+      animate(sy, H, { ...SHEET_SPRING, velocity: i.velocity.y }).then(() => {
+        setOpen(false);
+        isClosingRef.current = false;
+      });
+    } else {
+      animate(sy, 0, SHEET_SPRING);
+    }
+  };
+
+  /* ── artwork gestures in full view: drag down to close, swipe up to open lyrics, horizontal swipe to switch song ── */
+  const artX = useMotionValue(0);
   const artPanGesture = useRef<"none" | "x" | "y">("none");
 
   const onArtPanStart = () => {
     artPanGesture.current = "none";
-    beginSheetDrag();
   };
 
   const onArtPan = (_: PointerEvent, info: PanInfo) => {
     if (isLyricsOpen) return;
     if (artPanGesture.current === "none") {
-      if (Math.hypot(info.offset.x, info.offset.y) < 5) return;
+      if (Math.hypot(info.offset.x, info.offset.y) < 6) return;
       artPanGesture.current = Math.abs(info.offset.x) > Math.abs(info.offset.y) ? "x" : "y";
     }
+
     if (artPanGesture.current === "x") {
       artX.set(info.offset.x * 0.7);
-    } else if (info.offset.y > 0) {
-      dragSheet(info.offset.y);
+    } else if (artPanGesture.current === "y") {
+      if (info.offset.y > 0) {
+        // Dragging down moves the sheet down smoothly towards the mini player
+        sheetYRef.current.set(Math.min(H, info.offset.y));
+      }
     }
   };
 
   const onArtPanEnd = (_: PointerEvent, info: PanInfo) => {
     if (isLyricsOpen) return;
     if (artPanGesture.current === "x") {
-      if (info.offset.x < -60 || info.velocity.x < -400) handleNext();
-      else if (info.offset.x > 60 || info.velocity.x > 400) handlePrev();
+      if (info.offset.x < -60 || info.velocity.x < -400) {
+        handleNext();
+      } else if (info.offset.x > 60 || info.velocity.x > 400) {
+        handlePrev();
+      }
       animate(artX, 0, SPRING_SOFT);
-      if (sheetY.get() > 0.5) runTo(0); // safety: never leave the sheet half-dragged
     } else if (artPanGesture.current === "y") {
-      if (info.offset.y > 0 || sheetY.get() > 0.5) {
-        releaseSheet(info.velocity.y);
+      if (info.offset.y > 0) {
+        // Dragged down -> close sheet if past threshold or fast flick, else spring back
+        sheetPanEnd(_, info);
       } else if (info.offset.y < -35 || info.velocity.y < -250) {
+        // Swiped up -> open lyrics
         setIsLyricsOpen(true);
       }
     }
-    // keep "y"/"x" until after onTap has had a chance to read it
-    setTimeout(() => { artPanGesture.current = "none"; }, 0);
+    artPanGesture.current = "none";
   };
 
   /* Idle auto-hide flags */
+  const hideMeta = idle;
   const hideScrubber = isLyricsOpen && idle;
   const hideTransport = idle || (isLyricsOpen && isUserScrollingLyrics);
 
@@ -673,35 +623,35 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   );
 
   const artistGrey = "text-zinc-400 hover:text-zinc-400";
-  const glassBlur = "blur(22px) saturate(1.6)";
 
   return (
     <MotionConfig reducedMotion="user">
       <PlayerStyles />
 
-      {/* ───────────── MINI PLAYER ─────────────
-          Always mounted. While the sheet exists it fades in UNDER the opaque shell as the shell
-          docks (miniOp), then the shell dissolves to reveal it. No swap, no pop, no see-through. */}
+      {/* ───────────── MINI PLAYER ───────────── */}
       {!hidePlayer && (
         <motion.div
-          ref={miniShellRef}
           key="mini-player"
+          animate={{ opacity: isOpen ? 0 : 1 }}
+          transition={{ duration: isOpen ? 0.12 : 0.24, delay: isOpen ? 0.02 : 0.15 }}
           onPanStart={miniPanStart}
           onPan={miniPan}
           onPanEnd={miniPanEnd}
           className="fixed left-3 right-3 z-[300] select-none"
           style={{
             bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
-            height: PILL_H,
+            height: 62,
             touchAction: "none",
-            opacity: miniOp,
             pointerEvents: isOpen ? "none" : "auto",
             fontFamily: FONT_STACK,
           }}
         >
           <div
-            className="absolute inset-0 rounded-full border border-white/10 bg-white/[0.07] shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-            style={{ WebkitBackdropFilter: glassBlur, backdropFilter: glassBlur }}
+            className={cn(
+              "absolute inset-0 rounded-full border border-white/10 shadow-[0_8px_28px_rgba(0,0,0,0.45)]",
+              isGlass ? "bg-white/[0.07] backdrop-blur-xl" : "bg-[#1c1c1e]"
+            )}
+            style={isGlass ? { WebkitBackdropFilter: "blur(22px) saturate(1.6)", backdropFilter: "blur(22px) saturate(1.6)" } : undefined}
           />
           <MiniPlayerProgress />
 
@@ -769,166 +719,73 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         </motion.div>
       )}
 
-      {/* ───────────── FULL SCREEN SHEET (opaque shell that morphs into the pill) ───────────── */}
-      {isOpen && (
-        <motion.div
-          key="sheet-shell"
-          className="fixed z-[1100] select-none"
-          style={{
-            top: m.top,
-            left: m.left,
-            right: m.right,
-            bottom: m.bottom,
-            borderTopLeftRadius: m.rTop,
-            borderTopRightRadius: m.rTop,
-            borderBottomLeftRadius: m.rBot,
-            borderBottomRightRadius: m.rBot,
-            opacity: m.shellOp,
-            fontFamily: FONT_STACK,
-            WebkitFontSmoothing: "antialiased",
-          }}
-        >
-          {/* shadow + hairline live outside the clip so they aren't cut off */}
-          <motion.div
-            className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[0_8px_28px_rgba(0,0,0,0.45)] ring-1 ring-inset ring-white/10"
-            style={{ opacity: m.shadowOp }}
-          />
-
-          {/* clip */}
-          <div className="absolute inset-0 overflow-hidden" style={{ borderRadius: "inherit" }}>
-            {/* content: fixed full-screen size, anchored to the shell's top edge,
-                counter-shifted in x so it stays screen-aligned while the shell narrows */}
+      {/* ───────────── FULL SCREEN SHEET ───────────── */}
+      <LayoutGroup id={`m-${session}`}>
+        <AnimatePresence>
+          {isOpen && (
             <motion.div
-              ref={contentRef}
-              className="absolute left-0 top-0 flex flex-col overscroll-none"
+              key="full-sheet"
+              exit={{ y: H }}
+              transition={SHEET_SPRING}
+              className="fixed inset-0 z-[1100] flex select-none flex-col overscroll-none"
               style={{
-                x: m.cx,
-                width: vp.w || "100vw",
-                height: vp.h || "100dvh",
+                y: sheetY,
+                willChange: "transform",
+                fontFamily: FONT_STACK,
+                WebkitFontSmoothing: "antialiased",
                 overscrollBehavior: "none",
+                overscrollBehaviorY: "none",
                 touchAction: isLyricsOpen ? "pan-y" : "none",
               }}
             >
-              {/* OPAQUE backing (mesh). Stays at full opacity until the last few % of the dock,
-                  so the page never shows through. Fixed size → never re-layouts while resizing. */}
+              {/* Dynamic fluid mesh background */}
               <motion.div
-                className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#121214]"
-                style={{ opacity: m.meshOp }}
+                className="absolute inset-0 z-0 overflow-hidden bg-[#121214]"
+                style={{ borderTopLeftRadius: radius, borderTopRightRadius: radius }}
               >
-                <DynamicBackground surface="fullPlayer" coverUrl={shown.cover} paused={!isPlaying} />
+                <DynamicBackground key={session} surface="fullPlayer" coverUrl={shown.cover} paused={!isPlaying} />
                 <div
                   className="ps-t-soft absolute inset-0 bg-black/25"
                   style={{ opacity: isLyricsOpen ? 1 : 0 }}
                 />
               </motion.div>
 
-              {/* Mini-player ghost row: same layout as the real mini; rises in as we dock */}
-              <motion.div
-                className="pointer-events-none absolute left-3 right-3 top-0 z-10"
-                style={{ height: PILL_H, opacity: m.ghostOp, y: m.ghostY }}
-              >
-                <MiniPlayerProgress />
-                <div className="relative flex h-full items-center px-3.5">
-                  <div className="flex h-full min-w-0 flex-1 items-center">
-                    <div className="h-11 w-11 shrink-0" />
-                    <div className="relative ml-3 flex h-full min-w-0 flex-1 flex-col justify-center">
-                      <Marquee key={`gt-${currentTrack.id}`} align="left">
-                        <span className="pl-px text-[14px] font-semibold leading-[18px] tracking-[-0.01em] text-white">
-                          {currentTrack.title}
-                        </span>
-                      </Marquee>
-                      <Marquee key={`ga-${currentTrack.id}`} align="left">
-                        <span className="pl-px text-[12.5px] leading-[16px] text-zinc-400">
-                          <ArtistLinks track={currentTrack} maxArtists={3} linkClassName={artistGrey} />
-                        </span>
-                      </Marquee>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    <PlayPauseButton isPlaying={isPlaying} onToggle={() => {}} size={28} className="h-10 w-10" />
-                    <div className="flex h-10 w-10 items-center justify-center text-white">
-                      <SwiftUIForward size={24} fill="currentColor" />
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Artwork: ONE element for big, compact (lyrics) and mini. Transform-only. */}
-              <motion.div
-                className="pointer-events-none absolute left-0 top-0 z-20 overflow-hidden bg-zinc-800"
-                style={{
-                  width: ART_BASE,
-                  height: ART_BASE,
-                  x: m.artX,
-                  y: m.artY,
-                  scale: m.artS,
-                  opacity: m.artOp,
-                  borderRadius: m.artR,
-                  boxShadow: m.artShadow,
-                  transformOrigin: "0 0",
-                  willChange: "transform",
-                }}
-              >
-                {art}
-              </motion.div>
-
               {/* Grabber handle (drag down to close or tap) */}
               <motion.div
-                onPanStart={sheetPanStart}
                 onPan={sheetPan}
                 onPanEnd={sheetPanEnd}
-                onTap={closeSheet}
+                onClick={closeSheet}
                 className="relative z-30 flex shrink-0 cursor-grab touch-none items-center justify-center pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] active:cursor-grabbing"
-                style={{ opacity: m.grabOp, pointerEvents: m.grabPE as any }}
               >
                 <div className="h-[5px] w-9 rounded-full bg-white/35" />
               </motion.div>
 
-              {/* Middle region: artwork slot / compact header / lyrics */}
-              <motion.div
-                ref={regionRef}
-                className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-6"
-                style={{ touchAction: isLyricsOpen ? "pan-y" : "none", overscrollBehavior: "none" }}
-                onPanStart={!isLyricsOpen ? onArtPanStart : undefined}
-                onPan={!isLyricsOpen ? onArtPan : undefined}
-                onPanEnd={!isLyricsOpen ? onArtPanEnd : undefined}
-                onTap={
-                  !isLyricsOpen
-                    ? () => {
-                        if (artPanGesture.current === "none") setIsLyricsOpen(true);
-                      }
-                    : undefined
-                }
-              >
-                {/* Invisible slot: defines where the big artwork lives. Always laid out. */}
-                <div
-                  ref={slotRef}
-                  className="pointer-events-none shrink-0"
-                  style={{
-                    width: "min(100%, max(240px, calc(100dvh - 460px)), 420px)",
-                    aspectRatio: "1",
-                  }}
-                />
-
-                {/* Compact header (lyrics mode): artwork glides here, text rises in */}
+              {/* Compact header (active during lyrics view) */}
+              {isLyricsOpen && (
                 <motion.div
-                  onPanStart={sheetPanStart}
                   onPan={sheetPan}
                   onPanEnd={sheetPanEnd}
-                  className="absolute inset-x-0 top-0 z-20 flex touch-none items-start gap-3 px-6 pt-1"
-                  style={{
-                    height: HEADER_H,
-                    opacity: m.headOp,
-                    y: m.headY,
-                    pointerEvents: isLyricsOpen ? "auto" : "none",
-                  }}
+                  className="relative z-30 flex shrink-0 touch-none items-center gap-3 px-6 pb-3"
                 >
-                  <div
-                    className="h-14 w-14 shrink-0 cursor-pointer"
-                    onClick={() => setIsLyricsOpen(false)}
-                    title="Back to artwork"
-                  />
-                  <div className="flex h-14 min-w-0 flex-1 flex-col justify-center">
+                  <HeaderMorphWrap sheetY={sheetY} miniRef={miniArtRef} H={H}>
+                    <motion.div
+                      layoutId="m-art"
+                      transition={SHEET_SPRING}
+                      style={{ borderRadius: 10 }}
+                      className="relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden bg-zinc-800 shadow-lg ring-1 ring-white/10"
+                      onClick={() => setIsLyricsOpen(false)}
+                      title="Back to artwork"
+                    >
+                      {art}
+                    </motion.div>
+                  </HeaderMorphWrap>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...SPRING_SOFT, delay: 0.05 }}
+                    className="min-w-0 flex-1"
+                  >
                     <Marquee key={`ht-${currentTrack.id}`} align="left">
                       <span className="pl-px text-[17px] font-semibold leading-[22px] tracking-[-0.015em] text-white">
                         {currentTrack.title}
@@ -939,240 +796,261 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                         <ArtistLinks track={currentTrack} maxArtists={3} onClick={closeSheet} />
                       </span>
                     </Marquee>
-                  </div>
-                  <div
-                    className="flex h-14 shrink-0 items-center gap-2"
-                    onPointerDown={(e) => e.stopPropagation()}
-                  >
+                  </motion.div>
+                  <div className="flex shrink-0 items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
                     <LikeButton circle liked={liked} onToggle={toggleLike} size={16} />
                     <TrackMenu track={currentTrack} onLeave={leaveTo} />
                   </div>
                 </motion.div>
+              )}
 
-                {/* Lyrics */}
-                <motion.div
-                  className="absolute inset-x-0 bottom-0"
-                  style={{ top: HEADER_H, opacity: m.lyricsOp, y: m.lyricsY }}
-                >
-                  <AnimatePresence>
-                    {isLyricsOpen && showLyrics && (
-                      <motion.div
-                        key="lyrics"
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 8 }}
-                        transition={{ y: SPRING_SOFT, opacity: { duration: 0.28 } }}
-                        className="absolute inset-0"
-                      >
-                        <div
-                          className="ps-t-soft h-full w-full"
-                          style={{
-                            transform: idle ? "scale(1.05)" : "scale(1)",
-                            transformOrigin: "50% 38%",
-                          }}
+              {/* Middle region: artwork or lyrics view */}
+              <motion.div
+                className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-6"
+                style={{ touchAction: isLyricsOpen ? "pan-y" : "none", overscrollBehavior: "none" }}
+                onPanStart={!isLyricsOpen ? onArtPanStart : undefined}
+                onPan={!isLyricsOpen ? onArtPan : undefined}
+                onPanEnd={!isLyricsOpen ? onArtPanEnd : undefined}
+              >
+                {!isLyricsOpen && (
+                  <div
+                    className="flex items-center justify-center w-full"
+                    style={{
+                      width: "min(100%, max(240px, calc(100dvh - 460px)), 420px)",
+                      aspectRatio: "1",
+                      touchAction: "none",
+                    }}
+                  >
+                    <motion.div
+                      onPanStart={onArtPanStart}
+                      onPan={onArtPan}
+                      onPanEnd={onArtPanEnd}
+                      onTap={() => {
+                        if (artPanGesture.current === "none") {
+                          setIsLyricsOpen(true);
+                        }
+                      }}
+                      style={{ x: artX, touchAction: "none" }}
+                      className="h-full w-full cursor-pointer touch-none"
+                    >
+                      <MorphWrap sheetY={sheetY} miniRef={miniArtRef} H={H} paused={!isPlaying}>
+                        <motion.div
+                          layoutId="m-art"
+                          transition={SHEET_SPRING}
+                          style={{ borderRadius: BIG_R }}
+                          className="relative h-full w-full overflow-hidden"
                         >
-                          <LyricsView
-                            trackId={currentTrack.id}
-                            title={currentTrack.title}
-                            artist={currentTrack.artist?.name}
-                            rawLyrics={currentTrack.lyrics}
-                            isLyricsOpen={isLyricsOpen}
-                            isMobile={true}
-                            isFullscreen={true}
-                            isIdle={idle}
-                            duration={duration}
-                            transparent={true}
-                            onUserScrollChange={setIsUserScrollingLyrics}
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                          {art}
+                        </motion.div>
+                      </MorphWrap>
+                    </motion.div>
+                  </div>
+                )}
+
+                <AnimatePresence>
+                  {isLyricsOpen && showLyrics && (
+                    <motion.div
+                      key="lyrics"
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      transition={{ y: SPRING_SOFT, opacity: { duration: 0.28 } }}
+                      className="absolute inset-0"
+                    >
+                      <div
+                        className="ps-t-soft h-full w-full"
+                        style={{
+                          transform: idle ? "scale(1.05)" : "scale(1)",
+                          transformOrigin: "50% 38%",
+                        }}
+                      >
+                        <LyricsView
+                          trackId={currentTrack.id}
+                          title={currentTrack.title}
+                          artist={currentTrack.artist?.name}
+                          rawLyrics={currentTrack.lyrics}
+                          isLyricsOpen={isLyricsOpen}
+                          isMobile={true}
+                          isFullscreen={true}
+                          isIdle={idle}
+                          duration={duration}
+                          transparent={true}
+                          onUserScrollChange={setIsUserScrollingLyrics}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
 
-              {/* Bottom block: track info, seekbar, playback actions.
-                  Each group has an OUTER wrapper (drag-driven rise + fade) and an INNER wrapper
-                  (idle / lyrics collapse) so the two animations never fight over one property. */}
+              {/* Bottom block: track info, seekbar, playback actions */}
               <div
                 className="relative z-10 shrink-0 px-6 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] pt-2"
                 style={{ touchAction: isLyricsOpen ? "pan-y" : "none" }}
               >
-                {/* Meta (title / artist / like / more) */}
-                <motion.div style={{ opacity: m.metaOp, y: m.metaY }}>
-                  <AnimatePresence initial={false}>
-                    {!isLyricsOpen && (
-                      <motion.div
-                        key="meta"
-                        initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-                        animate={{
-                          height: idle ? 0 : "auto",
-                          opacity: idle ? 0 : 1,
-                          marginBottom: idle ? 0 : 12,
-                        }}
-                        exit={{ height: 0, opacity: 0, marginBottom: 0 }}
-                        transition={{
-                          height: { type: "spring", stiffness: 300, damping: 30 },
-                          opacity: { duration: 0.25 },
-                          marginBottom: { type: "spring", stiffness: 300, damping: 30 },
-                        }}
-                        className="flex items-center gap-3 overflow-hidden"
-                        style={{ pointerEvents: idle ? "none" : "auto" }}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <AnimatePresence mode="wait" initial={false}>
-                            <motion.div
-                              key={currentTrack.id}
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -8 }}
-                              transition={{ duration: 0.2 }}
-                            >
-                              <Marquee align="left">
-                                <span
-                                  className="cursor-pointer pl-px text-[22px] font-semibold leading-[28px] tracking-[-0.02em] text-white"
-                                  onClick={() => leaveTo(`/track/${currentTrack.id}`)}
-                                >
-                                  {currentTrack.title}
-                                </span>
-                              </Marquee>
-                              <Marquee align="left">
-                                <span className="pl-px text-[17px] leading-[22px] text-white/60">
-                                  <ArtistLinks
-                                    track={currentTrack}
-                                    maxArtists={3}
-                                    linkClassName="text-white/60 hover:text-white transition-colors"
-                                    onClick={closeSheet}
-                                  />
-                                </span>
-                              </Marquee>
-                            </motion.div>
-                          </AnimatePresence>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <LikeButton circle liked={liked} onToggle={toggleLike} size={16} />
-                          <TrackMenu track={currentTrack} onLeave={leaveTo} />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-
-                {/* Scrubber */}
-                <motion.div style={{ opacity: m.scrubOp, y: m.scrubY }}>
+                {!isLyricsOpen && (
                   <motion.div
                     animate={{
-                      height: hideScrubber ? 0 : "auto",
-                      opacity: hideScrubber ? 0 : 1,
-                      marginTop: hideScrubber ? 0 : idle ? 4 : 0,
+                      height: idle ? 0 : "auto",
+                      opacity: idle ? 0 : 1,
+                      marginBottom: idle ? 0 : 12,
                     }}
                     transition={{
                       height: { type: "spring", stiffness: 300, damping: 30 },
                       opacity: { duration: 0.25 },
-                      marginTop: { type: "spring", stiffness: 300, damping: 30 },
+                      marginBottom: { type: "spring", stiffness: 300, damping: 30 },
                     }}
-                    className="mx-auto w-full max-w-[420px] overflow-hidden"
-                    style={{ pointerEvents: hideScrubber ? "none" : "auto" }}
+                    className="overflow-hidden flex items-center gap-3"
+                    style={{ pointerEvents: idle ? "none" : "auto" }}
                   >
-                    <MobileScrubber isLyricsOpen={isLyricsOpen} />
+                    <div className="min-w-0 flex-1">
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.div
+                          key={currentTrack.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <Marquee align="left">
+                            <span
+                              className="cursor-pointer pl-px text-[22px] font-semibold leading-[28px] tracking-[-0.02em] text-white"
+                              onClick={() => leaveTo(`/track/${currentTrack.id}`)}
+                            >
+                              {currentTrack.title}
+                            </span>
+                          </Marquee>
+                          <Marquee align="left">
+                            <span className="pl-px text-[17px] leading-[22px] text-white/60">
+                              <ArtistLinks
+                                track={currentTrack}
+                                maxArtists={3}
+                                linkClassName="text-white/60 hover:text-white transition-colors"
+                                onClick={closeSheet}
+                              />
+                            </span>
+                          </Marquee>
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <LikeButton circle liked={liked} onToggle={toggleLike} size={16} />
+                      <TrackMenu track={currentTrack} onLeave={leaveTo} />
+                    </div>
                   </motion.div>
+                )}
+
+                {/* Scrubber / Progress — moves up in normal mode; completely hides in lyrics mode when idle */}
+                <motion.div
+                  animate={{
+                    height: (isLyricsOpen && idle) ? 0 : "auto",
+                    opacity: (isLyricsOpen && idle) ? 0 : 1,
+                    marginTop: (isLyricsOpen && idle) ? 0 : (idle ? 4 : 0),
+                  }}
+                  transition={{
+                    height: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.25 },
+                    marginTop: { type: "spring", stiffness: 300, damping: 30 },
+                  }}
+                  className="mx-auto w-full max-w-[420px] overflow-hidden"
+                  style={{ pointerEvents: (isLyricsOpen && idle) ? "none" : "auto" }}
+                >
+                  <MobileScrubber isLyricsOpen={isLyricsOpen} />
                 </motion.div>
 
-                {/* Transport + secondary tools */}
-                <motion.div style={{ opacity: m.transOp, y: m.transY }}>
-                  <motion.div
-                    animate={{
-                      height: hideTransport ? 0 : "auto",
-                      opacity: hideTransport ? 0 : 1,
-                      marginTop: hideTransport ? 0 : 12,
-                    }}
-                    transition={{
-                      height: { type: "spring", stiffness: 300, damping: 30 },
-                      opacity: { duration: 0.25 },
-                      marginTop: { type: "spring", stiffness: 300, damping: 30 },
-                    }}
-                    className="mx-auto w-full max-w-[420px] overflow-hidden"
-                    style={{ pointerEvents: hideTransport ? "none" : "auto" }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <PlateButton
-                        size={42}
-                        active={isShuffled}
-                        onClick={toggleShuffle}
-                        title={`Shuffle: ${isShuffled ? "On" : "Off"}`}
-                      >
-                        <SFShuffle size={19} />
-                      </PlateButton>
-                      <SpringButton onClick={handlePrev} className="h-12 w-12 text-white" title="Previous">
-                        <SwiftUIBackward size={30} fill="currentColor" />
-                      </SpringButton>
-                      <PlayPauseButton
-                        isPlaying={isPlaying}
-                        onToggle={togglePlay}
-                        size={42}
-                        className="h-14 w-14"
-                      />
-                      <SpringButton onClick={handleNext} className="h-12 w-12 text-white" title="Next">
-                        <SwiftUIForward size={30} fill="currentColor" />
-                      </SpringButton>
-                      <PlateButton
-                        size={42}
-                        active={repeatMode !== "off"}
-                        onClick={toggleRepeat}
-                        title={`Repeat: ${repeatMode}`}
-                        className="relative"
-                      >
-                        <SFRepeat size={19} />
-                        <AnimatePresence>
-                          {(repeatMode === "one" || repeatMode === "two") && (
-                            <motion.span
-                              initial={{ scale: 0, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              exit={{ scale: 0, opacity: 0 }}
-                              transition={SPRING}
-                              className="pointer-events-none absolute inset-0 flex items-center justify-center text-[7px] font-black"
-                            >
-                              {repeatMode === "one" ? "1" : "2"}
-                            </motion.span>
-                          )}
-                        </AnimatePresence>
-                      </PlateButton>
-                    </div>
+                {/* Transport Buttons — collapses when idle */}
+                <motion.div
+                  animate={{
+                    height: hideTransport ? 0 : "auto",
+                    opacity: hideTransport ? 0 : 1,
+                    marginTop: hideTransport ? 0 : 12,
+                  }}
+                  transition={{
+                    height: { type: "spring", stiffness: 300, damping: 30 },
+                    opacity: { duration: 0.25 },
+                    marginTop: { type: "spring", stiffness: 300, damping: 30 },
+                  }}
+                  className="mx-auto w-full max-w-[420px] overflow-hidden"
+                  style={{ pointerEvents: hideTransport ? "none" : "auto" }}
+                >
+                  <div className="flex items-center justify-between">
+                    <PlateButton
+                      size={42}
+                      active={isShuffled}
+                      onClick={toggleShuffle}
+                      title={`Shuffle: ${isShuffled ? "On" : "Off"}`}
+                    >
+                      <SFShuffle size={19} />
+                    </PlateButton>
+                    <SpringButton onClick={handlePrev} className="h-12 w-12 text-white" title="Previous">
+                      <SwiftUIBackward size={30} fill="currentColor" />
+                    </SpringButton>
+                    <PlayPauseButton
+                      isPlaying={isPlaying}
+                      onToggle={togglePlay}
+                      size={42}
+                      className="h-14 w-14"
+                    />
+                    <SpringButton onClick={handleNext} className="h-12 w-12 text-white" title="Next">
+                      <SwiftUIForward size={30} fill="currentColor" />
+                    </SpringButton>
+                    <PlateButton
+                      size={42}
+                      active={repeatMode !== "off"}
+                      onClick={toggleRepeat}
+                      title={`Repeat: ${repeatMode}`}
+                      className="relative"
+                    >
+                      <SFRepeat size={19} />
+                      <AnimatePresence>
+                        {(repeatMode === "one" || repeatMode === "two") && (
+                          <motion.span
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            transition={SPRING}
+                            className="pointer-events-none absolute inset-0 flex items-center justify-center text-[7px] font-black"
+                          >
+                            {repeatMode === "one" ? "1" : "2"}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </PlateButton>
+                  </div>
 
-                    {/* Secondary Tools: FX, Lyrics, Queue */}
-                    <div className="mx-auto mt-5 flex max-w-[300px] items-center justify-between">
-                      <PlateButton
-                        size={44}
-                        active={isAudioFxOpen}
-                        onClick={() => setAudioFxOpen(!isAudioFxOpen)}
-                        title="Studio FX"
-                      >
-                        <SFFx size={22} />
-                      </PlateButton>
-                      <PlateButton
-                        size={44}
-                        active={isLyricsOpen}
-                        onClick={() => setIsLyricsOpen(!isLyricsOpen)}
-                        title="Lyrics"
-                      >
-                        <SFLyrics size={22} />
-                      </PlateButton>
-                      <PlateButton
-                        size={44}
-                        active={isQueueOpen}
-                        onClick={() => setIsQueueOpen(!isQueueOpen)}
-                        title="Queue"
-                      >
-                        <SwiftUIQueue size={22} stroke="currentColor" />
-                      </PlateButton>
-                    </div>
-                  </motion.div>
+                  {/* Secondary Tools: FX, Lyrics, Queue */}
+                  <div className="mx-auto mt-5 flex max-w-[300px] items-center justify-between">
+                    <PlateButton
+                      size={44}
+                      active={isAudioFxOpen}
+                      onClick={() => setAudioFxOpen(!isAudioFxOpen)}
+                      title="Studio FX"
+                    >
+                      <SFFx size={22} />
+                    </PlateButton>
+                    <PlateButton
+                      size={44}
+                      active={isLyricsOpen}
+                      onClick={() => setIsLyricsOpen(!isLyricsOpen)}
+                      title="Lyrics"
+                    >
+                      <SFLyrics size={22} />
+                    </PlateButton>
+                    <PlateButton
+                      size={44}
+                      active={isQueueOpen}
+                      onClick={() => setIsQueueOpen(!isQueueOpen)}
+                      title="Queue"
+                    >
+                      <SwiftUIQueue size={22} stroke="currentColor" />
+                    </PlateButton>
+                  </div>
                 </motion.div>
               </div>
             </motion.div>
-          </div>
-        </motion.div>
-      )}
+          )}
+        </AnimatePresence>
+      </LayoutGroup>
     </MotionConfig>
   );
 }

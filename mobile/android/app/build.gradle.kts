@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.plugin.serialization")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -27,6 +28,10 @@ android {
 
     buildTypes {
         release {
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
@@ -50,9 +55,13 @@ tasks.matching { it.name.contains("AarMetadata") }.configureEach {
 
 dependencies {
     implementation(files("libs/innertubex-android.aar"))
+    implementation(files("libs/quackjs-android.aar"))
+    implementation("io.ktor:ktor-client-core:3.6.0")
     implementation("io.ktor:ktor-client-okhttp:3.6.0")
     implementation("io.ktor:ktor-client-content-negotiation:3.6.0")
+    implementation("io.ktor:ktor-client-encoding:3.6.0")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.0")
+    implementation("com.jakewharton.timber:timber:5.0.1")
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-common:1.5.1")
     implementation("androidx.media3:media3-datasource:1.5.1")
