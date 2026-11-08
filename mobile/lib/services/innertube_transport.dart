@@ -80,11 +80,7 @@ class InnerTubeTransport {
         } catch (_) {}
       }();
 
-  String get _clientVersion {
-    final d = DateTime.now().toUtc();
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '1.${d.year}${two(d.month)}${two(d.day)}.01.00';
-  }
+  static const String _clientVersion = '1.20241101.01.00';
 
   Map<String, dynamic> _payload(Map<String, dynamic> body, String gl) => {
         'context': {
@@ -163,6 +159,9 @@ class InnerTubeTransport {
             .timeout(_timeout);
 
         final code = res.statusCode;
+        if (kDebugMode) {
+          debugPrint('[IT] $endpoint gl=$gl status=$code attempt=$attempt');
+        }
 
         if (code == 200) {
           final Map<String, dynamic> json;

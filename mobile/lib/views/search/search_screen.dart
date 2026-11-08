@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
@@ -89,6 +90,74 @@ const List<String> _kTrendingPills = [
   'Coldplay',
   'Billie Eilish',
   'Tamil Hits',
+];
+
+const List<Map<String, String>> _kDefaultPopularArtists = [
+  {
+    'name': 'Anirudh Ravichander',
+    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'name': 'A. R. Rahman',
+    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'name': 'Taylor Swift',
+    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'name': 'The Weeknd',
+    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'name': 'Sid Sriram',
+    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'name': 'Coldplay',
+    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'name': 'Billie Eilish',
+    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'name': 'Harris Jayaraj',
+    'photo': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+];
+
+const List<Map<String, String>> _kDefaultPopularAlbums = [
+  {
+    'title': 'Leo',
+    'artist': 'Anirudh Ravichander',
+    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'title': 'Jailer',
+    'artist': 'Anirudh Ravichander',
+    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'title': 'Starboy',
+    'artist': 'The Weeknd',
+    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'title': '1989 (Taylor\'s Version)',
+    'artist': 'Taylor Swift',
+    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'title': 'After Hours',
+    'artist': 'The Weeknd',
+    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
+  {
+    'title': 'Ponniyin Selvan Part-1',
+    'artist': 'A. R. Rahman',
+    'cover': 'https://lh3.googleusercontent.com/s/v4/g',
+  },
 ];
 
 enum _SearchCategoryFilter { all, songs, artists, albums, playlists }
@@ -432,7 +501,7 @@ class _SearchScreenState extends State<SearchScreen>
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 135,
+              height: 145,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -440,12 +509,14 @@ class _SearchScreenState extends State<SearchScreen>
                 itemCount: popularArtists.length,
                 itemBuilder: (context, i) {
                   final a = popularArtists[i];
+                  final name = a['name'] ?? 'Artist';
+                  final photo = a['photo'];
                   return Padding(
                     padding: const EdgeInsets.only(right: 14),
                     child: MediaCard(
-                      title: a['name']!,
+                      title: name,
                       subtitle: 'Artist',
-                      imageUrl: a['photo']!,
+                      imageUrl: (photo != null && photo.isNotEmpty) ? photo : null,
                       isCircular: true,
                       width: 90,
                       onTap: () {
@@ -454,8 +525,8 @@ class _SearchScreenState extends State<SearchScreen>
                           context,
                           CupertinoPageRoute(
                             builder: (_) => ArtistScreen(
-                              artistName: a['name']!,
-                              imageUrl: a['photo']!,
+                              artistName: name,
+                              imageUrl: photo,
                             ),
                           ),
                         );
@@ -483,7 +554,7 @@ class _SearchScreenState extends State<SearchScreen>
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 185,
+              height: 195,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -491,12 +562,15 @@ class _SearchScreenState extends State<SearchScreen>
                 itemCount: popularAlbums.length,
                 itemBuilder: (context, i) {
                   final alb = popularAlbums[i];
+                  final title = alb['title'] ?? 'Album';
+                  final artist = alb['artist'] ?? 'Artist';
+                  final cover = alb['cover'];
                   return Padding(
                     padding: const EdgeInsets.only(right: 14),
                     child: MediaCard(
-                      title: alb['title']!,
-                      subtitle: alb['artist']!,
-                      imageUrl: alb['cover']!,
+                      title: title,
+                      subtitle: artist,
+                      imageUrl: (cover != null && cover.isNotEmpty) ? cover : null,
                       width: 130,
                       onTap: () {
                         HapticFeedback.lightImpact();
@@ -504,9 +578,9 @@ class _SearchScreenState extends State<SearchScreen>
                           context,
                           CupertinoPageRoute(
                             builder: (_) => AlbumScreen(
-                              albumTitle: alb['title']!,
-                              artistName: alb['artist']!,
-                              coverUrl: alb['cover']!,
+                              albumTitle: title,
+                              artistName: artist,
+                              coverUrl: cover,
                             ),
                           ),
                         );
@@ -1239,10 +1313,18 @@ class _SearchScreenState extends State<SearchScreen>
     final out = <Map<String, String>>[];
     for (final t in tracks) {
       final name = t.artist.split(',').first.trim();
-      if (seen.add(name.toLowerCase())) {
+      if (name.isNotEmpty && seen.add(name.toLowerCase())) {
         out.add({'name': name, 'photo': t.coverUrl});
       }
       if (out.length >= 8) break;
+    }
+    if (out.length < 4) {
+      for (final a in _kDefaultPopularArtists) {
+        if (seen.add(a['name']!.toLowerCase())) {
+          out.add(a);
+        }
+        if (out.length >= 8) break;
+      }
     }
     return out;
   }
@@ -1255,6 +1337,14 @@ class _SearchScreenState extends State<SearchScreen>
         out.add({'title': t.album, 'artist': t.artist, 'cover': t.coverUrl});
       }
       if (out.length >= 8) break;
+    }
+    if (out.length < 4) {
+      for (final alb in _kDefaultPopularAlbums) {
+        if (seen.add(alb['title']!.toLowerCase())) {
+          out.add(alb);
+        }
+        if (out.length >= 8) break;
+      }
     }
     return out;
   }
@@ -1284,9 +1374,9 @@ class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
   final ValueChanged<String> onSubmit;
 
   @override
-  double get minExtent => top + 64;
+  double get minExtent => math.max(56.0, top + 56.0);
   @override
-  double get maxExtent => top + 64;
+  double get maxExtent => math.max(56.0, top + 56.0);
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
@@ -1294,7 +1384,7 @@ class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
 
     return Container(
       color: Zen.bg.withValues(alpha: 0.96),
-      padding: EdgeInsets.fromLTRB(16, top + 8, 16, 8),
+      padding: EdgeInsets.fromLTRB(16, top + 6, 16, 8),
       child: Row(
         children: [
           // Cupertino-styled rounded search text box

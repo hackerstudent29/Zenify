@@ -201,8 +201,8 @@ class _PresetsTabState extends State<_PresetsTab> {
               setState(() => _naming = !_naming);
             },
             child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: const Color(0xFF18181B),
                 borderRadius: BorderRadius.circular(12),
@@ -221,7 +221,7 @@ class _PresetsTabState extends State<_PresetsTab> {
                     _naming ? 'CANCEL' : 'SAVE CURRENT',
                     style: TextStyle(
                       color: Zen.rose,
-                      fontSize: 10,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.2,
                     ),

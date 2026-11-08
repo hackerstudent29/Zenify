@@ -12,7 +12,7 @@ class Track {
   final int durationSeconds;
   final String language;
   final bool hasLyrics;
-  final String source; // 'saavn', 'youtube', 'itunes', 'local'
+  final String source; // 'youtube', 'local'
   final List<ArtistRef> artists;
 
   const Track({
@@ -168,24 +168,15 @@ class Track {
 
     // 6. Audio stream
     final rawStream = _clean(json['streamUrl']) ?? _clean(json['audioUrl']);
-    final isPreview = rawStream != null &&
-        (rawStream.contains('audio-ssl') ||
-            rawStream.contains('mzstatic') ||
-            rawStream.contains('itunes.apple.com'));
-
     String? resolvedStream;
-    if (rawStream != null && !isPreview && !rawStream.contains('stream-youtube') && !rawStream.contains('localhost')) {
-      resolvedStream = rawStream.startsWith('/') ? '$baseUrl$rawStream' : rawStream;
+    if (rawStream != null && rawStream.startsWith('http')) {
+      resolvedStream = rawStream;
     } else {
       resolvedStream = null;
     }
 
-    // 7. Source
-    const knownSources = {'saavn', 'youtube', 'itunes', 'local'};
-    final declared = _clean(json['source'])?.toLowerCase();
-    final source = (declared != null && knownSources.contains(declared))
-        ? declared
-        : (id.startsWith('itunes-') ? 'itunes' : 'youtube');
+    // 7. Source (YouTube-first architecture)
+    final source = id.startsWith('local-') ? 'local' : 'youtube';
 
     // 8. Artists parsing
     final rawArtists = json['artists'];
@@ -338,9 +329,9 @@ int _parseDuration(Map<String, dynamic> json) {
   return fallback;
 }
 
-/// Upgrades low-resolution thumbnails (e.g. 60x60, 120x120, 150x150) from
-/// YouTube Music, Google CDN, JioSaavn, and iTunes into pristine crystal-clear
-/// 800x800 / 600x600 HD artwork.
+/// Upgrades low-resolution thumbnails (e.g. 60x60, 120x120) from
+/// YouTube Music and Google CDN into pristine crystal-clear
+/// 800x800 HD artwork.
 String upgradeArtworkUrl(String rawUrl, {String? videoId}) {
   var url = rawUrl.trim();
   if (url.isEmpty) {
@@ -366,13 +357,6 @@ String upgradeArtworkUrl(String rawUrl, {String? videoId}) {
     url = url.replaceAll(RegExp(r'/(?:default|mqdefault|hqdefault)\.jpg'), '/maxresdefault.jpg');
     url = url.replaceAll(RegExp(r'=w\d+-h\d+[^?#]*'), '=w800-h800-l90-rj');
   }
-
-  // 3. Apple Music / iTunes:
-  url = url.replaceAll(RegExp(r'\d+x\d+bb'), '600x600bb');
-
-  // 4. JioSaavn / Akamai:
-  url = url.replaceAll('150x150', '500x500');
-  url = url.replaceAll('50x50', '500x500');
 
   return url;
 }

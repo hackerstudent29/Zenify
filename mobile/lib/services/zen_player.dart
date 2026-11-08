@@ -38,11 +38,13 @@ class AudioPlayer implements FxEngine {
   final _posC = StreamController<Duration>.broadcast();
   final _durC = StreamController<Duration>.broadcast();
   final _doneC = StreamController<void>.broadcast();
+  final _errorC = StreamController<String>.broadcast();
 
   Stream<PlayerState> get onPlayerStateChanged => _stateC.stream;
   Stream<Duration> get onPositionChanged => _posC.stream;
   Stream<Duration> get onDurationChanged => _durC.stream;
   Stream<void> get onPlayerComplete => _doneC.stream;
+  Stream<String> get onError => _errorC.stream;
   PlayerState get state => _state;
 
   void _onEvent(dynamic e) {
@@ -62,10 +64,16 @@ class AudioPlayer implements FxEngine {
         _posC.add(Duration(milliseconds: (e['ms'] as num).toInt()));
       case 'duration':
         _durC.add(Duration(milliseconds: (e['ms'] as num).toInt()));
+      case 'resolved':
+        if (kDebugMode) {
+          debugPrint('ZenPlayer: resolved ${e['id']} via client ${e['client']} in ${e['ms']}ms (fromCache=${e['fromCache']})');
+        }
       case 'error':
-        if (kDebugMode) debugPrint('ZenPlayer error: ${e['message']}');
+        final errMsg = e['message']?.toString() ?? e['kind']?.toString() ?? 'playback error';
+        if (kDebugMode) debugPrint('ZenPlayer error: $errMsg');
         _state = PlayerState.stopped;
         _stateC.add(_state);
+        _errorC.add(errMsg);
     }
   }
 
@@ -76,6 +84,31 @@ class AudioPlayer implements FxEngine {
       if (kDebugMode) debugPrint('ZenPlayer: native engine missing (Android only). Call: $m');
     }
   }
+
+  Future<void> playMedia({
+    required String mediaId,
+    String? title,
+    String? artist,
+    String? artworkUrl,
+    int? startMs,
+  }) =>
+      _call('play', {
+        'mediaId': mediaId.replaceFirst('yt-', '').trim(),
+        'title': title ?? '',
+        'artist': artist ?? '',
+        'artworkUrl': artworkUrl ?? '',
+        'startMs': ?startMs,
+      });
+
+  Future<void> setNext(String? mediaId) =>
+      _call('setNext', {'mediaId': mediaId?.replaceFirst('yt-', '').trim()});
+
+  Future<void> prefetch(List<String> mediaIds) =>
+      _call('prefetch', {'mediaIds': mediaIds.map((id) => id.replaceFirst('yt-', '').trim()).toList()});
+
+  Future<void> prewarm() => _call('prewarm');
+
+  Future<void> clearAllCaches() => _call('clearAllCaches');
 
   Future<void> play(UrlSource source) =>
       _call('play', {'url': source.url, 'headers': source.headers});
@@ -92,7 +125,7 @@ class AudioPlayer implements FxEngine {
     _fxTimer?.cancel();
     await _sub?.cancel();
     await _call('dispose');
-    for (final c in [_stateC, _posC, _durC]) {
+    for (final c in [_stateC, _posC, _durC, _errorC]) {
       await c.close();
     }
     await _doneC.close();

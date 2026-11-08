@@ -131,15 +131,26 @@ class LyricsSheet extends StatelessWidget {
       final rawWords = m['words'];
       List<LyricWord>? words;
       if (rawWords is List && rawWords.isNotEmpty) {
-        words = [
-          for (final w in rawWords)
-            if (w is Map)
-              LyricWord(
-                text: (w['word'] ?? w['text'] ?? '').toString(),
-                start: _ms(w['timeMs'] ?? w['startMs']),
-                end: _ms(w['endMs']),
-              ),
-        ];
+        words = [];
+        for (var idx = 0; idx < rawWords.length; idx++) {
+          final w = rawWords[idx];
+          if (w is Map) {
+            final wordText = (w['word'] ?? w['text'] ?? '').toString();
+            final start = _ms(w['timeMs'] ?? w['startMs']);
+            Duration end;
+            final rawEnd = w['endMs'];
+            if (rawEnd is num && rawEnd > ((w['timeMs'] ?? w['startMs'] ?? 0) as num)) {
+              end = Duration(milliseconds: rawEnd.toInt());
+            } else if (idx + 1 < rawWords.length && rawWords[idx + 1] is Map) {
+              final nextW = rawWords[idx + 1] as Map;
+              final nextStart = _ms(nextW['timeMs'] ?? nextW['startMs']);
+              end = nextStart > start ? nextStart : start + const Duration(milliseconds: 320);
+            } else {
+              end = start + const Duration(milliseconds: 320);
+            }
+            words.add(LyricWord(text: wordText, start: start, end: end));
+          }
+        }
       }
       final endMs = m['endMs'];
       return LyricLine(
@@ -904,10 +915,23 @@ class _WordLineState extends State<_WordLine> {
     final s = List<double>.filled(n, 0);
     final e = List<double>.filled(n, 0);
     final ws = widget.words;
-    if (ws != null && ws.length == n && n > 0) {
-      for (var i = 0; i < n; i++) {
-        s[i] = ws[i].start.inMicroseconds / 1e6;
-        e[i] = math.max(s[i] + 0.05, ws[i].end.inMicroseconds / 1e6);
+    if (ws != null && ws.isNotEmpty && n > 0) {
+      if (ws.length == n) {
+        for (var i = 0; i < n; i++) {
+          s[i] = ws[i].start.inMicroseconds / 1e6;
+          e[i] = math.max(s[i] + 0.05, ws[i].end.inMicroseconds / 1e6);
+        }
+      } else {
+        // Proportionally distribute ws timings across tokens to preserve word timings
+        final lineStart = ws.first.start.inMicroseconds / 1e6;
+        final lineEnd = math.max(lineStart + 0.5, ws.last.end.inMicroseconds / 1e6);
+        final total = tokens.fold<int>(0, (a, t) => a + t.length);
+        var acc = 0;
+        for (var i = 0; i < n; i++) {
+          s[i] = lineStart + (acc / math.max(1, total)) * (lineEnd - lineStart);
+          acc += tokens[i].length;
+          e[i] = lineStart + (acc / math.max(1, total)) * (lineEnd - lineStart);
+        }
       }
     } else {
       final dur = math.max(0.5, widget.end - widget.start);
@@ -965,7 +989,7 @@ class _WordLineState extends State<_WordLine> {
       if (widget.current && !widget.plain) {
         return ValueListenableBuilder<double>(
           valueListenable: widget.clock,
-          builder: (context, t, child) => build(t),
+          builder: (_, t, _) => build(t),
         );
       }
       return build(null);
@@ -1108,7 +1132,7 @@ class _Dots extends StatelessWidget {
     if (!current) return _row(null);
     return ValueListenableBuilder<double>(
       valueListenable: clock,
-      builder: (context, t, child) => _row(t),
+      builder: (_, t, _) => _row(t),
     );
   }
 }

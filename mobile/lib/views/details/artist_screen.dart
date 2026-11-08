@@ -564,10 +564,20 @@ class _ArtistScreenState extends State<ArtistScreen> {
     try {
       final info = await ArtistService.instance.getArtist(widget.artistName, browseId: widget.browseId);
       if (info != null && (info.topSongs.isNotEmpty || info.albums.isNotEmpty)) {
+        List<Track> songs = List.of(info.topSongs);
+        if (songs.length < 5) {
+          try {
+            final fallbackSongs = await InnerTubeService.instance.search(widget.artistName).timeout(const Duration(seconds: 4));
+            final seen = songs.map((s) => s.id).toSet();
+            for (final s in fallbackSongs) {
+              if (seen.add(s.id)) songs.add(s);
+            }
+          } catch (_) {}
+        }
         if (mounted) {
           setState(() {
             _artistProfile = info;
-            _tracks = info.topSongs;
+            _tracks = songs;
             if (info.imageUrl.isNotEmpty) _resolvedImage = info.imageUrl;
             if (info.bio.isNotEmpty) _resolvedBio = info.bio;
             _loading = false;

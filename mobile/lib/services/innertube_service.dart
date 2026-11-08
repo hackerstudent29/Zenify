@@ -79,19 +79,72 @@ class InnerTubeService {
 
   List<Track> _parseSearchTracks(Map<String, dynamic> json) {
     final out = <Track>[];
+    final seen = <String>{};
     try {
       final sectionList = json['contents']?['tabbedSearchResultsRenderer']
-          ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
-          ?['contents'];
+              ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
+              ?['contents'] ??
+          json['contents']?['sectionListRenderer']?['contents'];
       if (sectionList is! List) return out;
 
       for (final section in sectionList) {
-        final items = section['musicShelfRenderer']?['contents'];
-        if (items is! List) continue;
-        for (final item in items) {
-          final t = _parseResponsiveListItem(
-              item['musicResponsiveListItemRenderer']);
-          if (t != null) out.add(t);
+        if (section is! Map) continue;
+        final sMap = Map<String, dynamic>.from(section);
+
+        // 1. Direct musicShelfRenderer
+        final shelfItems = sMap['musicShelfRenderer']?['contents'];
+        if (shelfItems is List) {
+          for (final item in shelfItems) {
+            if (item is Map) {
+              final t = _parseResponsiveListItem(item['musicResponsiveListItemRenderer']);
+              if (t != null && seen.add(t.id)) out.add(t);
+            }
+          }
+        }
+
+        // 2. itemSectionRenderer (wraps search result items in modern YouTube Music responses)
+        final isrContents = sMap['itemSectionRenderer']?['contents'];
+        if (isrContents is List) {
+          for (final it in isrContents) {
+            if (it is! Map) continue;
+            if (it['musicResponsiveListItemRenderer'] is Map) {
+              final t = _parseResponsiveListItem(it['musicResponsiveListItemRenderer']);
+              if (t != null && seen.add(t.id)) out.add(t);
+            } else if (it['musicShelfRenderer']?['contents'] is List) {
+              for (final subIt in (it['musicShelfRenderer']['contents'] as List)) {
+                if (subIt is Map) {
+                  final t = _parseResponsiveListItem(subIt['musicResponsiveListItemRenderer']);
+                  if (t != null && seen.add(t.id)) out.add(t);
+                }
+              }
+            }
+          }
+        }
+
+        // 3. musicCardShelfRenderer (top card result)
+        final card = sMap['musicCardShelfRenderer'];
+        if (card is Map) {
+          final cardNav = card['title']?['runs']?[0]?['navigationEndpoint'];
+          final cardVideoId = cardNav?['watchEndpoint']?['videoId'];
+          if (cardVideoId is String && cardVideoId.isNotEmpty) {
+            final cardTitle = card['title']?['runs']?[0]?['text'] as String? ?? 'Top Result';
+            final subRuns = card['subtitle']?['runs'] as List?;
+            final cardArtist = subRuns != null && subRuns.isNotEmpty
+                ? (subRuns[0]['text'] ?? 'Artist').toString()
+                : 'Artist';
+            final thumbs = card['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
+            final t = Track(
+              id: 'yt-$cardVideoId',
+              title: cardTitle,
+              artist: cardArtist,
+              album: 'Single',
+              coverUrl: _cover(thumbs, cardVideoId),
+              durationSeconds: 210,
+              language: Track.detectLanguage(cardTitle, cardArtist, '') ?? '',
+              source: 'youtube',
+            );
+            if (seen.add(t.id)) out.insert(0, t);
+          }
         }
       }
     } catch (e) {
@@ -115,11 +168,21 @@ class InnerTubeService {
       final nav = item['overlay']?['musicItemThumbnailOverlayRenderer']
           ?['content']?['musicPlayButtonRenderer']?['playNavigationEndpoint'];
       String? videoId = nav?['watchEndpoint']?['videoId'];
+      videoId ??= item['navigationEndpoint']?['watchEndpoint']?['videoId'];
       videoId ??= item['playlistItemData']?['videoId'];
-      if (videoId == null || videoId.isEmpty) return null;
+      videoId ??= item['doubleTapEndpoint']?['watchEndpoint']?['videoId'];
 
       final flex = item['flexColumns'] as List?;
       if (flex == null || flex.isEmpty) return null;
+
+      if (videoId == null && flex.isNotEmpty) {
+        final flex0 = flex[0];
+        final runs = flex0?['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
+        if (runs != null && runs.isNotEmpty && runs[0] is Map) {
+          videoId = runs[0]['navigationEndpoint']?['watchEndpoint']?['videoId'];
+        }
+      }
+      if (videoId == null || videoId.isEmpty) return null;
 
       final titleRuns = flex[0]?['musicResponsiveListItemFlexColumnRenderer']
           ?['text']?['runs'] as List?;
@@ -357,13 +420,18 @@ class InnerTubeService {
     final q = artistName.trim();
     if (q.isEmpty) return null;
     try {
-      // 1. Check general search for musicCardShelfRenderer
+      // 1. Check general search for musicCardShelfRenderer or artist responsive list item
       final res = await post('search', {'query': q}, ttl: _tArtistCard);
       final sections = res['contents']?['tabbedSearchResultsRenderer']
-          ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
-          ?['contents'];
+              ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
+              ?['contents'] ??
+          res['contents']?['sectionListRenderer']?['contents'];
+
       if (sections is List) {
         for (final section in sections) {
+          if (section is! Map) continue;
+
+          // 1a. musicCardShelfRenderer (top card result)
           final card = section['musicCardShelfRenderer'];
           if (card is Map) {
             final titleRuns = card['title']?['runs'] as List?;
@@ -396,6 +464,39 @@ class InnerTubeService {
               );
             }
           }
+
+          // 1b. itemSectionRenderer with artist item
+          final isr = section['itemSectionRenderer'];
+          if (isr is Map && isr['contents'] is List) {
+            for (final it in (isr['contents'] as List)) {
+              if (it is! Map) continue;
+              final r = it['musicResponsiveListItemRenderer'];
+              if (r is! Map) continue;
+              final browseEndpoint = r['navigationEndpoint']?['browseEndpoint'];
+              final pageType = browseEndpoint?['browseEndpointContextSupportedConfigs']
+                  ?['browseEndpointContextMusicConfig']?['pageType']?.toString() ?? '';
+              if (pageType == 'MUSIC_PAGE_TYPE_ARTIST') {
+                final browseId = browseEndpoint?['browseId'] as String?;
+                final flexCols = r['flexColumns'] as List?;
+                List? titleRuns;
+                if (flexCols != null && flexCols.isNotEmpty && flexCols[0] is Map) {
+                  final col0 = flexCols[0] as Map;
+                  titleRuns = col0['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
+                }
+                final artistTitle = titleRuns?.isNotEmpty == true ? titleRuns![0]['text'] as String? ?? q : q;
+                final thumbs = r['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
+                final rawThumb = thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String? : null;
+                if (browseId != null && browseId.isNotEmpty) {
+                  return (
+                    name: artistTitle,
+                    browseId: browseId,
+                    audience: null,
+                    thumb: rawThumb != null ? upgradeArtworkUrl(rawThumb) : null,
+                  );
+                }
+              }
+            }
+          }
         }
       }
 
@@ -410,14 +511,23 @@ class InnerTubeService {
       );
 
       final artistSections = artistSearchRes['contents']?['tabbedSearchResultsRenderer']
-          ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
-          ?['contents'];
+              ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
+              ?['contents'] ??
+          artistSearchRes['contents']?['sectionListRenderer']?['contents'];
 
       if (artistSections is List && artistSections.isNotEmpty) {
-        final shelf = artistSections[0]['musicShelfRenderer'];
-        final items = shelf?['contents'] as List?;
-        if (items != null && items.isNotEmpty) {
+        for (final sec in artistSections) {
+          if (sec is! Map) continue;
+          final items = <dynamic>[];
+          if (sec['musicShelfRenderer']?['contents'] is List) {
+            items.addAll(sec['musicShelfRenderer']['contents'] as List);
+          }
+          if (sec['itemSectionRenderer']?['contents'] is List) {
+            items.addAll(sec['itemSectionRenderer']['contents'] as List);
+          }
+
           for (final item in items) {
+            if (item is! Map) continue;
             final r = item['musicResponsiveListItemRenderer'];
             if (r == null) continue;
             final flexCols = r['flexColumns'] as List?;
@@ -467,10 +577,22 @@ class InnerTubeService {
   Future<Map<String, dynamic>?> getArtistChannel(String browseId) async {
     try {
       final res = await post('browse', {'browseId': browseId}, ttl: _tArtistPage);
-      final header = res['header']?['musicImmersiveHeaderRenderer'] ??
+      final sections = res['contents']?['singleColumnBrowseResultsRenderer']
+              ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
+              ?['contents'] ??
+          res['contents']?['sectionListRenderer']?['contents'];
+
+      var header = res['header']?['musicImmersiveHeaderRenderer'] ??
           res['header']?['musicVisualHeaderRenderer'] ??
           res['header']?['musicHeaderRenderer'] ??
           res['header']?['musicResponsiveHeaderRenderer'];
+
+      if (header == null && sections is List && sections.isNotEmpty) {
+        final sec0 = sections[0];
+        if (sec0 is Map) {
+          header = sec0['musicResponsiveHeaderRenderer'] ?? sec0['musicVisualHeaderRenderer'];
+        }
+      }
 
       final thumbs = header?['thumbnail']?['musicThumbnailRenderer']
               ?['thumbnail']?['thumbnails'] as List? ??
@@ -479,7 +601,8 @@ class InnerTubeService {
           header?['foregroundThumbnail']?['musicThumbnailRenderer']
               ?['thumbnail']?['thumbnails'] as List? ??
           header?['straplineThumbnail']?['musicThumbnailRenderer']
-              ?['thumbnail']?['thumbnails'] as List?;
+              ?['thumbnail']?['thumbnails'] as List? ??
+          header?['thumbnail']?['thumbnails'] as List?;
       final rawThumb =
           thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String : null;
 
@@ -489,12 +612,9 @@ class InnerTubeService {
       final playlists = <Map<String, dynamic>>[];
       final related = <Map<String, dynamic>>[];
 
-      final sections = res['contents']?['singleColumnBrowseResultsRenderer']
-          ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
-          ?['contents'];
-
       if (sections is List) {
         for (final section in sections) {
+          if (section is! Map) continue;
           final shelf = section['musicShelfRenderer'] ??
               section['musicCarouselShelfRenderer'];
           if (shelf == null) continue;
@@ -507,12 +627,50 @@ class InnerTubeService {
               .toLowerCase();
           final contents = shelf['contents'] as List? ?? const [];
 
-          if (shelfTitle.contains('top song') ||
-              shelfTitle.contains('popular')) {
+          final isSongShelf = shelfTitle.contains('song') ||
+              shelfTitle.contains('popular') ||
+              shelfTitle.contains('top') ||
+              shelfTitle.contains('track') ||
+              (topSongs.isEmpty && shelf.containsKey('contents'));
+
+          if (isSongShelf) {
             for (final item in contents) {
               final t = _parseResponsiveListItem(
                   item['musicResponsiveListItemRenderer']);
               if (t != null) topSongs.add(t);
+            }
+
+            // Follow shelf "More" / "See All" browse endpoint to get full songs list
+            final moreEndpoint = shelf['bottomEndpoint']?['browseEndpoint'] ??
+                shelf['header']?['musicCarouselShelfBasicHeaderRenderer']
+                    ?['moreContentButton']?['buttonRenderer']
+                    ?['navigationEndpoint']?['browseEndpoint'];
+            final moreBrowseId = moreEndpoint?['browseId'] as String?;
+            final moreParams = moreEndpoint?['params'] as String?;
+            if (moreBrowseId != null && topSongs.length < 25) {
+              try {
+                final moreBody = <String, dynamic>{'browseId': moreBrowseId};
+                if (moreParams != null) moreBody['params'] = moreParams;
+                final moreRes = await post('browse', moreBody, ttl: _tArtistPage);
+                final moreContents = moreRes['contents']?['singleColumnBrowseResultsRenderer']
+                        ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
+                        ?['contents'] ??
+                    moreRes['contents']?['sectionListRenderer']?['contents'];
+                if (moreContents is List) {
+                  for (final sec in moreContents) {
+                    final items = sec['musicShelfRenderer']?['contents'] ??
+                        sec['musicPlaylistShelfRenderer']?['contents'];
+                    if (items is List) {
+                      for (final it in items) {
+                        final t = _parseResponsiveListItem(it['musicResponsiveListItemRenderer']);
+                        if (t != null && !topSongs.any((s) => s.id == t.id)) {
+                          topSongs.add(t);
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (_) {}
             }
           } else if (shelfTitle.contains('album')) {
             for (final item in contents) {
@@ -525,6 +683,45 @@ class InnerTubeService {
                   'coverUrl': c['coverUrl'],
                 });
               }
+            }
+
+            // Follow shelf "More" browse endpoint to get full album catalog
+            final moreAlbumEndpoint = shelf['bottomEndpoint']?['browseEndpoint'] ??
+                shelf['header']?['musicCarouselShelfBasicHeaderRenderer']
+                    ?['moreContentButton']?['buttonRenderer']
+                    ?['navigationEndpoint']?['browseEndpoint'];
+            final moreAlbumBrowseId = moreAlbumEndpoint?['browseId'] as String?;
+            final moreAlbumParams = moreAlbumEndpoint?['params'] as String?;
+            if (moreAlbumBrowseId != null && albums.length < 15) {
+              try {
+                final moreBody = <String, dynamic>{'browseId': moreAlbumBrowseId};
+                if (moreAlbumParams != null) moreBody['params'] = moreAlbumParams;
+                final moreRes = await post('browse', moreBody, ttl: _tArtistPage);
+                final moreContents = moreRes['contents']?['singleColumnBrowseResultsRenderer']
+                        ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
+                        ?['contents'] ??
+                    moreRes['contents']?['sectionListRenderer']?['contents'];
+                if (moreContents is List) {
+                  for (final sec in moreContents) {
+                    final items = sec['gridRenderer']?['items'] ??
+                        sec['musicShelfRenderer']?['contents'] ??
+                        sec['musicCarouselShelfRenderer']?['contents'];
+                    if (items is List) {
+                      for (final it in items) {
+                        final c = _twoRowCard(it);
+                        if (c != null && !albums.any((a) => a['browseId'] == c['browseId'])) {
+                          albums.add({
+                            'title': c['title'] ?? 'Album',
+                            'year': c['subtitle'],
+                            'browseId': c['browseId'],
+                            'coverUrl': c['coverUrl'],
+                          });
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (_) {}
             }
           } else if (shelfTitle.contains('single') ||
               shelfTitle.contains('ep')) {

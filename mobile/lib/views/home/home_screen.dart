@@ -23,6 +23,7 @@ import '../profile/profile_screen.dart';
 import '../../services/country_service.dart';
 import '../../services/listening_history_service.dart';
 import '../../services/innertube_service.dart';
+import '../../services/update_service.dart';
 
 /* ------------------------------------------------------------------ */
 /*  Physics primitives                                                  */
@@ -957,6 +958,18 @@ class _HomeScreenState extends State<HomeScreen> {
     CountryService.instance.countryNotifier.addListener(_onCountryChanged);
     ListeningHistoryService.instance.historyNotifier.addListener(_onHistoryChanged);
     _loadAllHomeData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAppUpdate();
+    });
+  }
+
+  Future<void> _checkAppUpdate() async {
+    await Future.delayed(const Duration(milliseconds: 1800));
+    if (!mounted) return;
+    final info = await UpdateService.instance.checkForUpdate(silent: true);
+    if (info != null && info.hasUpdate && !UpdateService.instance.hasDismissedPrompt && mounted) {
+      UpdateService.instance.showUpdateSheet(context, info);
+    }
   }
 
   void _onCountryChanged() {
@@ -1154,6 +1167,86 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     );
                   },
+                ),
+
+                // In-App Update Banner (Appears when a new version is available)
+                SliverToBoxAdapter(
+                  child: ValueListenableBuilder<UpdateInfo?>(
+                    valueListenable: UpdateService.instance.availableUpdateNotifier,
+                    builder: (context, update, _) {
+                      if (update == null || !update.hasUpdate) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF18181B),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.crimson.withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: AppColors.crimson.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.system_update_rounded, color: AppColors.crimson, size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Zenify v${update.latestVersion} Available',
+                                      style: const TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Tap to view release notes & update',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white.withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  UpdateService.instance.showUpdateSheet(context, update);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.crimson,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'UPDATE',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
 
                 // Mood chips (scroll away with the page)

@@ -15,6 +15,7 @@ import '../room_together/room_together_screen.dart';
 import '../auth/welcome_screen.dart';
 import '../settings/settings_screen.dart';
 import '../insights/insights_screen.dart';
+import '../../services/dock_visibility.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,7 +24,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _userCtrl = TextEditingController();
   bool _savedFeedback = false;
@@ -368,19 +369,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 8),
           _buildQualityOption(
-            title: 'Akamai 320kbps CDN (Pristine)',
-            subtitle: 'Ultra-low latency, full songs from high-speed Akamai Edge',
-            value: '320k',
-            selected: auth.audioQuality == '320k',
-            onTap: () => auth.setAudioQuality('320k'),
+            title: 'High Quality (InnerTube HQ)',
+            subtitle: 'Ultra-low latency, crystal-clear 256k AAC streaming',
+            value: 'high',
+            selected: auth.audioQuality == 'high' || auth.audioQuality == '320k' || auth.audioQuality == 'yt-direct',
+            onTap: () => auth.setAudioQuality('high'),
           ),
           const SizedBox(height: 8),
           _buildQualityOption(
-            title: 'YouTube Direct (On-Device)',
-            subtitle: 'Direct googlevideo.com extraction without proxying',
-            value: 'yt-direct',
-            selected: auth.audioQuality == 'yt-direct',
-            onTap: () => auth.setAudioQuality('yt-direct'),
+            title: 'Standard Quality',
+            subtitle: 'Efficient data-saving 128k/160k audio stream',
+            value: 'standard',
+            selected: auth.audioQuality == 'standard',
+            onTap: () => auth.setAudioQuality('standard'),
           ),
           const SizedBox(height: 8),
           _buildQualityOption(

@@ -14,7 +14,9 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_state.dart';
 import '../../services/cache_service.dart';
+import '../../services/dock_visibility.dart';
 import '../../services/settings_service.dart';
+import '../../services/update_service.dart';
 import '../auth/welcome_screen.dart';
 import '../player/studio_fx_sheet.dart';
 
@@ -25,9 +27,9 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
   int _versionTapCount = 0;
-  String _appVersion = '2.5.3 (Build 42)';
+  String _appVersion = 'v2.6.2 (Build 44)';
 
   @override
   void initState() {
@@ -44,6 +46,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  void _onCheckForUpdates() async {
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.crimson),
+            ),
+            SizedBox(width: 12),
+            Text('Checking release channel...', style: TextStyle(color: Colors.white, fontSize: 13)),
+          ],
+        ),
+        backgroundColor: const Color(0xFF18181B),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+
+    final info = await UpdateService.instance.checkForUpdate(silent: false);
+    if (!mounted) return;
+
+    if (info != null && info.hasUpdate) {
+      UpdateService.instance.showUpdateSheet(context, info);
+    } else {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF18181B),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'ZENIFY UPDATE CHANNEL',
+                    style: GoogleFonts.oswald(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
+                      color: AppColors.crimson,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _diagRow('Current Build', _appVersion),
+              _diagRow('Release Channel', 'v2.6.2 Production (ARM64)'),
+              _diagRow('Status', 'Up to date • Latest package installed'),
+              _diagRow('Pipeline', 'YouTube Music InnerTube + StudioFX DSP'),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.crimson,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('DONE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   void _onVersionTapped() {
@@ -470,11 +556,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: 'Check for Updates',
                       subtitle: 'Zenify Release Channel (Device Mode)',
                       icon: Icons.system_update_rounded,
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('You are on the latest release.')),
-                        );
-                      },
+                      onTap: _onCheckForUpdates,
                     ),
                     _buildDivider(),
                     _buildActionRow(

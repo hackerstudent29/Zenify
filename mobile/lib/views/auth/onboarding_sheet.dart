@@ -9,6 +9,7 @@ import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/spring_kit.dart';
 import '../../services/auth_state.dart';
+import '../../services/dock_visibility.dart';
 
 // ---------------------------------------------------------------------------
 // Result passed to onSave
@@ -258,7 +259,7 @@ class OnboardingSheet extends StatefulWidget {
 }
 
 class _OnboardingSheetState extends State<OnboardingSheet>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, HideDocksMixin {
   static const _steps = 4;
   static const _surface = Color(0xFF1C1C1E);
   static const _fill = Color(0x1FFFFFFF);

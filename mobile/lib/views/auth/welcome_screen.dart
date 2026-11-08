@@ -7,6 +7,7 @@ import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/spring_kit.dart';
 import '../../services/auth_state.dart';
+import '../../services/dock_visibility.dart';
 import 'email_otp_sheet.dart';
 import 'google_logo.dart';
 import 'onboarding_sheet.dart';
@@ -20,7 +21,7 @@ class WelcomeScreen extends StatefulWidget {
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen> {
+class _WelcomeScreenState extends State<WelcomeScreen> with HideDocksMixin {
   bool _isGoogleLoading = false;
   String? _errorMessage;
 

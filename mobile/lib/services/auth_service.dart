@@ -310,7 +310,7 @@ class AuthService {
             'Authorization': 'Bearer ${ApiService.authToken}',
         };
 
-    final paths = [path, if (fallbackPath != null) fallbackPath];
+    final paths = [path, ?fallbackPath];
     Exception? lastError;
 
     for (final base in ApiService.bases) {

@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "streamMode": "device",
+  "minAppVersion": "1.0.0",
+  "latestAppVersion": "2.6.4",
+  "updateUrl": "https://listenzenify.com/download/app",
+  "releaseNotes": "• Multi-tier karaoke lyrics: Tier 1 Word-by-Word (WBW) fill animation via lrc.red & backend\n• Direct on-device audio streaming restored with ExoPlayer header protection\n• Auto-purge stale plain lyrics so tracks upgrade to glowing fill effect\n• Dock auto-hide on auth, settings, and profile screens",
+  "message": null
+}
+

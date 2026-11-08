@@ -44,8 +44,17 @@ flutter {
     source = "../.."
 }
 
+tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+    enabled = false
+}
+
 dependencies {
+    implementation(files("libs/innertubex-android.aar"))
+    implementation("io.ktor:ktor-client-okhttp:3.6.0")
+    implementation("io.ktor:ktor-client-content-negotiation:3.6.0")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.0")
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-common:1.5.1")
     implementation("androidx.media3:media3-datasource:1.5.1")
+    implementation("androidx.media3:media3-datasource-okhttp:1.5.1")
 }

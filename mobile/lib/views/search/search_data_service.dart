@@ -96,20 +96,25 @@ class SearchDataService {
 
     // 1. Direct on-device YouTube InnerTube search (user IP directly to YouTube Music):
     try {
-      Map<String, dynamic>? generalJson;
+      final generalJson = await InnerTubeService.instance
+          .post('search', {'query': q})
+          .timeout(const Duration(seconds: 8));
+
+      final parsed = _parseGeneralSearch(generalJson, q);
+
+      // If general search succeeded with songs or topResult, return immediately for instant response
+      if (parsed.songs.length >= 3 || (parsed.topResult != null && parsed.songs.isNotEmpty)) {
+        return parsed;
+      }
+
+      // If general search returned few or no songs, supplement with filtered song search
       List<Track> filteredSongs = [];
-
       try {
-        generalJson = await InnerTubeService.instance.post('search', {'query': q}).timeout(const Duration(seconds: 6));
+        filteredSongs = await InnerTubeService.instance
+            .search(q)
+            .timeout(const Duration(seconds: 6));
       } catch (_) {}
 
-      try {
-        filteredSongs = await InnerTubeService.instance.search(q).timeout(const Duration(seconds: 6));
-      } catch (_) {}
-
-      final parsed = generalJson != null ? _parseGeneralSearch(generalJson, q) : const SearchResultsGroup();
-
-      // Merge songs from filtered search with general search (deduplicated)
       final mergedSongs = <Track>[...parsed.songs];
       final seenIds = mergedSongs.map((s) => s.id).toSet();
       for (final song in filteredSongs) {
@@ -118,11 +123,12 @@ class SearchDataService {
         }
       }
 
-      // If no artists were returned in general search, query YouTube Music artist endpoint directly
       final enrichedArtists = List<SearchArtist>.from(parsed.artists);
       if (enrichedArtists.isEmpty) {
         try {
-          final artistCard = await InnerTubeService.instance.searchArtist(q).timeout(const Duration(seconds: 4));
+          final artistCard = await InnerTubeService.instance
+              .searchArtist(q)
+              .timeout(const Duration(seconds: 4));
           if (artistCard != null) {
             enrichedArtists.add(SearchArtist(
               name: artistCard.name,
@@ -220,7 +226,8 @@ class SearchDataService {
   SearchResultsGroup _parseGeneralSearch(Map<String, dynamic> json, String query) {
     try {
       final sectionList = json['contents']?['tabbedSearchResultsRenderer']?['tabs']?[0]
-          ?['tabRenderer']?['content']?['sectionListRenderer']?['contents'];
+              ?['tabRenderer']?['content']?['sectionListRenderer']?['contents'] ??
+          json['contents']?['sectionListRenderer']?['contents'];
       if (sectionList is! List) return const SearchResultsGroup();
 
       SearchTopResult? topResult;
@@ -299,6 +306,8 @@ class SearchDataService {
             if (it is! Map) continue;
             if (it['musicResponsiveListItemRenderer'] is Map) {
               processItem(Map<String, dynamic>.from(it['musicResponsiveListItemRenderer']));
+            } else if (it['musicCardShelfRenderer'] is Map && topResult == null) {
+              topResult = _parseTopResult(Map<String, dynamic>.from(it['musicCardShelfRenderer']));
             } else if (it['musicShelfRenderer'] is Map) {
               final subShelf = it['musicShelfRenderer'] as Map;
               final titleRuns = subShelf['title']?['runs'] as List?;
@@ -421,11 +430,20 @@ class SearchDataService {
           ?['musicPlayButtonRenderer']?['playNavigationEndpoint'];
       String? videoId = nav?['watchEndpoint']?['videoId'] ??
           item['navigationEndpoint']?['watchEndpoint']?['videoId'] ??
-          item['playlistItemData']?['videoId'];
-      if (videoId == null || videoId.isEmpty) return null;
+          item['playlistItemData']?['videoId'] ??
+          item['doubleTapEndpoint']?['watchEndpoint']?['videoId'];
 
       final flexColumns = item['flexColumns'] as List?;
       if (flexColumns == null || flexColumns.isEmpty) return null;
+
+      if (videoId == null && flexColumns.isNotEmpty) {
+        final flex0 = flexColumns[0];
+        final runs = flex0?['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
+        if (runs != null && runs.isNotEmpty && runs[0] is Map) {
+          videoId = runs[0]['navigationEndpoint']?['watchEndpoint']?['videoId'];
+        }
+      }
+      if (videoId == null || videoId.isEmpty) return null;
 
       final titleRuns = _getColumnRuns(flexColumns[0]);
       final title = titleRuns != null && titleRuns.isNotEmpty && titleRuns[0] is Map
