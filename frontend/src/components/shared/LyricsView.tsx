@@ -880,6 +880,7 @@ export function LyricsView({
     <LyricsToolbar
       placement={isSidebar ? "top-left" : "top-right"}
       compact={!!isSidebar}
+      isMobile={isMobile}
       canTranslate={canTranslate}
       isRomanized={isRomanized}
       romanizedLabel={romanizedLabel}
@@ -889,7 +890,6 @@ export function LyricsView({
       onOffset={handleOffsetChange}
       onClose={!isMobile && !isSidebar && !isFullscreen ? onClose : undefined}
       hidden={isUserScrolling || !!isIdle}
-      qualityBadge={data?.qualityBadge}
       isPlainMode={isPlainMode}
       onTogglePlainMode={togglePlainMode}
     />

@@ -3,6 +3,7 @@ package com.zenify.mobile.yt
 import android.content.Context
 import android.util.Log
 import com.metrolist.innertubex.InnerTube
+import com.metrolist.innertubex.InnerTubeLogger
 import com.metrolist.innertubex.cipher.YouTubeCipherService
 import com.metrolist.innertubex.extraction.AudioQuality
 import com.metrolist.innertubex.extraction.ContentHints
@@ -10,6 +11,7 @@ import com.metrolist.innertubex.extraction.ExtractedStream
 import com.metrolist.innertubex.extraction.InnerTubeExtractor
 import com.metrolist.innertubex.extraction.StreamResolveException
 import com.metrolist.innertubex.extraction.YtConfigParserImpl
+import com.metrolist.innertubex.extraction.strategy.ContentAwareFallbackStrategy
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -22,6 +24,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 object YtEngine {
@@ -89,8 +92,8 @@ object YtEngine {
                     val tp = PoTokenGenerator(context.applicationContext)
                     tokenProvider = tp
                     extractorInstance = InnerTubeExtractor(
-                        parser = parser,
-                        cipher = cipherService,
+                        configParser = parser,
+                        cipherService = cipherService,
                         innerTube = innerTube,
                         tokenProvider = tp
                     )
@@ -148,14 +151,17 @@ object YtEngine {
             hints = hints,
             excludedClients = ex,
             audioQuality = q,
-            clientPlaybackNonce = null,
+            clientPlaybackNonce = UUID.randomUUID().toString(),
+        ) ?: throw StreamResolveException(
+            StreamResolveException.Reason.NO_PLAYABLE_STREAM,
+            "No playable stream found for $id"
         )
     }
 
     private fun ExtractedStream.toResolved(): Resolved {
         val headers = StreamHeaders.forClient(clientName)
         val now = System.currentTimeMillis()
-        val expiresMs = expiresAt.toEpochMilliseconds()
+        val expiresMs = expiresAt?.toEpochMilliseconds() ?: (now + 6 * 3600 * 1000L)
         val expiresInSec = ((expiresMs - now) / 1000).coerceAtLeast(0).toInt()
         return Resolved(
             url = audioUrl,
@@ -166,7 +172,7 @@ object YtEngine {
             contentLength = contentLengthBytes,
             loudnessDb = loudnessDb,
             title = mediaMetadata?.title,
-            artist = mediaMetadata?.artist
+            artist = mediaMetadata?.author
         )
     }
 

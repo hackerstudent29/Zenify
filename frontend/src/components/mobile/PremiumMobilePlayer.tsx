@@ -52,8 +52,15 @@ const PILL_SIDE = 12;
 const HEADER_H = 68;        // compact lyrics header height (inside the middle region)
 const HEAD_ART = 56;
 
-// One spring drives open / close / release. Slightly over-damped: no bounce past the edges.
-const SHEET = { type: "spring", stiffness: 340, damping: 36, mass: 1, restDelta: 0.4, restSpeed: 0.4 } as const;
+/** Swipe-up feel. The sheet moves OPEN_GAIN px for every 1px of finger travel,
+ *  so you only have to drag ~60% of the distance. Release uses velocity projection (iOS style). */
+const OPEN_GAIN = 1.65;
+const PROJECT = 0.2;        // seconds of velocity "coasting" used to decide where the sheet would land
+const OPEN_AT = 0.62;       // projected position (fraction of travel) below which the sheet opens
+const CLOSE_AT = 0.28;      // projected position (fraction of travel) above which the sheet closes
+
+// One spring drives open / close / release. Almost critically damped: fast, no visible bounce.
+const SHEET = { type: "spring", stiffness: 360, damping: 34, mass: 0.9, restDelta: 0.3, restSpeed: 0.3 } as const;
 const LYRICS_SPRING = { type: "spring", stiffness: 260, damping: 30, mass: 1 } as const;
 const PAUSE_SPRING = { type: "spring", stiffness: 300, damping: 22, mass: 0.6 } as const;
 
@@ -126,17 +133,17 @@ interface Geo extends MiniGeo {
 /*  Main                                                               */
 /*                                                                     */
 /*  ONE source of truth: sheetY (0 = fully open, travel = docked).     */
-/*  Shell rect, corner radius, artwork, every text block, and the      */
-/*  mini-player ghost are all derived from it in `apply()`, so drag,   */
-/*  open, close and flick-release follow the exact same trajectory.    */
+/*  Shell rect, corner radius, artwork, every text block and the       */
+/*  mini-player handoff are all derived from it in `apply()`.          */
 /*                                                                     */
-/*  The sheet is a *shell* that morphs into the mini player's pill:    */
-/*   - the shell's top edge follows the finger 1:1                     */
-/*   - its content is anchored to that top edge, so the artwork        */
-/*     always rides INSIDE the tab and can never leave it              */
-/*   - in the last ~55% it narrows/rounds into the exact pill rect     */
-/*   - the mesh background fades into the same glass the mini uses,    */
-/*     so the swap to the real mini player is invisible               */
+/*  Apple-Music-style morph:                                           */
+/*   - the shell's top edge follows the finger                         */
+/*   - content is anchored to that top edge, so the artwork rides      */
+/*     INSIDE the tab (and is additionally clamped inside it)          */
+/*   - the shell stays OPAQUE (mesh) the whole way down, and only in   */
+/*     the last few % does it dissolve to reveal the REAL mini player  */
+/*     that has already faded in underneath it. There is never a       */
+/*     frame where translucent glass shows the page through the shell. */
 /* ------------------------------------------------------------------ */
 export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boolean }) {
   const router = useRouter();
@@ -193,6 +200,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const L = useMotionValue(isLyricsOpen ? 1 : 0); // lyrics-mode progress
   const pause = useMotionValue(isPlaying ? 1 : PAUSED);
   const artX = useMotionValue(0);              // horizontal swipe on artwork
+  const miniOp = useMotionValue(1);            // real mini player visibility (handoff)
 
   const m = useMemo(
     () => ({
@@ -200,7 +208,6 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
       top: motionValue(0), left: motionValue(0), right: motionValue(0), bottom: motionValue(0),
       rTop: motionValue(0), rBot: motionValue(0),
       shellOp: motionValue(1), shadowOp: motionValue(0),
-      glassOp: motionValue(0), glassDisplay: motionValue("none"),
       meshOp: motionValue(1), cx: motionValue(0),
       // content groups
       grabOp: motionValue(1), grabPE: motionValue("auto"),
@@ -212,7 +219,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
       ghostOp: motionValue(1), ghostY: motionValue(0),
       // artwork
       artX: motionValue(0), artY: motionValue(0), artS: motionValue(1),
-      artR: motionValue(BIG_R), artShadow: motionValue("none"),
+      artR: motionValue(BIG_R), artShadow: motionValue("none"), artOp: motionValue(1),
     }),
     []
   );
@@ -228,56 +235,59 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     const v = clamp(sheetY.get(), 0, D);
     const q = v / D;              // 0 = open, 1 = docked
     const p = 1 - q;
-    const r = smooth(0.45, 1, q); // "shrink into pill" phase (last 55%)
+    const r = smooth(0.2, 1, q);  // shell narrows toward the pill (starts early so it feels like one card shrinking)
     const Lv = L.get();
     const Lc = clamp(Lv);
 
-    /* shell: top edge = finger (1:1); sides/bottom/radius morph to the pill in the last phase */
+    /* shell: top edge = sheet position; sides/bottom/radius morph to the pill */
     m.top.set(v);
     m.left.set(g.mini.left * r);
     m.right.set((g.W - g.mini.left - g.mini.w) * r);
-    m.bottom.set((g.H - g.mini.top - g.mini.h) * r);
-    m.rTop.set(PILL_R * clamp(v / 120));
+    const bottomInset = (g.H - g.mini.top - g.mini.h) * r;
+    m.bottom.set(bottomInset);
+    m.rTop.set(PILL_R * clamp(v / 100));
     m.rBot.set(PILL_R * r);
     m.cx.set(-g.mini.left * r); // keeps content screen-aligned while the shell narrows
     m.shellOp.set(hidePlayerRef.current ? 1 - smooth(0.7, 1, q) : 1);
-    m.shadowOp.set(smooth(0.6, 1, q));
+    m.shadowOp.set(smooth(0.5, 0.9, q) * (1 - smooth(0.95, 1, q)));
 
-    /* background: mesh fades into the SAME glass the mini player uses → invisible handoff */
-    const glass = smooth(0.55, 0.95, q);
-    m.glassOp.set(glass);
-    m.glassDisplay.set(glass < 0.01 ? "none" : "block");
-    m.meshOp.set(1 - smooth(0.7, 1, q));
+    /* HANDOFF — the important part.
+       1. The real mini fades in UNDER the opaque shell (q .82 → .96): invisible, shell covers it.
+       2. Only then (q .93 → 1) the shell's opaque mesh dissolves, revealing the real mini.
+       Result: coverage is never partial, so the page can never show through the shell. */
+    miniOp.set(smooth(0.82, 0.96, q));
+    m.meshOp.set(1 - smooth(0.93, 1, q));
 
     /* text / controls: each group rises from below + fades, staggered. Closing is the exact reverse. */
-    const grab = smooth(0.5, 0.9, p);
+    const grab = smooth(0.55, 0.95, p);
     m.grabOp.set(grab);
     m.grabPE.set(p > 0.5 ? "auto" : "none");
 
-    const meta = smooth(0.28, 0.66, p);
+    const meta = smooth(0.3, 0.7, p);
     m.metaOp.set(meta);
-    m.metaY.set((1 - meta) * 26);
+    m.metaY.set((1 - meta) * 36);
 
-    const scrub = smooth(0.38, 0.76, p);
+    const scrub = smooth(0.38, 0.78, p);
     m.scrubOp.set(scrub);
-    m.scrubY.set((1 - scrub) * 32);
+    m.scrubY.set((1 - scrub) * 44);
 
-    const trans = smooth(0.46, 0.86, p);
+    const trans = smooth(0.46, 0.88, p);
     m.transOp.set(trans);
-    m.transY.set((1 - trans) * 40);
+    m.transY.set((1 - trans) * 52);
 
     const lyr = smooth(0.34, 0.74, p);
     m.lyricsOp.set(lyr);
-    m.lyricsY.set((1 - lyr) * 22);
+    m.lyricsY.set((1 - lyr) * 28);
 
     const head = smooth(0.3, 0.7, p) * smooth(0.25, 0.8, Lc);
     m.headOp.set(head);
     m.headY.set((1 - smooth(0.25, 0.8, Lc)) * 8 + (1 - smooth(0.3, 0.7, p)) * 14);
 
-    /* mini-player ghost row (title / artist / buttons) arrives last, rising into place */
-    const ghost = smooth(0.8, 1, q);
+    /* mini-player ghost row (title / artist / buttons) arrives late, rising into place,
+       and leaves again at the very end so it never doubles over the real mini */
+    const ghost = smooth(0.78, 0.93, q) * (1 - smooth(0.95, 1, q));
     m.ghostOp.set(ghost);
-    m.ghostY.set((1 - ghost) * 10);
+    m.ghostY.set((1 - smooth(0.78, 0.93, q)) * 12);
 
     /* artwork: big ⇄ compact (lyrics) blended by L, then → mini by q, all in sheet-content space */
     const k = pause.get();
@@ -294,22 +304,27 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
     x += artX.get() * (1 - Lc) * (1 - q); // swipe-to-skip nudge
 
-    const qa = q; // art rides inside the tab: linear in q, can't outrun the shell
-    x = lerp(x, g.miniArt.left, qa);
-    y = lerp(y, g.miniArt.rel, qa);
-    size = lerp(size, g.miniArt.size, qa);
+    // art rides inside the tab: linear in q, so it can't outrun the shell
+    x = lerp(x, g.miniArt.left, q);
+    y = lerp(y, g.miniArt.rel, q);
+    size = lerp(size, g.miniArt.size, q);
+
+    // hard guarantee: the artwork never leaves the shell (top or bottom edge)
+    const shellH = g.H - v - bottomInset;
+    y = Math.max(0, Math.min(y, shellH - size - 4));
 
     const s = Math.max(0.01, size / ART_BASE);
     m.artX.set(x);
     m.artY.set(y);
     m.artS.set(s);
-    m.artR.set(lerp(lerp(BIG_R, HEAD_R, Lc), MINI_R, qa) / s);
+    m.artOp.set(1 - smooth(0.96, 1, q));
+    m.artR.set(lerp(lerp(BIG_R, HEAD_R, Lc), MINI_R, q) / s);
     m.artShadow.set(
-      `0 0 0 1px rgba(255,255,255,0.1), 0 ${(24 * (1 - qa)).toFixed(1)}px ${(48 * (1 - qa)).toFixed(1)}px rgba(0,0,0,${(
-        0.5 * (1 - qa) * (1 - 0.5 * Lc)
+      `0 0 0 1px rgba(255,255,255,0.1), 0 ${(24 * (1 - q)).toFixed(1)}px ${(48 * (1 - q)).toFixed(1)}px rgba(0,0,0,${(
+        0.5 * (1 - q) * (1 - 0.5 * Lc)
       ).toFixed(3)})`
     );
-  }, [sheetY, L, pause, artX, m]);
+  }, [sheetY, L, pause, artX, miniOp, m]);
 
   useMotionValueEvent(sheetY, "change", apply);
   useMotionValueEvent(L, "change", apply);
@@ -418,12 +433,13 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     if (!isOpen) {
       stopAnim();
       sheetY.set(travel.current);
+      miniOp.set(1); // real mini fully visible whenever the sheet is gone
       return;
     }
     if (dragOpen.current) return;
     runTo(0);
     return () => stopAnim();
-  }, [isOpen, runTo, stopAnim, sheetY]);
+  }, [isOpen, runTo, stopAnim, sheetY, miniOp]);
 
   // Lyrics mode: artwork glides between big ⇄ compact header
   useEffect(() => {
@@ -516,11 +532,14 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const dragSheet = (dy: number) => {
     sheetY.set(clamp(panBase.current + dy, 0, travel.current));
   };
-  /** Release the sheet: flick/threshold decides, spring inherits finger velocity */
+
+  /** Release the open sheet. Decision uses where the sheet would COAST to (position + velocity),
+   *  so a short flick closes it and a slow small drag springs back. */
   const releaseSheet = (vy: number) => {
     const D = travel.current;
     const v = sheetY.get();
-    const shouldClose = vy > 320 || (v > 90 && vy > -320);
+    const projected = v + vy * PROJECT;
+    const shouldClose = vy > 300 || (projected > D * CLOSE_AT && vy > -300);
     if (shouldClose) {
       runTo(D, vy, () => {
         anim.current = null;
@@ -531,7 +550,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
     }
   };
 
-  /* mini player: swipe up opens sheet (finger-tracked); swipe horizontal skips */
+  /* mini player: swipe up opens sheet (finger-tracked, geared); swipe horizontal skips */
   const miniX = useMotionValue(0);
   const gesture = useRef<"none" | "x" | "y">("none");
   const panned = useRef(false);
@@ -543,20 +562,23 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
 
   const miniPan = (_: PointerEvent, i: PanInfo) => {
     if (gesture.current === "none") {
-      if (Math.hypot(i.offset.x, i.offset.y) < 6) return;
-      gesture.current = Math.abs(i.offset.x) > Math.abs(i.offset.y) ? "x" : "y";
+      if (Math.hypot(i.offset.x, i.offset.y) < 4) return;
+      // bias toward vertical so a slightly diagonal swipe up still opens the player
+      gesture.current = Math.abs(i.offset.x) > Math.abs(i.offset.y) * 1.2 ? "x" : "y";
       panned.current = true;
-      if (gesture.current === "y" && i.offset.y < 0 && !isOpenRef.current) {
+    }
+    if (gesture.current === "x") {
+      miniX.set(i.offset.x * 0.8);
+      return;
+    }
+    if (gesture.current === "y") {
+      if (!dragOpen.current && !isOpenRef.current && i.offset.y < -2) {
         dragOpen.current = true;
         stopAnim();
         panBase.current = travel.current;
         setOpen(true);
       }
-    }
-    if (gesture.current === "x") {
-      miniX.set(i.offset.x * 0.8);
-    } else if (dragOpen.current) {
-      dragSheet(i.offset.y);
+      if (dragOpen.current) dragSheet(i.offset.y * OPEN_GAIN);
     }
   };
 
@@ -569,8 +591,9 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
       dragOpen.current = false;
       const D = travel.current;
       const v = sheetY.get();
-      const vy = i.velocity.y;
-      const shouldOpen = vy < -280 || (v < D * 0.8 && vy < 280);
+      const vy = i.velocity.y * OPEN_GAIN; // finger velocity → sheet velocity
+      const projected = v + vy * PROJECT;
+      const shouldOpen = vy < -250 || (projected < D * OPEN_AT && vy < 400);
       if (shouldOpen) runTo(0, vy);
       else
         runTo(D, vy, () => {
@@ -597,7 +620,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
   const onArtPan = (_: PointerEvent, info: PanInfo) => {
     if (isLyricsOpen) return;
     if (artPanGesture.current === "none") {
-      if (Math.hypot(info.offset.x, info.offset.y) < 6) return;
+      if (Math.hypot(info.offset.x, info.offset.y) < 5) return;
       artPanGesture.current = Math.abs(info.offset.x) > Math.abs(info.offset.y) ? "x" : "y";
     }
     if (artPanGesture.current === "x") {
@@ -657,9 +680,8 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
       <PlayerStyles />
 
       {/* ───────────── MINI PLAYER ─────────────
-          Hidden (not faded) while the sheet exists. The sheet's shell docks into this exact
-          rect with the exact same glass, then React swaps them in one commit: no overlap,
-          no see-through frame, no pop. */}
+          Always mounted. While the sheet exists it fades in UNDER the opaque shell as the shell
+          docks (miniOp), then the shell dissolves to reveal it. No swap, no pop, no see-through. */}
       {!hidePlayer && (
         <motion.div
           ref={miniShellRef}
@@ -672,7 +694,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
             height: PILL_H,
             touchAction: "none",
-            opacity: isOpen ? 0 : 1,
+            opacity: miniOp,
             pointerEvents: isOpen ? "none" : "auto",
             fontFamily: FONT_STACK,
           }}
@@ -747,7 +769,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
         </motion.div>
       )}
 
-      {/* ───────────── FULL SCREEN SHEET (shell that morphs into the pill) ───────────── */}
+      {/* ───────────── FULL SCREEN SHEET (opaque shell that morphs into the pill) ───────────── */}
       {isOpen && (
         <motion.div
           key="sheet-shell"
@@ -766,26 +788,14 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
             WebkitFontSmoothing: "antialiased",
           }}
         >
-          {/* shadow lives outside the clip so it isn't cut off */}
+          {/* shadow + hairline live outside the clip so they aren't cut off */}
           <motion.div
-            className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[0_8px_28px_rgba(0,0,0,0.45)]"
+            className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[0_8px_28px_rgba(0,0,0,0.45)] ring-1 ring-inset ring-white/10"
             style={{ opacity: m.shadowOp }}
           />
 
           {/* clip */}
           <div className="absolute inset-0 overflow-hidden" style={{ borderRadius: "inherit" }}>
-            {/* glass = identical to the mini player's, fades in as the shell docks */}
-            <motion.div
-              className="absolute inset-0 border border-white/10 bg-white/[0.07]"
-              style={{
-                borderRadius: "inherit",
-                display: m.glassDisplay,
-                opacity: m.glassOp,
-                WebkitBackdropFilter: glassBlur,
-                backdropFilter: glassBlur,
-              }}
-            />
-
             {/* content: fixed full-screen size, anchored to the shell's top edge,
                 counter-shifted in x so it stays screen-aligned while the shell narrows */}
             <motion.div
@@ -799,7 +809,8 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                 touchAction: isLyricsOpen ? "pan-y" : "none",
               }}
             >
-              {/* Fluid mesh background (fixed size → never re-layouts while the shell resizes) */}
+              {/* OPAQUE backing (mesh). Stays at full opacity until the last few % of the dock,
+                  so the page never shows through. Fixed size → never re-layouts while resizing. */}
               <motion.div
                 className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#121214]"
                 style={{ opacity: m.meshOp }}
@@ -811,7 +822,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                 />
               </motion.div>
 
-              {/* Mini-player ghost row: same layout as the real mini; fades/rises in as we dock */}
+              {/* Mini-player ghost row: same layout as the real mini; rises in as we dock */}
               <motion.div
                 className="pointer-events-none absolute left-3 right-3 top-0 z-10"
                 style={{ height: PILL_H, opacity: m.ghostOp, y: m.ghostY }}
@@ -851,6 +862,7 @@ export function PremiumMobilePlayer({ hidePlayer = false }: { hidePlayer?: boole
                   x: m.artX,
                   y: m.artY,
                   scale: m.artS,
+                  opacity: m.artOp,
                   borderRadius: m.artR,
                   boxShadow: m.artShadow,
                   transformOrigin: "0 0",
