@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -25,39 +24,20 @@ import '../details/album_screen.dart';
 const double _kPaused = 0.86; // artwork shrink while paused
 const double _kBigR = 14;
 const double _kMiniR = 8;
-const double _kMiniH = 62;
-const double _kMiniSide = 12;
-const double _kPillR = 31;
-
-// Springs (critically damped on close so the pill never bounces below itself).
-const _kOpenSpring = SpringDescription(mass: 1, stiffness: 190, damping: 24);
-const _kCloseSpring = SpringDescription(mass: 1, stiffness: 240, damping: 31);
-const _kHideSpring = SpringDescription(mass: 1, stiffness: 260, damping: 30);
 
 enum _Axis { none, x, y }
 
 /// What fills the middle of the open sheet.
 enum _Panel { art, lyrics, queue }
 
-/// smoothstep of [x] between [a] and [b].
-double _ss(double x, double a, double b) {
-  final t = ((x - a) / (b - a)).clamp(0.0, 1.0).toDouble();
-  return t * t * (3 - 2 * t);
-}
-
 /// Drop this ONCE above your tab bar content:
 ///
 ///   Stack(children: [ pages, const Positioned.fill(child: PlayerShell()) ])
 ///
-/// ONE surface morphs between the mini pill and the full-screen player:
-///  - Its frame is Rect.lerp(miniPill, screen, t), so the top edge follows the
-///    finger 1:1 (travel = distance from pill top to screen top).
-///  - Material cross-fades glass -> solid -> artwork mesh, so the glass pill
-///    can never show through or "pop" while closing.
-///  - Content is laid out at full-screen size and clipped by the surface, so it
-///    rides inside the card. The artwork lives in card coordinates, so it can
-///    never leave the card.
-///  - Text/controls rise from below with a staggered fade, reversed on close.
+/// One spring controller (`_sheet`, 0 = docked mini, 1 = fully open) drives the
+/// sheet, the artwork morph, the mini fade and the corner radius. A second
+/// (`_dock`, 0 = big artwork, 1 = artwork docked in the header) drives the
+/// lyrics / queue transitions the same way.
 class PlayerShell extends StatefulWidget {
   const PlayerShell({
     super.key,
@@ -90,18 +70,11 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
   void closePanel() => _setPanel(_Panel.art);
   void closeSheet() => _close();
 
-  /// 0 = docked mini pill, 1 = fully open.
   late final AnimationController _sheet = AnimationController.unbounded(vsync: this, value: 0);
   late final AnimationController _pause = AnimationController.unbounded(vsync: this, value: 1);
-
-  /// 0 = big artwork, 1 = artwork docked in the header (lyrics / queue).
   late final AnimationController _dock = AnimationController.unbounded(vsync: this, value: 0);
   late final AnimationController _artX = AnimationController.unbounded(vsync: this, value: 0);
   late final AnimationController _miniX = AnimationController.unbounded(vsync: this, value: 0);
-
-  /// 0 = visible, 1 = slid fully below the screen (docks hidden).
-  late final AnimationController _hide =
-      AnimationController.unbounded(vsync: this, value: widget.hideMini ? 1 : 0);
   late final Ticker _probe = createTicker((_) => _measure());
 
   final ValueNotifier<Rect?> _bigRect = ValueNotifier(null);
@@ -137,31 +110,14 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
   bool _artDragging = false;
 
   @override
-  void didUpdateWidget(covariant PlayerShell oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.hideMini != widget.hideMini) {
-      _drive(_hide, widget.hideMini ? 1 : 0, spring: _kHideSpring);
-    }
-  }
-
-  @override
   void dispose() {
     _probe.dispose();
-    for (final c in [_sheet, _pause, _dock, _artX, _miniX, _hide]) {
+    for (final c in [_sheet, _pause, _dock, _artX, _miniX]) {
       c.dispose();
     }
     _bigRect.dispose();
     super.dispose();
   }
-
-  /// Spring an (unbounded) controller to [to]. Velocity is in value-units / s.
-  TickerFuture _drive(
-    AnimationController c,
-    double to, {
-    double velocity = 0,
-    required SpringDescription spring,
-  }) =>
-      c.animateWith(SpringSimulation(spring, c.value, to, velocity));
 
   /* ───────────────────────── sync with player ───────────────────────── */
 
@@ -248,11 +204,11 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
     HapticFeedback.lightImpact();
     if (!_open) setState(() => _open = true);
     if (!_probe.isActive) _probe.start();
-    _drive(_sheet, 1, velocity: velocity, spring: _kOpenSpring);
+    _sheet.springTo(1, velocity: velocity);
   }
 
   void _close({double velocity = 0}) {
-    _drive(_sheet, 0, velocity: velocity, spring: _kCloseSpring).then((_) {
+    _sheet.springTo(0, velocity: velocity).then((_) {
       if (!mounted) return;
       _probe.stop();
       _dock.value = 0;
@@ -270,13 +226,10 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
   }
 
   void _dragUpdate(double dy) {
-    if (!_dragging) return;
     _sheet.value = (_sheet.value - dy / _travel).clamp(0.0, 1.0);
   }
 
   void _dragEnd(double vy) {
-    // Cancel callbacks can fire without a matching start; ignore those.
-    if (!_dragging) return;
     _dragging = false;
     final vt = -vy / _travel; // t / second, + = opening
     final t = _sheet.value;
@@ -300,10 +253,12 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
 
   void _togglePanel(_Panel p) => _setPanel(_panel == p ? _Panel.art : p);
 
-  /* ───────────────────────── geometry (card coordinates) ───────────────────────── */
+  /* ───────────────────────── geometry ───────────────────────── */
 
-  // Mini artwork slot inside the pill, in card coordinates (card x == screen x).
-  static const Rect _miniArt = Rect.fromLTWH(_kMiniSide + 14, 9, 44, 44);
+  Rect _miniRect(Size s, EdgeInsets safe) {
+    final bottom = widget.miniBottomOffset + safe.bottom;
+    return Rect.fromLTWH(12 + 14, s.height - bottom - 62 + 9, 44, 44);
+  }
 
   Rect _headerRect(EdgeInsets safe) => Rect.fromLTWH(24, safe.top + 29, 56, 56);
 
@@ -381,16 +336,6 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
     _miniAxis = _Axis.none;
   }
 
-  /// A cancelled gesture must never skip a track; just settle back.
-  void _miniCancel() {
-    if (_miniAxis == _Axis.x) {
-      _miniX.springTo(0, spring: kSoftSpring);
-    } else if (_dragging) {
-      _dragEnd(0);
-    }
-    _miniAxis = _Axis.none;
-  }
-
   /* ───────────────────────── artwork gestures (open sheet) ───────────────────────── */
 
   void _artStart(DragStartDetails _) {
@@ -456,47 +401,7 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
     _artAxis = _Axis.none;
   }
 
-  void _artCancel() {
-    if (_artAxis == _Axis.x) {
-      _artX.springTo(0, spring: kSoftSpring);
-    } else if (_artDragging) {
-      _artDragging = false;
-      _dragEnd(0);
-    }
-    _artAxis = _Axis.none;
-  }
-
   /* ───────────────────────── actions ───────────────────────── */
-
-  void _goArtist(dynamic track) {
-    if (widget.onGoToArtist != null) {
-      widget.onGoToArtist!(track);
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ArtistScreen(artistName: track.artist as String)),
-      );
-    }
-  }
-
-  void _goAlbum(dynamic track) {
-    if (widget.onGoToAlbum != null) {
-      widget.onGoToAlbum!(track);
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => AlbumScreen(
-            albumTitle: (track.album as String?)?.isNotEmpty == true
-                ? (track.album as String)
-                : (track.title as String),
-            artistName: track.artist as String,
-            coverUrl: track.coverUrl as String?,
-          ),
-        ),
-      );
-    }
-  }
 
   void _showTrackMenu(dynamic track) {
     final q = context.read<QueueState>();
@@ -526,7 +431,16 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
             onPressed: () {
               Navigator.pop(ctx);
               _close();
-              _goArtist(track);
+              if (widget.onGoToArtist != null) {
+                widget.onGoToArtist!(track);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ArtistScreen(artistName: track.artist as String),
+                  ),
+                );
+              }
             },
             child: const Text('Go to Artist'),
           ),
@@ -534,7 +448,22 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
             onPressed: () {
               Navigator.pop(ctx);
               _close();
-              _goAlbum(track);
+              if (widget.onGoToAlbum != null) {
+                widget.onGoToAlbum!(track);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AlbumScreen(
+                      albumTitle: (track.album as String?)?.isNotEmpty == true
+                          ? (track.album as String)
+                          : (track.title as String),
+                      artistName: track.artist as String,
+                      coverUrl: track.coverUrl as String?,
+                    ),
+                  ),
+                );
+              }
             },
             child: const Text('Go to Album'),
           ),
@@ -568,10 +497,7 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
     final mq = MediaQuery.of(context);
     final size = mq.size;
     final safe = mq.padding;
-
-    final miniTop = size.height - widget.miniBottomOffset - safe.bottom - _kMiniH;
-    // Distance the top edge travels, so the card follows the finger 1:1.
-    _travel = math.max(260.0, miniTop);
+    _travel = size.height * 0.78;
 
     final isExpanded = _open || _sheet.value > 0.05 || _docked;
 
@@ -588,265 +514,160 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
       child: SizedBox.expand(
         child: Stack(
           clipBehavior: Clip.none,
-          children: [_buildSurface(player, track, size, safe, miniTop)],
+          children: [
+            _buildMini(player, track, safe),
+            _buildSheet(player, track, size, safe),
+            _buildArtOverlay(size, safe),
+          ],
         ),
       ),
     );
   }
 
-  /* ───────────────────────── THE MORPHING SURFACE ───────────────────────── */
+  /* ───────────────────────── MINI PLAYER ───────────────────────── */
 
-  Widget _buildSurface(
-    PlayerState player,
-    dynamic track,
-    Size size,
-    EdgeInsets safe,
-    double miniTop,
-  ) {
-    // Built once per state change; the per-frame builder below only moves it.
-    final content = _content(player, track, size, safe);
-    final mini = Rect.fromLTWH(_kMiniSide, miniTop, size.width - 2 * _kMiniSide, _kMiniH);
-    final full = Offset.zero & size;
-
-    return AnimatedBuilder(
-      animation: Listenable.merge([_sheet, _hide]),
-      child: content,
-      builder: (context, child) {
-        final t = _sheet.value.clamp(0.0, 1.0).toDouble();
-        final hide = _hide.value.clamp(0.0, 1.0).toDouble() * (1 - t);
-
-        var rect = Rect.lerp(mini, full, t)!;
-        if (hide > 0) {
-          rect = rect.shift(Offset(0, hide * (size.height - miniTop + 24)));
-        }
-
-        // Pill radius holds while it is a card, then flattens at the top.
-        final br = BorderRadius.circular(_kPillR * (1 - _ss(t, 0.55, 1.0)));
-
-        // Material crossfade: glass -> solid -> artwork mesh.
-        final glassA = 1 - _ss(t, 0.0, 0.30);
-        final baseA = 0.40 + 0.60 * _ss(t, 0.0, 0.35); // 0.40 == the old 0x66 tint
-        final shadowA = 0.45 * (1 - _ss(t, 0.0, 0.5));
-
-        return Positioned.fromRect(
-          rect: rect,
+  Widget _buildMini(PlayerState player, dynamic track, EdgeInsets safe) {
+    return Positioned(
+      left: 12,
+      right: 12,
+      bottom: widget.miniBottomOffset + safe.bottom,
+      height: 62,
+      child: AnimatedSlide(
+        offset: widget.hideMini ? const Offset(0, 1.8) : Offset.zero,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeInOutCubic,
+        child: AnimatedOpacity(
+          opacity: widget.hideMini ? 0.0 : 1.0,
+          duration: const Duration(milliseconds: 200),
           child: IgnorePointer(
-            ignoring: hide > 0.5,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: br,
-                boxShadow: shadowA > 0.002
-                    ? [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: shadowA),
-                          blurRadius: 28,
-                          offset: const Offset(0, 8),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: ClipRRect(
-                borderRadius: br,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Blur only while the base is still translucent. Once the
-                    // base is opaque it is invisible anyway, so drop the cost.
-                    if (t < 0.37)
-                      BackdropFilter(
-                        filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                        child: const SizedBox.expand(),
-                      ),
-                    ColoredBox(color: const Color(0xFF18181C).withValues(alpha: baseA)),
-                    IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.white.withValues(alpha: 0.14 * glassA),
-                              Colors.white.withValues(alpha: 0.02 * glassA),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Content is laid out at full-screen size and clipped by the
-                    // card, so it rides with the top edge instead of squashing.
-                    OverflowBox(
-                      alignment: Alignment.topCenter,
-                      minWidth: size.width,
-                      maxWidth: size.width,
-                      minHeight: size.height,
-                      maxHeight: size.height,
-                      child: child,
-                    ),
-                    IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: br,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.18 * glassA),
-                            width: 0.8,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Everything that lives inside the card, in card (== screen at t=1) coords.
-  Widget _content(PlayerState player, dynamic track, Size size, EdgeInsets safe) {
-    return Stack(
-      key: _sheetKey,
-      clipBehavior: Clip.none,
-      children: [
-        if (_open) ...[
-          Positioned.fill(
-            key: const ValueKey('mesh'),
-            child: _SheetFade(
-              t: _sheet,
-              a: 0.06,
-              b: 0.5,
-              child: RepaintBoundary(
-                child: ArtworkMeshBackground(
-                  coverUrl: track?.coverUrl,
-                  fallbackAsset: 'assets/images/z_logo.png',
-                  paused: !player.isPlaying,
-                  backgroundColor: _palette.isNotEmpty ? _palette.first : null,
-                ),
-              ),
-            ),
-          ),
-          // soft scrim keeps lyrics / queue text readable
-          Positioned.fill(
-            key: const ValueKey('scrim'),
-            child: IgnorePointer(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 450),
-                curve: Curves.easeOutCubic,
-                color: Colors.black.withValues(alpha: _docked ? 0.26 : 0),
-              ),
-            ),
-          ),
-        ],
-        Positioned(
-          key: const ValueKey('mini'),
-          left: _kMiniSide,
-          top: 0,
-          width: size.width - 2 * _kMiniSide,
-          height: _kMiniH,
-          child: _miniLayer(player, track),
-        ),
-        if (_open)
-          Positioned.fill(
-            key: const ValueKey('column'),
-            child: _sheetColumn(player, track, safe),
-          ),
-        _artLayer(size, safe),
-      ],
-    );
-  }
-
-  /* ───────────────────────── MINI CONTENT (fades out first) ───────────────────────── */
-
-  Widget _miniLayer(PlayerState player, dynamic track) {
-    return IgnorePointer(
-      ignoring: _open,
-      child: AnimatedBuilder(
-        animation: _sheet,
-        child: _miniBody(player, track),
-        builder: (_, c) {
-          final p = 1 - _ss(_sheet.value.clamp(0.0, 1.0).toDouble(), 0.0, 0.16);
-          return Opacity(
-            opacity: p,
-            child: Transform.translate(offset: Offset(0, -8 * (1 - p)), child: c),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _miniBody(PlayerState player, dynamic track) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _openSheet(),
-      onPanStart: _miniStart,
-      onPanUpdate: _miniUpdate,
-      onPanEnd: _miniEnd,
-      onPanCancel: _miniCancel,
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 14, right: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: AnimatedBuilder(
-                    animation: _miniX,
-                    builder: (_, child) => Transform.translate(offset: Offset(_miniX.value, 0), child: child),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 44, height: 44), // artwork lives in the art layer
-                        const SizedBox(width: 12),
-                        Expanded(child: _miniText(track)),
-                      ],
-                    ),
-                  ),
-                ),
-                PressableScale(
-                  onTap: player.togglePlay,
-                  child: SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: _PlayGlyph(playing: player.isPlaying, size: 28),
-                  ),
-                ),
-                PressableScale(
-                  onTap: _next,
-                  child: const SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: Icon(Icons.fast_forward_rounded, color: Colors.white, size: 26),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 26,
-            right: 26,
-            bottom: 0,
-            child: ValueListenableBuilder<Duration>(
-              valueListenable: player.positionNotifier,
-              builder: (_, position, _) {
-                final total = player.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity);
-                final pos = position.inMilliseconds.toDouble().clamp(0.0, total);
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(1),
-                  child: SizedBox(
-                    height: 2,
-                    child: LinearProgressIndicator(
-                      value: (pos / total).clamp(0.0, 1.0),
-                      backgroundColor: Colors.white.withValues(alpha: 0.1),
-                      valueColor: const AlwaysStoppedAnimation(AppColors.accent),
-                    ),
+            ignoring: widget.hideMini || _open,
+            child: AnimatedBuilder(
+              animation: _sheet,
+              builder: (_, child) {
+                final t = _sheet.value.clamp(0.0, 1.0);
+                final o = (1 - t * 8).clamp(0.0, 1.0);
+                return Opacity(
+                  opacity: o,
+                  child: Transform.scale(
+                    scale: 1 - 0.04 * (1 - o),
+                    child: IgnorePointer(ignoring: _open, child: child),
                   ),
                 );
               },
+              child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _openSheet(),
+          onPanStart: _miniStart,
+          onPanUpdate: _miniUpdate,
+          onPanEnd: _miniEnd,
+          onPanCancel: () => _miniEnd(DragEndDetails()),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(31),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  blurRadius: 28,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(31),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0x6618181C),
+                    borderRadius: BorderRadius.circular(31),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      width: 0.8,
+                    ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.14),
+                        Colors.white.withValues(alpha: 0.02),
+                      ],
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 14, right: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: AnimatedBuilder(
+                                animation: _miniX,
+                                builder: (_, child) =>
+                                    Transform.translate(offset: Offset(_miniX.value, 0), child: child),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(width: 44, height: 44), // artwork flies in here
+                                    const SizedBox(width: 12),
+                                    Expanded(child: _miniText(track)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            PressableScale(
+                              onTap: player.togglePlay,
+                              child: SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: _PlayGlyph(playing: player.isPlaying, size: 28),
+                              ),
+                            ),
+                            PressableScale(
+                              onTap: _next,
+                              child: const SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: Icon(Icons.fast_forward_rounded, color: Colors.white, size: 26),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        left: 26,
+                        right: 26,
+                        bottom: 0,
+                        child: ValueListenableBuilder<Duration>(
+                          valueListenable: player.positionNotifier,
+                          builder: (_, position, _) {
+                            final total =
+                                player.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity);
+                            final pos = position.inMilliseconds.toDouble().clamp(0.0, total);
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(1),
+                              child: SizedBox(
+                                height: 2,
+                                child: LinearProgressIndicator(
+                                  value: (pos / total).clamp(0.0, 1.0),
+                                  backgroundColor: Colors.white.withValues(alpha: 0.1),
+                                  valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-        ],
+        ),
       ),
-    );
+    ),
+  ),
+),
+);
   }
 
   Widget _miniText(dynamic track) {
@@ -879,22 +700,17 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
     );
   }
 
-  /* ───────────────────────── MORPHING ARTWORK (inside the card) ───────────────────────── */
+  /* ───────────────────────── MORPHING ARTWORK ───────────────────────── */
 
-  Widget _artLayer(Size size, EdgeInsets safe) {
+  Widget _buildArtOverlay(Size size, EdgeInsets safe) {
     return AnimatedBuilder(
-      key: const ValueKey('art'),
       animation: Listenable.merge([_sheet, _pause, _dock, _artX, _bigRect]),
       builder: (context, _) {
-        final t = _sheet.value.clamp(0.0, 1.0).toDouble();
-        final l = _dock.value.clamp(0.0, 1.0).toDouble();
+        final t = _sheet.value.clamp(0.0, 1.0);
+        final l = _dock.value.clamp(0.0, 1.0);
+        final isOverlayHidden = widget.hideMini && t <= 0.001;
 
-        // Positions are in CARD coordinates and the card top moves with the
-        // finger, so no easing can ever push the artwork outside the card.
-        // The ease only makes it grow a touch later than the card, so it
-        // never feels like it outruns the sheet.
-        final ta = Curves.easeInOutCubic.transform(t);
-
+        final mini = _miniRect(size, safe);
         final big = _bigRect.value ?? _fallbackBig(size, safe);
         final openRect = Rect.lerp(big, _headerRect(safe), l)!;
 
@@ -902,12 +718,11 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
         final k0 = ui.lerpDouble(_pause.value, 1, l)!;
         final kEff = 1 - (1 - k0) * t;
 
-        var r = Rect.lerp(_miniArt, openRect, ta)!;
+        var r = Rect.lerp(mini, openRect, t)!;
         r = Rect.fromCenter(center: r.center, width: r.width * kEff, height: r.height * kEff);
         r = r.shift(Offset(_artX.value * t, 0));
 
-        final radius = ui.lerpDouble(_kMiniR, ui.lerpDouble(_kBigR, 10, l)!, ta)!;
-        final shadow = ta * ta * (1 - l * 0.6);
+        final radius = ui.lerpDouble(_kMiniR, ui.lerpDouble(_kBigR, 10, l)!, t)!;
         final url = _shownCover ?? '';
 
         Widget art = DecoratedBox(
@@ -916,9 +731,9 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
             borderRadius: BorderRadius.circular(radius),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5 * shadow),
-                blurRadius: 48 * ta,
-                offset: Offset(0, 24 * ta),
+                color: Colors.black.withValues(alpha: 0.5 * t * (1 - l * 0.6)),
+                blurRadius: 48 * t,
+                offset: Offset(0, 24 * t),
               ),
             ],
           ),
@@ -936,13 +751,22 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
             onPanStart: _artStart,
             onPanUpdate: _artUpdate,
             onPanEnd: _artEnd,
-            onPanCancel: _artCancel,
+            onPanCancel: () => _artEnd(DragEndDetails()),
             child: art,
           );
         }
         return Positioned.fromRect(
           rect: r,
-          child: IgnorePointer(ignoring: !_open, child: art),
+          child: AnimatedSlide(
+            offset: isOverlayHidden ? const Offset(0, 1.8) : Offset.zero,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeInOutCubic,
+            child: AnimatedOpacity(
+              opacity: isOverlayHidden ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: IgnorePointer(ignoring: !_open || isOverlayHidden, child: art),
+            ),
+          ),
         );
       },
     );
@@ -978,7 +802,55 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
     );
   }
 
-  /* ───────────────────────── FULL PLAYER CONTENT ───────────────────────── */
+  /* ───────────────────────── FULL SHEET ───────────────────────── */
+
+  Widget _buildSheet(PlayerState player, dynamic track, Size size, EdgeInsets safe) {
+    return Positioned.fill(
+      child: AnimatedBuilder(
+        animation: _sheet,
+        builder: (context, _) {
+          final t = _sheet.value.clamp(0.0, 1.0);
+          if (!_open && t <= 0.001) return const SizedBox.shrink();
+          final radius = math.min(1.0, (1 - t) * _travel / 140) * 32;
+          final contentOpacity = ((t - 0.35) / 0.65).clamp(0.0, 1.0);
+
+          return Transform.translate(
+            offset: Offset(0, (1 - t) * size.height),
+            child: ClipRRect(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
+              child: Stack(
+                key: _sheetKey,
+                children: [
+                  Positioned.fill(
+                    child: ArtworkMeshBackground(
+                      coverUrl: track?.coverUrl,
+                      fallbackAsset: 'assets/images/z_logo.png',
+                      paused: !player.isPlaying,
+                      backgroundColor: _palette.isNotEmpty ? _palette.first : null,
+                    ),
+                  ),
+                  // soft scrim keeps lyrics / queue text readable
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 450),
+                        curve: Curves.easeOutCubic,
+                        color: Colors.black.withValues(alpha: _docked ? 0.26 : 0),
+                      ),
+                    ),
+                  ),
+                  Opacity(
+                    opacity: contentOpacity,
+                    child: _sheetColumn(player, track, safe),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   Widget _edgeFade(Widget child) {
     return ShaderMask(
@@ -1004,7 +876,7 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
           child: NotificationListener<ScrollNotification>(
             onNotification: (n) {
               if (n is OverscrollNotification && n.overscroll < 0) {
-                if (!_dragging) _dragStart();
+                _dragStart();
                 _dragUpdate(-n.overscroll);
                 return true;
               }
@@ -1022,7 +894,7 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
           child: NotificationListener<ScrollNotification>(
             onNotification: (n) {
               if (n is OverscrollNotification && n.overscroll < 0) {
-                if (!_dragging) _dragStart();
+                _dragStart();
                 _dragUpdate(-n.overscroll);
                 return true;
               }
@@ -1060,160 +932,114 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
     );
   }
 
-  /// Each block rises from below with a fade, staggered top to bottom on open
-  /// and in reverse on close (they are all driven by the same sheet value).
   Widget _sheetColumn(PlayerState player, dynamic track, EdgeInsets safe) {
     final isArt = _panel == _Panel.art;
     final isLyrics = _panel == _Panel.lyrics;
 
-    return IgnorePointer(
-      ignoring: !_open,
-      child: Column(
-        children: [
-          // Grabber (drag down or tap to close)
-          _Rise(
-            t: _sheet,
-            a: 0.15,
-            b: 0.5,
-            dy: 16,
+    return Column(
+      children: [
+        // Grabber (drag down or tap to close)
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _close,
+          onPanStart: (_) => _dragStart(),
+          onPanUpdate: (d) => _dragUpdate(d.delta.dy),
+          onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
+          child: Padding(
+            padding: EdgeInsets.only(top: safe.top + 12, bottom: 12),
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Compact header (lyrics / queue): artwork docks here
+        _collapse(_docked, _compactHeader(track)),
+
+        // Middle region: artwork lives in the overlay; lyrics / queue live here
+        Expanded(
+          child: SizedBox.expand(
+            key: _regionKey,
             child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _close,
-              onPanStart: (_) => _dragStart(),
-              onPanUpdate: (d) => _dragUpdate(d.delta.dy),
-              onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-              onPanCancel: () => _dragEnd(0),
-              child: Padding(
-                padding: EdgeInsets.only(top: safe.top + 12, bottom: 12),
-                child: Center(
-                  child: Container(
-                    width: 36,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(3),
+              behavior: HitTestBehavior.translucent,
+              onVerticalDragStart: (_) => _dragStart(),
+              onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
+              onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
+              onVerticalDragCancel: () => _dragEnd(0),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 380),
+                reverseDuration: const Duration(milliseconds: 260),
+                transitionBuilder: _panelTransition,
+                layoutBuilder: (cur, prev) => Stack(
+                  fit: StackFit.expand,
+                  children: [...prev, ?cur],
+                ),
+                child: _panelBody(),
+              ),
+            ),
+          ),
+        ),
+
+        // Bottom block
+        GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onVerticalDragStart: (_) => _dragStart(),
+          onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
+          onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
+          onVerticalDragCancel: () => _dragEnd(0),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(24, 8, 24, safe.bottom + 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // title / artist / like / more: only while the big artwork is showing
+                _collapse(isArt, _metaRow(track)),
+
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: ScrubberSlider(
+                    positionNotifier: player.positionNotifier,
+                    duration: player.duration,
+                    onSeek: (pos) => player.seek(pos),
+                  ),
+                ),
+              ),
+
+              // transport hides only while lyrics are open
+              _collapse(
+                !isLyrics,
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 12, bottom: 20),
+                      child: _transport(player),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
 
-          // Compact header (lyrics / queue): artwork docks here
-          _Rise(
-            t: _sheet,
-            a: 0.3,
-            b: 0.7,
-            dy: 24,
-            child: _collapse(_docked, _compactHeader(track)),
-          ),
-
-          // Middle region. The measured box sits OUTSIDE the rise transform so
-          // the artwork's target rect never wobbles while the sheet opens.
-          Expanded(
-            child: SizedBox.expand(
-              key: _regionKey,
-              child: _Rise(
-                t: _sheet,
-                a: 0.3,
-                b: 0.8,
-                dy: 36,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onVerticalDragStart: (_) => _dragStart(),
-                  onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
-                  onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-                  onVerticalDragCancel: () => _dragEnd(0),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 380),
-                    reverseDuration: const Duration(milliseconds: 260),
-                    transitionBuilder: _panelTransition,
-                    layoutBuilder: (cur, prev) => Stack(
-                      fit: StackFit.expand,
-                      children: [...prev, ?cur],
-                    ),
-                    child: _panelBody(),
-                  ),
-                ),
+              AnimatedPadding(
+                duration: const Duration(milliseconds: 380),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.only(top: isLyrics ? 14 : 0),
+                child: _tools(isLyrics),
               ),
-            ),
+            ],
           ),
-
-          // Bottom block
-          GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onVerticalDragStart: (_) => _dragStart(),
-            onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
-            onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-            onVerticalDragCancel: () => _dragEnd(0),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(24, 8, 24, safe.bottom + 18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // title / artist / like / more: only while the big artwork is showing
-                  _Rise(
-                    t: _sheet,
-                    a: 0.38,
-                    b: 0.78,
-                    dy: 44,
-                    child: _collapse(isArt, _metaRow(track)),
-                  ),
-                  _Rise(
-                    t: _sheet,
-                    a: 0.46,
-                    b: 0.86,
-                    dy: 52,
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: ScrubberSlider(
-                          positionNotifier: player.positionNotifier,
-                          duration: player.duration,
-                          onSeek: (pos) => player.seek(pos),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // transport hides only while lyrics are open
-                  _Rise(
-                    t: _sheet,
-                    a: 0.54,
-                    b: 0.94,
-                    dy: 60,
-                    child: _collapse(
-                      !isLyrics,
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 420),
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 12, bottom: 20),
-                            child: _transport(player),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  _Rise(
-                    t: _sheet,
-                    a: 0.62,
-                    b: 1.0,
-                    dy: 68,
-                    child: AnimatedPadding(
-                      duration: const Duration(milliseconds: 380),
-                      curve: Curves.easeOutCubic,
-                      padding: EdgeInsets.only(top: isLyrics ? 14 : 0),
-                      child: _tools(isLyrics),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
-    );
-  }
+    ],
+  );
+}
 
   /// Smoothly collapses / expands a block (height + fade + tiny rise).
   Widget _collapse(bool show, Widget child) {
@@ -1259,7 +1085,6 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
       onPanStart: (_) => _dragStart(),
       onPanUpdate: (d) => _dragUpdate(d.delta.dy),
       onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-      onPanCancel: () => _dragEnd(0),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
         child: Row(
@@ -1319,7 +1144,22 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
                 GestureDetector(
                   onTap: () {
                     _close();
-                    _goAlbum(track);
+                    if (widget.onGoToAlbum != null) {
+                      widget.onGoToAlbum!(track);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AlbumScreen(
+                            albumTitle: (track.album as String?)?.isNotEmpty == true
+                                ? (track.album as String)
+                                : (track.title as String),
+                            artistName: track.artist as String,
+                            coverUrl: track.coverUrl as String?,
+                          ),
+                        ),
+                      );
+                    }
                   },
                   child: SwapText(
                     track.title as String,
@@ -1336,7 +1176,16 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
                 GestureDetector(
                   onTap: () {
                     _close();
-                    _goArtist(track);
+                    if (widget.onGoToArtist != null) {
+                      widget.onGoToArtist!(track);
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ArtistScreen(artistName: track.artist as String),
+                        ),
+                      );
+                    }
                   },
                   child: SwapText(
                     track.artist as String,
@@ -1456,62 +1305,6 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
           ),
         ],
       ),
-    );
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Scroll-linked helpers                                               */
-/* ------------------------------------------------------------------ */
-
-/// Fades [child] in between sheet progress [a]..[b].
-class _SheetFade extends StatelessWidget {
-  const _SheetFade({required this.t, required this.a, required this.b, required this.child});
-  final Animation<double> t;
-  final double a, b;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: t,
-      child: child,
-      builder: (_, c) {
-        final p = _ss(t.value.clamp(0.0, 1.0).toDouble(), a, b);
-        return p >= 1 ? c! : Opacity(opacity: p, child: c);
-      },
-    );
-  }
-}
-
-/// Rises from [dy] px below while fading in between sheet progress [a]..[b].
-/// Driven by the same value as the sheet, so closing plays it in reverse and
-/// dragging scrubs it 1:1.
-class _Rise extends StatelessWidget {
-  const _Rise({
-    required this.t,
-    required this.a,
-    required this.b,
-    required this.dy,
-    required this.child,
-  });
-  final Animation<double> t;
-  final double a, b, dy;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: t,
-      child: child,
-      builder: (_, c) {
-        final p = _ss(t.value.clamp(0.0, 1.0).toDouble(), a, b);
-        if (p >= 1) return c!;
-        return Opacity(
-          opacity: p,
-          child: Transform.translate(offset: Offset(0, (1 - p) * dy), child: c),
-        );
-      },
     );
   }
 }

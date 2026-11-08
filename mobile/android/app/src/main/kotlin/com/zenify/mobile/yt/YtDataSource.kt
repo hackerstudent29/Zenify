@@ -57,6 +57,7 @@ object YtDataSource {
 
         // 1. Base HTTP source backed by our single shared OkHttpClient with IPv4 preference
         val okHttpFactory = OkHttpDataSource.Factory(Net.ok)
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 
         // 2. Default data source (supports assets/raw/file + delegates HTTP to OkHttp)
         val defaultFactory = DefaultDataSource.Factory(appContext, okHttpFactory)
@@ -80,6 +81,11 @@ object YtDataSource {
                     .setUri(Uri.parse(resolved.url))
                     .setHttpRequestHeaders(headers)
                     .setCustomData(videoId)
+                    .build()
+            } else if (uri.host?.contains("googlevideo.com") == true) {
+                val headers = StreamHeaders.forClient("WEB_REMIX", com.zenify.mobile.audio.ZenAudioPlugin.activeHeaders)
+                dataSpec.buildUpon()
+                    .setHttpRequestHeaders(headers)
                     .build()
             } else {
                 dataSpec
