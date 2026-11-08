@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
@@ -26,6 +27,7 @@ import '../../design_system/zen.dart';
 import '../../models/track.dart';
 import '../../services/innertube_service.dart';
 import '../../services/player_state.dart';
+import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
 import '../details/artist_screen.dart';
 import 'explore_data_service.dart';
@@ -352,7 +354,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 _buildPlaylistsSection(playlists),
 
                 // Clearance for mini player & floating bottom dock
-                const SizedBox(height: 140),
+                SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
               ],
             ),
           ),
@@ -841,7 +843,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          rel.title,
+                          MediaNormalizer.cleanCompactTitle(rel.title),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -851,7 +853,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                           ),
                         ),
                         Text(
-                          rel.artist,
+                          MediaNormalizer.formatArtists(rel.artist),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1327,72 +1329,77 @@ class _ExploreHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Zen.bg.withValues(alpha: 0.95),
-      padding: EdgeInsets.fromLTRB(16, top + 4, 16, 6),
-      child: Row(
-        children: [
-          // Large Title
-          const Text(
-            'Explore',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.6,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const Spacer(),
-
-          // Country Selector Pill
-          PressableScale(
-            onTap: onCountryTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0x1FFFFFFF),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          color: Zen.bg.withValues(alpha: 0.88),
+          padding: EdgeInsets.fromLTRB(16, top + 4, 16, 6),
+          child: Row(
+            children: [
+              // Large Title
+              const Text(
+                'Explore',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.6,
+                  color: AppColors.textPrimary,
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(country.flag, style: const TextStyle(fontSize: 14)),
-                  const SizedBox(width: 5),
-                  Text(
-                    country.code,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                    ),
+              const Spacer(),
+
+              // Country Selector Pill
+              PressableScale(
+                onTap: onCountryTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0x1FFFFFFF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5),
                   ),
-                  const SizedBox(width: 3),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.textSecondary),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(country.flag, style: const TextStyle(fontSize: 14)),
+                      const SizedBox(width: 5),
+                      Text(
+                        country.code,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(width: 3),
+                      const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.textSecondary),
+                    ],
+                  ),
+                ),
               ),
-            ),
+
+              const SizedBox(width: 8),
+
+              // Together Room Button
+              if (onTogetherTap != null)
+                IconButton(
+                  icon: const Icon(Icons.all_inclusive_rounded, color: AppColors.textSecondary, size: 22),
+                  onPressed: onTogetherTap,
+                  tooltip: 'Listen Together',
+                ),
+
+              // Profile Button
+              if (onProfileTap != null)
+                IconButton(
+                  icon: const Icon(Icons.person_rounded, color: AppColors.textSecondary, size: 22),
+                  onPressed: onProfileTap,
+                  tooltip: 'Profile',
+                ),
+            ],
           ),
-
-          const SizedBox(width: 8),
-
-          // Together Room Button
-          if (onTogetherTap != null)
-            IconButton(
-              icon: const Icon(Icons.all_inclusive_rounded, color: AppColors.textSecondary, size: 22),
-              onPressed: onTogetherTap,
-              tooltip: 'Listen Together',
-            ),
-
-          // Profile Button
-          if (onProfileTap != null)
-            IconButton(
-              icon: const Icon(Icons.person_rounded, color: AppColors.textSecondary, size: 22),
-              onPressed: onProfileTap,
-              tooltip: 'Profile',
-            ),
-        ],
+        ),
       ),
     );
   }

@@ -6,6 +6,7 @@ import '../../data/datasources/catalog_datasource.dart';
 import '../../models/track.dart';
 import '../../services/api_service.dart';
 import '../../services/innertube_service.dart';
+import '../../utils/media_normalizer.dart';
 import 'search_models.dart';
 
 class SearchDataService {
@@ -353,25 +354,9 @@ class SearchDataService {
   SearchTopResult? _parseTopResult(Map<String, dynamic> card) {
     try {
       final titleRuns = card['title']?['runs'] as List?;
-      final title = titleRuns?.isNotEmpty == true ? titleRuns![0]['text'] as String : 'Top Result';
-
       final subtitleRuns = card['subtitle']?['runs'] as List?;
-      final subtitle = subtitleRuns?.isNotEmpty == true
-          ? subtitleRuns!.map((r) => r['text'] ?? '').join()
-          : '';
-
       final thumbs = card['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
       final rawCover = thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String : null;
-
-      final subLower = subtitle.toLowerCase();
-      TopResultType type = TopResultType.song;
-      if (subLower.contains('artist')) {
-        type = TopResultType.artist;
-      } else if (subLower.contains('album') || subLower.contains('ep') || subLower.contains('single')) {
-        type = TopResultType.album;
-      } else if (subLower.contains('playlist')) {
-        type = TopResultType.playlist;
-      }
 
       final browseEndpoint = card['title']?['runs']?[0]?['navigationEndpoint']?['browseEndpoint'];
       final browseId = browseEndpoint?['browseId'] as String?;
@@ -386,28 +371,46 @@ class SearchDataService {
         videoId = nav?['watchEndpoint']?['videoId'] as String?;
       }
 
+      final norm = MediaNormalizer.normalize(
+        id: videoId != null ? 'yt-$videoId' : (browseId ?? ''),
+        titleRuns: titleRuns,
+        subtitleRuns: subtitleRuns,
+        rawImageUrl: rawCover,
+        videoId: videoId,
+      );
+
+      final subLower = norm.subtitle.toLowerCase();
+      TopResultType type = TopResultType.song;
+      if (subLower.contains('artist')) {
+        type = TopResultType.artist;
+      } else if (subLower.contains('album') || subLower.contains('ep') || subLower.contains('single')) {
+        type = TopResultType.album;
+      } else if (subLower.contains('playlist')) {
+        type = TopResultType.playlist;
+      }
+
       Track? track;
       if (videoId != null && videoId.isNotEmpty) {
         track = Track(
           id: 'yt-$videoId',
-          title: title,
-          artist: subtitle.split('•').first.trim(),
+          title: norm.title,
+          artist: norm.subtitle,
           album: 'Single',
-          coverUrl: rawCover ?? 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg',
+          coverUrl: norm.imageUrl,
           durationSeconds: 210,
           source: 'youtube',
         );
       }
 
       return SearchTopResult(
-        title: title,
-        subtitle: subtitle.isNotEmpty ? subtitle : 'Top Result',
+        title: norm.title,
+        subtitle: norm.subtitle.isNotEmpty ? norm.subtitle : 'Top Result',
         type: type,
-        imageUrl: rawCover != null ? upgradeArtworkUrl(rawCover) : null,
+        imageUrl: norm.imageUrl.isNotEmpty ? norm.imageUrl : null,
         track: track,
-        artist: type == TopResultType.artist ? SearchArtist(name: title, imageUrl: rawCover != null ? upgradeArtworkUrl(rawCover) : null, browseId: browseId) : null,
+        artist: type == TopResultType.artist ? SearchArtist(name: norm.title, imageUrl: norm.imageUrl.isNotEmpty ? norm.imageUrl : null, browseId: browseId) : null,
         album: type == TopResultType.album
-            ? SearchAlbum(title: title, artist: subtitle.split('•').first.trim(), coverUrl: rawCover != null ? upgradeArtworkUrl(rawCover) : null, browseId: browseId)
+            ? SearchAlbum(title: norm.title, artist: norm.subtitle, coverUrl: norm.imageUrl.isNotEmpty ? norm.imageUrl : null, browseId: browseId)
             : null,
       );
     } catch (_) {
@@ -446,48 +449,43 @@ class SearchDataService {
       if (videoId == null || videoId.isEmpty) return null;
 
       final titleRuns = _getColumnRuns(flexColumns[0]);
-      final title = titleRuns != null && titleRuns.isNotEmpty && titleRuns[0] is Map
-          ? (titleRuns[0]['text'] as String? ?? 'Unknown Track')
-          : 'Unknown Track';
+      final subRuns = flexColumns.length > 1 ? _getColumnRuns(flexColumns[1]) : null;
+      final thumbs = item['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
+      final rawCover = thumbs?.isNotEmpty == true
+          ? thumbs!.last['url'] as String
+          : 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
 
-      String artist = 'Unknown Artist';
-      String album = 'Single';
+      final norm = MediaNormalizer.normalize(
+        id: 'yt-$videoId',
+        titleRuns: titleRuns,
+        subtitleRuns: subRuns,
+        rawImageUrl: rawCover,
+        videoId: videoId,
+      );
+
       int duration = 210;
-
-      if (flexColumns.length > 1) {
-        final subRuns = _getColumnRuns(flexColumns[1]);
-        if (subRuns != null && subRuns.isNotEmpty) {
-          final textList = subRuns
-              .whereType<Map>()
-              .map((r) => (r['text'] ?? '').toString())
-              .where((s) => s != ' • ' && s.trim().isNotEmpty)
-              .toList();
-          if (textList.isNotEmpty) artist = textList[0];
-          if (textList.length > 1 && !textList[1].contains(':')) album = textList[1];
-          final last = textList.last;
-          if (last.contains(':')) {
-            final parts = last.split(':').map(int.tryParse).toList();
-            if (parts.every((p) => p != null)) {
-              duration = parts.fold(0, (acc, val) => acc * 60 + val!);
+      if (subRuns != null) {
+        for (final r in subRuns) {
+          if (r is Map && r['text'] is String) {
+            final t = (r['text'] as String).trim();
+            if (t.contains(':')) {
+              final parts = t.split(':').map(int.tryParse).toList();
+              if (parts.every((p) => p != null)) {
+                duration = parts.fold(0, (acc, val) => acc * 60 + val!);
+              }
             }
           }
         }
       }
 
-      final thumbs = item['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
-      final rawCover = thumbs?.isNotEmpty == true
-          ? thumbs!.last['url'] as String
-          : 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
-      final cover = upgradeArtworkUrl(rawCover, videoId: videoId);
-
       return Track(
-        id: 'yt-$videoId',
-        title: title,
-        artist: artist,
-        album: album,
-        coverUrl: cover,
+        id: norm.id,
+        title: norm.title,
+        artist: norm.subtitle,
+        album: 'Single',
+        coverUrl: norm.imageUrl,
         durationSeconds: duration,
-        language: Track.detectLanguage(title, artist, album) ?? '',
+        language: Track.detectLanguage(norm.title, norm.subtitle, 'Single') ?? '',
         source: 'youtube',
       );
     } catch (_) {
@@ -501,28 +499,29 @@ class SearchDataService {
       if (flexColumns == null || flexColumns.isEmpty) return null;
 
       final titleRuns = _getColumnRuns(flexColumns[0]);
-      final name = titleRuns != null && titleRuns.isNotEmpty && titleRuns[0] is Map
-          ? (titleRuns[0]['text'] as String? ?? '')
-          : '';
-      if (name.isEmpty) return null;
-
-      String? subscribers;
-      if (flexColumns.length > 1) {
-        final subRuns = _getColumnRuns(flexColumns[1]);
-        if (subRuns != null && subRuns.isNotEmpty) {
-          subscribers = subRuns.whereType<Map>().map((r) => r['text'] ?? '').join().replaceAll('•', '').trim();
-        }
-      }
-
+      final subRuns = flexColumns.length > 1 ? _getColumnRuns(flexColumns[1]) : null;
       final thumbs = item['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
-      final imageUrl = thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String : null;
+      final rawImageUrl = thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String : null;
 
       final browseEndpoint = item['navigationEndpoint']?['browseEndpoint'];
       final browseId = browseEndpoint?['browseId'] as String?;
 
+      final norm = MediaNormalizer.normalize(
+        id: browseId ?? '',
+        titleRuns: titleRuns,
+        subtitleRuns: subRuns,
+        rawImageUrl: rawImageUrl,
+        defaultType: 'artist',
+      );
+
+      String? subscribers;
+      if (subRuns != null && subRuns.isNotEmpty) {
+        subscribers = subRuns.whereType<Map>().map((r) => r['text'] ?? '').join().replaceAll('•', '').trim();
+      }
+
       return SearchArtist(
-        name: name,
-        imageUrl: imageUrl != null ? upgradeArtworkUrl(imageUrl) : null,
+        name: norm.title,
+        imageUrl: norm.imageUrl.isNotEmpty ? norm.imageUrl : null,
         subscribers: subscribers,
         browseId: browseId,
       );
@@ -537,33 +536,26 @@ class SearchDataService {
       if (flexColumns == null || flexColumns.isEmpty) return null;
 
       final titleRuns = _getColumnRuns(flexColumns[0]);
-      final title = titleRuns != null && titleRuns.isNotEmpty && titleRuns[0] is Map
-          ? (titleRuns[0]['text'] as String? ?? '')
-          : '';
-      if (title.isEmpty) return null;
-
-      String artist = 'Unknown Artist';
-      String? year;
-      if (flexColumns.length > 1) {
-        final subRuns = _getColumnRuns(flexColumns[1]);
-        if (subRuns != null && subRuns.isNotEmpty) {
-          final texts = subRuns.whereType<Map>().map((r) => (r['text'] ?? '').toString()).where((s) => s != ' • ' && s.trim().isNotEmpty).toList();
-          if (texts.isNotEmpty) artist = texts[0];
-          if (texts.length > 1) year = texts.last;
-        }
-      }
-
+      final subRuns = flexColumns.length > 1 ? _getColumnRuns(flexColumns[1]) : null;
       final thumbs = item['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
-      final coverUrl = thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String : null;
+      final rawCover = thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String : null;
 
       final browseEndpoint = item['navigationEndpoint']?['browseEndpoint'];
       final browseId = browseEndpoint?['browseId'] as String?;
 
+      final norm = MediaNormalizer.normalize(
+        id: browseId ?? '',
+        titleRuns: titleRuns,
+        subtitleRuns: subRuns,
+        rawImageUrl: rawCover,
+        defaultType: 'album',
+      );
+
       return SearchAlbum(
-        title: title,
-        artist: artist,
-        coverUrl: coverUrl != null ? upgradeArtworkUrl(coverUrl) : null,
-        year: year,
+        title: norm.title,
+        artist: norm.subtitle,
+        coverUrl: norm.imageUrl.isNotEmpty ? norm.imageUrl : null,
+        year: norm.year,
         browseId: browseId,
       );
     } catch (_) {

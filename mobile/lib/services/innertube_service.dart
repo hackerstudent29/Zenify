@@ -1,7 +1,9 @@
 // lib/services/innertube_service.dart
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import '../models/track.dart';
+import '../utils/media_normalizer.dart';
 import 'country_service.dart';
 import 'innertube_transport.dart';
 
@@ -50,6 +52,52 @@ class InnerTubeService {
         forceRefresh: forceRefresh,
       );
 
+  // ─────────────────────────────── Native Bridge ──────────────────────────────
+  static const MethodChannel _nativeChannel = MethodChannel('zenify/innertube');
+  bool get _useNative => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  Future<List<Track>> _searchNative(String query) async {
+    try {
+      final res = await _nativeChannel.invokeMethod<List<dynamic>>('searchSummary', {'query': query});
+      if (res == null || res.isEmpty) return const [];
+      final tracks = <Track>[];
+      final seen = <String>{};
+      for (final s in res) {
+        if (s is! Map) continue;
+        final items = s['items'] as List?;
+        if (items == null) continue;
+        for (final item in items) {
+          if (item is! Map) continue;
+          if (item['type'] == 'song') {
+            final id = item['id'] as String?;
+            if (id == null || id.isEmpty || !seen.add(id)) continue;
+            final title = MediaNormalizer.cleanTitle(item['title'] as String?);
+            final rawArtists = item['artists'] as List?;
+            final artists = MediaNormalizer.formatArtists(rawArtists?.map((a) => (a is Map ? a['name'] : a)).toList());
+            final albumName = (item['album'] is Map) ? (item['album']['name'] as String?) : null;
+            final album = albumName != null ? MediaNormalizer.cleanTitle(albumName) : 'Single';
+            final thumb = MediaNormalizer.upgradeArtworkUrl(item['thumbnail'] as String?, videoId: id);
+            final duration = (item['duration'] as num?)?.toInt() ?? 210;
+            tracks.add(Track(
+              id: 'yt-$id',
+              title: title,
+              artist: artists,
+              album: album,
+              coverUrl: thumb,
+              durationSeconds: duration,
+              language: Track.detectLanguage(title, artists, album) ?? '',
+              source: 'youtube',
+            ));
+          }
+        }
+      }
+      return tracks;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] Native searchSummary error: $e');
+      return const [];
+    }
+  }
+
   // ─────────────────────────────── Search ────────────────────────────────────
 
   static const _songsFilter = 'EgWKAQIIAWoKEAUQAxAEEAkQEQ%3D%3D';
@@ -59,6 +107,12 @@ class InnerTubeService {
   Future<List<Track>> searchOrThrow(String query) async {
     final q = query.trim();
     if (q.isEmpty) return const [];
+
+    if (_useNative) {
+      final nativeTracks = await _searchNative(q);
+      if (nativeTracks.isNotEmpty) return nativeTracks;
+    }
+
     final res = await post(
       'search',
       {'query': q, 'params': _songsFilter},
@@ -184,31 +238,34 @@ class InnerTubeService {
       }
       if (videoId == null || videoId.isEmpty) return null;
 
-      final titleRuns = flex[0]?['musicResponsiveListItemFlexColumnRenderer']
-          ?['text']?['runs'] as List?;
-      final title = titleRuns?.isNotEmpty == true
-          ? titleRuns![0]['text'] as String
-          : 'Unknown Track';
+      List? titleRuns;
+      if (flex.isNotEmpty && flex[0] is Map) {
+        final f0 = flex[0] as Map;
+        titleRuns = f0['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
+      }
+      List? subRuns;
+      if (flex.length > 1 && flex[1] is Map) {
+        final f1 = flex[1] as Map;
+        subRuns = f1['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
+      }
 
-      String artist = 'Unknown Artist';
-      String album = 'Single';
+      final norm = MediaNormalizer.normalize(
+        id: 'yt-$videoId',
+        titleRuns: titleRuns,
+        subtitleRuns: subRuns,
+        videoId: videoId,
+      );
+
       int duration = 210;
-
-      if (flex.length > 1) {
-        final subRuns = flex[1]?['musicResponsiveListItemFlexColumnRenderer']
-            ?['text']?['runs'] as List?;
-        if (subRuns != null && subRuns.isNotEmpty) {
-          final parts = subRuns
-              .map((r) => (r['text'] ?? '').toString())
-              .where((s) => s != ' • ' && s.trim().isNotEmpty)
-              .toList();
-          if (parts.isNotEmpty) artist = parts[0];
-          if (parts.length > 1) album = parts[1];
-          final last = parts.last;
-          if (last.contains(':')) {
-            final nums = last.split(':').map(int.tryParse).toList();
-            if (nums.every((p) => p != null)) {
-              duration = nums.fold(0, (acc, v) => acc * 60 + v!);
+      if (subRuns != null) {
+        for (final r in subRuns) {
+          if (r is Map && r['text'] is String) {
+            final t = (r['text'] as String).trim();
+            if (t.contains(':')) {
+              final nums = t.split(':').map(int.tryParse).toList();
+              if (nums.every((p) => p != null)) {
+                duration = nums.fold(0, (acc, v) => acc * 60 + v!);
+              }
             }
           }
         }
@@ -218,13 +275,13 @@ class InnerTubeService {
           ?['thumbnails'] as List?;
 
       return Track(
-        id: 'yt-$videoId',
-        title: title,
-        artist: artist,
-        album: album,
+        id: norm.id,
+        title: norm.title,
+        artist: norm.subtitle,
+        album: 'Single',
         coverUrl: _cover(thumbs, videoId),
         durationSeconds: duration,
-        language: Track.detectLanguage(title, artist, album) ?? '',
+        language: Track.detectLanguage(norm.title, norm.subtitle, 'Single') ?? '',
         source: 'youtube',
       );
     } catch (_) {
@@ -242,26 +299,25 @@ class InnerTubeService {
       if (videoId is! String || videoId.isEmpty) return null;
 
       final titleRuns = item['title']?['runs'] as List?;
-      final title = titleRuns?.isNotEmpty == true
-          ? titleRuns![0]['text'] as String
-          : 'Unknown Track';
-
       final subRuns = item['subtitle']?['runs'] as List?;
-      final artist = (subRuns != null && subRuns.isNotEmpty)
-          ? (subRuns[0]['text'] ?? 'Unknown Artist').toString()
-          : 'Unknown Artist';
-
       final thumbs = item['thumbnailRenderer']?['musicThumbnailRenderer']
           ?['thumbnail']?['thumbnails'] as List?;
 
-      return Track(
+      final norm = MediaNormalizer.normalize(
         id: 'yt-$videoId',
-        title: title,
-        artist: artist,
+        titleRuns: titleRuns,
+        subtitleRuns: subRuns,
+        videoId: videoId,
+      );
+
+      return Track(
+        id: norm.id,
+        title: norm.title,
+        artist: norm.subtitle,
         album: 'Single',
         coverUrl: _cover(thumbs, videoId),
         durationSeconds: 210,
-        language: Track.detectLanguage(title, artist, 'Single') ?? '',
+        language: Track.detectLanguage(norm.title, norm.subtitle, 'Single') ?? '',
         source: 'youtube',
       );
     } catch (_) {
@@ -278,6 +334,16 @@ class InnerTubeService {
   Future<List<String>> getSearchSuggestions(String query) async {
     final q = query.trim();
     if (q.isEmpty) return const [];
+
+    if (_useNative) {
+      try {
+        final list = await _nativeChannel.invokeMethod<List<dynamic>>('searchSuggestions', {'query': q});
+        if (list != null && list.isNotEmpty) {
+          return list.whereType<String>().toList();
+        }
+      } catch (_) {}
+    }
+
     try {
       final res = await post('music/get_search_suggestions', {'input': q},
           ttl: _tSuggest);
@@ -306,6 +372,37 @@ class InnerTubeService {
   // ────────────────────────────── Home feed ──────────────────────────────────
 
   Future<List<Track>> getHomeFeed({String? countryCode}) async {
+    if (_useNative) {
+      try {
+        final res = await _nativeChannel.invokeMethod<List<dynamic>>('getHomeFeed');
+        if (res != null && res.isNotEmpty) {
+          final tracks = <Track>[];
+          final seen = <String>{};
+          for (final sec in res) {
+            if (sec is! Map) continue;
+            final items = sec['items'] as List? ?? const [];
+            for (final it in items) {
+              if (it is! Map || it['type'] != 'song') continue;
+              final id = it['id'] as String?;
+              if (id == null || id.isEmpty || !seen.add(id)) continue;
+              tracks.add(Track(
+                id: 'yt-$id',
+                title: MediaNormalizer.cleanTitle(it['title'] as String?),
+                artist: MediaNormalizer.formatArtists((it['artists'] as List?)?.map((a) => a is Map ? a['name'] : a).toList()),
+                album: it['album'] is Map ? MediaNormalizer.cleanTitle(it['album']['name'] as String?) : 'Single',
+                coverUrl: MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?, videoId: id),
+                durationSeconds: (it['duration'] as num?)?.toInt() ?? 210,
+                source: 'youtube',
+              ));
+            }
+          }
+          if (tracks.isNotEmpty) return tracks;
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[InnerTube] Native getHomeFeed error: $e');
+      }
+    }
+
     try {
       final res = await post('browse', {'browseId': 'FEmusic_home'},
           countryCode: countryCode, ttl: _tHome);
@@ -341,6 +438,46 @@ class InnerTubeService {
       getCharts({String? countryCode}) async {
     final tracks = <Track>[];
     final artists = <({String name, String subs, String image})>[];
+
+    if (_useNative) {
+      try {
+        final res = await _nativeChannel.invokeMethod<List<dynamic>>('getCharts', {'countryCode': countryCode ?? CountryService.instance.currentCode});
+        if (res != null && res.isNotEmpty) {
+          final seen = <String>{};
+          for (final sec in res) {
+            if (sec is! Map) continue;
+            final items = sec['items'] as List? ?? const [];
+            for (final it in items) {
+              if (it is! Map) continue;
+              if (it['type'] == 'song') {
+                final id = it['id'] as String?;
+                if (id == null || id.isEmpty || !seen.add(id)) continue;
+                tracks.add(Track(
+                  id: 'yt-$id',
+                  title: MediaNormalizer.cleanTitle(it['title'] as String?),
+                  artist: MediaNormalizer.formatArtists((it['artists'] as List?)?.map((a) => a is Map ? a['name'] : a).toList()),
+                  album: it['album'] is Map ? MediaNormalizer.cleanTitle(it['album']['name'] as String?) : 'Single',
+                  coverUrl: MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?, videoId: id),
+                  durationSeconds: (it['duration'] as num?)?.toInt() ?? 210,
+                  source: 'youtube',
+                ));
+              } else if (it['type'] == 'artist') {
+                final name = MediaNormalizer.cleanTitle(it['title'] as String?);
+                final img = MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?);
+                if (name.isNotEmpty && !artists.any((a) => a.name.toLowerCase() == name.toLowerCase())) {
+                  artists.add((name: name, subs: 'Top Artist', image: img));
+                }
+              }
+            }
+          }
+          if (tracks.isNotEmpty || artists.isNotEmpty) {
+            return (tracks: tracks, artists: artists);
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[InnerTube] Native getCharts error: $e');
+      }
+    }
     try {
       final res = await post('browse', {'browseId': 'FEmusic_charts'},
           countryCode: countryCode, ttl: _tCharts);
@@ -563,18 +700,125 @@ class InnerTubeService {
   Map<String, dynamic>? _twoRowCard(dynamic item) {
     final row = item['musicTwoRowItemRenderer'];
     if (row == null) return null;
+    final titleRuns = row['title']?['runs'] as List?;
+    final subRuns = row['subtitle']?['runs'] as List?;
     final rawCover = row['thumbnailRenderer']?['musicThumbnailRenderer']
         ?['thumbnail']?['thumbnails']?.last['url'] as String?;
+    final browseId = row['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+
+    final norm = MediaNormalizer.normalize(
+      id: browseId ?? '',
+      titleRuns: titleRuns,
+      subtitleRuns: subRuns,
+      rawImageUrl: rawCover,
+      defaultType: 'album',
+    );
+
     return {
-      'title': row['title']?['runs']?[0]?['text'] as String?,
-      'subtitle': row['subtitle']?['runs']?.map((r) => r['text']).join(' ') ?? '',
-      'browseId': row['navigationEndpoint']?['browseEndpoint']?['browseId']
-          as String?,
-      'coverUrl': rawCover != null ? upgradeArtworkUrl(rawCover) : '',
+      'title': norm.title,
+      'subtitle': norm.subtitle,
+      'browseId': browseId,
+      'coverUrl': norm.imageUrl,
     };
   }
 
   Future<Map<String, dynamic>?> getArtistChannel(String browseId) async {
+    if (_useNative) {
+      try {
+        final res = await _nativeChannel.invokeMethod<Map<dynamic, dynamic>>('getArtist', {'browseId': browseId});
+        if (res != null && res.isNotEmpty) {
+          final artistMap = Map<String, dynamic>.from(res['artist'] as Map? ?? {});
+          final name = MediaNormalizer.cleanTitle(artistMap['title'] as String?);
+          final rawThumb = artistMap['thumbnail'] as String?;
+          final thumb = rawThumb != null ? MediaNormalizer.upgradeArtworkUrl(rawThumb) : null;
+          final bio = res['description'] as String?;
+          final subscriberCount = res['subscriberCountText'] as String?;
+
+          final topSongs = <Track>[];
+          final albums = <Map<String, dynamic>>[];
+          final singles = <Map<String, dynamic>>[];
+          final playlists = <Map<String, dynamic>>[];
+          final related = <Map<String, dynamic>>[];
+
+          final sections = res['sections'] as List? ?? const [];
+          for (final sec in sections) {
+            if (sec is! Map) continue;
+            final title = (sec['title'] ?? '').toString().toLowerCase();
+            final items = sec['items'] as List? ?? const [];
+
+            if (title.contains('song') || title.contains('top') || title.contains('popular') || title.contains('track')) {
+              for (final it in items) {
+                if (it is! Map || it['type'] != 'song') continue;
+                final id = it['id'] as String?;
+                if (id == null || id.isEmpty) continue;
+                topSongs.add(Track(
+                  id: 'yt-$id',
+                  title: MediaNormalizer.cleanTitle(it['title'] as String?),
+                  artist: MediaNormalizer.formatArtists((it['artists'] as List?)?.map((a) => a is Map ? a['name'] : a).toList()),
+                  album: it['album'] is Map ? MediaNormalizer.cleanTitle(it['album']['name'] as String?) : 'Single',
+                  coverUrl: MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?, videoId: id),
+                  durationSeconds: (it['duration'] as num?)?.toInt() ?? 210,
+                  source: 'youtube',
+                ));
+              }
+            } else if (title.contains('album')) {
+              for (final it in items) {
+                if (it is! Map) continue;
+                albums.add({
+                  'title': MediaNormalizer.cleanTitle(it['title'] as String?),
+                  'year': it['year']?.toString() ?? '',
+                  'browseId': it['browseId'] ?? it['id'],
+                  'coverUrl': MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?),
+                });
+              }
+            } else if (title.contains('single') || title.contains('ep')) {
+              for (final it in items) {
+                if (it is! Map) continue;
+                singles.add({
+                  'title': MediaNormalizer.cleanTitle(it['title'] as String?),
+                  'year': it['year']?.toString() ?? '',
+                  'browseId': it['browseId'] ?? it['id'],
+                  'coverUrl': MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?),
+                });
+              }
+            } else if (title.contains('playlist')) {
+              for (final it in items) {
+                if (it is! Map) continue;
+                playlists.add({
+                  'title': MediaNormalizer.cleanTitle(it['title'] as String?),
+                  'browseId': it['id'],
+                  'coverUrl': MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?),
+                });
+              }
+            } else if (title.contains('related') || title.contains('similar') || title.contains('fans might')) {
+              for (final it in items) {
+                if (it is! Map) continue;
+                related.add({
+                  'name': MediaNormalizer.cleanTitle(it['title'] as String?),
+                  'subs': 'Artist',
+                  'imageUrl': MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?),
+                  'browseId': it['id'],
+                });
+              }
+            }
+          }
+
+          return {
+            'name': name,
+            'bio': bio,
+            'subscriberCount': subscriberCount,
+            'thumb': thumb,
+            'topSongs': topSongs,
+            'albums': albums,
+            'singles': singles,
+            'playlists': playlists,
+            'related': related,
+          };
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[InnerTube] Native getArtist error: $e');
+      }
+    }
     try {
       final res = await post('browse', {'browseId': browseId}, ttl: _tArtistPage);
       final sections = res['contents']?['singleColumnBrowseResultsRenderer']
@@ -789,6 +1033,38 @@ class InnerTubeService {
 
   /// Fetches full album tracklist and metadata from YouTube Music browseId.
   Future<({List<Track> tracks, String coverUrl})?> getAlbum(String browseId) async {
+    if (_useNative) {
+      try {
+        final res = await _nativeChannel.invokeMethod<Map<dynamic, dynamic>>('getAlbum', {'browseId': browseId});
+        if (res != null && res.isNotEmpty) {
+          final albumMap = Map<String, dynamic>.from(res['album'] as Map? ?? {});
+          final albumTitle = MediaNormalizer.cleanTitle(albumMap['title'] as String?);
+          final coverUrl = MediaNormalizer.upgradeArtworkUrl(albumMap['thumbnail'] as String?);
+          final rawSongs = res['songs'] as List? ?? const [];
+          final tracks = <Track>[];
+          for (final s in rawSongs) {
+            if (s is! Map) continue;
+            final id = s['id'] as String?;
+            if (id == null || id.isEmpty) continue;
+            tracks.add(Track(
+              id: 'yt-$id',
+              title: MediaNormalizer.cleanTitle(s['title'] as String?),
+              artist: MediaNormalizer.formatArtists((s['artists'] as List?)?.map((a) => a is Map ? a['name'] : a).toList()),
+              album: albumTitle.isNotEmpty ? albumTitle : 'Single',
+              coverUrl: MediaNormalizer.upgradeArtworkUrl(s['thumbnail'] as String?, videoId: id),
+              durationSeconds: (s['duration'] as num?)?.toInt() ?? 210,
+              source: 'youtube',
+            ));
+          }
+          if (tracks.isNotEmpty) {
+            return (tracks: tracks, coverUrl: coverUrl);
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[InnerTube] Native getAlbum error: $e');
+      }
+    }
+
     try {
       final res = await post('browse', {'browseId': browseId}, ttl: const Duration(hours: 12));
       final header = res['header']?['musicDetailHeaderRenderer'] ??

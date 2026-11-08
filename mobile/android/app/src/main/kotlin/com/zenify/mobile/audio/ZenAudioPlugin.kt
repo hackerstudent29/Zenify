@@ -113,7 +113,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             p.playWhenReady -> "playing" // buffering still counts as playing, so UI does not flicker
             else -> "paused"
         }
-        emit(mapOf("type" to "state", "value" to s))
+        val isBuffering = p.playbackState == Player.STATE_BUFFERING
+        emit(mapOf("type" to "state", "value" to s, "buffering" to isBuffering))
     }
 
     private fun ensurePlayer(): ExoPlayer {

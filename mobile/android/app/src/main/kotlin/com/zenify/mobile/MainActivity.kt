@@ -16,6 +16,9 @@ class MainActivity : AudioServiceActivity() {
         // Register custom ExoPlayer native audio pipeline with real-time StudioFX
         flutterEngine.plugins.add(com.zenify.mobile.audio.ZenAudioPlugin())
 
+        // Register Metrolist InnerTube native client
+        flutterEngine.plugins.add(com.zenify.mobile.innertube.ZenInnerTubePlugin())
+
         // App utility channel: Native URL launcher and APK update downloader
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {

@@ -15,6 +15,7 @@ import '../../services/artist_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
+import '../../utils/media_normalizer.dart';
 import 'album_screen.dart';
 
 /* ------------------------------------------------------------------ */
@@ -617,7 +618,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
   Widget build(BuildContext context) {
     final player = context.watch<PlayerState>();
     final top = MediaQuery.paddingOf(context).top;
-    final name = widget.artistName;
+    final name = MediaNormalizer.formatArtists(widget.artistName);
     final following = LibraryStore.instance.isFollowing(name);
 
     // Split results into the artist's own tracks and other artists.
@@ -629,9 +630,11 @@ class _ArtistScreenState extends State<ArtistScreen> {
     // Group songs into releases.
     final map = <String, _Release>{};
     for (final t in songs) {
-      final a = t.album;
-      final key = a.isEmpty ? t.title : a;
-      map.putIfAbsent(key, () => _Release(key, t.coverUrl)).tracks.add(t);
+      final a = MediaNormalizer.cleanTitle(t.album);
+      final key = (a.isEmpty || a.toLowerCase() == 'single' || MediaNormalizer.isMetadataNoise(a))
+          ? MediaNormalizer.cleanCompactTitle(t.title)
+          : a;
+      map.putIfAbsent(key, () => _Release(key, MediaNormalizer.upgradeArtworkUrl(t.coverUrl))).tracks.add(t);
     }
     final releases = map.values.toList();
     final albums = _artistProfile != null && _artistProfile!.albums.isNotEmpty

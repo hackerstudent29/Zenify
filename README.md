@@ -7,13 +7,13 @@
   <br />
   <h1>Zenify: Free Ad-Free Music Streaming App</h1>
   <p>
-    <b>The beautiful, ad-free music streaming platform with Apple-grade design, real-time synced lyrics, studio equalizer & 8D audio, and native mobile client.</b>
+    <b>The beautiful, ad-free music streaming platform with Apple-grade design, native YouTube Music InnerTube pipeline, real-time synced lyrics, studio equalizer & 8D audio, and native mobile client.</b>
   </p>
 
   <p>
     <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/🚀_Live_Web_App-listenzenify.com-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-    <a href="https://listenzenify.com/download"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v2.6.0-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v2.6.0-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
+    <a href="https://listenzenify.com/download"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v2.6.5-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v2.6.5-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="MIT License" /></a>
     <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
   </p>
@@ -49,7 +49,7 @@ Install the native **Zenify Android application** directly to your phone for sea
 <div align="center">
   <br />
   <a href="https://listenzenify.com/downloads/zenify.apk">
-    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v2.6.0)-22.1_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
+    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v2.6.5)-60.3_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
   </a>
   <br />
   <p><i>Direct download link: <a href="https://listenzenify.com/downloads/zenify.apk">https://listenzenify.com/downloads/zenify.apk</a> or mirror via <a href="https://github.com/hackerstudent29/Zenify/raw/main/frontend/public/downloads/zenify.apk">GitHub Raw</a></i></p>
@@ -93,15 +93,17 @@ Start listening immediately — **no sign-up or credit card required**.
 | Feature | Description |
 |---|---|
 | **100% Free & Ad-Free** | Uninterrupted music streaming with zero audio ads, banner popups, or subscription fees. |
-| **Pristine 320kbps Akamai CDN Audio** | Full-length high-fidelity audio streams with instant seeking and zero buffering. |
+| **Native InnerTube Pipeline** | Asynchronous Kotlin coroutine streaming with Android VR/TV client, PO-token pre-warming & `RefusedRetryDataSource` for sub-300ms instant playback and zero 403 errors. |
+| **Pristine 320kbps Akamai CDN Audio** | Full-length high-fidelity audio streams with instant HTTP 206 range seeking and zero buffering. |
+| **Universal Media Normalizer** | Deep metadata cleaning: strips stray quotes, unbalanced brackets, movie tags (in compact view), play count noise, and isolates artists with high-res artwork upscaling. |
 | **Apple-Grade Fluid UI** | Glassmorphic design, spring physics, and dynamic artwork mesh palettes inspired by Apple Music. |
-| **Real-Time Synced Karaoke Lyrics** | Sub-second word-level synchronization with automatic instrumental break markers across 50+ languages. |
+| **Real-Time Synced Karaoke Lyrics** | Sub-second word-level synchronization with Word-by-Word (WBW) glowing fill animation and instrumental pause markers across 50+ languages. |
 | **Studio 3-Band Equalizer** | Hardware-accelerated parametric EQ (Bass, Mid, Treble) with live parameter interpolation. |
 | **8D Spatial Audio & Audio FX** | Headphone-orbiting 8D sound, dynamic room reverb, tube warmth, and DJ pitch/tempo control. |
 | **Room Together (Live Listening)** | Synchronized group listening rooms with low-drift playback for you and your friends. |
 | **Local Music Player (MP3 / FLAC)** | Drop personal audio files to play privately offline without uploading to any cloud server. |
 | **Continuous Smart Autoplay** | Vibe-based recommendation engine that auto-queues similar music when your playlist finishes. |
-| **Cross-Platform** | Web (Vite + React 19), Native Android (Flutter 3.44 + Kotlin ExoPlayer), and PWA (iOS/Desktop). |
+| **Cross-Platform** | Web (Vite + React 19), Native Android (Flutter 3.44 + Kotlin Media3 ExoPlayer), and PWA (iOS/Desktop). |
 
 ---
 
@@ -126,6 +128,7 @@ Start listening immediately — **no sign-up or credit card required**.
 | **Price** | **100% Free** | Free with ads | Paid ($10.99/mo) | Free with ads |
 | **Audio Ads Between Songs** | **Zero** | Frequent audio ads | None (Paid) | Frequent video/audio ads |
 | **Account Required to Listen** | **No** | Yes | Yes | Yes |
+| **Instant Native InnerTube Streaming** | **Yes (Sub-300ms)** | No | No | Official client only |
 | **Real-Time Synced Lyrics** | **Included** | Limited | Included (Paid) | Basic text |
 | **Studio Equalizer & 8D Audio** | **Included** | Basic presets only | Basic presets only | None |
 | **Plays Local Files Privately** | **Yes (Client-side)** | Complex sync | Desktop only | Upload to cloud |
@@ -142,18 +145,19 @@ Zenify Workspace
 │   ├── public/downloads/   # Distributed release packages (zenify.apk)
 │   └── src/app/download/   # Dedicated interactive download page with QR code
 ├── mobile/                 # Native Mobile Client (Flutter 3.44, Dart 3.12, Android Media3)
-│   ├── android/            # Kotlin audio plugins (ZenAudioPlugin, ZenFxProcessor)
+│   ├── android/            # Kotlin audio & streaming plugins (ZenInnerTubePlugin, ZenAudioPlugin, YtEngine)
 │   └── lib/                # Cross-platform views, services, state stores, and player engine
 ├── backend/                # API Server (Fastify, Prisma ORM, PostgreSQL, WebSockets)
 │   ├── src/routes/         # Tracks, search, albums, artists, auth, lyrics, and downloads
-│   └── src/services/       # JioSaavn Clean CDN, Innertube, personalization, and cron schedulers
+│   └── src/services/       # JioSaavn Clean CDN, InnerTube, personalization, and cron schedulers
 └── docs/                   # Visual documentation, parity guides, and schemas
 ```
 
 - **Frontend**: React 19, Vite, Tailwind CSS v4, Framer Motion, TanStack Query, Zustand, Radix UI.
 - **Mobile**: Flutter 3.44.2, Dart 3.12.2, Android Media3 ExoPlayer, Provider, Cupertino Icons.
+- **Mobile Backend Engine**: Metrolist InnerTube Kotlin integration with asynchronous coroutine dispatchers, PO-token generator, and `RefusedRetryDataSource`.
 - **Backend**: Node.js, Fastify, TypeScript, Prisma ORM, PostgreSQL, `@fastify/websocket`, JWT.
-- **Audio Resolution**: Pristine JioSaavn Akamai 320kbps CDN resolution + yt-dlp / Innertube stream fallback.
+- **Audio Resolution**: Pristine JioSaavn Akamai 320kbps CDN resolution + yt-dlp / InnerTube stream fallback.
 
 ---
 
