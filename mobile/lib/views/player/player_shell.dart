@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
@@ -8,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/scrubber_slider.dart';
@@ -489,14 +489,14 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
     );
   }
 
-  /* ───────────────────────── MINI PLAYER ───────────────────────── */
+  /* ───────────────────────── MINI PLAYER (Apple Music glass pill) ───────────────────────── */
 
   Widget _buildMini(PlayerState player, dynamic track, EdgeInsets safe) {
     return Positioned(
-      left: 12,
-      right: 12,
+      left: 16, // same width as the dock (pill + search circle)
+      right: 16,
       bottom: widget.miniBottomOffset + safe.bottom,
-      height: 62,
+      height: 58,
       child: AnimatedSlide(
         offset: widget.hideMini ? const Offset(0, 1.8) : Offset.zero,
         duration: const Duration(milliseconds: 260),
@@ -520,117 +520,75 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
                 );
               },
               child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => _openSheet(),
-          onPanStart: _miniStart,
-          onPanUpdate: _miniUpdate,
-          onPanEnd: _miniEnd,
-          onPanCancel: () => _miniEnd(DragEndDetails()),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(31),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.45),
-                  blurRadius: 28,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(31),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0x6618181C),
-                    borderRadius: BorderRadius.circular(31),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      width: 0.8,
-                    ),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.14),
-                        Colors.white.withValues(alpha: 0.02),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _openSheet(),
+                onPanStart: _miniStart,
+                onPanUpdate: _miniUpdate,
+                onPanEnd: _miniEnd,
+                onPanCancel: () => _miniEnd(DragEndDetails()),
+                child: AppleGlass(
+                  borderRadius: BorderRadius.circular(29),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(9, 0, 6, 0),
+                    child: Row(
+                      children: [
+                        // artwork + title/artist (swipes horizontally to skip)
+                        Expanded(
+                          child: AnimatedBuilder(
+                            animation: _miniX,
+                            builder: (_, _) => Transform.translate(
+                              offset: Offset(_miniX.value, 0),
+                              child: Row(
+                                key: ValueKey('mini-${track.id}'),
+                                children: [
+                                  DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.28),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: SizedBox(
+                                        width: 40,
+                                        height: 40,
+                                        child: CoverImage((track.coverUrl as String?) ?? ''),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 11),
+                                  // title fades out toward the buttons, like Apple Music
+                                  Expanded(child: RightEdgeFade(child: _miniText(track))),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        PressableScale(
+                          onTap: player.togglePlay,
+                          scale: 0.88,
+                          child: SizedBox(
+                            width: 46,
+                            height: 46,
+                            child: _PlayGlyph(playing: player.isPlaying, size: 34),
+                          ),
+                        ),
+                        PressableScale(
+                          onTap: _next,
+                          scale: 0.88,
+                          child: const SizedBox(
+                            width: 46,
+                            height: 46,
+                            child: Icon(Icons.fast_forward_rounded, color: Colors.white, size: 34),
+                          ),
+                        ),
                       ],
                     ),
-                  ),
-                  child: Stack(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(left: 14, right: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: AnimatedBuilder(
-                                animation: _miniX,
-                                builder: (_, _) => Transform.translate(
-                                  offset: Offset(_miniX.value, 0),
-                                  child: Row(
-                                    key: ValueKey('mini-${track.id}'),
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: SizedBox(
-                                          width: 44,
-                                          height: 44,
-                                          child: CoverImage((track.coverUrl as String?) ?? ''),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(child: _miniText(track)),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            PressableScale(
-                              onTap: player.togglePlay,
-                              child: SizedBox(
-                                width: 40,
-                                height: 40,
-                                child: _PlayGlyph(playing: player.isPlaying, size: 28),
-                              ),
-                            ),
-                            PressableScale(
-                              onTap: _next,
-                              child: const SizedBox(
-                                width: 40,
-                                height: 40,
-                                child: Icon(Icons.fast_forward_rounded, color: Colors.white, size: 26),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Positioned(
-                        left: 26,
-                        right: 26,
-                        bottom: 0,
-                        child: ValueListenableBuilder<Duration>(
-                          valueListenable: player.positionNotifier,
-                          builder: (_, position, _) {
-                            final total =
-                                player.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity);
-                            final pos = position.inMilliseconds.toDouble().clamp(0.0, total);
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(1),
-                              child: SizedBox(
-                                height: 2,
-                                child: LinearProgressIndicator(
-                                  value: (pos / total).clamp(0.0, 1.0),
-                                  backgroundColor: Colors.white.withValues(alpha: 0.1),
-                                  valueColor: const AlwaysStoppedAnimation(AppColors.accent),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),
@@ -638,10 +596,7 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
           ),
         ),
       ),
-    ),
-  ),
-),
-);
+    );
   }
 
   Widget _miniText(dynamic track) {
@@ -654,18 +609,18 @@ class PlayerShellState extends State<PlayerShell> with TickerProviderStateMixin 
           dir: _dir,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 14,
-            height: 18 / 14,
+            fontSize: 15,
+            height: 19 / 15,
             fontWeight: FontWeight.w600,
-            letterSpacing: -0.15,
+            letterSpacing: -0.2,
           ),
         ),
         InteractiveArtistsText(
           artists: track is Track ? track.resolvedArtists : (track.artist as String),
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.6),
-            fontSize: 12.5,
-            height: 16 / 12.5,
+            color: Colors.white.withValues(alpha: 0.58),
+            fontSize: 13.5,
+            height: 17 / 13.5,
           ),
           onTapArtist: (artistName) {
             if (widget.onGoToArtist != null) {

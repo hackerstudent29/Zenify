@@ -5,3 +5,29 @@
 -keep class meow.nyx.quackjs.** { *; }
 -keep class com.zenify.mobile.** { *; }
 
+# Ktor & OkHttp
+-dontwarn io.ktor.**
+-keep class io.ktor.** { *; }
+-dontwarn okhttp3.**
+-keep class okhttp3.** { *; }
+-dontwarn okio.**
+-keep class okio.** { *; }
+
+# Media3 & ExoPlayer
+-dontwarn androidx.media3.**
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media.**
+-keep class androidx.media.** { *; }
+
+# Kotlinx Serialization
+-keepattributes *Annotation*,InnerClasses,Signature,EnclosingMethod
+-dontwarn kotlinx.serialization.**
+-keepclassmembers class * {
+    @kotlinx.serialization.Serializable <fields>;
+}
+-keep class kotlinx.serialization.** { *; }
+
+# Timber
+-dontwarn com.jakewharton.timber.**
+-keep class com.jakewharton.timber.** { *; }
+

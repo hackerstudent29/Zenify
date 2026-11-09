@@ -80,8 +80,8 @@ class UpdateService {
 
     try {
       final packageInfo = await PackageInfo.fromPlatform();
-      final currentVersion = packageInfo.version.isNotEmpty ? packageInfo.version : '2.6.1';
-      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 43;
+      final currentVersion = packageInfo.version.isNotEmpty ? packageInfo.version : '1.0.1';
+      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 1;
 
       // Remote config candidates in priority order
       final urls = [

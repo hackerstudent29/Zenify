@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/widgets/marquee_text.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../models/track.dart';
 

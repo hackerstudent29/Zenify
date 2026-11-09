@@ -20,7 +20,7 @@ import '../../design_system/zen.dart';
 import '../../models/track.dart';
 import '../../services/playback_bridge.dart';
 import '../details/album_screen.dart';
-import '../details/artist_screen.dart';
+import '../../design_system/widgets/interactive_artists_text.dart';
 import 'now_playing_widgets.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -235,30 +235,15 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                     style: Zen.title3.copyWith(
                         fontSize: 23, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.of(context).push(
-                      CupertinoPageRoute(
-                        builder: (_) => ArtistScreen(
-                          artistName: track.artist,
-                          imageUrl: track.coverUrl,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Text(
-                    track.artist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      letterSpacing: -0.3,
-                      color: Color(0xCCFFFFFF),
-                      fontWeight: FontWeight.w600,
-                    ),
+                InteractiveArtistsText(
+                  artists: track.resolvedArtists,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    letterSpacing: -0.3,
+                    color: Color(0xCCFFFFFF),
+                    fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
                 ),
                 if (track.album.isNotEmpty && track.album != 'Single') ...[
                   const SizedBox(height: 2),

@@ -9,7 +9,7 @@ import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/scrubber_slider.dart';
 import '../../services/player_state.dart';
 import '../details/album_screen.dart';
-import '../details/artist_screen.dart';
+import '../../design_system/widgets/interactive_artists_text.dart';
 import '../lyrics/lyrics_sheet.dart';
 import 'studio_fx_sheet.dart';
 
@@ -159,28 +159,14 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                               style: AppTypography.title2.copyWith(fontSize: 22),
                             ),
                             const SizedBox(height: 4),
-                            GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => ArtistScreen(
-                                      artistName: track.artist,
-                                      imageUrl: track.coverUrl,
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                track.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTypography.body.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            InteractiveArtistsText(
+                              artists: track.resolvedArtists,
+                              style: AppTypography.body.copyWith(
+                                color: AppColors.textSecondary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
+                              maxLines: 1,
                             ),
                             if (track.album.isNotEmpty && track.album != 'Single') ...[
                               const SizedBox(height: 2),

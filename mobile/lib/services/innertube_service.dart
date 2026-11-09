@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../models/artist_ref.dart';
 import '../models/track.dart';
 import '../utils/media_normalizer.dart';
 import 'country_service.dart';
@@ -18,6 +19,27 @@ export 'innertube_transport.dart' show InnerTubeException;
 class InnerTubeService {
   InnerTubeService._();
   static final InnerTubeService instance = InnerTubeService._();
+
+  static List<ArtistRef> parseArtistRefs(List? rawArtists, [String? fallbackString]) {
+    final refs = <ArtistRef>[];
+    if (rawArtists != null) {
+      for (final a in rawArtists) {
+        if (a is Map) {
+          final aName = (a['name'] as String?)?.trim();
+          final aId = (a['id'] as String?)?.trim();
+          if (aName != null && aName.isNotEmpty) {
+            refs.add(ArtistRef(name: aName, id: aId ?? ''));
+          }
+        } else if (a is String && a.trim().isNotEmpty) {
+          refs.addAll(ArtistRef.splitFromName(a));
+        }
+      }
+    }
+    if (refs.isEmpty && fallbackString != null && fallbackString.trim().isNotEmpty) {
+      refs.addAll(ArtistRef.splitFromName(fallbackString));
+    }
+    return refs;
+  }
 
   static const String hl = InnerTubeTransport.hl;
 
@@ -69,7 +91,10 @@ class InnerTubeService {
         if (id == null || id.isEmpty || !seen.add(id)) continue;
         final title = MediaNormalizer.cleanTitle(item['title'] as String?);
         final rawArtists = item['artists'] as List?;
-        final artists = MediaNormalizer.formatArtists(rawArtists?.map((a) => (a is Map ? a['name'] : a)).toList());
+        final artistRefs = parseArtistRefs(rawArtists);
+        final artists = artistRefs.isNotEmpty
+            ? ArtistRef.formatList(artistRefs)
+            : MediaNormalizer.formatArtists(rawArtists?.map((a) => (a is Map ? a['name'] : a)).toList());
         final albumName = (item['album'] is Map) ? (item['album']['name'] as String?) : null;
         final album = albumName != null ? MediaNormalizer.cleanTitle(albumName) : 'Single';
         final thumb = MediaNormalizer.upgradeArtworkUrl(item['thumbnail'] as String?, videoId: id);
@@ -78,6 +103,7 @@ class InnerTubeService {
           id: 'yt-$id',
           title: title,
           artist: artists,
+          artists: artistRefs,
           album: album,
           coverUrl: thumb,
           durationSeconds: duration,
@@ -124,7 +150,10 @@ class InnerTubeService {
             if (id == null || id.isEmpty || !seen.add(id)) continue;
             final title = MediaNormalizer.cleanTitle(item['title'] as String?);
             final rawArtists = item['artists'] as List?;
-            final artists = MediaNormalizer.formatArtists(rawArtists?.map((a) => (a is Map ? a['name'] : a)).toList());
+            final artistRefs = parseArtistRefs(rawArtists);
+            final artists = artistRefs.isNotEmpty
+                ? ArtistRef.formatList(artistRefs)
+                : MediaNormalizer.formatArtists(rawArtists?.map((a) => (a is Map ? a['name'] : a)).toList());
             final albumName = (item['album'] is Map) ? (item['album']['name'] as String?) : null;
             final album = albumName != null ? MediaNormalizer.cleanTitle(albumName) : 'Single';
             final thumb = MediaNormalizer.upgradeArtworkUrl(item['thumbnail'] as String?, videoId: id);
@@ -133,6 +162,7 @@ class InnerTubeService {
               id: 'yt-$id',
               title: title,
               artist: artists,
+              artists: artistRefs,
               album: album,
               coverUrl: thumb,
               durationSeconds: duration,
@@ -436,10 +466,16 @@ class InnerTubeService {
               if (it is! Map || it['type'] != 'song') continue;
               final id = it['id'] as String?;
               if (id == null || id.isEmpty || !seen.add(id)) continue;
+              final rawArtists = it['artists'] as List?;
+              final artistRefs = parseArtistRefs(rawArtists);
+              final artists = artistRefs.isNotEmpty
+                  ? ArtistRef.formatList(artistRefs)
+                  : MediaNormalizer.formatArtists(rawArtists?.map((a) => a is Map ? a['name'] : a).toList());
               tracks.add(Track(
                 id: 'yt-$id',
                 title: MediaNormalizer.cleanTitle(it['title'] as String?),
-                artist: MediaNormalizer.formatArtists((it['artists'] as List?)?.map((a) => a is Map ? a['name'] : a).toList()),
+                artist: artists,
+                artists: artistRefs,
                 album: it['album'] is Map ? MediaNormalizer.cleanTitle(it['album']['name'] as String?) : 'Single',
                 coverUrl: MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?, videoId: id),
                 durationSeconds: (it['duration'] as num?)?.toInt() ?? 210,
@@ -503,10 +539,16 @@ class InnerTubeService {
               if (it['type'] == 'song') {
                 final id = it['id'] as String?;
                 if (id == null || id.isEmpty || !seen.add(id)) continue;
+                final rawArtists = it['artists'] as List?;
+                final artistRefs = parseArtistRefs(rawArtists);
+                final artistsList = artistRefs.isNotEmpty
+                    ? ArtistRef.formatList(artistRefs)
+                    : MediaNormalizer.formatArtists(rawArtists?.map((a) => a is Map ? a['name'] : a).toList());
                 tracks.add(Track(
                   id: 'yt-$id',
                   title: MediaNormalizer.cleanTitle(it['title'] as String?),
-                  artist: MediaNormalizer.formatArtists((it['artists'] as List?)?.map((a) => a is Map ? a['name'] : a).toList()),
+                  artist: artistsList,
+                  artists: artistRefs,
                   album: it['album'] is Map ? MediaNormalizer.cleanTitle(it['album']['name'] as String?) : 'Single',
                   coverUrl: MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?, videoId: id),
                   durationSeconds: (it['duration'] as num?)?.toInt() ?? 210,

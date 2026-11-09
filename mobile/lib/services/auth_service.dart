@@ -106,7 +106,7 @@ class AuthService {
         'deviceId': deviceId,
         'deviceName': 'Android Mobile',
         'platform': 'android',
-        'appVersion': '2.5.3',
+        'appVersion': '1.0.1',
       };
 
       final response = await _postFirstSuccessful('/api/auth/google', payload);
@@ -165,7 +165,7 @@ class AuthService {
       'deviceId': deviceId,
       'deviceName': 'Android Mobile',
       'platform': 'android',
-      'appVersion': '2.5.3',
+      'appVersion': '1.0.1',
     };
 
     final response = await _postFirstSuccessful('/api/auth/otp/verify', payload,
