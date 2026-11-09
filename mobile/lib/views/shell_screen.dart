@@ -1,8 +1,7 @@
 import 'dart:math' as math;
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../design_system/widgets/pressable_scale.dart';
+import '../design_system/widgets/apple_glass.dart';
 import '../design_system/zen.dart';
 import '../models/track.dart';
 import '../services/dock_visibility.dart';
@@ -16,9 +15,9 @@ import 'search/search_screen.dart';
 import 'profile/profile_screen.dart';
 import 'room_together/room_together_screen.dart';
 
-/// AppShell: 4 tabs that cross-fade with a spring, a floating glass tab bar
-/// with an interactive sliding rose highlight, and persistent morphing PlayerShell.
-/// Dock gracefully slides down and mini player takes its place on pushed detail routes.
+/// AppShell: 4 tabs, an Apple Music style liquid-glass dock (slide-to-switch lens +
+/// round search button) and the persistent morphing PlayerShell whose mini player
+/// floats as a glass pill right above the dock.
 class ShellScreen extends StatefulWidget {
   const ShellScreen({super.key});
 
@@ -58,9 +57,10 @@ class _TabRouteObserver extends NavigatorObserver {
 }
 
 class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStateMixin {
-  // Floating tab bar geometry.
-  static const double _navHeight = 60;
-  static const double _navMargin = 10; // gap below the bar (above safe area)
+  // Floating dock geometry (Apple Music: 64pt glass pill + round search).
+  static const double _navHeight = 64;
+  static const double _navMargin = 12; // gap below the dock (above safe area)
+  static const double _miniGap = 10; // gap between mini player and dock
 
   int _currentIndex = 0;
   late final AnimationController _dockController;
@@ -107,7 +107,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
 
   void _onTabDepthChanged(int tabIndex, int depth) {
     _tabDepths[tabIndex] = depth;
-    // Keep bottom navigation dock persistent across all pages and tabs (depth > 0 maintains dock).
+    // Keep bottom navigation dock persistent across all pages and tabs.
     if (_dockController.value != 1.0) {
       _dockController.value = 1.0;
     }
@@ -143,13 +143,106 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
       return;
     }
     FocusManager.instance.primaryFocus?.unfocus();
-    ZenHaptics.tap();
     _tabHistory.remove(_currentIndex);
     _tabHistory.add(_currentIndex);
     setState(() => _currentIndex = index);
     if (_dockController.value != 1.0) {
       _dockController.value = 1.0;
     }
+  }
+
+  void _handleBack() {
+    // 0. Full player sheet (or a sub-panel like lyrics/queue) closes first.
+    final player = _playerShellKey.currentState;
+    if (player != null && player.isOpen) {
+      if (player.isPanelOpen) {
+        player.closePanel();
+      } else {
+        player.closeSheet();
+      }
+      return;
+    }
+
+    // 1. Pop nested subpages in the active tab.
+    final currentNav = _navKeys[_currentIndex].currentState;
+    if (currentNav != null && currentNav.canPop()) {
+      currentNav.maybePop();
+      return;
+    }
+
+    // 2. Go back through tab history.
+    if (_tabHistory.isNotEmpty) {
+      final prevTab = _tabHistory.removeLast();
+      FocusManager.instance.primaryFocus?.unfocus();
+      ZenHaptics.tap();
+      setState(() => _currentIndex = prevTab);
+      return;
+    }
+
+    // 3. Any other tab with empty history → Home.
+    if (_currentIndex != 0) {
+      _select(0);
+      return;
+    }
+
+    // 4. Double-back guard at the root of Home.
+    final now = DateTime.now();
+    if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+      _lastBackPress = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Swipe or press back again to exit',
+            style: TextStyle(color: Colors.white, fontSize: 13),
+          ),
+          backgroundColor: const Color(0xFF18181B),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 90),
+        ),
+      );
+      return;
+    }
+
+    SystemNavigator.pop();
+  }
+
+  void _goToArtist(dynamic trackOrArtist) {
+    final String artist;
+    if (trackOrArtist is String) {
+      artist = trackOrArtist;
+    } else if (trackOrArtist is Track) {
+      final names = trackOrArtist.artistNames;
+      artist = names.isNotEmpty ? names.first : trackOrArtist.artist;
+    } else {
+      artist = trackOrArtist?.artist?.toString() ?? trackOrArtist?.toString() ?? '';
+    }
+    if (artist.isNotEmpty) {
+      _openInActiveTab(ArtistScreen(artistName: artist));
+    }
+  }
+
+  void _goToAlbum(dynamic track) {
+    final String title;
+    final String artist;
+    final String? cover;
+    if (track is Track) {
+      title = track.album.isNotEmpty ? track.album : track.title;
+      artist = track.artist;
+      cover = track.coverUrl;
+    } else {
+      final a = track?.album?.toString();
+      final t = track?.title?.toString() ?? 'Album';
+      title = (a != null && a.isNotEmpty) ? a : t;
+      artist = track?.artist?.toString() ?? 'Unknown Artist';
+      cover = track?.coverUrl?.toString();
+    }
+    _openInActiveTab(AlbumScreen(
+      albumTitle: title,
+      artistName: artist,
+      coverUrl: cover,
+    ));
   }
 
   @override
@@ -160,64 +253,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-
-        // 0. If the full player sheet is open (or a sub-panel like lyrics/queue), close it first
-        final player = _playerShellKey.currentState;
-        if (player != null && player.isOpen) {
-          if (player.isPanelOpen) {
-            player.closePanel();
-          } else {
-            player.closeSheet();
-          }
-          return;
-        }
-
-        final currentNav = _navKeys[_currentIndex].currentState;
-        // 1. Pop nested subpages in the active tab (e.g. Artist, Album, Playlist, Profile)
-        if (currentNav != null && currentNav.canPop()) {
-          currentNav.maybePop();
-          return;
-        }
-
-        // 2. Pop previous tab from history if the user moved across tabs
-        if (_tabHistory.isNotEmpty) {
-          final prevTab = _tabHistory.removeLast();
-          FocusManager.instance.primaryFocus?.unfocus();
-          ZenHaptics.tap();
-          setState(() => _currentIndex = prevTab);
-          return;
-        }
-
-        // 3. If on a tab other than Home with empty history, jump to Home
-        if (_currentIndex != 0) {
-          _select(0);
-          return;
-        }
-
-        // 4. Double-back guard at the root of Home: prevent accidental exit
-        final now = DateTime.now();
-        if (_lastBackPress == null ||
-            now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
-          _lastBackPress = now;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
-                'Swipe or press back again to exit',
-                style: TextStyle(color: Colors.white, fontSize: 13),
-              ),
-              backgroundColor: const Color(0xFF18181B),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              margin: const EdgeInsets.fromLTRB(20, 0, 20, 90),
-            ),
-          );
-          return;
-        }
-
-        // Second back within 2 seconds: close app
-        SystemNavigator.pop();
+        _handleBack();
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
@@ -229,12 +265,13 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
               animation: _dockController,
               builder: (context, _) {
                 final dockProgress = _dockController.value;
-                final miniBottom = (_navHeight + _navMargin) * dockProgress + 8;
+                // mini player sits right above the dock; falls to the bottom if the dock hides
+                final miniBottom = (_navHeight + _navMargin + _miniGap) * dockProgress + _miniGap;
 
                 return Stack(
                   fit: StackFit.expand,
                   children: [
-                    // 1. Tab views in IndexedStack with persistent nested Navigators.
+                    // 1. Tab views with persistent nested Navigators.
                     Positioned.fill(
                       child: IndexedStack(
                         index: _currentIndex,
@@ -242,7 +279,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
                       ),
                     ),
 
-                    // 2. Floating frosted-glass tab bar with synchronized slide & fade.
+                    // 2. Apple Music style glass dock (slide lens + search circle).
                     Positioned(
                       left: 16,
                       right: 16,
@@ -260,7 +297,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
                               offset: Offset(0, (_navHeight + safeBottom + 24) * (1 - dockProgress)),
                               child: Opacity(
                                 opacity: (dockProgress * 1.6).clamp(0.0, 1.0),
-                                child: _FloatingNavBar(
+                                child: AppleDock(
                                   height: _navHeight,
                                   index: _currentIndex,
                                   onSelect: _select,
@@ -272,219 +309,21 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
                       ),
                     ),
 
-                    // 3. Fluid single-controller morphing PlayerShell with dynamic bottom clearance.
+                    // 3. Morphing PlayerShell (mini player pill above the dock).
                     Positioned.fill(
                       child: PlayerShell(
                         key: _playerShellKey,
                         hideMini: hideDocks,
                         miniBottomOffset: miniBottom,
-                    onGoToArtist: (trackOrArtist) {
-                      final String artist;
-                      if (trackOrArtist is String) {
-                        artist = trackOrArtist;
-                      } else if (trackOrArtist is Track) {
-                        final names = trackOrArtist.artistNames;
-                        artist = names.isNotEmpty ? names.first : trackOrArtist.artist;
-                      } else {
-                        artist = trackOrArtist?.artist?.toString() ?? trackOrArtist?.toString() ?? '';
-                      }
-                      if (artist.isNotEmpty) {
-                        _openInActiveTab(ArtistScreen(artistName: artist));
-                      }
-                    },
-                    onGoToAlbum: (track) {
-                      final String title;
-                      final String artist;
-                      final String? cover;
-                      if (track is Track) {
-                        title = track.album.isNotEmpty ? track.album : track.title;
-                        artist = track.artist;
-                        cover = track.coverUrl;
-                      } else {
-                        final a = track?.album?.toString();
-                        final t = track?.title?.toString() ?? 'Album';
-                        title = (a != null && a.isNotEmpty) ? a : t;
-                        artist = track?.artist?.toString() ?? 'Unknown Artist';
-                        cover = track?.coverUrl?.toString();
-                      }
-                      _openInActiveTab(AlbumScreen(
-                        albumTitle: title,
-                        artistName: artist,
-                        coverUrl: cover,
-                      ));
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ),
-  ),
-);
-  }
-}
-
-class _NavSpec {
-  const _NavSpec(this.label, this.active, this.inactive);
-  final String label;
-  final IconData active;
-  final IconData inactive;
-}
-
-class _FloatingNavBar extends StatelessWidget {
-  const _FloatingNavBar({
-    required this.height,
-    required this.index,
-    required this.onSelect,
-  });
-
-  final double height;
-  final int index;
-  final ValueChanged<int> onSelect;
-
-  static const _items = [
-    _NavSpec('Home', Icons.home_rounded, Icons.home_outlined),
-    _NavSpec('Explore', Icons.grid_view_rounded, Icons.grid_view_outlined),
-    _NavSpec('Library', Icons.library_music_rounded,
-        Icons.library_music_outlined),
-    _NavSpec('Search', CupertinoIcons.search, CupertinoIcons.search),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: 30,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: GlassPanel(
-        borderRadius: BorderRadius.circular(32),
-        blur: 32,
-        tint: const Color(0xA6121214),
-        child: SizedBox(
-          height: height,
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final itemWidth = constraints.maxWidth / _items.length;
-                return Stack(
-                  children: [
-                    // Sliding rose highlight, driven by a spring.
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 650),
-                      curve: Zen.springSnappy,
-                      left: index * itemWidth,
-                      top: 0,
-                      bottom: 0,
-                      width: itemWidth,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Zen.rose.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(26),
-                          border: Border.all(
-                            color: Zen.rose.withValues(alpha: 0.28),
-                            width: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: Row(
-                        children: [
-                          for (int i = 0; i < _items.length; i++)
-                            Expanded(
-                              child: _NavItem(
-                                spec: _items[i],
-                                selected: i == index,
-                                onTap: () => onSelect(i),
-                              ),
-                            ),
-                        ],
+                        onGoToArtist: _goToArtist,
+                        onGoToAlbum: _goToAlbum,
                       ),
                     ),
                   ],
                 );
               },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.spec,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _NavSpec spec;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? Zen.rose : Zen.labelSecondary;
-
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: spec.label,
-      child: PressableScale(
-        onTap: onTap,
-        child: SizedBox.expand(
-          child: ColoredBox(
-            color: Colors.transparent, // makes the whole cell tappable
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedScale(
-                  scale: selected ? 1.12 : 1.0,
-                  duration: const Duration(milliseconds: 520),
-                  curve: Zen.springBouncy,
-                  child: TweenAnimationBuilder<Color?>(
-                    tween: ColorTween(end: color),
-                    duration: const Duration(milliseconds: 250),
-                    builder: (context, c, _) => AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: ScaleTransition(scale: animation, child: child),
-                      ),
-                      child: Icon(
-                        selected ? spec.active : spec.inactive,
-                        key: ValueKey(selected),
-                        color: c,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 220),
-                  style: TextStyle(
-                    fontSize: 10,
-                    letterSpacing: 0.1,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    color: color,
-                  ),
-                  child: Text(spec.label),
-                ),
-              ],
-            ),
-          ),
+            );
+          },
         ),
       ),
     );

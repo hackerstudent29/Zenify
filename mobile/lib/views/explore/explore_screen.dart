@@ -30,6 +30,8 @@ import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
 import '../details/artist_screen.dart';
+import '../details/artist_popup.dart';
+import '../../design_system/widgets/interactive_artists_text.dart';
 import 'explore_data_service.dart';
 
 /* ------------------------------------------------------------------ */
@@ -716,10 +718,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    track.artist,
+                  InteractiveArtistsText(
+                    artists: track.resolvedArtists,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
@@ -732,6 +733,7 @@ class _ExploreScreenState extends State<ExploreScreen>
               icon: const Icon(Icons.more_horiz_rounded, color: AppColors.textTertiary),
               onPressed: () {
                 final player = context.read<PlayerState>();
+                final resolvedArtists = track.resolvedArtists;
                 ZenDropdown.showTrackMenu(
                   context: context,
                   trackTitle: track.title,
@@ -739,10 +741,16 @@ class _ExploreScreenState extends State<ExploreScreen>
                   albumName: track.album,
                   onPlayNext: () => player.playNext(track),
                   onPlayLater: () => player.playLast(track),
-                  onGoToArtist: () => Navigator.push(
-                    context,
-                    CupertinoPageRoute(builder: (_) => ArtistScreen(artistName: track.artist)),
-                  ),
+                  onGoToArtist: () {
+                    if (resolvedArtists.length > 1) {
+                      showArtistPopup(context, artists: resolvedArtists);
+                    } else if (resolvedArtists.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        CupertinoPageRoute(builder: (_) => ArtistScreen(artistName: resolvedArtists.first.name)),
+                      );
+                    }
+                  },
                   onGoToAlbum: track.album.isNotEmpty && track.album != 'Single'
                       ? () => Navigator.push(
                             context,

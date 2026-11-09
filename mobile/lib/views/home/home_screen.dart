@@ -336,7 +336,6 @@ class _CoverCard extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.artists,
-    this.onSubtitleTap,
     this.playing = false,
     this.current = false,
     this.circular = false,
@@ -345,7 +344,6 @@ class _CoverCard extends StatelessWidget {
   final String url, title, subtitle;
   final List<ArtistRef>? artists;
   final VoidCallback onTap;
-  final VoidCallback? onSubtitleTap;
   final bool playing, current, circular;
   final double radius;
 
@@ -408,16 +406,12 @@ class _CoverCard extends StatelessWidget {
               style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
             )
           else
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onSubtitleTap,
-              child: Text(
-                MediaNormalizer.formatArtists(subtitle),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: circular ? TextAlign.center : TextAlign.start,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-              ),
+            Text(
+              MediaNormalizer.formatArtists(subtitle),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: circular ? TextAlign.center : TextAlign.start,
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
         ],
       ),
@@ -1290,10 +1284,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           url: t.coverUrl,
                           title: t.title,
                           subtitle: t.artist,
+                          artists: t.resolvedArtists,
                           current: cur,
                           playing: cur && player.isPlaying,
                           onTap: () => play(listenAgain, i),
-                          onSubtitleTap: () => _open(ArtistScreen(artistName: t.artist)),
                         );
                       },
                     ),
@@ -1383,8 +1377,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             url: t.coverUrl,
                             title: t.album,
                             subtitle: t.artist,
+                            artists: t.resolvedArtists,
                             radius: 8,
-                            onSubtitleTap: () => _open(ArtistScreen(artistName: t.artist)),
                             onTap: () => _open(AlbumScreen(
                               albumTitle: t.album,
                               artistName: t.artist,
@@ -1416,8 +1410,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             url: t.coverUrl,
                             title: t.title,
                             subtitle: t.artist,
+                            artists: t.resolvedArtists,
                             onTap: () => play(_favoriteArtistTracks, i),
-                            onSubtitleTap: () => _open(ArtistScreen(artistName: t.artist)),
                           );
                         },
                       ),
