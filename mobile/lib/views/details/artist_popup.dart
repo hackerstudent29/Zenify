@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../../design_system/widgets/monogram_avatar.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../models/artist_ref.dart';
 import '../../services/artist_service.dart';
+import '../../services/library_store.dart';
 import 'artist_screen.dart';
 
 /// Shows an Apple Music-style context popover or bottom sheet for single or multiple artists.
@@ -21,27 +23,53 @@ Future<void> showArtistPopup(
 
   List<ArtistRef> effectiveList = [];
   if (artists != null && artists.isNotEmpty) {
-    effectiveList = artists;
+    for (final a in artists) {
+      effectiveList.addAll(ArtistRef.splitFromName(a.name, defaultImageUrl: a.imageUrl));
+    }
   } else if (currentArtistName != null && currentArtistName.trim().isNotEmpty) {
     effectiveList = ArtistRef.splitFromName(currentArtistName);
   }
+
+  // Deduplicate
+  final seen = <String>{};
+  effectiveList = effectiveList.where((a) => seen.add(a.name.toLowerCase())).toList();
 
   if (effectiveList.isEmpty) {
     effectiveList = [ArtistRef.fromName('Unknown Artist')];
   }
 
+  final callerNav = Navigator.of(context);
+
   await showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: true,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (ctx) => _ArtistPopupSheet(artists: effectiveList),
+    builder: (ctx) => _ArtistPopupSheet(
+      artists: effectiveList,
+      onOpenArtist: (artist) {
+        Navigator.of(ctx).pop();
+        callerNav.push(
+          MaterialPageRoute(
+            builder: (_) => ArtistScreen(
+              artistName: artist.name,
+              imageUrl: artist.imageUrl,
+            ),
+          ),
+        );
+      },
+    ),
   );
 }
 
 class _ArtistPopupSheet extends StatefulWidget {
-  const _ArtistPopupSheet({required this.artists});
+  const _ArtistPopupSheet({
+    required this.artists,
+    required this.onOpenArtist,
+  });
 
   final List<ArtistRef> artists;
+  final ValueChanged<ArtistRef> onOpenArtist;
 
   @override
   State<_ArtistPopupSheet> createState() => _ArtistPopupSheetState();
@@ -54,6 +82,11 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
   @override
   void initState() {
     super.initState();
+    for (final a in widget.artists) {
+      if (LibraryStore.instance.isFollowing(a.name)) {
+        _following.add(a.id);
+      }
+    }
     _loadStats();
   }
 
@@ -79,7 +112,7 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.65,
       ),
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      margin: EdgeInsets.fromLTRB(12, 0, 12, math.max(12, bottomInset + 8)),
       decoration: BoxDecoration(
         color: const Color(0xE61E1E22),
         borderRadius: BorderRadius.circular(28),
@@ -150,7 +183,7 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
               Flexible(
                 child: ListView.separated(
                   shrinkWrap: true,
-                  padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottomInset),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   itemCount: widget.artists.length,
                   separatorBuilder: (_, index) => const SizedBox(height: 12),
                   itemBuilder: (context, i) {
@@ -171,54 +204,61 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
                       child: Row(
                         children: [
                           // Avatar
-                          ClipOval(
-                            child: SizedBox(
-                              width: 60,
-                              height: 60,
-                              child: artist.imageUrl != null && artist.imageUrl!.isNotEmpty
-                                  ? CachedNetworkImage(
-                                      imageUrl: artist.imageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (_, url, error) => MonogramAvatar(
+                          GestureDetector(
+                            onTap: () => widget.onOpenArtist(artist),
+                            child: ClipOval(
+                              child: SizedBox(
+                                width: 60,
+                                height: 60,
+                                child: artist.imageUrl != null && artist.imageUrl!.isNotEmpty
+                                    ? CachedNetworkImage(
+                                        imageUrl: artist.imageUrl!,
+                                        fit: BoxFit.cover,
+                                        errorWidget: (_, url, error) => MonogramAvatar(
+                                          name: artist.name,
+                                          size: 60,
+                                          isCircle: true,
+                                        ),
+                                      )
+                                    : MonogramAvatar(
                                         name: artist.name,
                                         size: 60,
                                         isCircle: true,
                                       ),
-                                    )
-                                  : MonogramAvatar(
-                                      name: artist.name,
-                                      size: 60,
-                                      isCircle: true,
-                                    ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 14),
 
                           // Name and Stats
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  artist.name,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTypography.headline.copyWith(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => widget.onOpenArtist(artist),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    artist.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.headline.copyWith(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  statLine,
-                                  style: AppTypography.caption.copyWith(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    statLine,
+                                    style: AppTypography.caption.copyWith(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -230,6 +270,7 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
                               PressableScale(
                                 onTap: () {
                                   HapticFeedback.selectionClick();
+                                  LibraryStore.instance.toggleFollow(artist.name, artist.imageUrl ?? '');
                                   setState(() {
                                     if (isFollowed) {
                                       _following.remove(artist.id);
@@ -258,18 +299,7 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
                               ),
                               const SizedBox(height: 6),
                               PressableScale(
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ArtistScreen(
-                                        artistName: artist.name,
-                                        imageUrl: artist.imageUrl,
-                                      ),
-                                    ),
-                                  );
-                                },
+                                onTap: () => widget.onOpenArtist(artist),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   child: const Row(

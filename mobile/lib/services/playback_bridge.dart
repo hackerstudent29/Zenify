@@ -51,7 +51,7 @@ class DemoPlaybackBridge extends ChangeNotifier implements PlaybackBridge {
     _timer = Timer.periodic(const Duration(milliseconds: 250), _tick);
   }
 
-  static const List<Track> _queue = [
+  static final List<Track> _queue = [
     Track(
       id: 'demo-1',
       title: 'Neela Nira',

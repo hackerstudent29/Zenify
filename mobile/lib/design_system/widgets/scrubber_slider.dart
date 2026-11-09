@@ -10,11 +10,15 @@ class ScrubberSlider extends StatefulWidget {
     required this.positionNotifier,
     required this.duration,
     required this.onSeek,
+    this.activeColor,
+    this.trackColor,
   });
 
   final ValueNotifier<Duration> positionNotifier;
   final Duration duration;
   final ValueChanged<Duration> onSeek;
+  final Color? activeColor;
+  final Color? trackColor;
 
   @override
   State<ScrubberSlider> createState() => _ScrubberSliderState();
@@ -41,6 +45,8 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
   @override
   Widget build(BuildContext context) {
     final totalMs = widget.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity);
+    final active = widget.activeColor ?? Colors.white.withValues(alpha: 0.6);
+    final track = widget.trackColor ?? Colors.white.withValues(alpha: 0.2);
 
     return ValueListenableBuilder<Duration>(
       valueListenable: widget.positionNotifier,
@@ -103,27 +109,24 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
                       alignment: Alignment.centerLeft,
                       clipBehavior: Clip.none,
                       children: [
-                        // Background Track (glass styled like website h-2 border border-white/5)
-                        Container(
-                          width: trackWidth,
-                          height: trackHeight,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.06),
-                              width: 0.6,
+                        // Clipped Apple-style background & progress bar
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: SizedBox(
+                            width: trackWidth,
+                            height: trackHeight,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(child: ColoredBox(color: track)),
+                                Positioned(
+                                  left: 0,
+                                  top: 0,
+                                  bottom: 0,
+                                  width: (trackWidth * progress).clamp(0.0, trackWidth),
+                                  child: ColoredBox(color: active),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-
-                        // Active Progress Track
-                        Container(
-                          width: (trackWidth * progress).clamp(0.0, trackWidth),
-                          height: trackHeight,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
                           ),
                         ),
 
@@ -135,7 +138,7 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
                               width: 16,
                               height: 16,
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: active.withValues(alpha: 0.95),
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
@@ -162,14 +165,14 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
                 children: [
                   Text(
                     _formatTime(_isDragging ? Duration(milliseconds: _dragPositionMs.toInt()) : position),
-                    style: AppTypography.timer,
+                    style: AppTypography.timer.copyWith(color: active.withValues(alpha: 0.8)),
                   ),
                   Text(
                     _formatRemaining(
                       _isDragging ? Duration(milliseconds: _dragPositionMs.toInt()) : position,
                       widget.duration,
                     ),
-                    style: AppTypography.timer,
+                    style: AppTypography.timer.copyWith(color: active.withValues(alpha: 0.8)),
                   ),
                 ],
               ),

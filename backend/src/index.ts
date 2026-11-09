@@ -343,7 +343,7 @@ const defaultRemoteConfig = {
         homeFeed: false,
     },
     minAppVersion: '1.0.0',
-    latestAppVersion: '2.6.7',
+    latestAppVersion: '1.0.1',
     updateUrl: 'https://listenzenify.com/download/app',
     releaseNotes: '• Pure YouTube Music Automix: Infinite continuous radio playback from current tracks\n• Native Android getNext queue integration via Dispatchers.IO\n• Enhanced MediaNormalizer artwork scaling and defensive null safety\n• Zero legacy provider dependencies: 100% pure YouTube Music catalog',
     message: null,
@@ -352,7 +352,7 @@ const defaultRemoteConfig = {
 server.get('/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.7.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.2.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
@@ -362,7 +362,7 @@ server.get('/download/app', async (request, reply) => {
 server.get('/api/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v2.6.7.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.2.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }

@@ -38,7 +38,10 @@ class ListeningHistoryService {
           for (final item in list) {
             if (item is Map) {
               try {
-                _history.add(Track.fromJson(Map<String, dynamic>.from(item)));
+                final t = Track.fromJson(Map<String, dynamic>.from(item));
+                if (!t.artist.contains("Instance of") && !t.artist.contains("ArtistRef") && t.artist != 'Unknown Artist') {
+                  _history.add(t);
+                }
               } catch (_) {}
             }
           }
@@ -52,7 +55,10 @@ class ListeningHistoryService {
         if (map != null) {
           _artistPlays.clear();
           map.forEach((k, v) {
-            if (v is int) _artistPlays[k.toString()] = v;
+            final keyStr = k.toString();
+            if (v is int && !keyStr.contains("Instance of") && !keyStr.contains("ArtistRef")) {
+              _artistPlays[keyStr] = v;
+            }
           });
         }
       }
@@ -97,6 +103,21 @@ class ListeningHistoryService {
     } catch (e) {
       if (kDebugMode) debugPrint('[ListeningHistoryService] persist error: $e');
     }
+  }
+
+  /// Returns the user's primary/dominant listening language (e.g. 'tamil', 'hindi', 'telugu', etc.).
+  String get primaryLanguage {
+    if (_history.isEmpty) return '';
+    final langCounts = <String, int>{};
+    for (final t in _history) {
+      final lang = t.language.isNotEmpty ? t.language : Track.detectLanguage(t.title, t.artist, t.album);
+      if (lang != null && lang.isNotEmpty) {
+        langCounts[lang] = (langCounts[lang] ?? 0) + 1;
+      }
+    }
+    if (langCounts.isEmpty) return '';
+    final top = langCounts.entries.reduce((a, b) => a.value > b.value ? a : b);
+    return top.key;
   }
 
   /// Returns user's top played artists ordered by play count descending.

@@ -16,11 +16,11 @@ class Track {
   final String source; // 'youtube', 'local'
   final List<ArtistRef> artists;
 
-  const Track({
+  Track({
     required this.id,
-    required this.title,
-    required this.artist,
-    required this.album,
+    required String title,
+    required String artist,
+    required String album,
     required this.coverUrl,
     this.streamUrl,
     this.durationSeconds = 210,
@@ -28,11 +28,22 @@ class Track {
     this.hasLyrics = true,
     this.source = 'youtube',
     this.artists = const [],
-  });
+  })  : title = MediaNormalizer.cleanTitle(title),
+        artist = MediaNormalizer.cleanArtistName(artist),
+        album = MediaNormalizer.cleanAlbumTitle(album);
+
+  /// Clean, compact title for cards and mini player (strips "From ..." movie subtitles and feature tags).
+  String get compactTitle => MediaNormalizer.cleanCompactTitle(title);
 
   /// List of distinct ArtistRef objects, parsed from [artists] or [artist].
   List<ArtistRef> get resolvedArtists {
-    if (artists.isNotEmpty) return artists;
+    final List<ArtistRef> out = [];
+    if (artists.isNotEmpty) {
+      for (final a in artists) {
+        out.addAll(ArtistRef.splitFromName(a.name, defaultImageUrl: a.imageUrl));
+      }
+    }
+    if (out.isNotEmpty) return out;
     return ArtistRef.splitFromName(artist);
   }
 
@@ -47,17 +58,11 @@ class Track {
 
   /// Guaranteed non-empty artist line with Apple Music multi-artist formatting ("A & B", "A, B & C").
   String get displayArtists {
-    if (artists.isNotEmpty) {
-      return ArtistRef.formatList(artists, fallback: artist.isNotEmpty ? artist : 'Unknown Artist');
+    final list = resolvedArtists;
+    if (list.isNotEmpty) {
+      return ArtistRef.formatList(list);
     }
-    if (artist.trim().isNotEmpty) {
-      final split = ArtistRef.splitFromName(artist);
-      if (split.length > 1) {
-        return ArtistRef.formatList(split);
-      }
-      return artist;
-    }
-    return album.isNotEmpty ? album : 'Unknown Artist';
+    return MediaNormalizer.formatArtists(artist);
   }
 
   // ───────────────────────────── Derived values ─────────────────────────────
@@ -78,12 +83,107 @@ class Track {
 
   static String? detectLanguage(String title, String artist, [String album = '']) {
     final lower = '$title $artist $album'.toLowerCase();
-    if (lower.contains('tamil')) return 'tamil';
-    if (lower.contains('telugu')) return 'telugu';
-    if (lower.contains('hindi')) return 'hindi';
-    if (lower.contains('malayalam')) return 'malayalam';
-    if (lower.contains('kannada')) return 'kannada';
-    if (lower.contains('punjabi')) return 'punjabi';
+
+    // 1. Explicit keyword check
+    if (lower.contains('tamil') || lower.contains('kollywood')) return 'tamil';
+    if (lower.contains('telugu') || lower.contains('tollywood')) return 'telugu';
+    if (lower.contains('hindi') || lower.contains('bollywood')) return 'hindi';
+    if (lower.contains('malayalam') || lower.contains('mollywood')) return 'malayalam';
+    if (lower.contains('kannada') || lower.contains('sandalwood')) return 'kannada';
+    if (lower.contains('punjabi') || lower.contains('pollywood')) return 'punjabi';
+
+    final aLower = artist.toLowerCase();
+
+    // 2. Tamil composer / artist recognition
+    if (aLower.contains('anirudh') ||
+        aLower.contains('yuvan') ||
+        aLower.contains('harris jayaraj') ||
+        aLower.contains('santhosh narayanan') ||
+        aLower.contains('sean roldan') ||
+        aLower.contains('ilaiyaraaja') ||
+        aLower.contains('ilayaraja') ||
+        aLower.contains('d. imman') ||
+        aLower.contains('imman') ||
+        aLower.contains('g.v. prakash') ||
+        aLower.contains('g. v. prakash') ||
+        aLower.contains('hiphop tamizha') ||
+        aLower.contains('pradeep kumar') ||
+        aLower.contains('vijay antony') ||
+        aLower.contains('silambarasan') ||
+        aLower.contains('dhibu ninan') ||
+        aLower.contains('sam c.s') ||
+        aLower.contains('sam c. s') ||
+        aLower.contains('ghibran') ||
+        aLower.contains('leon james') ||
+        aLower.contains('vivek-mervin')) {
+      return 'tamil';
+    }
+
+    // 3. Telugu composer / artist recognition
+    if (aLower.contains('thaman') ||
+        aLower.contains('devi sri prasad') ||
+        aLower.contains('mickey j meyer') ||
+        aLower.contains('ram miriyala') ||
+        aLower.contains('anurag kulkarni') ||
+        aLower.contains('keeravani') ||
+        aLower.contains('chaitan bharadwaj')) {
+      return 'telugu';
+    }
+
+    // 4. Malayalam composer / artist recognition
+    if (aLower.contains('sushin shyam') ||
+        aLower.contains('hesham abdul wahab') ||
+        aLower.contains('jakes bejoy') ||
+        aLower.contains('shaan rahman') ||
+        aLower.contains('deepak dev') ||
+        aLower.contains('rex vijayan') ||
+        aLower.contains('gopi sundar')) {
+      return 'malayalam';
+    }
+
+    // 5. Punjabi artist recognition
+    if (aLower.contains('karan aujla') ||
+        aLower.contains('diljit') ||
+        aLower.contains('sidhu moose') ||
+        aLower.contains('ap dhillon') ||
+        aLower.contains('shubh') ||
+        aLower.contains('guru randhawa') ||
+        aLower.contains('ammy virk')) {
+      return 'punjabi';
+    }
+
+    // 6. Hindi / Bollywood artist recognition
+    if (aLower.contains('arijit singh') ||
+        aLower.contains('pritam') ||
+        aLower.contains('sachin-jigar') ||
+        aLower.contains('vishal-shekhar') ||
+        aLower.contains('amit trivedi') ||
+        aLower.contains('badshah') ||
+        aLower.contains('neha kakkar') ||
+        aLower.contains('atif aslam') ||
+        aLower.contains('sonu nigam') ||
+        aLower.contains('jubin nautiyal') ||
+        aLower.contains('darshan raval')) {
+      return 'hindi';
+    }
+
+    // 7. English / Western artist recognition
+    if (aLower.contains('taylor swift') ||
+        aLower.contains('the weeknd') ||
+        aLower.contains('drake') ||
+        aLower.contains('ed sheeran') ||
+        aLower.contains('billie eilish') ||
+        aLower.contains('coldplay') ||
+        aLower.contains('dua lipa') ||
+        aLower.contains('bruno mars')) {
+      return 'english';
+    }
+
+    // 8. General A.R. Rahman check
+    if (aLower.contains('rahman')) {
+      return 'tamil';
+    }
+
     return null;
   }
 
@@ -116,41 +216,44 @@ class Track {
     String baseUrl = defaultBaseUrl,
   }) {
     // 1. Title
-    final title = _clean(json['title']) ??
+    final title = MediaNormalizer.cleanTitle(
+        _clean(json['title']) ??
         _clean(json['name']) ??
         _clean(json['trackName']) ??
-        'Unknown Title';
+        'Unknown Title');
 
-    // 2. Artist (handles String, Map, List and common alternate keys)
+    // 2. Artist (handles String, Map, List, ArtistRef and common alternate keys)
     String? artistName;
     final rawArtist = json['artist'];
     if (rawArtist is String) {
-      artistName = _clean(rawArtist);
+      artistName = MediaNormalizer.cleanArtistName(rawArtist);
     } else if (rawArtist is Map) {
-      artistName = _clean(rawArtist['name']);
+      artistName = MediaNormalizer.cleanArtistName(rawArtist['name'] ?? rawArtist['title']);
+    } else if (rawArtist is ArtistRef) {
+      artistName = MediaNormalizer.cleanArtistName(rawArtist.name);
+    } else if (rawArtist is List) {
+      artistName = _artistsFromList(rawArtist);
     }
     artistName ??= _artistsFromList(json['artists']) ??
-        _clean(json['primaryArtists']) ??
-        _clean(json['artistName']) ??
-        _clean(json['author']) ??
-        _clean(json['uploader']) ??
-        _clean(json['channel']);
-    // YouTube auto-generated channels look like "Artist - Topic".
-    artistName = (artistName ?? 'Unknown Artist')
-        .replaceAll(RegExp(r'\s*-\s*Topic$'), '')
-        .trim();
-    if (artistName.isEmpty) artistName = 'Unknown Artist';
+        (_clean(json['primaryArtists']) != null ? MediaNormalizer.cleanArtistName(json['primaryArtists']) : null) ??
+        (_clean(json['artistName']) != null ? MediaNormalizer.cleanArtistName(json['artistName']) : null) ??
+        (_clean(json['author']) != null ? MediaNormalizer.cleanArtistName(json['author']) : null) ??
+        (_clean(json['uploader']) != null ? MediaNormalizer.cleanArtistName(json['uploader']) : null) ??
+        (_clean(json['channel']) != null ? MediaNormalizer.cleanArtistName(json['channel']) : null);
+    artistName = (artistName ?? 'Unknown Artist').trim();
+    if (artistName.isEmpty || artistName.contains("Instance of 'ArtistRef'")) artistName = 'Unknown Artist';
 
     // 3. Album
     String? albumName;
     final rawAlbum = json['album'];
     if (rawAlbum is String) {
-      albumName = _clean(rawAlbum);
+      albumName = MediaNormalizer.cleanAlbumTitle(rawAlbum);
     } else if (rawAlbum is Map) {
-      albumName = _clean(rawAlbum['title']) ?? _clean(rawAlbum['name']);
+      albumName = MediaNormalizer.cleanAlbumTitle(rawAlbum['title'] ?? rawAlbum['name']);
     }
-    albumName ??= _clean(json['albumName']) ?? _clean(json['collectionName']);
-    albumName ??= 'Single';
+    albumName ??= (_clean(json['albumName']) != null ? MediaNormalizer.cleanAlbumTitle(json['albumName']) : null) ??
+        (_clean(json['collectionName']) != null ? MediaNormalizer.cleanAlbumTitle(json['collectionName']) : null);
+    albumName = (albumName != null && albumName.isNotEmpty) ? albumName : 'Single';
 
     // 4. Id (never empty, so equality and "now playing" checks stay reliable)
     final id = _clean(json['id']) ??
@@ -195,14 +298,19 @@ class Track {
     if (rawArtists is List) {
       for (final a in rawArtists) {
         if (a is Map) {
-          parsedArtists.add(ArtistRef.fromJson(Map<String, dynamic>.from(a)));
+          final n = a['name'] ?? a['title'] ?? a['text'];
+          if (n is String) {
+            parsedArtists.addAll(ArtistRef.splitFromName(n, defaultImageUrl: a['imageUrl']?.toString()));
+          }
         } else if (a is String && a.trim().isNotEmpty) {
-          parsedArtists.add(ArtistRef.fromName(a));
+          parsedArtists.addAll(ArtistRef.splitFromName(a));
+        } else if (a is ArtistRef) {
+          parsedArtists.addAll(ArtistRef.splitFromName(a.name, defaultImageUrl: a.imageUrl));
         }
       }
     }
     if (parsedArtists.isEmpty && artistName.isNotEmpty) {
-      parsedArtists.add(ArtistRef.fromName(artistName));
+      parsedArtists.addAll(ArtistRef.splitFromName(artistName));
     }
 
     return Track(
@@ -298,8 +406,14 @@ String? _clean(Object? value) {
 String? _artistsFromList(Object? value) {
   if (value is! List || value.isEmpty) return null;
   final names = value
-      .map((a) => a is Map ? _clean(a['name']) : _clean(a))
+      .map((a) {
+        if (a is ArtistRef) return a.name;
+        if (a is Map) return _clean(a['name'] ?? a['title']);
+        if (a is String) return MediaNormalizer.stripIdNoise(_clean(a) ?? '');
+        return null;
+      })
       .whereType<String>()
+      .where((n) => n.isNotEmpty && !n.contains("Instance of 'ArtistRef'") && !n.contains("Instance of"))
       .toList();
   return names.isEmpty ? null : names.join(', ');
 }

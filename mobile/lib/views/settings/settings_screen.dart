@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/zen.dart';
 import '../../services/api_service.dart';
@@ -29,7 +30,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
   int _versionTapCount = 0;
-  String _appVersion = 'v2.6.2 (Build 44)';
+  String _appVersion = 'v1.0.1 (Build 3)';
 
   @override
   void initState() {
@@ -109,7 +110,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
               ),
               const SizedBox(height: 16),
               _diagRow('Current Build', _appVersion),
-              _diagRow('Release Channel', 'v2.6.2 Production (ARM64)'),
+              _diagRow('Release Channel', 'v1.0.1 Production (ARM64)'),
               _diagRow('Status', 'Up to date • Latest package installed'),
               _diagRow('Pipeline', 'YouTube Music InnerTube + StudioFX DSP'),
               const SizedBox(height: 24),
@@ -213,25 +214,14 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // App Bar
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: Zen.bg.withValues(alpha: 0.90),
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-              onPressed: () => Navigator.of(context).pop(),
+          // Dynamic Island Floating Header
+          SliverToBoxAdapter(
+            child: DynamicIslandHeader(
+              title: 'Settings',
+              showBack: true,
+              onBack: () => Navigator.of(context).pop(),
+              showProfile: false,
             ),
-            title: Text(
-              'SETTINGS',
-              style: GoogleFonts.oswald(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-                color: Colors.white,
-              ),
-            ),
-            centerTitle: true,
           ),
 
           SliverToBoxAdapter(

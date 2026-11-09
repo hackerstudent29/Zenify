@@ -16,6 +16,8 @@ import 'library_store.dart';
 import 'listening_history_service.dart';
 import 'listening_tracker_service.dart';
 import 'lyrics_service.dart';
+import 'permission_service.dart';
+import 'stream_resolver_service.dart';
 
 enum ZenifyRepeatMode { off, all, one }
 
@@ -77,7 +79,12 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   final List<Track> _history = [];
   int _currentIndex = 0;
   int? _autoplayStartIndex;
+  bool _collectionLocked = false;
+  bool get isCollectionLocked => _collectionLocked;
+  DateTime? _lastTransitionHandled;
   String? _lastError;
+  final Set<String> _playedSessionTrackIds = <String>{};
+  bool _prepopulatingRadio = false;
 
   // Engine coordination
   int _playToken = 0;
@@ -248,6 +255,13 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   }
 
   Future<void> _onComplete() async {
+    final now = DateTime.now();
+    if (_lastTransitionHandled != null &&
+        now.difference(_lastTransitionHandled!) < const Duration(milliseconds: 1400)) {
+      return;
+    }
+    _lastTransitionHandled = now;
+
     ListeningTrackerService.instance.endTrack('completed');
     if (_sleepAtEndOfTrack) {
       _clearSleep();
@@ -267,6 +281,13 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   }
 
   Future<void> _onAutoTransition(String mediaId) async {
+    final now = DateTime.now();
+    if (_lastTransitionHandled != null &&
+        now.difference(_lastTransitionHandled!) < const Duration(milliseconds: 1400)) {
+      return;
+    }
+    _lastTransitionHandled = now;
+
     ListeningTrackerService.instance.endTrack('completed');
     if (_sleepAtEndOfTrack) {
       _clearSleep();
@@ -282,20 +303,34 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     }
 
     int nextIndex = _currentIndex + 1;
+    bool needsForcePlay = false;
+
     if (mediaId.isNotEmpty) {
       final clean = mediaId.replaceFirst('yt-', '').trim();
       final idx = _queue.indexWhere((t) => t.id.replaceFirst('yt-', '').trim() == clean);
-      if (idx >= 0) nextIndex = idx;
+      if (idx >= 0) {
+        nextIndex = idx;
+      } else {
+        // Foreign / outdated track in native ExoPlayer -> force play real queue track
+        needsForcePlay = true;
+      }
     }
 
     if (nextIndex < _queue.length) {
       _currentIndex = nextIndex;
     } else if (_repeatMode == ZenifyRepeatMode.all) {
       _currentIndex = 0;
-    } else if (_autoplay && await _appendRelated()) {
+      needsForcePlay = true;
+    } else if (!_collectionLocked && _autoplay && await _appendRelated()) {
       _currentIndex++;
+      needsForcePlay = true;
     } else {
       await _endOfQueue();
+      return;
+    }
+
+    if (needsForcePlay) {
+      await _startCurrent();
       return;
     }
 
@@ -325,9 +360,16 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     );
     notifyListeners();
 
+    _playedSessionTrackIds.add(track.id);
+    _playedSessionTrackIds.add(track.id.replaceFirst('yt-', ''));
+
     unawaited(_loadLyricsForTrack(track, token));
     unawaited(_resolveAccent(track, token));
     _prefetchNext();
+
+    if (!_collectionLocked && _autoplay && (_queue.length - _currentIndex) <= 4) {
+      unawaited(_appendRelated());
+    }
   }
 
   void _setPosition(Duration pos) {
@@ -343,8 +385,18 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
   /// Replace the queue and start playing. If [shuffle] is null the current
   /// shuffle setting is kept (like Apple Music).
-  Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool? shuffle}) async {
+  /// When [collectionLocked] is true, playback strictly stays inside [tracks].
+  Future<void> setQueue(
+    List<Track> tracks, {
+    int startIndex = 0,
+    bool? shuffle,
+    bool collectionLocked = false,
+  }) async {
     if (tracks.isEmpty) return;
+    _collectionLocked = collectionLocked;
+    // Wipe previous gapless next track in native player so it never leaks
+    unawaited(_audioPlayer.setNext(null));
+
     _originalQueue = List.of(tracks);
     _queue = List.of(tracks);
     _currentIndex = startIndex.clamp(0, _queue.length - 1);
@@ -459,6 +511,8 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
     _currentTrack = track;
     LibraryStore.instance.registerTrack(track);
+    // Request media notification permission on Android 13+ when playback begins
+    unawaited(PermissionService.instance.ensureNotificationPermission());
     _isTransitioning = true;
     _pausing = false;
     _isBuffering = true;
@@ -496,6 +550,11 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       // Apple Music always eases audio in instead of cutting it.
       unawaited(_rampVolume(volumeNotifier.value, const Duration(milliseconds: 260)));
       _prefetchNext();
+      _playedSessionTrackIds.add(seed.id);
+      _playedSessionTrackIds.add(seed.id.replaceFirst('yt-', ''));
+      if (!_collectionLocked && _autoplay && (_queue.length - _currentIndex) <= 3) {
+        unawaited(_prepopulateRadio(seed));
+      }
     } catch (e) {
       if (token != _playToken) return;
       if (kDebugMode) debugPrint('Audio playback error: $e');
@@ -515,10 +574,10 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
     Object? error;
 
-    // 1. TOP PRIORITY: Native ExoPlayer Pipeline with InnerTubeX + PO Token + RefusedRetryDataSource
-    // Instant ~200-300ms audio playback directly on device, Zero 403s.
+    // 1. TOP PRIORITY: Native ExoPlayer Pipeline with InnerTubeX + PO Token
+    // Instant ~200-300ms audio playback directly on device.
     final videoId = track.id.replaceFirst('yt-', '').trim();
-    if (videoId.isNotEmpty) {
+    if (videoId.length == 11 && !videoId.contains(' ') && !videoId.startsWith('http') && !videoId.startsWith('gen-')) {
       try {
         if (token != _playToken) return;
         await _audioPlayer.playMedia(
@@ -550,17 +609,29 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       }
     }
 
-    // 3. Fallback: Zenify Backend Stream Proxy (/stream-youtube?v=)
+    // 3. On-Device Stream Resolver: searches YouTube Music accurately by Title + Artist
     try {
-      final videoId = track.id.replaceFirst('yt-', '').trim();
-      if (videoId.isNotEmpty) {
-        final proxyUrl = '${ApiService.baseUrl}/stream-youtube?v=$videoId';
+      final resolved = await StreamResolverService.instance.resolveTrack(track);
+      if (resolved != null && resolved.url.isNotEmpty) {
         if (token != _playToken) return;
-        await _audioPlayer.play(ap.UrlSource(proxyUrl));
+        await _audioPlayer.play(ap.UrlSource(resolved.url));
         return;
       }
     } catch (e) {
       error = e;
+      if (kDebugMode) debugPrint('[PlayerState] StreamResolverService error: $e');
+    }
+
+    // 4. Fallback: Zenify Backend Stream Proxy (/stream-youtube?v=)
+    if (videoId.length == 11 && !videoId.contains(' ')) {
+      try {
+        final proxyUrl = '${ApiService.baseUrl}/stream-youtube?v=$videoId';
+        if (token != _playToken) return;
+        await _audioPlayer.play(ap.UrlSource(proxyUrl));
+        return;
+      } catch (e) {
+        error = e;
+      }
     }
 
     throw error ?? StateError('Unable to resolve audio stream for "${track.title}"');
@@ -571,10 +642,18 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     if (n < _queue.length) {
       final nextTrack = _queue[n];
       unawaited(ApiService.prefetchLyrics(nextTrack));
-      // Gapless next track setup & native engine prefetch
-      unawaited(_audioPlayer.setNext(nextTrack.id));
+      // Gapless next track setup & native engine prefetch with metadata
+      unawaited(_audioPlayer.setNext(
+        nextTrack.id,
+        title: nextTrack.title,
+        artist: nextTrack.artist,
+        artworkUrl: nextTrack.coverUrl,
+      ));
       final lookahead = _queue.skip(n).take(2).map((t) => t.id).toList();
       unawaited(_audioPlayer.prefetch(lookahead));
+    } else {
+      // Clear next item in native player at queue boundary so it doesn't auto-transition
+      unawaited(_audioPlayer.setNext(null));
     }
   }
 
@@ -675,12 +754,13 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   @override
   Future<void> next() async {
     if (_queue.isEmpty) return;
+    _lastTransitionHandled = DateTime.now();
     ListeningTrackerService.instance.endTrack('skipped');
     if (_currentIndex < _queue.length - 1) {
       _currentIndex++;
     } else if (_repeatMode == ZenifyRepeatMode.all) {
       _currentIndex = 0;
-    } else if (_autoplay && await _appendRelated()) {
+    } else if (!_collectionLocked && _autoplay && await _appendRelated()) {
       _currentIndex++;
     } else {
       await _endOfQueue();
@@ -717,17 +797,87 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     } catch (_) {}
   }
 
-  /// Autoplay: keep the music going with similar songs when the queue ends.
-  Future<bool> _appendRelated() async {
+  /// Immediately populates the radio queue when user starts playing a song,
+  /// matching the seed song's language and user affinity without repeats.
+  Future<void> _prepopulateRadio(Track seed) async {
+    if (_prepopulatingRadio || _collectionLocked || !_autoplay) return;
+    _prepopulatingRadio = true;
     try {
-      final related = await InnerTubeService.instance.fetchRelated(_queue[_currentIndex]);
-      final existing = _queue.map((t) => t.id).toSet();
-      final fresh = related.where((t) => existing.add(t.id)).take(20).toList();
-      if (fresh.isEmpty) return false;
+      final userLang = ListeningHistoryService.instance.primaryLanguage;
+      final targetLang = seed.language.isNotEmpty
+          ? seed.language
+          : (Track.detectLanguage(seed.title, seed.artist, seed.album) ?? userLang);
+
+      final related = await InnerTubeService.instance.fetchRelated(seed, targetLanguage: targetLang);
+      if (related.isEmpty) return;
+
+      final existingIds = {
+        ..._queue.map((t) => t.id),
+        ..._queue.map((t) => t.id.replaceFirst('yt-', '')),
+        ..._playedSessionTrackIds,
+      };
+
+      final fresh = related.where((t) {
+        final cleanId = t.id.replaceFirst('yt-', '');
+        return !existingIds.contains(t.id) && !existingIds.contains(cleanId);
+      }).take(20).toList();
+
+      if (fresh.isNotEmpty) {
+        _autoplayStartIndex ??= _queue.length;
+        _queue.addAll(fresh);
+        _originalQueue.addAll(fresh);
+        notifyListeners();
+        _prefetchNext();
+      }
+    } catch (_) {
+    } finally {
+      _prepopulatingRadio = false;
+    }
+  }
+
+  /// Autoplay: keep the music going infinitely with similar songs when the queue gets low.
+  Future<bool> _appendRelated() async {
+    if (_collectionLocked || !_autoplay) return false;
+    try {
+      final seed = _queue.isNotEmpty ? _queue[_currentIndex] : _currentTrack;
+      if (seed == null) return false;
+
+      final userLang = ListeningHistoryService.instance.primaryLanguage;
+      final targetLang = seed.language.isNotEmpty
+          ? seed.language
+          : (Track.detectLanguage(seed.title, seed.artist, seed.album) ?? userLang);
+
+      final related = await InnerTubeService.instance.fetchRelated(seed, targetLanguage: targetLang);
+      final existingIds = {
+        ..._queue.map((t) => t.id),
+        ..._queue.map((t) => t.id.replaceFirst('yt-', '')),
+        ..._playedSessionTrackIds,
+      };
+
+      final fresh = related.where((t) {
+        final cleanId = t.id.replaceFirst('yt-', '');
+        return !existingIds.contains(t.id) && !existingIds.contains(cleanId);
+      }).take(20).toList();
+
+      if (fresh.isEmpty) {
+        // Infinite mix fallback: if related tracks are exhausted, query radio hits in matching language!
+        final moreQuery = targetLang.isNotEmpty ? '$targetLang hits radio' : '${seed.artist} radio mix';
+        final more = await InnerTubeService.instance.search(moreQuery);
+        final moreFresh = more.where((t) {
+          final cleanId = t.id.replaceFirst('yt-', '');
+          return !existingIds.contains(t.id) && !existingIds.contains(cleanId);
+        }).take(20).toList();
+        if (moreFresh.isEmpty) return false;
+        _queue.addAll(moreFresh);
+        _originalQueue.addAll(moreFresh);
+      } else {
+        _queue.addAll(fresh);
+        _originalQueue.addAll(fresh);
+      }
+
       _autoplayStartIndex ??= _queue.length;
-      _queue.addAll(fresh);
-      _originalQueue.addAll(fresh);
       notifyListeners();
+      _prefetchNext();
       return true;
     } catch (_) {
       return false;

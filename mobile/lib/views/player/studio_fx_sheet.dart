@@ -12,9 +12,10 @@ import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/zen.dart' hide SpringCurve;
 import '../../services/studio_fx_state.dart';
 import 'glass_sheet.dart';
+import 'player_kit.dart' show showSpringSheet;
 
 Future<void> showStudioFxSheet(BuildContext context) =>
-    showGlassSheet<void>(context, builder: (_) => const StudioFxSheet());
+    showSpringSheet<void>(context, builder: (_) => const StudioFxSheet());
 
 /// Studio FX: real-time audio engine sheet (Presets, EQ, Space, Voice, Tempo, Chain).
 class StudioFxSheet extends StatefulWidget {

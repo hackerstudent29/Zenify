@@ -110,8 +110,18 @@ class AudioPlayer implements FxEngine {
         'startMs': startMs,
       });
 
-  Future<void> setNext(String? mediaId) =>
-      _call('setNext', {'mediaId': mediaId?.replaceFirst('yt-', '').trim()});
+  Future<void> setNext(
+    String? mediaId, {
+    String? title,
+    String? artist,
+    String? artworkUrl,
+  }) =>
+      _call('setNext', {
+        'mediaId': mediaId?.replaceFirst('yt-', '').trim(),
+        'title': title ?? '',
+        'artist': artist ?? '',
+        'artworkUrl': artworkUrl ?? '',
+      });
 
   Future<void> prefetch(List<String> mediaIds) =>
       _call('prefetch', {'mediaIds': mediaIds.map((id) => id.replaceFirst('yt-', '').trim()).toList()});
