@@ -6,7 +6,6 @@ import { motion, useMotionValue, useSpring, useTransform, useVelocity } from "fr
 import {
   SFAppleHome,
   SFAppleGrid,
-  SwiftUITogether,
   SFAppleLibrary,
   SFAppleSearch,
 } from "@/components/ui/SwiftUIIcons";
@@ -28,11 +27,10 @@ export function MobileNav() {
   const pathname = usePathname() ?? "/";
   const router = useRouter();
 
-  // Canonical 4 Apple Music dock items (Admin is moved exclusively to the Profile page dropdown)
+  // Spacious 3-tab Apple Music split dock (Home · Discover · Library) + standalone circular Search bubble
   const items = [
     { label: "Home", icon: SFAppleHome, href: "/" },
     { label: "Discover", icon: SFAppleGrid, href: "/discover" },
-    { label: "Together", icon: SwiftUITogether, href: "/together" },
     { label: "Library", icon: SFAppleLibrary, href: "/liked" },
   ];
   const n = items.length;
