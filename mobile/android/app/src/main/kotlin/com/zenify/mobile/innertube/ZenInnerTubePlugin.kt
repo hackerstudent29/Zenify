@@ -7,6 +7,7 @@ import com.metrolist.innertube.models.AlbumItem
 import com.metrolist.innertube.models.ArtistItem
 import com.metrolist.innertube.models.PlaylistItem
 import com.metrolist.innertube.models.SongItem
+import com.metrolist.innertube.models.WatchEndpoint
 import com.metrolist.innertube.models.YTItem
 import com.metrolist.innertube.models.YouTubeLocale
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -16,11 +17,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * ZenInnerTubePlugin connects the Android Metrolist InnerTube Kotlin pipeline
- * to the Zenify Flutter front-end over the 'zenify/innertube' MethodChannel.
+ * (InnerTubeX on WEB_REMIX YouTube Music) to the Zenify Flutter front-end
+ * over the 'zenify/innertube' MethodChannel.
  *
  * All network calls run on Dispatchers.IO to maintain 60-120fps UI smoothness,
  * returning structured, type-safe data to Dart.
@@ -55,13 +56,73 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                 val summaries = summaryPage.summaries.map { summary ->
                                     mapOf(
                                         "title" to summary.title,
-                                        "items" to summary.items.map { ytItemToMap(it) }
+                                        "items" to summary.items.mapNotNull { ytItemToMap(it) }
                                     )
                                 }
                                 replySuccess(result, summaries)
                             },
                             onFailure = { err ->
                                 replyError(result, "SEARCH_ERROR", err.message, null)
+                            }
+                        )
+                    }
+
+                    "searchSongs" -> {
+                        val query = call.argument<String>("query") ?: ""
+                        if (query.isBlank()) {
+                            replySuccess(result, emptyList<Map<String, Any?>>())
+                            return@launch
+                        }
+                        val outcome = YouTube.search(query, YouTube.SearchFilter.FILTER_SONG)
+                        outcome.fold(
+                            onSuccess = { searchResult ->
+                                val songs = searchResult.items.filterIsInstance<SongItem>().map {
+                                    songItemToMap(it) + ("type" to "song")
+                                }
+                                replySuccess(result, songs)
+                            },
+                            onFailure = { err ->
+                                replyError(result, "SEARCH_SONGS_ERROR", err.message, null)
+                            }
+                        )
+                    }
+
+                    "searchAlbums" -> {
+                        val query = call.argument<String>("query") ?: ""
+                        if (query.isBlank()) {
+                            replySuccess(result, emptyList<Map<String, Any?>>())
+                            return@launch
+                        }
+                        val outcome = YouTube.search(query, YouTube.SearchFilter.FILTER_ALBUM)
+                        outcome.fold(
+                            onSuccess = { searchResult ->
+                                val albums = searchResult.items.filterIsInstance<AlbumItem>().map {
+                                    albumItemToMap(it) + ("type" to "album")
+                                }
+                                replySuccess(result, albums)
+                            },
+                            onFailure = { err ->
+                                replyError(result, "SEARCH_ALBUMS_ERROR", err.message, null)
+                            }
+                        )
+                    }
+
+                    "searchArtists" -> {
+                        val query = call.argument<String>("query") ?: ""
+                        if (query.isBlank()) {
+                            replySuccess(result, emptyList<Map<String, Any?>>())
+                            return@launch
+                        }
+                        val outcome = YouTube.search(query, YouTube.SearchFilter.FILTER_ARTIST)
+                        outcome.fold(
+                            onSuccess = { searchResult ->
+                                val artists = searchResult.items.filterIsInstance<ArtistItem>().map {
+                                    artistItemToMap(it) + ("type" to "artist")
+                                }
+                                replySuccess(result, artists)
+                            },
+                            onFailure = { err ->
+                                replyError(result, "SEARCH_ARTISTS_ERROR", err.message, null)
                             }
                         )
                     }
@@ -74,58 +135,170 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         }
                         val outcome = YouTube.searchSuggestions(query)
                         outcome.fold(
-                            onSuccess = { list -> replySuccess(result, list) },
+                            onSuccess = { suggestions ->
+                                // Safe serialization: suggestions.queries is List<String>
+                                replySuccess(result, suggestions.queries)
+                            },
                             onFailure = { err -> replyError(result, "SUGGEST_ERROR", err.message, null) }
                         )
                     }
 
                     "getArtist" -> {
-                        val browseId = call.argument<String>("browseId") ?: ""
-                        if (browseId.isBlank()) {
-                            replyError(result, "BAD_ARGS", "browseId cannot be blank", null)
-                            return@launch
+                        var browseId = call.argument<String>("browseId") ?: ""
+                        val artistName = call.argument<String>("name")
+                            ?: call.argument<String>("artistName")
+                            ?: ""
+
+                        // If browseId is missing, resolve it through YouTube Music artist search
+                        if (browseId.isBlank() && artistName.isNotBlank()) {
+                            val searchOutcome = YouTube.search(artistName, YouTube.SearchFilter.FILTER_ARTIST)
+                            val foundArtist = searchOutcome.getOrNull()?.items
+                                ?.filterIsInstance<ArtistItem>()
+                                ?.firstOrNull()
+                            if (foundArtist != null) {
+                                browseId = foundArtist.id
+                            } else {
+                                val summaryOutcome = YouTube.searchSummary(artistName)
+                                val summaryArtist = summaryOutcome.getOrNull()?.summaries
+                                    ?.flatMap { it.items }
+                                    ?.filterIsInstance<ArtistItem>()
+                                    ?.firstOrNull()
+                                if (summaryArtist != null) {
+                                    browseId = summaryArtist.id
+                                }
+                            }
                         }
-                        val outcome = YouTube.artist(browseId)
-                        outcome.fold(
-                            onSuccess = { page ->
+
+                        if (browseId.isNotBlank()) {
+                            val outcome = YouTube.artist(browseId)
+                            if (outcome.isSuccess) {
+                                val page = outcome.getOrThrow()
+                                val artistData = artistItemToMap(page.artist).toMutableMap()
+                                if ((artistData["title"] as? String).isNullOrBlank() && artistName.isNotBlank()) {
+                                    artistData["title"] = artistName
+                                }
                                 val artistMap = mapOf(
-                                    "artist" to artistItemToMap(page.artist),
-                                    "description" to page.description,
-                                    "subscriberCountText" to page.subscriberCountText,
+                                    "artist" to artistData,
+                                    "description" to (page.description ?: "Official artist profile for ${artistData["title"] ?: artistName} on Zenify."),
+                                    "subscriberCountText" to (page.subscriberCountText ?: "Official Artist"),
                                     "monthlyListenerCount" to page.monthlyListenerCount,
                                     "sections" to page.sections.map { section ->
                                         mapOf(
                                             "title" to section.title,
-                                            "items" to section.items.map { ytItemToMap(it) }
+                                            "items" to section.items.mapNotNull { ytItemToMap(it) }
                                         )
                                     }
                                 )
                                 replySuccess(result, artistMap)
-                            },
-                            onFailure = { err ->
-                                replyError(result, "ARTIST_ERROR", err.message, null)
+                                return@launch
                             }
+                        }
+
+                        // Robust fallback: if channel browseId fails or is missing, search songs directly
+                        val fallbackName = if (artistName.isNotBlank()) artistName else "Unknown Artist"
+                        val songsOutcome = YouTube.search(fallbackName, YouTube.SearchFilter.FILTER_SONG)
+                        val songs = songsOutcome.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
+                        val thumb = songs.firstOrNull()?.thumbnail ?: ""
+                        val fallbackArtist = mapOf(
+                            "id" to browseId,
+                            "title" to fallbackName,
+                            "thumbnail" to thumb,
+                            "channelId" to null,
+                            "shareLink" to null
                         )
+                        val fallbackMap = mapOf(
+                            "artist" to fallbackArtist,
+                            "description" to "Official artist profile for $fallbackName on Zenify.",
+                            "subscriberCountText" to "Top Artist",
+                            "monthlyListenerCount" to null,
+                            "sections" to listOf(
+                                mapOf(
+                                    "title" to "Top Songs",
+                                    "items" to songs.map { songItemToMap(it) + ("type" to "song") }
+                                )
+                            )
+                        )
+                        replySuccess(result, fallbackMap)
                     }
 
                     "getAlbum" -> {
-                        val browseId = call.argument<String>("browseId") ?: ""
-                        if (browseId.isBlank()) {
-                            replyError(result, "BAD_ARGS", "browseId cannot be blank", null)
-                            return@launch
+                        var browseId = call.argument<String>("browseId") ?: ""
+                        val albumTitle = call.argument<String>("title")
+                            ?: call.argument<String>("albumTitle")
+                            ?: ""
+                        val artistName = call.argument<String>("artist")
+                            ?: call.argument<String>("artistName")
+                            ?: ""
+
+                        if (browseId.isBlank() && albumTitle.isNotBlank()) {
+                            val query = if (artistName.isNotBlank()) "$albumTitle $artistName" else albumTitle
+                            val albumSearch = YouTube.search(query, YouTube.SearchFilter.FILTER_ALBUM)
+                            val albumItem = albumSearch.getOrNull()?.items
+                                ?.filterIsInstance<AlbumItem>()
+                                ?.firstOrNull()
+                            if (albumItem != null) {
+                                browseId = albumItem.browseId ?: albumItem.id
+                            }
                         }
-                        val outcome = YouTube.album(browseId)
-                        outcome.fold(
-                            onSuccess = { page ->
+
+                        if (browseId.isNotBlank()) {
+                            val outcome = YouTube.album(browseId)
+                            if (outcome.isSuccess) {
+                                val page = outcome.getOrThrow()
                                 val albumMap = mapOf(
                                     "album" to albumItemToMap(page.album),
                                     "songs" to page.songs.map { songItemToMap(it) },
                                     "otherVersions" to page.otherVersions.map { albumItemToMap(it) }
                                 )
                                 replySuccess(result, albumMap)
+                                return@launch
+                            }
+                        }
+
+                        // Fallback: search songs for album title
+                        val fallbackTitle = if (albumTitle.isNotBlank()) albumTitle else "Album"
+                        val query = if (artistName.isNotBlank()) "$fallbackTitle $artistName" else fallbackTitle
+                        val searchSongs = YouTube.search(query, YouTube.SearchFilter.FILTER_SONG)
+                        val songs = searchSongs.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
+                        val thumb = songs.firstOrNull()?.thumbnail ?: ""
+                        val fallbackAlbum = mapOf(
+                            "id" to browseId,
+                            "browseId" to browseId,
+                            "playlistId" to null,
+                            "title" to fallbackTitle,
+                            "artists" to listOf(mapOf("id" to null, "name" to (if (artistName.isNotBlank()) artistName else "Various Artists"))),
+                            "year" to 2026,
+                            "thumbnail" to thumb,
+                            "explicit" to false,
+                            "shareLink" to null
+                        )
+                        val fallbackMap = mapOf(
+                            "album" to fallbackAlbum,
+                            "songs" to songs.map { songItemToMap(it) },
+                            "otherVersions" to emptyList<Map<String, Any?>>()
+                        )
+                        replySuccess(result, fallbackMap)
+                    }
+
+                    "getPlaylist" -> {
+                        val playlistId = call.argument<String>("playlistId")
+                            ?: call.argument<String>("browseId")
+                            ?: ""
+                        if (playlistId.isBlank()) {
+                            replyError(result, "BAD_ARGS", "playlistId cannot be blank", null)
+                            return@launch
+                        }
+                        val outcome = YouTube.playlist(playlistId)
+                        outcome.fold(
+                            onSuccess = { page ->
+                                val map = mapOf(
+                                    "playlist" to playlistItemToMap(page.playlist),
+                                    "songs" to page.songs.map { songItemToMap(it) }
+                                )
+                                replySuccess(result, map)
                             },
                             onFailure = { err ->
-                                replyError(result, "ALBUM_ERROR", err.message, null)
+                                replyError(result, "PLAYLIST_ERROR", err.message, null)
                             }
                         )
                     }
@@ -139,7 +312,7 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                         "title" to section.title,
                                         "label" to section.label,
                                         "thumbnail" to section.thumbnail,
-                                        "items" to section.items.map { ytItemToMap(it) }
+                                        "items" to section.items.mapNotNull { ytItemToMap(it) }
                                     )
                                 }
                                 replySuccess(result, sections)
@@ -162,7 +335,7 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                     mapOf(
                                         "title" to section.title,
                                         "chartType" to section.chartType.name,
-                                        "items" to section.items.map { ytItemToMap(it) }
+                                        "items" to section.items.mapNotNull { ytItemToMap(it) }
                                     )
                                 }
                                 replySuccess(result, sections)
@@ -178,12 +351,42 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         outcome.fold(
                             onSuccess = { explorePage ->
                                 val exploreMap = mapOf(
-                                    "newReleaseAlbums" to explorePage.newReleaseAlbums.map { albumItemToMap(it) }
+                                    "newReleaseAlbums" to explorePage.newReleaseAlbums.map { albumItemToMap(it) },
+                                    "moodAndGenres" to explorePage.moodAndGenres.map { item ->
+                                        mapOf(
+                                            "title" to item.title,
+                                            "endpoint" to item.endpoint.browseId,
+                                            "stripeColor" to item.stripeColor
+                                        )
+                                    }
                                 )
                                 replySuccess(result, exploreMap)
                             },
                             onFailure = { err ->
                                 replyError(result, "EXPLORE_ERROR", err.message, null)
+                            }
+                        )
+                    }
+
+                    "getNext" -> {
+                        val videoId = call.argument<String>("videoId") ?: ""
+                        val playlistId = call.argument<String>("playlistId")
+                        if (videoId.isBlank()) {
+                            replyError(result, "BAD_ARGS", "videoId cannot be blank", null)
+                            return@launch
+                        }
+                        val endpoint = WatchEndpoint(
+                            videoId = videoId,
+                            playlistId = playlistId ?: "RDAMVM$videoId"
+                        )
+                        val outcome = YouTube.next(endpoint)
+                        outcome.fold(
+                            onSuccess = { nextResult ->
+                                val list = nextResult.items.map { songItemToMap(it) + ("type" to "song") }
+                                replySuccess(result, list)
+                            },
+                            onFailure = { err ->
+                                replyError(result, "NEXT_ERROR", err.message, null)
                             }
                         )
                     }
@@ -206,14 +409,24 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun replySuccess(result: MethodChannel.Result, data: Any?) {
-        mainHandler.post { result.success(data) }
+        mainHandler.post {
+            try {
+                result.success(data)
+            } catch (e: Throwable) {
+                result.error("SERIALIZATION_ERROR", e.message, null)
+            }
+        }
     }
 
     private fun replyError(result: MethodChannel.Result, code: String, msg: String?, details: Any?) {
-        mainHandler.post { result.error(code, msg, details) }
+        mainHandler.post {
+            try {
+                result.error(code, msg, details)
+            } catch (_: Throwable) {}
+        }
     }
 
-    private fun ytItemToMap(item: YTItem): Map<String, Any?> {
+    private fun ytItemToMap(item: YTItem): Map<String, Any?>? {
         return when (item) {
             is SongItem -> songItemToMap(item) + ("type" to "song")
             is AlbumItem -> albumItemToMap(item) + ("type" to "album")

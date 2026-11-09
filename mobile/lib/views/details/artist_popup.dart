@@ -14,16 +14,21 @@ import 'artist_screen.dart';
 /// Shows an Apple Music-style context popover or bottom sheet for single or multiple artists.
 Future<void> showArtistPopup(
   BuildContext context, {
-  required List<ArtistRef> artists,
+  List<ArtistRef>? artists,
   String? currentArtistName,
 }) async {
   HapticFeedback.lightImpact();
 
-  final effectiveList = artists.isNotEmpty
-      ? artists
-      : (currentArtistName != null && currentArtistName.trim().isNotEmpty)
-          ? [ArtistRef.fromName(currentArtistName)]
-          : [ArtistRef.fromName('Unknown Artist')];
+  List<ArtistRef> effectiveList = [];
+  if (artists != null && artists.isNotEmpty) {
+    effectiveList = artists;
+  } else if (currentArtistName != null && currentArtistName.trim().isNotEmpty) {
+    effectiveList = ArtistRef.splitFromName(currentArtistName);
+  }
+
+  if (effectiveList.isEmpty) {
+    effectiveList = [ArtistRef.fromName('Unknown Artist')];
+  }
 
   await showModalBottomSheet<void>(
     context: context,

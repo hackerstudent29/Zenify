@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/track.dart';
+import '../utils/media_normalizer.dart';
 import 'api_service.dart';
 import 'innertube_service.dart';
 
@@ -110,14 +111,20 @@ class ArtistService {
       YTArtistCard? ytCard;
 
       // 1. Resolve artist via YouTube Music InnerTube directly
-      if (targetBrowseId == null || targetBrowseId.isEmpty) {
+      Map<String, dynamic>? ytChannel = await InnerTubeService.instance.getArtistChannel(
+        targetBrowseId ?? '',
+        artistName: cleanName,
+      );
+
+      if (ytChannel == null && (targetBrowseId == null || targetBrowseId.isEmpty)) {
         ytCard = await InnerTubeService.instance.searchArtist(cleanName);
         targetBrowseId = ytCard?.browseId;
-      }
-
-      Map<String, dynamic>? ytChannel;
-      if (targetBrowseId != null && targetBrowseId.isNotEmpty) {
-        ytChannel = await InnerTubeService.instance.getArtistChannel(targetBrowseId);
+        if (targetBrowseId != null && targetBrowseId.isNotEmpty) {
+          ytChannel = await InnerTubeService.instance.getArtistChannel(
+            targetBrowseId,
+            artistName: cleanName,
+          );
+        }
       }
 
       // If YouTube Music channel found, build 100% from pristine YouTube Music
@@ -132,17 +139,20 @@ class ArtistService {
             : ytCard?.thumb;
 
         final imageUrl = (rawImage != null && rawImage.isNotEmpty)
-            ? upgradeArtworkUrl(rawImage)
+            ? MediaNormalizer.upgradeArtworkUrl(rawImage)
             : '';
 
-        final bio = (ytChannel['bio'] as String?) ??
-            'Official artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, and singles.';
+        final bio = (ytChannel['bio'] as String?)?.isNotEmpty == true
+            ? ytChannel['bio'] as String
+            : 'Official artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, and singles.';
 
         final subscriberCount = (ytChannel['subscriberCount'] as String?) ??
             ytCard?.audience ??
             'Top Artist';
 
-        final monthlyAudience = ytCard?.audience ?? subscriberCount;
+        final monthlyAudience = (ytChannel['monthlyListenerCount'] as String?) ??
+            ytCard?.audience ??
+            subscriberCount;
 
         // Top Songs (YouTube Music tracks)
         final topSongs = <Track>[];

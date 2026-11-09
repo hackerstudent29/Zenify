@@ -8,7 +8,6 @@ import 'package:flutter/physics.dart';
 
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/marquee_text.dart';
-import '../../design_system/widgets/monogram_avatar.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../models/track.dart';
 
@@ -67,37 +66,12 @@ class SwapText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enterCurve = Interval(delay.clamp(0.0, 0.9), 1, curve: Curves.easeOutCubic);
-    return ClipRect(
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 460),
-        reverseDuration: const Duration(milliseconds: 460),
-        layoutBuilder: (cur, prev) => Stack(
-          alignment: Alignment.centerLeft,
-          children: [...prev, ?cur],
-        ),
-        transitionBuilder: (c, anim) {
-          return AnimatedBuilder(
-            animation: anim,
-            builder: (_, _) {
-              final exiting = anim.status == AnimationStatus.reverse;
-              final v = exiting
-                  ? Curves.easeIn.transform(anim.value)
-                  : enterCurve.transform(anim.value);
-              final dx = (exiting ? -dir : dir) * 0.32 * (1 - v);
-              return Opacity(
-                opacity: v.clamp(0.0, 1.0),
-                child: FractionalTranslation(translation: Offset(dx, 0), child: c),
-              );
-            },
-          );
-        },
-        child: MarqueeText(
-          text,
-          key: ValueKey(text),
-          style: style,
-        ),
-      ),
+    return Text(
+      text,
+      key: ValueKey(text),
+      style: style,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
@@ -166,32 +140,43 @@ class CoverImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cleanUrl = upgradeArtworkUrl(url);
+    if (cleanUrl.isEmpty) {
+      return Container(
+        color: const Color(0xFF18181B),
+        child: const Center(
+          child: Icon(Icons.music_note_rounded, color: AppColors.textTertiary, size: 36),
+        ),
+      );
+    }
     return CachedNetworkImage(
+      key: ValueKey(cleanUrl),
       imageUrl: cleanUrl,
       fit: BoxFit.cover,
-      fadeInDuration: const Duration(milliseconds: 150),
+      fadeInDuration: Duration.zero,
       fadeOutDuration: Duration.zero,
-      placeholder: (_, _) => Container(color: AppColors.surface2),
+      placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
       errorWidget: (_, _, _) {
         if (cleanUrl.contains('maxresdefault.jpg')) {
           final fallbackUrl = cleanUrl.replaceAll('maxresdefault.jpg', 'hqdefault.jpg');
           return CachedNetworkImage(
+            key: ValueKey(fallbackUrl),
             imageUrl: fallbackUrl,
             fit: BoxFit.cover,
             fadeInDuration: Duration.zero,
-            placeholder: (_, _) => Container(color: AppColors.surface2),
+            placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
             errorWidget: (_, _, _) => Container(
-              color: AppColors.surface2,
+              color: const Color(0xFF18181B),
               child: const Center(
-                child: Icon(Icons.music_note_rounded, color: AppColors.textTertiary, size: 28),
+                child: Icon(Icons.music_note_rounded, color: AppColors.textTertiary, size: 32),
               ),
             ),
           );
         }
-        return const MonogramAvatar(
-          name: 'Zenify',
-          size: 300,
-          isCircle: false,
+        return Container(
+          color: const Color(0xFF18181B),
+          child: const Center(
+            child: Icon(Icons.music_note_rounded, color: AppColors.textTertiary, size: 36),
+          ),
         );
       },
     );

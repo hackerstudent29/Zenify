@@ -39,6 +39,7 @@ class AudioPlayer implements FxEngine {
   final _posC = StreamController<Duration>.broadcast();
   final _durC = StreamController<Duration>.broadcast();
   final _doneC = StreamController<void>.broadcast();
+  final _autoTransitionC = StreamController<String>.broadcast();
   final _errorC = StreamController<String>.broadcast();
 
   Stream<PlayerState> get onPlayerStateChanged => _stateC.stream;
@@ -46,12 +47,16 @@ class AudioPlayer implements FxEngine {
   Stream<Duration> get onPositionChanged => _posC.stream;
   Stream<Duration> get onDurationChanged => _durC.stream;
   Stream<void> get onPlayerComplete => _doneC.stream;
+  Stream<String> get onAutoTransition => _autoTransitionC.stream;
   Stream<String> get onError => _errorC.stream;
   PlayerState get state => _state;
 
   void _onEvent(dynamic e) {
     if (e is! Map) return;
     switch (e['type']) {
+      case 'autoTransition':
+        final id = e['mediaId'] as String? ?? '';
+        _autoTransitionC.add(id);
       case 'state':
         final s = switch (e['value']) {
           'playing' => PlayerState.playing,

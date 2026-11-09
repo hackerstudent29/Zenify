@@ -10,6 +10,7 @@ import '../tokens/app_colors.dart';
 import '../tokens/app_spacing.dart';
 import '../tokens/app_typography.dart';
 import 'equalizer_bars.dart';
+import 'interactive_artists_text.dart';
 import 'marquee_text.dart';
 import 'pressable_scale.dart';
 import 'zen_dropdown.dart';
@@ -124,29 +125,11 @@ class SongTile extends StatelessWidget {
                         ),
                       ],
                       Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            if (track.artists.length > 1) {
-                              showArtistPopup(context, artists: track.artists);
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ArtistScreen(artistName: track.artist),
-                                ),
-                              );
-                            }
-                          },
-                          onLongPress: () {
-                            showArtistPopup(context, artists: track.artists, currentArtistName: track.artist);
-                          },
-                          child: MarqueeText(
-                            track.displayArtists,
-                            style: AppTypography.subhead.copyWith(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                            ),
+                        child: InteractiveArtistsText(
+                          artists: track.resolvedArtists,
+                          style: AppTypography.subhead.copyWith(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -184,10 +167,17 @@ class SongTile extends StatelessWidget {
       albumName: track.album,
       onPlayNext: () => player.playNext(track),
       onPlayLater: () => player.playLast(track),
-      onGoToArtist: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ArtistScreen(artistName: track.artist)),
-      ),
+      onGoToArtist: () {
+        final artistList = track.artistNames;
+        if (artistList.length > 1) {
+          showArtistPopup(context, artists: track.resolvedArtists);
+        } else if (artistList.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ArtistScreen(artistName: artistList.first)),
+          );
+        }
+      },
       onGoToAlbum: track.album.isNotEmpty && track.album != 'Single'
           ? () => Navigator.push(
                 context,

@@ -19,7 +19,10 @@ import '../../services/auth_state.dart';
 import '../../services/player_state.dart';
 import '../details/artist_screen.dart';
 import '../details/album_screen.dart';
+import '../details/artist_popup.dart';
 import '../profile/profile_screen.dart';
+import '../../models/artist_ref.dart';
+import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../services/country_service.dart';
 import '../../services/listening_history_service.dart';
 import '../../services/innertube_service.dart';
@@ -332,6 +335,7 @@ class _CoverCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.artists,
     this.onSubtitleTap,
     this.playing = false,
     this.current = false,
@@ -339,6 +343,7 @@ class _CoverCard extends StatelessWidget {
     this.radius = 10,
   });
   final String url, title, subtitle;
+  final List<ArtistRef>? artists;
   final VoidCallback onTap;
   final VoidCallback? onSubtitleTap;
   final bool playing, current, circular;
@@ -396,17 +401,24 @@ class _CoverCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onSubtitleTap,
-            child: Text(
-              MediaNormalizer.formatArtists(subtitle),
+          if (artists != null && artists!.isNotEmpty && !circular)
+            InteractiveArtistsText(
+              artists: artists!,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: circular ? TextAlign.center : TextAlign.start,
               style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            )
+          else
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onSubtitleTap,
+              child: Text(
+                MediaNormalizer.formatArtists(subtitle),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: circular ? TextAlign.center : TextAlign.start,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -491,20 +503,10 @@ class _SongRow extends StatelessWidget {
                       Row(
                         children: [
                           Flexible(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                Navigator.of(context).push(
-                                  CupertinoPageRoute(builder: (_) => ArtistScreen(artistName: MediaNormalizer.formatArtists(track.artist))),
-                                );
-                              },
-                              child: Text(
-                                MediaNormalizer.formatArtists(track.artist),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                              ),
+                            child: InteractiveArtistsText(
+                              artists: track is Track ? track.resolvedArtists : (track.artist as String),
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                              maxLines: 1,
                             ),
                           ),
                           if (subtitleAlbum && track.album != null && track.album.toString().isNotEmpty && track.album != 'Single') ...[
@@ -544,6 +546,7 @@ class _SongRow extends StatelessWidget {
                     icon: const Icon(Icons.more_horiz_rounded, color: AppColors.textTertiary, size: 22),
                     onPressed: () {
                       final p = context.read<PlayerState>();
+                      final resolvedArtists = track is Track ? track.resolvedArtists : ArtistRef.splitFromName(track.artist as String?);
                       ZenDropdown.showTrackMenu(
                         context: context,
                         trackTitle: track.title,
@@ -551,10 +554,16 @@ class _SongRow extends StatelessWidget {
                         albumName: track.album,
                         onPlayNext: () => p.playNext(track),
                         onPlayLater: () => p.playLast(track),
-                        onGoToArtist: () => Navigator.push(
-                          context,
-                          CupertinoPageRoute(builder: (_) => ArtistScreen(artistName: track.artist)),
-                        ),
+                        onGoToArtist: () {
+                          if (resolvedArtists.length > 1) {
+                            showArtistPopup(context, artists: resolvedArtists);
+                          } else if (resolvedArtists.isNotEmpty) {
+                            Navigator.push(
+                              context,
+                              CupertinoPageRoute(builder: (_) => ArtistScreen(artistName: resolvedArtists.first.name)),
+                            );
+                          }
+                        },
                         onGoToAlbum: track.album.isNotEmpty && track.album != 'Single'
                             ? () => Navigator.push(
                                   context,
@@ -1334,7 +1343,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             title: a.name,
                             subtitle: a.subs,
                             circular: true,
-                            onTap: () => _open(ArtistScreen(artistName: a.name)),
+                            onTap: () => _open(ArtistScreen(artistName: a.name, imageUrl: a.image)),
                           );
                         },
                       ),

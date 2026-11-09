@@ -95,7 +95,20 @@ class SearchDataService {
     final q = query.trim();
     if (q.isEmpty) return const SearchResultsGroup();
 
-    // 1. Direct on-device YouTube InnerTube search (user IP directly to YouTube Music):
+    // 1. Pristine Native InnerTubeX (YouTube Music WEB_REMIX directly on Android device):
+    try {
+      final nativeSummary = await InnerTubeService.instance.searchSummaryNative(q);
+      if (nativeSummary != null && nativeSummary.isNotEmpty) {
+        final parsed = _parseNativeSummary(nativeSummary, q);
+        if (parsed.songs.isNotEmpty || parsed.artists.isNotEmpty || parsed.topResult != null) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[SearchDataService] Native searchSummary notice: $e');
+    }
+
+    // 2. Direct on-device YouTube InnerTube search:
     try {
       final generalJson = await InnerTubeService.instance
           .post('search', {'query': q})
@@ -222,6 +235,139 @@ class SearchDataService {
     } catch (_) {}
 
     return const SearchResultsGroup();
+  }
+
+  SearchResultsGroup _parseNativeSummary(Map<String, dynamic> data, String query) {
+    try {
+      final summaries = data['summaries'] as List? ?? const [];
+      final songs = <Track>[];
+      final artists = <SearchArtist>[];
+      final albums = <SearchAlbum>[];
+      final playlists = <SearchPlaylist>[];
+      final seenSongIds = <String>{};
+      final seenArtists = <String>{};
+      final seenAlbums = <String>{};
+      final seenPlaylists = <String>{};
+
+      for (final s in summaries) {
+        if (s is! Map) continue;
+        final items = s['items'] as List? ?? const [];
+
+        for (final it in items) {
+          if (it is! Map) continue;
+          final type = it['type'] as String?;
+
+          if (type == 'song') {
+            final id = it['id'] as String?;
+            if (id == null || id.isEmpty || !seenSongIds.add(id)) continue;
+            final tTitle = MediaNormalizer.cleanTitle(it['title'] as String?);
+            final rawArtists = it['artists'] as List?;
+            final artistStr = MediaNormalizer.formatArtists(
+              rawArtists?.map((a) => a is Map ? a['name'] : a).toList(),
+            );
+            final albumName = (it['album'] is Map) ? (it['album']['name'] as String?) : null;
+            final album = albumName != null ? MediaNormalizer.cleanTitle(albumName) : 'Single';
+            final thumb = MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?, videoId: id);
+            final duration = (it['duration'] as num?)?.toInt() ?? 210;
+
+            songs.add(Track(
+              id: 'yt-$id',
+              title: tTitle,
+              artist: artistStr,
+              album: album,
+              coverUrl: thumb,
+              durationSeconds: duration,
+              language: Track.detectLanguage(tTitle, artistStr, album) ?? '',
+              source: 'youtube',
+            ));
+          } else if (type == 'artist') {
+            final aName = MediaNormalizer.cleanTitle(it['title'] as String?);
+            if (aName.isEmpty || !seenArtists.add(aName.toLowerCase())) continue;
+            final browseId = it['id'] as String? ?? it['channelId'] as String?;
+            final thumb = MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?);
+            artists.add(SearchArtist(
+              name: aName,
+              imageUrl: thumb.isNotEmpty ? thumb : null,
+              subscribers: 'Artist',
+              browseId: browseId,
+            ));
+          } else if (type == 'album') {
+            final alTitle = MediaNormalizer.cleanTitle(it['title'] as String?);
+            if (alTitle.isEmpty || !seenAlbums.add(alTitle.toLowerCase())) continue;
+            final browseId = it['browseId'] as String? ?? it['id'] as String?;
+            final rawArtists = it['artists'] as List?;
+            final artistStr = MediaNormalizer.formatArtists(
+              rawArtists?.map((a) => a is Map ? a['name'] : a).toList(),
+            );
+            final thumb = MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?);
+            final year = it['year']?.toString();
+            albums.add(SearchAlbum(
+              title: alTitle,
+              artist: artistStr,
+              coverUrl: thumb.isNotEmpty ? thumb : null,
+              year: year,
+              browseId: browseId,
+            ));
+          } else if (type == 'playlist') {
+            final pTitle = MediaNormalizer.cleanTitle(it['title'] as String?);
+            final id = it['id'] as String? ?? '';
+            if (pTitle.isEmpty || !seenPlaylists.add(id)) continue;
+            final thumb = MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?);
+            final authorMap = it['author'] as Map?;
+            final author = authorMap?['name'] as String? ?? 'YouTube Music';
+            playlists.add(SearchPlaylist(
+              title: pTitle,
+              curator: author,
+              coverUrl: thumb.isNotEmpty ? thumb : null,
+              trackCount: (it['songCountText'] as String?) ?? 'Playlist',
+              browseId: id,
+            ));
+          }
+        }
+      }
+
+      SearchTopResult? top;
+      final qLower = query.toLowerCase();
+      final exactArtist = artists.where((a) => a.name.toLowerCase() == qLower).firstOrNull;
+      if (exactArtist != null) {
+        top = SearchTopResult(
+          title: exactArtist.name,
+          subtitle: 'Artist • Official',
+          type: TopResultType.artist,
+          imageUrl: exactArtist.imageUrl,
+          artist: exactArtist,
+        );
+      } else if (songs.isNotEmpty) {
+        final s = songs.first;
+        top = SearchTopResult(
+          title: s.title,
+          subtitle: 'Song • ${s.artist}',
+          type: TopResultType.song,
+          imageUrl: s.coverUrl,
+          track: s,
+        );
+      } else if (artists.isNotEmpty) {
+        final a = artists.first;
+        top = SearchTopResult(
+          title: a.name,
+          subtitle: 'Artist • Official',
+          type: TopResultType.artist,
+          imageUrl: a.imageUrl,
+          artist: a,
+        );
+      }
+
+      return SearchResultsGroup(
+        topResult: top,
+        songs: songs,
+        artists: artists,
+        albums: albums,
+        playlists: playlists,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[SearchDataService] Native parse notice: $e');
+      return const SearchResultsGroup();
+    }
   }
 
   SearchResultsGroup _parseGeneralSearch(Map<String, dynamic> json, String query) {

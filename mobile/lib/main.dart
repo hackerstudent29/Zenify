@@ -10,6 +10,7 @@ import 'services/queue_state.dart';
 import 'services/studio_fx_state.dart';
 import 'services/auth_state.dart';
 import 'services/country_service.dart';
+import 'services/innertube_service.dart';
 import 'services/listening_history_service.dart';
 import 'services/listening_tracker_service.dart';
 import 'services/settings_service.dart';
@@ -94,7 +95,14 @@ class ZenifyMobileApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider<StudioFxState>.value(value: fx),
         ChangeNotifierProvider<PlayerState>.value(value: player),
-        ChangeNotifierProvider(create: (_) => QueueState()),
+        ChangeNotifierProvider(create: (_) {
+          final q = QueueState();
+          q.autoplayProvider = (seed, exclude) async {
+            final nextSongs = await InnerTubeService.instance.getNextQueue(seed.id);
+            return nextSongs.where((t) => !exclude.contains(t.id)).toList();
+          };
+          return q;
+        }),
         ChangeNotifierProvider(create: (_) => AuthState()),
         ChangeNotifierProvider<SettingsState>.value(value: SettingsState.instance),
       ],

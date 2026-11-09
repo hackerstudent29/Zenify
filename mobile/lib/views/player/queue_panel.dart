@@ -469,20 +469,21 @@ class _QueuePanelState extends State<QueuePanel> {
             },
             child: const Text('Move to Bottom'),
           ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              if (widget.onGoToArtist != null) {
-                widget.onGoToArtist!(e.track);
-              } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ArtistScreen(artistName: e.artist)),
-                );
-              }
-            },
-            child: const Text('Go to Artist'),
-          ),
+          for (final artist in e.track.artistNames)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(ctx);
+                if (widget.onGoToArtist != null) {
+                  widget.onGoToArtist!(artist);
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ArtistScreen(artistName: artist)),
+                  );
+                }
+              },
+              child: Text('Go to $artist'),
+            ),
           CupertinoActionSheetAction(
             onPressed: () {
               Navigator.pop(ctx);

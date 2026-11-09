@@ -399,31 +399,40 @@ object YouTube {
                         ?.buttonRenderer
                         ?.navigationEndpoint
                         ?.watchPlaylistEndpoint
-                        ?.playlistId!!
+                        ?.playlistId ?: ""
                 val albumItem =
                     AlbumItem(
                         browseId = browseId,
                         playlistId = playlistId,
                         title =
-                            response.header.musicDetailHeaderRenderer.title.runs
+                            response.header
+                                ?.musicDetailHeaderRenderer
+                                ?.title
+                                ?.runs
                                 ?.firstOrNull()
-                                ?.text!!,
+                                ?.text ?: "",
                         artists =
-                            PageHelper
-                                .extractArtists(response.header.musicDetailHeaderRenderer.subtitle.runs)
-                                .takeIf { it.isNotEmpty() },
+                            response.header?.musicDetailHeaderRenderer?.subtitle?.runs?.let {
+                                PageHelper.extractArtists(it).takeIf { a -> a.isNotEmpty() }
+                            },
                         year =
-                            response.header.musicDetailHeaderRenderer.subtitle.runs
+                            response.header
+                                ?.musicDetailHeaderRenderer
+                                ?.subtitle
+                                ?.runs
                                 ?.lastOrNull()
                                 ?.text
                                 ?.toIntOrNull(),
                         thumbnail =
-                            response.header.musicDetailHeaderRenderer.thumbnail.croppedSquareThumbnailRenderer
+                            response.header
+                                ?.musicDetailHeaderRenderer
+                                ?.thumbnail
+                                ?.croppedSquareThumbnailRenderer
                                 ?.thumbnail
                                 ?.thumbnails
-                                ?.lastOrNull()!!
-                                .url,
-                        explicit = false, // TODO: Extract explicit badge for albums from YouTube response
+                                ?.lastOrNull()
+                                ?.url ?: response.background?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                        explicit = false,
                     )
                 return@runCatching AlbumPage(
                     album = albumItem,
@@ -442,8 +451,8 @@ object YouTube {
                             ?.getItems()
                             ?.mapNotNull {
                                 AlbumPage.getSong(it, albumItem)
-                            }!!
-                            .toMutableList(),
+                            }
+                            ?.toMutableList() ?: mutableListOf(),
                     otherVersions = emptyList(),
                 )
             } else {
@@ -451,7 +460,7 @@ object YouTube {
                     response.microformat
                         ?.microformatDataRenderer
                         ?.urlCanonical
-                        ?.substringAfterLast('=')!!
+                        ?.substringAfterLast('=', "") ?: browseId
                 val albumItem =
                     AlbumItem(
                         browseId = browseId,
@@ -470,10 +479,19 @@ object YouTube {
                                 ?.title
                                 ?.runs
                                 ?.firstOrNull()
-                                ?.text!!,
+                                ?.text
+                                ?: response.header
+                                    ?.musicDetailHeaderRenderer
+                                    ?.title
+                                    ?.runs
+                                    ?.firstOrNull()
+                                    ?.text
+                                ?: "",
                         artists =
-                            response.contents.twoColumnBrowseResultsRenderer.tabs
-                                .firstOrNull()
+                            response.contents
+                                ?.twoColumnBrowseResultsRenderer
+                                ?.tabs
+                                ?.firstOrNull()
                                 ?.tabRenderer
                                 ?.content
                                 ?.sectionListRenderer
@@ -483,10 +501,15 @@ object YouTube {
                                 ?.straplineTextOne
                                 ?.runs
                                 ?.let(PageHelper::extractArtists)
-                                ?.takeIf { it.isNotEmpty() },
+                                ?.takeIf { it.isNotEmpty() }
+                                ?: response.header?.musicDetailHeaderRenderer?.subtitle?.runs?.let {
+                                    PageHelper.extractArtists(it).takeIf { a -> a.isNotEmpty() }
+                                },
                         year =
-                            response.contents.twoColumnBrowseResultsRenderer.tabs
-                                .firstOrNull()
+                            response.contents
+                                ?.twoColumnBrowseResultsRenderer
+                                ?.tabs
+                                ?.firstOrNull()
                                 ?.tabRenderer
                                 ?.content
                                 ?.sectionListRenderer
@@ -497,10 +520,19 @@ object YouTube {
                                 ?.runs
                                 ?.lastOrNull()
                                 ?.text
-                                ?.toIntOrNull(),
+                                ?.toIntOrNull()
+                                ?: response.header
+                                    ?.musicDetailHeaderRenderer
+                                    ?.subtitle
+                                    ?.runs
+                                    ?.lastOrNull()
+                                    ?.text
+                                    ?.toIntOrNull(),
                         thumbnail =
-                            response.contents.twoColumnBrowseResultsRenderer.tabs
-                                .firstOrNull()
+                            response.contents
+                                ?.twoColumnBrowseResultsRenderer
+                                ?.tabs
+                                ?.firstOrNull()
                                 ?.tabRenderer
                                 ?.content
                                 ?.sectionListRenderer
@@ -512,8 +544,17 @@ object YouTube {
                                 ?.thumbnail
                                 ?.thumbnails
                                 ?.lastOrNull()
-                                ?.url!!,
-                        explicit = false, // TODO: Extract explicit badge for albums from YouTube response
+                                ?.url
+                                ?: response.header
+                                    ?.musicDetailHeaderRenderer
+                                    ?.thumbnail
+                                    ?.croppedSquareThumbnailRenderer
+                                    ?.thumbnail
+                                    ?.thumbnails
+                                    ?.lastOrNull()
+                                    ?.url
+                                ?: response.background?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                        explicit = false,
                     )
                 val albumSongsList =
                     if (withSongs) {
@@ -542,7 +583,7 @@ object YouTube {
                     album = resolvedAlbum,
                     songs = albumSongsList,
                     otherVersions =
-                        response.contents.twoColumnBrowseResultsRenderer.secondaryContents
+                        response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents
                             ?.sectionListRenderer
                             ?.contents
                             ?.getOrNull(
@@ -693,7 +734,14 @@ object YouTube {
                                     ?.title
                                     ?.runs
                                     ?.firstOrNull()
-                                    ?.text!!,
+                                    ?.text
+                                ?: response.header
+                                    ?.musicDetailHeaderRenderer
+                                    ?.title
+                                    ?.runs
+                                    ?.firstOrNull()
+                                    ?.text
+                                ?: "",
                         thumbnail =
                             response.header
                                 ?.musicImmersiveHeaderRenderer
@@ -702,12 +750,27 @@ object YouTube {
                                 ?.getThumbnailUrl()
                                 ?: response.header
                                     ?.musicVisualHeaderRenderer
+                                    ?.thumbnail
+                                    ?.musicThumbnailRenderer
+                                    ?.getThumbnailUrl()
+                                ?: response.header
+                                    ?.musicVisualHeaderRenderer
                                     ?.foregroundThumbnail
                                     ?.musicThumbnailRenderer
                                     ?.getThumbnailUrl()
                                 ?: response.header
                                     ?.musicDetailHeaderRenderer
                                     ?.thumbnail
+                                    ?.musicThumbnailRenderer
+                                    ?.getThumbnailUrl()
+                                ?: response.header
+                                    ?.musicHeaderRenderer
+                                    ?.thumbnail
+                                    ?.musicThumbnailRenderer
+                                    ?.thumbnails
+                                    ?.lastOrNull()
+                                    ?.url
+                                ?: response.background
                                     ?.musicThumbnailRenderer
                                     ?.getThumbnailUrl(),
                         channelId =

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show immutable;
+import '../utils/media_normalizer.dart';
 import 'artist_ref.dart';
 
 @immutable
@@ -29,18 +30,28 @@ class Track {
     this.artists = const [],
   });
 
+  /// List of distinct ArtistRef objects, parsed from [artists] or [artist].
+  List<ArtistRef> get resolvedArtists {
+    if (artists.isNotEmpty) return artists;
+    return ArtistRef.splitFromName(artist);
+  }
+
+  /// List of individual artist names, clean and deduplicated.
+  List<String> get artistNames {
+    final list = resolvedArtists;
+    if (list.isNotEmpty) {
+      return list.map((a) => a.name).toList();
+    }
+    return MediaNormalizer.splitArtistNames(artist);
+  }
+
   /// Guaranteed non-empty artist line with Apple Music multi-artist formatting ("A & B", "A, B & C").
   String get displayArtists {
     if (artists.isNotEmpty) {
       return ArtistRef.formatList(artists, fallback: artist.isNotEmpty ? artist : 'Unknown Artist');
     }
     if (artist.trim().isNotEmpty) {
-      final split = artist
-          .split(RegExp(r',|\s+&\s+|\s+feat\.?\s+|\s+ft\.?\s+', caseSensitive: false))
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .map((s) => ArtistRef.fromName(s))
-          .toList();
+      final split = ArtistRef.splitFromName(artist);
       if (split.length > 1) {
         return ArtistRef.formatList(split);
       }

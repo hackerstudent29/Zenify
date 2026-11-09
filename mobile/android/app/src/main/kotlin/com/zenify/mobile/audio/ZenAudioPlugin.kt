@@ -164,6 +164,11 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 emitState()
             }
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                    emit(mapOf("type" to "autoTransition", "mediaId" to (mediaItem?.mediaId ?: "")))
+                }
+            }
             override fun onPlayerError(error: PlaybackException) {
                 val is403 = error.message?.contains("403") == true || error.errorCodeName.contains("BAD_HTTP_STATUS")
                 Log.e("ZenAudioPlugin", "ExoPlayer playback error: ${error.errorCodeName} (code=${error.errorCode}, is403=$is403) - ${error.message}", error)
