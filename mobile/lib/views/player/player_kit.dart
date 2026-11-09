@@ -3,10 +3,12 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../models/track.dart';
 
@@ -25,8 +27,7 @@ extension SpringDrive on AnimationController {
     double target, {
     SpringDescription spring = kSheetSpring,
     double velocity = 0,
-  }) =>
-      animateWith(SpringSimulation(spring, value, target, velocity));
+  }) => animateWith(SpringSimulation(spring, value, target, velocity));
 }
 
 /// A [Curve] backed by a real spring simulation (0 → 1). Lets route / implicit
@@ -46,7 +47,6 @@ class SpringCurve extends Curve {
 /* ------------------------------------------------------------------ */
 /// Slides + fades old text out and new text in. [dir] = 1 when going to the
 /// next track (new text arrives from the right), -1 for previous.
-/// [delay] (0..0.9) staggers the entering text so title and artist cascade.
 class SwapText extends StatelessWidget {
   const SwapText(
     this.text, {
@@ -65,12 +65,41 @@ class SwapText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      key: ValueKey(text),
-      style: style,
-      maxLines: maxLines,
-      overflow: TextOverflow.ellipsis,
+    final current = ValueKey<String>(text);
+    return AnimatedSwitcher(
+      duration: Duration(
+        milliseconds: 360 + (delay.clamp(0.0, 0.9) * 200).round(),
+      ),
+      reverseDuration: const Duration(milliseconds: 240),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, anim) {
+        final incoming = child.key == current;
+        return FadeTransition(
+          opacity: anim,
+          child: AnimatedBuilder(
+            animation: anim,
+            child: child,
+            builder: (_, c) {
+              // incoming: slides in from dir side; outgoing: leaves to the opposite side
+              final v = anim.value;
+              final dx = incoming
+                  ? (1 - v) * 28.0 * dir
+                  : (1 - v) * -28.0 * dir;
+              return Transform.translate(offset: Offset(dx, 0), child: c);
+            },
+          ),
+        );
+      },
+      layoutBuilder: (cur, prev) =>
+          Stack(alignment: Alignment.centerLeft, children: [...prev, ?cur]),
+      child: Text(
+        text,
+        key: current,
+        style: style,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }
@@ -93,8 +122,12 @@ class FadeSlideIn extends StatefulWidget {
   State<FadeSlideIn> createState() => _FadeSlideInState();
 }
 
-class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController.unbounded(vsync: this, value: 0);
+class _FadeSlideInState extends State<FadeSlideIn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController.unbounded(
+    vsync: this,
+    value: 0,
+  );
   Timer? _t;
 
   @override
@@ -123,7 +156,10 @@ class _FadeSlideInState extends State<FadeSlideIn> with SingleTickerProviderStat
       child: widget.child,
       builder: (_, child) => Opacity(
         opacity: _c.value.clamp(0.0, 1.0),
-        child: Transform.translate(offset: Offset(0, (1 - _c.value) * widget.dy), child: child),
+        child: Transform.translate(
+          offset: Offset(0, (1 - _c.value) * widget.dy),
+          child: child,
+        ),
       ),
     );
   }
@@ -136,17 +172,21 @@ class CoverImage extends StatelessWidget {
   const CoverImage(this.url, {super.key});
   final String url;
 
+  static Widget _empty(double size) => Container(
+    color: const Color(0xFF18181B),
+    child: Center(
+      child: Icon(
+        CupertinoIcons.music_note,
+        color: AppColors.textTertiary,
+        size: size,
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final cleanUrl = upgradeArtworkUrl(url);
-    if (cleanUrl.isEmpty) {
-      return Container(
-        color: const Color(0xFF18181B),
-        child: const Center(
-          child: Icon(Icons.music_note_rounded, color: AppColors.textTertiary, size: 36),
-        ),
-      );
-    }
+    if (cleanUrl.isEmpty) return _empty(34);
     return CachedNetworkImage(
       key: ValueKey(cleanUrl),
       imageUrl: cleanUrl,
@@ -156,37 +196,35 @@ class CoverImage extends StatelessWidget {
       placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
       errorWidget: (_, _, _) {
         if (cleanUrl.contains('maxresdefault.jpg')) {
-          final fallbackUrl = cleanUrl.replaceAll('maxresdefault.jpg', 'hqdefault.jpg');
+          final fallbackUrl = cleanUrl.replaceAll(
+            'maxresdefault.jpg',
+            'hqdefault.jpg',
+          );
           return CachedNetworkImage(
             key: ValueKey(fallbackUrl),
             imageUrl: fallbackUrl,
             fit: BoxFit.cover,
             fadeInDuration: Duration.zero,
             placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
-            errorWidget: (_, _, _) => Container(
-              color: const Color(0xFF18181B),
-              child: const Center(
-                child: Icon(Icons.music_note_rounded, color: AppColors.textTertiary, size: 32),
-              ),
-            ),
+            errorWidget: (_, _, _) => _empty(30),
           );
         }
-        return Container(
-          color: const Color(0xFF18181B),
-          child: const Center(
-            child: Icon(Icons.music_note_rounded, color: AppColors.textTertiary, size: 36),
-          ),
-        );
+        return _empty(34);
       },
     );
   }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Glass circle (like / more)                                          */
+/*  Glass circle (like / more): same liquid glass as the dock           */
 /* ------------------------------------------------------------------ */
 class GlassCircle extends StatelessWidget {
-  const GlassCircle({super.key, required this.child, this.onTap, this.size = 36});
+  const GlassCircle({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.size = 36,
+  });
   final Widget child;
   final VoidCallback? onTap;
   final double size;
@@ -195,20 +233,15 @@ class GlassCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     return PressableScale(
       onTap: onTap ?? () {},
-      child: ClipOval(
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            width: size,
-            height: size,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 0.6),
-            ),
-            child: child,
-          ),
+      child: AppleGlass(
+        borderRadius: BorderRadius.circular(size / 2),
+        blur: 4,
+        saturation: 1.5,
+        shadow: false,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Center(child: child),
         ),
       ),
     );
@@ -236,21 +269,27 @@ class PlateButton extends StatelessWidget {
     return PressableScale(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 260),
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
         width: size,
         height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: active ? Colors.white.withValues(alpha: 0.22) : Colors.transparent,
+          color: active
+              ? Colors.white.withValues(alpha: 0.20)
+              : Colors.transparent,
         ),
         child: TweenAnimationBuilder<Color?>(
-          duration: const Duration(milliseconds: 260),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
           tween: ColorTween(
             end: active ? Colors.white : Colors.white.withValues(alpha: 0.62),
           ),
-          builder: (_, color, ch) => IconTheme(data: IconThemeData(color: color), child: ch!),
+          builder: (_, color, ch) => IconTheme(
+            data: IconThemeData(color: color),
+            child: ch!,
+          ),
           child: child,
         ),
       ),
@@ -270,14 +309,21 @@ class PopLikeButton extends StatefulWidget {
   State<PopLikeButton> createState() => _PopLikeButtonState();
 }
 
-class _PopLikeButtonState extends State<PopLikeButton> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
+class _PopLikeButtonState extends State<PopLikeButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController.unbounded(
+    vsync: this,
+    value: 0,
+  );
 
   @override
   void didUpdateWidget(covariant PopLikeButton old) {
     super.didUpdateWidget(old);
-    if (widget.liked && !old.liked) _c.forward(from: 0);
+    if (widget.liked && !old.liked) {
+      // spring "pop": kick the scale up and let the spring settle it back
+      _c.value = 0;
+      _c.animateWith(SpringSimulation(kPauseSpring, 0, 0, 5));
+    }
   }
 
   @override
@@ -293,11 +339,11 @@ class _PopLikeButtonState extends State<PopLikeButton> with SingleTickerProvider
       child: AnimatedBuilder(
         animation: _c,
         builder: (_, _) => Transform.scale(
-          scale: 1 + 0.38 * math.sin(math.pi * _c.value),
+          scale: 1 + 0.5 * _c.value.clamp(-0.3, 1.0),
           child: Icon(
-            widget.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            size: 18,
-            color: widget.liked ? AppColors.accent : Colors.white,
+            widget.liked ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+            size: 17,
+            color: widget.liked ? kAppleRed : Colors.white,
           ),
         ),
       ),
@@ -324,7 +370,11 @@ Future<List<Color>?> extractPalette(String url) async {
   final cached = _paletteCache[url];
   if (cached != null) return cached;
   try {
-    final provider = ResizeImage(CachedNetworkImageProvider(url), width: 32, height: 32);
+    final provider = ResizeImage(
+      CachedNetworkImageProvider(url),
+      width: 32,
+      height: 32,
+    );
     final completer = Completer<ui.Image>();
     final stream = provider.resolve(ImageConfiguration.empty);
     late ImageStreamListener listener;
@@ -358,7 +408,14 @@ Future<List<Color>?> extractPalette(String url) async {
     }
     final colors = sums.map((s) {
       final n = math.max(1, s[3]);
-      return _vivid(Color.fromARGB(255, (s[0] / n).round(), (s[1] / n).round(), (s[2] / n).round()));
+      return _vivid(
+        Color.fromARGB(
+          255,
+          (s[0] / n).round(),
+          (s[1] / n).round(),
+          (s[2] / n).round(),
+        ),
+      );
     }).toList();
     _paletteCache[url] = colors;
     return colors;
@@ -371,7 +428,11 @@ Future<List<Color>?> extractPalette(String url) async {
 /*  Ambient fluid mesh background                                       */
 /* ------------------------------------------------------------------ */
 class AmbientBackground extends StatefulWidget {
-  const AmbientBackground({super.key, required this.colors, required this.animate});
+  const AmbientBackground({
+    super.key,
+    required this.colors,
+    required this.animate,
+  });
   final List<Color> colors;
   final bool animate;
 
@@ -379,11 +440,17 @@ class AmbientBackground extends StatefulWidget {
   State<AmbientBackground> createState() => _AmbientBackgroundState();
 }
 
-class _AmbientBackgroundState extends State<AmbientBackground> with TickerProviderStateMixin {
-  late final AnimationController _drift =
-      AnimationController(vsync: this, duration: const Duration(seconds: 36));
-  late final AnimationController _blend =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 900), value: 1);
+class _AmbientBackgroundState extends State<AmbientBackground>
+    with TickerProviderStateMixin {
+  late final AnimationController _drift = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 36),
+  );
+  late final AnimationController _blend = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+    value: 1,
+  );
   late List<Color> _from = widget.colors;
   late List<Color> _to = widget.colors;
 
@@ -432,21 +499,26 @@ class _MeshPainter extends CustomPainter {
   _MeshPainter(this.s, Listenable repaint) : super(repaint: repaint);
   final _AmbientBackgroundState s;
 
+  static const _bases = [
+    Offset(0.2, 0.18),
+    Offset(0.85, 0.3),
+    Offset(0.2, 0.75),
+    Offset(0.8, 0.88),
+  ];
+
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFF121214));
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = const Color(0xFF121214),
+    );
     final colors = s._current();
     final p = s._drift.value * 2 * math.pi;
     final maxSide = math.max(size.width, size.height);
 
     for (var i = 0; i < 4; i++) {
       final a = p + i * math.pi / 2;
-      final base = [
-        const Offset(0.2, 0.18),
-        const Offset(0.85, 0.3),
-        const Offset(0.2, 0.75),
-        const Offset(0.8, 0.88),
-      ][i];
+      final base = _bases[i];
       final center = Offset(
         size.width * (base.dx + 0.12 * math.sin(a + i)),
         size.height * (base.dy + 0.1 * math.cos(a * 1.3 - i)),

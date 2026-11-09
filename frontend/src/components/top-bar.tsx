@@ -186,16 +186,6 @@ export function TopBar() {
               </button>
             </GlobalTooltip>
 
-            {/* Local Device Music Quick Button */}
-            <GlobalTooltip content="Local Device Music" side="bottom">
-              <button
-                onClick={() => router.push("/local-library")}
-                className="flex items-center justify-center w-8 h-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white active:scale-95 transition-all shadow-sm cursor-pointer"
-              >
-                <HardDrive size={16} />
-              </button>
-            </GlobalTooltip>
-
             {!user && (
               <button
                 onClick={() => router.push("/login")}
@@ -305,6 +295,7 @@ export function TopBar() {
                         onClick: () => useUIStore.getState().toggleNotifications(),
                       },
                       { id: "settings", label: "Settings", icon: <Settings size={14} />, onClick: () => useUIStore.getState().openSettings() },
+                      { id: "local-device", label: "Local Device Music", icon: <HardDrive size={14} className="text-zinc-400" />, onClick: () => router.push("/local-library") },
                       { id: "download-app", label: "Download App (APK)", icon: <Smartphone size={14} className="text-brand" />, onClick: () => router.push("/download") },
                       { id: "about-creator", label: "About Creator", icon: <Info size={14} />, onClick: () => router.push("/about") },
                       { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push("/about-zenify") },
@@ -323,6 +314,7 @@ export function TopBar() {
                       },
                     ]
                   : [
+                      { id: "local-device", label: "Local Device Music", icon: <HardDrive size={14} className="text-zinc-400" />, onClick: () => router.push("/local-library") },
                       { id: "download-app", label: "Download App (APK)", icon: <Smartphone size={14} className="text-brand" />, onClick: () => router.push("/download") },
                       { id: "about-creator", label: "About Creator", icon: <Info size={14} />, onClick: () => router.push("/about") },
                       { id: "about-zenify", label: "About Zenify", icon: <Sparkles size={14} className="text-white" />, onClick: () => router.push("/about-zenify") },
