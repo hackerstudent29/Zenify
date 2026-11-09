@@ -151,8 +151,8 @@ export function MobileNav() {
 
   return (
     <nav className="pointer-events-none relative w-full select-none" aria-label="Primary">
-      {/* soft scrim so the glass has something to refract against */}
-      <div className="absolute inset-x-0 bottom-0 h-[150px] bg-gradient-to-t from-black/55 via-black/20 to-transparent" />
+      {/* Ultra-subtle bottom vignette so liquid glass refractions pop over both dark and bright content */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
 
       <div className="relative flex items-center gap-2.5 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+8px)]">
         {/* ───────────── Tab pill ───────────── */}
