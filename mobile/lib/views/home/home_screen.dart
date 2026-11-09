@@ -12,15 +12,13 @@ import 'package:provider/provider.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/widgets/monogram_avatar.dart';
+import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../models/track.dart';
-import '../../services/auth_state.dart';
 import '../../services/player_state.dart';
 import '../details/artist_screen.dart';
 import '../details/album_screen.dart';
 import '../details/artist_popup.dart';
-import '../profile/profile_screen.dart';
 import '../../models/artist_ref.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../services/country_service.dart';
@@ -407,7 +405,11 @@ class _CoverCard extends StatelessWidget {
             )
           else
             Text(
-              MediaNormalizer.formatArtists(subtitle),
+              circular
+                  ? (subtitle.trim().isNotEmpty && subtitle.trim().toLowerCase() != 'unknown artist'
+                      ? subtitle.trim()
+                      : 'Artist')
+                  : MediaNormalizer.formatArtists(subtitle),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: circular ? TextAlign.center : TextAlign.start,
@@ -563,8 +565,8 @@ class _SongRow extends StatelessWidget {
                                   context,
                                   CupertinoPageRoute(
                                     builder: (_) => AlbumScreen(
-                                      albumTitle: track.album,
-                                      artistName: track.artist,
+                                      albumTitle: MediaNormalizer.cleanTitle(track.album),
+                                      artistName: MediaNormalizer.formatArtists(track.artist),
                                       coverUrl: track.coverUrl,
                                     ),
                                   ),
@@ -673,140 +675,6 @@ class _PagedRowsState extends State<_PagedRows> {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Header: large title that collapses, avatar only                     */
-/* ------------------------------------------------------------------ */
-class _NavDelegate extends SliverPersistentHeaderDelegate {
-  _NavDelegate({required this.top, required this.title});
-  final double top;
-  final String title;
-  static const double bar = 52, large = 46;
-
-  @override
-  double get maxExtent => top + bar + large;
-  @override
-  double get minExtent => top + bar;
-
-  @override
-  Widget build(BuildContext context, double shrink, bool overlaps) {
-    final t = (shrink / large).clamp(0.0, 1.0).toDouble();
-    return Container(
-      color: AppColors.bg,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(height: 0.5, color: AppColors.hairline.withValues(alpha: t)),
-          ),
-          // collapsed title
-          Positioned(
-            top: top,
-            left: 0,
-            right: 0,
-            height: bar,
-            child: Center(
-              child: Opacity(
-                opacity: ((t - 0.6) / 0.4).clamp(0.0, 1.0).toDouble(),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/images/z_logo.png',
-                      width: 20,
-                      height: 20,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      title,
-                      style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // profile
-          Positioned(
-            top: top,
-            right: 16,
-            height: bar,
-            child: Center(
-              child: SpringPress(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-                },
-                child: SizedBox(
-                  width: 34,
-                  height: 34,
-                  child: Consumer<AuthState>(
-                    builder: (context, auth, _) {
-                      final avatar = auth.user?.avatarUrl;
-                      if (avatar != null && avatar.startsWith('http')) {
-                        return ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: avatar,
-                            fit: BoxFit.cover,
-                            placeholder: (_, _) => MonogramAvatar(name: auth.user?.name ?? 'Z', size: 34),
-                            errorWidget: (_, _, _) => MonogramAvatar(name: auth.user?.name ?? 'Z', size: 34),
-                          ),
-                        );
-                      }
-                      return MonogramAvatar(
-                        name: auth.user?.name ?? 'Zenify',
-                        size: 34,
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // large title
-          Positioned(
-            left: 20,
-            bottom: 6,
-            child: Opacity(
-              opacity: (1 - t * 1.6).clamp(0.0, 1.0).toDouble(),
-              child: Transform.translate(
-                offset: Offset(0, -shrink * 0.2),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/images/z_logo.png',
-                      width: 34,
-                      height: 34,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _NavDelegate old) => old.top != top || old.title != title;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Mood chips (YT Music filter row, Apple pill style)                  */
@@ -1010,10 +878,47 @@ class _HomeScreenState extends State<HomeScreen> {
       _recentHistory = ListeningHistoryService.instance.getRecentTracks();
       _favoriteArtist = ListeningHistoryService.instance.getFavoriteArtist();
 
+      final userLang = ListeningHistoryService.instance.primaryLanguage;
+      final fav = _favoriteArtist;
+
+      // Personalized taste-first loading: if user listens to a specific language/artist (e.g. Tamil),
+      // prioritize their preferred language and favorite artist over generic national charts!
+      if (userLang.isNotEmpty || (fav != null && fav.isNotEmpty)) {
+        final query = (fav != null && fav.isNotEmpty) ? '$fav radio' : '$userLang top hits';
+        InnerTubeService.instance.search(query).then((tracks) {
+          if (mounted && tracks.isNotEmpty) {
+            setState(() {
+              _quickPicks = tracks;
+              _loading = false;
+            });
+          }
+        }).catchError((_) {});
+
+        if (userLang.isNotEmpty) {
+          InnerTubeService.instance.search('$userLang top trending').then((tracks) {
+            if (mounted && tracks.isNotEmpty) {
+              setState(() {
+                _chartTracks = tracks;
+                _loading = false;
+              });
+            }
+          }).catchError((_) {});
+
+          InnerTubeService.instance.search('latest $userLang songs').then((tracks) {
+            if (mounted && tracks.isNotEmpty) {
+              setState(() {
+                _newReleases = tracks;
+                _loading = false;
+              });
+            }
+          }).catchError((_) {});
+        }
+      }
+
       // Progressive loading: don't block the screen with Future.wait!
-      // 1. Home feed / Quick picks
+      // 1. Home feed / Quick picks (used as baseline or fallback)
       InnerTubeService.instance.getHomeFeed(countryCode: country.code).then((tracks) {
-        if (mounted && tracks.isNotEmpty) {
+        if (mounted && tracks.isNotEmpty && _quickPicks.isEmpty) {
           setState(() {
             _quickPicks = tracks;
             _loading = false;
@@ -1022,7 +927,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }).catchError((_) async {
         try {
           final ytSearchFallback = await InnerTubeService.instance.search('Top Songs').timeout(const Duration(seconds: 5));
-          if (mounted && ytSearchFallback.isNotEmpty) {
+          if (mounted && ytSearchFallback.isNotEmpty && _quickPicks.isEmpty) {
             setState(() {
               _quickPicks = ytSearchFallback;
               _loading = false;
@@ -1030,7 +935,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return;
           }
         } catch (_) {}
-        if (mounted) {
+        if (mounted && _quickPicks.isEmpty) {
           setState(() {
             _quickPicks = CatalogDataSource.allTracks;
             _loading = false;
@@ -1038,26 +943,30 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       });
 
-      // 2. Regional Charts
-      InnerTubeService.instance.getCharts(countryCode: country.code).then((data) {
-        if (mounted) {
-          setState(() {
-            if (data.tracks.isNotEmpty) _chartTracks = data.tracks;
-            if (data.artists.isNotEmpty) _chartArtists = data.artists;
-            _loading = false;
-          });
-        }
-      }).catchError((_) {});
+      // 2. Regional Charts (if not already populated by language preference)
+      if (userLang.isEmpty) {
+        InnerTubeService.instance.getCharts(countryCode: country.code).then((data) {
+          if (mounted && _chartTracks.isEmpty) {
+            setState(() {
+              if (data.tracks.isNotEmpty) _chartTracks = data.tracks;
+              if (data.artists.isNotEmpty) _chartArtists = data.artists;
+              _loading = false;
+            });
+          }
+        }).catchError((_) {});
+      }
 
-      // 3. New Releases
-      InnerTubeService.instance.getNewReleases(countryCode: country.code).then((tracks) {
-        if (mounted && tracks.isNotEmpty) {
-          setState(() {
-            _newReleases = tracks;
-            _loading = false;
-          });
-        }
-      }).catchError((_) {});
+      // 3. New Releases (if not already populated by language preference)
+      if (userLang.isEmpty) {
+        InnerTubeService.instance.getNewReleases(countryCode: country.code).then((tracks) {
+          if (mounted && tracks.isNotEmpty && _newReleases.isEmpty) {
+            setState(() {
+              _newReleases = tracks;
+              _loading = false;
+            });
+          }
+        }).catchError((_) {});
+      }
 
       // 4. Fallback guard: after 3s, ensure screen never hangs
       Future.delayed(const Duration(milliseconds: 3000), () async {
@@ -1150,11 +1059,13 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppColors.bg,
       body: _loading && _quickPicks.isEmpty && _chartTracks.isEmpty && CatalogDataSource.allTracks.isEmpty
           ? const Center(child: CupertinoActivityIndicator(color: Colors.white70, radius: 14))
-          : CustomScrollView(
-              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-              slivers: [
-                SliverPersistentHeader(pinned: true, delegate: _NavDelegate(top: top, title: 'Home')),
-                CupertinoSliverRefreshControl(
+          : Stack(
+              children: [
+                CustomScrollView(
+                  physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                  slivers: [
+                    SliverToBoxAdapter(child: SizedBox(height: top + 56)),
+                    CupertinoSliverRefreshControl(
                   onRefresh: () async {
                     await _loadAllHomeData(refresh: true);
                     if (mounted) setState(() => _refresh++);
@@ -1274,15 +1185,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       onMore: () {},
                     ),
                     _Shelf(
-                      height: 196,
-                      itemExtent: 150,
+                      height: 236,
+                      itemExtent: 170,
                       count: listenAgain.length,
                       builder: (c, i) {
                         final t = listenAgain[i];
                         final cur = player.currentTrack?.id == t.id;
                         return _CoverCard(
                           url: t.coverUrl,
-                          title: t.title,
+                          title: MediaNormalizer.cleanCompactTitle(t.title),
                           subtitle: t.artist,
                           artists: t.resolvedArtists,
                           current: cur,
@@ -1368,8 +1279,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       _SecHeader(title: 'Albums for you', onMore: () {}),
                       _Shelf(
-                        height: 232,
-                        itemExtent: 184,
+                        height: 236,
+                        itemExtent: 170,
                         count: albums.length,
                         builder: (c, i) {
                           final t = albums[i];
@@ -1380,8 +1291,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             artists: t.resolvedArtists,
                             radius: 8,
                             onTap: () => _open(AlbumScreen(
-                              albumTitle: t.album,
-                              artistName: t.artist,
+                              albumTitle: MediaNormalizer.cleanTitle(t.album),
+                              artistName: MediaNormalizer.formatArtists(t.artist),
                               coverUrl: t.coverUrl,
                             )),
                           );
@@ -1401,14 +1312,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         onMore: () => _open(ArtistScreen(artistName: _favoriteArtist!)),
                       ),
                       _Shelf(
-                        height: 176,
-                        itemExtent: 132,
+                        height: 236,
+                        itemExtent: 170,
                         count: _favoriteArtistTracks.length,
                         builder: (c, i) {
                           final t = _favoriteArtistTracks[i];
                           return _CoverCard(
                             url: t.coverUrl,
-                            title: t.title,
+                            title: MediaNormalizer.cleanCompactTitle(t.title),
                             subtitle: t.artist,
                             artists: t.resolvedArtists,
                             onTap: () => play(_favoriteArtistTracks, i),
@@ -1449,6 +1360,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 SliverToBoxAdapter(child: SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom)),
               ],
             ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: DynamicIslandHeader(
+                title: 'Home',
+                showBack: false,
+                showProfile: true,
+                topPadding: top + 4,
+              ),
+            ),
+          ],
+        ),
     );
   }
 }

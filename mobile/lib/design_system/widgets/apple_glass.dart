@@ -202,12 +202,24 @@ class AppleDock extends StatefulWidget {
     required this.index,
     required this.onSelect,
     this.height = 64,
+    this.searchExpanded = false,
+    this.onSearchTap,
+    this.onBack,
   });
 
   /// 0 Home · 1 Explore · 2 Library · 3 Search
   final int index;
   final ValueChanged<int> onSelect;
   final double height;
+
+  /// true → pill collapses into a back circle, search circle grows into a bar
+  final bool searchExpanded;
+
+  /// tap on the expanded search bar (→ go to typing at the top)
+  final VoidCallback? onSearchTap;
+
+  /// tap on the back circle
+  final VoidCallback? onBack;
 
   @override
   State<AppleDock> createState() => _AppleDockState();
@@ -248,6 +260,11 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
     value: widget.index < _count ? 1 : 0,
   );
 
+  late final AnimationController _exp = AnimationController.unbounded(
+    vsync: this,
+    value: widget.searchExpanded ? 1 : 0,
+  );
+
   bool _pressing = false;
   double _itemW = 1;
   double _vel = 0, _lastV = 0;
@@ -267,6 +284,7 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _exp.dispose();
     _pos.dispose();
     _lens.dispose();
     _sel.dispose();
@@ -276,6 +294,9 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
   @override
   void didUpdateWidget(covariant AppleDock old) {
     super.didUpdateWidget(old);
+    if (old.searchExpanded != widget.searchExpanded) {
+      _springTo(_exp, widget.searchExpanded ? 1 : 0, spring: _soft);
+    }
     if (old.index == widget.index || _pressing) return;
     if (_handled == widget.index) {
       _handled = null; // the long-press release spring already owns the motion
@@ -363,93 +384,214 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
     final h = widget.height;
     return SizedBox(
       height: h,
-      child: Row(
+      child: LayoutBuilder(
+        builder: (context, c) {
+          const gap = 10.0;
+          final total = c.maxWidth;
+          final fullPill = total - gap - h;
+          return AnimatedBuilder(
+            animation: _exp,
+            builder: (_, _) {
+              final e = _exp.value.clamp(0.0, 1.0);
+              final pillW = ui.lerpDouble(fullPill, h, e)!;
+              final searchW = total - gap - pillW;
+              return Row(
+                children: [
+                  SizedBox(width: pillW, height: h, child: _pill(h, fullPill, e)),
+                  const SizedBox(width: gap),
+                  SizedBox(width: searchW, height: h, child: _search(h, e)),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _pill(double h, double fullW, double e) {
+    return AppleGlass(
+      borderRadius: BorderRadius.circular(h / 2),
+      child: Stack(
         children: [
-          Expanded(child: _pill(h)),
-          const SizedBox(width: 10),
-          _search(h),
+          // normal tabs: keep their full width (no squishing) and just fade out
+          IgnorePointer(
+            ignoring: e > 0.02,
+            child: Opacity(
+              opacity: (1 - e * 1.8).clamp(0.0, 1.0),
+              child: OverflowBox(
+                alignment: Alignment.centerLeft,
+                minWidth: fullW,
+                maxWidth: fullW,
+                child: SizedBox(width: fullW, height: h, child: _pillTabs(h)),
+              ),
+            ),
+          ),
+          // back button fades in as the pill becomes a circle
+          if (e > 0.02)
+            Positioned.fill(
+              child: Opacity(
+                opacity: ((e - 0.45) / 0.55).clamp(0.0, 1.0),
+                child: PressableScale(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    widget.onBack?.call();
+                  },
+                  child: const Center(
+                    child: Icon(
+                      CupertinoIcons.chevron_back,
+                      size: 24,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _pill(double h) {
-    return AppleGlass(
-      borderRadius: BorderRadius.circular(h / 2),
-      child: LayoutBuilder(
-        builder: (context, c) {
-          _itemW = (c.maxWidth - _inset * 2) / _count;
-          return RawGestureDetector(
-            behavior: HitTestBehavior.opaque,
-            gestures: <Type, GestureRecognizerFactory>{
-              TapGestureRecognizer:
-                  GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
-                    () => TapGestureRecognizer(),
-                    (t) => t.onTapUp = (d) => _tapAt(d.localPosition.dx),
+  /// The old pill body (tabs + long-press lens), unchanged.
+  Widget _pillTabs(double h) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        _itemW = (c.maxWidth - _inset * 2) / _count;
+        return RawGestureDetector(
+          behavior: HitTestBehavior.opaque,
+          gestures: <Type, GestureRecognizerFactory>{
+            TapGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+                  () => TapGestureRecognizer(),
+                  (t) => t.onTapUp = (d) => _tapAt(d.localPosition.dx),
+                ),
+            LongPressGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+                  () => LongPressGestureRecognizer(
+                    duration: const Duration(milliseconds: 230),
                   ),
-              LongPressGestureRecognizer:
-                  GestureRecognizerFactoryWithHandlers<
-                    LongPressGestureRecognizer
-                  >(
-                    () => LongPressGestureRecognizer(
-                      duration: const Duration(milliseconds: 230),
-                    ),
-                    (l) {
-                      l.onLongPressStart = _lpStart;
-                      l.onLongPressMoveUpdate = _lpMove;
-                      l.onLongPressEnd = (d) =>
-                          _lpEnd(d.velocity.pixelsPerSecond.dx);
-                      l.onLongPressCancel = () => _lpEnd(0);
+                  (l) {
+                    l.onLongPressStart = _lpStart;
+                    l.onLongPressMoveUpdate = _lpMove;
+                    l.onLongPressEnd = (d) =>
+                        _lpEnd(d.velocity.pixelsPerSecond.dx);
+                    l.onLongPressCancel = () => _lpEnd(0);
+                  },
+                ),
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(_inset),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_pos, _lens]),
+                    builder: (_, _) {
+                      final vis = _lens.value.clamp(0.0, 1.0);
+                      if (vis < 0.01) return const SizedBox.shrink();
+                      final stretch = 1 + (_vel.abs() * 0.035).clamp(0.0, 0.14);
+                      final scale = (0.82 + 0.28 * vis);
+                      return Align(
+                        alignment: Alignment.centerLeft,
+                        child: Transform.translate(
+                          offset: Offset(_pos.value * _itemW, 0),
+                          child: Transform(
+                            alignment: Alignment.center,
+                            transform: Matrix4.diagonal3Values(
+                              scale * stretch,
+                              scale,
+                              1,
+                            ),
+                            child: _LensBody(
+                              width: _itemW,
+                              height: h - _inset * 2,
+                              vis: vis,
+                            ),
+                          ),
+                        ),
+                      );
                     },
                   ),
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(_inset),
-              child: Stack(
-                children: [
-                  // the sliding glass lens: built ONLY while it is visible
-                  Positioned.fill(
-                    child: AnimatedBuilder(
-                      animation: Listenable.merge([_pos, _lens]),
-                      builder: (_, _) {
-                        final vis = _lens.value.clamp(0.0, 1.0);
-                        if (vis < 0.01) return const SizedBox.shrink();
-                        final stretch =
-                            1 + (_vel.abs() * 0.035).clamp(0.0, 0.14);
-                        final scale = (0.82 + 0.28 * vis);
-                        return Align(
-                          alignment: Alignment.centerLeft,
-                          child: Transform.translate(
-                            offset: Offset(_pos.value * _itemW, 0),
-                            child: Transform(
-                              alignment: Alignment.center,
-                              transform: Matrix4.diagonal3Values(
-                                scale * stretch,
-                                scale,
-                                1,
-                              ),
-                              child: _LensBody(
-                                width: _itemW,
-                                height: h - _inset * 2,
-                                vis: vis,
+                ),
+                Row(
+                  children: [
+                    for (int i = 0; i < _count; i++) Expanded(child: _item(i)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _search(double h, double e) {
+    final selected = widget.index == 3;
+    final expanded = widget.searchExpanded;
+    return PressableScale(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        if (expanded) {
+          widget.onSearchTap?.call(); // bar → typing at the top
+        } else {
+          widget.onSelect(3); // circle → bar
+        }
+      },
+      child: AppleGlass(
+        borderRadius: BorderRadius.circular(h / 2),
+        child: SizedBox(
+          height: h,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Padding(
+                padding: EdgeInsets.only(left: 20 * e),
+                child: Align(
+                  alignment: Alignment(-e, 0), // centre → left as it grows
+                  child: ClipRect(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TweenAnimationBuilder<Color?>(
+                          tween: ColorTween(
+                            end: (selected || expanded)
+                                ? kAppleRed
+                                : const Color(0xF2FFFFFF),
+                          ),
+                          duration: const Duration(milliseconds: 260),
+                          builder: (_, col, _) => Icon(
+                            CupertinoIcons.search,
+                            size: ui.lerpDouble(26, 20, e)!,
+                            color: col,
+                          ),
+                        ),
+                        if (e > 0.25) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Opacity(
+                              opacity: ((e - 0.4) / 0.6).clamp(0.0, 1.0),
+                              child: Text(
+                                'Search songs, artists, albums',
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.clip,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white.withValues(alpha: 0.65),
+                                ),
                               ),
                             ),
                           ),
-                        );
-                      },
+                        ],
+                      ],
                     ),
                   ),
-                  Row(
-                    children: [
-                      for (int i = 0; i < _count; i++)
-                        Expanded(child: _item(i)),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -491,34 +633,7 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
     );
   }
 
-  Widget _search(double h) {
-    final selected = widget.index == 3;
-    return PressableScale(
-      onTap: () {
-        if (!selected) HapticFeedback.selectionClick();
-        widget.onSelect(3);
-      },
-      child: AppleGlass(
-        borderRadius: BorderRadius.circular(h / 2),
-        child: SizedBox(
-          width: h,
-          height: h,
-          child: Center(
-            // colour only: no background disc when selected
-            child: TweenAnimationBuilder<Color?>(
-              tween: ColorTween(
-                end: selected ? kAppleRed : const Color(0xF2FFFFFF),
-              ),
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              builder: (_, c, _) =>
-                  Icon(CupertinoIcons.search, size: 26, color: c),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+
 }
 
 /// The lens itself: clear glass with a bright specular edge. Painted once per frame, no backdrop pass.

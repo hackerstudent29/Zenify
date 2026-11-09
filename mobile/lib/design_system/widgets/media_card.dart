@@ -16,7 +16,7 @@ class MediaCard extends StatelessWidget {
     this.subtitle,
     this.imageUrl,
     this.isCircular = false,
-    this.width = 150.0,
+    this.width = 170.0,
     this.twoLineTitle = false,
     this.onTap,
   });
@@ -98,16 +98,18 @@ class MediaCard extends StatelessWidget {
                     style: AppTypography.headline.copyWith(fontSize: 14),
                   )
                 : MarqueeText(
-                    title,
+                    isCircular ? title : MediaNormalizer.cleanCompactTitle(title),
                     textAlign: isCircular ? TextAlign.center : TextAlign.left,
                     style: AppTypography.headline.copyWith(fontSize: 14),
                   ),
 
             // Subtitle
-            if (subtitle != null) ...[
+            if (subtitle != null || isCircular) ...[
               const SizedBox(height: 2),
               MarqueeText(
-                subtitle!,
+                (isCircular && (subtitle == null || subtitle!.trim().isEmpty || subtitle!.trim().toLowerCase() == 'unknown artist'))
+                    ? 'Artist'
+                    : MediaNormalizer.formatArtists(subtitle ?? ''),
                 textAlign: isCircular ? TextAlign.center : TextAlign.left,
                 style: AppTypography.subhead.copyWith(fontSize: 12),
               ),

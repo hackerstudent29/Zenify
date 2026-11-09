@@ -1,10 +1,9 @@
 {
-  "version": 4,
+  "version": 5,
   "streamMode": "device",
   "minAppVersion": "1.0.0",
-  "latestAppVersion": "2.6.7",
+  "latestAppVersion": "1.0.2",
   "updateUrl": "https://listenzenify.com/download/app",
-  "releaseNotes": "• Pure YouTube Music Automix: Infinite continuous radio playback from current tracks\n• Native Android getNext queue integration via Dispatchers.IO\n• Enhanced MediaNormalizer artwork scaling and defensive null safety\n• Zero legacy provider dependencies: 100% pure YouTube Music catalog",
+  "releaseNotes": "• Dynamic Island Header with smooth vacuum transition and seamless text marquee\n• Perfect audio sync on auto-transition with native ExoPlayer queue pipeline\n• Personalized infinite radio mix strictly respecting user language preference (Tamil & regional affinity)\n• Standalone search dock bubble with smooth morphing and top-field search animation\n• Apple Music standardized 170px cover cards and search overflow fix\n• Clean artist references and multi-artist tap navigation",
   "message": null
 }
-

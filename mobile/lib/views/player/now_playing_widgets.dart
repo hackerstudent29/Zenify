@@ -664,7 +664,7 @@ class AppleMiniPlayer extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(track.title,
+                            Text(track.compactTitle,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: Zen.headline.copyWith(fontSize: 15)),
@@ -950,7 +950,7 @@ class _BannerCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                               color: Zen.rose)),
                       const SizedBox(height: 2),
-                      Text(track.title,
+                      Text(track.compactTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Zen.headline.copyWith(fontSize: 15)),

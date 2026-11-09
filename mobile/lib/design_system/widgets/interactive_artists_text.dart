@@ -29,14 +29,15 @@ class InteractiveArtistsText extends StatelessWidget {
   final void Function(String artistName)? onTapArtist;
 
   void _handleTap(BuildContext context, String artistName, {List<ArtistRef>? refs}) {
-    if (artistName.trim().isEmpty || artistName == 'Unknown Artist') return;
+    final clean = MediaNormalizer.cleanArtistName(artistName);
+    if (clean.isEmpty || clean == 'Unknown Artist') return;
     if (onTapArtist != null) {
-      onTapArtist!(artistName);
+      onTapArtist!(clean);
     } else {
       String? browseId;
       String? imageUrl;
       if (refs != null && refs.isNotEmpty) {
-        final match = refs.where((r) => r.name.toLowerCase() == artistName.toLowerCase()).firstOrNull;
+        final match = refs.where((r) => r.name.toLowerCase() == clean.toLowerCase()).firstOrNull;
         if (match != null) {
           if (match.id.isNotEmpty && !match.id.contains('_')) {
             browseId = match.id;
@@ -48,7 +49,7 @@ class InteractiveArtistsText extends StatelessWidget {
         context,
         MaterialPageRoute(
           builder: (_) => ArtistScreen(
-            artistName: artistName,
+            artistName: clean,
             browseId: browseId,
             imageUrl: imageUrl,
           ),
@@ -59,34 +60,53 @@ class InteractiveArtistsText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> names = [];
     final List<ArtistRef> refs = [];
+    final List<String> names = [];
+
+    void addName(String name) {
+      final clean = MediaNormalizer.cleanArtistName(name);
+      if (clean.isNotEmpty && !names.contains(clean) && !clean.contains("Instance of 'ArtistRef'")) {
+        names.add(clean);
+      }
+    }
 
     if (artists is List<ArtistRef>) {
       for (final a in artists as List<ArtistRef>) {
-        final n = a.name.trim();
-        if (n.isNotEmpty && !names.contains(n)) {
-          names.add(n);
-          refs.add(a);
+        final split = ArtistRef.splitFromName(a.name, defaultImageUrl: a.imageUrl);
+        refs.addAll(split);
+        for (final r in split) {
+          addName(r.name);
         }
       }
-    } else if (artists is List<String>) {
-      for (final s in artists as List<String>) {
-        final sub = MediaNormalizer.splitArtistNames(s);
-        for (final n in sub) {
-          if (n.isNotEmpty && !names.contains(n)) {
-            names.add(n);
-            refs.add(ArtistRef.fromName(n));
+    } else if (artists is Iterable) {
+      for (final item in artists as Iterable) {
+        if (item is ArtistRef) {
+          final split = ArtistRef.splitFromName(item.name, defaultImageUrl: item.imageUrl);
+          refs.addAll(split);
+          for (final r in split) {
+            addName(r.name);
+          }
+        } else if (item != null) {
+          final split = ArtistRef.splitFromName(item);
+          refs.addAll(split);
+          for (final r in split) {
+            addName(r.name);
           }
         }
       }
-    } else if (artists is String) {
-      final sub = MediaNormalizer.splitArtistNames(artists as String);
-      for (final n in sub) {
-        if (n.isNotEmpty && !names.contains(n)) {
-          names.add(n);
-          refs.add(ArtistRef.fromName(n));
-        }
+    } else if (artists != null) {
+      final split = ArtistRef.splitFromName(artists);
+      refs.addAll(split);
+      for (final r in split) {
+        addName(r.name);
+      }
+    }
+
+    if (names.isEmpty) {
+      final splitFallback = MediaNormalizer.splitArtistNames(artists);
+      for (final n in splitFallback) {
+        addName(n);
+        refs.add(ArtistRef.fromName(n));
       }
     }
 

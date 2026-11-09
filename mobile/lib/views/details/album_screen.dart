@@ -9,6 +9,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/widgets/dynamic_island_header.dart';
+import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../models/track.dart';
 import '../../services/innertube_service.dart';
@@ -367,8 +369,8 @@ class _AlbumScreenState extends State<AlbumScreen> {
 
       final res = await InnerTubeService.instance.getAlbum(
         bId,
-        albumTitle: widget.albumTitle,
-        artistName: widget.artistName,
+        albumTitle: MediaNormalizer.stripIdNoise(MediaNormalizer.cleanTitle(widget.albumTitle)),
+        artistName: MediaNormalizer.stripIdNoise(MediaNormalizer.formatArtists(widget.artistName)),
       );
       if (res != null && res.tracks.isNotEmpty) {
         if (mounted) {
@@ -381,7 +383,7 @@ class _AlbumScreenState extends State<AlbumScreen> {
         return;
       }
 
-      final r = await InnerTubeService.instance.search('${widget.albumTitle} ${widget.artistName}');
+      final r = await InnerTubeService.instance.search('${MediaNormalizer.stripIdNoise(widget.albumTitle)} ${MediaNormalizer.stripIdNoise(widget.artistName)}');
       // Prefer exact album matches; fall back to everything returned.
       final exact = r.where((t) {
         final a = t.album;
@@ -405,7 +407,7 @@ class _AlbumScreenState extends State<AlbumScreen> {
     HapticFeedback.mediumImpact();
     final q = List<Track>.of(_tracks);
     if (shuffle) q.shuffle();
-    context.read<PlayerState>().setQueue(q, startIndex: shuffle ? 0 : i);
+    context.read<PlayerState>().setQueue(q, startIndex: shuffle ? 0 : i, collectionLocked: true);
   }
 
   void _openAlbum(_Release r) => Navigator.push(
@@ -418,6 +420,28 @@ class _AlbumScreenState extends State<AlbumScreen> {
           ),
         ),
       );
+
+  String get _displayAlbumTitle {
+    var t = MediaNormalizer.cleanAlbumTitle(widget.albumTitle);
+    if (t.isEmpty || t.startsWith('UC') || t.toLowerCase() == 'single') {
+      if (_tracks.isNotEmpty) {
+        final a = MediaNormalizer.cleanAlbumTitle(_tracks.first.album);
+        if (a.isNotEmpty && a != 'Single' && !a.startsWith('UC')) return a;
+        return MediaNormalizer.cleanTitle(_tracks.first.title);
+      }
+    }
+    return t.isNotEmpty ? t : 'Album';
+  }
+
+  String get _displayArtistName {
+    var a = MediaNormalizer.formatArtists(widget.artistName);
+    if (a.isEmpty || a.startsWith('UC') || a == 'Unknown Artist') {
+      if (_tracks.isNotEmpty && _tracks.first.artist.isNotEmpty && !_tracks.first.artist.startsWith('UC')) {
+        return MediaNormalizer.formatArtists(_tracks.first.artist);
+      }
+    }
+    return a.isNotEmpty ? a : 'Artist';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -486,56 +510,60 @@ class _AlbumScreenState extends State<AlbumScreen> {
                       const SizedBox(height: 22),
                       _Reveal(
                         delay: const Duration(milliseconds: 160),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Column(
-                            children: [
-                              Text(
-                                MediaNormalizer.cleanTitle(widget.albumTitle),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.6),
-                              ),
-                              const SizedBox(height: 4),
-                              _Press(
-                                scale: 0.94,
-                                onTap: () {
-                                  final artists = MediaNormalizer.splitArtistNames(widget.artistName);
-                                  if (artists.length > 1) {
-                                    showArtistPopup(context, currentArtistName: widget.artistName);
-                                  } else if (artists.isNotEmpty) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => ArtistScreen(artistName: artists.first)),
-                                    );
-                                  }
-                                },
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        MediaNormalizer.formatArtists(widget.artistName),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: AppColors.accent, fontSize: 20, fontWeight: FontWeight.w500),
+                        child: IslandTitleFade(
+                          controller: _sc,
+                          revealOffset: 240,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Column(
+                              children: [
+                                Text(
+                                  _displayAlbumTitle,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.6),
+                                ),
+                                const SizedBox(height: 4),
+                                _Press(
+                                  scale: 0.94,
+                                  onTap: () {
+                                    final artists = MediaNormalizer.splitArtistNames(_displayArtistName);
+                                    if (artists.length > 1) {
+                                      showArtistPopup(context, currentArtistName: _displayArtistName);
+                                    } else if (artists.isNotEmpty) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => ArtistScreen(artistName: artists.first)),
+                                      );
+                                    }
+                                  },
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          _displayArtistName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(color: AppColors.accent, fontSize: 20, fontWeight: FontWeight.w500),
+                                        ),
                                       ),
-                                    ),
-                                    const Icon(Icons.chevron_right_rounded, color: AppColors.accent, size: 22),
-                                  ],
+                                      const Icon(Icons.chevron_right_rounded, color: AppColors.accent, size: 22),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 400),
-                                child: Text(
-                                  _loading ? 'Album' : 'Album · ${_tracks.length} ${_tracks.length == 1 ? 'song' : 'songs'}',
-                                  key: ValueKey(_loading),
-                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                                const SizedBox(height: 2),
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 400),
+                                  child: Text(
+                                    _loading ? 'Album' : 'Album · ${_tracks.length} ${_tracks.length == 1 ? 'song' : 'songs'}',
+                                    key: ValueKey(_loading),
+                                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -650,60 +678,18 @@ class _AlbumScreenState extends State<AlbumScreen> {
             ],
           ),
 
-          // Top bar: back button, title fades in once the cover scrolls away
+          // Top bar: Dynamic Island 3-dock floating header
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: AnimatedBuilder(
-              animation: _sc,
-              builder: (_, child) {
-                final o = _sc.hasClients ? _sc.offset : 0.0;
-                final t = ((o - (top + _coverTop + coverSize - 40)) / 50).clamp(0.0, 1.0).toDouble();
-                return Container(
-                  height: top + 52,
-                  padding: EdgeInsets.only(top: top),
-                  decoration: BoxDecoration(
-                    color: AppColors.bg.withValues(alpha: t),
-                    border: Border(bottom: BorderSide(color: AppColors.hairline.withValues(alpha: t), width: 0.5)),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Opacity(
-                        opacity: t,
-                        child: Transform.translate(
-                          offset: Offset(0, (1 - t) * 8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 64),
-                            child: Text(MediaNormalizer.cleanTitle(widget.albumTitle),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
-                          ),
-                        ),
-                      ),
-                      child!,
-                    ],
-                  ),
-                );
-              },
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 14),
-                  child: _Press(
-                    scale: 0.88,
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.surface2),
-                      child: const Icon(CupertinoIcons.chevron_back, color: Colors.white, size: 20),
-                    ),
-                  ),
-                ),
-              ),
+            child: DynamicIslandHeader(
+              title: MediaNormalizer.cleanAlbumTitle(widget.albumTitle),
+              scrollController: _sc,
+              revealOffset: 240,
+              showBack: true,
+              onBack: () => Navigator.pop(context),
+              showProfile: true,
             ),
           ),
         ],
@@ -767,13 +753,17 @@ class _TrackRow extends StatelessWidget {
                               fontWeight: FontWeight.w500,
                               letterSpacing: -0.2,
                             ),
-                            child: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              MediaNormalizer.cleanCompactTitle(track.title),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           if (showArtist)
-                            Text(track.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                            InteractiveArtistsText(
+                              artists: track.resolvedArtists,
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                            ),
                         ],
                       ),
                     ),

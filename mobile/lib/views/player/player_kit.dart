@@ -21,13 +21,20 @@ const kPauseSpring = SpringDescription(mass: 0.6, stiffness: 300, damping: 22);
 const kSnappySpring = SpringDescription(mass: 0.8, stiffness: 420, damping: 30);
 
 extension SpringDrive on AnimationController {
-  /// Drives an (ideally unbounded) controller to [target] with a real spring,
-  /// inheriting finger velocity (units per second) for a fluid hand-off.
+  /// Inherits the current velocity when interrupted mid-flight, so tapping
+  /// during an animation reverses it smoothly instead of restarting.
   TickerFuture springTo(
     double target, {
     SpringDescription spring = kSheetSpring,
-    double velocity = 0,
-  }) => animateWith(SpringSimulation(spring, value, target, velocity));
+    double? velocity,
+  }) => animateWith(
+    SpringSimulation(
+      spring,
+      value,
+      target,
+      velocity ?? (isAnimating ? this.velocity : 0),
+    ),
+  );
 }
 
 /// A [Curve] backed by a real spring simulation (0 → 1). Lets route / implicit
@@ -40,6 +47,95 @@ class SpringCurve extends Curve {
   @override
   double transformInternal(double t) =>
       SpringSimulation(spring, 0, 1, 0).x(t * seconds);
+}
+
+/* ------------------------------------------------------------------ */
+/*  SpringPop: a springy "kick" for any widget                          */
+/* ------------------------------------------------------------------ */
+/// Wraps [child] and, whenever [trigger] changes value or [pulse] notifies,
+/// kicks it with a real spring: scale up/down by [scale] and nudge by
+/// ([dx], [dy]) pixels, then settles back with a little overshoot.
+///
+///  • play / pause glyph      → trigger: isPlaying
+///  • previous / next buttons → pulse: a ValueNotifier bumped on every skip,
+///                              dx = ∓12 so the icon nudges in its direction
+///  • lyrics / queue toggles  → trigger: panel open state
+class SpringPop extends StatefulWidget {
+  const SpringPop({
+    super.key,
+    required this.child,
+    this.trigger,
+    this.pulse,
+    this.scale = 0.25,
+    this.dx = 0,
+    this.dy = 0,
+    this.strength = 40,
+  });
+
+  final Widget child;
+  final Object? trigger;
+  final Listenable? pulse;
+  final double scale;
+  final double dx;
+  final double dy;
+
+  /// Initial spring velocity (40 ≈ a peak displacement of 0.75).
+  final double strength;
+
+  @override
+  State<SpringPop> createState() => _SpringPopState();
+}
+
+class _SpringPopState extends State<SpringPop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController.unbounded(
+    vsync: this,
+    value: 0,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    widget.pulse?.addListener(_kick);
+  }
+
+  @override
+  void didUpdateWidget(covariant SpringPop old) {
+    super.didUpdateWidget(old);
+    if (old.pulse != widget.pulse) {
+      old.pulse?.removeListener(_kick);
+      widget.pulse?.addListener(_kick);
+    }
+    if (old.trigger != widget.trigger) _kick();
+  }
+
+  @override
+  void dispose() {
+    widget.pulse?.removeListener(_kick);
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _kick() {
+    if (!mounted) return;
+    _c.value = 0;
+    _c.animateWith(SpringSimulation(kPauseSpring, 0, 0, widget.strength));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (_, child) {
+        final v = _c.value;
+        return Transform.translate(
+          offset: Offset(widget.dx * v, widget.dy * v),
+          child: Transform.scale(scale: 1 + widget.scale * v, child: child),
+        );
+      },
+    );
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -320,9 +416,9 @@ class _PopLikeButtonState extends State<PopLikeButton>
   void didUpdateWidget(covariant PopLikeButton old) {
     super.didUpdateWidget(old);
     if (widget.liked && !old.liked) {
-      // spring "pop": kick the scale up and let the spring settle it back
+      // spring "pop": a strong kick (peak ≈ 0.75) that settles back with overshoot
       _c.value = 0;
-      _c.animateWith(SpringSimulation(kPauseSpring, 0, 0, 5));
+      _c.animateWith(SpringSimulation(kPauseSpring, 0, 0, 40));
     }
   }
 
@@ -547,3 +643,220 @@ class _MeshPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _MeshPainter old) => true;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Marquee: one seamless right→left loop, repeated every [interval]    */
+/* ------------------------------------------------------------------ */
+/// Text that fits stays still. Text that overflows waits [interval], then
+/// scrolls right→left ONCE around a full loop: it leaves on the left while a
+/// copy of itself enters from the right, finishing exactly where it began.
+/// It never scrolls back. Then it rests for [interval] and repeats.
+class MarqueeScroll extends StatefulWidget {
+  const MarqueeScroll({
+    super.key,
+    required this.child,
+    this.resetKey,
+    this.interval = const Duration(seconds: 7),
+    this.firstDelay = const Duration(milliseconds: 2500),
+    this.speed = 42, // px / second
+    this.gap = 48, // space between the end of the text and its repeat
+  });
+  final Widget child;
+  final Object? resetKey; // change → restart from the beginning
+  final Duration interval;
+  final Duration firstDelay;
+  final double speed;
+  final double gap;
+
+  @override
+  State<MarqueeScroll> createState() => _MarqueeScrollState();
+}
+
+class _MarqueeScrollState extends State<MarqueeScroll> {
+  final ScrollController _ctrl = ScrollController();
+  final GlobalKey _childKey = GlobalKey();
+  int _run = 0;
+  bool _loop = false; // second copy is mounted only while looping
+  bool _overflow = false;
+
+  bool _alive(int id) => mounted && id == _run;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  @override
+  void didUpdateWidget(covariant MarqueeScroll old) {
+    super.didUpdateWidget(old);
+    if (old.resetKey != widget.resetKey) {
+      _loop = false;
+      if (_ctrl.hasClients) _ctrl.jumpTo(0);
+      _start();
+    }
+  }
+
+  @override
+  void dispose() {
+    _run++;
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  double? _contentWidth() {
+    final ro = _childKey.currentContext?.findRenderObject();
+    if (ro is RenderBox && ro.hasSize) return ro.size.width;
+    return null;
+  }
+
+  void _measure() {
+    if (!mounted || !_ctrl.hasClients) return;
+    final w = _contentWidth();
+    if (w == null) return;
+    final over = w > _ctrl.position.viewportDimension + 1;
+    if (over != _overflow) setState(() => _overflow = over);
+  }
+
+  Future<void> _start() async {
+    final id = ++_run;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_alive(id)) _measure();
+    });
+    var wait = widget.firstDelay;
+    while (_alive(id)) {
+      await Future<void>.delayed(wait);
+      wait = widget.interval;
+      if (!_alive(id) || !_ctrl.hasClients) continue;
+      _measure();
+      final w = _contentWidth();
+      if (!_overflow || w == null) continue; // fits on screen → stay still
+
+      setState(() => _loop = true); // mount the second copy
+      await WidgetsBinding.instance.endOfFrame;
+      if (!_alive(id) || !_ctrl.hasClients) return;
+
+      final dist =
+          w + widget.gap; // after this, copy #2 sits exactly where #1 began
+      await _ctrl.animateTo(
+        dist,
+        duration: Duration(milliseconds: (dist / widget.speed * 1000).round()),
+        curve: Curves.linear,
+      );
+      if (!_alive(id)) return;
+      if (_ctrl.hasClients) _ctrl.jumpTo(0); // identical picture → invisible
+      setState(() => _loop = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, _) {
+        final left = _ctrl.hasClients
+            ? _ctrl.offset.clamp(0.0, 14.0).toDouble()
+            : 0.0;
+        final right = _overflow ? 16.0 : 0.0;
+        return ShaderMask(
+          blendMode: BlendMode.dstIn,
+          shaderCallback: (r) {
+            final w = r.width <= 0 ? 1.0 : r.width;
+            return LinearGradient(
+              colors: const [
+                Colors.transparent,
+                Colors.black,
+                Colors.black,
+                Colors.transparent,
+              ],
+              stops: [
+                0.0,
+                (left / w).clamp(0.0, 0.5).toDouble(),
+                (1 - right / w).clamp(0.5, 1.0).toDouble(),
+                1.0,
+              ],
+            ).createShader(r);
+          },
+          child: SingleChildScrollView(
+            controller: _ctrl,
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                KeyedSubtree(key: _childKey, child: widget.child),
+                if (_loop) ...[SizedBox(width: widget.gap), widget.child],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/* ---------------- spring bottom sheet (Studio FX etc.) ---------------- */
+Future<T?> showSpringSheet<T>(
+  BuildContext context, {
+  required WidgetBuilder builder,
+  bool barrierDismissible = true,
+}) {
+  return Navigator.of(context, rootNavigator: true).push<T>(
+    _SpringSheetRoute<T>(
+      builder: builder,
+      barrierDismissible: barrierDismissible,
+    ),
+  );
+}
+
+class _SpringSheetRoute<T> extends PopupRoute<T> {
+  _SpringSheetRoute({required this.builder, this.barrierDismissible = true});
+  final WidgetBuilder builder;
+
+  @override
+  final bool barrierDismissible;
+  @override
+  Color? get barrierColor => Colors.black.withValues(alpha: 0.45);
+  @override
+  String? get barrierLabel => 'Dismiss';
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 620);
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 340);
+
+  static const _in = SpringCurve(kSheetSpring, 0.62);
+
+  @override
+  Widget buildPage(BuildContext c, Animation<double> a, Animation<double> s) =>
+      builder(c);
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondary,
+    Widget child,
+  ) {
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (_, c) {
+        final closing = animation.status == AnimationStatus.reverse;
+        final v = closing
+            ? Curves.easeOutCubic.transform(animation.value)
+            : _in.transform(animation.value);
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: FractionalTranslation(
+            translation: Offset(0, (1 - v).clamp(0.0, 1.0)),
+            child: Opacity(
+              opacity: (animation.value * 2.5).clamp(0.0, 1.0),
+              child: c,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+

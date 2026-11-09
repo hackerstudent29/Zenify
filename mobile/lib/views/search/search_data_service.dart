@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
+import '../../models/artist_ref.dart';
 import '../../models/track.dart';
 import '../../services/api_service.dart';
 import '../../services/innertube_service.dart';
@@ -262,11 +263,12 @@ class SearchDataService {
             if (id == null || id.isEmpty || !seenSongIds.add(id)) continue;
             final tTitle = MediaNormalizer.cleanTitle(it['title'] as String?);
             final rawArtists = it['artists'] as List?;
-            final artistStr = MediaNormalizer.formatArtists(
-              rawArtists?.map((a) => a is Map ? a['name'] : a).toList(),
-            );
+            final artistRefs = InnerTubeService.parseArtistRefs(rawArtists);
+            final artistStr = artistRefs.isNotEmpty
+                ? ArtistRef.formatList(artistRefs)
+                : MediaNormalizer.formatArtists(rawArtists);
             final albumName = (it['album'] is Map) ? (it['album']['name'] as String?) : null;
-            final album = albumName != null ? MediaNormalizer.cleanTitle(albumName) : 'Single';
+            final album = albumName != null ? MediaNormalizer.cleanAlbumTitle(albumName) : 'Single';
             final thumb = MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?, videoId: id);
             final duration = (it['duration'] as num?)?.toInt() ?? 210;
 
@@ -274,6 +276,7 @@ class SearchDataService {
               id: 'yt-$id',
               title: tTitle,
               artist: artistStr,
+              artists: artistRefs,
               album: album,
               coverUrl: thumb,
               durationSeconds: duration,
@@ -281,7 +284,7 @@ class SearchDataService {
               source: 'youtube',
             ));
           } else if (type == 'artist') {
-            final aName = MediaNormalizer.cleanTitle(it['title'] as String?);
+            final aName = MediaNormalizer.cleanArtistName(it['title'] as String?);
             if (aName.isEmpty || !seenArtists.add(aName.toLowerCase())) continue;
             final browseId = it['id'] as String? ?? it['channelId'] as String?;
             final thumb = MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?);
@@ -292,13 +295,11 @@ class SearchDataService {
               browseId: browseId,
             ));
           } else if (type == 'album') {
-            final alTitle = MediaNormalizer.cleanTitle(it['title'] as String?);
+            final alTitle = MediaNormalizer.cleanAlbumTitle(it['title'] as String?);
             if (alTitle.isEmpty || !seenAlbums.add(alTitle.toLowerCase())) continue;
             final browseId = it['browseId'] as String? ?? it['id'] as String?;
             final rawArtists = it['artists'] as List?;
-            final artistStr = MediaNormalizer.formatArtists(
-              rawArtists?.map((a) => a is Map ? a['name'] : a).toList(),
-            );
+            final artistStr = MediaNormalizer.formatArtists(rawArtists);
             final thumb = MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?);
             final year = it['year']?.toString();
             albums.add(SearchAlbum(
@@ -309,12 +310,12 @@ class SearchDataService {
               browseId: browseId,
             ));
           } else if (type == 'playlist') {
-            final pTitle = MediaNormalizer.cleanTitle(it['title'] as String?);
+            final pTitle = MediaNormalizer.cleanPlaylistTitle(it['title'] as String?);
             final id = it['id'] as String? ?? '';
             if (pTitle.isEmpty || !seenPlaylists.add(id)) continue;
             final thumb = MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?);
             final authorMap = it['author'] as Map?;
-            final author = authorMap?['name'] as String? ?? 'YouTube Music';
+            final author = MediaNormalizer.cleanTitle(authorMap?['name'] as String? ?? 'YouTube Music');
             playlists.add(SearchPlaylist(
               title: pTitle,
               curator: author,

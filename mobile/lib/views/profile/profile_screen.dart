@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../design_system/widgets/apple_glass.dart';
+import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_button.dart';
 import '../../design_system/zen.dart';
@@ -69,67 +71,34 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // App Bar with Back Button
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: Zen.bg.withValues(alpha: 0.85),
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/images/z_logo.png',
-                  width: 20,
-                  height: 20,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Account & Profile',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ],
-            ),
-            centerTitle: true,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 20),
-                onPressed: () {
+          // Dynamic Island Floating Header
+          SliverToBoxAdapter(
+            child: DynamicIslandHeader(
+              title: 'Account & Profile',
+              showBack: true,
+              onBack: () => Navigator.of(context).pop(),
+              trailing: PressableScale(
+                scale: 0.88,
+                onTap: () {
+                  HapticFeedback.lightImpact();
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   );
                 },
-              ),
-              if (auth.isLoggedIn)
-                IconButton(
-                  icon: const Icon(Icons.logout_rounded, color: Colors.white70, size: 20),
-                  onPressed: () => _confirmSignOut(auth),
-                )
-              else
-                IconButton(
-                  icon: const Icon(Icons.login_rounded, color: Colors.white70, size: 20),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        fullscreenDialog: true,
-                        builder: (_) => WelcomeScreen(onFinished: () => Navigator.of(context).pop()),
-                      ),
-                    );
-                  },
+                child: AppleGlass(
+                  borderRadius: BorderRadius.circular(22),
+                  tint: const Color(0x26121216),
+                  child: const SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Center(
+                      child: Icon(Icons.settings_outlined, color: Colors.white, size: 20),
+                    ),
+                  ),
                 ),
-            ],
+              ),
+            ),
           ),
 
           SliverToBoxAdapter(
@@ -289,6 +258,14 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                   ),
                 );
               },
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            ZenButton(
+              label: 'SIGN OUT',
+              icon: Icons.logout_rounded,
+              width: double.infinity,
+              onTap: () => _confirmSignOut(auth),
             ),
           ],
         ],

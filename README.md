@@ -12,8 +12,8 @@
 
   <p>
     <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/🚀_Live_Web_App-listenzenify.com-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-    <a href="https://listenzenify.com/download"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v2.6.7-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v2.6.7-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
+    <a href="https://listenzenify.com/download"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v1.0.2-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v1.0.2-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="MIT License" /></a>
     <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
   </p>
@@ -49,7 +49,7 @@ Install the native **Zenify Android application** directly to your phone for sea
 <div align="center">
   <br />
   <a href="https://listenzenify.com/downloads/zenify.apk">
-    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v2.6.7)-60.3_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
+    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.2)-64.6_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
   </a>
   <br />
   <p><i>Direct download link: <a href="https://listenzenify.com/downloads/zenify.apk">https://listenzenify.com/downloads/zenify.apk</a> or mirror via <a href="https://github.com/hackerstudent29/Zenify/raw/main/frontend/public/downloads/zenify.apk">GitHub Raw</a></i></p>
@@ -95,6 +95,10 @@ Start listening immediately — **no sign-up or credit card required**.
 | **100% Free & Ad-Free** | Uninterrupted music streaming with zero audio ads, banner popups, or subscription fees. |
 | **Native InnerTube Pipeline** | Asynchronous Kotlin coroutine streaming with Android VR/TV client, PO-token pre-warming & `RefusedRetryDataSource` for sub-300ms instant playback and zero 403 errors. |
 | **Pristine 320kbps Akamai CDN Audio** | Full-length high-fidelity audio streams with instant HTTP 206 range seeking and zero buffering. |
+| **Dynamic Island & Marquee** | Smooth vacuum animation pulling screen titles into the top Dynamic Island header with seamless 5-second text marquee loops. |
+| **Intelligent Language Radio** | Endless continuous radio matching user listening affinity (Tamil, Telugu, Hindi, etc.) without song repetitions. |
+| **ExoPlayer Gapless Queue Sync** | Native Android Media3 playlist pipeline eliminating audio/metadata de-sync during auto track transitions. |
+| **Apple Music Dock & Search Morph** | Liquid glass bottom dock with detached search bubble morphing seamlessly into a full-screen search bar. |
 | **Universal Media Normalizer** | Deep metadata cleaning: strips stray quotes, unbalanced brackets, movie tags (in compact view), play count noise, and isolates artists with high-res artwork upscaling. |
 | **Apple-Grade Fluid UI** | Glassmorphic design, spring physics, and dynamic artwork mesh palettes inspired by Apple Music. |
 | **Real-Time Synced Karaoke Lyrics** | Sub-second word-level synchronization with Word-by-Word (WBW) glowing fill animation and instrumental pause markers across 50+ languages. |

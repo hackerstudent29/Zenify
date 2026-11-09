@@ -9,8 +9,10 @@ import 'package:provider/provider.dart';
 
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/tokens/app_colors.dart';
+import '../../models/track.dart';
 import '../../services/player_state.dart';
 import '../../services/queue_state.dart';
+import '../../utils/media_normalizer.dart';
 import '../details/artist_screen.dart';
 import '../details/album_screen.dart';
 import 'player_kit.dart';
@@ -71,19 +73,33 @@ class _QueuePanelState extends State<QueuePanel> {
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
-              SliverToBoxAdapter(child: _actions(q, player)),
-              if (hist.isNotEmpty) SliverToBoxAdapter(child: _historySection(hist)),
-              const SliverToBoxAdapter(child: _SectionTitle('Now Playing')),
+              const SliverToBoxAdapter(child: SizedBox(height: 4)),
+              if (hist.isNotEmpty)
+                SliverToBoxAdapter(child: FadeSlideIn(child: _historySection(hist))),
+              const SliverToBoxAdapter(
+                child: FadeSlideIn(
+                  delay: Duration(milliseconds: 40),
+                  child: _SectionTitle('Now Playing'),
+                ),
+              ),
               if (current != null)
                 SliverToBoxAdapter(
-                  child: _TrackRow(
-                    track: current,
-                    highlight: true,
-                    onTap: () {},
-                    trailing: _EqBars(playing: player.isPlaying),
+                  child: FadeSlideIn(
+                    delay: const Duration(milliseconds: 80),
+                    child: _TrackRow(
+                      track: current,
+                      highlight: true,
+                      onTap: () {},
+                      trailing: _EqBars(playing: player.isPlaying),
+                    ),
                   ),
                 ),
-              SliverToBoxAdapter(child: _upNextHeader(q, up.length)),
+              SliverToBoxAdapter(
+                child: FadeSlideIn(
+                  delay: const Duration(milliseconds: 120),
+                  child: _upNextHeader(q, player, up.length),
+                ),
+              ),
               if (up.isEmpty)
                 SliverToBoxAdapter(child: _empty(q))
               else
@@ -147,6 +163,28 @@ class _QueuePanelState extends State<QueuePanel> {
                     );
                   },
                 ),
+              if (up.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: PressableScale(
+                      onTap: () {
+                        HapticFeedback.mediumImpact();
+                        q.clear();
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                        child: Text(
+                          'Clear Queue',
+                          style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (q.autoplay)
                 SliverToBoxAdapter(
                   child: Padding(
@@ -176,55 +214,7 @@ class _QueuePanelState extends State<QueuePanel> {
 
   /* ───────────────────────── pieces ───────────────────────── */
 
-  Widget _actions(QueueState q, PlayerState p) {
-    final repeatOn = p.repeatMode != ZenifyRepeatMode.off;
-    return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 18),
-      child: Row(
-        children: [
-          Expanded(
-            child: _Pill(
-              icon: Icons.shuffle_rounded,
-              label: 'Shuffle',
-              active: p.isShuffle,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                p.toggleShuffle();
-                if (!p.isShuffle) return;
-                q.shuffleUpNext();
-              },
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _Pill(
-              icon: p.repeatMode == ZenifyRepeatMode.one
-                  ? Icons.repeat_one_rounded
-                  : Icons.repeat_rounded,
-              label: 'Repeat',
-              active: repeatOn,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                p.toggleRepeat();
-              },
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _Pill(
-              icon: Icons.all_inclusive_rounded,
-              label: 'Autoplay',
-              active: q.autoplay,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                q.toggleAutoplay();
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   Widget _historySection(List<QueueEntry> hist) {
     final shown = hist.length > 30 ? hist.sublist(hist.length - 30) : hist;
@@ -261,8 +251,8 @@ class _QueuePanelState extends State<QueuePanel> {
           ),
         ),
         AnimatedSize(
-          duration: const Duration(milliseconds: 420),
-          curve: Curves.easeOutCubic,
+          duration: const Duration(milliseconds: 520),
+          curve: const SpringCurve(kSoftSpring, 0.5),
           alignment: Alignment.topCenter,
           child: ClipRect(
             child: AnimatedSwitcher(
@@ -296,44 +286,62 @@ class _QueuePanelState extends State<QueuePanel> {
     );
   }
 
-  Widget _upNextHeader(QueueState q, int count) {
+  Widget _upNextHeader(QueueState q, PlayerState p, int count) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 6),
+      padding: const EdgeInsets.only(top: 22, bottom: 10),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           const Text(
             'Playing Next',
-            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
+            ),
           ),
           const SizedBox(width: 8),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: Text(
-              '$count',
+              '',
               key: ValueKey(count),
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 15),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 15,
+              ),
             ),
           ),
           const Spacer(),
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 220),
-            opacity: count == 0 ? 0 : 1,
-            child: PressableScale(
-              onTap: count == 0
-                  ? () {}
-                  : () {
-                      HapticFeedback.mediumImpact();
-                      q.clear();
-                    },
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                child: Text(
-                  'Clear',
-                  style: TextStyle(color: AppColors.accent, fontSize: 15, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
+          _QueueToggle(
+            icon: CupertinoIcons.shuffle,
+            active: p.isShuffle,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              p.toggleShuffle();
+              if (!p.isShuffle) return;
+              q.shuffleUpNext();
+            },
+          ),
+          const SizedBox(width: 8),
+          _QueueToggle(
+            icon: p.repeatMode == ZenifyRepeatMode.one
+                ? CupertinoIcons.repeat_1
+                : CupertinoIcons.repeat,
+            active: p.repeatMode != ZenifyRepeatMode.off,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              p.toggleRepeat();
+            },
+          ),
+          const SizedBox(width: 8),
+          _QueueToggle(
+            icon: CupertinoIcons.infinite,
+            active: q.autoplay,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              q.toggleAutoplay();
+            },
           ),
         ],
       ),
@@ -452,8 +460,8 @@ class _QueuePanelState extends State<QueuePanel> {
     showCupertinoModalPopup<void>(
       context: context,
       builder: (ctx) => CupertinoActionSheet(
-        title: Text(e.title),
-        message: Text(e.artist),
+        title: Text(MediaNormalizer.cleanTitle(e.title)),
+        message: Text(MediaNormalizer.formatArtists(e.artist)),
         actions: [
           CupertinoActionSheetAction(
             onPressed: () {
@@ -491,8 +499,8 @@ class _QueuePanelState extends State<QueuePanel> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => AlbumScreen(
-                    albumTitle: e.title,
-                    artistName: e.artist,
+                    albumTitle: MediaNormalizer.cleanAlbumTitle(e.track.album.isNotEmpty ? e.track.album : e.title),
+                    artistName: MediaNormalizer.formatArtists(e.artist),
                     coverUrl: e.track.coverUrl as String?,
                   ),
                 ),
@@ -535,10 +543,13 @@ class _SectionTitle extends StatelessWidget {
       );
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.icon, required this.label, required this.active, required this.onTap});
+class _QueueToggle extends StatelessWidget {
+  const _QueueToggle({
+    required this.icon,
+    required this.active,
+    required this.onTap,
+  });
   final IconData icon;
-  final String label;
   final bool active;
   final VoidCallback onTap;
 
@@ -546,29 +557,33 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) {
     return PressableScale(
       onTap: onTap,
+      scale: 0.88,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 260),
+        duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
-        height: 42,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: active ? 0.26 : 0.09),
-          borderRadius: BorderRadius.circular(21),
-          border: Border.all(color: Colors.white.withValues(alpha: active ? 0.18 : 0.06), width: 0.8),
+          shape: BoxShape.circle,
+          color: active
+              ? Colors.white.withValues(alpha: 0.92)
+              : Colors.white.withValues(alpha: 0.14),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: Colors.white.withValues(alpha: active ? 1 : 0.75)),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: active ? 1 : 0.75),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
+        child: Center(
+          child: SpringPop(
+            trigger: active,
+            scale: 0.25,
+            child: TweenAnimationBuilder<Color?>(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+              tween: ColorTween(
+                end: active
+                    ? Colors.black.withValues(alpha: 0.85)
+                    : Colors.white,
               ),
+              builder: (_, c, _) => Icon(icon, size: 18, color: c),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -624,14 +639,14 @@ class _TrackRow extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          track.title as String,
+                          MediaNormalizer.cleanCompactTitle(track.title as String),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          track.artist as String,
+                          track is Track ? track.displayArtists : MediaNormalizer.formatArtists(track.artist),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),

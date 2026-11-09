@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
@@ -18,6 +17,8 @@ import 'package:provider/provider.dart';
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/tokens/app_typography.dart';
+import '../../design_system/widgets/apple_glass.dart';
+import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/media_card.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/section_header.dart';
@@ -289,28 +290,19 @@ class _ExploreScreenState extends State<ExploreScreen>
 
     return Scaffold(
       backgroundColor: Zen.bg,
-      body: CustomScrollView(
-        key: const PageStorageKey<String>('explore_scroll_view'),
-        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        slivers: [
-          // 1. Pinned Apple Music Header
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _ExploreHeaderDelegate(
-              top: topInset,
-              country: _country,
-              onCountryTap: _pickCountry,
-              onProfileTap: widget.onOpenProfile,
-              onTogetherTap: widget.onOpenTogether,
-            ),
-          ),
+      body: Stack(
+        children: [
+          CustomScrollView(
+            key: const PageStorageKey<String>('explore_scroll_view'),
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            slivers: [
+              SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
+              // 1. iOS Pull-to-refresh
+              CupertinoSliverRefreshControl(
+                onRefresh: () => _loadData(force: true),
+              ),
 
-          // 2. iOS Pull-to-refresh
-          CupertinoSliverRefreshControl(
-            onRefresh: () => _loadData(force: true),
-          ),
-
-          // 3. Main Explore Content
+              // 2. Main Explore Content
           SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,7 +354,40 @@ class _ExploreScreenState extends State<ExploreScreen>
           ),
         ],
       ),
-    );
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: DynamicIslandHeader(
+          title: 'Explore',
+          subtitle: '${_country.flag} ${_country.code}',
+          showBack: false,
+          leading: PressableScale(
+            scale: 0.88,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _pickCountry();
+            },
+            child: AppleGlass(
+              borderRadius: BorderRadius.circular(22),
+              tint: const Color(0x26121216),
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: Text(_country.flag, style: const TextStyle(fontSize: 18)),
+                ),
+              ),
+            ),
+          ),
+          showProfile: true,
+          onProfileTap: widget.onOpenProfile,
+          topPadding: topInset + 4,
+        ),
+      ),
+    ],
+  ),
+);
   }
 
   // ---------------------------------------------------------------------------
@@ -708,7 +733,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    track.title,
+                    MediaNormalizer.cleanCompactTitle(track.title),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1311,108 +1336,3 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Collapsing Apple Music Header                                      */
-/* ------------------------------------------------------------------ */
-
-class _ExploreHeaderDelegate extends SliverPersistentHeaderDelegate {
-  _ExploreHeaderDelegate({
-    required this.top,
-    required this.country,
-    required this.onCountryTap,
-    this.onProfileTap,
-    this.onTogetherTap,
-  });
-
-  final double top;
-  final ExploreCountry country;
-  final VoidCallback onCountryTap;
-  final VoidCallback? onProfileTap;
-  final VoidCallback? onTogetherTap;
-
-  @override
-  double get minExtent => top + 48;
-  @override
-  double get maxExtent => top + 56;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          color: Zen.bg.withValues(alpha: 0.88),
-          padding: EdgeInsets.fromLTRB(16, top + 4, 16, 6),
-          child: Row(
-            children: [
-              // Large Title
-              const Text(
-                'Explore',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.6,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-
-              // Country Selector Pill
-              PressableScale(
-                onTap: onCountryTap,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1FFFFFFF),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(country.flag, style: const TextStyle(fontSize: 14)),
-                      const SizedBox(width: 5),
-                      Text(
-                        country.code,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(width: 3),
-                      const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.textSecondary),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Together Room Button
-              if (onTogetherTap != null)
-                IconButton(
-                  icon: const Icon(Icons.all_inclusive_rounded, color: AppColors.textSecondary, size: 22),
-                  onPressed: onTogetherTap,
-                  tooltip: 'Listen Together',
-                ),
-
-              // Profile Button
-              if (onProfileTap != null)
-                IconButton(
-                  icon: const Icon(Icons.person_rounded, color: AppColors.textSecondary, size: 22),
-                  onPressed: onProfileTap,
-                  tooltip: 'Profile',
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _ExploreHeaderDelegate oldDelegate) =>
-      oldDelegate.country.code != country.code || oldDelegate.top != top;
-}

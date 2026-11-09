@@ -7,6 +7,10 @@ import 'package:provider/provider.dart';
 import '../../models/track.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
+import '../../utils/media_normalizer.dart';
+import '../../views/details/album_screen.dart';
+import '../../views/details/artist_popup.dart';
+import '../../views/details/artist_screen.dart';
 import '../tokens/app_colors.dart';
 import '../tokens/app_typography.dart';
 import 'pressable_scale.dart';
@@ -167,10 +171,10 @@ class ZenDropdown {
     VoidCallback? onToggleLike,
     bool? isLiked,
   }) {
-    final title = track?.title ?? trackTitle ?? '';
-    final artist = track?.artist ?? artistName ?? '';
-    final album = (track != null && track.album.isNotEmpty)
-        ? track.album
+    final title = track != null ? MediaNormalizer.cleanTitle(track.title) : (trackTitle ?? '');
+    final artist = track != null ? MediaNormalizer.formatArtists(track.artist) : (artistName ?? '');
+    final album = (track != null && track.album.isNotEmpty && track.album != 'Single')
+        ? MediaNormalizer.cleanAlbumTitle(track.album)
         : (albumName ?? '');
     final liked = isLiked ?? (track != null ? LibraryStore.instance.isLiked(track) : false);
 
@@ -180,6 +184,39 @@ class ZenDropdown {
         (track != null ? () => context.read<PlayerState>().playLast(track) : null);
     final likeAction = onToggleLike ??
         (track != null ? () => LibraryStore.instance.toggleLove(track) : null);
+
+    final goToArtistAction = onGoToArtist ??
+        (track != null
+            ? () {
+                final resolved = track.resolvedArtists;
+                if (resolved.length > 1) {
+                  showArtistPopup(context, artists: resolved);
+                } else if (resolved.isNotEmpty) {
+                  Navigator.push(
+                    context,
+                    CupertinoPageRoute(
+                      builder: (_) => ArtistScreen(artistName: resolved.first.name),
+                    ),
+                  );
+                }
+              }
+            : null);
+
+    final goToAlbumAction = onGoToAlbum ??
+        ((track != null && track.album.isNotEmpty && track.album != 'Single')
+            ? () {
+                Navigator.push(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (_) => AlbumScreen(
+                      albumTitle: MediaNormalizer.cleanAlbumTitle(track.album),
+                      artistName: MediaNormalizer.formatArtists(track.artist),
+                      coverUrl: track.coverUrl,
+                    ),
+                  ),
+                );
+              }
+            : null);
 
     show(
       context: context,
@@ -198,17 +235,17 @@ class ZenDropdown {
             icon: CupertinoIcons.text_append,
             onTap: playLaterAction,
           ),
-        if (onGoToArtist != null)
+        if (goToArtistAction != null)
           ZenDropdownItem(
             title: 'Go to artist',
             icon: CupertinoIcons.person,
-            onTap: onGoToArtist,
+            onTap: goToArtistAction,
           ),
-        if (onGoToAlbum != null && album.isNotEmpty)
+        if (goToAlbumAction != null && album.isNotEmpty)
           ZenDropdownItem(
             title: 'Go to album',
             icon: CupertinoIcons.music_albums,
-            onTap: onGoToAlbum,
+            onTap: goToAlbumAction,
           ),
         if (likeAction != null)
           ZenDropdownItem(

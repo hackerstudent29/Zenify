@@ -167,6 +167,11 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
                     emit(mapOf("type" to "autoTransition", "mediaId" to (mediaItem?.mediaId ?: "")))
+                    // Remove finished media items so that the active item is always at index 0
+                    val cur = player?.currentMediaItemIndex ?: 0
+                    if (cur > 0) {
+                        player?.removeMediaItems(0, cur)
+                    }
                 }
             }
             override fun onPlayerError(error: PlaybackException) {
@@ -226,21 +231,36 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         p.playWhenReady = true
     }
 
-    private fun setNextMediaId(mediaId: String?) {
+    private fun setNextMediaId(
+        mediaId: String?,
+        title: String? = null,
+        artist: String? = null,
+        artworkUrl: String? = null
+    ) {
         val p = player ?: return
+        val curIndex = p.currentMediaItemIndex
+        val nextIndex = curIndex + 1
         if (mediaId.isNullOrBlank()) {
-            if (p.mediaItemCount > 1) {
-                p.removeMediaItems(1, p.mediaItemCount)
+            if (p.mediaItemCount > nextIndex) {
+                p.removeMediaItems(nextIndex, p.mediaItemCount)
             }
         } else {
             val uri = Uri.parse("zenify://media/$mediaId")
+            val metadata = MediaMetadata.Builder()
+                .setTitle(title)
+                .setArtist(artist)
+                .setArtworkUri(if (!artworkUrl.isNullOrBlank()) Uri.parse(artworkUrl) else null)
+                .build()
+
             val mediaItem = MediaItem.Builder()
                 .setMediaId(mediaId)
                 .setCustomCacheKey(mediaId)
                 .setUri(uri)
+                .setMediaMetadata(metadata)
                 .build()
-            if (p.mediaItemCount > 1) {
-                p.replaceMediaItem(1, mediaItem)
+
+            if (p.mediaItemCount > nextIndex) {
+                p.replaceMediaItem(nextIndex, mediaItem)
             } else {
                 p.addMediaItem(mediaItem)
             }
@@ -283,7 +303,10 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 }
                 "setNext" -> {
                     val mediaId = call.argument<String>("mediaId")
-                    setNextMediaId(mediaId)
+                    val title = call.argument<String>("title")
+                    val artist = call.argument<String>("artist")
+                    val artworkUrl = call.argument<String>("artworkUrl")
+                    setNextMediaId(mediaId, title, artist, artworkUrl)
                     result.success(null)
                 }
                 "prefetch" -> {

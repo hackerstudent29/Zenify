@@ -21,9 +21,9 @@ class GlassSheetRoute<T> extends PopupRoute<T> {
   @override
   String? get barrierLabel => 'Dismiss';
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 520);
+  Duration get transitionDuration => const Duration(milliseconds: 440);
   @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 340);
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 320);
 
   @override
   Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondary) {
@@ -35,12 +35,20 @@ class GlassSheetRoute<T> extends PopupRoute<T> {
       Animation<double> secondaryAnimation, Widget child) {
     final curved = CurvedAnimation(
       parent: animation,
-      curve: const SpringCurve(kSheetSpring, 0.5),
-      reverseCurve: Curves.easeInCubic,
+      curve: const SpringCurve(kSnappySpring, 0.45),
+      reverseCurve: Curves.easeOutCubic,
     );
-    return SlideTransition(
-      position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(curved),
-      child: child,
+    final fade = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
+    );
+    return FadeTransition(
+      opacity: fade,
+      child: SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 0.25), end: Offset.zero).animate(curved),
+        child: child,
+      ),
     );
   }
 }

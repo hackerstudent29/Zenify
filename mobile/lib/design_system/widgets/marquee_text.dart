@@ -38,6 +38,7 @@ class _MarqueeTextState extends State<MarqueeText>
     with SingleTickerProviderStateMixin {
   AnimationController? _controller;
   double _textWidth = 0.0;
+  double _textHeight = 0.0;
   bool _overflows = false;
   Timer? _loopTimer;
 
@@ -58,10 +59,12 @@ class _MarqueeTextState extends State<MarqueeText>
     )..layout(maxWidth: double.infinity);
 
     final width = painter.width;
+    final height = painter.height;
     final overflows = width > maxWidth;
 
-    if (overflows != _overflows || (width - _textWidth).abs() > 1.0) {
+    if (overflows != _overflows || (width - _textWidth).abs() > 1.0 || (height - _textHeight).abs() > 0.5) {
       _textWidth = width;
+      _textHeight = height;
       _overflows = overflows;
 
       if (_overflows && widget.active) {
@@ -143,59 +146,68 @@ class _MarqueeTextState extends State<MarqueeText>
         }
 
         final fadeFraction = (widget.fadeEdge / maxWidth).clamp(0.01, 0.2);
+        final textH = _textHeight > 0
+            ? _textHeight
+            : ((widget.style?.fontSize ?? 14.0) * 1.35);
 
         return RepaintBoundary(
-          child: AnimatedBuilder(
-            animation: _controller!,
-            builder: (context, _) {
-              final progress = _controller!.value;
-              final isAtStart = progress <= 0.001;
-              final leftFade = isAtStart ? 0.0 : (progress * 10.0).clamp(0.0, 1.0) * fadeFraction;
-              final leftColor = isAtStart ? Colors.black : Colors.transparent;
-              final offset = -(progress * (_textWidth + widget.gap));
+          child: SizedBox(
+            height: textH,
+            child: AnimatedBuilder(
+              animation: _controller!,
+              builder: (context, _) {
+                final progress = _controller!.value;
+                final isAtStart = progress <= 0.001;
+                final leftFade = isAtStart ? 0.0 : (progress * 10.0).clamp(0.0, 1.0) * fadeFraction;
+                final leftColor = isAtStart ? Colors.black : Colors.transparent;
+                final offset = -(progress * (_textWidth + widget.gap));
 
-              return ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: (rect) => LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    leftColor,
-                    Colors.black,
-                    Colors.black,
-                    Colors.transparent,
-                  ],
-                  stops: [0.0, leftFade, 1.0 - fadeFraction, 1.0],
-                ).createShader(rect),
-                child: ClipRect(
-                  child: OverflowBox(
-                    alignment: Alignment.centerLeft,
-                    maxWidth: double.infinity,
-                    child: Transform.translate(
-                      offset: Offset(offset, 0),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            widget.text,
-                            style: widget.style,
-                            maxLines: 1,
-                            softWrap: false,
-                          ),
-                          SizedBox(width: widget.gap),
-                          Text(
-                            widget.text,
-                            style: widget.style,
-                            maxLines: 1,
-                            softWrap: false,
-                          ),
-                        ],
+                return ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (rect) => LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      leftColor,
+                      Colors.black,
+                      Colors.black,
+                      Colors.transparent,
+                    ],
+                    stops: [0.0, leftFade, 1.0 - fadeFraction, 1.0],
+                  ).createShader(rect),
+                  child: ClipRect(
+                    child: OverflowBox(
+                      alignment: Alignment.centerLeft,
+                      minWidth: 0.0,
+                      maxWidth: double.infinity,
+                      minHeight: textH,
+                      maxHeight: textH,
+                      child: Transform.translate(
+                        offset: Offset(offset, 0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.text,
+                              style: widget.style,
+                              maxLines: 1,
+                              softWrap: false,
+                            ),
+                            SizedBox(width: widget.gap),
+                            Text(
+                              widget.text,
+                              style: widget.style,
+                              maxLines: 1,
+                              softWrap: false,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         );
       },

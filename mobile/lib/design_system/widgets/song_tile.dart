@@ -91,7 +91,7 @@ class SongTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   MarqueeText(
-                    track.title,
+                    track.compactTitle,
                     active: isActive,
                     style: AppTypography.headline.copyWith(
                       fontSize: 15,
@@ -101,29 +101,6 @@ class SongTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      if (track.source == 'youtube') ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444).withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4), width: 0.5),
-                          ),
-                          child: const Text('YT', style: TextStyle(color: Color(0xFFEF4444), fontSize: 9, fontWeight: FontWeight.w700)),
-                        ),
-                      ] else ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: AppColors.accent.withValues(alpha: 0.3), width: 0.5),
-                          ),
-                          child: const Text('320K', style: TextStyle(color: AppColors.accent, fontSize: 9, fontWeight: FontWeight.w700)),
-                        ),
-                      ],
                       Expanded(
                         child: InteractiveArtistsText(
                           artists: track.resolvedArtists,

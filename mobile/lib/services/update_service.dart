@@ -10,6 +10,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../design_system/tokens/app_colors.dart';
 import 'api_service.dart';
+import 'dock_visibility.dart';
 
 /// Information regarding the latest available app release.
 class UpdateInfo {
@@ -59,6 +60,12 @@ class UpdateService {
       final lClean = latest.trim().toLowerCase().replaceAll(RegExp(r'^v'), '').split('+')[0];
       final cClean = current.trim().toLowerCase().replaceAll(RegExp(r'^v'), '').split('+')[0];
 
+      // If current is 1.0.x and remote returned legacy 2.x from previous repo, ignore
+      if (cClean.startsWith('1.') && lClean.startsWith('2.')) {
+        return false;
+      }
+      if (lClean == cClean) return false;
+
       final lParts = lClean.split('.').map((e) => int.tryParse(e) ?? 0).toList();
       final cParts = cClean.split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
@@ -81,7 +88,7 @@ class UpdateService {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version.isNotEmpty ? packageInfo.version : '1.0.1';
-      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 1;
+      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 3;
 
       // Remote config candidates in priority order
       final urls = [
@@ -111,7 +118,7 @@ class UpdateService {
         return null;
       }
 
-      final latestAppVersion = (configData['latestAppVersion'] ?? configData['version'] ?? '2.6.2').toString();
+      final latestAppVersion = (configData['latestAppVersion'] ?? configData['version'] ?? currentVersion).toString();
       final minAppVersion = (configData['minAppVersion'] ?? '1.0.0').toString();
       final updateUrl = (configData['updateUrl'] ?? 'https://listenzenify.com/download/app').toString();
       final releaseNotes = (configData['releaseNotes'] ??
@@ -153,8 +160,10 @@ class UpdateService {
 
   /// Displays an Apple Music / Zenify styled modal bottom sheet detailing the update.
   void showUpdateSheet(BuildContext context, UpdateInfo info) {
+    DockVisibility.hideDocksNotifier.value = true;
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
@@ -361,6 +370,8 @@ class UpdateService {
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      DockVisibility.hideDocksNotifier.value = false;
+    });
   }
 }

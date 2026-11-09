@@ -28,10 +28,19 @@ class InnerTubeService {
           final aName = (a['name'] as String?)?.trim();
           final aId = (a['id'] as String?)?.trim();
           if (aName != null && aName.isNotEmpty) {
-            refs.add(ArtistRef(name: aName, id: aId ?? ''));
+            final split = ArtistRef.splitFromName(aName);
+            if (split.length > 1) {
+              refs.addAll(split);
+            } else if (split.length == 1) {
+              refs.add(ArtistRef.fromName(split.first.name, id: aId));
+            } else {
+              refs.add(ArtistRef.fromName(aName, id: aId ?? ''));
+            }
           }
         } else if (a is String && a.trim().isNotEmpty) {
           refs.addAll(ArtistRef.splitFromName(a));
+        } else if (a is ArtistRef) {
+          refs.addAll(ArtistRef.splitFromName(a.name, defaultImageUrl: a.imageUrl));
         }
       }
     }
@@ -1314,11 +1323,18 @@ class InnerTubeService {
             if (raw is Map) {
               final norm = MediaNormalizer.normalizeMap(Map<String, dynamic>.from(raw));
               if (norm.id.isNotEmpty && norm.id != cleanId) {
+                final rawAlbum = raw['album'];
+                final albName = rawAlbum is Map
+                    ? (rawAlbum['name'] ?? rawAlbum['title'])?.toString()
+                    : rawAlbum?.toString();
+                final cleanAlbum = (albName != null && albName.isNotEmpty)
+                    ? MediaNormalizer.cleanTitle(albName)
+                    : 'Single';
                 tracks.add(Track(
                   id: norm.id.startsWith('yt-') ? norm.id : 'yt-${norm.id}',
                   title: norm.cleanTitle,
                   artist: norm.subtitle,
-                  album: norm.subtitle,
+                  album: cleanAlbum,
                   coverUrl: norm.imageUrl,
                   durationSeconds: (raw['duration'] as num?)?.toInt() ?? 210,
                   language: Track.detectLanguage(norm.cleanTitle, norm.subtitle, 'Single') ?? '',
@@ -1394,7 +1410,58 @@ class InnerTubeService {
     }
   }
 
-  Future<List<Track>> fetchRelated(Track seed) => getNextQueue(seed.id);
+  Future<List<Track>> fetchRelated(Track seed, {String? targetLanguage}) async {
+    final cleanId = seed.id.replaceFirst('yt-', '').trim();
+    final raw = await getNextQueue(cleanId);
+    final targetLang = (targetLanguage != null && targetLanguage.isNotEmpty)
+        ? targetLanguage.toLowerCase()
+        : (seed.language.isNotEmpty
+            ? seed.language.toLowerCase()
+            : (Track.detectLanguage(seed.title, seed.artist, seed.album) ?? ''));
+
+    final results = <Track>[];
+    final seen = <String>{seed.id, cleanId};
+
+    bool isMatch(Track t) {
+      final tClean = t.id.replaceFirst('yt-', '');
+      if (seen.contains(t.id) || seen.contains(tClean)) return false;
+      if (targetLang.isEmpty) return true;
+      final tLang = t.language.isNotEmpty
+          ? t.language.toLowerCase()
+          : (Track.detectLanguage(t.title, t.artist, t.album) ?? '');
+      if (tLang.isEmpty) return true;
+      return tLang == targetLang;
+    }
+
+    // 1. Filter raw nextQueue by target language so conflicting languages (e.g. Hindi in Tamil) never leak
+    for (final t in raw) {
+      if (isMatch(t)) {
+        seen.add(t.id);
+        seen.add(t.id.replaceFirst('yt-', ''));
+        results.add(t);
+      }
+    }
+
+    // 2. If YouTube's nextQueue had language drift or returned fewer than 10 tracks, backfill with search in same language!
+    if (results.length < 10) {
+      try {
+        final query = targetLang.isNotEmpty
+            ? '${seed.artist} $targetLang songs'
+            : '${seed.artist} radio';
+        final searchHits = await search(query);
+        for (final t in searchHits) {
+          if (isMatch(t)) {
+            seen.add(t.id);
+            seen.add(t.id.replaceFirst('yt-', ''));
+            results.add(t);
+            if (results.length >= 25) break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return results;
+  }
 
   // ────────────────────────────── Lyrics ─────────────────────────────────────
 

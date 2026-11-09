@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../design_system/widgets/apple_glass.dart';
+import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_button.dart';
 import '../../design_system/zen.dart';
@@ -130,33 +132,31 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen>
           CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              // Room Header
-              SliverAppBar(
-                pinned: true,
-                backgroundColor: Zen.bg.withValues(alpha: 0.88),
-                elevation: 0,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                title: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.group_rounded, color: Colors.white70, size: 18),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Room Together',
-                      style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700),
+              // Dynamic Island Floating Header
+              SliverToBoxAdapter(
+                child: DynamicIslandHeader(
+                  title: 'Room Together',
+                  showBack: true,
+                  onBack: () => Navigator.of(context).pop(),
+                  trailing: PressableScale(
+                    scale: 0.88,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _copyCode();
+                    },
+                    child: AppleGlass(
+                      borderRadius: BorderRadius.circular(22),
+                      tint: const Color(0x26121216),
+                      child: const SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Center(
+                          child: Icon(Icons.share_rounded, color: Colors.white, size: 20),
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-                centerTitle: true,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.share_rounded, color: Colors.white70, size: 20),
-                    onPressed: _copyCode,
                   ),
-                ],
+                ),
               ),
 
               if (!_inRoom)
@@ -213,7 +213,7 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen>
                           accentColor: Colors.white70,
                           onTap: () => setState(() => _inRoom = false),
                         ),
-                        const SizedBox(height: 120),
+                        SizedBox(height: MediaQuery.paddingOf(context).bottom + 210),
                       ],
                     ),
                   ),
@@ -239,7 +239,7 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen>
             Positioned(
               left: 20,
               right: 20,
-              bottom: 24,
+              bottom: MediaQuery.paddingOf(context).bottom + 144,
               child: _buildReactionBar(),
             ),
         ],

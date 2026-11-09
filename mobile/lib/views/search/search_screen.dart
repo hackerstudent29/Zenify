@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
@@ -13,12 +12,14 @@ import 'package:provider/provider.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/media_card.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/song_tile.dart';
 import '../../design_system/zen.dart';
 import '../../models/track.dart';
 import '../../services/player_state.dart';
+import '../../services/search_nav.dart';
 import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
 import '../details/artist_screen.dart';
@@ -188,7 +189,6 @@ class _SearchScreenState extends State<SearchScreen>
   Timer? _debounceTimer;
   int _searchRequestId = 0;
 
-  bool _isFocused = false;
   bool _isLoading = false;
   String _activeQuery = '';
 
@@ -200,14 +200,30 @@ class _SearchScreenState extends State<SearchScreen>
   void initState() {
     super.initState();
     _dataService.initRecents();
-    _focusNode.addListener(_onFocusChanged);
     _textCtrl.addListener(_onTextChanged);
+    _focusNode.addListener(_onFocusChanged);
+    SearchNav.phase.addListener(_onPhase);
   }
 
   void _onFocusChanged() {
-    if (mounted) {
-      setState(() => _isFocused = _focusNode.hasFocus);
+    if (!_focusNode.hasFocus && mounted) {
+      if (SearchNav.phase.value == SearchPhase.typing && _activeQuery.isEmpty) {
+        SearchNav.phase.value = SearchPhase.bar;
+      }
     }
+  }
+
+  void _onPhase() {
+    final p = SearchNav.phase.value;
+    if (p == SearchPhase.typing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus(); // keyboard opens
+      });
+    } else {
+      _focusNode.unfocus();
+      if (_activeQuery.isNotEmpty) _clearSearch();
+    }
+    if (mounted) setState(() {});
   }
 
   void _onTextChanged() {
@@ -278,6 +294,7 @@ class _SearchScreenState extends State<SearchScreen>
   void _cancelSearch() {
     _focusNode.unfocus();
     _clearSearch();
+    SearchNav.phase.value = SearchPhase.bar;
   }
 
   void _playSong(List<Track> list, int index) {
@@ -287,8 +304,9 @@ class _SearchScreenState extends State<SearchScreen>
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
+    SearchNav.phase.removeListener(_onPhase);
     _focusNode.removeListener(_onFocusChanged);
+    _debounceTimer?.cancel();
     _textCtrl.removeListener(_onTextChanged);
     _textCtrl.dispose();
     _focusNode.dispose();
@@ -300,6 +318,7 @@ class _SearchScreenState extends State<SearchScreen>
     super.build(context);
     final topInset = MediaQuery.paddingOf(context).top;
     final hasQuery = _activeQuery.isNotEmpty;
+    final typing = SearchNav.phase.value == SearchPhase.typing;
 
     return PopScope(
       canPop: false,
@@ -309,39 +328,104 @@ class _SearchScreenState extends State<SearchScreen>
           _focusNode.unfocus();
         } else if (_activeQuery.isNotEmpty) {
           _clearSearch();
-        } else if (widget.onBack != null) {
-          widget.onBack!();
+        } else if (SearchNav.phase.value == SearchPhase.typing) {
+          SearchNav.phase.value = SearchPhase.bar; // field returns to the dock
+        } else {
+          widget.onBack?.call();
         }
       },
       child: Scaffold(
         backgroundColor: Zen.bg,
-        body: CustomScrollView(
-          key: const PageStorageKey<String>('search_scroll_view'),
-          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-          slivers: [
-            // 1. Pinned Apple Search Header
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _SearchHeaderDelegate(
-                top: topInset,
-                controller: _textCtrl,
-                focusNode: _focusNode,
-                isFocused: _isFocused,
-                onClear: _clearSearch,
-                onCancel: _cancelSearch,
-                onSubmit: _submitSearch,
+        body: Stack(
+          children: [
+            CustomScrollView(
+              key: const PageStorageKey<String>('search_scroll_view'),
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              slivers: [
+                SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
+
+                // 2. Body based on state: Suggestions, Results, or Landing
+                if (hasQuery && _liveSuggestions.isNotEmpty && _searchResults.isEmpty && _isLoading)
+                  _buildSuggestionsSliver()
+                else if (hasQuery)
+                  _buildResultsSliver()
+                else
+                  _buildLandingSliver(),
+
+                // Clearance for mini player & floating bottom dock
+                SliverToBoxAdapter(
+                  child: SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
+                ),
+              ],
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: DynamicIslandHeader(
+                title: 'Search',
+                showBack: typing,
+                onBack: () {
+                  _cancelSearch();
+                  SearchNav.phase.value = SearchPhase.bar; // back to the dock bar
+                },
+                showProfile: true,
+                topPadding: topInset + 4,
+                centerWidget: typing ? _topField() : null,
               ),
             ),
-
-            // 2. Body based on state: Suggestions, Results, or Landing
-            if (hasQuery && _liveSuggestions.isNotEmpty && _searchResults.isEmpty && _isLoading)
-              _buildSuggestionsSliver()
-            else if (hasQuery)
-              _buildResultsSliver()
-            else
-              _buildLandingSliver(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _topField() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
+      builder: (_, v, child) => Opacity(
+        opacity: v,
+        child: Transform.translate(offset: Offset(0, (1 - v) * 40), child: child),
+      ),
+      child: Row(
+        children: [
+          const Icon(CupertinoIcons.search, size: 16, color: Colors.white70),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _textCtrl,
+              focusNode: _focusNode,
+              textInputAction: TextInputAction.search,
+              onSubmitted: _submitSearch,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              cursorColor: AppColors.crimson,
+              decoration: const InputDecoration(
+                hintText: 'Search songs, artists, albums...',
+                hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+          if (_textCtrl.text.isNotEmpty)
+            GestureDetector(
+              onTap: _clearSearch,
+              child: const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Icon(
+                  CupertinoIcons.clear_circled_solid,
+                  size: 16,
+                  color: Colors.white38,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -540,7 +624,7 @@ class _SearchScreenState extends State<SearchScreen>
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 165,
+              height: 204,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -1413,129 +1497,4 @@ class _SearchScreenState extends State<SearchScreen>
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Pinned Apple Music Search Bar Delegate                            */
-/* ------------------------------------------------------------------ */
 
-class _SearchHeaderDelegate extends SliverPersistentHeaderDelegate {
-  _SearchHeaderDelegate({
-    required this.top,
-    required this.controller,
-    required this.focusNode,
-    required this.isFocused,
-    required this.onClear,
-    required this.onCancel,
-    required this.onSubmit,
-  });
-
-  final double top;
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final bool isFocused;
-  final VoidCallback onClear;
-  final VoidCallback onCancel;
-  final ValueChanged<String> onSubmit;
-
-  @override
-  double get minExtent => math.max(56.0, top + 56.0);
-  @override
-  double get maxExtent => math.max(56.0, top + 56.0);
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    final hasText = controller.text.isNotEmpty;
-
-    return Container(
-      color: Zen.bg.withValues(alpha: 0.96),
-      padding: EdgeInsets.fromLTRB(16, top + 6, 16, 8),
-      child: Row(
-        children: [
-          // Cupertino-styled rounded search text box
-          Expanded(
-            child: Container(
-              height: 42,
-              decoration: BoxDecoration(
-                color: const Color(0x1FFFFFFF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isFocused
-                      ? AppColors.accent.withValues(alpha: 0.6)
-                      : Colors.white.withValues(alpha: 0.08),
-                  width: 0.8,
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
-                children: [
-                  const Icon(CupertinoIcons.search, size: 18, color: AppColors.textTertiary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: onSubmit,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      cursorColor: AppColors.accent,
-                      decoration: const InputDecoration(
-                        hintText: 'Artists, Songs, Lyrics, and More',
-                        hintStyle: TextStyle(
-                          color: AppColors.textTertiary,
-                          fontSize: 14,
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10),
-                      ),
-                    ),
-                  ),
-                  if (hasText)
-                    GestureDetector(
-                      onTap: onClear,
-                      child: const Icon(
-                        CupertinoIcons.clear_thick_circled,
-                        size: 17,
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-
-          // Cancel button (slides in when focused)
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            width: isFocused ? 64 : 0,
-            padding: const EdgeInsets.only(left: 10),
-            child: isFocused
-                ? GestureDetector(
-                    onTap: onCancel,
-                    child: const Text(
-                      'Cancel',
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: AppColors.accent,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _SearchHeaderDelegate oldDelegate) =>
-      oldDelegate.isFocused != isFocused ||
-      oldDelegate.controller.text != controller.text ||
-      oldDelegate.top != top;
-}

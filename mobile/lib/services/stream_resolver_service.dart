@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import '../models/track.dart';
+import '../utils/media_normalizer.dart';
 import 'innertube_service.dart';
 
 class ResolvedStream {
@@ -42,17 +43,39 @@ class StreamResolverService {
       if (direct != null && direct.url.isNotEmpty) return direct;
     }
 
-    // 2. Search on-device directly via InnerTube for this track title & artist
+    // 2. Search on-device directly via YouTube Music InnerTube for this track title & artist
     try {
-      final String q;
-      if (track.artist.isNotEmpty && track.artist != 'Unknown Artist') {
-        q = '${track.title} ${track.artist}'.trim();
-      } else {
-        q = track.title.trim();
+      final cleanTitle = MediaNormalizer.cleanCompactTitle(track.title);
+      final cleanArtist = MediaNormalizer.stripIdNoise(MediaNormalizer.formatArtists(track.artist));
+      final String q = (cleanArtist.isNotEmpty && cleanArtist != 'Unknown Artist')
+          ? '$cleanTitle $cleanArtist'.trim()
+          : cleanTitle;
+
+      // Prefer YouTube Music song filter first (pure official music tracks, no videos/trailers)
+      List<Track> songs = await InnerTubeService.instance.searchSongsNative(q).timeout(const Duration(seconds: 8));
+      if (songs.isEmpty) {
+        songs = await InnerTubeService.instance.search(q).timeout(const Duration(seconds: 8));
       }
-      final results = await InnerTubeService.instance.search(q).timeout(const Duration(seconds: 10));
-      if (results.isNotEmpty) {
-        final topId = results.first.id.replaceFirst('yt-', '').trim();
+      if (songs.isNotEmpty) {
+        final lowerTarget = cleanTitle.toLowerCase();
+        final lowerArtist = cleanArtist.toLowerCase();
+        final exact = songs.firstWhere(
+          (s) {
+            final st = MediaNormalizer.cleanCompactTitle(s.title).toLowerCase();
+            final sa = s.artist.toLowerCase();
+            final titleMatches = st == lowerTarget || st.contains(lowerTarget) || lowerTarget.contains(st);
+            final artistMatches = lowerArtist.isEmpty || lowerArtist == 'unknown artist' || sa.contains(lowerArtist) || lowerArtist.contains(sa);
+            return titleMatches && artistMatches;
+          },
+          orElse: () => songs.firstWhere(
+            (s) {
+              final st = MediaNormalizer.cleanCompactTitle(s.title).toLowerCase();
+              return st == lowerTarget || st.contains(lowerTarget) || lowerTarget.contains(st);
+            },
+            orElse: () => songs.first,
+          ),
+        );
+        final topId = exact.id.replaceFirst('yt-', '').trim();
         if (topId.length == 11) {
           final direct = await resolveStream(topId);
           if (direct != null && direct.url.isNotEmpty) return direct;
