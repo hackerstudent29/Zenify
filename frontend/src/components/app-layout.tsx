@@ -29,15 +29,35 @@ import { useAuthStore } from "@/store/authStore";
 import { GlobalLyricsSidebar } from "@/components/shared/GlobalLyricsSidebar";
 import { Glass } from "@/components/ui/glass";
 
+// Safe lazy-loader that catches chunk loading failures gracefully
+function safeLazy<T extends React.ComponentType<any>>(
+  importer: () => Promise<{ default: T }>
+) {
+  return React.lazy(async () => {
+    try {
+      return await importer();
+    } catch (err: any) {
+      console.warn("[AppLayout] Dynamic import error, retrying...", err?.message);
+      try {
+        await new Promise((r) => setTimeout(r, 1500));
+        return await importer();
+      } catch (retryErr) {
+        console.error("[AppLayout] Dynamic chunk failed to load:", retryErr);
+        return { default: (() => null) as unknown as T };
+      }
+    }
+  });
+}
+
 // Lazy-loaded auxiliary modals to minimize critical initial chunk size
-const DownloadModal = React.lazy(() => import("@/components/shared/DownloadModal").then(m => ({ default: m.DownloadModal })));
-const AddTrackToPlaylistModal = React.lazy(() => import("@/components/shared/AddTrackToPlaylistModal").then(m => ({ default: m.AddTrackToPlaylistModal })));
-const AudioFxModal = React.lazy(() => import("@/components/player/audio-fx-modal").then(m => ({ default: m.AudioFxModal })));
-const ShortcutHelpModal = React.lazy(() => import("@/components/shared/shortcut-help-modal").then(m => ({ default: m.ShortcutHelpModal })));
-const UserOnboardingTour = React.lazy(() => import("@/components/shared/UserOnboardingTour").then(m => ({ default: m.UserOnboardingTour })));
-const CloudSyncSidePopup = React.lazy(() => import("@/components/shared/CloudSyncSidePopup").then(m => ({ default: m.CloudSyncSidePopup })));
-const BatchImportToast = React.lazy(() => import("@/components/shared/batch-import-toast").then(m => ({ default: m.BatchImportToast })));
-const SettingsModal = React.lazy(() => import("@/components/settings/SettingsModal").then(m => ({ default: m.SettingsModal })));
+const DownloadModal = safeLazy(() => import("@/components/shared/DownloadModal").then(m => ({ default: m.DownloadModal })));
+const AddTrackToPlaylistModal = safeLazy(() => import("@/components/shared/AddTrackToPlaylistModal").then(m => ({ default: m.AddTrackToPlaylistModal })));
+const AudioFxModal = safeLazy(() => import("@/components/player/audio-fx-modal").then(m => ({ default: m.AudioFxModal })));
+const ShortcutHelpModal = safeLazy(() => import("@/components/shared/shortcut-help-modal").then(m => ({ default: m.ShortcutHelpModal })));
+const UserOnboardingTour = safeLazy(() => import("@/components/shared/UserOnboardingTour").then(m => ({ default: m.UserOnboardingTour })));
+const CloudSyncSidePopup = safeLazy(() => import("@/components/shared/CloudSyncSidePopup").then(m => ({ default: m.CloudSyncSidePopup })));
+const BatchImportToast = safeLazy(() => import("@/components/shared/batch-import-toast").then(m => ({ default: m.BatchImportToast })));
+const SettingsModal = safeLazy(() => import("@/components/settings/SettingsModal").then(m => ({ default: m.SettingsModal })));
 
 /* ------------------------------------------------------------------ */
 /*  Apple-style tokens                                                 */

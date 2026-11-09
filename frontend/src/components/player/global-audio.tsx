@@ -427,7 +427,7 @@ export function GlobalAudio() {
                   audio.src = `${fallbackMediaUrl}${sep}auto-recovered=true&t=${Date.now()}`;
                   audio.load();
                   audio.play().catch((playErr) => {
-                    if (playErr?.name === 'AbortError') return;
+                    if (playErr?.name === 'AbortError' || playErr?.message?.includes('interrupted')) return;
                     console.warn("[GlobalAudio/Automator] Secondary playback attempt failed:", playErr);
                     setTimeout(() => {
                       useUIStore.getState().showToast(`Skipping unplayable track: "${current.title}"`, 'error');
@@ -496,7 +496,10 @@ export function GlobalAudio() {
               audio.src = directPreview;
               audio.load();
               if (isPlaying) {
-                audio.play().catch(() => triggerRecovery());
+                audio.play().catch(playErr => {
+                  if (playErr?.name === 'AbortError' || playErr?.message?.includes('interrupted')) return;
+                  triggerRecovery();
+                });
               }
               return;
             }

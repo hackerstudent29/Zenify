@@ -21,8 +21,8 @@ class AppleGlass extends StatelessWidget {
     super.key,
     required this.borderRadius,
     this.child,
-    this.blur = 30,
-    this.tint = const Color(0x40202024),
+    this.blur = 14,
+    this.tint = const Color(0x1F18181C),
     this.shadow = true,
   });
 
@@ -49,9 +49,9 @@ class AppleGlass extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.white.withValues(alpha: 0.20),
-                    Colors.white.withValues(alpha: 0.04),
                     Colors.white.withValues(alpha: 0.09),
+                    Colors.white.withValues(alpha: 0.01),
+                    Colors.white.withValues(alpha: 0.04),
                   ],
                   stops: const [0, 0.55, 1],
                 ),
@@ -79,15 +79,15 @@ class _GlassShadowPainter extends CustomPainter {
     canvas.save();
     canvas.clipPath(outside);
     canvas.drawRRect(
-      rrect.shift(const Offset(0, 10)),
+      rrect.shift(const Offset(0, 8)),
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.30)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
+        ..color = Colors.black.withValues(alpha: 0.22)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
     );
     canvas.drawRRect(
       rrect.shift(const Offset(0, 2)),
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.14)
+        ..color = Colors.black.withValues(alpha: 0.12)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
     canvas.restore();
@@ -109,10 +109,10 @@ class _GlassRimPainter extends CustomPainter {
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [
-        Colors.white.withValues(alpha: 0.55),
-        Colors.white.withValues(alpha: 0.06),
-        Colors.white.withValues(alpha: 0.06),
-        Colors.white.withValues(alpha: 0.30),
+        Colors.white.withValues(alpha: 0.40),
+        Colors.white.withValues(alpha: 0.04),
+        Colors.white.withValues(alpha: 0.04),
+        Colors.white.withValues(alpha: 0.18),
       ],
       stops: const [0, 0.35, 0.65, 1],
     ).createShader(rect);
@@ -131,7 +131,7 @@ class _GlassRimPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: 0.05),
+        ..color = Colors.white.withValues(alpha: 0.04),
     );
     canvas.restore();
   }
@@ -333,16 +333,16 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
                                 height: h - _inset * 2,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(h / 2),
-                                  color: Colors.white.withValues(alpha: 0.13 + 0.09 * press),
+                                  color: Colors.white.withValues(alpha: 0.10 + 0.07 * press),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.16 + 0.20 * press),
+                                    color: Colors.white.withValues(alpha: 0.22 + 0.15 * press),
                                     width: 0.8,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.18 * press),
-                                      blurRadius: 14,
-                                      offset: const Offset(0, 4),
+                                      color: Colors.black.withValues(alpha: 0.12 * press),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 3),
                                     ),
                                   ],
                                 ),
