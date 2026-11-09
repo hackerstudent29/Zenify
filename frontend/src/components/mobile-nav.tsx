@@ -6,12 +6,13 @@ import { motion, useMotionValue, useSpring, useTransform, useVelocity } from "fr
 import {
   SFAppleHome,
   SFAppleGrid,
-  SwiftUIHeart,
+  SFAppleRadio,
   SFAppleLibrary,
   SFAppleSearch,
 } from "@/components/ui/SwiftUIIcons";
 import { cn } from "@/lib/utils";
 import { glassSurface, lensSurface } from "@/components/mobile/glass";
+import { SpotlightSearchOverlay } from "@/components/shared/SpotlightSearch";
 
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -31,15 +32,36 @@ export function MobileNav() {
   const items = [
     { label: "Home", icon: SFAppleHome, href: "/" },
     { label: "Discover", icon: SFAppleGrid, href: "/discover" },
-    { label: "Liked", icon: SwiftUIHeart, href: "/liked" },
+    { label: "Radio", icon: SFAppleRadio, href: "/radio" },
     { label: "Library", icon: SFAppleLibrary, href: "/local-library" },
   ];
   const n = items.length;
 
-  const activeIdx = items.findIndex((it) =>
-    it.href === "/" ? pathname === "/" : pathname === it.href || pathname.startsWith(it.href + "/")
-  );
-  const searchActive = pathname.startsWith("/search");
+  const activeIdx = items.findIndex((it) => {
+    if (it.href === "/") return pathname === "/";
+    if (pathname === it.href || pathname.startsWith(it.href + "/")) return true;
+    if (it.label === "Library" && (pathname === "/library" || pathname.startsWith("/library/"))) return true;
+    if (it.label === "Radio" && (pathname === "/liked" || pathname.startsWith("/liked/"))) return true;
+    return false;
+  });
+
+  /* ── spotlight search panel state ── */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOrigin, setSearchOrigin] = useState<DOMRect | null>(null);
+  const searchBtnRef = useRef<HTMLButtonElement>(null);
+
+  const openSearch = () => {
+    setSearchOrigin(searchBtnRef.current?.getBoundingClientRect() ?? null);
+    setSearchOpen(true);
+  };
+
+  useEffect(() => {
+    if (pathname === "/search" && !searchOpen) {
+      openSearch();
+    }
+  }, [pathname]);
+
+  const searchActive = searchOpen || pathname.startsWith("/search");
 
   /* ── state ── */
   const innerRef = useRef<HTMLDivElement>(null);
@@ -146,100 +168,113 @@ export function MobileNav() {
   };
 
   return (
-    <nav className="pointer-events-none relative w-full select-none" aria-label="Primary">
-      {/* Ultra-subtle bottom vignette so liquid glass refractions pop over both dark and bright content */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+    <>
+      <nav className="pointer-events-none relative w-full select-none" aria-label="Primary">
+        {/* Ultra-subtle bottom vignette so liquid glass refractions pop over both dark and bright content */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
 
-      <div className="relative flex items-center gap-2.5 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+8px)]">
-        {/* ───────────── Tab pill (Home · Discover · Liked · Library) ───────────── */}
-        <div
-          className="pointer-events-auto relative flex-1 rounded-full"
-          style={{ height: DOCK_H, ...glassSurface }}
-        >
+        <div className="relative flex items-center gap-2.5 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+8px)]">
+          {/* ───────────── Tab pill (Home · Discover · Liked · Library) ───────────── */}
           <div
-            ref={innerRef}
-            role="tablist"
-            className="relative h-full touch-none"
-            style={{ margin: `0 ${PAD}px`, width: `calc(100% - ${PAD * 2}px)` }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={(e) => finish(e, true)}
-            onPointerCancel={(e) => finish(e, false)}
+            className="pointer-events-auto relative flex-1 rounded-full"
+            style={{ height: DOCK_H, ...glassSurface }}
           >
-            {/* sliding lens */}
-            {itemW > 0 && (
-              <motion.div
-                className="pointer-events-none absolute rounded-full"
-                style={{
-                  top: PAD,
-                  bottom: PAD,
-                  left: 0,
-                  width: itemW,
-                  x,
-                  scaleX,
-                  scaleY: pressScale,
-                  opacity: lensOpacity,
-                  ...lensSurface,
-                }}
-              />
-            )}
+            <div
+              ref={innerRef}
+              role="tablist"
+              className="relative h-full touch-none"
+              style={{ margin: `0 ${PAD}px`, width: `calc(100% - ${PAD * 2}px)` }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={(e) => finish(e, true)}
+              onPointerCancel={(e) => finish(e, false)}
+            >
+              {/* sliding lens */}
+              {itemW > 0 && (
+                <motion.div
+                  className="pointer-events-none absolute rounded-full"
+                  style={{
+                    top: PAD,
+                    bottom: PAD,
+                    left: 0,
+                    width: itemW,
+                    x,
+                    scaleX,
+                    scaleY: pressScale,
+                    opacity: lensOpacity,
+                    ...lensSurface,
+                  }}
+                />
+              )}
 
-            {/* tabs */}
-            <div className="relative z-10 flex h-full">
-              {items.map((item, i) => {
-                const active = shownIdx === i;
-                const Icon = item.icon;
-                const tone = active ? "text-brand" : "text-white/70";
-                return (
-                  <button
-                    key={item.href}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeIdx === i}
-                    aria-label={item.label}
-                    onClick={(e) => {
-                      if (e.detail === 0 && pathname !== item.href) router.push(item.href);
-                    }}
-                    className="flex flex-1 flex-col items-center justify-center gap-[3px] bg-transparent outline-none [-webkit-tap-highlight-color:transparent]"
-                  >
-                    <span className={cn("pointer-events-none transition-colors duration-200", tone)}>
-                      <Icon size={24} filled={active} className={cn("transition-all duration-200", tone)} />
-                    </span>
-                    <span
-                      className={cn(
-                        "pointer-events-none text-[10.5px] font-semibold leading-none tracking-[-0.005em] transition-colors duration-200",
-                        tone
-                      )}
+              {/* tabs */}
+              <div className="relative z-10 flex h-full">
+                {items.map((item, i) => {
+                  const active = shownIdx === i;
+                  const Icon = item.icon;
+                  const tone = active ? "text-brand" : "text-white/70";
+                  return (
+                    <button
+                      key={item.href}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeIdx === i}
+                      aria-label={item.label}
+                      onClick={(e) => {
+                        if (e.detail === 0 && pathname !== item.href) router.push(item.href);
+                      }}
+                      className="flex flex-1 flex-col items-center justify-center gap-[3px] bg-transparent outline-none [-webkit-tap-highlight-color:transparent]"
                     >
-                      {item.label}
-                    </span>
-                  </button>
-                );
-              })}
+                      <span className={cn("pointer-events-none transition-colors duration-200", tone)}>
+                        <Icon size={24} filled={active} className={cn("transition-all duration-200", tone)} />
+                      </span>
+                      <span
+                        className={cn(
+                          "pointer-events-none text-[10.5px] font-semibold leading-none tracking-[-0.005em] transition-colors duration-200",
+                          tone
+                        )}
+                      >
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* ───────────── Separate Round Search Dock Button ───────────── */}
-        <motion.button
-          type="button"
-          aria-label="Search"
-          onClick={() => {
-            if (pathname !== "/search") {
-              router.push("/search");
+          {/* ───────────── Separate Round Search Dock Button (Opens Spotlight Search Panel) ───────────── */}
+          <motion.button
+            ref={searchBtnRef}
+            type="button"
+            aria-label="Search"
+            onClick={openSearch}
+            whileTap={{ scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 520, damping: 26, mass: 0.6 }}
+            className={cn(
+              "pointer-events-auto flex shrink-0 items-center justify-center rounded-full outline-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200",
+              searchActive ? "text-brand" : "text-white/80"
+            )}
+            style={{ width: DOCK_H, height: DOCK_H, ...glassSurface }}
+          >
+            <SFAppleSearch size={25} strokeWidth={2.4} />
+          </motion.button>
+        </div>
+      </nav>
+
+      {/* Spotlight Search Panel Overlay (Opened from Bottom Search Button) */}
+      {searchOpen && (
+        <SpotlightSearchOverlay
+          originRect={searchOrigin}
+          onClose={() => {
+            setSearchOpen(false);
+            searchBtnRef.current?.focus({ preventScroll: true });
+            if (pathname === "/search") {
+              router.back();
             }
           }}
-          whileTap={{ scale: 0.9 }}
-          transition={{ type: "spring", stiffness: 520, damping: 26, mass: 0.6 }}
-          className={cn(
-            "pointer-events-auto flex shrink-0 items-center justify-center rounded-full outline-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200",
-            searchActive ? "text-brand" : "text-white/80"
-          )}
-          style={{ width: DOCK_H, height: DOCK_H, ...glassSurface }}
-        >
-          <SFAppleSearch size={25} strokeWidth={2.4} />
-        </motion.button>
-      </div>
-    </nav>
+        />
+      )}
+    </>
   );
 }

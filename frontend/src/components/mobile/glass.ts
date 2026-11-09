@@ -35,9 +35,10 @@ export const glassSurface: CSSProperties = {
   boxShadow: `${GLASS_RIM}, ${GLASS_DROP}`,
 };
 
-/** The sliding "lens" behind the active tab — water-drop liquid refraction */
+/** The sliding "lens" behind the active tab — water-drop liquid refraction with Apple Red glow */
 export const lensSurface: CSSProperties = {
-  background: "linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.05) 100%)",
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(225,29,72,0.14) 60%, rgba(225,29,72,0.06) 100%)",
   boxShadow:
-    "inset 0 1px 0.5px rgba(255,255,255,0.40), inset 0 -0.5px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.22)",
+    "inset 0 1px 0.5px rgba(255,255,255,0.45), inset 0 -0.5px 0 rgba(225,29,72,0.25), 0 2px 10px rgba(0,0,0,0.24)",
 };
