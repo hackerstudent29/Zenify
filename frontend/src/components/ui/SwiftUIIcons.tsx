@@ -620,3 +620,62 @@ export function SwiftUIAdmin({
 }
 export const SFAdmin = SwiftUIAdmin;
 
+/**
+ * Authentic Apple Music Dock SF Symbols
+ */
+export function SFAppleHome({ size = 24, filled = false, className = "", ...props }: IconProps & { filled?: boolean }) {
+  if (filled) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} {...props}>
+        <path d="M12.7 2.37a1 1 0 0 0-1.4 0l-8.5 7.73a1 1 0 0 0-.3.74V19a2 2 0 0 0 2 2h4.5a1 1 0 0 0 1-1v-4.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1V20a1 1 0 0 0 1 1H19a2 2 0 0 0 2-2v-8.16a1 1 0 0 0-.3-.74l-8-7.73z" />
+      </svg>
+    );
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+      <path d="M3 10.5L12 3l9 7.5V19a2 2 0 0 1-2 2h-4.5a1 1 0 0 1-1-1v-4.5a1 1 0 0 0-1-1h-1a1 1 0 0 0-1 1V20a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2v-8.5z" />
+    </svg>
+  );
+}
+
+export function SFAppleGrid({ size = 24, filled = false, className = "", ...props }: IconProps & { filled?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth={filled ? 0 : 2} className={className} {...props}>
+      <rect x="3.75" y="3.75" width="7" height="7" rx="2" />
+      <rect x="13.25" y="3.75" width="7" height="7" rx="2" />
+      <rect x="3.75" y="13.25" width="7" height="7" rx="2" />
+      <rect x="13.25" y="13.25" width="7" height="7" rx="2" />
+    </svg>
+  );
+}
+
+export function SFAppleLibrary({ size = 24, filled = false, className = "", ...props }: IconProps & { filled?: boolean }) {
+  if (filled) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} {...props}>
+        <path d="M7 3.5h10M5.5 5.5h13" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+        <rect x="3.5" y="7.5" width="17" height="13.5" rx="3.5" fill="currentColor" />
+        <path d="M11.5 15.75a1.75 1.75 0 1 1-1.5-1.73v-3.77a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75v1.25a.75.75 0 0 1-.75.75h-2.25v3.5z" fill="#18181b" />
+      </svg>
+    );
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+      <path d="M7 3.5h10M5.5 5.5h13" strokeWidth={1.8} />
+      <rect x="3.5" y="7.5" width="17" height="13.5" rx="3.5" />
+      <circle cx="10" cy="16" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M11.5 16v-4.5a.5.5 0 0 1 .5-.5h2" strokeWidth={1.8} />
+    </svg>
+  );
+}
+
+export function SFAppleSearch({ size = 24, className = "", strokeWidth = 2.4, ...props }: IconProps & { strokeWidth?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+      <circle cx="10.8" cy="10.8" r="6.8" />
+      <path d="M15.8 15.8L21 21" />
+    </svg>
+  );
+}
+
+

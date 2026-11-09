@@ -68,8 +68,8 @@ export function TopBar() {
           </button>
         )}
 
-        {/* Section K: Single Spotlight Search button on the left of header */}
-        <HeaderSearchButton />
+        {/* Spotlight Search: desktop/tablet header search; mobile uses the dedicated liquid glass search dock button */}
+        {!isMobile && <HeaderSearchButton />}
 
         {/* Sticky Title swap on scroll */}
         <AnimatePresence mode="wait">
@@ -118,6 +118,18 @@ export function TopBar() {
             items={
               user
                 ? [
+                    ...(user?.role === "ADMIN"
+                      ? [
+                          {
+                            id: "admin-console",
+                            label: "Admin Console",
+                            icon: <Database size={16} className="text-brand" />,
+                            className: "text-brand hover:text-brand font-semibold",
+                            onClick: () => router.push("/admin"),
+                          },
+                          { id: "divider-admin-mob", isSeparator: true },
+                        ]
+                      : []),
                     { id: "profile", label: "Profile", icon: <UserIcon size={16} />, onClick: () => router.push("/profile") },
                     {
                       id: "notifications",
