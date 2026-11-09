@@ -6,7 +6,7 @@ import { motion, useMotionValue, useSpring, useTransform, useVelocity } from "fr
 import {
   SFAppleHome,
   SFAppleGrid,
-  SFAppleRadio,
+  SwiftUITogether,
   SFAppleLibrary,
   SFAppleSearch,
 } from "@/components/ui/SwiftUIIcons";
@@ -32,16 +32,25 @@ export function MobileNav() {
   const items = [
     { label: "Home", icon: SFAppleHome, href: "/" },
     { label: "Discover", icon: SFAppleGrid, href: "/discover" },
-    { label: "Radio", icon: SFAppleRadio, href: "/radio" },
-    { label: "Library", icon: SFAppleLibrary, href: "/local-library" },
+    { label: "Together", icon: SwiftUITogether, href: "/together" },
+    { label: "Library", icon: SFAppleLibrary, href: "/liked" },
   ];
   const n = items.length;
 
   const activeIdx = items.findIndex((it) => {
     if (it.href === "/") return pathname === "/";
     if (pathname === it.href || pathname.startsWith(it.href + "/")) return true;
-    if (it.label === "Library" && (pathname === "/library" || pathname.startsWith("/library/"))) return true;
-    if (it.label === "Radio" && (pathname === "/liked" || pathname.startsWith("/liked/"))) return true;
+    if (
+      it.label === "Library" &&
+      (pathname === "/liked" ||
+        pathname.startsWith("/liked/") ||
+        pathname === "/library" ||
+        pathname.startsWith("/library/") ||
+        pathname === "/local-library" ||
+        pathname.startsWith("/local-library/"))
+    ) {
+      return true;
+    }
     return false;
   });
 
