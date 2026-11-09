@@ -302,13 +302,15 @@ class _SearchScreenState extends State<SearchScreen>
     final hasQuery = _activeQuery.isNotEmpty;
 
     return PopScope(
-      canPop: _activeQuery.isEmpty && !_isFocused,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (_focusNode.hasFocus) {
           _focusNode.unfocus();
         } else if (_activeQuery.isNotEmpty) {
           _clearSearch();
+        } else if (widget.onBack != null) {
+          widget.onBack!();
         }
       },
       child: Scaffold(
@@ -1305,7 +1307,17 @@ class _SearchScreenState extends State<SearchScreen>
                   width: 130,
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    _submitSearch(pl.title);
+                    Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (_) => AlbumScreen(
+                          albumTitle: pl.title,
+                          artistName: pl.curator ?? 'Playlist',
+                          coverUrl: pl.coverUrl,
+                          browseId: pl.browseId,
+                        ),
+                      ),
+                    );
                   },
                 ),
               );
@@ -1336,7 +1348,20 @@ class _SearchScreenState extends State<SearchScreen>
             subtitle: pl.curator ?? 'Playlist',
             imageUrl: pl.coverUrl,
             width: 160,
-            onTap: () => _submitSearch(pl.title),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (_) => AlbumScreen(
+                    albumTitle: pl.title,
+                    artistName: pl.curator ?? 'Playlist',
+                    coverUrl: pl.coverUrl,
+                    browseId: pl.browseId,
+                  ),
+                ),
+              );
+            },
           );
         },
       ),

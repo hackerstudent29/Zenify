@@ -1,10 +1,10 @@
 {
-  "version": 3,
+  "version": 4,
   "streamMode": "device",
   "minAppVersion": "1.0.0",
-  "latestAppVersion": "2.6.6",
+  "latestAppVersion": "2.6.7",
   "updateUrl": "https://listenzenify.com/download/app",
-  "releaseNotes": "• StudioFX DSP Engine overhaul: Zero digital clipping & distortion across all volume levels\n• Dynamic headroom auto-trim for EQ with broadcast-grade peak limiter & silky soft knee\n• Balanced acoustic presets: Studio Clarity, Bass Boost, Concert Hall, and calibrated AutoEq curves\n• Instant native InnerTube streaming with clean playback reliability",
+  "releaseNotes": "• Pure YouTube Music Automix: Infinite continuous radio playback from current tracks\n• Native Android getNext queue integration via Dispatchers.IO\n• Enhanced MediaNormalizer artwork scaling and defensive null safety\n• Zero legacy provider dependencies: 100% pure YouTube Music catalog",
   "message": null
 }
 

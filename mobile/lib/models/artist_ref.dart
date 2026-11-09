@@ -1,3 +1,5 @@
+import '../utils/media_normalizer.dart';
+
 /// Model representing a referenced artist (primary, featured, or collaborator).
 class ArtistRef {
   const ArtistRef({
@@ -33,6 +35,13 @@ class ArtistRef {
         name: name.trim().isEmpty ? 'Unknown Artist' : name.trim(),
         imageUrl: imageUrl,
       );
+
+  /// Splits composite names and creates individual ArtistRef models.
+  static List<ArtistRef> splitFromName(String? raw, {String? defaultImageUrl}) {
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final names = MediaNormalizer.splitArtistNames(raw);
+    return names.map((n) => ArtistRef.fromName(n, imageUrl: defaultImageUrl)).toList();
+  }
 
   /// Apple Music formatting: "A", "A & B", "A, B & C".
   static String formatList(List<ArtistRef> list, {String fallback = 'Unknown Artist'}) {

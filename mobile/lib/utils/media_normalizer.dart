@@ -86,42 +86,56 @@ class MediaNormalizer {
     return false;
   }
 
-  /// Cleans artist names, splits separators (&, feat., etc.), removes duplicates,
-  /// and formats as "Artist 1, Artist 2".
-  static String formatArtists(dynamic rawArtists) {
-    if (rawArtists == null) return 'Unknown Artist';
-
+  /// Splits composite artist strings like "Artist A, Artist B & Artist C feat. Artist D"
+  /// into individual distinct artist names.
+  static List<String> splitArtistNames(dynamic rawArtists) {
+    if (rawArtists == null) return const [];
     final names = <String>[];
     void addName(String candidate) {
       final decoded = decodeHtml(candidate).trim();
       if (decoded.isEmpty || isMetadataNoise(decoded)) return;
-      // Filter out album type or play counts
       final lower = decoded.toLowerCase();
       if (lower == 'album' || lower == 'single' || lower == 'ep' || lower.contains('plays') || lower.contains('views')) {
         return;
       }
-      if (!names.any((n) => n.toLowerCase() == decoded.toLowerCase())) {
-        names.add(decoded);
+      var clean = decoded.replaceAll(RegExp(r'^[\(\[\{]+|[\)\]\}]+$'), '').trim();
+      if (clean.isNotEmpty && !names.any((n) => n.toLowerCase() == clean.toLowerCase())) {
+        names.add(clean);
       }
     }
 
     if (rawArtists is String) {
-      // Split on common delimiters
-      final parts = rawArtists.split(RegExp(r'[,/&]|(\s+(feat\.?|ft\.?)\s+)', caseSensitive: false));
+      final parts = rawArtists.split(RegExp(r'[,/•·|]|(\s+(&|and|feat\.?|ft\.?|featuring)\s+)', caseSensitive: false));
       for (final p in parts) {
         addName(p);
       }
     } else if (rawArtists is Iterable) {
       for (final a in rawArtists) {
         if (a is String) {
-          addName(a);
+          final parts = a.split(RegExp(r'[,/•·|]|(\s+(&|and|feat\.?|ft\.?|featuring)\s+)', caseSensitive: false));
+          for (final p in parts) {
+            addName(p);
+          }
         } else if (a is Map) {
           final t = a['text'] ?? a['name'];
-          if (t is String) addName(t);
+          if (t is String) {
+            final parts = t.split(RegExp(r'[,/•·|]|(\s+(&|and|feat\.?|ft\.?|featuring)\s+)', caseSensitive: false));
+            for (final p in parts) {
+              addName(p);
+            }
+          }
         }
       }
     }
+    return names;
+  }
 
+  /// Cleans artist names, splits separators (&, feat., etc.), removes duplicates,
+  /// and formats as "Artist 1, Artist 2".
+  static String formatArtists(dynamic rawArtists) {
+    if (rawArtists == null) return 'Unknown Artist';
+
+    final names = splitArtistNames(rawArtists);
     return names.isNotEmpty ? names.join(', ') : 'Unknown Artist';
   }
 
@@ -137,19 +151,22 @@ class MediaNormalizer {
 
     var u = url;
 
-    // Upgrades Google / YouTube thumbnail resolutions
+    // Upgrades Google / YouTube Music thumbnail resolutions
     if (u.contains('googleusercontent.com') || u.contains('ggpht.com')) {
-      u = u.replaceAll(RegExp(r'=(w\d+-h\d+|s\d+)[^=]*$'), '=w$targetSize-h$targetSize-l90-rj');
+      final hasPortraitParam = u.contains('-p') || u.contains('-c');
+      final param = hasPortraitParam
+          ? '=w$targetSize-h$targetSize-p-l90-rj'
+          : '=w$targetSize-h$targetSize-l90-rj';
+      u = u.replaceAll(RegExp(r'=(w\d+-h\d+|s\d+)[^=]*$'), param);
       if (!u.contains('=w')) {
-        u = '$u=w$targetSize-h$targetSize-l90-rj';
+        u = '$u$param';
       }
       return u;
     }
 
+    // Upgrade ytimg: use hqdefault.jpg (always available, 480x360 crisp, no 404 delays)
     if (u.contains('ytimg.com/vi/')) {
-      if (u.contains('hqdefault') || u.contains('mqdefault') || u.contains('default')) {
-        return u.replaceAll(RegExp(r'(hqdefault|mqdefault|sddefault|default)\.jpg'), 'maxresdefault.jpg');
-      }
+      return u.replaceAll(RegExp(r'/(?:maxresdefault|mqdefault|sddefault|default)\.jpg'), '/hqdefault.jpg');
     }
 
     return u;
@@ -244,6 +261,20 @@ class MediaNormalizer {
       videoId: videoId,
     );
   }
+
+  /// Convenience normalizer for plain Maps.
+  static NormalizedMediaItem normalizeMap(Map<String, dynamic> map) {
+    return normalize(
+      id: (map['id'] ?? map['videoId'] ?? '').toString(),
+      rawTitle: (map['title'] ?? map['name'])?.toString(),
+      rawSubtitle: (map['subtitle'] ?? map['artist'] ?? map['artists'])?.toString(),
+      rawImageUrl: (map['imageUrl'] ?? map['thumbnail'] ?? map['coverUrl'])?.toString(),
+      defaultType: (map['type'] ?? 'song').toString(),
+      year: map['year']?.toString(),
+      browseId: map['browseId']?.toString(),
+      videoId: (map['videoId'] ?? map['id'])?.toString(),
+    );
+  }
 }
 
 /// Standardized UI Model used uniformly across all Zenify screens.
@@ -269,6 +300,9 @@ class NormalizedMediaItem {
   final String? duration;
   final String? browseId;
   final String? videoId;
+
+  /// Cleaned title (alias for title).
+  String get cleanTitle => title;
 
   /// Clean, compact title for cards and mini player (strips "From ..." movie subtitles).
   String get compactTitle => MediaNormalizer.cleanCompactTitle(title);

@@ -278,9 +278,17 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
                         key: _playerShellKey,
                         hideMini: hideDocks,
                         miniBottomOffset: miniBottom,
-                    onGoToArtist: (track) {
-                      final artist = track is Track ? track.artist : track?.artist ?? track?.toString();
-                      if (artist != null && artist.isNotEmpty) {
+                    onGoToArtist: (trackOrArtist) {
+                      final String artist;
+                      if (trackOrArtist is String) {
+                        artist = trackOrArtist;
+                      } else if (trackOrArtist is Track) {
+                        final names = trackOrArtist.artistNames;
+                        artist = names.isNotEmpty ? names.first : trackOrArtist.artist;
+                      } else {
+                        artist = trackOrArtist?.artist?.toString() ?? trackOrArtist?.toString() ?? '';
+                      }
+                      if (artist.isNotEmpty) {
                         _openInActiveTab(ArtistScreen(artistName: artist));
                       }
                     },

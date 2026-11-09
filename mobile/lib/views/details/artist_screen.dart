@@ -286,9 +286,8 @@ class _SkeletonState extends State<_Skeleton> with SingleTickerProviderStateMixi
 }
 
 class _SecHeader extends StatelessWidget {
-  const _SecHeader(this.title, {this.sub});
+  const _SecHeader(this.title);
   final String title;
-  final String? sub;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -296,7 +295,6 @@ class _SecHeader extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (sub != null) Text(sub!, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
             Text(
               title,
               style: const TextStyle(
@@ -506,9 +504,11 @@ class _Pill extends StatelessWidget {
 /*  Screen                                                              */
 /* ------------------------------------------------------------------ */
 class _Release {
-  _Release(this.title, this.cover, {this.browseId});
+  _Release(this.title, this.cover, {this.browseId, this.year = '', this.type = 'Album'});
   final String title, cover;
   final String? browseId;
+  final String year;
+  final String type;
   final List<Track> tracks = [];
 }
 
@@ -638,11 +638,12 @@ class _ArtistScreenState extends State<ArtistScreen> {
     }
     final releases = map.values.toList();
     final albums = _artistProfile != null && _artistProfile!.albums.isNotEmpty
-        ? _artistProfile!.albums.map((a) => _Release(a.title, a.coverUrl, browseId: a.browseId)).toList()
+        ? _artistProfile!.albums.map((a) => _Release(a.title, a.coverUrl, browseId: a.browseId, year: a.year, type: 'Album')).toList()
         : releases.where((r) => r.tracks.length >= 3).toList();
     final singles = _artistProfile != null && _artistProfile!.singles.isNotEmpty
-        ? _artistProfile!.singles.map((s) => _Release(s.title, s.coverUrl, browseId: s.browseId)).toList()
+        ? _artistProfile!.singles.map((s) => _Release(s.title, s.coverUrl, browseId: s.browseId, year: s.year, type: s.type)).toList()
         : releases.where((r) => r.tracks.length < 3).toList();
+    final featuredPlaylists = _artistProfile?.featuredPlaylists ?? const [];
 
     // Related artists (from other artists in the results or profile).
     final relMap = <String, Track>{};
@@ -761,8 +762,12 @@ class _ArtistScreenState extends State<ArtistScreen> {
                               child: Text(
                                 _loading
                                     ? 'Artist'
-                                    : 'Artist · ${songs.length} songs · ${releases.length} releases',
-                                key: ValueKey(_loading),
+                                    : (_artistProfile?.monthlyAudience?.isNotEmpty == true
+                                        ? '${_artistProfile!.monthlyAudience} · ${albums.length + singles.length} releases'
+                                        : (_artistProfile?.subscriberCount.isNotEmpty == true && _artistProfile!.subscriberCount != 'Top Artist'
+                                            ? '${_artistProfile!.subscriberCount} · ${songs.length} songs'
+                                            : 'Artist · ${songs.length} songs · ${albums.length + singles.length} releases')),
+                                key: ValueKey('$_loading-${_artistProfile?.subscriberCount}-${songs.length}'),
                                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 15),
                               ),
                             ),
@@ -878,9 +883,11 @@ class _ArtistScreenState extends State<ArtistScreen> {
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
                                             Text(
-                                              releases.first.tracks.length < 3
-                                                  ? 'Single · $name'
-                                                  : 'Album · ${releases.first.tracks.length} songs',
+                                              releases.first.year.isNotEmpty
+                                                  ? '${releases.first.type} · ${releases.first.year}'
+                                                  : (releases.first.tracks.length < 3
+                                                      ? 'Single · $name'
+                                                      : 'Album · ${releases.first.tracks.length} songs'),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
@@ -967,7 +974,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
                               builder: (i) => _Cover(
                                 url: albums[i].cover,
                                 title: albums[i].title,
-                                subtitle: 'Album · ${albums[i].tracks.length} songs',
+                                subtitle: albums[i].year.isNotEmpty ? 'Album · ${albums[i].year}' : (albums[i].tracks.isNotEmpty ? 'Album · ${albums[i].tracks.length} songs' : 'Album'),
                                 radius: 8,
                                 onTap: () => _openAlbum(albums[i]),
                               ),
@@ -986,60 +993,41 @@ class _ArtistScreenState extends State<ArtistScreen> {
                               builder: (i) => _Cover(
                                 url: singles[i].cover,
                                 title: singles[i].title,
-                                subtitle: singles[i].tracks.length == 1 ? 'Single' : 'EP',
+                                subtitle: singles[i].year.isNotEmpty ? '${singles[i].type} · ${singles[i].year}' : (singles[i].tracks.length == 1 ? 'Single' : 'EP'),
                                 onTap: () => _openAlbum(singles[i]),
                               ),
                             ),
                           ),
                         ],
 
-                        // Videos: 16:9
-                        _Reveal(child: _SecHeader('Videos', sub: 'Watch and listen')),
-                        _Reveal(
-                          child: _Shelf(
-                            height: 196,
-                            itemExtent: 274,
-                            count: math.min(8, songs.length),
-                            builder: (i) {
-                              final t = songs[i];
-                              return _Press(
-                                onTap: () => _play(songs, i),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    AspectRatio(
-                                      aspectRatio: 16 / 9,
-                                      child: Stack(
-                                        fit: StackFit.expand,
-                                        children: [
-                                          _Img(t.coverUrl, radius: 12),
-                                          Center(
-                                            child: Container(
-                                              width: 44,
-                                              height: 44,
-                                              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.45)),
-                                              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                        // Featured on: playlists
+                        if (featuredPlaylists.isNotEmpty) ...[
+                          const _Reveal(child: _SecHeader('Featured on')),
+                          _Reveal(
+                            child: _Shelf(
+                              height: 232,
+                              itemExtent: 184,
+                              count: featuredPlaylists.length,
+                              builder: (i) => _Cover(
+                                url: featuredPlaylists[i].coverUrl,
+                                title: featuredPlaylists[i].title,
+                                subtitle: featuredPlaylists[i].subtitle ?? 'Playlist',
+                                radius: 8,
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => AlbumScreen(
+                                      albumTitle: featuredPlaylists[i].title,
+                                      artistName: name,
+                                      coverUrl: featuredPlaylists[i].coverUrl,
+                                      browseId: featuredPlaylists[i].browseId,
                                     ),
-                                    const SizedBox(height: 10),
-                                    Text(t.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                                    const SizedBox(height: 2),
-                                    Text(t.artist,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                                  ],
+                                  ),
                                 ),
-                              );
-                            },
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
 
                         // Fans might also like: circles
                         if (related.isNotEmpty) ...[
@@ -1056,7 +1044,13 @@ class _ArtistScreenState extends State<ArtistScreen> {
                                 circular: true,
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => ArtistScreen(artistName: related[i].key)),
+                                  MaterialPageRoute(
+                                    builder: (_) => ArtistScreen(
+                                      artistName: related[i].key,
+                                      browseId: related[i].value.id.isNotEmpty ? related[i].value.id : null,
+                                      imageUrl: related[i].value.coverUrl.isNotEmpty ? related[i].value.coverUrl : null,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1107,11 +1101,16 @@ class _ArtistScreenState extends State<ArtistScreen> {
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                                    child: Row(
+                                    child: Wrap(
+                                      spacing: 20,
+                                      runSpacing: 10,
                                       children: [
-                                        _Stat('${songs.length}', 'Songs'),
-                                        _Stat('${releases.length}', 'Releases'),
-                                        _Stat('${related.length}', 'Related'),
+                                        if (_artistProfile?.monthlyAudience?.isNotEmpty == true)
+                                          _Stat(_artistProfile!.monthlyAudience!.replaceAll(' monthly listeners', '').replaceAll(' listeners', ''), 'Monthly'),
+                                        if (_artistProfile?.subscriberCount.isNotEmpty == true && _artistProfile!.subscriberCount != 'Top Artist')
+                                          _Stat(_artistProfile!.subscriberCount.replaceAll(' subscribers', ''), 'Subscribers'),
+                                        _Stat('${songs.length}', 'Top Songs'),
+                                        _Stat('${albums.length + singles.length}', 'Releases'),
                                       ],
                                     ),
                                   ),

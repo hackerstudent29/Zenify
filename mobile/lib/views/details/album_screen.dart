@@ -15,6 +15,7 @@ import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
+import 'artist_popup.dart';
 import 'artist_screen.dart';
 
 /* ------------------------------------------------------------------ */
@@ -347,18 +348,37 @@ class _AlbumScreenState extends State<AlbumScreen> {
 
   Future<void> _loadAlbum() async {
     try {
-      if (widget.browseId != null && widget.browseId!.isNotEmpty) {
-        final res = await InnerTubeService.instance.getAlbum(widget.browseId!);
-        if (res != null && res.tracks.isNotEmpty) {
-          if (mounted) {
-            setState(() {
-              _tracks = res.tracks;
-              if (res.coverUrl.isNotEmpty) _resolvedCover = res.coverUrl;
-              _loading = false;
-            });
+      final bId = widget.browseId ?? '';
+      if (bId.isNotEmpty) {
+        if (bId.startsWith('VLPL') || bId.startsWith('PL') || bId.startsWith('RD')) {
+          final pRes = await InnerTubeService.instance.getPlaylist(bId);
+          if (pRes != null && pRes.tracks.isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                _tracks = pRes.tracks;
+                if (pRes.coverUrl.isNotEmpty) _resolvedCover = pRes.coverUrl;
+                _loading = false;
+              });
+            }
+            return;
           }
-          return;
         }
+      }
+
+      final res = await InnerTubeService.instance.getAlbum(
+        bId,
+        albumTitle: widget.albumTitle,
+        artistName: widget.artistName,
+      );
+      if (res != null && res.tracks.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _tracks = res.tracks;
+            if (res.coverUrl.isNotEmpty) _resolvedCover = res.coverUrl;
+            _loading = false;
+          });
+        }
+        return;
       }
 
       final r = await InnerTubeService.instance.search('${widget.albumTitle} ${widget.artistName}');
@@ -480,10 +500,17 @@ class _AlbumScreenState extends State<AlbumScreen> {
                               const SizedBox(height: 4),
                               _Press(
                                 scale: 0.94,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => ArtistScreen(artistName: MediaNormalizer.formatArtists(widget.artistName))),
-                                ),
+                                onTap: () {
+                                  final artists = MediaNormalizer.splitArtistNames(widget.artistName);
+                                  if (artists.length > 1) {
+                                    showArtistPopup(context, currentArtistName: widget.artistName);
+                                  } else if (artists.isNotEmpty) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => ArtistScreen(artistName: artists.first)),
+                                    );
+                                  }
+                                },
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [

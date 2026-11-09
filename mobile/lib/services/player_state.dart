@@ -204,6 +204,7 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       }
     }));
     _subs.add(_audioPlayer.onPlayerComplete.listen((_) => _onComplete()));
+    _subs.add(_audioPlayer.onAutoTransition.listen((id) => _onAutoTransition(id)));
     _subs.add(_audioPlayer.onError.listen(_onEngineError));
   }
 
@@ -263,6 +264,70 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       return;
     }
     await next();
+  }
+
+  Future<void> _onAutoTransition(String mediaId) async {
+    ListeningTrackerService.instance.endTrack('completed');
+    if (_sleepAtEndOfTrack) {
+      _clearSleep();
+      _isPlaying = false;
+      _setPosition(Duration.zero);
+      notifyListeners();
+      return;
+    }
+
+    if (_repeatMode == ZenifyRepeatMode.one) {
+      await seek(Duration.zero);
+      return;
+    }
+
+    int nextIndex = _currentIndex + 1;
+    if (mediaId.isNotEmpty) {
+      final clean = mediaId.replaceFirst('yt-', '').trim();
+      final idx = _queue.indexWhere((t) => t.id.replaceFirst('yt-', '').trim() == clean);
+      if (idx >= 0) nextIndex = idx;
+    }
+
+    if (nextIndex < _queue.length) {
+      _currentIndex = nextIndex;
+    } else if (_repeatMode == ZenifyRepeatMode.all) {
+      _currentIndex = 0;
+    } else if (_autoplay && await _appendRelated()) {
+      _currentIndex++;
+    } else {
+      await _endOfQueue();
+      return;
+    }
+
+    final track = _queue[_currentIndex];
+    final token = ++_playToken;
+    _currentTrack = track;
+    LibraryStore.instance.registerTrack(track);
+    _isTransitioning = false;
+    _pausing = false;
+    _isBuffering = false;
+    _isPlaying = true;
+    _lastError = null;
+    _isScrubbing = false;
+    scrubbingNotifier.value = false;
+    _seekTarget = null;
+    _duration = Duration(seconds: track.durationSeconds);
+    _setPosition(Duration.zero);
+    _pushHistory(track);
+    ListeningTrackerService.instance.startTrack(
+      trackId: track.id,
+      trackTitle: track.title,
+      trackAlbum: track.album,
+      trackDurationMs: track.durationSeconds * 1000,
+      artists: [
+        {'artistKey': track.artist, 'artistName': track.artist, 'isPrimary': true}
+      ],
+    );
+    notifyListeners();
+
+    unawaited(_loadLyricsForTrack(track, token));
+    unawaited(_resolveAccent(track, token));
+    _prefetchNext();
   }
 
   void _setPosition(Duration pos) {

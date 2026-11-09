@@ -12,8 +12,8 @@
 
   <p>
     <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/🚀_Live_Web_App-listenzenify.com-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-    <a href="https://listenzenify.com/download"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v2.6.6-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v2.6.6-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
+    <a href="https://listenzenify.com/download"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v2.6.7-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v2.6.7-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="MIT License" /></a>
     <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
   </p>
@@ -49,7 +49,7 @@ Install the native **Zenify Android application** directly to your phone for sea
 <div align="center">
   <br />
   <a href="https://listenzenify.com/downloads/zenify.apk">
-    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v2.6.6)-60.3_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
+    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v2.6.7)-60.3_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
   </a>
   <br />
   <p><i>Direct download link: <a href="https://listenzenify.com/downloads/zenify.apk">https://listenzenify.com/downloads/zenify.apk</a> or mirror via <a href="https://github.com/hackerstudent29/Zenify/raw/main/frontend/public/downloads/zenify.apk">GitHub Raw</a></i></p>
