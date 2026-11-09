@@ -333,14 +333,26 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
                                 height: h - _inset * 2,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(h / 2),
-                                  color: Colors.white.withValues(alpha: 0.10 + 0.07 * press),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.white.withValues(alpha: 0.18 + 0.06 * press),
+                                      kAppleRed.withValues(alpha: 0.12 + 0.05 * press),
+                                    ],
+                                  ),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.22 + 0.15 * press),
+                                    color: Colors.white.withValues(alpha: 0.28 + 0.12 * press),
                                     width: 0.8,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.12 * press),
+                                      color: kAppleRed.withValues(alpha: 0.16),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.14 * press),
                                       blurRadius: 10,
                                       offset: const Offset(0, 3),
                                     ),

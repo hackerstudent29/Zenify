@@ -655,7 +655,7 @@ export function SFAppleLibrary({ size = 24, filled = false, className = "", ...p
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} {...props}>
         <path d="M7 3.5h10M5.5 5.5h13" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
         <rect x="3.5" y="7.5" width="17" height="13.5" rx="3.5" fill="currentColor" />
-        <path d="M11.5 15.75a1.75 1.75 0 1 1-1.5-1.73v-3.77a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75v1.25a.75.75 0 0 1-.75.75h-2.25v3.5z" fill="#18181b" />
+        <path d="M11.5 15.75a1.75 1.75 0 1 1-1.5-1.73v-3.77a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75v1.25a.75.75 0 0 1-.75.75h-2.25v3.5z" fill="white" />
       </svg>
     );
   }
@@ -665,6 +665,29 @@ export function SFAppleLibrary({ size = 24, filled = false, className = "", ...p
       <rect x="3.5" y="7.5" width="17" height="13.5" rx="3.5" />
       <circle cx="10" cy="16" r="1.5" fill="currentColor" stroke="none" />
       <path d="M11.5 16v-4.5a.5.5 0 0 1 .5-.5h2" strokeWidth={1.8} />
+    </svg>
+  );
+}
+
+export function SFAppleRadio({ size = 24, filled = false, className = "", ...props }: IconProps & { filled?: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <circle cx="12" cy="12" r={filled ? 2.5 : 2} fill="currentColor" stroke="none" />
+      <path d="M8.5 8.5a5 5 0 0 0 0 7" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M5.5 5.5a9.2 9.2 0 0 0 0 13" />
+      <path d="M18.5 5.5a9.2 9.2 0 0 1 0 13" />
     </svg>
   );
 }
