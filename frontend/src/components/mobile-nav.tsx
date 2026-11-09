@@ -3,16 +3,14 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, useMotionValue, useSpring, useTransform, useVelocity } from "framer-motion";
-import { Search } from "lucide-react";
 import {
-  SwiftUIHome,
-  SwiftUICompass,
+  SFAppleHome,
+  SFAppleGrid,
   SwiftUIHeart,
-  SwiftUIDevice,
-  SwiftUIAdmin,
+  SFAppleLibrary,
+  SFAppleSearch,
 } from "@/components/ui/SwiftUIIcons";
 import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/store/authStore";
 import { glassSurface, lensSurface } from "@/components/mobile/glass";
 
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -28,15 +26,13 @@ const PRESS_SPRING = { stiffness: 620, damping: 30, mass: 0.6 };
 export function MobileNav() {
   const pathname = usePathname() ?? "/";
   const router = useRouter();
-  const { user } = useAuthStore();
-  const isAdmin = user?.role === "ADMIN";
 
+  // Canonical 4 Apple Music dock items (Admin is moved exclusively to the Profile page dropdown)
   const items = [
-    { label: "Home", icon: SwiftUIHome, href: "/" },
-    { label: "Discover", icon: SwiftUICompass, href: "/discover" },
+    { label: "Home", icon: SFAppleHome, href: "/" },
+    { label: "Discover", icon: SFAppleGrid, href: "/discover" },
     { label: "Liked", icon: SwiftUIHeart, href: "/liked" },
-    { label: "Library", icon: SwiftUIDevice, href: "/local-library" },
-    ...(isAdmin ? [{ label: "Admin", icon: SwiftUIAdmin, href: "/admin" }] : []),
+    { label: "Library", icon: SFAppleLibrary, href: "/local-library" },
   ];
   const n = items.length;
 
@@ -155,7 +151,7 @@ export function MobileNav() {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
 
       <div className="relative flex items-center gap-2.5 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+8px)]">
-        {/* ───────────── Tab pill ───────────── */}
+        {/* ───────────── Tab pill (Home · Discover · Liked · Library) ───────────── */}
         <div
           className="pointer-events-auto relative flex-1 rounded-full"
           style={{ height: DOCK_H, ...glassSurface }}
@@ -201,23 +197,13 @@ export function MobileNav() {
                     role="tab"
                     aria-selected={activeIdx === i}
                     aria-label={item.label}
-                    // keyboard / assistive activation only; pointer input is handled by the surface
                     onClick={(e) => {
                       if (e.detail === 0 && pathname !== item.href) router.push(item.href);
                     }}
                     className="flex flex-1 flex-col items-center justify-center gap-[3px] bg-transparent outline-none [-webkit-tap-highlight-color:transparent]"
                   >
                     <span className={cn("pointer-events-none transition-colors duration-200", tone)}>
-                      {item.href === "/liked" ? (
-                        <SwiftUIHeart size={25} filled={active} />
-                      ) : (
-                        <Icon
-                          size={25}
-                          fill={active ? "currentColor" : "none"}
-                          fillOpacity={active ? 0.95 : 0}
-                          stroke="currentColor"
-                        />
-                      )}
+                      <Icon size={24} filled={active} className={cn("transition-all duration-200", tone)} />
                     </span>
                     <span
                       className={cn(
@@ -234,20 +220,24 @@ export function MobileNav() {
           </div>
         </div>
 
-        {/* ───────────── Search bubble ───────────── */}
+        {/* ───────────── Separate Round Search Dock Button ───────────── */}
         <motion.button
           type="button"
           aria-label="Search"
-          onClick={() => pathname !== "/search" && router.push("/search")}
+          onClick={() => {
+            if (pathname !== "/search") {
+              router.push("/search");
+            }
+          }}
           whileTap={{ scale: 0.9 }}
           transition={{ type: "spring", stiffness: 520, damping: 26, mass: 0.6 }}
           className={cn(
-            "pointer-events-auto flex shrink-0 items-center justify-center rounded-full outline-none [-webkit-tap-highlight-color:transparent]",
+            "pointer-events-auto flex shrink-0 items-center justify-center rounded-full outline-none [-webkit-tap-highlight-color:transparent] transition-colors duration-200",
             searchActive ? "text-brand" : "text-white/80"
           )}
           style={{ width: DOCK_H, height: DOCK_H, ...glassSurface }}
         >
-          <Search size={26} strokeWidth={2.4} />
+          <SFAppleSearch size={25} strokeWidth={2.4} />
         </motion.button>
       </div>
     </nav>
