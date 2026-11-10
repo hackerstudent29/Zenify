@@ -139,7 +139,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     return Navigator(
       key: _navKeys[index],
       observers: [_TabRouteObserver((d) => _onTabDepthChanged(index, d))],
-      onGenerateRoute: (settings) => CupertinoPageRoute(
+      onGenerateRoute: (settings) => ZenPageRoute(
         builder: (_) => root,
         settings: settings,
       ),
@@ -152,7 +152,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
       player.closeSheet();
     }
     _navKeys[_currentIndex].currentState?.push(
-      MaterialPageRoute(builder: (_) => page),
+      ZenPageRoute(builder: (_) => page),
     );
   }
 
@@ -418,7 +418,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
 }
 
 /// Keeps state and scroll position of all tabs while smoothly animating
-/// tab switches with an Apple-style subtle vertical spring and fade.
+/// tab switches with an Apple-style subtle direction-aware fluid spring and fade.
 class _AnimatedTabStack extends StatefulWidget {
   const _AnimatedTabStack({
     required this.index,
@@ -434,13 +434,15 @@ class _AnimatedTabStack extends StatefulWidget {
 
 class _AnimatedTabStackState extends State<_AnimatedTabStack> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  int _prevIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _prevIndex = widget.index;
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 200),
       value: 1.0,
     );
   }
@@ -449,6 +451,7 @@ class _AnimatedTabStackState extends State<_AnimatedTabStack> with SingleTickerP
   void didUpdateWidget(_AnimatedTabStack oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.index != widget.index) {
+      _prevIndex = oldWidget.index;
       _controller.forward(from: 0.0);
     }
   }
@@ -461,16 +464,24 @@ class _AnimatedTabStackState extends State<_AnimatedTabStack> with SingleTickerP
 
   @override
   Widget build(BuildContext context) {
+    final bool isForward = widget.index >= _prevIndex;
+    final double slideSign = isForward ? 1.0 : -1.0;
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         final t = Curves.easeOutCubic.transform(_controller.value);
+        final double slideOffset = (1.0 - t) * 0.025 * slideSign;
+
         return Opacity(
           opacity: t.clamp(0.0, 1.0),
-          child: Transform.scale(
-            scale: 0.985 + 0.015 * t,
-            alignment: Alignment.center,
-            child: child,
+          child: FractionalTranslation(
+            translation: Offset(slideOffset, 0),
+            child: Transform.scale(
+              scale: 0.992 + 0.008 * t,
+              alignment: Alignment.center,
+              child: child,
+            ),
           ),
         );
       },

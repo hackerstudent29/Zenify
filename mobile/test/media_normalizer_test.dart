@@ -34,10 +34,10 @@ void main() {
 
     test('formats and de-duplicates artist names', () {
       final formatted = MediaNormalizer.formatArtists(['Atif Aslam', 'Atif Aslam', 'Shiraz Uppal']);
-      expect(formatted, 'Atif Aslam, Shiraz Uppal');
+      expect(formatted, 'Atif Aslam & Shiraz Uppal');
 
       final stringSplit = MediaNormalizer.formatArtists('A.R. Rahman & Sid Sriram, Shreya Ghoshal');
-      expect(stringSplit, 'A.R. Rahman, Sid Sriram, Shreya Ghoshal');
+      expect(stringSplit, 'A.R. Rahman, Sid Sriram & Shreya Ghoshal');
     });
 
     test('handles empty title with fallback', () {
@@ -51,8 +51,8 @@ void main() {
         contains('=w500-h500-l90-rj'),
       );
       expect(
-        MediaNormalizer.upgradeArtworkUrl('https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'),
-        'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+        MediaNormalizer.upgradeArtworkUrl('https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg'),
+        'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
       );
       // Broken dummy url fallback
       expect(
@@ -81,9 +81,9 @@ void main() {
       );
 
       expect(item.title, 'Banjaare');
-      expect(item.subtitle, 'Atif Aslam, Shiraz Uppal');
+      expect(item.subtitle, 'Atif Aslam & Shiraz Uppal');
       expect(item.year, '2024');
-      expect(item.imageUrl, 'https://i.ytimg.com/vi/xyz/maxresdefault.jpg');
+      expect(item.imageUrl, 'https://i.ytimg.com/vi/xyz/hqdefault.jpg');
     });
   });
 }

@@ -253,9 +253,12 @@ class MediaNormalizer {
       s = s.replaceAll(']', '').trim();
     }
 
-    // 7. Strip stray quotes inside or adjacent to leftover brackets/words
-    s = s.replaceAll(RegExp(r'["\u201c\u201d\x27\u2018\u2019]+(\]|\))'), r'$1').trim();
-    s = s.replaceAll(RegExp(r'(\[|\()+\s*["\u201c\u201d\x27\u2018\u2019]+'), r'$1').trim();
+    // 7. Strip stray quotes inside or adjacent to leftover brackets/words if unmatched
+    final straightQuotes = '"'.allMatches(s).length;
+    if (straightQuotes.isOdd) {
+      s = s.replaceAllMapped(RegExp(r'["\u201c\u201d\x27\u2018\u2019]+(\]|\))'), (m) => m.group(1)!).trim();
+      s = s.replaceAllMapped(RegExp(r'(\[|\()+\s*["\u201c\u201d\x27\u2018\u2019]+'), (m) => m.group(1)!).trim();
+    }
 
     // 8. Strip surrounding quotes (curly and straight)
     s = s.replaceAll(RegExp(r'^["\u201c\u201d\x27\u2018\u2019]+|["\u201c\u201d\x27\u2018\u2019]+$'), '').trim();

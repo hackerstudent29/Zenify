@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
@@ -14,6 +15,7 @@ import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/media_card.dart';
+import '../../design_system/widgets/monogram_avatar.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/song_tile.dart';
 import '../../design_system/zen.dart';
@@ -95,76 +97,6 @@ const List<String> _kTrendingPills = [
   'Tamil Hits',
 ];
 
-const List<Map<String, String>> _kDefaultPopularArtists = [
-  {
-    'name': 'Anirudh Ravichander',
-    'photo': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&h=500&fit=crop',
-  },
-  {
-    'name': 'A. R. Rahman',
-    'photo': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&h=500&fit=crop',
-  },
-  {
-    'name': 'Taylor Swift',
-    'photo': 'https://images.unsplash.com/photo-1526478806334-5fd488fcaabc?w=500&h=500&fit=crop',
-  },
-  {
-    'name': 'The Weeknd',
-    'photo': 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&h=500&fit=crop',
-  },
-  {
-    'name': 'Sid Sriram',
-    'photo': 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500&h=500&fit=crop',
-  },
-  {
-    'name': 'Coldplay',
-    'photo': 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&h=500&fit=crop',
-  },
-  {
-    'name': 'Billie Eilish',
-    'photo': 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&h=500&fit=crop',
-  },
-  {
-    'name': 'Harris Jayaraj',
-    'photo': 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&h=500&fit=crop',
-  },
-];
-
-const List<Map<String, String>> _kDefaultPopularAlbums = [
-  {
-    'title': 'Leo',
-    'artist': 'Anirudh Ravichander',
-    'cover': 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&h=500&fit=crop',
-  },
-  {
-    'title': 'Jailer',
-    'artist': 'Anirudh Ravichander',
-    'cover': 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&h=500&fit=crop',
-  },
-  {
-    'title': 'Starboy',
-    'artist': 'The Weeknd',
-    'cover': 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500&h=500&fit=crop',
-  },
-  {
-    'title': '1989 (Taylor\'s Version)',
-    'artist': 'Taylor Swift',
-    'cover': 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&h=500&fit=crop',
-  },
-  {
-    'title': 'After Hours',
-    'artist': 'The Weeknd',
-    'cover': 'https://images.unsplash.com/photo-1511735111819-9a3f7709049c?w=500&h=500&fit=crop',
-  },
-  {
-    'title': 'Ponniyin Selvan Part-1',
-    'artist': 'A. R. Rahman',
-    'cover': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&h=500&fit=crop',
-  },
-];
-
-enum _SearchCategoryFilter { all, songs, artists, albums, playlists }
-
 /* ------------------------------------------------------------------ */
 /*  Main Search Screen                                                 */
 /* ------------------------------------------------------------------ */
@@ -185,17 +117,22 @@ class _SearchScreenState extends State<SearchScreen>
 
   final TextEditingController _textCtrl = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   final SearchDataService _dataService = SearchDataService.instance;
 
   Timer? _debounceTimer;
   int _searchRequestId = 0;
 
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   String _activeQuery = '';
 
   List<String> _liveSuggestions = [];
-  SearchResultsGroup _searchResults = const SearchResultsGroup();
-  _SearchCategoryFilter _selectedFilter = _SearchCategoryFilter.all;
+  SearchResult _searchResults = SearchResult(
+    originalQuery: '',
+    intent: const SearchIntent(originalQuery: '', normalizedQuery: '', entityText: ''),
+  );
+  SearchFilter _selectedFilter = SearchFilter.all;
 
   @override
   void initState() {
@@ -203,6 +140,7 @@ class _SearchScreenState extends State<SearchScreen>
     _dataService.initRecents();
     _textCtrl.addListener(_onTextChanged);
     _focusNode.addListener(_onFocusChanged);
+    _scrollController.addListener(_onScroll);
     SearchNav.phase.addListener(_onPhase);
   }
 
@@ -218,13 +156,38 @@ class _SearchScreenState extends State<SearchScreen>
     final p = SearchNav.phase.value;
     if (p == SearchPhase.typing) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusNode.requestFocus(); // keyboard opens
+        if (mounted) _focusNode.requestFocus();
       });
     } else {
       _focusNode.unfocus();
       if (_activeQuery.isNotEmpty) _clearSearch();
     }
     if (mounted) setState(() {});
+  }
+
+  void _onScroll() {
+    if (_selectedFilter == SearchFilter.all) return;
+    if (_isLoading || _isLoadingMore) return;
+    if (_searchResults.continuation == null || _searchResults.continuation!.isEmpty) return;
+
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    final updated = await _dataService.loadMore(
+      currentResult: _searchResults,
+      filter: _selectedFilter,
+    );
+    if (mounted) {
+      setState(() {
+        _searchResults = updated;
+        _isLoadingMore = false;
+      });
+    }
   }
 
   void _onTextChanged() {
@@ -236,30 +199,39 @@ class _SearchScreenState extends State<SearchScreen>
     if (query.isEmpty) {
       setState(() {
         _liveSuggestions = [];
-        _searchResults = const SearchResultsGroup();
+        _searchResults = SearchResult(
+          originalQuery: '',
+          intent: const SearchIntent(originalQuery: '', normalizedQuery: '', entityText: ''),
+        );
         _isLoading = false;
       });
       return;
     }
 
     final id = ++_searchRequestId;
-    setState(() => _isLoading = true);
 
-    // 1. Instant suggestions
+    // 1. Instant local Trie suggestions (0ms)
+    final localSuggestions = _dataService.getInstantLocalSuggestions(query);
+    setState(() {
+      _liveSuggestions = localSuggestions;
+      _isLoading = true;
+    });
+
+    // 2. Fetch merged online suggestions
     _dataService.getSuggestions(query).then((suggestions) {
       if (mounted && id == _searchRequestId) {
         setState(() => _liveSuggestions = suggestions);
       }
     });
 
-    // 2. Debounced deep search (320ms)
-    _debounceTimer = Timer(const Duration(milliseconds: 320), () {
-      _executeSearch(query, id);
+    // 3. Debounced deep search (250ms target)
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
+      _executeSearch(query, id, filter: _selectedFilter);
     });
   }
 
-  Future<void> _executeSearch(String query, int id) async {
-    final results = await _dataService.search(query);
+  Future<void> _executeSearch(String query, int id, {SearchFilter filter = SearchFilter.all}) async {
+    final results = await _dataService.search(query: query, filter: filter);
     if (mounted && id == _searchRequestId) {
       setState(() {
         _searchResults = results;
@@ -268,7 +240,7 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
-  void _submitSearch(String query) {
+  void _submitSearch(String query, {SearchFilter filter = SearchFilter.all}) {
     if (query.trim().isEmpty) return;
     _focusNode.unfocus();
     _textCtrl.text = query;
@@ -278,8 +250,20 @@ class _SearchScreenState extends State<SearchScreen>
     setState(() {
       _isLoading = true;
       _liveSuggestions = [];
+      _selectedFilter = filter;
     });
-    _executeSearch(query, id);
+    _executeSearch(query, id, filter: filter);
+  }
+
+  void _onFilterSelected(SearchFilter filter) {
+    if (_selectedFilter == filter) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selectedFilter = filter;
+      _isLoading = true;
+    });
+    final id = ++_searchRequestId;
+    _executeSearch(_activeQuery, id, filter: filter);
   }
 
   void _clearSearch() {
@@ -287,8 +271,12 @@ class _SearchScreenState extends State<SearchScreen>
     _activeQuery = '';
     setState(() {
       _liveSuggestions = [];
-      _searchResults = const SearchResultsGroup();
+      _searchResults = SearchResult(
+        originalQuery: '',
+        intent: const SearchIntent(originalQuery: '', normalizedQuery: '', entityText: ''),
+      );
       _isLoading = false;
+      _selectedFilter = SearchFilter.all;
     });
   }
 
@@ -315,6 +303,8 @@ class _SearchScreenState extends State<SearchScreen>
   void dispose() {
     SearchNav.phase.removeListener(_onPhase);
     _focusNode.removeListener(_onFocusChanged);
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _debounceTimer?.cancel();
     _textCtrl.removeListener(_onTextChanged);
     _textCtrl.dispose();
@@ -338,7 +328,7 @@ class _SearchScreenState extends State<SearchScreen>
         } else if (_activeQuery.isNotEmpty) {
           _clearSearch();
         } else if (SearchNav.phase.value == SearchPhase.typing) {
-          SearchNav.phase.value = SearchPhase.bar; // field returns to the dock
+          SearchNav.phase.value = SearchPhase.bar;
         } else {
           widget.onBack?.call();
         }
@@ -348,12 +338,13 @@ class _SearchScreenState extends State<SearchScreen>
         body: Stack(
           children: [
             CustomScrollView(
+              controller: _scrollController,
               key: const PageStorageKey<String>('search_scroll_view'),
               physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
               slivers: [
                 SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
 
-                // 2. Body based on state: Suggestions, Results, or Landing
+                // Body based on state: Suggestions, Results, or Landing
                 if (hasQuery && _liveSuggestions.isNotEmpty && _searchResults.isEmpty && _isLoading)
                   _buildSuggestionsSliver()
                 else if (hasQuery)
@@ -377,7 +368,7 @@ class _SearchScreenState extends State<SearchScreen>
                 isDockPage: !typing,
                 onBack: () {
                   _cancelSearch();
-                  SearchNav.phase.value = SearchPhase.bar; // back to the dock bar
+                  SearchNav.phase.value = SearchPhase.bar;
                 },
                 showProfile: true,
                 topPadding: topInset + 4,
@@ -408,7 +399,7 @@ class _SearchScreenState extends State<SearchScreen>
               controller: _textCtrl,
               focusNode: _focusNode,
               textInputAction: TextInputAction.search,
-              onSubmitted: _submitSearch,
+              onSubmitted: (q) => _submitSearch(q, filter: _selectedFilter),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 14,
@@ -498,58 +489,80 @@ class _SearchScreenState extends State<SearchScreen>
                       builder: (context) {
                         final matchedArtist = popularArtists.firstWhere(
                           (a) => a['name']?.toLowerCase() == item.toLowerCase(),
-                          orElse: () => _kDefaultPopularArtists.firstWhere(
-                            (a) => a['name']?.toLowerCase() == item.toLowerCase(),
-                            orElse: () => const {},
-                          ),
+                          orElse: () => const {},
                         );
-                        final artistPhoto = matchedArtist['photo'];
+                        final hasArtistPhoto = matchedArtist.isNotEmpty &&
+                            matchedArtist['photo'] != null &&
+                            matchedArtist['photo']!.isNotEmpty;
 
                         return InkWell(
-                          onTap: () => _submitSearch(item),
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            _submitSearch(item);
+                          },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             child: Row(
                               children: [
-                                if (artistPhoto != null && artistPhoto.isNotEmpty)
-                                  ClipOval(
+                                if (hasArtistPhoto) ...[
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
                                     child: CachedNetworkImage(
-                                      imageUrl: MediaNormalizer.upgradeArtworkUrl(artistPhoto),
-                                      width: 28,
-                                      height: 28,
+                                      imageUrl: matchedArtist['photo']!,
+                                      width: 32,
+                                      height: 32,
                                       fit: BoxFit.cover,
-                                      placeholder: (context, url) => Container(
-                                        width: 28,
-                                        height: 28,
-                                        color: AppColors.surface2,
-                                        child: const Icon(Icons.person_rounded, size: 16, color: AppColors.textTertiary),
-                                      ),
-                                      errorWidget: (context, url, error) => Container(
-                                        width: 28,
-                                        height: 28,
-                                        color: AppColors.surface2,
-                                        child: const Icon(Icons.history_rounded, size: 16, color: AppColors.textTertiary),
+                                      placeholder: (_, url) => Container(color: AppColors.surface2),
+                                      errorWidget: (_, url, error) => const Icon(
+                                        Icons.history_rounded,
+                                        size: 20,
+                                        color: AppColors.textTertiary,
                                       ),
                                     ),
-                                  )
-                                else
-                                  const Icon(Icons.history_rounded, size: 20, color: AppColors.textTertiary),
-                                const SizedBox(width: 12),
+                                  ),
+                                  const SizedBox(width: 12),
+                                ] else ...[
+                                  const Icon(
+                                    Icons.history_rounded,
+                                    size: 20,
+                                    color: AppColors.textTertiary,
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
                                 Expanded(
-                                  child: Text(
-                                    item,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item,
+                                        style: const TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      if (hasArtistPhoto) ...[
+                                        const SizedBox(height: 1),
+                                        const Text(
+                                          'Artist',
+                                          style: TextStyle(
+                                            color: AppColors.textTertiary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w400,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textTertiary),
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 18,
+                                    color: AppColors.textTertiary,
+                                  ),
                                   onPressed: () => _dataService.removeRecent(item),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
+                                  splashRadius: 18,
                                 ),
                               ],
                             ),
@@ -558,7 +571,7 @@ class _SearchScreenState extends State<SearchScreen>
                       },
                     ),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                 ],
               );
             },
@@ -587,13 +600,19 @@ class _SearchScreenState extends State<SearchScreen>
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: PressableScale(
-                      onTap: () => _submitSearch(pill),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _submitSearch(pill);
+                      },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0x1FFFFFFF),
+                          color: const Color(0x18FFFFFF),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 0.5),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            width: 0.5,
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -619,115 +638,7 @@ class _SearchScreenState extends State<SearchScreen>
 
           const SizedBox(height: 28),
 
-          // C. Popular Artists
-          if (popularArtists.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Popular Artists',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 204,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: popularArtists.length,
-                itemBuilder: (context, i) {
-                  final a = popularArtists[i];
-                  final name = a['name'] ?? 'Artist';
-                  final photo = a['photo'];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 14),
-                    child: MediaCard(
-                      title: name,
-                      subtitle: 'Artist',
-                      imageUrl: (photo != null && photo.isNotEmpty) ? MediaNormalizer.upgradeArtworkUrl(photo) : null,
-                      isCircular: true,
-                      width: 104,
-                      twoLineTitle: true,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.push(
-                          context,
-                          CupertinoPageRoute(
-                            builder: (_) => ArtistScreen(
-                              artistName: name,
-                              imageUrl: photo,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 28),
-          ],
-
-          // D. Popular Albums
-          if (popularAlbums.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Popular Albums',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 195,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: popularAlbums.length,
-                itemBuilder: (context, i) {
-                  final alb = popularAlbums[i];
-                  final title = alb['title'] ?? 'Album';
-                  final artist = alb['artist'] ?? 'Artist';
-                  final cover = alb['cover'];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 14),
-                    child: MediaCard(
-                      title: title,
-                      subtitle: artist,
-                      imageUrl: (cover != null && cover.isNotEmpty) ? cover : null,
-                      width: 130,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.push(
-                          context,
-                          CupertinoPageRoute(
-                            builder: (_) => AlbumScreen(
-                              albumTitle: title,
-                              artistName: artist,
-                              coverUrl: cover,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 28),
-          ],
-
-          // E. Browse Categories Grid
+          // C. Browse Categories Grid
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -747,44 +658,48 @@ class _SearchScreenState extends State<SearchScreen>
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: 1.5,
+                mainAxisSpacing: 12,
+                childAspectRatio: 2.1,
               ),
               itemCount: _kSearchCategories.length,
               itemBuilder: (context, i) {
                 final cat = _kSearchCategories[i];
                 return PressableScale(
-                  onTap: () => _submitSearch(cat.query),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _submitSearch(cat.query);
+                  },
                   child: Container(
-                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: cat.gradient,
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: cat.gradient.first.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
-                    child: Stack(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
                       children: [
-                        Text(
-                          cat.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                        Expanded(
+                          child: Text(
+                            cat.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Icon(
-                            cat.icon,
-                            color: Colors.white.withValues(alpha: 0.7),
-                            size: 28,
-                          ),
-                        ),
+                        Icon(cat.icon, color: Colors.white70, size: 24),
                       ],
                     ),
                   ),
@@ -793,8 +708,110 @@ class _SearchScreenState extends State<SearchScreen>
             ),
           ),
 
-          // Bottom clearance
-          SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
+          const SizedBox(height: 28),
+
+          // D. Popular Artists Shelf (170x170 circle)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Popular Artists',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 260,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: popularArtists.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, i) {
+                final a = popularArtists[i];
+                final name = a['name'] ?? 'Artist';
+                final photo = a['photo'];
+                return MediaCard(
+                  title: name,
+                  subtitle: 'Artist',
+                  imageUrl: (photo != null && photo.isNotEmpty)
+                      ? MediaNormalizer.upgradeArtworkUrl(photo)
+                      : null,
+                  isCircular: true,
+                  width: 170,
+                  twoLineTitle: true,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (_) => ArtistScreen(
+                          artistName: name,
+                          imageUrl: photo,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // E. Popular Albums Shelf (170x170 rounded 8)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Trending Albums',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 260,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: popularAlbums.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, i) {
+                final alb = popularAlbums[i];
+                final title = alb['title'] ?? 'Album';
+                final artist = alb['artist'] ?? 'Artist';
+                final cover = alb['cover'];
+                return MediaCard(
+                  title: title,
+                  subtitle: artist,
+                  imageUrl: (cover != null && cover.isNotEmpty) ? cover : null,
+                  width: 170,
+                  twoLineTitle: true,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.push(
+                      context,
+                      CupertinoPageRoute(
+                        builder: (_) => AlbumScreen(
+                          albumTitle: title,
+                          artistName: artist,
+                          coverUrl: cover,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -809,7 +826,7 @@ class _SearchScreenState extends State<SearchScreen>
         (context, index) {
           final item = _liveSuggestions[index];
           return InkWell(
-            onTap: () => _submitSearch(item),
+            onTap: () => _submitSearch(item, filter: _selectedFilter),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
               child: Row(
@@ -842,9 +859,16 @@ class _SearchScreenState extends State<SearchScreen>
   // ---------------------------------------------------------------------------
   Widget _buildResultsSliver() {
     if (_isLoading && _searchResults.isEmpty) {
-      return const SliverFillRemaining(
-        child: Center(
-          child: CupertinoActivityIndicator(radius: 14),
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Column(
+            children: [
+              _buildShimmerHeroCard(),
+              const SizedBox(height: 20),
+              _buildShimmerList(),
+            ],
+          ),
         ),
       );
     }
@@ -886,42 +910,38 @@ class _SearchScreenState extends State<SearchScreen>
         children: [
           const SizedBox(height: 8),
 
-          // 1. Horizontal Category Filter Bar
+          // 1. Horizontal Category Filter Chips Bar
           _buildFilterTabs(),
+
+          // 2. "Did You Mean" pill
+          if (_searchResults.correctedQuery != null) ...[
+            const SizedBox(height: 10),
+            _buildDidYouMeanPill(_searchResults.correctedQuery!),
+          ],
 
           const SizedBox(height: 14),
 
-          // 2. Render Results based on active filter
-          if (_selectedFilter == _SearchCategoryFilter.all) ...[
-            if (_searchResults.topResult != null) ...[
-              _buildTopResultSection(_searchResults.topResult!),
-              const SizedBox(height: 20),
-            ],
-            if (_searchResults.songs.isNotEmpty) ...[
-              _buildSongsSection(_searchResults.songs.take(5).toList()),
-              const SizedBox(height: 24),
-            ],
-            if (_searchResults.artists.isNotEmpty) ...[
-              _buildArtistsSection(_searchResults.artists),
-              const SizedBox(height: 24),
-            ],
-            if (_searchResults.albums.isNotEmpty) ...[
-              _buildAlbumsSection(_searchResults.albums),
-              const SizedBox(height: 24),
-            ],
-            if (_searchResults.playlists.isNotEmpty) ...[
-              _buildPlaylistsSection(_searchResults.playlists),
-              const SizedBox(height: 24),
-            ],
-          ] else if (_selectedFilter == _SearchCategoryFilter.songs) ...[
+          // 3. Render Results based on active filter & layout mode
+          if (_selectedFilter == SearchFilter.all) ...[
+            ..._buildDynamicOverviewSections(),
+          ] else if (_selectedFilter == SearchFilter.songs) ...[
             _buildFullSongsList(_searchResults.songs),
-          ] else if (_selectedFilter == _SearchCategoryFilter.artists) ...[
+          ] else if (_selectedFilter == SearchFilter.artists) ...[
             _buildFullArtistsList(_searchResults.artists),
-          ] else if (_selectedFilter == _SearchCategoryFilter.albums) ...[
+          ] else if (_selectedFilter == SearchFilter.albums) ...[
             _buildFullAlbumsList(_searchResults.albums),
-          ] else if (_selectedFilter == _SearchCategoryFilter.playlists) ...[
+          ] else if (_selectedFilter == SearchFilter.featuredPlaylists ||
+              _selectedFilter == SearchFilter.communityPlaylists) ...[
             _buildFullPlaylistsList(_searchResults.playlists),
+          ] else if (_selectedFilter == SearchFilter.videos) ...[
+            _buildFullVideosList(_searchResults.videos),
           ],
+
+          if (_isLoadingMore)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CupertinoActivityIndicator(radius: 12)),
+            ),
 
           SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
         ],
@@ -930,15 +950,16 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Category Filter Bar
+  // Category Filter Bar Chips
   // ---------------------------------------------------------------------------
   Widget _buildFilterTabs() {
     final filters = [
-      {'id': _SearchCategoryFilter.all, 'label': 'All'},
-      {'id': _SearchCategoryFilter.songs, 'label': 'Songs (${_searchResults.songs.length})'},
-      {'id': _SearchCategoryFilter.artists, 'label': 'Artists (${_searchResults.artists.length})'},
-      {'id': _SearchCategoryFilter.albums, 'label': 'Albums (${_searchResults.albums.length})'},
-      {'id': _SearchCategoryFilter.playlists, 'label': 'Playlists (${_searchResults.playlists.length})'},
+      SearchFilter.all,
+      SearchFilter.songs,
+      SearchFilter.artists,
+      SearchFilter.albums,
+      SearchFilter.featuredPlaylists,
+      SearchFilter.videos,
     ];
 
     return SingleChildScrollView(
@@ -951,23 +972,20 @@ class _SearchScreenState extends State<SearchScreen>
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: PressableScale(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _selectedFilter = f['id'] as _SearchCategoryFilter);
-                },
+                onTap: () => _onFilterSelected(f),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: _selectedFilter == f['id']
+                    color: _selectedFilter == f
                         ? AppColors.accent
                         : const Color(0x1FFFFFFF),
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Text(
-                    f['label'] as String,
+                    f.label,
                     style: TextStyle(
-                      color: _selectedFilter == f['id'] ? Colors.white : AppColors.textSecondary,
+                      color: _selectedFilter == f ? Colors.white : AppColors.textSecondary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -981,9 +999,209 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Top Result Card
+  // "Did You Mean" Correction Pill
+  // ---------------------------------------------------------------------------
+  Widget _buildDidYouMeanPill(String corrected) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0x18FFFFFF),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.spellcheck_rounded, color: AppColors.accent, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  children: [
+                    const TextSpan(text: 'Showing results for '),
+                    TextSpan(
+                      text: corrected,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const TextSpan(text: '. Search instead for '),
+                    WidgetSpan(
+                      child: GestureDetector(
+                        onTap: () => _submitSearch(_activeQuery, filter: _selectedFilter),
+                        child: Text(
+                          _activeQuery,
+                          style: const TextStyle(
+                            color: AppColors.accent,
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dynamic Overview Sections Driven by Search Intent Layout Mode
+  // ---------------------------------------------------------------------------
+  List<Widget> _buildDynamicOverviewSections() {
+    final widgets = <Widget>[];
+    final mode = _searchResults.intent.layoutMode;
+
+    // A. Top Result Hero Card
+    if (_searchResults.topResult != null) {
+      widgets.add(_buildTopResultSection(_searchResults.topResult!));
+      widgets.add(const SizedBox(height: 20));
+    }
+
+    // Helper map of section builders
+    Widget songsShelf() => _searchResults.songs.isNotEmpty
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('Songs', onSeeAll: () => _onFilterSelected(SearchFilter.songs)),
+              const SizedBox(height: 8),
+              for (int i = 0; i < math.min(5, _searchResults.songs.length); i++)
+                SongTile(
+                  track: _searchResults.songs[i].toTrack(),
+                  onTap: () => _playSong(_searchResults.songs.map((s) => s.toTrack()).toList(), i),
+                ),
+              const SizedBox(height: 24),
+            ],
+          )
+        : const SizedBox.shrink();
+
+    Widget artistsShelf() => _searchResults.artists.isNotEmpty
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('Artists', onSeeAll: () => _onFilterSelected(SearchFilter.artists)),
+              const SizedBox(height: 10),
+              _buildArtistsHorizontalShelf(_searchResults.artists),
+              const SizedBox(height: 24),
+            ],
+          )
+        : const SizedBox.shrink();
+
+    Widget albumsShelf() => _searchResults.albums.isNotEmpty
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('Albums', onSeeAll: () => _onFilterSelected(SearchFilter.albums)),
+              const SizedBox(height: 10),
+              _buildAlbumsHorizontalShelf(_searchResults.albums),
+              const SizedBox(height: 24),
+            ],
+          )
+        : const SizedBox.shrink();
+
+    Widget playlistsShelf() => _searchResults.playlists.isNotEmpty
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('Playlists', onSeeAll: () => _onFilterSelected(SearchFilter.featuredPlaylists)),
+              const SizedBox(height: 10),
+              _buildPlaylistsHorizontalShelf(_searchResults.playlists),
+              const SizedBox(height: 24),
+            ],
+          )
+        : const SizedBox.shrink();
+
+    Widget videosShelf() => _searchResults.videos.isNotEmpty
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('Videos', onSeeAll: () => _onFilterSelected(SearchFilter.videos)),
+              const SizedBox(height: 10),
+              _buildVideosHorizontalShelf(_searchResults.videos),
+              const SizedBox(height: 24),
+            ],
+          )
+        : const SizedBox.shrink();
+
+    // Section ordering based on acceptance rules & layout mode:
+    switch (mode) {
+      case SearchLayoutMode.exactArtist:
+        // Artist Hero leads -> Top songs by artist -> Albums -> Playlists -> Videos -> Other artists
+        widgets.addAll([songsShelf(), albumsShelf(), playlistsShelf(), videosShelf(), artistsShelf()]);
+        break;
+
+      case SearchLayoutMode.artistType:
+        if (_searchResults.intent.intentType == SearchItemType.song) {
+          widgets.addAll([songsShelf(), albumsShelf(), playlistsShelf(), videosShelf(), artistsShelf()]);
+        } else if (_searchResults.intent.intentType == SearchItemType.album) {
+          widgets.addAll([albumsShelf(), songsShelf(), playlistsShelf(), videosShelf(), artistsShelf()]);
+        } else if (_searchResults.intent.intentType == SearchItemType.playlist) {
+          widgets.addAll([playlistsShelf(), songsShelf(), albumsShelf(), videosShelf(), artistsShelf()]);
+        } else {
+          widgets.addAll([songsShelf(), albumsShelf(), playlistsShelf(), videosShelf(), artistsShelf()]);
+        }
+        break;
+
+      case SearchLayoutMode.songTitle:
+        widgets.addAll([songsShelf(), artistsShelf(), albumsShelf(), playlistsShelf(), videosShelf()]);
+        break;
+
+      case SearchLayoutMode.albumOrPlaylist:
+        widgets.addAll([albumsShelf(), playlistsShelf(), songsShelf(), artistsShelf(), videosShelf()]);
+        break;
+
+      case SearchLayoutMode.generic:
+        widgets.addAll([songsShelf(), artistsShelf(), albumsShelf(), playlistsShelf(), videosShelf()]);
+        break;
+    }
+
+    return widgets;
+  }
+
+  Widget _buildSectionHeader(String title, {required VoidCallback onSeeAll}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          PressableScale(
+            onTap: onSeeAll,
+            child: const Text(
+              'See All',
+              style: TextStyle(
+                color: AppColors.accent,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Top Result Card (120x120 artwork, 20sp bold title, 14sp subtitle, Play/Radio)
   // ---------------------------------------------------------------------------
   Widget _buildTopResultSection(SearchTopResult top) {
+    final item = top.item;
+    final isArtist = item.type == SearchItemType.artist;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -999,37 +1217,7 @@ class _SearchScreenState extends State<SearchScreen>
           ),
           const SizedBox(height: 10),
           PressableScale(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              if (top.type == TopResultType.artist && top.artist != null) {
-                Navigator.push(
-                  context,
-                  CupertinoPageRoute(
-                    builder: (_) => ArtistScreen(
-                      artistName: top.artist!.name,
-                      imageUrl: top.artist!.imageUrl,
-                      browseId: top.artist!.browseId,
-                    ),
-                  ),
-                );
-              } else if (top.type == TopResultType.album && top.album != null) {
-                Navigator.push(
-                  context,
-                  CupertinoPageRoute(
-                    builder: (_) => AlbumScreen(
-                      albumTitle: top.album!.title,
-                      artistName: top.album!.artist,
-                      coverUrl: top.album!.coverUrl,
-                      browseId: top.album!.browseId,
-                    ),
-                  ),
-                );
-              } else if (top.track != null) {
-                _playSong([top.track!], 0);
-              } else if (_searchResults.songs.isNotEmpty) {
-                _playSong(_searchResults.songs, 0);
-              }
-            },
+            onTap: () => _handleItemTap(item),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1039,25 +1227,34 @@ class _SearchScreenState extends State<SearchScreen>
               ),
               child: Row(
                 children: [
+                  // 120x120 Hi-Res Artwork (Circle for Artist, rounded 12 for others)
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(top.type == TopResultType.artist ? 35 : 12),
-                    child: top.imageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: top.imageUrl!,
-                            width: 70,
-                            height: 70,
-                            fit: BoxFit.cover,
-                            placeholder: (_, url) => Container(color: AppColors.surface2),
-                            errorWidget: (_, url, error) => Container(color: AppColors.surface2),
-                          )
-                        : Container(
-                            width: 70,
-                            height: 70,
-                            color: AppColors.surface2,
-                            child: const Icon(Icons.music_note, color: Colors.white54),
-                          ),
+                    borderRadius: BorderRadius.circular(isArtist ? 60 : 12),
+                    child: SizedBox(
+                      width: 120,
+                      height: 120,
+                      child: top.imageUrl.isNotEmpty && top.imageUrl.startsWith('http')
+                          ? CachedNetworkImage(
+                              imageUrl: top.imageUrl,
+                              fit: BoxFit.cover,
+                              memCacheWidth: 240,
+                              placeholder: (_, url) => Container(color: AppColors.surface2),
+                              errorWidget: (_, url, error) => MonogramAvatar(
+                                name: top.title,
+                                size: 120,
+                                isCircle: isArtist,
+                              ),
+                            )
+                          : MonogramAvatar(
+                              name: top.title,
+                              size: 120,
+                              isCircle: isArtist,
+                            ),
+                    ),
                   ),
                   const SizedBox(width: 16),
+
+                  // Metadata text: Title (20sp bold) & Subtitle (14sp 2 lines)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1068,33 +1265,93 @@ class _SearchScreenState extends State<SearchScreen>
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: 20,
                             fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 4),
                         Text(
                           top.subtitle,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: Colors.white.withValues(alpha: 0.75),
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
+                            height: 1.25,
                           ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Action Buttons: Play + Radio
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                _handleItemTap(item);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'PLAY',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (top.radioPlaylistId != null) ...[
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  _startRadio(top.radioPlaylistId!);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.radio_rounded, color: Colors.white, size: 16),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'RADIO',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.accent,
-                    ),
-                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
                   ),
                 ],
               ),
@@ -1106,248 +1363,62 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Songs Section & List
+  // Horizontal Shelf Builders (Albums, Artists, Playlists, Videos)
   // ---------------------------------------------------------------------------
-  Widget _buildSongsSection(List<Track> songs) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Songs',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 19, fontWeight: FontWeight.w800),
-              ),
-              if (_searchResults.songs.length > 5)
-                PressableScale(
-                  onTap: () => setState(() => _selectedFilter = _SearchCategoryFilter.songs),
-                  child: const Text('See All', style: TextStyle(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w600)),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        for (int i = 0; i < songs.length; i++)
-          SongTile(
-            track: songs[i],
-            onTap: () => _playSong(_searchResults.songs, i),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildFullSongsList(List<Track> songs) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: songs.length,
-      itemBuilder: (context, i) {
-        return SongTile(
-          track: songs[i],
-          index: i + 1,
-          onTap: () => _playSong(songs, i),
-        );
-      },
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Artists Section & List
-  // ---------------------------------------------------------------------------
-  Widget _buildArtistsSection(List<SearchArtist> artists) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'Artists',
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 19, fontWeight: FontWeight.w800),
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 236,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: artists.length,
-            itemBuilder: (context, i) {
-              final a = artists[i];
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: MediaCard(
-                  title: a.name,
-                  subtitle: a.subscribers ?? 'Artist',
-                  imageUrl: a.imageUrl,
-                  isCircular: true,
-                  width: 170,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.push(
-                      context,
-                      CupertinoPageRoute(
-                        builder: (_) => ArtistScreen(
-                          artistName: a.name,
-                          imageUrl: a.imageUrl,
-                          browseId: a.browseId,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFullArtistsList(List<SearchArtist> artists) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: artists.length,
-      itemBuilder: (context, i) {
-        final a = artists[i];
-        return PressableScale(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.push(
-              context,
-              CupertinoPageRoute(
-                builder: (_) => ArtistScreen(
-                  artistName: a.name,
-                  imageUrl: a.imageUrl,
-                  browseId: a.browseId,
-                ),
-              ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0x0CFFFFFF),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(25),
-                  child: a.imageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: a.imageUrl!,
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          placeholder: (_, url) => Container(color: AppColors.surface2),
-                        )
-                      : Container(width: 50, height: 50, color: AppColors.surface2),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        a.name,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-                      ),
-                      if (a.subscribers != null)
-                        Text(a.subscribers!, style: const TextStyle(color: AppColors.textTertiary, fontSize: 13)),
-                    ],
+  Widget _buildArtistsHorizontalShelf(List<SearchArtistItem> artists) {
+    return SizedBox(
+      height: 260,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: artists.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (context, i) {
+          final a = artists[i];
+          return MediaCard(
+            title: a.name,
+            subtitle: a.subscriberText ?? 'Artist',
+            imageUrl: a.thumbnailUrlHiRes.isNotEmpty ? a.thumbnailUrlHiRes : a.thumbnailUrl,
+            isCircular: true,
+            width: 170,
+            twoLineTitle: true,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (_) => ArtistScreen(
+                    artistName: a.name,
+                    imageUrl: a.thumbnailUrlHiRes,
+                    browseId: a.browseId,
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Albums Section & List
-  // ---------------------------------------------------------------------------
-  Widget _buildAlbumsSection(List<SearchAlbum> albums) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'Albums',
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 19, fontWeight: FontWeight.w800),
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 236,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: albums.length,
-            itemBuilder: (context, i) {
-              final alb = albums[i];
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: MediaCard(
-                  title: alb.title,
-                  subtitle: alb.artist,
-                  imageUrl: alb.coverUrl,
-                  width: 170,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.push(
-                      context,
-                      CupertinoPageRoute(
-                        builder: (_) => AlbumScreen(
-                          albumTitle: alb.title,
-                          artistName: alb.artist,
-                          coverUrl: alb.coverUrl,
-                          browseId: alb.browseId,
-                        ),
-                      ),
-                    );
-                  },
-                ),
               );
             },
-          ),
-        ),
-      ],
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildFullAlbumsList(List<SearchAlbum> albums) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 14,
-          childAspectRatio: 0.76,
-        ),
+  Widget _buildAlbumsHorizontalShelf(List<SearchAlbumItem> albums) {
+    return SizedBox(
+      height: 260,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: albums.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, i) {
           final alb = albums[i];
           return MediaCard(
             title: alb.title,
-            subtitle: alb.artist,
-            imageUrl: alb.coverUrl,
-            width: 160,
+            subtitle: alb.subtitle,
+            imageUrl: alb.thumbnailUrlHiRes.isNotEmpty ? alb.thumbnailUrlHiRes : alb.thumbnailUrl,
+            width: 170,
+            twoLineTitle: true,
             onTap: () {
               HapticFeedback.lightImpact();
               Navigator.push(
@@ -1355,8 +1426,8 @@ class _SearchScreenState extends State<SearchScreen>
                 CupertinoPageRoute(
                   builder: (_) => AlbumScreen(
                     albumTitle: alb.title,
-                    artistName: alb.artist,
-                    coverUrl: alb.coverUrl,
+                    artistName: alb.subtitle,
+                    coverUrl: alb.thumbnailUrlHiRes,
                     browseId: alb.browseId,
                   ),
                 ),
@@ -1368,80 +1439,23 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Playlists Section & List
-  // ---------------------------------------------------------------------------
-  Widget _buildPlaylistsSection(List<SearchPlaylist> playlists) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'Playlists',
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 19, fontWeight: FontWeight.w800),
-          ),
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 236,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: playlists.length,
-            itemBuilder: (context, i) {
-              final pl = playlists[i];
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: MediaCard(
-                  title: pl.title,
-                  subtitle: pl.curator ?? 'Playlist',
-                  imageUrl: pl.coverUrl,
-                  width: 170,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.push(
-                      context,
-                      CupertinoPageRoute(
-                        builder: (_) => AlbumScreen(
-                          albumTitle: pl.title,
-                          artistName: pl.curator ?? 'Playlist',
-                          coverUrl: pl.coverUrl,
-                          browseId: pl.browseId,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFullPlaylistsList(List<SearchPlaylist> playlists) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 14,
-          childAspectRatio: 0.76,
-        ),
+  Widget _buildPlaylistsHorizontalShelf(List<SearchPlaylistItem> playlists) {
+    return SizedBox(
+      height: 260,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: playlists.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, i) {
           final pl = playlists[i];
           return MediaCard(
             title: pl.title,
-            subtitle: pl.curator ?? 'Playlist',
-            imageUrl: pl.coverUrl,
-            width: 160,
+            subtitle: pl.subtitle,
+            imageUrl: pl.thumbnailUrlHiRes.isNotEmpty ? pl.thumbnailUrlHiRes : pl.thumbnailUrl,
+            width: 170,
+            twoLineTitle: true,
             onTap: () {
               HapticFeedback.lightImpact();
               Navigator.push(
@@ -1449,8 +1463,8 @@ class _SearchScreenState extends State<SearchScreen>
                 CupertinoPageRoute(
                   builder: (_) => AlbumScreen(
                     albumTitle: pl.title,
-                    artistName: pl.curator ?? 'Playlist',
-                    coverUrl: pl.coverUrl,
+                    artistName: pl.author ?? 'Playlist',
+                    coverUrl: pl.thumbnailUrlHiRes,
                     browseId: pl.browseId,
                   ),
                 ),
@@ -1462,49 +1476,473 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Data extraction helpers
-  // ---------------------------------------------------------------------------
-  List<Map<String, String>> _extractPopularArtists(List<Track> tracks) {
-    final seen = <String>{};
-    final out = <Map<String, String>>[];
-    for (final t in tracks) {
-      final name = t.artist.split(',').first.trim();
-      if (name.isNotEmpty && seen.add(name.toLowerCase())) {
-        out.add({'name': name, 'photo': t.coverUrl});
-      }
-      if (out.length >= 8) break;
-    }
-    if (out.length < 4) {
-      for (final a in _kDefaultPopularArtists) {
-        if (seen.add(a['name']!.toLowerCase())) {
-          out.add(a);
-        }
-        if (out.length >= 8) break;
-      }
-    }
-    return out;
+  Widget _buildVideosHorizontalShelf(List<SearchVideoItem> videos) {
+    return SizedBox(
+      height: 195,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: videos.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (context, i) {
+          final v = videos[i];
+          return PressableScale(
+            onTap: () => _handleItemTap(v),
+            child: SizedBox(
+              width: 180,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: CachedNetworkImage(
+                        imageUrl: v.thumbnailUrlHiRes.isNotEmpty ? v.thumbnailUrlHiRes : v.thumbnailUrl,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 360,
+                        placeholder: (_, url) => Container(color: AppColors.surface2),
+                        errorWidget: (_, url, error) => Container(color: AppColors.surface2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    v.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    v.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
-  List<Map<String, String>> _extractPopularAlbums(List<Track> tracks) {
-    final seen = <String>{};
-    final out = <Map<String, String>>[];
-    for (final t in tracks) {
-      if (t.album.isNotEmpty && t.album != 'Single' && seen.add(t.album.toLowerCase())) {
-        out.add({'title': t.album, 'artist': t.artist, 'cover': t.coverUrl});
-      }
-      if (out.length >= 8) break;
+  // ---------------------------------------------------------------------------
+  // Full-width Filtered Views (Infinite Scrollable)
+  // ---------------------------------------------------------------------------
+  Widget _buildFullSongsList(List<SearchSongItem> songs) {
+    final trackList = songs.map((s) => s.toTrack()).toList();
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: songs.length,
+      itemBuilder: (context, i) {
+        return SongTile(
+          track: trackList[i],
+          index: i + 1,
+          onTap: () => _playSong(trackList, i),
+        );
+      },
+    );
+  }
+
+  Widget _buildFullArtistsList(List<SearchArtistItem> artists) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: artists.length,
+      itemBuilder: (context, i) {
+        final a = artists[i];
+        return PressableScale(
+          onTap: () => _handleItemTap(a),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0x0CFFFFFF),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(25),
+                  child: a.thumbnailUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: a.thumbnailUrl,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          placeholder: (_, url) => Container(color: AppColors.surface2),
+                          errorWidget: (_, url, error) => MonogramAvatar(name: a.name, size: 50, isCircle: true),
+                        )
+                      : MonogramAvatar(name: a.name, size: 50, isCircle: true),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        a.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        a.subscriberText ?? 'Artist',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(CupertinoIcons.chevron_forward, color: AppColors.textTertiary, size: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFullAlbumsList(List<SearchAlbumItem> albums) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 14,
+          crossAxisSpacing: 14,
+          childAspectRatio: 0.68,
+        ),
+        itemCount: albums.length,
+        itemBuilder: (context, i) {
+          final alb = albums[i];
+          return MediaCard(
+            title: alb.title,
+            subtitle: alb.subtitle,
+            imageUrl: alb.thumbnailUrlHiRes.isNotEmpty ? alb.thumbnailUrlHiRes : alb.thumbnailUrl,
+            width: 170,
+            twoLineTitle: true,
+            onTap: () => _handleItemTap(alb),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFullPlaylistsList(List<SearchPlaylistItem> playlists) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 14,
+          crossAxisSpacing: 14,
+          childAspectRatio: 0.68,
+        ),
+        itemCount: playlists.length,
+        itemBuilder: (context, i) {
+          final pl = playlists[i];
+          return MediaCard(
+            title: pl.title,
+            subtitle: pl.subtitle,
+            imageUrl: pl.thumbnailUrlHiRes.isNotEmpty ? pl.thumbnailUrlHiRes : pl.thumbnailUrl,
+            width: 170,
+            twoLineTitle: true,
+            onTap: () => _handleItemTap(pl),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFullVideosList(List<SearchVideoItem> videos) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: videos.length,
+      itemBuilder: (context, i) {
+        final v = videos[i];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: PressableScale(
+            onTap: () => _handleItemTap(v),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 140,
+                    height: 80,
+                    child: CachedNetworkImage(
+                      imageUrl: v.thumbnailUrlHiRes.isNotEmpty ? v.thumbnailUrlHiRes : v.thumbnailUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, url) => Container(color: AppColors.surface2),
+                      errorWidget: (_, url, error) => Container(color: AppColors.surface2),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        v.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        v.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Navigation & Playback Handlers
+  // ---------------------------------------------------------------------------
+  void _handleItemTap(SearchItem item) {
+    HapticFeedback.lightImpact();
+    if (item is SearchArtistItem) {
+      Navigator.push(
+        context,
+        ZenPageRoute(
+          builder: (_) => ArtistScreen(
+            artistName: item.name,
+            imageUrl: item.thumbnailUrlHiRes,
+            browseId: item.browseId,
+          ),
+        ),
+      );
+    } else if (item is SearchAlbumItem) {
+      Navigator.push(
+        context,
+        ZenPageRoute(
+          builder: (_) => AlbumScreen(
+            albumTitle: item.title,
+            artistName: item.subtitle,
+            coverUrl: item.thumbnailUrlHiRes,
+            browseId: item.browseId,
+          ),
+        ),
+      );
+    } else if (item is SearchPlaylistItem) {
+      Navigator.push(
+        context,
+        ZenPageRoute(
+          builder: (_) => AlbumScreen(
+            albumTitle: item.title,
+            artistName: item.author ?? 'Playlist',
+            coverUrl: item.thumbnailUrlHiRes,
+            browseId: item.browseId,
+          ),
+        ),
+      );
+    } else if (item is SearchSongItem) {
+      final t = item.toTrack();
+      _playSong([t], 0);
+    } else if (item is SearchVideoItem) {
+      final t = Track(
+        id: item.videoId != null ? 'yt-${item.videoId}' : item.id,
+        title: item.title,
+        artist: item.channel ?? 'YouTube',
+        album: 'Video',
+        coverUrl: item.thumbnailUrlHiRes,
+        durationSeconds: 210,
+        source: 'youtube',
+      );
+      _playSong([t], 0);
     }
-    if (out.length < 4) {
-      for (final alb in _kDefaultPopularAlbums) {
-        if (seen.add(alb['title']!.toLowerCase())) {
-          out.add(alb);
-        }
-        if (out.length >= 8) break;
+  }
+
+  void _startRadio(String playlistId) {
+    if (_searchResults.songs.isNotEmpty) {
+      _playSong(_searchResults.songs.map((s) => s.toTrack()).toList(), 0);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shimmer Skeletons with Text Placeholders
+  // ---------------------------------------------------------------------------
+  Widget _buildShimmerHeroCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0x10FFFFFF),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 140,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: 80,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShimmerList() {
+    return Column(
+      children: List.generate(
+        4,
+        (i) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 15,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 160,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Catalog extraction helpers for Landing State
+  // ---------------------------------------------------------------------------
+  List<Map<String, String>> _extractPopularArtists(List<Track> catalog) {
+    final map = <String, Map<String, String>>{};
+    for (final t in catalog) {
+      if (t.artist.isNotEmpty && !map.containsKey(t.artist.toLowerCase())) {
+        map[t.artist.toLowerCase()] = {
+          'name': t.artist,
+          'photo': t.coverUrl,
+        };
       }
     }
-    return out;
+    return map.values.take(8).toList();
+  }
+
+  List<Map<String, String>> _extractPopularAlbums(List<Track> catalog) {
+    final map = <String, Map<String, String>>{};
+    for (final t in catalog) {
+      if (t.album.isNotEmpty &&
+          t.album != 'Single' &&
+          !map.containsKey(t.album.toLowerCase())) {
+        map[t.album.toLowerCase()] = {
+          'title': t.album,
+          'artist': t.artist,
+          'cover': t.coverUrl,
+        };
+      }
+    }
+    return map.values.take(8).toList();
   }
 }
-
-

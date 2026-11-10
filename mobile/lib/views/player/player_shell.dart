@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/zen.dart';
 import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/pressable_scale.dart';
@@ -259,7 +260,7 @@ class PlayerShellState extends State<PlayerShell>
     } else {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => ArtistScreen(artistName: artistName)),
+        ZenPageRoute(builder: (_) => ArtistScreen(artistName: artistName)),
       );
     }
   }
@@ -271,7 +272,7 @@ class PlayerShellState extends State<PlayerShell>
     } else {
       Navigator.push(
         context,
-        MaterialPageRoute(
+        ZenPageRoute(
           builder: (_) => AlbumScreen(
             albumTitle: (track?.album as String?)?.isNotEmpty == true
                 ? (track is Track ? track.album : MediaNormalizer.cleanAlbumTitle(track?.album?.toString()))
@@ -866,7 +867,7 @@ class PlayerShellState extends State<PlayerShell>
             } else {
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                ZenPageRoute(
                   builder: (_) => ArtistScreen(artistName: artistName),
                 ),
               );
@@ -1037,6 +1038,10 @@ class PlayerShellState extends State<PlayerShell>
             ((t - 0.3) / 0.7).clamp(0.0, 1.0),
           );
 
+          // background card fades with how far the sheet is on screen:
+          // 1 when fully open → 0 when docked at the bottom (mini player)
+          final bgOpacity = Curves.easeInOut.transform(t);
+
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {}, // absorb taps: prevents background click-through
@@ -1050,28 +1055,35 @@ class PlayerShellState extends State<PlayerShell>
                 child: Stack(
                   key: _sheetKey,
                   children: [
-                    Positioned.fill(child: Container(color: Colors.black)),
+                    // ── BACKGROUND CARD (fades out as the sheet is dragged down) ──
                     Positioned.fill(
-                      child: RepaintBoundary(
-                        child: ArtworkMeshBackground(
-                          coverUrl: track?.coverUrl,
-                          fallbackAsset: 'assets/images/z_logo.png',
-                          paused: !_playing,
-                          backgroundColor: _palette.isNotEmpty
-                              ? _palette.first
-                              : null,
-                        ),
-                      ),
-                    ),
-                    // soft scrim keeps lyrics / queue text readable
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 450),
-                          curve: Curves.easeOutCubic,
-                          color: Colors.black.withValues(
-                            alpha: _docked ? 0.26 : 0,
-                          ),
+                      child: Opacity(
+                        opacity: bgOpacity,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Container(color: Colors.black),
+                            RepaintBoundary(
+                              child: ArtworkMeshBackground(
+                                coverUrl: track?.coverUrl,
+                                fallbackAsset: 'assets/images/z_logo.png',
+                                paused: !_playing,
+                                backgroundColor: _palette.isNotEmpty
+                                    ? _palette.first
+                                    : null,
+                              ),
+                            ),
+                            // soft scrim keeps lyrics / queue text readable
+                            IgnorePointer(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 450),
+                                curve: Curves.easeOutCubic,
+                                color: Colors.black.withValues(
+                                  alpha: _docked ? 0.26 : 0,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

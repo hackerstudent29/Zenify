@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/zen.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
@@ -425,7 +426,7 @@ class _AlbumScreenState extends State<AlbumScreen> {
 
   void _openAlbum(_Release r) => Navigator.push(
         context,
-        MaterialPageRoute(
+        ZenPageRoute(
           builder: (_) => AlbumScreen(
             albumTitle: r.title,
             artistName: r.artist,
@@ -547,7 +548,7 @@ class _AlbumScreenState extends State<AlbumScreen> {
                                     } else if (artists.isNotEmpty) {
                                       Navigator.push(
                                         context,
-                                        MaterialPageRoute(builder: (_) => ArtistScreen(artistName: artists.first)),
+                                        ZenPageRoute(builder: (_) => ArtistScreen(artistName: artists.first)),
                                       );
                                     }
                                   },

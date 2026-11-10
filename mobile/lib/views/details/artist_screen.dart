@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/zen.dart';
 import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
@@ -853,7 +854,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
 
   void _openAlbum(_Release r) => Navigator.push(
         context,
-        CupertinoPageRoute(
+        ZenPageRoute(
           builder: (_) => AlbumScreen(
             albumTitle: MediaNormalizer.stripIdNoise(r.title),
             artistName: MediaNormalizer.stripIdNoise(widget.artistName),
@@ -1411,7 +1412,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
                               radius: 8,
                               onTap: () => Navigator.push(
                                 context,
-                                CupertinoPageRoute(
+                                ZenPageRoute(
                                   builder: (_) => AlbumScreen(
                                     albumTitle: featuredPlaylists[i].title,
                                     artistName: name,
@@ -1437,7 +1438,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
                               circular: true,
                               onTap: () => Navigator.push(
                                 context,
-                                CupertinoPageRoute(
+                                ZenPageRoute(
                                   builder: (_) => ArtistScreen(
                                     artistName: related[i].key,
                                     browseId: related[i].value.id.isNotEmpty ? related[i].value.id : null,

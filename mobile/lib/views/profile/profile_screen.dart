@@ -83,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                   HapticFeedback.lightImpact();
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    ZenPageRoute(builder: (_) => const SettingsScreen()),
                   );
                 },
                 child: AppleGlass(
@@ -252,7 +252,7 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
+                  ZenPageRoute(
                     fullscreenDialog: true,
                     builder: (_) => WelcomeScreen(onFinished: () => Navigator.of(context).pop()),
                   ),
@@ -285,7 +285,7 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const InsightsScreen()),
+                    ZenPageRoute(builder: (_) => const InsightsScreen()),
                   );
                 },
               ),
@@ -298,7 +298,7 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    ZenPageRoute(builder: (_) => const SettingsScreen()),
                   );
                 },
               ),
@@ -315,7 +315,7 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const RoomTogetherScreen()),
+                    ZenPageRoute(builder: (_) => const RoomTogetherScreen()),
                   );
                 },
               ),
