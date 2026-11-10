@@ -1,9 +1,9 @@
 {
-  "version": 7,
+  "version": 8,
   "streamMode": "device",
   "minAppVersion": "1.0.0",
-  "latestAppVersion": "1.0.4",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.4/zenify-v1.0.4.apk",
-  "releaseNotes": "• Fixed Library store persistence: liked songs, saved albums, followed artists, and playlists reliably stored with metadata\n• In-playlist YouTube Music online song search: search millions of songs and instantly add/remove them with pill buttons and spring haptics\n• Enforced pure audio songs-only filter for playlist additions\n• Library 'Songs' tab now aggregates all liked and playlist songs dynamically\n• Real-time Room Together collaborative listening with democratic fair queue and sub-millisecond clock sync\n• Pure InnerTube decentralized 160 kbps Opus streaming on-device\n• Anti-clipping ReplayGain limiter with hyperbolic tangent ceiling",
+  "latestAppVersion": "1.0.5",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.5/zenify-v1.0.5.apk",
+  "releaseNotes": "• Persistent floating Dynamic Island header across all screens (Settings, Profile, Room Together, Insights, Albums, Artists, Library)\n• Clean, unified Apple-style profile button dock at top right of Library screen\n• Seamless in-playlist song search with instant add/remove pills and spring haptics\n• High-performance SQLite + JSON store for liked tracks, followed artists, saved albums, and custom playlists\n• Real-time Room Together synchronized collaborative listening with fair queue and sub-millisecond clock sync\n• Pure InnerTube decentralized 160 kbps Opus audio streaming on-device\n• ReplayGain anti-clipping limiter with hyperbolic tangent ceiling",
   "message": null
 }

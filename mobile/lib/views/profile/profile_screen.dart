@@ -66,17 +66,65 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
     final auth = context.watch<AuthState>();
     final user = auth.user;
 
+    final topInset = MediaQuery.paddingOf(context).top;
+
     return Scaffold(
       backgroundColor: Zen.bg,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // Dynamic Island Floating Header
-          SliverToBoxAdapter(
+      body: Stack(
+        children: [
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
+
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Profile Header Card
+                      _buildHeaderCard(auth, user),
+                      const SizedBox(height: 18),
+
+                      // Quick Navigation: Room Together & Studio FX
+                      _buildQuickAccessSection(),
+                      const SizedBox(height: 24),
+
+                      // Audio Quality & Streaming Engine
+                      _buildAudioSettingsSection(auth),
+                      const SizedBox(height: 24),
+
+                      // Music Region & Country (YouTube Music)
+                      _buildRegionAndCountrySection(),
+                      const SizedBox(height: 24),
+
+                      // Account Details & Edit Section
+                      _buildProfileEditSection(auth, user),
+                      const SizedBox(height: 24),
+
+                      // Cache & Media Storage
+                      _buildCacheSection(),
+                      const SizedBox(height: 24),
+
+                      // App Information
+                      _buildAppInfoSection(),
+                      const SizedBox(height: 48),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
             child: DynamicIslandHeader(
               title: 'Account & Profile',
               showBack: true,
               onBack: () => Navigator.of(context).pop(),
+              topPadding: topInset + 4,
               trailing: PressableScale(
                 scale: 0.88,
                 onTap: () {
@@ -97,44 +145,6 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Profile Header Card
-                  _buildHeaderCard(auth, user),
-                  const SizedBox(height: 18),
-
-                  // Quick Navigation: Room Together & Studio FX
-                  _buildQuickAccessSection(),
-                  const SizedBox(height: 24),
-
-                  // Audio Quality & Streaming Engine
-                  _buildAudioSettingsSection(auth),
-                  const SizedBox(height: 24),
-
-                  // Music Region & Country (YouTube Music)
-                  _buildRegionAndCountrySection(),
-                  const SizedBox(height: 24),
-
-                  // Account Details & Edit Section
-                  _buildProfileEditSection(auth, user),
-                  const SizedBox(height: 24),
-
-                  // Cache & Media Storage
-                  _buildCacheSection(),
-                  const SizedBox(height: 24),
-
-                  // App Information
-                  _buildAppInfoSection(),
-                  const SizedBox(height: 48),
-                ],
               ),
             ),
           ),

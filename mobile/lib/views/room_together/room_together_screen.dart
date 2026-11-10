@@ -210,6 +210,8 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen>
       });
     }
 
+    final topInset = MediaQuery.paddingOf(context).top;
+
     return Scaffold(
       backgroundColor: Zen.bg,
       body: Stack(
@@ -217,31 +219,8 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen>
           CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              // Top Header
-              SliverToBoxAdapter(
-                child: DynamicIslandHeader(
-                  title: 'Room Together',
-                  showBack: true,
-                  onBack: () => Navigator.of(context).pop(),
-                  trailing: together.inRoom
-                      ? PressableScale(
-                          scale: 0.88,
-                          onTap: () => _copyRoomCode(together.roomCode),
-                          child: AppleGlass(
-                            borderRadius: BorderRadius.circular(22),
-                            tint: const Color(0x26121216),
-                            child: const SizedBox(
-                              width: 44,
-                              height: 44,
-                              child: Center(
-                                child: Icon(Icons.share_rounded, color: Colors.white, size: 20),
-                              ),
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-              ),
+              // Top Clearance for Floating Header
+              SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
 
               if (!together.inRoom)
                 SliverFillRemaining(
@@ -317,6 +296,36 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen>
               bottom: MediaQuery.paddingOf(context).bottom + 24,
               child: _buildReactionBar(together),
             ),
+
+          // Persistent Floating Dynamic Island Header
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: DynamicIslandHeader(
+              title: 'Room Together',
+              showBack: true,
+              onBack: () => Navigator.of(context).pop(),
+              topPadding: topInset + 4,
+              trailing: together.inRoom
+                  ? PressableScale(
+                      scale: 0.88,
+                      onTap: () => _copyRoomCode(together.roomCode),
+                      child: AppleGlass(
+                        borderRadius: BorderRadius.circular(22),
+                        tint: const Color(0x26121216),
+                        child: const SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Center(
+                            child: Icon(Icons.share_rounded, color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+          ),
         ],
       ),
     );
