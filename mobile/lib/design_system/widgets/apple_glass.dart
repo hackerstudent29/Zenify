@@ -7,6 +7,7 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import 'pressable_scale.dart';
+import '../zen.dart';
 
 /// Apple Music accent (the rose-red used for the selected tab + search).
 const Color kAppleRed = Color(0xFFFA2D48);
@@ -201,10 +202,12 @@ class AppleDock extends StatefulWidget {
     super.key,
     required this.index,
     required this.onSelect,
-    this.height = 64,
+    this.height = 54,
     this.searchExpanded = false,
     this.onSearchTap,
     this.onBack,
+    this.dockProgress = 1.0,
+    this.onExploreTap,
   });
 
   /// 0 Home · 1 Explore · 2 Library · 3 Search
@@ -220,6 +223,12 @@ class AppleDock extends StatefulWidget {
 
   /// tap on the back circle
   final VoidCallback? onBack;
+
+  /// 1.0 = resting dock [Home · Explore · Library] + Search, 0.0 = three-dock island mode
+  final double dockProgress;
+
+  /// tap on the collapsed left explore squircle button
+  final VoidCallback? onExploreTap;
 
   @override
   State<AppleDock> createState() => _AppleDockState();
@@ -382,24 +391,26 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final h = widget.height;
+    final dp = widget.dockProgress.clamp(0.0, 1.0);
     return SizedBox(
       height: h,
       child: LayoutBuilder(
         builder: (context, c) {
-          const gap = 10.0;
+          const gap = 8.0;
           final total = c.maxWidth;
           final fullPill = total - gap - h;
           return AnimatedBuilder(
             animation: _exp,
             builder: (_, _) {
               final e = _exp.value.clamp(0.0, 1.0);
-              final pillW = ui.lerpDouble(fullPill, h, e)!;
-              final searchW = total - gap - pillW;
+              final normalPillW = ui.lerpDouble(h, fullPill, dp)!;
+              final pillW = ui.lerpDouble(normalPillW, h, e)!;
+              final searchW = e > 0.01 ? (total - gap - pillW) : h;
               return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  SizedBox(width: pillW, height: h, child: _pill(h, fullPill, e)),
-                  const SizedBox(width: gap),
-                  SizedBox(width: searchW, height: h, child: _search(h, e)),
+                  SizedBox(width: pillW, height: h, child: _pill(h, fullPill, e, dp)),
+                  SizedBox(width: searchW, height: h, child: _search(h, e, dp)),
                 ],
               );
             },
@@ -409,24 +420,49 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
     );
   }
 
-  Widget _pill(double h, double fullW, double e) {
+  Widget _pill(double h, double fullW, double e, double dp) {
+    final radius = ui.lerpDouble(18.0, h / 2, dp)!;
     return AppleGlass(
-      borderRadius: BorderRadius.circular(h / 2),
+      borderRadius: BorderRadius.circular(radius),
       child: Stack(
         children: [
-          // normal tabs: keep their full width (no squishing) and just fade out
-          IgnorePointer(
-            ignoring: e > 0.02,
-            child: Opacity(
-              opacity: (1 - e * 1.8).clamp(0.0, 1.0),
-              child: OverflowBox(
-                alignment: Alignment.centerLeft,
-                minWidth: fullW,
-                maxWidth: fullW,
-                child: SizedBox(width: fullW, height: h, child: _pillTabs(h)),
+          // normal tabs: keep their full width (no squishing) and smoothly fade out
+          if (dp > 0.05)
+            IgnorePointer(
+              ignoring: e > 0.02 || dp < 0.6,
+              child: Opacity(
+                opacity: (dp * (1 - e * 1.8)).clamp(0.0, 1.0),
+                child: OverflowBox(
+                  alignment: Alignment.centerLeft,
+                  minWidth: fullW,
+                  maxWidth: fullW,
+                  child: SizedBox(width: fullW, height: h, child: _pillTabs(h)),
+                ),
               ),
             ),
-          ),
+          // collapsed left dock button: Explore 2x2 grid icon in Zen.rose
+          if (dp < 0.95 && e < 0.02)
+            Positioned.fill(
+              child: Opacity(
+                opacity: ((1.0 - dp * 1.8)).clamp(0.0, 1.0),
+                child: IgnorePointer(
+                  ignoring: dp >= 0.6,
+                  child: PressableScale(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      widget.onExploreTap?.call();
+                    },
+                    child: Center(
+                      child: Icon(
+                        CupertinoIcons.square_grid_2x2_fill,
+                        size: 23,
+                        color: Zen.rose,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // back button fades in as the pill becomes a circle
           if (e > 0.02)
             Positioned.fill(
@@ -526,9 +562,10 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
     );
   }
 
-  Widget _search(double h, double e) {
+  Widget _search(double h, double e, double dp) {
     final selected = widget.index == 3;
     final expanded = widget.searchExpanded;
+    final radius = ui.lerpDouble(18.0, h / 2, dp)!;
     return PressableScale(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -539,7 +576,7 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
         }
       },
       child: AppleGlass(
-        borderRadius: BorderRadius.circular(h / 2),
+        borderRadius: BorderRadius.circular(radius),
         child: SizedBox(
           height: h,
           child: Stack(

@@ -37,7 +37,7 @@ class ListeningTimeline extends StatelessWidget {
             children: [
               Text(
                 'LISTENING ACTIVITY',
-                style: GoogleFonts.oswald(
+                style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,

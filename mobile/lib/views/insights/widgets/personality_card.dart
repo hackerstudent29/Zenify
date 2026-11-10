@@ -37,7 +37,7 @@ class PersonalityCard extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               'HOW PERSONAS ARE DETERMINED',
-              style: GoogleFonts.oswald(
+              style: GoogleFonts.inter(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.0,
@@ -114,7 +114,7 @@ class PersonalityCard extends StatelessWidget {
                 ),
                 child: Text(
                   'YOUR MUSIC PERSONA',
-                  style: GoogleFonts.oswald(
+                  style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.0,
@@ -131,7 +131,7 @@ class PersonalityCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             title,
-            style: GoogleFonts.oswald(
+            style: GoogleFonts.inter(
               fontSize: 24,
               fontWeight: FontWeight.w800,
               color: Colors.white,

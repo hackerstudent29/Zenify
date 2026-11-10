@@ -1,9 +1,9 @@
 {
-  "version": 8,
+  "version": 9,
   "streamMode": "device",
   "minAppVersion": "1.0.0",
-  "latestAppVersion": "1.0.5",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.5/zenify-v1.0.5.apk",
-  "releaseNotes": "• Persistent floating Dynamic Island header across all screens (Settings, Profile, Room Together, Insights, Albums, Artists, Library)\n• Clean, unified Apple-style profile button dock at top right of Library screen\n• Seamless in-playlist song search with instant add/remove pills and spring haptics\n• High-performance SQLite + JSON store for liked tracks, followed artists, saved albums, and custom playlists\n• Real-time Room Together synchronized collaborative listening with fair queue and sub-millisecond clock sync\n• Pure InnerTube decentralized 160 kbps Opus audio streaming on-device\n• ReplayGain anti-clipping limiter with hyperbolic tangent ceiling",
+  "latestAppVersion": "1.0.6",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.6/zenify-v1.0.6.apk",
+  "releaseNotes": "• Liquid Glass Three-Dock Morphing Island: Bottom dock fluidly collapses on scroll into a compact Apple Music 3-dock layout (Explore launcher, Center mini player with artwork/title/controls, and Search)\n• Apple Music Contextual Dropdown & Action Sheet: Liquid glass modal bottom sheet with 25px blur, #1C1C1E background, song header, 4 circular quick-share shortcuts, and 6 clean action rows with single dividers\n• Featured Artists Bottom Sheet: 60px circular artist avatars, listeners metrics, Apple Music Follow button, and profile viewer\n• Pure typography consistency across app using GoogleFonts.inter\n• Rebuilt search pipeline with multi-tier ranking, transliteration matching, and zero missing titles\n• Real-time Room Together synchronized collaborative listening\n• High-performance SQLite + JSON store with optimized caching",
   "message": null
 }

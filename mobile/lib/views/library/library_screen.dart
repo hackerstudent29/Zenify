@@ -27,6 +27,7 @@ import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_typography.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
@@ -374,30 +375,11 @@ Future<UserPlaylist?> _createPlaylist(BuildContext c, {Track? first}) async {
 
 /// Long-press / ellipsis menu for any song.
 Future<void> _trackActions(BuildContext c, Track t) async {
-  HapticFeedback.mediumImpact();
-  final store = LibraryStore.instance;
-  final liked = store.isLiked(t);
-  final act = await _sheet(
-    c,
-    [
-      _A('like', liked ? Icons.favorite_border_rounded : Icons.favorite_rounded,
-          liked ? 'Remove from Liked Songs' : 'Add to Liked Songs'),
-      const _A('playlist', Icons.playlist_add_rounded, 'Add to Playlist…'),
-      const _A('artist', Icons.person_outline_rounded, 'Go to Artist'),
-    ],
-    title: t.title,
-    message: t.artist,
+  ZenDropdown.showTrackMenu(
+    context: c,
+    track: t,
+    onAddToPlaylist: () => _addToPlaylist(c, t),
   );
-  if (!c.mounted || act == null) return;
-  switch (act) {
-    case 'like':
-      store.toggleLike(t);
-      _toast(c, store.isLiked(t) ? 'Added to Liked Songs' : 'Removed from Liked Songs');
-    case 'playlist':
-      await _addToPlaylist(c, t);
-    case 'artist':
-      _openArtist(c, t.artist);
-  }
 }
 
 Future<void> _addToPlaylist(BuildContext c, Track t) async {

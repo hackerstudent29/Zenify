@@ -18,7 +18,7 @@ import '../../services/auth_service.dart';
 import '../../services/auth_state.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/player_state.dart';
-import '../profile/login_modal.dart';
+import '../auth/welcome_screen.dart';
 import 'widgets/achievements_card.dart';
 import 'widgets/breakdown_chart.dart';
 import 'widgets/discoveries_card.dart';
@@ -407,7 +407,7 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
             Text(
               'YOUR PERSONAL REPLAY & INSIGHTS',
               textAlign: TextAlign.center,
-              style: GoogleFonts.oswald(
+              style: GoogleFonts.inter(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.8,
@@ -426,14 +426,27 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
             ),
             const SizedBox(height: 28),
             PressableScale(
-              onTap: () => showLoginModal(context),
+              scale: 0.95,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                Navigator.of(context).push(
+                  ZenPageRoute(
+                    builder: (_) => WelcomeScreen(
+                      onFinished: () {
+                        Navigator.of(context).pop();
+                        _fetchInsights();
+                      },
+                    ),
+                  ),
+                );
+              },
               child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 28),
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 decoration: BoxDecoration(
                   color: const Color(0xFF18181B),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -442,9 +455,9 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
                     const SizedBox(width: 10),
                     Text(
                       'SIGN IN / CREATE ACCOUNT',
-                      style: GoogleFonts.oswald(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 1.2,
                         color: AppColors.crimson,
                       ),
@@ -479,7 +492,7 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
             const SizedBox(height: 20),
             Text(
               'No Listening History Yet',
-              style: GoogleFonts.oswald(
+              style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,

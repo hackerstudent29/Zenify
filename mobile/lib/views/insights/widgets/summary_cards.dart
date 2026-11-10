@@ -184,7 +184,7 @@ class SummaryCards extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: GoogleFonts.oswald(
+            style: GoogleFonts.inter(
               fontSize: isSecondary ? 16 : 18,
               fontWeight: FontWeight.w700,
               color: Colors.white,

@@ -45,7 +45,7 @@ class DiscoveriesCard extends StatelessWidget {
                   children: [
                     Text(
                       '$discoveriesCount NEW DISCOVERIES',
-                      style: GoogleFonts.oswald(
+                      style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.6,
