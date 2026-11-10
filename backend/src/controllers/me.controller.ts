@@ -110,6 +110,69 @@ export class MeController {
   }
 
   /**
+   * GET /api/me/history
+   */
+  async getHistory(
+    req: FastifyRequest<{
+      Querystring: { cursor?: string; limit?: string; search?: string; source?: string; dateRange?: string };
+    }>,
+    reply: FastifyReply
+  ) {
+    const userId = (req.user as any)?.id;
+    if (!userId) throw reply.server.httpErrors.unauthorized();
+
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    const history = await ListeningService.getHistory(userId, {
+      cursor: req.query.cursor,
+      limit,
+      search: req.query.search,
+      source: req.query.source,
+      dateRange: req.query.dateRange as any,
+    });
+    return reply.send(history);
+  }
+
+  /**
+   * DELETE /api/me/history/:eventId
+   */
+  async deleteHistoryEvent(req: FastifyRequest<{ Params: { eventId: string } }>, reply: FastifyReply) {
+    const userId = (req.user as any)?.id;
+    if (!userId) throw reply.server.httpErrors.unauthorized();
+
+    const result = await ListeningService.deleteEvent(userId, req.params.eventId);
+    return reply.send(result);
+  }
+
+  /**
+   * DELETE /api/me/history
+   */
+  async clearHistory(
+    req: FastifyRequest<{ Querystring: { all?: string; from?: string; to?: string } }>,
+    reply: FastifyReply
+  ) {
+    const userId = (req.user as any)?.id;
+    if (!userId) throw reply.server.httpErrors.unauthorized();
+
+    const isAll = req.query.all === 'true';
+    const from = req.query.from ? new Date(req.query.from) : undefined;
+    const to = req.query.to ? new Date(req.query.to) : undefined;
+
+    const result = await ListeningService.deleteHistory(userId, { all: isAll, from, to });
+    return reply.send(result);
+  }
+
+  /**
+   * GET /api/me/achievements
+   */
+  async getAchievements(req: FastifyRequest, reply: FastifyReply) {
+    const userId = (req.user as any)?.id;
+    if (!userId) throw reply.server.httpErrors.unauthorized();
+
+    const achievements = await ListeningService.getAchievements(userId);
+    return reply.send(achievements);
+  }
+
+  /**
    * GET /api/me/sessions
    */
   async getSessions(req: FastifyRequest, reply: FastifyReply) {

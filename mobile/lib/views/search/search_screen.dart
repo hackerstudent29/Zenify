@@ -17,6 +17,7 @@ import '../../design_system/widgets/media_card.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/song_tile.dart';
 import '../../design_system/zen.dart';
+import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/player_state.dart';
 import '../../services/search_nav.dart';
@@ -299,7 +300,15 @@ class _SearchScreenState extends State<SearchScreen>
 
   void _playSong(List<Track> list, int index) {
     if (list.isEmpty) return;
-    context.read<PlayerState>().setQueue(list, startIndex: index);
+    final startIdx = index.clamp(0, list.length - 1);
+    final ctx = PlaybackContext(
+      type: PlaybackContextType.search,
+      id: _textCtrl.text.trim().isNotEmpty ? _textCtrl.text.trim() : 'search',
+      tracks: list,
+      startTrack: list[startIdx],
+      title: _textCtrl.text.trim(),
+    );
+    context.read<PlayerState>().setQueue(list, startIndex: startIdx, context: ctx);
   }
 
   @override
@@ -365,6 +374,7 @@ class _SearchScreenState extends State<SearchScreen>
               child: DynamicIslandHeader(
                 title: 'Search',
                 showBack: typing,
+                isDockPage: !typing,
                 onBack: () {
                   _cancelSearch();
                   SearchNav.phase.value = SearchPhase.bar; // back to the dock bar
@@ -1160,7 +1170,7 @@ class _SearchScreenState extends State<SearchScreen>
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 135,
+          height: 236,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1175,7 +1185,7 @@ class _SearchScreenState extends State<SearchScreen>
                   subtitle: a.subscribers ?? 'Artist',
                   imageUrl: a.imageUrl,
                   isCircular: true,
-                  width: 90,
+                  width: 170,
                   onTap: () {
                     HapticFeedback.lightImpact();
                     Navigator.push(
@@ -1280,7 +1290,7 @@ class _SearchScreenState extends State<SearchScreen>
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 185,
+          height: 236,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1294,7 +1304,7 @@ class _SearchScreenState extends State<SearchScreen>
                   title: alb.title,
                   subtitle: alb.artist,
                   imageUrl: alb.coverUrl,
-                  width: 130,
+                  width: 170,
                   onTap: () {
                     HapticFeedback.lightImpact();
                     Navigator.push(
@@ -1374,7 +1384,7 @@ class _SearchScreenState extends State<SearchScreen>
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 185,
+          height: 236,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1388,7 +1398,7 @@ class _SearchScreenState extends State<SearchScreen>
                   title: pl.title,
                   subtitle: pl.curator ?? 'Playlist',
                   imageUrl: pl.coverUrl,
-                  width: 130,
+                  width: 170,
                   onTap: () {
                     HapticFeedback.lightImpact();
                     Navigator.push(

@@ -41,22 +41,28 @@ export function TopBar() {
     notify(msg, type);
   };
 
+  const isDockPage =
+    pathname === "/" ||
+    pathname === "/discover" ||
+    pathname === "/liked" ||
+    pathname === "/library";
+
   return (
     <div className="h-full px-4 md:px-6 flex items-center justify-between gap-6 relative pt-[env(safe-area-inset-top,0px)]">
       {/* Left side: Navigation / Logo + Universal Back Button + Spotlight Search + Sticky Title */}
       <div className="flex items-center gap-2.5 md:gap-3 shrink-0">
-        {/* Mobile Logo on Home */}
-        {isMobile && pathname === "/" && (
+        {/* Mobile Logo on Dock Pages */}
+        {isMobile && isDockPage && (
           <div
             className="flex items-center gap-2 group cursor-pointer shrink-0"
             onClick={() => router.push("/")}
           >
-            <ZenifyLogo size={48} />
+            <ZenifyLogo size={40} />
           </div>
         )}
 
         {/* Universal Back Button beside search (desktop, tablet, mobile) */}
-        {pathname !== "/" && (
+        {!isDockPage && (
           <button
             type="button"
             onClick={() => router.back()}

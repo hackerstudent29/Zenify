@@ -137,6 +137,50 @@ class ListeningHistoryService {
     return top.key;
   }
 
+  /// Returns user's second most-listened artist.
+  String? getSecondFavoriteArtist() {
+    final top = getTopArtists(limit: 2);
+    if (top.length >= 2) return top[1].name;
+    return null;
+  }
+
+  /// Returns older tracks from history (skipped first 5 recent) to rediscover.
+  List<Track> getRediscoverTracks({int limit = 10}) {
+    if (_history.length <= 5) return const [];
+    return _history.skip(5).take(limit).toList();
+  }
+
+  /// Returns time-of-day greeting, contextual mood, and targeted search term.
+  static ({String greeting, String moodLabel, String defaultSearchTerm}) getTimeOfDayContext(String preferredLanguage) {
+    final hour = DateTime.now().hour;
+    final langPrefix = preferredLanguage.isNotEmpty ? '$preferredLanguage ' : '';
+    if (hour >= 5 && hour < 12) {
+      return (
+        greeting: 'Good morning',
+        moodLabel: 'Morning Acoustic & Energize',
+        defaultSearchTerm: '${langPrefix}morning acoustic hits',
+      );
+    } else if (hour >= 12 && hour < 17) {
+      return (
+        greeting: 'Good afternoon',
+        moodLabel: 'Focus & Midday Flow',
+        defaultSearchTerm: '${langPrefix}midday flow songs',
+      );
+    } else if (hour >= 17 && hour < 21) {
+      return (
+        greeting: 'Good evening',
+        moodLabel: 'Evening Melodies & Unwind',
+        defaultSearchTerm: '${langPrefix}evening chill melodies',
+      );
+    } else {
+      return (
+        greeting: 'Late night vibes',
+        moodLabel: 'Midnight Melodies & Ambient',
+        defaultSearchTerm: '${langPrefix}midnight melodies',
+      );
+    }
+  }
+
   /// Returns recently played tracks up to [limit].
   List<Track> getRecentTracks({int limit = 20}) {
     return _history.take(limit).toList();

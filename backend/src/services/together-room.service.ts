@@ -56,6 +56,9 @@ export interface TogetherRoomState {
   queue: TogetherQueueItem[];
   player: TogetherPlayerState;
   chat: TogetherChatMessage[];
+  skipVotes: string[];
+  reactions: Record<string, number>;
+  seq: number;
   createdAt: number;
 }
 
@@ -194,6 +197,9 @@ export class TogetherRoomService {
         startedAtServerMs: 0,
       },
       chat: [],
+      skipVotes: [],
+      reactions: { '❤️': 0, '🔥': 0, '👏': 0, '😭': 0 },
+      seq: 1,
       createdAt: Date.now(),
     };
 
@@ -216,13 +222,19 @@ export class TogetherRoomService {
         activeRooms.set(normalized, room);
       }
     }
+    if (room) {
+      if (!room.skipVotes) room.skipVotes = [];
+      if (!room.reactions) room.reactions = { '❤️': 0, '🔥': 0, '👏': 0, '😭': 0 };
+      if (!room.seq) room.seq = 1;
+    }
     return room || null;
   }
 
   /**
-   * Persist room state
+   * Persist room state (increments sequence number for gap detection)
    */
   static async saveRoom(room: TogetherRoomState): Promise<void> {
+    room.seq = (room.seq || 0) + 1;
     activeRooms.set(room.roomCode, room);
     await setCacheVal(`together:room:${room.roomCode}`, room, 43200);
   }
@@ -328,7 +340,7 @@ export class TogetherRoomService {
   }
 
   /**
-   * Add a track to room queue
+   * Add a track to room queue with Fair Queue limits and duplicate protection
    */
   static async addQueueItem(
     code: string,
@@ -338,9 +350,21 @@ export class TogetherRoomService {
     const room = await this.getRoom(code);
     if (!room) throw new Error('Room not found');
 
+    // 1. Fair queue per-user cap (non-hosts max 3 tracks queued)
+    const userCount = room.queue.filter((q) => q.addedByUserId === addedByUser.id).length;
+    if (userCount >= 3 && room.hostId !== addedByUser.id) {
+      throw new Error('Queue limit reached (max 3 tracks per listener)');
+    }
+
+    // 2. Duplicate prevention (check current song & queue)
+    const trackId = track.id || track.videoId;
+    if (room.player.trackId === trackId || room.queue.some((q) => q.trackId === trackId)) {
+      throw new Error('This track is already playing or in queue');
+    }
+
     const item: TogetherQueueItem = {
       id: crypto.randomUUID(),
-      trackId: track.id,
+      trackId,
       track,
       addedByUserId: addedByUser.id,
       addedByName: addedByUser.name,
@@ -350,6 +374,42 @@ export class TogetherRoomService {
     room.queue.push(item);
     await this.saveRoom(room);
     return { room, item };
+  }
+
+  /**
+   * Cast a vote to skip the current track
+   */
+  static async voteSkip(
+    code: string,
+    userId: string
+  ): Promise<{ room: TogetherRoomState; skipped: boolean; votes: number; needed: number }> {
+    const room = await this.getRoom(code);
+    if (!room) throw new Error('Room not found');
+
+    if (!room.skipVotes) room.skipVotes = [];
+    if (!room.skipVotes.includes(userId)) {
+      room.skipVotes.push(userId);
+    }
+
+    const totalListeners = Math.max(1, room.members.length);
+    const needed = Math.max(1, Math.ceil(totalListeners * 0.5));
+    let skipped = false;
+
+    if (room.skipVotes.length >= needed && room.queue.length > 0) {
+      const nextItem = room.queue.shift()!;
+      room.player = {
+        trackId: nextItem.trackId,
+        track: nextItem.track,
+        state: 'playing',
+        positionSec: 0,
+        startedAtServerMs: Date.now() + 1500, // 1.5s barrier for synchronized start
+      };
+      room.skipVotes = [];
+      skipped = true;
+    }
+
+    await this.saveRoom(room);
+    return { room, skipped, votes: room.skipVotes.length, needed };
   }
 
   /**

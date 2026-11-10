@@ -12,6 +12,7 @@ import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
+import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
@@ -405,9 +406,21 @@ class _AlbumScreenState extends State<AlbumScreen> {
   void _play(int i, {bool shuffle = false}) {
     if (_tracks.isEmpty) return;
     HapticFeedback.mediumImpact();
-    final q = List<Track>.of(_tracks);
-    if (shuffle) q.shuffle();
-    context.read<PlayerState>().setQueue(q, startIndex: shuffle ? 0 : i, collectionLocked: true);
+    final startIdx = i.clamp(0, _tracks.length - 1);
+    final ctx = PlaybackContext(
+      type: PlaybackContextType.album,
+      id: widget.albumTitle,
+      tracks: _tracks,
+      startTrack: _tracks[startIdx],
+      title: widget.albumTitle,
+    );
+    context.read<PlayerState>().setQueue(
+      _tracks,
+      startIndex: startIdx,
+      shuffle: shuffle,
+      collectionLocked: true,
+      context: ctx,
+    );
   }
 
   void _openAlbum(_Release r) => Navigator.push(

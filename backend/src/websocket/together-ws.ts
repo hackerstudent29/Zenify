@@ -161,7 +161,7 @@ export async function registerTogetherWebSocket(server: FastifyInstance) {
               break;
             }
 
-            // Playback: Host Play with 500ms Barrier
+            // Playback: Host Play with 1500ms Scheduled Barrier for sub-second sync
             case 'HOST_PLAY': {
               const currentRoom = await TogetherRoomService.getRoom(roomCode);
               if (!currentRoom) return;
@@ -170,7 +170,7 @@ export async function registerTogetherWebSocket(server: FastifyInstance) {
                 return;
               }
 
-              const startAtServerMs = Date.now() + 500; // 500ms barrier
+              const startAtServerMs = Date.now() + 1500; // 1.5s barrier for device buffering & lockstep start
               const track = payload.track || currentRoom.player.track;
               const positionSec = Number(payload.positionSec) || 0;
 
@@ -181,6 +181,7 @@ export async function registerTogetherWebSocket(server: FastifyInstance) {
                 positionSec,
                 startedAtServerMs: startAtServerMs,
               };
+              currentRoom.skipVotes = [];
               await TogetherRoomService.saveRoom(currentRoom);
 
               broadcastToRoom(roomCode, {
@@ -190,6 +191,8 @@ export async function registerTogetherWebSocket(server: FastifyInstance) {
                 positionSec,
                 startAtServerMs,
                 initiatedBy: username,
+                skipVotes: [],
+                seq: currentRoom.seq,
               });
               break;
             }
@@ -285,17 +288,70 @@ export async function registerTogetherWebSocket(server: FastifyInstance) {
               break;
             }
 
-            // Reaction Emoji burst (❤️, 🔥, 👏, 😭, 💃, 🎧)
+            // Skip Vote with configurable threshold
+            case 'SKIP_VOTE': {
+              const result = await TogetherRoomService.voteSkip(roomCode, userId);
+              if (result.skipped) {
+                broadcastToRoom(roomCode, {
+                  type: 'PLAY_AT',
+                  trackId: result.room.player.trackId,
+                  track: result.room.player.track,
+                  positionSec: 0,
+                  startAtServerMs: result.room.player.startedAtServerMs,
+                  initiatedBy: 'Vote Skip',
+                  skipVotes: [],
+                  seq: result.room.seq,
+                });
+                broadcastToRoom(roomCode, {
+                  type: 'QUEUE_UPDATED',
+                  queue: result.room.queue,
+                  seq: result.room.seq,
+                });
+              } else {
+                broadcastToRoom(roomCode, {
+                  type: 'SKIP_VOTES_UPDATED',
+                  votes: result.votes,
+                  needed: result.needed,
+                  voters: result.room.skipVotes,
+                });
+              }
+              break;
+            }
+
+            // Reaction with real-time aggregated counters (❤️, 🔥, 👏, 😭, 💃, 🎧)
             case 'REACTION': {
               const emoji = String(payload.emoji || '❤️').slice(0, 4);
+              const currentRoom = await TogetherRoomService.getRoom(roomCode);
+              if (currentRoom) {
+                if (!currentRoom.reactions) currentRoom.reactions = {};
+                currentRoom.reactions[emoji] = (currentRoom.reactions[emoji] || 0) + 1;
+                await TogetherRoomService.saveRoom(currentRoom);
+              }
               broadcastToRoom(roomCode, {
                 type: 'REACTION',
                 id: crypto.randomUUID(),
                 userId,
                 username,
                 emoji,
+                reactions: currentRoom?.reactions || {},
                 timestamp: Date.now(),
               });
+              break;
+            }
+
+            // Client requests full room snapshot (e.g. sequence gap or reconnect)
+            case 'REQUEST_RESYNC': {
+              const currentRoom = await TogetherRoomService.getRoom(roomCode);
+              if (currentRoom) {
+                socket.send(
+                  JSON.stringify({
+                    type: 'INIT_STATE',
+                    room: currentRoom,
+                    self: { userId, username, avatar, role },
+                    serverTime: Date.now(),
+                  })
+                );
+              }
               break;
             }
 

@@ -2,13 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' hide RepeatMode;
+import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/tokens/app_colors.dart';
+import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/player_state.dart';
 import '../../services/queue_state.dart';
@@ -315,23 +316,21 @@ class _QueuePanelState extends State<QueuePanel> {
           const Spacer(),
           _QueueToggle(
             icon: CupertinoIcons.shuffle,
-            active: p.isShuffle,
+            active: q.shuffle,
             onTap: () {
               HapticFeedback.selectionClick();
-              p.toggleShuffle();
-              if (!p.isShuffle) return;
-              q.shuffleUpNext();
+              q.toggleShuffle();
             },
           ),
           const SizedBox(width: 8),
           _QueueToggle(
-            icon: p.repeatMode == ZenifyRepeatMode.one
+            icon: q.repeatMode == RepeatMode.one
                 ? CupertinoIcons.repeat_1
                 : CupertinoIcons.repeat,
-            active: p.repeatMode != ZenifyRepeatMode.off,
+            active: q.repeatMode != RepeatMode.off,
             onTap: () {
               HapticFeedback.selectionClick();
-              p.toggleRepeat();
+              q.cycleRepeat();
             },
           ),
           const SizedBox(width: 8),

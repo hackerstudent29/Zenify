@@ -10,7 +10,6 @@ import 'package:provider/provider.dart';
 
 import '../../services/auth_state.dart';
 import '../../views/profile/profile_screen.dart';
-import '../tokens/app_colors.dart';
 import 'apple_glass.dart';
 import 'monogram_avatar.dart';
 import 'pressable_scale.dart';
@@ -45,6 +44,8 @@ class DynamicIslandHeader extends StatefulWidget {
     this.horizontalMargin = 14.0,
     this.scrollController,
     this.revealOffset = 120,
+    this.isDockPage,
+    this.onCenterTap,
   });
 
   final String title;
@@ -66,6 +67,13 @@ class DynamicIslandHeader extends StatefulWidget {
 
   /// Scroll offset at which the centre pill spawns.
   final double revealOffset;
+
+  /// Whether this header is on a root page in the persistent navbar dock.
+  /// When true, renders the full transparent Zenify logo on the left.
+  final bool? isDockPage;
+
+  /// Optional tap handler for the centre island pill.
+  final VoidCallback? onCenterTap;
 
   @override
   State<DynamicIslandHeader> createState() => _DynamicIslandHeaderState();
@@ -131,13 +139,14 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
     // Sits slightly lower than before (+4px).
     final top = widget.topPadding ?? (MediaQuery.paddingOf(context).top + 10);
     final canPop = widget.showBack ?? Navigator.canPop(context);
+    final isDock = widget.isDockPage ?? (!canPop && widget.showBack != true);
     final hasTitle = widget.showCenter && (widget.title.trim().isNotEmpty || widget.centerWidget != null);
 
     final double h = widget.height;
     // Symmetrical clearance so the Dynamic Island pill remains dead-center relative to screen
-    // Left dock is 44px, right dock is 44px (profile or trailing action).
-    // sideClearance = 44 + 8 = 52px ensures ample breathing room and prevents congestion.
-    final double leftDockW = h;
+    // On dock root pages, the full transparent logo is ~86px wide.
+    // On subpages with back button, left dock is 44px.
+    final double leftDockW = isDock ? 92.0 : h;
     final double rightDockW = widget.trailing != null
         ? 44.0
         : (widget.showProfile ? h : 0.0);
@@ -163,6 +172,11 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: () {
+                          if (widget.onCenterTap != null) {
+                            HapticFeedback.lightImpact();
+                            widget.onCenterTap!();
+                            return;
+                          }
                           final sc = widget.scrollController;
                           if (sc != null && sc.hasClients && sc.offset > 0) {
                             HapticFeedback.lightImpact();
@@ -201,7 +215,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
             // Left Dock
             Align(
               alignment: Alignment.centerLeft,
-              child: _buildLeftDock(context, canPop),
+              child: _buildLeftDock(context, canPop, isDock),
             ),
 
             // Right Dock
@@ -215,9 +229,43 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
     );
   }
 
-  Widget _buildLeftDock(BuildContext context, bool canPop) {
+  Widget _buildLeftDock(BuildContext context, bool canPop, bool isDock) {
     if (widget.leading != null) return widget.leading!;
     final h = widget.height;
+
+    if (isDock) {
+      return PressableScale(
+        scale: 0.94,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          final sc = widget.scrollController;
+          if (sc != null && sc.hasClients && sc.offset > 0) {
+            sc.animateTo(
+              0,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        },
+        child: SizedBox(
+          height: h,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Image.asset(
+              'assets/images/zenify_logo.png',
+              height: 26,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (_, _, _) => Image.asset(
+                'assets/images/z_logo.png',
+                height: 24,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return PressableScale(
       scale: 0.88,
@@ -235,17 +283,8 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
         child: SizedBox(
           width: h,
           height: h,
-          child: Center(
-            child: canPop
-                ? const Icon(CupertinoIcons.chevron_back, color: Colors.white, size: 20)
-                : Image.asset(
-                    'assets/images/z_logo.png',
-                    width: 20,
-                    height: 20,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) =>
-                        const Icon(CupertinoIcons.music_note_2, color: AppColors.crimson, size: 18),
-                  ),
+          child: const Center(
+            child: Icon(CupertinoIcons.chevron_back, color: Colors.white, size: 20),
           ),
         ),
       ),

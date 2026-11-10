@@ -7,10 +7,11 @@ import 'data/datasources/catalog_datasource.dart';
 import 'design_system/zen.dart';
 import 'services/player_state.dart';
 import 'services/queue_state.dart';
+import 'services/smart_queue_engine.dart';
+import 'services/together_service.dart';
 import 'services/studio_fx_state.dart';
 import 'services/auth_state.dart';
 import 'services/country_service.dart';
-import 'services/innertube_service.dart';
 import 'services/listening_history_service.dart';
 import 'services/listening_tracker_service.dart';
 import 'services/settings_service.dart';
@@ -33,6 +34,16 @@ void main() async {
   final studioFxState = StudioFxState();
   await studioFxState.load();
   playerState.attachStudioFx(studioFxState);
+
+  final queueState = QueueState();
+  queueState.autoplayProvider = (seed, excludeIds, excludeSignatures) =>
+      SmartQueueEngine.fetchAndRank(
+        seed: seed,
+        existingIds: excludeIds,
+        existingSignatures: excludeSignatures,
+        count: SmartQueueWeights.targetQueueSize,
+      );
+  playerState.attachQueue(queueState);
   await LibraryStore.instance.ensureLoaded();
 
   // Initialize background media notifications and lock screen controls
@@ -69,6 +80,7 @@ void main() async {
       builder: (context) => ZenifyMobileApp(
         playerState: playerState,
         studioFxState: studioFxState,
+        queueState: queueState,
       ),
     ),
   );
@@ -79,10 +91,12 @@ class ZenifyMobileApp extends StatelessWidget {
     super.key,
     this.playerState,
     this.studioFxState,
+    this.queueState,
   });
 
   final PlayerState? playerState;
   final StudioFxState? studioFxState;
+  final QueueState? queueState;
 
   static final ThemeData _theme = zenDarkTheme();
 
@@ -90,19 +104,23 @@ class ZenifyMobileApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final fx = studioFxState ?? StudioFxState();
     final player = playerState ?? (PlayerState()..attachStudioFx(fx));
+    final queue = queueState ?? QueueState();
+    queue.autoplayProvider ??= (seed, excludeIds, excludeSignatures) =>
+        SmartQueueEngine.fetchAndRank(
+          seed: seed,
+          existingIds: excludeIds,
+          existingSignatures: excludeSignatures,
+          count: SmartQueueWeights.targetQueueSize,
+        );
+    player.attachQueue(queue);
+    final together = TogetherService.instance..attachPlayer(player);
 
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<StudioFxState>.value(value: fx),
         ChangeNotifierProvider<PlayerState>.value(value: player),
-        ChangeNotifierProvider(create: (_) {
-          final q = QueueState();
-          q.autoplayProvider = (seed, exclude) async {
-            final nextSongs = await InnerTubeService.instance.getNextQueue(seed.id);
-            return nextSongs.where((t) => !exclude.contains(t.id)).toList();
-          };
-          return q;
-        }),
+        ChangeNotifierProvider<QueueState>.value(value: queue),
+        ChangeNotifierProvider<TogetherService>.value(value: together),
         ChangeNotifierProvider(create: (_) => AuthState()),
         ChangeNotifierProvider<SettingsState>.value(value: SettingsState.instance),
       ],

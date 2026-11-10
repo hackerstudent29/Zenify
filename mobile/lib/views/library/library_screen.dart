@@ -28,6 +28,7 @@ import '../../design_system/tokens/app_typography.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/spring_kit.dart';
+import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
@@ -228,13 +229,26 @@ class _SpringVisibleState extends State<_SpringVisible> with SingleTickerProvide
 void _play(BuildContext c, List<Track> l, int i) {
   if (l.isEmpty) return;
   HapticFeedback.lightImpact();
-  c.read<PlayerState>().setQueue(l, startIndex: i, collectionLocked: true);
+  final startIdx = i.clamp(0, l.length - 1);
+  final ctx = PlaybackContext(
+    type: PlaybackContextType.library,
+    id: 'library',
+    tracks: l,
+    startTrack: l[startIdx],
+  );
+  c.read<PlayerState>().setQueue(l, startIndex: startIdx, collectionLocked: true, context: ctx);
 }
 
 void _shuffle(BuildContext c, List<Track> l) {
   if (l.isEmpty) return;
   HapticFeedback.lightImpact();
-  c.read<PlayerState>().setQueue(List.of(l)..shuffle(), startIndex: 0, collectionLocked: true);
+  final ctx = PlaybackContext(
+    type: PlaybackContextType.library,
+    id: 'library',
+    tracks: l,
+    startTrack: l.first,
+  );
+  c.read<PlayerState>().setQueue(l, startIndex: 0, shuffle: true, collectionLocked: true, context: ctx);
 }
 
 Future<T?> _push<T>(BuildContext c, Widget page, {bool modal = false}) {
@@ -515,6 +529,7 @@ Widget _page({
                   child: DynamicIslandHeader(
                     title: title,
                     showBack: !root,
+                    isDockPage: root,
                     onBack: () => Navigator.maybePop(context),
                     showProfile: true,
                     trailing: trailing,

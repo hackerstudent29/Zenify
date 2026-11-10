@@ -17,9 +17,10 @@ import 'listening_history_service.dart';
 import 'listening_tracker_service.dart';
 import 'lyrics_service.dart';
 import 'permission_service.dart';
+import 'queue_state.dart';
 import 'stream_resolver_service.dart';
 
-enum ZenifyRepeatMode { off, all, one }
+typedef ZenifyRepeatMode = RepeatMode;
 
 /// Player controller modelled on Apple Music behaviour.
 ///
@@ -116,6 +117,7 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
   // Studio FX Engine Connection
   StudioFxState? _fxState;
+  QueueState? _queueState;
 
   FxEngine get fxEngine => _audioPlayer;
 
@@ -123,6 +125,14 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     if (_fxState == fx) return;
     _fxState = fx;
     fx.attachEngine(_audioPlayer);
+  }
+
+  void attachQueue(QueueState queue) {
+    if (_queueState == queue) return;
+    _queueState = queue;
+    if (_currentTrack != null && queue.current == null) {
+      queue.syncCurrent(_currentTrack);
+    }
   }
 
   void _onStudioFxChanged() {
@@ -136,17 +146,13 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   bool get isPlaying => _isPlaying;
   @override
   bool get isBuffering => _isBuffering;
-  bool get isShuffle => _isShuffle;
+  bool get isShuffle => _queueState?.shuffle ?? _isShuffle;
   @override
-  bool get shuffle => _isShuffle;
-  bool get autoplay => _autoplay;
-  ZenifyRepeatMode get repeatMode => _repeatMode;
+  bool get shuffle => _queueState?.shuffle ?? _isShuffle;
+  bool get autoplay => _queueState?.autoplay ?? _autoplay;
+  ZenifyRepeatMode get repeatMode => _queueState?.repeatMode ?? _repeatMode;
   @override
-  RepeatMode get repeat => switch (_repeatMode) {
-    ZenifyRepeatMode.off => RepeatMode.off,
-    ZenifyRepeatMode.all => RepeatMode.all,
-    ZenifyRepeatMode.one => RepeatMode.one,
-  };
+  RepeatMode get repeat => _queueState?.repeatMode ?? _repeatMode;
   @override
   Duration get duration => _duration;
   @override
@@ -169,11 +175,22 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   List<Track> get history => List.unmodifiable(_history);
 
   @override
-  bool get hasNext =>
-      _currentIndex < _queue.length - 1 || _repeatMode == ZenifyRepeatMode.all;
+  bool get hasNext {
+    if (_repeatMode == ZenifyRepeatMode.all) return true;
+    if (_queueState != null) {
+      return _queueState!.hasNext || (_autoplay && !_collectionLocked);
+    }
+    return _currentIndex < _queue.length - 1 || (_autoplay && !_collectionLocked);
+  }
+
   @override
-  bool get hasPrevious =>
-      _currentIndex > 0 || _repeatMode == ZenifyRepeatMode.all;
+  bool get hasPrevious {
+    if (_repeatMode == ZenifyRepeatMode.all) return true;
+    if (_queueState != null) {
+      return _queueState!.hasPrevious;
+    }
+    return _currentIndex > 0;
+  }
 
   List<Map<String, dynamic>> get lyricsLines => _lyricsLines;
   bool get isLoadingLyrics => _isLoadingLyrics;
@@ -271,131 +288,14 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   }
 
   Future<void> _onComplete() async {
-    final now = DateTime.now();
-    if (_lastTransitionHandled != null &&
-        now.difference(_lastTransitionHandled!) <
-            const Duration(milliseconds: 1400)) {
-      return;
-    }
-    _lastTransitionHandled = now;
-
-    ListeningTrackerService.instance.endTrack('completed');
-    if (_sleepAtEndOfTrack) {
-      _clearSleep();
-      _isPlaying = false;
-      _setPosition(Duration.zero);
-      notifyListeners();
-      return;
-    }
-    if (_repeatMode == ZenifyRepeatMode.one) {
-      await seek(Duration.zero);
-      try {
-        await _audioPlayer.resume();
-      } catch (_) {}
-      return;
-    }
-    await next();
+    await advance(reason: AdvanceReason.trackCompleted);
   }
 
   Future<void> _onAutoTransition(String mediaId) async {
-    final now = DateTime.now();
-    if (_lastTransitionHandled != null &&
-        now.difference(_lastTransitionHandled!) <
-            const Duration(milliseconds: 1400)) {
-      return;
-    }
-    _lastTransitionHandled = now;
-
-    ListeningTrackerService.instance.endTrack('completed');
-    if (_sleepAtEndOfTrack) {
-      _clearSleep();
-      _isPlaying = false;
-      _setPosition(Duration.zero);
-      notifyListeners();
-      return;
-    }
-
-    if (_repeatMode == ZenifyRepeatMode.one) {
-      await seek(Duration.zero);
-      return;
-    }
-
-    int nextIndex = _currentIndex + 1;
-    bool needsForcePlay = false;
-
-    if (mediaId.isNotEmpty) {
-      final clean = mediaId.replaceFirst('yt-', '').trim();
-      final idx = _queue.indexWhere(
-        (t) => t.id.replaceFirst('yt-', '').trim() == clean,
-      );
-      if (idx >= 0) {
-        nextIndex = idx;
-      } else {
-        // Foreign / outdated track in native ExoPlayer -> force play real queue track
-        needsForcePlay = true;
-      }
-    }
-
-    if (nextIndex < _queue.length) {
-      _currentIndex = nextIndex;
-    } else if (_repeatMode == ZenifyRepeatMode.all) {
-      _currentIndex = 0;
-      needsForcePlay = true;
-    } else if (!_collectionLocked && _autoplay && await _appendRelated()) {
-      _currentIndex++;
-      needsForcePlay = true;
-    } else {
-      await _endOfQueue();
-      return;
-    }
-
-    if (needsForcePlay) {
-      await _startCurrent();
-      return;
-    }
-
-    final track = _queue[_currentIndex];
-    final token = ++_playToken;
-    _currentTrack = track;
-    LibraryStore.instance.registerTrack(track);
-    _isTransitioning = false;
-    _pausing = false;
-    _isBuffering = false;
-    _isPlaying = true;
-    _lastError = null;
-    _isScrubbing = false;
-    scrubbingNotifier.value = false;
-    _seekTarget = null;
-    _duration = Duration(seconds: track.durationSeconds);
-    _setPosition(Duration.zero);
-    _pushHistory(track);
-    ListeningTrackerService.instance.startTrack(
-      trackId: track.id,
-      trackTitle: track.title,
-      trackAlbum: track.album,
-      trackDurationMs: track.durationSeconds * 1000,
-      artists: [
-        {
-          'artistKey': track.artist,
-          'artistName': track.artist,
-          'isPrimary': true,
-        },
-      ],
+    await advance(
+      reason: AdvanceReason.trackCompleted,
+      autoTransitionMediaId: mediaId,
     );
-    notifyListeners();
-
-    _playedSessionTrackIds.add(track.id);
-    _playedSessionTrackIds.add(track.id.replaceFirst('yt-', ''));
-
-    unawaited(_loadLyricsForTrack(track, token));
-    unawaited(_resolveAccent(track, token));
-    _prefetchNext();
-
-    if (!_collectionLocked &&
-        _autoplay &&
-        (_queue.length - _currentIndex) <= 4) {
-      unawaited(_appendRelated());
-    }
   }
 
   void _setPosition(Duration pos) {
@@ -417,26 +317,36 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     int startIndex = 0,
     bool? shuffle,
     bool collectionLocked = false,
+    PlaybackContext? context,
   }) async {
     if (tracks.isEmpty) return;
     _collectionLocked = collectionLocked;
-    // Wipe previous gapless next track in native player so it never leaks
+    _queueState?.setCollectionLocked(collectionLocked);
     unawaited(_audioPlayer.setNext(null));
+
+    final ctx = context ??
+        PlaybackContext(
+          type: collectionLocked ? PlaybackContextType.album : PlaybackContextType.queueOnly,
+          id: 'ctx_${DateTime.now().millisecondsSinceEpoch}',
+          tracks: tracks,
+          startTrack: tracks[startIndex.clamp(0, tracks.length - 1)],
+        );
+
+    final doShuffle = shuffle ?? (_queueState?.shuffle ?? _isShuffle);
+    _isShuffle = doShuffle;
+
+    if (_queueState != null) {
+      _queueState!.setContext(ctx, startIndex: startIndex, shuffle: doShuffle);
+      final cur = _queueState!.current;
+      if (cur != null) {
+        await _startCurrentTrack(cur);
+        return;
+      }
+    }
 
     _originalQueue = List.of(tracks);
     _queue = List.of(tracks);
     _currentIndex = startIndex.clamp(0, _queue.length - 1);
-    _autoplayStartIndex = null;
-
-    final doShuffle = shuffle ?? _isShuffle;
-    _isShuffle = doShuffle;
-    if (doShuffle) {
-      final first = _queue[_currentIndex];
-      final others = List<Track>.of(_queue)..removeAt(_currentIndex);
-      others.shuffle(_rng);
-      _queue = [first, ...others];
-      _currentIndex = 0;
-    }
     await _startCurrent();
   }
 
@@ -452,7 +362,10 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
   /// Play one track. If it is in the queue the queue is kept, otherwise it is
   /// inserted right after the current song.
-  Future<void> playTrack(Track track) async {
+  Future<void> playTrack(Track track, {bool syncQueue = true}) async {
+    if (syncQueue) {
+      _queueState?.syncCurrent(track);
+    }
     final idx = _queue.indexWhere((t) => t.id == track.id);
     if (idx >= 0) {
       _currentIndex = idx;
@@ -467,6 +380,7 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
   /// "Play Next": insert directly after the current song.
   void playNext(Track track) {
+    _queueState?.playNext(track);
     if (_queue.isEmpty) {
       setQueue([track]);
       return;
@@ -481,6 +395,7 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
   /// "Play Last": append to the end of Up Next.
   void playLast(Track track) {
+    _queueState?.addToQueue(track);
     if (_queue.isEmpty) {
       setQueue([track]);
       return;
@@ -489,6 +404,32 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     _originalQueue.add(track);
     HapticFeedback.lightImpact();
     notifyListeners();
+  }
+
+  /// Tap a row in "Playing Next": advance directly to this queue entry.
+  Future<void> jumpTo(QueueEntry e) async {
+    _queueState?.jumpTo(e);
+    await _startCurrentTrack(e.track);
+  }
+
+  /// Tap a row in "History": rewind and play from history.
+  Future<void> playFromHistory(QueueEntry e) async {
+    _queueState?.playFromHistory(e);
+    await _startCurrentTrack(e.track);
+  }
+
+  Future<void> _startCurrentTrack(Track track) async {
+    _currentTrack = track;
+    final idx = _queue.indexWhere((t) => t.id == track.id);
+    if (idx >= 0) {
+      _currentIndex = idx;
+    } else {
+      final at = _queue.isEmpty ? 0 : _currentIndex + 1;
+      _queue.insert(at, track);
+      _originalQueue.add(track);
+      _currentIndex = at;
+    }
+    await _startCurrent();
   }
 
   void removeFromQueue(int index) {
@@ -534,7 +475,22 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
   // ---- Transport ------------------------------------------------------------------
 
-  Future<void> _startCurrent() async {
+  /// Plays a track directly (used by search, library, and Room Together)
+  Future<void> playMedia(Track track, {int? startMs, String source = 'manual'}) async {
+    _currentTrack = track;
+    final idx = _queue.indexWhere((t) => t.id == track.id);
+    if (idx >= 0) {
+      _currentIndex = idx;
+    } else {
+      final at = _queue.isEmpty ? 0 : _currentIndex + 1;
+      _queue.insert(at, track);
+      _originalQueue.add(track);
+      _currentIndex = at;
+    }
+    await _startCurrent(startMs: startMs, source: source);
+  }
+
+  Future<void> _startCurrent({int? startMs, String source = 'manual'}) async {
     if (_queue.isEmpty) return;
     _currentIndex = _currentIndex.clamp(0, _queue.length - 1);
     final track = _queue[_currentIndex];
@@ -554,7 +510,7 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     scrubbingNotifier.value = false;
     _seekTarget = null;
     _duration = Duration(seconds: track.durationSeconds);
-    _setPosition(Duration.zero);
+    _setPosition(startMs != null ? Duration(milliseconds: startMs) : Duration.zero);
     _pushHistory(track);
     ListeningTrackerService.instance.startTrack(
       trackId: track.id,
@@ -576,7 +532,7 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
     try {
       await _applyVolume(0);
-      await _playWithFallback(track, token);
+      await _playWithFallback(track, token, startMs: startMs);
       if (token != _playToken) return;
 
       _onStudioFxChanged();
@@ -606,7 +562,7 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     }
   }
 
-  Future<void> _playWithFallback(Track track, int token) async {
+  Future<void> _playWithFallback(Track track, int token, {int? startMs}) async {
     if (token != _playToken) return;
     _isPlaying = true;
     _isBuffering = true;
@@ -628,6 +584,7 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
           title: track.title,
           artist: track.artist,
           artworkUrl: track.coverUrl,
+          startMs: startMs,
         );
         return;
       } catch (e) {
@@ -684,9 +641,25 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   }
 
   void _prefetchNext() {
-    final n = _currentIndex + 1;
-    if (n < _queue.length) {
-      final nextTrack = _queue[n];
+    Track? nextTrack;
+    List<String> lookahead = [];
+
+    if (_queueState != null && _queueState!.hasNext) {
+      nextTrack = _queueState!.upNext.first.track;
+      lookahead = _queueState!.upNext
+          .skip(1)
+          .take(2)
+          .map((e) => e.track.id)
+          .toList();
+    } else {
+      final n = _currentIndex + 1;
+      if (n < _queue.length) {
+        nextTrack = _queue[n];
+        lookahead = _queue.skip(n + 1).take(2).map((t) => t.id).toList();
+      }
+    }
+
+    if (nextTrack != null) {
       unawaited(ApiService.prefetchLyrics(nextTrack));
       // Gapless next track setup & native engine prefetch with metadata
       unawaited(
@@ -697,8 +670,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
           artworkUrl: nextTrack.coverUrl,
         ),
       );
-      final lookahead = _queue.skip(n).take(2).map((t) => t.id).toList();
-      unawaited(_audioPlayer.prefetch(lookahead));
+      if (lookahead.isNotEmpty) {
+        unawaited(_audioPlayer.prefetch(lookahead));
+      }
     } else {
       // Clear next item in native player at queue boundary so it doesn't auto-transition
       unawaited(_audioPlayer.setNext(null));
@@ -804,41 +778,149 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   }
 
   // ---- Skip -----------------------------------------------------------------------
-  @override
-  Future<void> next() async {
-    if (_queue.isEmpty) return;
-    _lastTransitionHandled = DateTime.now();
-    ListeningTrackerService.instance.endTrack('skipped');
-    if (_currentIndex < _queue.length - 1) {
-      _currentIndex++;
-    } else if (_repeatMode == ZenifyRepeatMode.all) {
-      _currentIndex = 0;
-    } else if (!_collectionLocked && _autoplay && await _appendRelated()) {
-      _currentIndex++;
-    } else {
+  // ---- Unified Advance & Skip -----------------------------------------------------
+
+  /// The SINGLE advance path across UI next, background/notification controls,
+  /// and track completion events.
+  Future<void> advance({
+    required AdvanceReason reason,
+    String? autoTransitionMediaId,
+  }) async {
+    final now = DateTime.now();
+    // Guard against completion events firing twice in rapid succession (<800ms)
+    if (reason == AdvanceReason.trackCompleted &&
+        _lastTransitionHandled != null &&
+        now.difference(_lastTransitionHandled!) <
+            const Duration(milliseconds: 800)) {
+      return;
+    }
+    _lastTransitionHandled = now;
+
+    ListeningTrackerService.instance.endTrack(
+      reason == AdvanceReason.trackCompleted ? 'completed' : 'skipped',
+    );
+
+    if (_sleepAtEndOfTrack) {
+      _clearSleep();
+      _isPlaying = false;
+      _setPosition(Duration.zero);
+      notifyListeners();
+      return;
+    }
+
+    final q = _queueState;
+    if (q != null) {
+      // 1. Repeat One + Track Completed -> replay current track (seek to 0)
+      if (q.repeatMode == RepeatMode.one &&
+          reason == AdvanceReason.trackCompleted) {
+        await seek(Duration.zero);
+        try {
+          await _audioPlayer.resume();
+        } catch (_) {}
+        return;
+      }
+
+      // 2. Delegate advance to QueueState single advance path
+      final nextEntry = q.advance(reason: reason);
+      if (nextEntry != null) {
+        final track = nextEntry.track;
+        final cleanMediaId =
+            autoTransitionMediaId?.replaceFirst('yt-', '').trim() ?? '';
+        final cleanTrackId = track.id.replaceFirst('yt-', '').trim();
+
+        if (cleanMediaId.isNotEmpty && cleanMediaId == cleanTrackId) {
+          // Native engine already transitioned smoothly to this track
+          _currentTrack = track;
+          final token = ++_playToken;
+          LibraryStore.instance.registerTrack(track);
+          _isTransitioning = false;
+          _pausing = false;
+          _isBuffering = false;
+          _isPlaying = true;
+          _lastError = null;
+          _duration = Duration(seconds: track.durationSeconds);
+          _setPosition(Duration.zero);
+          _pushHistory(track);
+          ListeningTrackerService.instance.startTrack(
+            trackId: track.id,
+            trackTitle: track.title,
+            trackAlbum: track.album,
+            trackDurationMs: track.durationSeconds * 1000,
+            artists: [
+              {
+                'artistKey': track.artist,
+                'artistName': track.artist,
+                'isPrimary': true,
+              },
+            ],
+          );
+          notifyListeners();
+          unawaited(_loadLyricsForTrack(track, token));
+          unawaited(_resolveAccent(track, token));
+          _prefetchNext();
+          return;
+        }
+
+        await _startCurrentTrack(track);
+        return;
+      }
+
+      // 3. Queue is empty. If autoplay enabled, top up and take next
+      if (q.autoplay && !_collectionLocked) {
+        await q.ensureAutoplay();
+        final autoEntry = q.advance(reason: reason);
+        if (autoEntry != null) {
+          await _startCurrentTrack(autoEntry.track);
+          return;
+        }
+      }
+
+      // 4. End of queue reached
       await _endOfQueue();
       return;
     }
-    await _startCurrent();
+
+    // Fallback if _queueState is not attached
+    if (_queue.isEmpty) return;
+    if (_currentIndex < _queue.length - 1) {
+      _currentIndex++;
+      await _startCurrent();
+    } else if (_repeatMode == RepeatMode.all) {
+      _currentIndex = 0;
+      await _startCurrent();
+    } else {
+      await _endOfQueue();
+    }
   }
 
   @override
+  Future<void> next({String source = 'manual'}) =>
+      advance(reason: AdvanceReason.userNext);
+
+  @override
   Future<void> previous() async {
-    if (_queue.isEmpty) return;
-    // Apple Music: more than 3s in, restart the song instead of going back.
+    ListeningTrackerService.instance.endTrack('previous');
+    // Apple Music rule: past 3s, restart current song instead of going back
     if (livePosition.inSeconds > 3) {
       await seek(Duration.zero);
       return;
     }
+
+    if (_queueState != null && _queueState!.hasPrevious) {
+      final prevEntry = _queueState!.takePrevious();
+      if (prevEntry != null) {
+        await _startCurrentTrack(prevEntry.track);
+        return;
+      }
+    }
+
+    if (_queue.isEmpty) return;
     if (_currentIndex > 0) {
       _currentIndex--;
-    } else if (_repeatMode == ZenifyRepeatMode.all) {
-      _currentIndex = _queue.length - 1;
+      await _startCurrent();
     } else {
       await seek(Duration.zero);
-      return;
     }
-    await _startCurrent();
   }
 
   Future<void> _endOfQueue() async {
@@ -896,114 +978,41 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     }
   }
 
-  /// Autoplay: keep the music going infinitely with similar songs when the queue gets low.
-  Future<bool> _appendRelated() async {
-    if (_collectionLocked || !_autoplay) return false;
-    try {
-      final seed = _queue.isNotEmpty ? _queue[_currentIndex] : _currentTrack;
-      if (seed == null) return false;
-
-      final userLang = ListeningHistoryService.instance.primaryLanguage;
-      final targetLang = seed.language.isNotEmpty
-          ? seed.language
-          : (Track.detectLanguage(seed.title, seed.artist, seed.album) ??
-                userLang);
-
-      final related = await InnerTubeService.instance.fetchRelated(
-        seed,
-        targetLanguage: targetLang,
-      );
-      final existingIds = {
-        ..._queue.map((t) => t.id),
-        ..._queue.map((t) => t.id.replaceFirst('yt-', '')),
-        ..._playedSessionTrackIds,
-      };
-
-      final fresh = related
-          .where((t) {
-            final cleanId = t.id.replaceFirst('yt-', '');
-            return !existingIds.contains(t.id) &&
-                !existingIds.contains(cleanId);
-          })
-          .take(20)
-          .toList();
-
-      if (fresh.isEmpty) {
-        // Infinite mix fallback: if related tracks are exhausted, query radio hits in matching language!
-        final moreQuery = targetLang.isNotEmpty
-            ? '$targetLang hits radio'
-            : '${seed.artist} radio mix';
-        final more = await InnerTubeService.instance.search(moreQuery);
-        final moreFresh = more
-            .where((t) {
-              final cleanId = t.id.replaceFirst('yt-', '');
-              return !existingIds.contains(t.id) &&
-                  !existingIds.contains(cleanId);
-            })
-            .take(20)
-            .toList();
-        if (moreFresh.isEmpty) return false;
-        _queue.addAll(moreFresh);
-        _originalQueue.addAll(moreFresh);
-      } else {
-        _queue.addAll(fresh);
-        _originalQueue.addAll(fresh);
-      }
-
-      _autoplayStartIndex ??= _queue.length;
-      notifyListeners();
-      _prefetchNext();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
   // ---- Modes ----------------------------------------------------------------------
   @override
   void toggleShuffle() {
-    _isShuffle = !_isShuffle;
-    if (_queue.isNotEmpty) {
-      if (_isShuffle) {
-        // Like Apple Music: only the upcoming songs get shuffled.
-        final head = _queue.sublist(0, _currentIndex + 1);
-        final tail = _queue.sublist(_currentIndex + 1)..shuffle(_rng);
-        _queue = [...head, ...tail];
-      } else {
-        final current = _queue[_currentIndex];
-        final restored = List<Track>.of(_originalQueue);
-        final i = restored.indexWhere((t) => t.id == current.id);
-        if (i >= 0) {
-          _queue = restored;
-          _currentIndex = i;
-        }
-      }
+    if (_queueState != null) {
+      _queueState!.toggleShuffle();
+      _isShuffle = _queueState!.shuffle;
+    } else {
+      _isShuffle = !_isShuffle;
     }
+    _prefetchNext();
     HapticFeedback.selectionClick();
     notifyListeners();
   }
 
-  void toggleRepeat() {
-    switch (_repeatMode) {
-      case ZenifyRepeatMode.off:
-        _repeatMode = ZenifyRepeatMode.all;
-        break;
-      case ZenifyRepeatMode.all:
-        _repeatMode = ZenifyRepeatMode.one;
-        break;
-      case ZenifyRepeatMode.one:
-        _repeatMode = ZenifyRepeatMode.off;
-        break;
-    }
-    HapticFeedback.selectionClick();
-    notifyListeners();
-  }
+  void toggleRepeat() => cycleRepeat();
 
   @override
-  void cycleRepeat() => toggleRepeat();
+  void cycleRepeat() {
+    if (_queueState != null) {
+      _queueState!.cycleRepeat();
+      _repeatMode = _queueState!.repeatMode;
+    } else {
+      _repeatMode = switch (_repeatMode) {
+        RepeatMode.off => RepeatMode.all,
+        RepeatMode.all => RepeatMode.one,
+        RepeatMode.one => RepeatMode.off,
+      };
+    }
+    HapticFeedback.selectionClick();
+    notifyListeners();
+  }
 
   void toggleAutoplay() {
     _autoplay = !_autoplay;
+    _queueState?.toggleAutoplay();
     HapticFeedback.selectionClick();
     notifyListeners();
   }

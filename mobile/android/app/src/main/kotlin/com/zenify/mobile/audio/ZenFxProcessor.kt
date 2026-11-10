@@ -73,16 +73,25 @@ class FxParams(
 class ZenFxProcessor : BaseAudioProcessor() {
     @Volatile var params: FxParams = FxParams()
     @Volatile var bands: FloatArray = FloatArray(BANDS)
+    @Volatile var loudnessDb: Double? = null
+        private set
 
     private var engine: Engine? = null
     private var inCh = 2
+
+    fun setLoudnessDb(db: Double?) {
+        loudnessDb = db
+        engine?.setLoudnessDb(db)
+    }
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT || inputAudioFormat.channelCount !in 1..2) {
             return AudioProcessor.AudioFormat.NOT_SET // leave unusual formats untouched
         }
         inCh = inputAudioFormat.channelCount
-        engine = Engine(inputAudioFormat.sampleRate.toFloat()) { bands = it.copyOf() }
+        engine = Engine(inputAudioFormat.sampleRate.toFloat()) { bands = it.copyOf() }.also {
+            it.setLoudnessDb(loudnessDb)
+        }
         return AudioProcessor.AudioFormat(inputAudioFormat.sampleRate, 2, C.ENCODING_PCM_16BIT)
     }
 
@@ -652,6 +661,20 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
     private var limGain = 1f
     private val limAtt = exp(-1f / (fs * 0.001f))
     private val limRel = exp(-1f / (fs * 0.060f))
+    private var targetLoudnessGain = 1f
+    private var currentLoudnessGain = 1f
+
+    fun setLoudnessDb(db: Double?) {
+        targetLoudnessGain = if (db != null) {
+            // YouTube loudnessDb is positive when track is louder than -14 LUFS.
+            // Target attenuation: -db.
+            // When track is quieter (db < 0), clamp boost to max +3.0 dB to prevent digital clipping.
+            val clampedDb = (-db).coerceIn(-15.0, 3.0).toFloat()
+            10f.pow(clampedDb / 20f)
+        } else {
+            1f
+        }
+    }
 
     fun clear() {
         mods.values.forEach { it.clear() }
@@ -671,6 +694,7 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
             order = list.toTypedArray()
         }
         bypassMix = smooth(bypassMix, if (p.bypass) 0f else 1f, kb)
+        currentLoudnessGain = smooth(currentLoudnessGain, targetLoudnessGain, k)
         vocal.update(p, k)
         for (m in order) m.update(p, k)
         width = smooth(width, p.width.coerceIn(0f, 2f), k)
@@ -679,6 +703,10 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
     }
 
     private fun frame() {
+        if (abs(currentLoudnessGain - 1f) > 0.001f) {
+            io[0] *= currentLoudnessGain
+            io[1] *= currentLoudnessGain
+        }
         vocal.process(io)
         for (i in order.indices) { val m = order[i]; if (m.active) m.process(io) }
         if (abs(width - 1f) > 0.01f) {
