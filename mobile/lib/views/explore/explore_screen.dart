@@ -7,7 +7,6 @@ import 'package:flutter/cupertino.dart'
         CupertinoActionSheet,
         CupertinoActionSheetAction,
         CupertinoActivityIndicator,
-        CupertinoPageRoute,
         CupertinoSliverRefreshControl,
         showCupertinoModalPopup;
 import 'package:flutter/material.dart';

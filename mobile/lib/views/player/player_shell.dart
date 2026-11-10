@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/zen.dart';
+import '../../design_system/zen.dart' hide SpringCurve;
 import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/pressable_scale.dart';

@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/motion/zen_page_route.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/player_state.dart';
@@ -485,7 +486,7 @@ class _QueuePanelState extends State<QueuePanel> {
                 } else {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => ArtistScreen(artistName: artist)),
+                    ZenPageRoute(builder: (_) => ArtistScreen(artistName: artist)),
                   );
                 }
               },
@@ -496,7 +497,7 @@ class _QueuePanelState extends State<QueuePanel> {
               Navigator.pop(ctx);
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                ZenPageRoute(
                   builder: (_) => AlbumScreen(
                     albumTitle: MediaNormalizer.cleanAlbumTitle(e.track.album.isNotEmpty ? e.track.album : e.title),
                     artistName: MediaNormalizer.formatArtists(e.artist),

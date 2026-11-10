@@ -11,7 +11,6 @@ import '../tokens/app_spacing.dart';
 import '../tokens/app_typography.dart';
 import 'equalizer_bars.dart';
 import 'interactive_artists_text.dart';
-import 'marquee_text.dart';
 import 'pressable_scale.dart';
 import 'zen_dropdown.dart';
 import '../zen.dart';

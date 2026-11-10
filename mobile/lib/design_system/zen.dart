@@ -10,7 +10,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter, PointerDeviceKind;
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
