@@ -7,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/widgets/apple_glass.dart';
+import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
@@ -148,48 +150,25 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
+    final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
       backgroundColor: Zen.bg,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // App Bar
-          SliverAppBar(
-            pinned: true,
-            backgroundColor: Zen.bg.withValues(alpha: 0.88),
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            title: Text(
-              'INSIGHTS & REPLAY',
-              style: GoogleFonts.oswald(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-                color: Colors.white,
-              ),
-            ),
-            centerTitle: true,
-            actions: [
-              if (auth.isLoggedIn)
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 20),
-                  onPressed: _fetchInsights,
-                ),
-            ],
-          ),
+      body: Stack(
+        children: [
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
 
-          // Auth Guard Check
-          if (!auth.isLoggedIn)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _buildAuthPrompt(context),
-            )
-          else ...[
-            // View Mode Selector: Insights vs History
+              // Auth Guard Check
+              if (!auth.isLoggedIn)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _buildAuthPrompt(context),
+                )
+              else ...[
+                // View Mode Selector: Insights vs History
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
@@ -331,7 +310,40 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
           ],
         ],
       ),
-    );
+
+      // Floating Dynamic Island Header
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: DynamicIslandHeader(
+          title: 'Insights & Replay',
+          showBack: true,
+          onBack: () => Navigator.of(context).pop(),
+          showProfile: false,
+          topPadding: topInset + 4,
+          trailing: auth.isLoggedIn
+              ? PressableScale(
+                  scale: 0.88,
+                  onTap: _fetchInsights,
+                  child: AppleGlass(
+                    borderRadius: BorderRadius.circular(22),
+                    tint: const Color(0x26121216),
+                    child: const SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Center(
+                        child: Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+        ),
+      ),
+    ],
+  ),
+);
   }
 
   List<List<int>> _parseHeatmap(dynamic raw) {

@@ -30,7 +30,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
   int _versionTapCount = 0;
-  String _appVersion = 'v1.0.1 (Build 3)';
+  String _appVersion = 'v1.0.5 (Build 8)';
 
   @override
   void initState() {
@@ -209,30 +209,25 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
     final settings = context.watch<SettingsState>();
     final user = auth.user;
 
+    final topInset = MediaQuery.paddingOf(context).top;
+
     return Scaffold(
       backgroundColor: Zen.bg,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // Dynamic Island Floating Header
-          SliverToBoxAdapter(
-            child: DynamicIslandHeader(
-              title: 'Settings',
-              showBack: true,
-              onBack: () => Navigator.of(context).pop(),
-              showProfile: false,
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. Account / Profile Header
-                  _buildProfileCard(auth, user),
-                  const SizedBox(height: 28),
+      body: Stack(
+        children: [
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. Account / Profile Header
+                      _buildProfileCard(auth, user),
+                      const SizedBox(height: 28),
 
                   // 2. Audio & Fidelity Section
                   _buildSectionHeader('AUDIO & FIDELITY'),
@@ -563,7 +558,21 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
           ),
         ],
       ),
-    );
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: DynamicIslandHeader(
+          title: 'Settings',
+          showBack: true,
+          onBack: () => Navigator.of(context).pop(),
+          showProfile: false,
+          topPadding: topInset + 4,
+        ),
+      ),
+    ],
+  ),
+);
   }
 
   // ==================== WIDGET BUILDERS ====================

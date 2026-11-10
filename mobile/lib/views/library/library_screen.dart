@@ -27,7 +27,6 @@ import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_typography.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
-import '../../design_system/widgets/spring_kit.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
@@ -505,6 +504,7 @@ Widget _page({
   String? previous,
   Widget? trailing,
   bool root = false,
+  VoidCallback? onOpenProfile,
   required List<Widget> slivers,
 }) =>
     AnnotatedRegion<SystemUiOverlayStyle>(
@@ -534,7 +534,9 @@ Widget _page({
                     showBack: !root,
                     isDockPage: root,
                     onBack: () => Navigator.maybePop(context),
-                    showProfile: true,
+                    showProfile: root,
+                    onProfileTap: onOpenProfile,
+                    topPadding: top + 4,
                     trailing: trailing,
                   ),
                 ),
@@ -588,20 +590,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
         _push(context, const _SongsPage());
       case _Cat.liked:
         _push(context, const _LikedPage());
-    }
-  }
-
-  Future<void> _menu() async {
-    HapticFeedback.selectionClick();
-    final r = await _sheet(context, const [
-      _A('new', Icons.add_rounded, 'New Playlist…'),
-      _A('edit', Icons.edit_rounded, 'Edit Library'),
-    ]);
-    if (!mounted || r == null) return;
-    if (r == 'new') {
-      await _createPlaylist(context);
-    } else {
-      setState(() => _editing = true);
     }
   }
 
@@ -672,16 +660,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
         return _page(
           title: 'Library',
           root: true,
+          onOpenProfile: widget.onOpenProfile,
           trailing: _editing
               ? _TextBtn('Done', onTap: () {
                   HapticFeedback.selectionClick();
                   setState(() => _editing = false);
                 })
-              : Row(mainAxisSize: MainAxisSize.min, children: [
-                  _CircleBtn(Icons.more_horiz_rounded, _menu),
-                  const SizedBox(width: 10),
-                  ProfileAvatarButton(size: 32, onTap: widget.onOpenProfile),
-                ]),
+              : null,
           slivers: [
             CupertinoSliverRefreshControl(
               onRefresh: () async {

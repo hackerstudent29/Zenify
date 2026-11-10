@@ -13,8 +13,8 @@ import 'dart:ui' show ImageFilter, PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'tokens/app_colors.dart';
 import 'motion/zen_page_route.dart';
+import 'tokens/app_colors.dart';
 export 'widgets/marquee_text.dart';
 export 'motion/zen_page_route.dart';
 
