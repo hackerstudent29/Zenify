@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart'
     show
         CupertinoActionSheet,
         CupertinoActionSheetAction,
+        CupertinoActivityIndicator,
         CupertinoAlertDialog,
         CupertinoDialogAction,
         CupertinoPageRoute,
@@ -28,8 +29,10 @@ import '../../design_system/tokens/app_typography.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/spring_kit.dart';
+import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
@@ -253,7 +256,7 @@ void _shuffle(BuildContext c, List<Track> l) {
 
 Future<T?> _push<T>(BuildContext c, Widget page, {bool modal = false}) {
   HapticFeedback.selectionClick();
-  return Navigator.of(c).push(CupertinoPageRoute<T>(builder: (_) => page, fullscreenDialog: modal));
+  return Navigator.of(c).push(ZenPageRoute<T>(builder: (_) => page, fullscreenDialog: modal));
 }
 
 void _openArtist(BuildContext c, String name) =>
@@ -365,9 +368,10 @@ Future<UserPlaylist?> _createPlaylist(BuildContext c, {Track? first}) async {
   final n = await _promptName(c, title: 'New Playlist', confirm: 'Create');
   if (n == null || n.isEmpty || !c.mounted) return null;
   final store = LibraryStore.instance;
-  store.createPlaylist(n, first: first);
+  final p = store.createPlaylist(n, first: first);
   HapticFeedback.mediumImpact();
-  return null;
+  _push(c, _PlaylistPage(p));
+  return p;
 }
 
 /// Long-press / ellipsis menu for any song.
@@ -613,7 +617,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       for (final p in s.playlists)
         _Item(
           title: p.name,
-          sub: 'Playlist',
+          sub: _n(p.trackIds.length, 'song', 'songs'),
           cover: _Collage(s.playlistTracks(p).take(4).map((t) => t.coverUrl).toList(), radius: 0),
           onTap: () => _push(context, _PlaylistPage(p)),
           onLong: () => _playlistMenu(context, p),
@@ -624,6 +628,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
           sub: a.artist,
           cover: _Cover(a.cover, radius: 0),
           onTap: () => _openAlbum(context, a.title, a.artist, a.cover),
+        ),
+      for (final art in s.followedArtists)
+        _Item(
+          title: art.name,
+          sub: 'Artist',
+          cover: _Avatar(art.cover, 160),
+          onTap: () => _openArtist(context, art.name),
         ),
     ];
     if (items.length < 8) {
@@ -648,6 +659,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
       listenable: Listenable.merge([LibraryStore.instance, CatalogDataSource.tracksNotifier]),
       builder: (context, _) {
         final store = LibraryStore.instance;
+        if (!store.isLoaded) {
+          return const ColoredBox(
+            color: Colors.black,
+            child: Center(
+              child: CupertinoActivityIndicator(radius: 14, color: _rose),
+            ),
+          );
+        }
         final items = _recent(store);
         final w = (MediaQuery.sizeOf(context).width - 40 - 16) / 2;
 
@@ -823,36 +842,74 @@ class _PlaylistsPage extends StatelessWidget {
             previous: 'Library',
             trailing: _CircleBtn(Icons.add_rounded, () => _createPlaylist(ctx)),
             slivers: [
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (c, i) {
-                    if (i == 0) {
-                      return _ListRow(
-                        leading: Container(
-                          decoration: BoxDecoration(color: _fill, borderRadius: BorderRadius.circular(8)),
-                          child: const Icon(Icons.add_rounded, color: _rose, size: 30),
-                        ),
-                        title: 'New Playlist…',
-                        titleColor: _rose,
-                        onTap: () => _createPlaylist(c),
-                      );
-                    }
-                    final p = lists[i - 1];
-                    return _ListRow(
-                      leading: _Frame(
-                        radius: 8,
-                        child: _Collage(s.playlistTracks(p).take(4).map((t) => t.coverUrl).toList(), radius: 0),
-                      ),
-                      title: p.name,
-                      subtitle: _n(p.trackIds.length, 'song', 'songs'),
-                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0x4DEBEBF5), size: 22),
-                      onTap: () => _push(c, _PlaylistPage(p)),
-                      onLong: () => _playlistMenu(c, p),
-                    );
-                  },
-                  childCount: lists.length + 1,
+              SliverToBoxAdapter(
+                child: _ListRow(
+                  leading: Container(
+                    decoration: BoxDecoration(color: _rose.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.add_rounded, color: _rose, size: 28),
+                  ),
+                  title: 'New Playlist…',
+                  titleColor: _rose,
+                  thumb: 44,
+                  onTap: () => _createPlaylist(ctx),
                 ),
               ),
+              if (lists.isEmpty)
+                SliverToBoxAdapter(
+                  child: _Empty(
+                    icon: Icons.queue_music_rounded,
+                    title: 'No Playlists Yet',
+                    message: 'Create playlists for workouts, road trips, or favorite vibes.',
+                    action: PressableScale(
+                      scale: 0.95,
+                      onTap: () => _createPlaylist(ctx),
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 6),
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 22),
+                        decoration: BoxDecoration(
+                          color: _rose,
+                          borderRadius: BorderRadius.circular(21),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _rose.withValues(alpha: 0.35),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            Text('Create Playlist', style: _t(14, w: FontWeight.w700, c: Colors.white)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (c, i) {
+                      final p = lists[i];
+                      return _ListRow(
+                        leading: _Frame(
+                          radius: 8,
+                          child: _Collage(s.playlistTracks(p).take(4).map((t) => t.coverUrl).toList(), radius: 0),
+                        ),
+                        title: p.name,
+                        subtitle: _n(p.trackIds.length, 'song', 'songs'),
+                        trailing: const Icon(Icons.chevron_right_rounded, color: Color(0x4DEBEBF5), size: 22),
+                        onTap: () => _push(c, _PlaylistPage(p)),
+                        onLong: () => _playlistMenu(c, p),
+                      );
+                    },
+                    childCount: lists.length,
+                  ),
+                ),
             ],
           );
         },
@@ -875,7 +932,14 @@ class _PlaylistPage extends StatelessWidget {
           return _page(
             title: p.name,
             previous: 'Playlists',
-            trailing: _CircleBtn(Icons.more_horiz_rounded, () => _playlistMenu(ctx, p, inDetail: true)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _CircleBtn(Icons.search_rounded, () => _push(ctx, _AddSongsPage(p), modal: true)),
+                const SizedBox(width: 8),
+                _CircleBtn(Icons.more_horiz_rounded, () => _playlistMenu(ctx, p, inDetail: true)),
+              ],
+            ),
             slivers: [
               SliverToBoxAdapter(
                 child: Padding(
@@ -910,23 +974,82 @@ class _PlaylistPage extends StatelessWidget {
                 ),
               ),
               SliverToBoxAdapter(
-                child: _ListRow(
-                  leading: Container(
-                    decoration: BoxDecoration(color: _fill, borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.add_rounded, color: _rose, size: 26),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: PressableScale(
+                    scale: 0.98,
+                    onTap: () => _push(ctx, _AddSongsPage(p), modal: true),
+                    child: Container(
+                      height: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: _fill,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _hair),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: _rose.withValues(alpha: 0.18),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.search_rounded, color: _rose, size: 18),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Search & Add Songs', style: _t(15, w: FontWeight.w600, c: _rose)),
+                                Text('Search online songs to add to this playlist', style: _t(11, c: _sub)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.add_rounded, color: _rose, size: 22),
+                        ],
+                      ),
+                    ),
                   ),
-                  title: 'Add Songs',
-                  titleColor: _rose,
-                  thumb: 44,
-                  onTap: () => _push(ctx, _AddSongsPage(p), modal: true),
                 ),
               ),
               if (tracks.isEmpty)
-                const SliverToBoxAdapter(
+                SliverToBoxAdapter(
                   child: _Empty(
                     icon: Icons.music_note_rounded,
                     title: 'Empty Playlist',
-                    message: 'Tap “Add Songs” or press and hold any song to add it here.',
+                    message: 'Search songs online or pick from your library to add to this playlist.',
+                    action: PressableScale(
+                      scale: 0.95,
+                      onTap: () => _push(ctx, _AddSongsPage(p), modal: true),
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 22),
+                        decoration: BoxDecoration(
+                          color: _rose,
+                          borderRadius: BorderRadius.circular(21),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _rose.withValues(alpha: 0.35),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.search_rounded, color: Colors.white, size: 18),
+                            const SizedBox(width: 8),
+                            Text('Search & Add Songs', style: _t(14, w: FontWeight.w700, c: Colors.white)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 )
               else
@@ -964,7 +1087,46 @@ class _PlaylistPage extends StatelessWidget {
       );
 }
 
-/// Multi-add picker (modal). Tap rows to add/remove instantly.
+class _AddPill extends StatelessWidget {
+  const _AddPill({required this.added, required this.onTap});
+  final bool added;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => _Bump(
+        trigger: added,
+        child: PressableScale(
+          scale: 0.9,
+          onTap: onTap,
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: added ? _rose : _fill,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: added ? _rose : _hair),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  added ? Icons.check_rounded : Icons.add_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  added ? 'Added' : 'Add',
+                  style: _t(13, w: FontWeight.w600, c: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+/// Multi-add picker (modal) with live YouTube Music online search.
 class _AddSongsPage extends StatefulWidget {
   const _AddSongsPage(this.initial);
   final UserPlaylist initial;
@@ -975,11 +1137,62 @@ class _AddSongsPage extends StatefulWidget {
 
 class _AddSongsPageState extends State<_AddSongsPage> {
   final _q = TextEditingController();
+  Timer? _debounce;
+  bool _searching = false;
+  List<Track> _onlineResults = [];
+
+  @override
+  void initState() {
+    super.initState();
+    LibraryStore.instance.ensureLoaded();
+  }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _q.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String text) {
+    final query = text.trim();
+    if (query.isEmpty) {
+      _debounce?.cancel();
+      setState(() {
+        _searching = false;
+        _onlineResults = [];
+      });
+      return;
+    }
+
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 320), () => _searchOnline(query));
+  }
+
+  Future<void> _searchOnline(String query) async {
+    if (query.isEmpty) return;
+    setState(() {
+      _searching = true;
+    });
+
+    try {
+      final results = await InnerTubeService.instance.search(query);
+      if (!mounted || _q.text.trim() != query) return;
+
+      final store = LibraryStore.instance;
+      for (final t in results) {
+        store.registerTrack(t);
+      }
+
+      setState(() {
+        _onlineResults = results;
+        _searching = false;
+      });
+    } catch (_) {
+      if (mounted && _q.text.trim() == query) {
+        setState(() => _searching = false);
+      }
+    }
   }
 
   @override
@@ -989,53 +1202,133 @@ class _AddSongsPageState extends State<_AddSongsPage> {
           final s = LibraryStore.instance;
           final p = s.playlistById(widget.initial.id);
           if (p == null) return const ColoredBox(color: Colors.black);
-          final ids = s.playlistTracks(p).map((t) => t.id).toSet();
-          final songs = _filterTracks(CatalogDataSource.allTracks, _q.text, _Sort.recent);
+          final inPlaylist = s.playlistTracks(p).map((t) => t.id).toSet();
+          final q = _q.text.trim();
+          final isQueryEmpty = q.isEmpty;
+
+          Widget sectionHeader(String title, [Widget? trailing]) => SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(title, style: _t(17, w: FontWeight.w700, ls: -0.2))),
+                      ?trailing,
+                    ],
+                  ),
+                ),
+              );
+
+          Widget songRow(Track t) {
+            final on = inPlaylist.contains(t.id);
+            void toggle() {
+              HapticFeedback.selectionClick();
+              if (on) {
+                s.removeFromPlaylist(p.id, t);
+              } else {
+                s.addToPlaylist(p.id, t);
+              }
+            }
+
+            return _SongRow(
+              track: t,
+              onTap: toggle,
+              onLong: toggle,
+              trailing: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: _AddPill(added: on, onTap: toggle),
+              ),
+            );
+          }
+
+          final slivers = <Widget>[
+            SliverToBoxAdapter(
+              child: _Search(
+                controller: _q,
+                hint: 'Search songs online (song, artist)…',
+                onChanged: _onSearchChanged,
+              ),
+            ),
+          ];
+
+          if (isQueryEmpty) {
+            final liked = s.likedTracks;
+            final suggested = CatalogDataSource.allTracks;
+
+            if (liked.isNotEmpty) {
+              slivers.add(sectionHeader('From Liked Songs'));
+              slivers.add(
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (c, i) => songRow(liked[i]),
+                    childCount: liked.length,
+                  ),
+                ),
+              );
+            }
+
+            if (suggested.isNotEmpty) {
+              slivers.add(sectionHeader('Suggested Songs'));
+              slivers.add(
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (c, i) => songRow(suggested[i]),
+                    childCount: math.min(30, suggested.length),
+                  ),
+                ),
+              );
+            }
+          } else {
+            final seenIds = <String>{};
+            final combined = <Track>[];
+            for (final t in _onlineResults) {
+              if (seenIds.add(t.id)) combined.add(t);
+            }
+            final localMatches = _filterTracks(s.allLibraryTracks, q, _Sort.recent);
+            for (final t in localMatches) {
+              if (seenIds.add(t.id)) combined.add(t);
+            }
+
+            if (_searching && combined.isEmpty) {
+              slivers.add(
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(child: CupertinoActivityIndicator(radius: 14, color: _rose)),
+                  ),
+                ),
+              );
+            } else if (!_searching && combined.isEmpty) {
+              slivers.add(
+                SliverToBoxAdapter(
+                  child: _Empty(
+                    icon: Icons.search_off_rounded,
+                    title: 'No Songs Found',
+                    message: 'No songs matched “$q”. Try another search.',
+                  ),
+                ),
+              );
+            } else {
+              slivers.add(
+                sectionHeader(
+                  'Results (${combined.length})',
+                  _searching ? const CupertinoActivityIndicator(radius: 8, color: _rose) : null,
+                ),
+              );
+              slivers.add(
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (c, i) => songRow(combined[i]),
+                    childCount: combined.length,
+                  ),
+                ),
+              );
+            }
+          }
 
           return _page(
             title: 'Add Songs',
             trailing: _TextBtn('Done', onTap: () => Navigator.of(ctx).pop()),
-            slivers: [
-              SliverToBoxAdapter(
-                child: _Search(controller: _q, hint: 'Find Songs', onChanged: (_) => setState(() {})),
-              ),
-              if (songs.isEmpty)
-                const SliverToBoxAdapter(
-                  child: _Empty(icon: Icons.search_off_rounded, title: 'No Results', message: 'Try a different search.'),
-                )
-              else
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (c, i) {
-                      final t = songs[i];
-                      final on = ids.contains(t.id);
-                      void toggle() {
-                        HapticFeedback.selectionClick();
-                        if (on) {
-                          s.removeFromPlaylist(p.id, t);
-                        } else {
-                          s.addToPlaylist(p.id, t);
-                        }
-                      }
-
-                      return _SongRow(
-                        track: t,
-                        onTap: toggle,
-                        onLong: toggle,
-                        trailing: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: _Bump(
-                            trigger: on,
-                            child: Icon(on ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
-                                color: on ? _rose : _sub, size: 28),
-                          ),
-                        ),
-                      );
-                    },
-                    childCount: songs.length,
-                  ),
-                ),
-            ],
+            slivers: slivers,
           );
         },
       );
@@ -1412,8 +1705,10 @@ class _SongsPageState extends State<_SongsPage> {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: Listenable.merge([CatalogDataSource.tracksNotifier, LibraryStore.instance]),
         builder: (ctx, _) {
+          final store = LibraryStore.instance;
+          final allSongs = store.allLibraryTracks.isNotEmpty ? store.allLibraryTracks : CatalogDataSource.allTracks;
           final searching = _q.text.trim().isNotEmpty;
-          final songs = _filterTracks(CatalogDataSource.allTracks, _q.text, _sort);
+          final songs = _filterTracks(allSongs, _q.text, _sort);
           return _page(
             title: 'Songs',
             previous: 'Library',
@@ -1429,7 +1724,9 @@ class _SongsPageState extends State<_SongsPage> {
                 empty: _Empty(
                   icon: searching ? Icons.search_off_rounded : Icons.library_music_rounded,
                   title: searching ? 'No Results' : 'No Songs',
-                  message: searching ? 'Nothing matches “${_q.text.trim()}”.' : 'Songs from the catalog will show up here.',
+                  message: searching
+                      ? 'Nothing matches “${_q.text.trim()}”.'
+                      : 'Songs in your library will show up here. Like songs or add them to playlists to see them here.',
                 ),
               ),
             ],
@@ -1732,9 +2029,10 @@ class _Search extends StatelessWidget {
 }
 
 class _Empty extends StatelessWidget {
-  const _Empty({required this.icon, required this.title, required this.message});
+  const _Empty({required this.icon, required this.title, required this.message, this.action});
   final IconData icon;
   final String title, message;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) => _SpringAppear(
@@ -1752,6 +2050,10 @@ class _Empty extends StatelessWidget {
               Text(title, textAlign: TextAlign.center, style: _t(20, w: FontWeight.w700)),
               const SizedBox(height: 6),
               Text(message, textAlign: TextAlign.center, style: _t(15, c: _sub)),
+              if (action != null) ...[
+                const SizedBox(height: 18),
+                action!,
+              ],
             ],
           ),
         ),

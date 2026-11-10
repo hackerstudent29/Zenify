@@ -413,7 +413,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     if (item.albumTitle != null && item.artistName != null) {
                       Navigator.push(
                         context,
-                        CupertinoPageRoute(
+                        ZenPageRoute(
                           builder: (_) => AlbumScreen(
                             albumTitle: item.albumTitle!,
                             artistName: item.artistName!,
@@ -770,14 +770,14 @@ class _ExploreScreenState extends State<ExploreScreen>
                     } else if (resolvedArtists.isNotEmpty) {
                       Navigator.push(
                         context,
-                        CupertinoPageRoute(builder: (_) => ArtistScreen(artistName: resolvedArtists.first.name)),
+                        ZenPageRoute(builder: (_) => ArtistScreen(artistName: resolvedArtists.first.name)),
                       );
                     }
                   },
                   onGoToAlbum: track.album.isNotEmpty && track.album != 'Single'
                       ? () => Navigator.push(
                             context,
-                            CupertinoPageRoute(
+                            ZenPageRoute(
                               builder: (_) => AlbumScreen(
                                 albumTitle: track.album,
                                 artistName: track.artist,
@@ -825,7 +825,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     HapticFeedback.lightImpact();
                     Navigator.push(
                       context,
-                      CupertinoPageRoute(
+                      ZenPageRoute(
                         builder: (_) => AlbumScreen(
                           albumTitle: rel.title,
                           artistName: rel.artist,
@@ -1095,7 +1095,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                           HapticFeedback.lightImpact();
                           Navigator.push(
                             context,
-                            CupertinoPageRoute(
+                            ZenPageRoute(
                               builder: (_) => ArtistScreen(
                                 artistName: name,
                                 imageUrl: photo,

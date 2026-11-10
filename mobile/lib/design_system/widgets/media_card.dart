@@ -18,6 +18,7 @@ class MediaCard extends StatelessWidget {
     this.isCircular = false,
     this.width = 170.0,
     this.twoLineTitle = false,
+    this.borderRadius,
     this.onTap,
   });
 
@@ -27,6 +28,7 @@ class MediaCard extends StatelessWidget {
   final bool isCircular;
   final double width;
   final bool twoLineTitle;
+  final double? borderRadius;
   final VoidCallback? onTap;
 
   @override
@@ -56,6 +58,8 @@ class MediaCard extends StatelessWidget {
             isCircle: isCircular,
           );
 
+    final double effectiveRadius = borderRadius ?? AppSpacing.rCard;
+
     return PressableScale(
       onTap: onTap,
       child: SizedBox(
@@ -64,13 +68,14 @@ class MediaCard extends StatelessWidget {
           crossAxisAlignment: isCircular ? CrossAxisAlignment.center : CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Artwork with shadow and squircle / circular frame
+            // Artwork with deep shadow and fullview player-style artwork curve
             Container(
               width: width,
               height: width,
               decoration: BoxDecoration(
+                color: const Color(0xFF18181B),
                 shape: isCircular ? BoxShape.circle : BoxShape.rectangle,
-                borderRadius: isCircular ? null : BorderRadius.circular(AppSpacing.rCard),
+                borderRadius: isCircular ? null : BorderRadius.circular(effectiveRadius),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.35),
@@ -82,7 +87,7 @@ class MediaCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: isCircular
                     ? BorderRadius.circular(width / 2)
-                    : BorderRadius.circular(AppSpacing.rCard),
+                    : BorderRadius.circular(effectiveRadius),
                 child: imageWidget,
               ),
             ),

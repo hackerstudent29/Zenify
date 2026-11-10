@@ -15,7 +15,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'tokens/app_colors.dart';
+import 'motion/zen_page_route.dart';
 export 'widgets/marquee_text.dart';
+export 'motion/zen_page_route.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Spring curve
@@ -394,11 +396,11 @@ ThemeData zenDarkTheme() {
     dividerColor: Zen.hairline,
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
-        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.windows: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.android: ZenPageTransitionsBuilder(),
+        TargetPlatform.iOS: ZenPageTransitionsBuilder(),
+        TargetPlatform.macOS: ZenPageTransitionsBuilder(),
+        TargetPlatform.windows: ZenPageTransitionsBuilder(),
+        TargetPlatform.linux: ZenPageTransitionsBuilder(),
       },
     ),
     textSelectionTheme: TextSelectionThemeData(

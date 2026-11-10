@@ -15,11 +15,11 @@ class AppSpacing {
 
   // Radii
   static const double rTile = 12.0;
-  static const double rCard = 22.0;
+  static const double rCard = 12.0; // Media card artwork curve (matches fullview player artwork edges: 12.0)
   static const double rSheet = 28.0;
   static const double rArtList = 10.0;
-  static const double rArtGrid = 22.0;
-  static const double rArtPlayer = 28.0;
+  static const double rArtGrid = 12.0;
+  static const double rArtPlayer = 12.0;
   static const double rControl = 14.0; // search field, buttons
   static const double rPill = 32.0; // floating tab bar, chips
 

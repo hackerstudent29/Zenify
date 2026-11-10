@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
-    show CupertinoActivityIndicator, CupertinoPageRoute, CupertinoSliverRefreshControl, RefreshIndicatorMode;
+    show CupertinoActivityIndicator, CupertinoSliverRefreshControl, RefreshIndicatorMode;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/zen.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../models/playback_context.dart';
@@ -513,7 +514,7 @@ class _SongRow extends StatelessWidget {
                                 onTap: () {
                                   HapticFeedback.lightImpact();
                                   Navigator.of(context).push(
-                                    CupertinoPageRoute(
+                                    ZenPageRoute(
                                       builder: (_) => AlbumScreen(
                                         albumTitle: MediaNormalizer.cleanTitle(track.album),
                                         artistName: MediaNormalizer.formatArtists(track.artist),
@@ -556,14 +557,14 @@ class _SongRow extends StatelessWidget {
                           } else if (resolvedArtists.isNotEmpty) {
                             Navigator.push(
                               context,
-                              CupertinoPageRoute(builder: (_) => ArtistScreen(artistName: resolvedArtists.first.name)),
+                              ZenPageRoute(builder: (_) => ArtistScreen(artistName: resolvedArtists.first.name)),
                             );
                           }
                         },
                         onGoToAlbum: track.album.isNotEmpty && track.album != 'Single'
                             ? () => Navigator.push(
                                   context,
-                                  CupertinoPageRoute(
+                                  ZenPageRoute(
                                     builder: (_) => AlbumScreen(
                                       albumTitle: MediaNormalizer.cleanTitle(track.album),
                                       artistName: MediaNormalizer.formatArtists(track.artist),
@@ -1188,7 +1189,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Reveal(key: ValueKey('$_seed-$key'), child: child),
       );
 
-  void _open(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  void _open(Widget screen) => Navigator.push(context, ZenPageRoute(builder: (_) => screen));
 
   void play(List<Track> list, int i) {
     if (list.isEmpty) return;

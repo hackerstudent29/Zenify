@@ -14,6 +14,7 @@ import 'interactive_artists_text.dart';
 import 'marquee_text.dart';
 import 'pressable_scale.dart';
 import 'zen_dropdown.dart';
+import '../zen.dart';
 
 /// Reusable Apple Music-style Song Tile for track lists, search results and queues.
 class SongTile extends StatelessWidget {
@@ -151,14 +152,14 @@ class SongTile extends StatelessWidget {
         } else if (artistList.isNotEmpty) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => ArtistScreen(artistName: artistList.first)),
+            ZenPageRoute(builder: (_) => ArtistScreen(artistName: artistList.first)),
           );
         }
       },
       onGoToAlbum: track.album.isNotEmpty && track.album != 'Single'
           ? () => Navigator.push(
                 context,
-                MaterialPageRoute(
+                ZenPageRoute(
                   builder: (_) => AlbumScreen(
                     albumTitle: track.album,
                     artistName: track.artist,
