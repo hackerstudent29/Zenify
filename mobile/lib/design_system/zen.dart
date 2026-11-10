@@ -12,6 +12,7 @@ import 'dart:ui' show ImageFilter, PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'motion/zen_page_route.dart';
 import 'tokens/app_colors.dart';
@@ -410,7 +411,7 @@ ThemeData zenDarkTheme() {
   );
 
   return base.copyWith(
-    textTheme: base.textTheme.apply(
+    textTheme: GoogleFonts.interTextTheme(base.textTheme).apply(
       bodyColor: Zen.label,
       displayColor: Zen.label,
     ),

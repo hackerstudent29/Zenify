@@ -78,7 +78,7 @@ class _TopListsState extends State<TopLists> {
       children: [
         Text(
           title,
-          style: GoogleFonts.oswald(
+          style: GoogleFonts.inter(
             fontSize: 15,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.8,
@@ -137,7 +137,7 @@ class _TopListsState extends State<TopLists> {
                   width: 24,
                   child: Text(
                     '#${index + 1}',
-                    style: GoogleFonts.oswald(
+                    style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                       color: index == 0 ? AppColors.crimson : Colors.white38,
@@ -250,7 +250,7 @@ class _TopListsState extends State<TopLists> {
                     width: 24,
                     child: Text(
                       '#${index + 1}',
-                      style: GoogleFonts.oswald(
+                      style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                         color: index == 0 ? AppColors.crimson : Colors.white38,

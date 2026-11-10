@@ -212,7 +212,7 @@ class _HistoryViewState extends State<HistoryView> {
                         children: [
                           Text(
                             dateStr.toUpperCase(),
-                            style: GoogleFonts.oswald(
+                            style: GoogleFonts.inter(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.6,

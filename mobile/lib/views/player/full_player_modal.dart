@@ -7,6 +7,7 @@ import '../../design_system/tokens/app_typography.dart';
 import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/scrubber_slider.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/player_state.dart';
 import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
@@ -107,7 +108,9 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
-                        onPressed: () {},
+                        onPressed: () {
+                          ZenDropdown.showTrackMenu(context: context, track: track);
+                        },
                       ),
                     ],
                   ),

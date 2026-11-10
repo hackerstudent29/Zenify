@@ -1,11 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../models/track.dart';
-import '../../services/player_state.dart';
-import '../../views/details/album_screen.dart';
-import '../../views/details/artist_popup.dart';
-import '../../views/details/artist_screen.dart';
 import '../tokens/app_colors.dart';
 import '../tokens/app_spacing.dart';
 import '../tokens/app_typography.dart';
@@ -136,37 +131,9 @@ class SongTile extends StatelessWidget {
   }
 
   void _showTrackOptions(BuildContext context) {
-    final player = context.read<PlayerState>();
     ZenDropdown.showTrackMenu(
       context: context,
-      trackTitle: track.title,
-      artistName: track.artist,
-      albumName: track.album,
-      onPlayNext: () => player.playNext(track),
-      onPlayLater: () => player.playLast(track),
-      onGoToArtist: () {
-        final artistList = track.artistNames;
-        if (artistList.length > 1) {
-          showArtistPopup(context, artists: track.resolvedArtists);
-        } else if (artistList.isNotEmpty) {
-          Navigator.push(
-            context,
-            ZenPageRoute(builder: (_) => ArtistScreen(artistName: artistList.first)),
-          );
-        }
-      },
-      onGoToAlbum: track.album.isNotEmpty && track.album != 'Single'
-          ? () => Navigator.push(
-                context,
-                ZenPageRoute(
-                  builder: (_) => AlbumScreen(
-                    albumTitle: track.album,
-                    artistName: track.artist,
-                    coverUrl: track.coverUrl,
-                  ),
-                ),
-              )
-          : null,
+      track: track,
     );
   }
 }

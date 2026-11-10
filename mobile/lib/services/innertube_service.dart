@@ -1145,7 +1145,16 @@ class InnerTubeService {
   }
 
   /// Fetches full album tracklist and metadata from YouTube Music browseId.
-  Future<({List<Track> tracks, String coverUrl})?> getAlbum(
+  Future<({
+    List<Track> tracks,
+    String coverUrl,
+    String? title,
+    String? artist,
+    List<String>? artists,
+    int? year,
+    String? label,
+    String? description,
+  })?> getAlbum(
     String browseId, {
     String? albumTitle,
     String? artistName,
@@ -1167,6 +1176,15 @@ class InnerTubeService {
           final resolvedTitle = MediaNormalizer.cleanTitle(albumMap['title'] as String?);
           final titleToUse = resolvedTitle.isNotEmpty ? resolvedTitle : (albumTitle ?? 'Album');
           final coverUrl = MediaNormalizer.upgradeArtworkUrl(albumMap['thumbnail'] as String?);
+          final rawArtists = albumMap['artists'] as List?;
+          final artistsList = rawArtists
+              ?.map((a) => a is Map ? (a['name']?.toString() ?? '') : a.toString())
+              .where((name) => name.isNotEmpty)
+              .toList();
+          final artistResolved = (artistsList != null && artistsList.isNotEmpty)
+              ? artistsList.join(', ')
+              : (albumMap['artist']?.toString() ?? artistName);
+          final year = (albumMap['year'] as num?)?.toInt();
           final rawSongs = res['songs'] as List? ?? const [];
           final tracks = <Track>[];
           for (final s in rawSongs) {
@@ -1184,7 +1202,16 @@ class InnerTubeService {
             ));
           }
           if (tracks.isNotEmpty) {
-            return (tracks: tracks, coverUrl: coverUrl);
+            return (
+              tracks: tracks,
+              coverUrl: coverUrl,
+              title: titleToUse,
+              artist: artistResolved,
+              artists: artistsList,
+              year: year,
+              label: null,
+              description: null,
+            );
           }
         }
       } catch (e) {
@@ -1195,7 +1222,8 @@ class InnerTubeService {
     try {
       final res = await post('browse', {'browseId': browseId}, ttl: const Duration(hours: 12));
       final header = res['header']?['musicDetailHeaderRenderer'] ??
-          res['header']?['musicResponsiveHeaderRenderer'];
+          res['header']?['musicResponsiveHeaderRenderer'] ??
+          res['contents']?['twoColumnBrowseResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents']?[0]?['musicResponsiveHeaderRenderer'];
 
       String coverUrl = '';
       final thumbs = (header?['thumbnail']?['croppedSquareThumbnailRenderer']?['thumbnail']?['thumbnails'] ??
@@ -1204,7 +1232,26 @@ class InnerTubeService {
         coverUrl = upgradeArtworkUrl(thumbs.last['url'] as String);
       }
 
-      final albumTitle = (header?['title']?['runs']?[0]?['text'] ?? '').toString();
+      final rawTitle = (header?['title']?['runs']?[0]?['text'] ?? '').toString();
+      final albumTitleResolved = MediaNormalizer.cleanTitle(rawTitle);
+      final titleToUse = albumTitleResolved.isNotEmpty ? albumTitleResolved : (albumTitle ?? 'Album');
+
+      // Extract artists and release year from subtitle runs
+      final subtitleRuns = header?['subtitle']?['runs'] as List? ?? [];
+      String? fallbackArtist;
+      int? fallbackYear;
+      for (final run in subtitleRuns) {
+        final text = (run['text'] ?? '').toString().trim();
+        final parsedYear = int.tryParse(text);
+        if (parsedYear != null && parsedYear > 1900 && parsedYear < 2100) {
+          fallbackYear = parsedYear;
+        } else if (text.isNotEmpty && text != '•' && text != 'Album' && text != 'Single' && text != 'EP') {
+          fallbackArtist ??= text;
+        }
+      }
+
+      final strapline = header?['straplineTextOne']?['runs']?[0]?['text']?.toString();
+      final description = header?['description']?['runs']?[0]?['text']?.toString();
 
       final tracks = <Track>[];
       final sectionList = res['contents']?['singleColumnBrowseResultsRenderer']
@@ -1219,8 +1266,8 @@ class InnerTubeService {
             for (final item in contents) {
               final t = _parseResponsiveListItem(item['musicResponsiveListItemRenderer']);
               if (t != null) {
-                if (albumTitle.isNotEmpty && (t.album == 'Single' || t.album.isEmpty)) {
-                  tracks.add(t.copyWith(album: albumTitle));
+                if (titleToUse.isNotEmpty && (t.album == 'Single' || t.album.isEmpty)) {
+                  tracks.add(t.copyWith(album: titleToUse));
                 } else {
                   tracks.add(t);
                 }
@@ -1230,7 +1277,16 @@ class InnerTubeService {
         }
       }
 
-      return (tracks: tracks, coverUrl: coverUrl);
+      return (
+        tracks: tracks,
+        coverUrl: coverUrl,
+        title: titleToUse,
+        artist: strapline ?? fallbackArtist ?? artistName,
+        artists: fallbackArtist != null ? [fallbackArtist] : null,
+        year: fallbackYear,
+        label: strapline,
+        description: description,
+      );
     } catch (e) {
       if (kDebugMode) debugPrint('[InnerTube] getAlbum error: $e');
       return null;

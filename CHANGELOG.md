@@ -2,7 +2,25 @@
 
 All notable changes to the Zenify platform are documented in this file.
 
-## [2.6.0] - 2026-11-03
+## [1.0.6] - 2026-11-10
+
+### Added
+- **Liquid Glass Three-Dock Morphing Island**: On scroll down, the bottom navigation dock fluidly collapses into the Apple Music 3-dock island layout (Explore squircle launcher in rose, Center mini player island with album artwork, title, artists, and playback controls, and Right Search squircle).
+- **Apple Music Contextual Dropdown & Action Sheet**: Rebuilt all 3-dots menus into docked liquid glass modal bottom sheets with 25px blur, `#1C1C1E` background, song information header with artwork and like heart, 4 circular quick-share shortcuts (Copy Link, Message, Instagram Stories, Facebook Stories), and 6 clean action rows with single dividers.
+- **Featured Artists Docked Bottom Sheet**: 60px circular artist avatars matching profile pages, listeners/subscribers count, Apple Music Follow button, and View artist profile navigation.
+- **Unified Inter Typography**: Standardized typography across all components, sheets, and pages using `GoogleFonts.inter`.
+- **Rebuilt InnerTube Search Pipeline & Ranking Engine**: Multi-tier phonetic transliteration matching, strict query intent routing (exactArtist, artistType, songTitle, album), and complete zero-missing-name regression protection.
+
+## [1.0.5] - 2026-11-10
+
+### Added
+- **Floating Dynamic Island Header Everywhere**: Dynamic Island 3-dock headers now float permanently above scrollable content on Settings, Profile, Room Together, Insights & Replay, Album, Artist, and Search screens.
+- **Unified Library Profile Dock**: Clean single Apple-style frosted profile avatar dock at the top right of the Library screen matching Home and Explore.
+- **Robust Library Persistence**: Liked songs, saved albums, followed artists, and playlists reliably stored with metadata and dual-key backup protection.
+- **In-Playlist Online Song Search**: Instant YouTube Music InnerTube search with debounced typing and Apple Music-style pill controls.
+- **Room Together Synchronized Collaborative Listening**: Sub-millisecond NTP clock sync, democratic fair queue, and multi-client playback synchronization.
+
+
 
 ### Added
 - **Canonical Provider Data Identity**: Integrated provider-based IDs (`providerId`, `provider`) for Artists, Albums, and Tracks with relational `TrackArtist` role mapping (`primary`, `music`, `singer`, `featured`).

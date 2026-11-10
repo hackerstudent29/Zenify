@@ -14,6 +14,7 @@ import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/scrubber_slider.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/player_state.dart';
 import '../../services/queue_state.dart';
 import '../lyrics/lyrics_sheet.dart';
@@ -74,12 +75,14 @@ class PlayerShell extends StatefulWidget {
     super.key,
     this.hideMini = false,
     this.miniBottomOffset = 76,
+    this.dockProgress = 1.0,
     this.lyricsBuilder,
     this.onGoToArtist,
     this.onGoToAlbum,
   });
 
   final bool hideMini;
+  final double dockProgress;
 
   /// Distance from screen bottom (excluding safe area) to the mini player.
   final double miniBottomOffset;
@@ -101,6 +104,7 @@ class PlayerShellState extends State<PlayerShell>
   bool get isPanelOpen => _panel != _Panel.art;
   void closePanel() => _setPanel(_Panel.art);
   void closeSheet() => _close();
+  void openSheet({double velocity = 0}) => _openSheet(velocity: velocity);
 
   late final AnimationController _sheet = AnimationController.unbounded(
     vsync: this,
@@ -592,64 +596,22 @@ class PlayerShellState extends State<PlayerShell>
   /* ───────────────────────── actions ───────────────────────── */
 
   void _showTrackMenu(dynamic track) {
-    final q = context.read<QueueState>();
-    showCupertinoModalPopup<void>(
+    if (track == null) return;
+    final Track t = track is Track
+        ? track
+        : Track(
+            id: track.id?.toString() ?? '',
+            title: track.title?.toString() ?? '',
+            artist: track.artist?.toString() ?? '',
+            album: track.album?.toString() ?? '',
+            coverUrl: track.coverUrl?.toString() ?? '',
+            durationSeconds: track.durationSeconds is int ? track.durationSeconds as int : 0,
+          );
+    ZenDropdown.showTrackMenu(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(track is Track
-            ? track.title
-            : MediaNormalizer.cleanTitle(track?.title?.toString())),
-        message: Text(track is Track
-            ? track.artist
-            : MediaNormalizer.formatArtists(track?.artist?.toString())),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              q.playNext(track);
-            },
-            child: const Text('Play Next'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              q.addToQueue(track);
-            },
-            child: const Text('Add to Queue'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Add to Playlist'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Download'),
-          ),
-          for (final artist
-              in (track is Track
-                  ? track.artistNames
-                  : MediaNormalizer.splitArtistNames(track.artist as String?)))
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _openArtist(artist);
-              },
-              child: Text('Go to $artist'),
-            ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _openAlbum(track);
-            },
-            child: const Text('Go to Album'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
-        ),
-      ),
+      track: t,
+      onGoToArtist: () => _openArtist(t.artist),
+      onGoToAlbum: () => _openAlbum(t),
     );
   }
 
@@ -712,11 +674,20 @@ class PlayerShellState extends State<PlayerShell>
   /* ───────────────────────── MINI PLAYER (Apple Music glass pill) ───────────────────────── */
 
   Widget _buildMini(PlayerState player, dynamic track, EdgeInsets safe) {
+    final dp = widget.dockProgress.clamp(0.0, 1.0);
+    // Interpolate horizontal margins: 16pt (full resting mini player) -> 76pt (center island between left and right docks)
+    final miniLeft = lerpDouble(76.0, 16.0, dp)!;
+    final miniRight = lerpDouble(76.0, 16.0, dp)!;
+    final miniH = lerpDouble(52.0, _kMiniH, dp)!;
+    final miniArt = lerpDouble(36.0, _kMiniArt, dp)!;
+    final miniRadius = lerpDouble(26.0, 29.0, dp)!;
+    final padH = lerpDouble(8.0, 9.0, dp)!;
+
     return Positioned(
-      left: 16, // same width as the dock (pill + search circle)
-      right: 16,
+      left: miniLeft,
+      right: miniRight,
       bottom: widget.miniBottomOffset + safe.bottom,
-      height: _kMiniH,
+      height: miniH,
       child: AnimatedSlide(
         offset: widget.hideMini ? const Offset(0, 1.8) : Offset.zero,
         duration: const Duration(milliseconds: 320),
@@ -750,9 +721,9 @@ class PlayerShellState extends State<PlayerShell>
               onPanEnd: _miniEnd,
               onPanCancel: () => _miniEnd(DragEndDetails()),
               child: AppleGlass(
-                borderRadius: BorderRadius.circular(29),
+                borderRadius: BorderRadius.circular(miniRadius),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(9, 0, 6, 0),
+                  padding: EdgeInsets.fromLTRB(padH, 0, 4, 0),
                   child: Row(
                     children: [
                       // artwork + title/artist, swipe to skip
@@ -779,17 +750,17 @@ class PlayerShellState extends State<PlayerShell>
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: SizedBox(
-                                      width: _kMiniArt,
-                                      height: _kMiniArt,
+                                      width: miniArt,
+                                      height: miniArt,
                                       child: CoverImage(
                                         (track.coverUrl as String?) ?? '',
                                       ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 11),
+                                const SizedBox(width: 10),
                                 Expanded(
-                                  child: RightEdgeFade(child: _miniText(track)),
+                                  child: RightEdgeFade(child: _miniText(track, dp)),
                                 ),
                               ],
                             ),
@@ -800,26 +771,38 @@ class PlayerShellState extends State<PlayerShell>
                         onTap: player.togglePlay,
                         scale: 0.88,
                         child: SizedBox(
-                          width: 46,
-                          height: 46,
-                          child: _PlayGlyph(playing: _playing, size: 28),
+                          width: lerpDouble(38.0, 46.0, dp)!,
+                          height: lerpDouble(38.0, 46.0, dp)!,
+                          child: _PlayGlyph(
+                            playing: _playing,
+                            size: lerpDouble(22.0, 28.0, dp)!,
+                          ),
                         ),
                       ),
-                      PressableScale(
-                        onTap: _next,
-                        scale: 0.88,
-                        child: SizedBox(
-                          width: 46,
-                          height: 46,
-                          child: Center(
-                            child: SpringPop(
-                              pulse: _nextPulse,
-                              dx: 8,
-                              scale: 0.14,
-                              child: const Icon(
-                                CupertinoIcons.forward_fill,
-                                color: Colors.white,
-                                size: 28,
+                      ClipRect(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          widthFactor: dp,
+                          child: Opacity(
+                            opacity: dp,
+                            child: PressableScale(
+                              onTap: _next,
+                              scale: 0.88,
+                              child: SizedBox(
+                                width: 46,
+                                height: 46,
+                                child: Center(
+                                  child: SpringPop(
+                                    pulse: _nextPulse,
+                                    dx: 8,
+                                    scale: 0.14,
+                                    child: const Icon(
+                                      CupertinoIcons.forward_fill,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -836,7 +819,10 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  Widget _miniText(dynamic track) {
+  Widget _miniText(dynamic track, double dp) {
+    final titleSize = lerpDouble(13.5, 15.0, dp)!;
+    final artistSize = lerpDouble(11.5, 13.5, dp)!;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -846,10 +832,10 @@ class PlayerShellState extends State<PlayerShell>
               ? track.compactTitle
               : MediaNormalizer.cleanCompactTitle(track?.title?.toString()),
           dir: _dir,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
-            fontSize: 15,
-            height: 19 / 15,
+            fontSize: titleSize,
+            height: 1.2,
             fontWeight: FontWeight.w600,
             letterSpacing: -0.2,
           ),
@@ -858,8 +844,8 @@ class PlayerShellState extends State<PlayerShell>
           artists: _artistsOf(track),
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.58),
-            fontSize: 13.5,
-            height: 17 / 13.5,
+            fontSize: artistSize,
+            height: 1.2,
           ),
           onTapArtist: (artistName) {
             if (widget.onGoToArtist != null) {
@@ -887,15 +873,19 @@ class PlayerShellState extends State<PlayerShell>
         '';
     final currentKey = ValueKey<String>('cover-$url');
 
+    final dp = widget.dockProgress.clamp(0.0, 1.0);
+    final currentMiniH = lerpDouble(52.0, _kMiniH, dp)!;
+    final currentMiniArt = lerpDouble(36.0, _kMiniArt, dp)!;
+    final currentMiniLeft = lerpDouble(84.0, 25.0, dp)!;
     final mini = Rect.fromLTWH(
-      25,
+      currentMiniLeft,
       size.height -
           widget.miniBottomOffset -
           safe.bottom -
-          _kMiniH +
-          (_kMiniH - _kMiniArt) / 2,
-      _kMiniArt,
-      _kMiniArt,
+          currentMiniH +
+          (currentMiniH - currentMiniArt) / 2,
+      currentMiniArt,
+      currentMiniArt,
     );
     final fallbackSide = math.min(size.width - 56, 380.0);
     final big = _bigRect ??

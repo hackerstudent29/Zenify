@@ -95,7 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
                 children: [
                   Text(
                     'ZENIFY UPDATE CHANNEL',
-                    style: GoogleFonts.oswald(
+                    style: GoogleFonts.inter(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 1.0,
@@ -163,7 +163,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
               children: [
                 Text(
                   'SYSTEM DIAGNOSTICS',
-                  style: GoogleFonts.oswald(
+                  style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.0,
@@ -582,7 +582,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
       padding: const EdgeInsets.fromLTRB(6, 0, 0, 8),
       child: Text(
         title,
-        style: GoogleFonts.oswald(
+        style: GoogleFonts.inter(
           fontSize: 12,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.0,
@@ -1009,7 +1009,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
               children: [
                 Text(
                   'ACTIVE SESSIONS (${sessions.length})',
-                  style: GoogleFonts.oswald(
+                  style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.0,

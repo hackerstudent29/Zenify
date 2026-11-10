@@ -29,7 +29,7 @@ class AchievementsCard extends StatelessWidget {
             children: [
               Text(
                 'ACHIEVEMENTS & BADGES',
-                style: GoogleFonts.oswald(
+                style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,

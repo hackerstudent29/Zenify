@@ -42,7 +42,7 @@ class ListeningHeatmap extends StatelessWidget {
             children: [
               Text(
                 'LISTENING HEATMAP (24 × 7)',
-                style: GoogleFonts.oswald(
+                style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
@@ -103,7 +103,7 @@ class ListeningHeatmap extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         'PEAK: ${peakDay!.toUpperCase()} AT ${_formatHour(peakHour!)}',
-                        style: GoogleFonts.oswald(
+                        style: GoogleFonts.inter(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.6,
