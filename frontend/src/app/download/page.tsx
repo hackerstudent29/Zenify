@@ -30,7 +30,8 @@ export default function DownloadPage() {
 
   // Fallback download URLs
   const apkDownloadUrl = "/downloads/zenify.apk";
-  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases";
+  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.0.2";
+  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk";
   const absoluteDownloadUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/downloads/zenify.apk`
     : "https://listenzenify.com/downloads/zenify.apk";
@@ -252,7 +253,7 @@ export default function DownloadPage() {
                     <h3 className="text-base font-semibold text-white mt-1">Notification or Files</h3>
                   </div>
                   <p className="text-[14px] leading-relaxed text-zinc-400">
-                    Once the 22 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
+                    Once the 64.6 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
                   </p>
                 </div>
 
@@ -414,7 +415,7 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Release Version</span>
-                <span className="text-white">v2.6.0 (Build 1)</span>
+                <span className="text-white">v1.0.2 (Build 5)</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Package Format</span>
@@ -422,7 +423,7 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">File Size</span>
-                <span className="text-white">22.1 MB (23,158,080 bytes)</span>
+                <span className="text-white">64.6 MB (67,775,677 bytes)</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Minimum Operating System</span>
@@ -457,7 +458,7 @@ export default function DownloadPage() {
                 className="h-11 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 <Download size={16} className="text-brand" />
-                <span>Download Zenify APK (v2.6.0)</span>
+                <span>Download Zenify APK (v1.0.2)</span>
               </a>
             </div>
           </motion.div>

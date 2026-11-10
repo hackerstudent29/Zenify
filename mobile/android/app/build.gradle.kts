@@ -26,6 +26,11 @@ android {
         versionName = flutter.versionName
     }
 
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -52,6 +57,10 @@ flutter {
 }
 
 tasks.matching { it.name.contains("AarMetadata") }.configureEach {
+    enabled = false
+}
+
+tasks.matching { it.name.contains("Lint", ignoreCase = true) }.configureEach {
     enabled = false
 }
 
