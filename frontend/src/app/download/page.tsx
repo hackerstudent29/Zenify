@@ -112,7 +112,7 @@ export default function DownloadPage() {
                     className="h-12 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer shadow-lg hover:border-brand/40"
                   >
                     <Download size={18} className="text-brand shrink-0" />
-                    <span>Download APK (64.6 MB)</span>
+                    <span>Download APK (23.1 MB)</span>
                   </a>
 
                   <a
@@ -134,7 +134,7 @@ export default function DownloadPage() {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Package Size</span>
-                    <span className="text-white font-medium">64.6 MB</span>
+                    <span className="text-white font-medium">23.1 MB</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Compatibility</span>
@@ -253,7 +253,7 @@ export default function DownloadPage() {
                     <h3 className="text-base font-semibold text-white mt-1">Notification or Files</h3>
                   </div>
                   <p className="text-[14px] leading-relaxed text-zinc-400">
-                    Once the 64.6 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
+                    Once the 23.1 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
                   </p>
                 </div>
 
@@ -419,11 +419,11 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Package Format</span>
-                <span className="text-white">Universal Android APK (.apk)</span>
+                <span className="text-white">Optimized ARM64 APK (.apk) • Universal Fallback</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">File Size</span>
-                <span className="text-white">64.6 MB (67,775,677 bytes)</span>
+                <span className="text-white">23.1 MB (24,260,203 bytes)</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Minimum Operating System</span>

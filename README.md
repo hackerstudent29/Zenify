@@ -49,10 +49,10 @@ Install the native **Zenify Android application** directly to your phone for sea
 <div align="center">
   <br />
   <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk">
-    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.2)-64.6_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
+    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.2)-23.1_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
   </a>
   <br />
-  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk">zenify-v1.0.2.apk (GitHub Direct)</a> • <a href="https://listenzenify.com/downloads/zenify.apk">Web Direct</a> • <a href="https://github.com/hackerstudent29/Zenify/raw/main/frontend/public/downloads/zenify.apk">GitHub Raw Mirror</a></i></p>
+  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk">zenify-v1.0.2.apk (ARM64 23.1 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2-universal.apk">Universal APK (64.6 MB)</a> • <a href="https://listenzenify.com/downloads/zenify.apk">Web Direct</a></i></p>
   <br />
   <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fhackerstudent29%2FZenify%2Freleases%2Fdownload%2Fv1.0.2%2Fzenify-v1.0.2.apk&format=svg&color=ffffff&bgcolor=121214" alt="Scan QR Code to Download Zenify APK" width="180" />
   <p><b>Scan with your phone's camera to download directly</b></p>
@@ -92,7 +92,7 @@ Install the native **Zenify Android application** directly to your phone for sea
 Start listening immediately — **no sign-up or credit card required**.
 
 * **Live Web Player**: Open **[listenzenify.com](https://listenzenify.com)** or **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in any modern web browser.
-* **Download APK**: Direct download **[Zenify APK v1.0.2](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk)** (or visit [listenzenify.com/download](https://listenzenify.com/download) for web QR install).
+* **Download APK**: Direct download **[Zenify APK v1.0.2 (23.1 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk)** (or visit [listenzenify.com/download](https://listenzenify.com/download) for web QR install).
 
 ---
 
