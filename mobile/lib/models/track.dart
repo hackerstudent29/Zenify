@@ -32,6 +32,16 @@ class Track {
         artist = MediaNormalizer.cleanArtistName(artist),
         album = MediaNormalizer.cleanAlbumTitle(album);
 
+  factory Track.empty() => Track(
+        id: '',
+        title: '',
+        artist: '',
+        album: '',
+        coverUrl: '',
+        durationSeconds: 0,
+        hasLyrics: false,
+      );
+
   /// Clean, compact title for cards and mini player (strips "From ..." movie subtitles and feature tags).
   String get compactTitle => MediaNormalizer.cleanCompactTitle(title);
 
@@ -102,6 +112,8 @@ class Track {
         aLower.contains('sean roldan') ||
         aLower.contains('ilaiyaraaja') ||
         aLower.contains('ilayaraja') ||
+        aLower.contains('govind vasantha') ||
+        aLower.contains('sai abhyankkar') ||
         aLower.contains('d. imman') ||
         aLower.contains('imman') ||
         aLower.contains('g.v. prakash') ||
@@ -115,18 +127,29 @@ class Track {
         aLower.contains('sam c. s') ||
         aLower.contains('ghibran') ||
         aLower.contains('leon james') ||
-        aLower.contains('vivek-mervin')) {
+        aLower.contains('vivek-mervin') ||
+        aLower.contains('asal kolaar') ||
+        aLower.contains('paal dabba') ||
+        aLower.contains('stephen zechariah') ||
+        aLower.contains('shakthisree') ||
+        aLower.contains('haricharan')) {
       return 'tamil';
     }
 
     // 3. Telugu composer / artist recognition
     if (aLower.contains('thaman') ||
         aLower.contains('devi sri prasad') ||
+        aLower.contains('dsp') ||
         aLower.contains('mickey j meyer') ||
         aLower.contains('ram miriyala') ||
         aLower.contains('anurag kulkarni') ||
         aLower.contains('keeravani') ||
-        aLower.contains('chaitan bharadwaj')) {
+        aLower.contains('keeravaani') ||
+        aLower.contains('chaitan bharadwaj') ||
+        aLower.contains('vivek sagar') ||
+        aLower.contains('bheems') ||
+        aLower.contains('rahul sipligunj') ||
+        aLower.contains('mangli')) {
       return 'telugu';
     }
 
@@ -137,7 +160,11 @@ class Track {
         aLower.contains('shaan rahman') ||
         aLower.contains('deepak dev') ||
         aLower.contains('rex vijayan') ||
-        aLower.contains('gopi sundar')) {
+        aLower.contains('gopi sundar') ||
+        aLower.contains('dabzee') ||
+        aLower.contains('baby jean') ||
+        aLower.contains('thirumali') ||
+        aLower.contains('vidyasagar')) {
       return 'malayalam';
     }
 
@@ -148,7 +175,10 @@ class Track {
         aLower.contains('ap dhillon') ||
         aLower.contains('shubh') ||
         aLower.contains('guru randhawa') ||
-        aLower.contains('ammy virk')) {
+        aLower.contains('ammy virk') ||
+        aLower.contains('b praak') ||
+        aLower.contains('jaani') ||
+        aLower.contains('harrdy sandhu')) {
       return 'punjabi';
     }
 
@@ -163,7 +193,11 @@ class Track {
         aLower.contains('atif aslam') ||
         aLower.contains('sonu nigam') ||
         aLower.contains('jubin nautiyal') ||
-        aLower.contains('darshan raval')) {
+        aLower.contains('darshan raval') ||
+        aLower.contains('tanishk bagchi') ||
+        aLower.contains('mithoon') ||
+        aLower.contains('shankar-ehsaan-loy') ||
+        aLower.contains('jasleen royal')) {
       return 'hindi';
     }
 
@@ -175,7 +209,15 @@ class Track {
         aLower.contains('billie eilish') ||
         aLower.contains('coldplay') ||
         aLower.contains('dua lipa') ||
-        aLower.contains('bruno mars')) {
+        aLower.contains('bruno mars') ||
+        aLower.contains('post malone') ||
+        aLower.contains('justin bieber') ||
+        aLower.contains('eminem') ||
+        aLower.contains('kendrick lamar') ||
+        aLower.contains('rihanna') ||
+        aLower.contains('ariana grande') ||
+        aLower.contains('charlie puth') ||
+        aLower.contains('maroon 5')) {
       return 'english';
     }
 

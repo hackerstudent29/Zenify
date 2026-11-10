@@ -9,9 +9,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/playback_context.dart';
 import '../models/track.dart';
 
-enum RepeatMode { off, all, one }
+export '../models/playback_context.dart' show RepeatMode, AdvanceReason, PlaybackContext, PlaybackContextType;
 
 abstract class PlaybackBridge implements Listenable {
   Track? get currentTrack;

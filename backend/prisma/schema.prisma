@@ -59,6 +59,7 @@ model User {
   listeningEventArtists ListeningEventArtist[]
   userArtistStats UserArtistStat[]
   userHourlyStats UserHourlyStat[]
+  userAchievements UserAchievement[]
 }
 
 model Subscription {
@@ -870,6 +871,9 @@ model ListeningEvent {
   quality         Int      @default(256)
   deviceId        String?  @map("device_id")
   qualified       Boolean  @default(false)
+  isSkip          Boolean  @default(false) @map("is_skip")
+  isRepeat        Boolean  @default(false) @map("is_repeat")
+  completed       Boolean  @default(false)
   createdAt       DateTime @default(now()) @map("created_at")
 
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -922,4 +926,19 @@ model UserHourlyStat {
 
   @@id([userId, dow, hour])
   @@map("user_hourly_stats")
+}
+
+model UserAchievement {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  badgeId    String   @map("badge_id")
+  title      String
+  unlockedAt DateTime @default(now()) @map("unlocked_at")
+  data       Json?
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@map("user_achievements")
 }

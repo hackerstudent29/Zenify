@@ -17,7 +17,6 @@ import 'package:provider/provider.dart';
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/tokens/app_typography.dart';
-import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/media_card.dart';
 import '../../design_system/widgets/pressable_scale.dart';
@@ -25,6 +24,7 @@ import '../../design_system/widgets/section_header.dart';
 import '../../design_system/widgets/song_tile.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
+import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/innertube_service.dart';
 import '../../services/player_state.dart';
@@ -240,14 +240,28 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   void _play(List<Track> list, int index) {
     if (list.isEmpty) return;
-    context.read<PlayerState>().setQueue(list, startIndex: index);
+    final startIdx = index.clamp(0, list.length - 1);
+    final ctx = PlaybackContext(
+      type: PlaybackContextType.homeSection,
+      id: 'explore_trending',
+      tracks: list,
+      startTrack: list[startIdx],
+      title: 'Trending',
+    );
+    context.read<PlayerState>().setQueue(list, startIndex: startIdx, context: ctx);
   }
 
   void _shuffle(List<Track> list) {
     if (list.isEmpty) return;
     HapticFeedback.lightImpact();
-    final shuffled = List<Track>.of(list)..shuffle();
-    context.read<PlayerState>().setQueue(shuffled, startIndex: 0);
+    final ctx = PlaybackContext(
+      type: PlaybackContextType.homeSection,
+      id: 'explore_trending',
+      tracks: list,
+      startTrack: list.first,
+      title: 'Trending',
+    );
+    context.read<PlayerState>().setQueue(list, startIndex: 0, shuffle: true, context: ctx);
   }
 
   void _toggleFollow(String artistName) {
@@ -362,24 +376,8 @@ class _ExploreScreenState extends State<ExploreScreen>
           title: 'Explore',
           subtitle: '${_country.flag} ${_country.code}',
           showBack: false,
-          leading: PressableScale(
-            scale: 0.88,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              _pickCountry();
-            },
-            child: AppleGlass(
-              borderRadius: BorderRadius.circular(22),
-              tint: const Color(0x26121216),
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: Center(
-                  child: Text(_country.flag, style: const TextStyle(fontSize: 18)),
-                ),
-              ),
-            ),
-          ),
+          isDockPage: true,
+          onCenterTap: _pickCountry,
           showProfile: true,
           onProfileTap: widget.onOpenProfile,
           topPadding: topInset + 4,
@@ -1070,7 +1068,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 180,
+          height: 236,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1083,16 +1081,16 @@ class _ExploreScreenState extends State<ExploreScreen>
               final isFollowed = _followedArtists.contains(name);
 
               return Padding(
-                padding: const EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.only(right: 14),
                 child: SizedBox(
-                  width: 105,
+                  width: 170,
                   child: Column(
                     children: [
                       MediaCard(
                         title: '',
                         imageUrl: photo,
                         isCircular: true,
-                        width: 90,
+                        width: 170,
                         onTap: () {
                           HapticFeedback.lightImpact();
                           Navigator.push(
@@ -1106,7 +1104,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                           );
                         },
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Text(
                         name,
                         maxLines: 1,
@@ -1114,7 +1112,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1122,7 +1120,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                       PressableScale(
                         onTap: () => _toggleFollow(name),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
                           decoration: BoxDecoration(
                             color: isFollowed ? AppColors.accent : const Color(0x1FFFFFFF),
                             borderRadius: BorderRadius.circular(12),
@@ -1131,7 +1129,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                             isFollowed ? 'Following' : 'Follow',
                             style: TextStyle(
                               color: isFollowed ? Colors.white : AppColors.textSecondary,
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

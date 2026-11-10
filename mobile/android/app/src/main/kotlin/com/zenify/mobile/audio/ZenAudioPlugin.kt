@@ -134,13 +134,16 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
 
         val dataSourceFactory = YtDataSource.createDataSourceFactory(ctx) { videoId, resolved ->
+            val loudness = resolved.loudnessDb
+            processor.setLoudnessDb(loudness)
             main.post {
                 emit(mapOf(
                     "type" to "resolved",
                     "id" to videoId,
                     "client" to resolved.client,
                     "ms" to (resolved.expiresInSec * 1000),
-                    "fromCache" to false
+                    "fromCache" to false,
+                    "loudnessDb" to loudness
                 ))
             }
         }
@@ -196,8 +199,10 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         title: String?,
         artist: String?,
         artworkUrl: String?,
-        startMs: Long?
+        startMs: Long?,
+        loudnessDb: Double? = null
     ) {
+        processor.setLoudnessDb(loudnessDb)
         val p = ensurePlayer()
         val uri = Uri.parse("zenify://media/$mediaId")
         val metadata = MediaMetadata.Builder()
@@ -289,7 +294,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             title = call.argument<String>("title"),
                             artist = call.argument<String>("artist"),
                             artworkUrl = call.argument<String>("artworkUrl"),
-                            startMs = call.argument<Number>("startMs")?.toLong()
+                            startMs = call.argument<Number>("startMs")?.toLong(),
+                            loudnessDb = call.argument<Number>("loudnessDb")?.toDouble()
                         )
                     } else {
                         val url = call.argument<String>("url")
@@ -328,6 +334,11 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 "stop" -> { player?.stop(); player?.clearMediaItems(); result.success(null) }
                 "seek" -> { player?.seekTo(call.argument<Number>("ms")?.toLong() ?: 0L); result.success(null) }
                 "setVolume" -> { player?.volume = (call.argument<Number>("v")?.toFloat() ?: 1f).coerceIn(0f, 1f); result.success(null) }
+                "setLoudnessDb" -> {
+                    val db = call.argument<Number>("loudnessDb")?.toDouble()
+                    processor.setLoudnessDb(db)
+                    result.success(null)
+                }
                 "setFx" -> { setFx(call.arguments as Map<String, Any?>); result.success(null) }
                 "dispose" -> { player?.release(); player = null; result.success(null) }
                 else -> result.notImplemented()

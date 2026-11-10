@@ -76,7 +76,9 @@ class AudioPlayer implements FxEngine {
         _durC.add(Duration(milliseconds: (e['ms'] as num).toInt()));
       case 'resolved':
         if (kDebugMode) {
-          debugPrint('ZenPlayer: resolved ${e['id']} via client ${e['client']} in ${e['ms']}ms (fromCache=${e['fromCache']})');
+          final ldb = e['loudnessDb'];
+          final ldbStr = ldb != null ? ' loudness=${ldb}dB' : '';
+          debugPrint('ZenPlayer: resolved ${e['id']} via client ${e['client']} in ${e['ms']}ms (fromCache=${e['fromCache']})$ldbStr');
         }
       case 'error':
         final errMsg = e['message']?.toString() ?? e['kind']?.toString() ?? 'playback error';
@@ -101,14 +103,23 @@ class AudioPlayer implements FxEngine {
     String? artist,
     String? artworkUrl,
     int? startMs,
-  }) =>
-      _call('play', {
-        'mediaId': mediaId.replaceFirst('yt-', '').trim(),
-        'title': title ?? '',
-        'artist': artist ?? '',
-        'artworkUrl': artworkUrl ?? '',
-        'startMs': startMs,
-      });
+    double? loudnessDb,
+  }) {
+    final args = <String, dynamic>{
+      'mediaId': mediaId.replaceFirst('yt-', '').trim(),
+      'title': title ?? '',
+      'artist': artist ?? '',
+      'artworkUrl': artworkUrl ?? '',
+      'startMs': startMs,
+    };
+    if (loudnessDb != null) {
+      args['loudnessDb'] = loudnessDb;
+    }
+    return _call('play', args);
+  }
+
+  Future<void> setLoudnessDb(double? db) =>
+      _call('setLoudnessDb', {'loudnessDb': db});
 
   Future<void> setNext(
     String? mediaId, {

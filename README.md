@@ -12,8 +12,8 @@
 
   <p>
     <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/🚀_Live_Web_App-listenzenify.com-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v1.0.2-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v1.0.2-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.3/zenify-v1.0.3.apk"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v1.0.3-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v1.0.3-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="MIT License" /></a>
     <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
   </p>
@@ -48,31 +48,31 @@ Install the native **Zenify Android application** directly to your phone for sea
 
 <div align="center">
   <br />
-  <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk">
-    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.2)-23.1_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
+  <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.3/zenify-v1.0.3.apk">
+    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.3)-24.8_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download APK Package" height="42" />
   </a>
   <br />
-  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk">zenify-v1.0.2.apk (ARM64 23.1 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2-universal.apk">Universal APK (64.6 MB)</a> • <a href="https://listenzenify.com/downloads/zenify.apk">Web Direct</a></i></p>
+  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.3/zenify-v1.0.3.apk">zenify-v1.0.3.apk (ARM64 24.8 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.3/zenify-v1.0.3-universal.apk">Universal APK (65.2 MB)</a> • <a href="https://listenzenify.com/downloads/zenify.apk">Web Direct</a></i></p>
   <br />
-  <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fhackerstudent29%2FZenify%2Freleases%2Fdownload%2Fv1.0.2%2Fzenify-v1.0.2.apk&format=svg&color=ffffff&bgcolor=121214" alt="Scan QR Code to Download Zenify APK" width="180" />
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fhackerstudent29%2FZenify%2Freleases%2Fdownload%2Fv1.0.3%2Fzenify-v1.0.3.apk&format=svg&color=ffffff&bgcolor=121214" alt="Scan QR Code to Download Zenify APK" width="180" />
   <p><b>Scan with your phone's camera to download directly</b></p>
 </div>
 
 ### 📲 How to Install the APK on Your Android Phone
 
-1. **Download the APK Package**: Tap the **[Download Zenify APK (v1.0.2)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk)** button or scan the QR code above with your phone camera.
+1. **Download the APK Package**: Tap the **[Download Zenify APK (v1.0.3)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.3/zenify-v1.0.3.apk)** button or scan the QR code above with your phone camera.
    > *Note*: If Google Chrome or your browser displays *"File might be harmful"*, tap **Download anyway**. This is standard Android security verification for apps downloaded outside the Google Play Store.
 2. **Open the File**: When the download finishes, tap **Open** from your notification tray, or open your phone's **Files** or **Downloads** folder and tap `zenify.apk`.
 3. **Allow Unknown Apps**: If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings** and turn on **Allow from this source**.
 4. **Tap Install**: Tap **Install**. In a few seconds, installation will finish. Open Zenify to stream high-bitrate ad-free music with synced lyrics and lock-screen controls!
 
-### 🌟 What's New in Release v1.0.2
-- **Dynamic Island Header**: Floating glass header with smooth vacuum collapse transitions, real-time marquee titles, and edge-to-edge status bar clearance.
-- **Apple Liquid Glass Split Dock**: Spacious 3-tab navigation (`Home`, `Discover`, `Library`) with detached circular search bubble and spring physics.
-- **Full-View Player Animations**: Underdamped spring physics, interactive cover squish feedback, and auto-collapsing lyrics chrome for immersive viewing.
-- **Queue Overhaul & Automix**: Apple Music-style circular toggles for Shuffle, Repeat, and Autoplay with infinite continuous radio tailored to language preference.
-- **StudioFX DSP & Peak Limiter**: Hardware-accelerated parametric equalizer with calibrated presets and zero-clipping limiter.
-- **Deep Media Normalizer**: Automated bracket sanitization, multi-artist link extraction, and high-definition album artwork upscaling.
+### 🌟 What's New in Release v1.0.3
+- **Room Together Collaborative Listening**: Real-time synchronized playback for up to 100 users with sub-millisecond NTP clock sync, 1.5s barrier scheduling, 3-tier anti-drift pitch nudging (1.02x/0.98x), and sequence gap recovery.
+- **Democratic Fair Queue & Skip Voting**: Shared queue with per-listener 3-track fair cap, requester attribution badges, and majority skip voting with host override.
+- **Live Floating Reactions & Room Chat**: Real-time aggregated reaction counters (❤️, 🔥, 👏, 😭, 💃, 🎧) with ascending particle animations and threaded room chat.
+- **Recommendation-Weighted Smart Queue**: YouTube Music recommendation rank as primary signal (`recEngineRankWeight = 40.0`), Latin romanized artist/composer language detection before Unicode fallback, and smart mood-vibe scoring.
+- **ReplayGain Limiter & Zero-Clipping DSP**: Native Kotlin audio processor clamping loudness boosts to max +3.0 dB with envelope peak limiting (1ms attack, 60ms release) and hyperbolic tangent soft-clipping.
+- **Apple Music-Grade Design System**: Elevated dark charcoal background (`#121214`), liquid glass panels, and smooth dynamic island transitions.
 
 ### 🍎 Install on iPhone & iPad (PWA)
 1. Open **[listenzenify.com](https://listenzenify.com)** or **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in **Safari**.
@@ -92,7 +92,7 @@ Install the native **Zenify Android application** directly to your phone for sea
 Start listening immediately — **no sign-up or credit card required**.
 
 * **Live Web Player**: Open **[listenzenify.com](https://listenzenify.com)** or **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in any modern web browser.
-* **Download APK**: Direct download **[Zenify APK v1.0.2 (23.1 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk)** (or visit [listenzenify.com/download](https://listenzenify.com/download) for web QR install).
+* **Download APK**: Direct download **[Zenify APK v1.0.3 (24.8 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.3/zenify-v1.0.3.apk)** (or visit [listenzenify.com/download](https://listenzenify.com/download) for web QR install).
 
 ---
 
@@ -217,7 +217,7 @@ Yes. Zenify is completely free and open-source under the MIT license. There are 
 No. You can open Zenify and begin listening to songs, albums, and radios immediately without creating an account or providing an email address. Creating an account is optional to sync favorite songs across devices.
 
 ### 3. How do I download the Android APK?
-Tap the direct link **[Download Zenify APK (v1.0.2)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk)** or scan the QR code above with your phone camera. Follow the brief prompt to allow installation of unknown apps in Android Settings, and tap Install.
+Tap the direct link **[Download Zenify APK (v1.0.3)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.3/zenify-v1.0.3.apk)** or scan the QR code above with your phone camera. Follow the brief prompt to allow installation of unknown apps in Android Settings, and tap Install.
 
 ### 4. Can I play my own audio files from my computer or phone?
 Yes. The **My Library / Local Library** feature allows you to select MP3, FLAC, WAV, and M4A audio files from your device storage. Files play entirely inside your device using hardware audio decoding; your files are never uploaded to any remote server.

@@ -39,6 +39,32 @@ export async function meRoutes(server: FastifyInstance) {
     controller.getInsights.bind(controller)
   );
 
+  // Listening History
+  server.get(
+    '/history',
+    { preHandler: [server.authenticate] },
+    controller.getHistory.bind(controller)
+  );
+
+  server.delete(
+    '/history/:eventId',
+    { preHandler: [server.authenticate] },
+    controller.deleteHistoryEvent.bind(controller)
+  );
+
+  server.delete(
+    '/history',
+    { preHandler: [server.authenticate] },
+    controller.clearHistory.bind(controller)
+  );
+
+  // Achievements
+  server.get(
+    '/achievements',
+    { preHandler: [server.authenticate] },
+    controller.getAchievements.bind(controller)
+  );
+
   // Sessions Management
   server.get(
     '/sessions',

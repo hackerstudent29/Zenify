@@ -10,10 +10,10 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
+import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/player_state.dart';
 import '../details/artist_screen.dart';
@@ -802,6 +802,93 @@ class _GenreTile extends StatelessWidget {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Personalized Mix Cards (Apple Music / YT Music Mix Station style)  */
+/* ------------------------------------------------------------------ */
+class _MixCard extends StatelessWidget {
+  const _MixCard({
+    required this.title,
+    required this.subtitle,
+    required this.gradient,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<Color> gradient;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringPress(
+      onTap: onTap,
+      child: Container(
+        width: 164,
+        height: 164,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: gradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.20),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: Colors.white, size: 20),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Screen                                                              */
 /* ------------------------------------------------------------------ */
 class HomeScreen extends StatefulWidget {
@@ -815,14 +902,25 @@ class _HomeScreenState extends State<HomeScreen> {
   int _mood = -1;
   int _refresh = 0;
   bool _loading = true;
+  bool _loadingMood = false;
 
+  // Personalized telemetry & shelves
+  List<Track> _recentHistory = [];
+  List<Track> _rediscover = [];
   List<Track> _quickPicks = [];
+  List<Track> _timeOfDayTracks = [];
+  String _timeOfDayGreeting = 'Good day';
+  String _timeOfDayMoodLabel = 'Curated for you';
+
+  String? _favoriteArtist;
+  List<Track> _favoriteArtistTracks = [];
+  String? _secondFavoriteArtist;
+  List<Track> _secondFavoriteArtistTracks = [];
+
   List<Track> _chartTracks = [];
   List<({String name, String subs, String image})> _chartArtists = [];
   List<Track> _newReleases = [];
-  List<Track> _recentHistory = [];
-  String? _favoriteArtist;
-  List<Track> _favoriteArtistTracks = [];
+  List<Track> _moodTracks = [];
 
   @override
   void initState() {
@@ -852,10 +950,16 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) {
       setState(() {
         _recentHistory = ListeningHistoryService.instance.getRecentTracks();
+        _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
         final fav = ListeningHistoryService.instance.getFavoriteArtist();
+        final secondFav = ListeningHistoryService.instance.getSecondFavoriteArtist();
         if (fav != _favoriteArtist) {
           _favoriteArtist = fav;
           if (fav != null) _loadFavoriteArtistTracks(fav);
+        }
+        if (secondFav != _secondFavoriteArtist) {
+          _secondFavoriteArtist = secondFav;
+          if (secondFav != null) _loadSecondFavoriteArtistTracks(secondFav);
         }
       });
     }
@@ -875,126 +979,102 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final country = CountryService.instance.currentCountry;
 
+      // 1. Load User Listening Telemetry
       _recentHistory = ListeningHistoryService.instance.getRecentTracks();
+      _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
       _favoriteArtist = ListeningHistoryService.instance.getFavoriteArtist();
-
+      _secondFavoriteArtist = ListeningHistoryService.instance.getSecondFavoriteArtist();
       final userLang = ListeningHistoryService.instance.primaryLanguage;
-      final fav = _favoriteArtist;
 
-      // Personalized taste-first loading: if user listens to a specific language/artist (e.g. Tamil),
-      // prioritize their preferred language and favorite artist over generic national charts!
-      if (userLang.isNotEmpty || (fav != null && fav.isNotEmpty)) {
-        final query = (fav != null && fav.isNotEmpty) ? '$fav radio' : '$userLang top hits';
-        InnerTubeService.instance.search(query).then((tracks) {
+      // 2. Time-of-Day Context & Greeting
+      final timeCtx = ListeningHistoryService.getTimeOfDayContext(userLang);
+      _timeOfDayGreeting = timeCtx.greeting;
+      _timeOfDayMoodLabel = timeCtx.moodLabel;
+
+      // 3. Time-of-day shelf query
+      InnerTubeService.instance.search(timeCtx.defaultSearchTerm).then((tracks) {
+        if (mounted && tracks.isNotEmpty) {
+          setState(() => _timeOfDayTracks = tracks.take(12).toList());
+        }
+      }).catchError((_) {});
+
+      // 4. Personalized Quick Picks based on user's top artist / last track
+      if (_favoriteArtist != null && _favoriteArtist!.isNotEmpty) {
+        InnerTubeService.instance.search('${_favoriteArtist!} radio').then((tracks) {
           if (mounted && tracks.isNotEmpty) {
             setState(() {
-              _quickPicks = tracks;
+              _quickPicks = tracks.take(12).toList();
               _loading = false;
             });
           }
         }).catchError((_) {});
-
-        if (userLang.isNotEmpty) {
-          InnerTubeService.instance.search('$userLang top trending').then((tracks) {
-            if (mounted && tracks.isNotEmpty) {
-              setState(() {
-                _chartTracks = tracks;
-                _loading = false;
-              });
-            }
-          }).catchError((_) {});
-
-          InnerTubeService.instance.search('latest $userLang songs').then((tracks) {
-            if (mounted && tracks.isNotEmpty) {
-              setState(() {
-                _newReleases = tracks;
-                _loading = false;
-              });
-            }
-          }).catchError((_) {});
-        }
-      }
-
-      // Progressive loading: don't block the screen with Future.wait!
-      // 1. Home feed / Quick picks (used as baseline or fallback)
-      InnerTubeService.instance.getHomeFeed(countryCode: country.code).then((tracks) {
-        if (mounted && tracks.isNotEmpty && _quickPicks.isEmpty) {
-          setState(() {
-            _quickPicks = tracks;
-            _loading = false;
-          });
-        }
-      }).catchError((_) async {
-        try {
-          final ytSearchFallback = await InnerTubeService.instance.search('Top Songs').timeout(const Duration(seconds: 5));
-          if (mounted && ytSearchFallback.isNotEmpty && _quickPicks.isEmpty) {
+      } else if (_recentHistory.isNotEmpty) {
+        InnerTubeService.instance.fetchRelated(_recentHistory.first).then((tracks) {
+          if (mounted && tracks.isNotEmpty) {
             setState(() {
-              _quickPicks = ytSearchFallback;
+              _quickPicks = tracks.take(12).toList();
               _loading = false;
             });
-            return;
           }
-        } catch (_) {}
-        if (mounted && _quickPicks.isEmpty) {
-          setState(() {
-            _quickPicks = CatalogDataSource.allTracks;
-            _loading = false;
-          });
-        }
-      });
-
-      // 2. Regional Charts (if not already populated by language preference)
-      if (userLang.isEmpty) {
-        InnerTubeService.instance.getCharts(countryCode: country.code).then((data) {
-          if (mounted && _chartTracks.isEmpty) {
+        }).catchError((_) {});
+      } else {
+        // Zero history: fetch real live home feed
+        InnerTubeService.instance.getHomeFeed(countryCode: country.code).then((tracks) {
+          if (mounted && tracks.isNotEmpty && _quickPicks.isEmpty) {
             setState(() {
-              if (data.tracks.isNotEmpty) _chartTracks = data.tracks;
-              if (data.artists.isNotEmpty) _chartArtists = data.artists;
+              _quickPicks = tracks.take(12).toList();
               _loading = false;
             });
           }
         }).catchError((_) {});
       }
 
-      // 3. New Releases (if not already populated by language preference)
-      if (userLang.isEmpty) {
-        InnerTubeService.instance.getNewReleases(countryCode: country.code).then((tracks) {
-          if (mounted && tracks.isNotEmpty && _newReleases.isEmpty) {
-            setState(() {
-              _newReleases = tracks;
-              _loading = false;
-            });
-          }
-        }).catchError((_) {});
-      }
-
-      // 4. Fallback guard: after 3s, ensure screen never hangs
-      Future.delayed(const Duration(milliseconds: 3000), () async {
-        if (mounted && _quickPicks.isEmpty) {
-          try {
-            final ytFallback = await InnerTubeService.instance.search('Trending Hits').timeout(const Duration(seconds: 4));
-            if (mounted && ytFallback.isNotEmpty) {
-              setState(() {
-                _quickPicks = ytFallback;
-                _loading = false;
-              });
-              return;
-            }
-          } catch (_) {}
-          if (mounted) {
-            setState(() {
-              if (CatalogDataSource.allTracks.isNotEmpty) {
-                _quickPicks = CatalogDataSource.allTracks;
-              }
-              _loading = false;
-            });
-          }
-        }
-      });
-
-      if (_favoriteArtist != null) {
+      // 5. #1 Favorite Artist Spotlight
+      if (_favoriteArtist != null && _favoriteArtist!.isNotEmpty) {
         _loadFavoriteArtistTracks(_favoriteArtist!);
       }
+
+      // 6. #2 Favorite Artist Spotlight
+      if (_secondFavoriteArtist != null && _secondFavoriteArtist!.isNotEmpty) {
+        _loadSecondFavoriteArtistTracks(_secondFavoriteArtist!);
+      }
+
+      // 7. New Releases (filtered by user's dominant language)
+      if (userLang.isNotEmpty) {
+        InnerTubeService.instance.search('latest $userLang songs').then((tracks) {
+          if (mounted && tracks.isNotEmpty) {
+            setState(() {
+              _newReleases = tracks.take(9).toList();
+              _loading = false;
+            });
+          }
+        }).catchError((_) {});
+      } else {
+        InnerTubeService.instance.getNewReleases(countryCode: country.code).then((tracks) {
+          if (mounted && tracks.isNotEmpty) {
+            setState(() {
+              _newReleases = tracks.take(9).toList();
+              _loading = false;
+            });
+          }
+        }).catchError((_) {});
+      }
+
+      // 8. Regional Charts & Chart Artists
+      InnerTubeService.instance.getCharts(countryCode: country.code).then((data) {
+        if (mounted) {
+          setState(() {
+            if (data.tracks.isNotEmpty) _chartTracks = data.tracks.take(12).toList();
+            if (data.artists.isNotEmpty) _chartArtists = data.artists.take(10).toList();
+            _loading = false;
+          });
+        }
+      }).catchError((_) {});
+
+      // Fallback guard: ensure loading spinner is dismissed after 3s
+      Future.delayed(const Duration(milliseconds: 3000), () {
+        if (mounted && _loading) setState(() => _loading = false);
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('[HomeScreen] load error: $e');
       if (mounted) setState(() => _loading = false);
@@ -1003,13 +1083,103 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadFavoriteArtistTracks(String artistName) async {
     try {
-      final tracks = await InnerTubeService.instance.search(artistName);
+      final tracks = await InnerTubeService.instance.search('$artistName hits');
       if (mounted) {
         setState(() {
           _favoriteArtistTracks = tracks.take(8).toList();
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadSecondFavoriteArtistTracks(String artistName) async {
+    try {
+      final tracks = await InnerTubeService.instance.search('$artistName hits');
+      if (mounted) {
+        setState(() {
+          _secondFavoriteArtistTracks = tracks.take(8).toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _onSelectMood(int index) {
+    if (_mood == index) {
+      setState(() {
+        _mood = -1;
+        _moodTracks = [];
+        _loadingMood = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _mood = index;
+      _loadingMood = true;
+    });
+
+    final mood = _moods[index];
+    final userLang = ListeningHistoryService.instance.primaryLanguage;
+    final country = CountryService.instance.currentCountry;
+    final langPrefix = userLang.isNotEmpty ? '$userLang ' : '${country.name} ';
+    final query = '$langPrefix$mood hits';
+
+    InnerTubeService.instance.search(query).then((tracks) {
+      if (mounted && _mood == index) {
+        setState(() {
+          _moodTracks = tracks.take(12).toList();
+          _loadingMood = false;
+        });
+      }
+    }).catchError((_) {
+      if (mounted && _mood == index) {
+        setState(() => _loadingMood = false);
+      }
+    });
+  }
+
+  void _playMix(String mixType) {
+    HapticFeedback.mediumImpact();
+    final userLang = ListeningHistoryService.instance.primaryLanguage;
+    final country = CountryService.instance.currentCountry;
+    final langPrefix = userLang.isNotEmpty ? '$userLang ' : '${country.name} ';
+
+    switch (mixType) {
+      case 'supermix':
+        final pool = <Track>{
+          ..._favoriteArtistTracks,
+          ..._secondFavoriteArtistTracks,
+          ..._quickPicks,
+          ..._recentHistory,
+        }.toList();
+        if (pool.isNotEmpty) {
+          pool.shuffle();
+          play(pool, 0);
+        } else {
+          InnerTubeService.instance.search('${langPrefix}top hits supermix').then((tracks) {
+            if (tracks.isNotEmpty) play(tracks, 0);
+          });
+        }
+        break;
+
+      case 'discover':
+        InnerTubeService.instance.search('${langPrefix}fresh discoveries indie tracks').then((tracks) {
+          if (tracks.isNotEmpty) play(tracks, 0);
+        });
+        break;
+
+      case 'chill':
+        InnerTubeService.instance.search('${langPrefix}chill acoustic melodies').then((tracks) {
+          if (tracks.isNotEmpty) play(tracks, 0);
+        });
+        break;
+
+      case 'energy':
+        InnerTubeService.instance.search('${langPrefix}workout high energy dance hits').then((tracks) {
+          if (tracks.isNotEmpty) play(tracks, 0);
+        });
+        break;
+    }
   }
 
   int get _seed => (_mood + 1) * 7 + _refresh * 13;
@@ -1020,34 +1190,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _open(Widget screen) => Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 
+  void play(List<Track> list, int i) {
+    if (list.isEmpty) return;
+    HapticFeedback.lightImpact();
+    final startIdx = i.clamp(0, list.length - 1);
+    final ctx = PlaybackContext(
+      type: PlaybackContextType.homeSection,
+      id: 'home',
+      tracks: list,
+      startTrack: list[startIdx],
+    );
+    context.read<PlayerState>().setQueue(list, startIndex: startIdx, context: ctx);
+  }
+
   @override
   Widget build(BuildContext context) {
     final player = context.watch<PlayerState>();
     final top = MediaQuery.paddingOf(context).top;
     final country = CountryService.instance.currentCountry;
 
-    void play(List<Track> list, int i) {
-      HapticFeedback.lightImpact();
-      player.setQueue(list, startIndex: i);
-    }
-
-    // 1. Personalised "Listen again" (Real listening history, fallback to quickPicks)
+    // Real dynamic datasets
     final listenAgain = _recentHistory.isNotEmpty
         ? _recentHistory
-        : (_quickPicks.isNotEmpty ? _quickPicks.take(10).toList() : CatalogDataSource.allTracks.take(10).toList());
+        : (_quickPicks.isNotEmpty ? _quickPicks.take(10).toList() : _chartTracks.take(10).toList());
 
-    // 2. Real Quick picks from YouTube Music
-    final quick = _quickPicks.isNotEmpty ? _quickPicks.take(12).toList() : CatalogDataSource.allTracks.take(12).toList();
+    final quick = _quickPicks.isNotEmpty ? _quickPicks.take(12).toList() : _chartTracks.take(12).toList();
+    final charts = _chartTracks.isNotEmpty ? _chartTracks.take(12).toList() : const <Track>[];
+    final fresh = _newReleases.isNotEmpty ? _newReleases.take(9).toList() : const <Track>[];
 
-    // 3. Country-specific Trending & Charts
-    final charts = _chartTracks.isNotEmpty ? _chartTracks.take(12).toList() : CatalogDataSource.allTracks.take(12).toList();
-
-    // 4. Fresh Releases
-    final fresh = _newReleases.isNotEmpty ? _newReleases.take(9).toList() : CatalogDataSource.allTracks.take(9).toList();
-
-    // 5. Albums for you (extracted from real releases)
+    // Albums for you (extracted from real dynamic releases & quickpicks)
     final albumMap = <String, Track>{};
-    for (final t in [..._newReleases, ..._quickPicks, ..._chartTracks]) {
+    for (final t in [..._newReleases, ..._quickPicks, ..._chartTracks, ..._recentHistory]) {
       final alb = MediaNormalizer.cleanTitle(t.album);
       if (alb.isNotEmpty && alb.toLowerCase() != 'single' && !MediaNormalizer.isMetadataNoise(alb)) {
         albumMap.putIfAbsent(alb, () => t);
@@ -1057,7 +1230,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: _loading && _quickPicks.isEmpty && _chartTracks.isEmpty && CatalogDataSource.allTracks.isEmpty
+      body: _loading && _quickPicks.isEmpty && _chartTracks.isEmpty && _recentHistory.isEmpty
           ? const Center(child: CupertinoActivityIndicator(color: Colors.white70, radius: 14))
           : Stack(
               children: [
@@ -1066,313 +1239,498 @@ class _HomeScreenState extends State<HomeScreen> {
                   slivers: [
                     SliverToBoxAdapter(child: SizedBox(height: top + 56)),
                     CupertinoSliverRefreshControl(
-                  onRefresh: () async {
-                    await _loadAllHomeData(refresh: true);
-                    if (mounted) setState(() => _refresh++);
-                  },
-                  builder: (ctx, mode, pulled, trigger, extent) {
-                    final p = (pulled / trigger).clamp(0.0, 1.0).toDouble();
-                    final spinning = mode == RefreshIndicatorMode.refresh || mode == RefreshIndicatorMode.done;
-                    return Center(
-                      child: Opacity(
-                        opacity: p,
-                        child: spinning
-                            ? const CupertinoActivityIndicator(color: Colors.white70, radius: 12)
-                            : CupertinoActivityIndicator.partiallyRevealed(
-                                color: Colors.white70, radius: 12, progress: p),
-                      ),
-                    );
-                  },
-                ),
-
-                // In-App Update Banner (Appears when a new version is available)
-                SliverToBoxAdapter(
-                  child: ValueListenableBuilder<UpdateInfo?>(
-                    valueListenable: UpdateService.instance.availableUpdateNotifier,
-                    builder: (context, update, _) {
-                      if (update == null || !update.hasUpdate) return const SizedBox.shrink();
-                      return Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF18181B),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.crimson.withValues(alpha: 0.35)),
+                      onRefresh: () async {
+                        await _loadAllHomeData(refresh: true);
+                        if (mounted) setState(() => _refresh++);
+                      },
+                      builder: (ctx, mode, pulled, trigger, extent) {
+                        final p = (pulled / trigger).clamp(0.0, 1.0).toDouble();
+                        final spinning = mode == RefreshIndicatorMode.refresh || mode == RefreshIndicatorMode.done;
+                        return Center(
+                          child: Opacity(
+                            opacity: p,
+                            child: spinning
+                                ? const CupertinoActivityIndicator(color: Colors.white70, radius: 12)
+                                : CupertinoActivityIndicator.partiallyRevealed(
+                                    color: Colors.white70, radius: 12, progress: p),
                           ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: AppColors.crimson.withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.system_update_rounded, color: AppColors.crimson, size: 18),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Zenify v${update.latestVersion} Available',
-                                      style: const TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Tap to view release notes & update',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.white.withValues(alpha: 0.6),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  UpdateService.instance.showUpdateSheet(context, update);
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.crimson,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text(
-                                    'UPDATE',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                // Mood chips (scroll away with the page)
-                SliverToBoxAdapter(
-                  child: _Chips(
-                    selected: _mood,
-                    onSelect: (i) {
-                      setState(() => _mood = i);
-                    },
-                  ),
-                ),
-
-                // 1. Personalised "Listen again": real listening history
-                _sec('again', Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SecHeader(
-                      title: 'Listen again',
-                      overline: _recentHistory.isNotEmpty ? 'Jump back in' : 'Made for you',
-                      onMore: () {},
-                    ),
-                    _Shelf(
-                      height: 236,
-                      itemExtent: 170,
-                      count: listenAgain.length,
-                      builder: (c, i) {
-                        final t = listenAgain[i];
-                        final cur = player.currentTrack?.id == t.id;
-                        return _CoverCard(
-                          url: t.coverUrl,
-                          title: MediaNormalizer.cleanCompactTitle(t.title),
-                          subtitle: t.artist,
-                          artists: t.resolvedArtists,
-                          current: cur,
-                          playing: cur && player.isPlaying,
-                          onTap: () => play(listenAgain, i),
                         );
                       },
                     ),
+
+                    // In-App Update Banner
+                    SliverToBoxAdapter(
+                      child: ValueListenableBuilder<UpdateInfo?>(
+                        valueListenable: UpdateService.instance.availableUpdateNotifier,
+                        builder: (context, update, _) {
+                          if (update == null || !update.hasUpdate) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF18181B),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppColors.crimson.withValues(alpha: 0.35)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 34,
+                                    height: 34,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.crimson.withValues(alpha: 0.18),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.system_update_rounded, color: AppColors.crimson, size: 18),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Zenify v${update.latestVersion} Available',
+                                          style: const TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Tap to view release notes & update',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.white.withValues(alpha: 0.6),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      HapticFeedback.lightImpact();
+                                      UpdateService.instance.showUpdateSheet(context, update);
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.crimson,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'UPDATE',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Mood Chips (Interactive)
+                    SliverToBoxAdapter(
+                      child: _Chips(
+                        selected: _mood,
+                        onSelect: _onSelectMood,
+                      ),
+                    ),
+
+                    // 1. Mood Spotlight Shelf (Active when a mood chip is tapped)
+                    if (_mood != -1)
+                      _sec('mood-spotlight', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(
+                            title: '${_moods[_mood]} Spotlight',
+                            overline: 'Curated for this moment',
+                            onMore: () {},
+                          ),
+                          if (_loadingMood)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 36),
+                              child: Center(
+                                child: CupertinoActivityIndicator(color: Colors.white70, radius: 12),
+                              ),
+                            )
+                          else if (_moodTracks.isNotEmpty)
+                            _PagedRows(
+                              tracks: _moodTracks.take(12).toList(),
+                              rows: 4,
+                              player: player,
+                              onPlay: (i) => play(_moodTracks, i),
+                            ),
+                        ],
+                      )),
+
+                    // 2. Personalized Time-of-Day Adaptive Section
+                    if (_timeOfDayTracks.isNotEmpty && _mood == -1)
+                      _sec('time-of-day', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(
+                            title: _timeOfDayMoodLabel,
+                            overline: _timeOfDayGreeting,
+                            onMore: () {},
+                          ),
+                          _PagedRows(
+                            tracks: _timeOfDayTracks,
+                            rows: 4,
+                            player: player,
+                            onPlay: (i) => play(_timeOfDayTracks, i),
+                          ),
+                        ],
+                      )),
+
+                    // 3. Personalized "Listen Again" / "Jump Back In"
+                    if (listenAgain.isNotEmpty)
+                      _sec('again', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(
+                            title: 'Listen again',
+                            overline: _recentHistory.isNotEmpty ? 'Jump back in' : 'Trending for you',
+                            onMore: () {},
+                          ),
+                          _Shelf(
+                            height: 236,
+                            itemExtent: 170,
+                            count: listenAgain.length,
+                            builder: (c, i) {
+                              final t = listenAgain[i];
+                              final cur = player.currentTrack?.id == t.id;
+                              return _CoverCard(
+                                url: t.coverUrl,
+                                title: MediaNormalizer.cleanCompactTitle(t.title),
+                                subtitle: t.artist,
+                                artists: t.resolvedArtists,
+                                current: cur,
+                                playing: cur && player.isPlaying,
+                                onTap: () => play(listenAgain, i),
+                              );
+                            },
+                          ),
+                        ],
+                      )),
+
+                    // 4. Personalized Quick Picks
+                    if (quick.isNotEmpty)
+                      _sec('quick', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(
+                            title: 'Quick picks',
+                            overline: _favoriteArtist != null ? 'Tailored to your taste' : 'Start radio from a song',
+                          ),
+                          _PagedRows(
+                            tracks: quick,
+                            rows: 4,
+                            player: player,
+                            onPlay: (i) => play(quick, i),
+                          ),
+                        ],
+                      )),
+
+                    // 5. "Mixed For You" (Personalized AI Mix Stations)
+                    _sec('mixes', Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _SecHeader(title: 'Mixed for you', overline: 'Personalized stations'),
+                        _Shelf(
+                          height: 176,
+                          itemExtent: 170,
+                          count: 4,
+                          builder: (c, i) {
+                            switch (i) {
+                              case 0:
+                                return _MixCard(
+                                  title: 'My Supermix',
+                                  subtitle: 'Your blended favorites',
+                                  gradient: const [Color(0xFF9E2339), Color(0xFF4A0E17)],
+                                  icon: Icons.all_inclusive_rounded,
+                                  onTap: () => _playMix('supermix'),
+                                );
+                              case 1:
+                                return _MixCard(
+                                  title: 'Discover Mix',
+                                  subtitle: 'Fresh weekly finds',
+                                  gradient: const [Color(0xFF0F766E), Color(0xFF134E4A)],
+                                  icon: Icons.explore_rounded,
+                                  onTap: () => _playMix('discover'),
+                                );
+                              case 2:
+                                return _MixCard(
+                                  title: 'Chill Mix',
+                                  subtitle: 'Mellow & unhurried',
+                                  gradient: const [Color(0xFF1D4ED8), Color(0xFF1E3A8A)],
+                                  icon: Icons.spa_rounded,
+                                  onTap: () => _playMix('chill'),
+                                );
+                              default:
+                                return _MixCard(
+                                  title: 'Energy Mix',
+                                  subtitle: 'High-tempo momentum',
+                                  gradient: const [Color(0xFFD97706), Color(0xFF78350F)],
+                                  icon: Icons.bolt_rounded,
+                                  onTap: () => _playMix('energy'),
+                                );
+                            }
+                          },
+                        ),
+                      ],
+                    )),
+
+                    // 6. Because you listen to [_favoriteArtist] (#1 Spotlight)
+                    if (_favoriteArtist != null && _favoriteArtistTracks.isNotEmpty)
+                      _sec('similar', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(
+                            overline: 'Because you listen to',
+                            title: _favoriteArtist!,
+                            onMore: () => _open(ArtistScreen(artistName: _favoriteArtist!)),
+                          ),
+                          _Shelf(
+                            height: 236,
+                            itemExtent: 170,
+                            count: _favoriteArtistTracks.length,
+                            builder: (c, i) {
+                              final t = _favoriteArtistTracks[i];
+                              return _CoverCard(
+                                url: t.coverUrl,
+                                title: MediaNormalizer.cleanCompactTitle(t.title),
+                                subtitle: t.artist,
+                                artists: t.resolvedArtists,
+                                onTap: () => play(_favoriteArtistTracks, i),
+                              );
+                            },
+                          ),
+                        ],
+                      )),
+
+                    // 7. Because you listen to [_secondFavoriteArtist] (#2 Spotlight)
+                    if (_secondFavoriteArtist != null && _secondFavoriteArtistTracks.isNotEmpty)
+                      _sec('similar-second', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(
+                            overline: 'More by',
+                            title: _secondFavoriteArtist!,
+                            onMore: () => _open(ArtistScreen(artistName: _secondFavoriteArtist!)),
+                          ),
+                          _Shelf(
+                            height: 236,
+                            itemExtent: 170,
+                            count: _secondFavoriteArtistTracks.length,
+                            builder: (c, i) {
+                              final t = _secondFavoriteArtistTracks[i];
+                              return _CoverCard(
+                                url: t.coverUrl,
+                                title: MediaNormalizer.cleanCompactTitle(t.title),
+                                subtitle: t.artist,
+                                artists: t.resolvedArtists,
+                                onTap: () => play(_secondFavoriteArtistTracks, i),
+                              );
+                            },
+                          ),
+                        ],
+                      )),
+
+                    // 8. Rediscover Your Favorites (Deep cuts from earlier user history)
+                    if (_rediscover.isNotEmpty)
+                      _sec('rediscover', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _SecHeader(
+                            overline: 'From your past listening',
+                            title: 'Rediscover your favorites',
+                          ),
+                          _Shelf(
+                            height: 236,
+                            itemExtent: 170,
+                            count: _rediscover.length,
+                            builder: (c, i) {
+                              final t = _rediscover[i];
+                              return _CoverCard(
+                                url: t.coverUrl,
+                                title: MediaNormalizer.cleanCompactTitle(t.title),
+                                subtitle: t.artist,
+                                artists: t.resolvedArtists,
+                                onTap: () => play(_rediscover, i),
+                              );
+                            },
+                          ),
+                        ],
+                      )),
+
+                    // 9. New Releases (Tailored to user's language)
+                    if (fresh.isNotEmpty)
+                      _sec('new', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(
+                            title: 'New releases',
+                            overline: ListeningHistoryService.instance.primaryLanguage.isNotEmpty
+                                ? 'Fresh drops in ${ListeningHistoryService.instance.primaryLanguage.toUpperCase()}'
+                                : 'Just dropped',
+                            onMore: () {},
+                          ),
+                          _PagedRows(
+                            tracks: fresh,
+                            rows: 3,
+                            player: player,
+                            album: true,
+                            style: _RowStyle.grouped,
+                            onPlay: (i) => play(fresh, i),
+                          ),
+                        ],
+                      )),
+
+                    // 10. Country-specific Trending & Charts (Ranked 1 to 12)
+                    if (charts.isNotEmpty)
+                      _sec('charts', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(
+                            title: 'Top Hits in ${country.name}',
+                            overline: '${country.flag} Regional Charts',
+                            onMore: () {},
+                          ),
+                          _PagedRows(
+                            tracks: charts,
+                            rows: 4,
+                            player: player,
+                            style: _RowStyle.ranked,
+                            onPlay: (i) => play(charts, i),
+                          ),
+                        ],
+                      )),
+
+                    // 11. Top Artists for You (User's favorites + regional charts)
+                    if (_chartArtists.isNotEmpty)
+                      _sec('artists', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(
+                            title: 'Top Artists for You',
+                            overline: 'Trending in ${country.name}',
+                            onMore: () {},
+                          ),
+                          _Shelf(
+                            height: 236,
+                            itemExtent: 170,
+                            count: _chartArtists.length,
+                            builder: (c, i) {
+                              final a = _chartArtists[i];
+                              return _CoverCard(
+                                url: a.image,
+                                title: a.name,
+                                subtitle: a.subs,
+                                circular: true,
+                                onTap: () => _open(ArtistScreen(artistName: a.name, imageUrl: a.image)),
+                              );
+                            },
+                          ),
+                        ],
+                      )),
+
+                    // 12. Albums For You
+                    if (albums.isNotEmpty)
+                      _sec('albums', Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SecHeader(title: 'Albums for you', onMore: () {}),
+                          _Shelf(
+                            height: 236,
+                            itemExtent: 170,
+                            count: albums.length,
+                            builder: (c, i) {
+                              final t = albums[i];
+                              return _CoverCard(
+                                url: t.coverUrl,
+                                title: t.album,
+                                subtitle: t.artist,
+                                artists: t.resolvedArtists,
+                                radius: 8,
+                                onTap: () => _open(AlbumScreen(
+                                  albumTitle: MediaNormalizer.cleanTitle(t.album),
+                                  artistName: MediaNormalizer.formatArtists(t.artist),
+                                  coverUrl: t.coverUrl,
+                                )),
+                              );
+                            },
+                          ),
+                        ],
+                      )),
+
+                    // 13. Moods & Genres Flat Color Grid
+                    SliverToBoxAdapter(
+                      child: Reveal(
+                        key: ValueKey('$_seed-genres-h'),
+                        child: const _SecHeader(title: 'Moods & genres'),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 2.2,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (c, i) => Reveal(
+                            key: ValueKey('$_seed-g$i'),
+                            delay: Duration(milliseconds: 40 * (i % 2) + 60 * (i ~/ 2)),
+                            child: SpringPress(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                final genre = _genres[i].name;
+                                final userLang = ListeningHistoryService.instance.primaryLanguage;
+                                final q = userLang.isNotEmpty ? '$userLang $genre hits' : '$genre hits';
+                                InnerTubeService.instance.search(q).then((tracks) {
+                                  if (tracks.isNotEmpty) play(tracks, 0);
+                                });
+                              },
+                              child: _GenreTile(_genres[i]),
+                            ),
+                          ),
+                          childCount: _genres.length,
+                        ),
+                      ),
+                    ),
+
+                    // Clearance for floating mini player + persistent dock
+                    SliverToBoxAdapter(
+                      child: SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
+                    ),
                   ],
-                )),
-
-                // 2. Quick picks: real YouTube Music quick picks
-                if (quick.isNotEmpty)
-                  _sec('quick', Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const _SecHeader(title: 'Quick picks', overline: 'Start radio from a song'),
-                      _PagedRows(tracks: quick, rows: 4, player: player, onPlay: (i) => play(quick, i)),
-                    ],
-                  )),
-
-                // 3. Country-specific Trending & Charts
-                if (charts.isNotEmpty)
-                  _sec('charts', Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SecHeader(title: 'Top Hits in ${country.name}', overline: '${country.flag} Charts', onMore: () {}),
-                      _PagedRows(
-                        tracks: charts,
-                        rows: 4,
-                        player: player,
-                        style: _RowStyle.ranked,
-                        onPlay: (i) => play(charts, i),
-                      ),
-                    ],
-                  )),
-
-                // 4. Country Top Artists
-                if (_chartArtists.isNotEmpty)
-                  _sec('artists', Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SecHeader(title: 'Top Artists in ${country.name}', onMore: () {}),
-                      _Shelf(
-                        height: 160,
-                        itemExtent: 124,
-                        count: _chartArtists.length,
-                        builder: (c, i) {
-                          final a = _chartArtists[i];
-                          return _CoverCard(
-                            url: a.image,
-                            title: a.name,
-                            subtitle: a.subs,
-                            circular: true,
-                            onTap: () => _open(ArtistScreen(artistName: a.name, imageUrl: a.image)),
-                          );
-                        },
-                      ),
-                    ],
-                  )),
-
-                // 5. New Releases
-                if (fresh.isNotEmpty)
-                  _sec('new', Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SecHeader(title: 'New releases', overline: 'Just dropped', onMore: () {}),
-                      _PagedRows(
-                        tracks: fresh,
-                        rows: 3,
-                        player: player,
-                        album: true,
-                        style: _RowStyle.grouped,
-                        onPlay: (i) => play(fresh, i),
-                      ),
-                    ],
-                  )),
-
-                // 6. Albums for you
-                if (albums.isNotEmpty)
-                  _sec('albums', Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SecHeader(title: 'Albums for you', onMore: () {}),
-                      _Shelf(
-                        height: 236,
-                        itemExtent: 170,
-                        count: albums.length,
-                        builder: (c, i) {
-                          final t = albums[i];
-                          return _CoverCard(
-                            url: t.coverUrl,
-                            title: t.album,
-                            subtitle: t.artist,
-                            artists: t.resolvedArtists,
-                            radius: 8,
-                            onTap: () => _open(AlbumScreen(
-                              albumTitle: MediaNormalizer.cleanTitle(t.album),
-                              artistName: MediaNormalizer.formatArtists(t.artist),
-                              coverUrl: t.coverUrl,
-                            )),
-                          );
-                        },
-                      ),
-                    ],
-                  )),
-
-                // 7. Personalised Similar to [Favorite Artist]
-                if (_favoriteArtist != null && _favoriteArtistTracks.isNotEmpty)
-                  _sec('similar', Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SecHeader(
-                        overline: 'Similar to',
-                        title: _favoriteArtist!,
-                        onMore: () => _open(ArtistScreen(artistName: _favoriteArtist!)),
-                      ),
-                      _Shelf(
-                        height: 236,
-                        itemExtent: 170,
-                        count: _favoriteArtistTracks.length,
-                        builder: (c, i) {
-                          final t = _favoriteArtistTracks[i];
-                          return _CoverCard(
-                            url: t.coverUrl,
-                            title: MediaNormalizer.cleanCompactTitle(t.title),
-                            subtitle: t.artist,
-                            artists: t.resolvedArtists,
-                            onTap: () => play(_favoriteArtistTracks, i),
-                          );
-                        },
-                      ),
-                    ],
-                  )),
-
-                // 8. Moods & genres: flat colour grid
-                SliverToBoxAdapter(
-                  child: Reveal(
-                    key: ValueKey('$_seed-genres-h'),
-                    child: const _SecHeader(title: 'Moods & genres'),
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: DynamicIslandHeader(
+                    title: 'Home',
+                    showBack: false,
+                    isDockPage: true,
+                    showProfile: true,
+                    topPadding: top + 4,
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 2.2,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (c, i) => Reveal(
-                        key: ValueKey('$_seed-g$i'),
-                        delay: Duration(milliseconds: 40 * (i % 2) + 60 * (i ~/ 2)),
-                        child: _GenreTile(_genres[i]),
-                      ),
-                      childCount: _genres.length,
-                    ),
-                  ),
-                ),
-
-                // clearance for floating mini player + persistent tab bar
-                SliverToBoxAdapter(child: SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom)),
               ],
             ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: DynamicIslandHeader(
-                title: 'Home',
-                showBack: false,
-                showProfile: true,
-                topPadding: top + 4,
-              ),
-            ),
-          ],
-        ),
     );
   }
 }

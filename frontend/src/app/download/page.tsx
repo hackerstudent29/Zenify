@@ -30,8 +30,8 @@ export default function DownloadPage() {
 
   // Fallback download URLs
   const apkDownloadUrl = "/downloads/zenify.apk";
-  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.0.2";
-  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk";
+  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.0.3";
+  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.3/zenify-v1.0.3.apk";
   const absoluteDownloadUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/downloads/zenify.apk`
     : "https://listenzenify.com/downloads/zenify.apk";
@@ -112,7 +112,7 @@ export default function DownloadPage() {
                     className="h-12 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer shadow-lg hover:border-brand/40"
                   >
                     <Download size={18} className="text-brand shrink-0" />
-                    <span>Download APK (23.1 MB)</span>
+                    <span>Download APK (24.8 MB)</span>
                   </a>
 
                   <a
@@ -130,11 +130,11 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-zinc-400">
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Version</span>
-                    <span className="text-white font-medium">v1.0.2 (Build 5)</span>
+                    <span className="text-white font-medium">v1.0.3 (Build 6)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Package Size</span>
-                    <span className="text-white font-medium">23.1 MB</span>
+                    <span className="text-white font-medium">24.8 MB</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Compatibility</span>
@@ -253,7 +253,7 @@ export default function DownloadPage() {
                     <h3 className="text-base font-semibold text-white mt-1">Notification or Files</h3>
                   </div>
                   <p className="text-[14px] leading-relaxed text-zinc-400">
-                    Once the 23.1 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
+                    Once the 24.8 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
                   </p>
                 </div>
 
@@ -458,7 +458,7 @@ export default function DownloadPage() {
                 className="h-11 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 <Download size={16} className="text-brand" />
-                <span>Download Zenify APK (v1.0.2)</span>
+                <span>Download Zenify APK (v1.0.3)</span>
               </a>
             </div>
           </motion.div>

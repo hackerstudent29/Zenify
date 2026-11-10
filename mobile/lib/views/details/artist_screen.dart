@@ -13,6 +13,7 @@ import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
+import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/artist_service.dart';
 import '../../services/innertube_service.dart';
@@ -833,9 +834,21 @@ class _ArtistScreenState extends State<ArtistScreen> {
   void _play(List<Track> list, int i, {bool shuffle = false}) {
     if (list.isEmpty) return;
     HapticFeedback.mediumImpact();
-    final q = List<Track>.of(list);
-    if (shuffle) q.shuffle();
-    context.read<PlayerState>().setQueue(q, startIndex: shuffle ? 0 : i, collectionLocked: true);
+    final startIdx = i.clamp(0, list.length - 1);
+    final ctx = PlaybackContext(
+      type: PlaybackContextType.artist,
+      id: widget.artistName,
+      tracks: list,
+      startTrack: list[startIdx],
+      title: widget.artistName,
+    );
+    context.read<PlayerState>().setQueue(
+      list,
+      startIndex: startIdx,
+      shuffle: shuffle,
+      collectionLocked: true,
+      context: ctx,
+    );
   }
 
   void _openAlbum(_Release r) => Navigator.push(

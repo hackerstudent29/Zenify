@@ -32,12 +32,15 @@ const double _kMiniArt = 40;
 /// Lyrics open + no touch for this long → the bottom controls glide away.
 const Duration _kIdleHide = Duration(seconds: 5);
 
-/// Slightly bouncy spring (ζ≈0.69) for the cover flying to / from the header.
+/// ζ ≈ 1.0 → fluid, no overshoot. For a slower feel: stiffness 180, damping 27.
 const SpringDescription _kDockSpring = SpringDescription(
   mass: 1,
-  stiffness: 280,
-  damping: 23,
+  stiffness: 220,
+  damping: 30,
 );
+
+/// Heavy lyrics/queue body mounts when the cover is almost docked.
+const Duration _kMountDelay = Duration(milliseconds: 200);
 
 /// Spring-shaped easing for lyrics / queue content arriving.
 const SpringCurve _kPanelIn = SpringCurve(kSnappySpring, 0.5);
@@ -56,12 +59,13 @@ enum _Panel { art, lyrics, queue }
 ///    corner radius, the mini fade AND the artwork morph.
 ///  • `_dock`   0 = big artwork, 1 = artwork docked top-left in the header.
 ///    Drives the lyrics / queue transitions (header grows in, title row
-///    collapses, the cover flies to the header with a little overshoot).
-///    Tapping the docked cover springs it back to the centre.
+///    collapses, the cover flies to the header). Critically damped: no bounce.
+///    Tapping the docked cover glides it back to the centre.
 ///  • `_chrome` 0 = bottom controls shown, 1 = hidden. Lyrics open and idle for
 ///    5 s → 1. Any touch → 0.
-///  • ONE artwork widget lives in an overlay and is interpolated between the
-///    mini rect → big rect → header rect, so the cover really travels.
+///  • ONE artwork widget lives in an overlay, laid out once at the big size and
+///    moved/scaled with a matrix between mini → big → header, so there is no
+///    per-frame relayout.
 class PlayerShell extends StatefulWidget {
   static final ValueNotifier<bool> isPlayerOpenNotifier = ValueNotifier<bool>(false);
 
@@ -152,6 +156,7 @@ class PlayerShellState extends State<PlayerShell>
 
   // measured rect (in sheet coordinates) the big artwork rests in
   Rect? _bigRect;
+  Object? _bigRectKey;
   bool _measureQueued = false;
 
   final Set<String> _liked = {};
@@ -286,49 +291,26 @@ class PlayerShellState extends State<PlayerShell>
 
   /* ───────────────────────── transport (queue aware) ───────────────────────── */
 
-  /// ▶ THE ONE LINE TO MATCH TO YOUR PlayerState API:
-  /// start playing this exact track right now.
-  void _playTrack(dynamic track) =>
-      context.read<PlayerState>().playTrack(track);
-
   void _next() {
     _dir = 1;
     _nextPulse.value++;
-    final e = context.read<QueueState>().takeNext();
-    if (e != null) {
-      _playTrack(e.track);
-    } else {
-      context.read<PlayerState>().next();
-    }
+    context.read<PlayerState>().next(source: 'manual');
   }
 
   void _prev() {
     _dir = -1;
     _prevPulse.value++;
-    final p = context.read<PlayerState>();
-    // Apple behaviour: past 3s, "previous" restarts the song.
-    if (p.positionNotifier.value > const Duration(seconds: 3)) {
-      p.seek(Duration.zero);
-      return;
-    }
-    final e = context.read<QueueState>().takePrevious();
-    if (e != null) {
-      _playTrack(e.track);
-    } else {
-      p.previous();
-    }
+    context.read<PlayerState>().previous();
   }
 
   void _jumpTo(QueueEntry e) {
     _dir = 1;
-    context.read<QueueState>().jumpTo(e);
-    _playTrack(e.track);
+    context.read<PlayerState>().jumpTo(e);
   }
 
   void _playHistory(QueueEntry e) {
     _dir = -1;
-    context.read<QueueState>().playFromHistory(e);
-    _playTrack(e.track);
+    context.read<PlayerState>().playFromHistory(e);
   }
 
   /* ───────────────────────── sheet motion ───────────────────────── */
@@ -399,21 +381,25 @@ class PlayerShellState extends State<PlayerShell>
     HapticFeedback.selectionClick();
     _mountTimer?.cancel();
 
-    // Art → panel: let the cover start flying first, mount the heavy body
-    // ~90 ms later. Panel ↔ panel and → art switch immediately.
+    // Art → panel: let the cover glide first, mount the heavy body once the
+    // cover is almost docked. Panel ↔ panel and → art switch immediately.
     final immediate = p == _Panel.art || _bodyPanel != _Panel.art;
     setState(() {
       _panel = p;
       if (immediate) _bodyPanel = p;
     });
     if (!immediate) {
-      _mountTimer = Timer(const Duration(milliseconds: 90), () {
+      _mountTimer = Timer(_kMountDelay, () {
         if (mounted && _panel == p) setState(() => _bodyPanel = p);
       });
     }
 
     _dock
-        .springTo(p == _Panel.art ? 0 : 1, spring: _kDockSpring)
+        .springTo(
+          p == _Panel.art ? 0 : 1,
+          spring: _kDockSpring,
+          velocity: _dock.velocity, // interruptible, no dead stop
+        )
         .then((_) => _queueMeasure());
     if (p == _Panel.lyrics) {
       _bumpIdle(force: true);
@@ -469,6 +455,7 @@ class PlayerShellState extends State<PlayerShell>
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureArt());
   }
 
+  /// Measures once per screen metrics; never re-measures mid-animation.
   void _measureArt() {
     _measureQueued = false;
     if (!mounted ||
@@ -477,6 +464,16 @@ class PlayerShellState extends State<PlayerShell>
         _dock.value.abs() > 0.01) {
       return;
     }
+    final mq = MediaQuery.of(context);
+    final key = Object.hash(
+      mq.size.width,
+      mq.size.height,
+      mq.padding.top,
+      mq.padding.bottom,
+      mq.textScaler.scale(14),
+    );
+    if (_bigRect != null && key == _bigRectKey) return;
+
     final r = _regionKey.currentContext?.findRenderObject();
     final s = _sheetKey.currentContext?.findRenderObject();
     if (r is! RenderBox || s is! RenderBox) return;
@@ -486,18 +483,15 @@ class PlayerShellState extends State<PlayerShell>
         .min(r.size.width - 56, r.size.height - 24)
         .clamp(100.0, 380.0)
         .toDouble();
-    final rect = Rect.fromLTWH(
-      tl.dx + (r.size.width - side) / 2,
-      tl.dy + (r.size.height - side) * 0.2, // near the top, like Apple Music
-      side,
-      side,
-    );
-    final old = _bigRect;
-    if (old == null ||
-        (old.topLeft - rect.topLeft).distance > 0.5 ||
-        (old.width - side).abs() > 0.5) {
-      setState(() => _bigRect = rect);
-    }
+    _bigRectKey = key;
+    setState(() {
+      _bigRect = Rect.fromLTWH(
+        tl.dx + (r.size.width - side) / 2,
+        tl.dy + (r.size.height - side) * 0.2, // near the top, like Apple Music
+        side,
+        side,
+      );
+    });
   }
 
   /* ───────────────────────── mini gestures ───────────────────────── */
@@ -886,32 +880,55 @@ class PlayerShellState extends State<PlayerShell>
   /* ───────────────────────── ARTWORK OVERLAY (the morphing cover) ───────────────────────── */
 
   Widget _buildArtOverlay(dynamic track, Size size, EdgeInsets safe) {
-    final url =
-        (_shownCover?.isNotEmpty == true
+    final url = ((_shownCover?.isNotEmpty == true
             ? _shownCover
-            : (track?.coverUrl as String?)) ??
+            : (track?.coverUrl as String?))) ??
         '';
     final currentKey = ValueKey<String>('cover-$url');
-    // built once per state change, NOT once per animation frame.
-    // On skip the new cover slides in from the direction of travel.
-    final cover = AnimatedSwitcher(
-      duration: const Duration(milliseconds: 360),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeIn,
-      transitionBuilder: (child, anim) {
-        final incoming = child.key == currentKey;
-        return FadeTransition(
-          opacity: anim,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: Offset((incoming ? 0.10 : -0.10) * _dir, 0),
-              end: Offset.zero,
-            ).animate(anim),
-            child: child,
-          ),
-        );
-      },
-      child: SizedBox.expand(key: currentKey, child: CoverImage(url)),
+
+    final mini = Rect.fromLTWH(
+      25,
+      size.height -
+          widget.miniBottomOffset -
+          safe.bottom -
+          _kMiniH +
+          (_kMiniH - _kMiniArt) / 2,
+      _kMiniArt,
+      _kMiniArt,
+    );
+    final fallbackSide = math.min(size.width - 56, 380.0);
+    final big = _bigRect ??
+        Rect.fromLTWH((size.width - fallbackSide) / 2, safe.top + 70,
+            fallbackSide, fallbackSide);
+    final docked = Rect.fromLTWH(24, safe.top + 29, 56, 56);
+    final side = big.width; // laid out ONCE at this size
+
+    // Built once per state change, NOT per animation frame. Only a matrix
+    // animates, so there is no per-frame relayout or shadow re-blur.
+    final cover = RepaintBoundary(
+      child: SizedBox(
+        width: side,
+        height: side,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 360),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, anim) {
+            final incoming = child.key == currentKey;
+            return FadeTransition(
+              opacity: anim,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: Offset((incoming ? 0.10 : -0.10) * _dir, 0),
+                  end: Offset.zero,
+                ).animate(anim),
+                child: child,
+              ),
+            );
+          },
+          child: SizedBox.expand(key: currentKey, child: CoverImage(url)),
+        ),
+      ),
     );
 
     return Positioned.fill(
@@ -921,83 +938,66 @@ class PlayerShellState extends State<PlayerShell>
         builder: (context, child) {
           final t = _sheet.value.clamp(0.0, 1.0);
           if (!_open && t <= 0.001) return const SizedBox.shrink();
-          // NOT clamped to 0..1: the dock spring may overshoot a little, which
-          // makes the cover settle into the corner with a springy bounce.
-          final d = _dock.value.clamp(-0.2, 1.2).toDouble();
-          final dc = d.clamp(0.0, 1.0).toDouble();
 
-          final mini = Rect.fromLTWH(
-            25,
-            size.height -
-                widget.miniBottomOffset -
-                safe.bottom -
-                _kMiniH +
-                (_kMiniH - _kMiniArt) / 2,
-            _kMiniArt,
-            _kMiniArt,
-          );
-          final fallbackSide = math.min(size.width - 56, 380.0);
-          final big =
-              _bigRect ??
-              Rect.fromLTWH(
-                (size.width - fallbackSide) / 2,
-                safe.top + 70,
-                fallbackSide,
-                fallbackSide,
-              );
-          final docked = Rect.fromLTWH(24, safe.top + 29, 56, 56);
+          final d = _dock.value.clamp(0.0, 1.0).toDouble(); // no overshoot
+          final rect = Rect.lerp(mini, Rect.lerp(big, docked, d)!, t)!;
+          final radius = lerpDouble(8, lerpDouble(12, 8, d)!, t)!;
+          final pauseScale =
+              (1 - (1 - _pause.value) * (1 - d) * t) * _press.value;
+          final dx = _artX.value * t * (1 - d);
 
-          final open = Rect.lerp(big, docked, d)!;
-          final rect = Rect.lerp(mini, open, t)!;
-          final radius = lerpDouble(8, lerpDouble(12, 8, dc)!, t)!;
-          final pauseScale = (1 - (1 - _pause.value) * (1 - dc) * t) * _press.value;
-          final dx = _artX.value * t * (1 - dc);
+          final w = rect.width * pauseScale;
+          final scale = w / side;
+          final m = Matrix4.diagonal3Values(scale, scale, 1)
+            ..setTranslationRaw(
+              rect.center.dx + dx - w / 2,
+              rect.center.dy - w / 2,
+              0,
+            );
+          final r = radius / scale; // keep visual radius constant
+          final shadowA = lerpDouble(0.28, 0.45, t)! * (1 - 0.5 * d);
 
-          // Positioned must be a direct child of a Stack, so wrap it in one.
           return Stack(
             clipBehavior: Clip.none,
             children: [
-              Positioned.fromRect(
-                rect: rect.shift(Offset(dx, 0)),
-                child: IgnorePointer(
-                  ignoring: t < 0.95,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapDown: (_) => _press.springTo(0.94, spring: kSnappySpring),
-                    onTapUp: (_) => _press.springTo(1, spring: kPauseSpring),
-                    onTapCancel: () => _press.springTo(1, spring: kPauseSpring),
-                    // big cover → open lyrics; cover docked top-left → spring back to centre
-                    onTap: () =>
-                        _setPanel(_docked ? _Panel.art : _Panel.lyrics),
-                    onPanStart: _docked ? null : _artStart,
-                    onPanUpdate: _docked ? null : _artUpdate,
-                    onPanEnd: _docked ? null : _artEnd,
-                    onPanCancel: _docked
-                        ? null
-                        : () => _artEnd(DragEndDetails()),
-                    child: Transform.scale(
-                      scale: pauseScale,
+              Positioned(
+                left: 0,
+                top: 0,
+                width: side,
+                height: side,
+                child: Transform(
+                  transform: m,
+                  child: IgnorePointer(
+                    ignoring: t < 0.95,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (_) =>
+                          _press.springTo(0.94, spring: kSnappySpring),
+                      onTapUp: (_) => _press.springTo(1, spring: kPauseSpring),
+                      onTapCancel: () =>
+                          _press.springTo(1, spring: kPauseSpring),
+                      // big cover → open lyrics; docked top-left → back to centre
+                      onTap: () =>
+                          _setPanel(_docked ? _Panel.art : _Panel.lyrics),
+                      onPanStart: _docked ? null : _artStart,
+                      onPanUpdate: _docked ? null : _artUpdate,
+                      onPanEnd: _docked ? null : _artEnd,
+                      onPanCancel:
+                          _docked ? null : () => _artEnd(DragEndDetails()),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: const Color(0xFF27272A),
-                          borderRadius: BorderRadius.circular(radius),
+                          borderRadius: BorderRadius.circular(r),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(
-                                alpha:
-                                    lerpDouble(0.28, 0.45, t)! * (1 - 0.5 * dc),
-                              ),
-                              blurRadius:
-                                  lerpDouble(8, 36, t)! * (1 - 0.6 * dc),
-                              offset: Offset(
-                                0,
-                                lerpDouble(2, 16, t)! * (1 - 0.6 * dc),
-                              ),
+                              color: Colors.black.withValues(alpha: shadowA),
+                              blurRadius: 36, // fixed; scales with the matrix
+                              offset: const Offset(0, 16),
                             ),
                           ],
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(radius),
+                          borderRadius: BorderRadius.circular(r),
                           child: child,
                         ),
                       ),
@@ -1196,7 +1196,8 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Collapses / reveals [child] following the `_dock` spring (no pop-in).
+  /// Collapses / reveals [child] following the `_dock` spring. The child stays
+  /// mounted at every value (no pop-in, no first-frame rebuild hitch).
   /// [inverse]: visible while the big artwork is shown.
   Widget _dockCollapse({required bool inverse, required Widget child}) {
     return AnimatedBuilder(
@@ -1205,7 +1206,6 @@ class PlayerShellState extends State<PlayerShell>
       builder: (_, c) {
         final d = _dock.value.clamp(0.0, 1.0);
         final f = inverse ? 1 - d : d;
-        if (f <= 0.001) return const SizedBox(width: double.infinity);
         return IgnorePointer(
           ignoring: f < 0.85,
           child: ClipRect(
