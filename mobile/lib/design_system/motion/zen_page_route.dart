@@ -1,8 +1,5 @@
-import 'dart:math' as math;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-
-import '../zen.dart';
 
 /// Semantic page transition types reflecting Apple Music's fluid navigation hierarchy.
 enum ZenPageType {
@@ -22,32 +19,22 @@ enum ZenPageType {
 ///
 /// Opening animations are swift, underdamped, and responsive (280ms).
 /// Closing / popping animations are instant, crisp, and dismiss without dragging (210ms).
-class ZenPageRoute<T> extends PageRoute<T> {
+class ZenPageRoute<T> extends CupertinoPageRoute<T> {
   ZenPageRoute({
-    required this.builder,
+    required super.builder,
     super.settings,
     this.pageType,
     super.fullscreenDialog = false,
-    this.maintainState = true,
+    super.maintainState = true,
   });
 
-  final WidgetBuilder builder;
   final ZenPageType? pageType;
-
-  @override
-  final bool maintainState;
 
   @override
   Duration get transitionDuration => const Duration(milliseconds: 280);
 
   @override
   Duration get reverseTransitionDuration => const Duration(milliseconds: 210);
-
-  @override
-  Color? get barrierColor => null;
-
-  @override
-  String? get barrierLabel => null;
 
   ZenPageType _resolveType(Widget builtChild) {
     if (pageType != null) return pageType!;
@@ -65,31 +52,21 @@ class ZenPageRoute<T> extends PageRoute<T> {
   }
 
   @override
-  Widget buildPage(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-  ) {
-    return builder(context);
-  }
-
-  @override
   Widget buildTransitions(
     BuildContext context,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
+    if (fullscreenDialog) {
+      return super.buildTransitions(context, animation, secondaryAnimation, child);
+    }
     final type = _resolveType(child);
-    return CupertinoBackGestureDetector<T>(
-      enabledCallback: () => hasScopedWillPopCallback || canPop,
-      onStartPopGesture: () => startPopGesture(),
-      child: ZenPageTransition(
-        animation: animation,
-        secondaryAnimation: secondaryAnimation,
-        pageType: type,
-        child: child,
-      ),
+    return ZenPageTransition(
+      animation: animation,
+      secondaryAnimation: secondaryAnimation,
+      pageType: type,
+      child: child,
     );
   }
 }
@@ -108,29 +85,21 @@ class ZenPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    ZenPageType type = pageType ?? ZenPageType.detail;
     if (route.fullscreenDialog) {
-      type = ZenPageType.modal;
-    } else {
-      final name = route.settings.name ?? child.runtimeType.toString();
-      if (name.contains('Profile') ||
-          name.contains('Settings') ||
-          name.contains('Insights') ||
-          name.contains('Login') ||
-          name.contains('Sheet')) {
-        type = ZenPageType.modal;
-      }
+      return const CupertinoPageTransitionsBuilder().buildTransitions(
+        route,
+        context,
+        animation,
+        secondaryAnimation,
+        child,
+      );
     }
-
-    return CupertinoBackGestureDetector<T>(
-      enabledCallback: () => route.hasScopedWillPopCallback || route.canPop,
-      onStartPopGesture: () => (route as dynamic).startPopGesture(),
-      child: ZenPageTransition(
-        animation: animation,
-        secondaryAnimation: secondaryAnimation,
-        pageType: type,
-        child: child,
-      ),
+    final type = pageType ?? ZenPageType.detail;
+    return ZenPageTransition(
+      animation: animation,
+      secondaryAnimation: secondaryAnimation,
+      pageType: type,
+      child: child,
     );
   }
 }
@@ -208,7 +177,6 @@ class ZenPageTransition extends StatelessWidget {
     return AnimatedBuilder(
       animation: Listenable.merge([anim, secAnim]),
       builder: (context, c) {
-        // Primary slide entrance
         Widget result = SlideTransition(
           position: slideIn,
           child: Container(
@@ -225,7 +193,6 @@ class ZenPageTransition extends StatelessWidget {
           ),
         );
 
-        // When a higher page pushes on top of this one, apply parallax & scrim
         if (secAnim.value > 0.001) {
           result = SlideTransition(
             position: parallaxOut,

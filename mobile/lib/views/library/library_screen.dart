@@ -10,7 +10,6 @@ import 'package:flutter/cupertino.dart'
         CupertinoActivityIndicator,
         CupertinoAlertDialog,
         CupertinoDialogAction,
-        CupertinoPageRoute,
         CupertinoSearchTextField,
         CupertinoSliverRefreshControl,
         CupertinoTextField,
