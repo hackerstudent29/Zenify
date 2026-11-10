@@ -107,6 +107,7 @@ mobile/build/
 mobile/.dart_tool/
 *.apk
 !frontend/public/downloads/zenify.apk
+!frontend/public/downloads/zenify-v1.0.6.apk
 *.aab
 *.ipa
 
