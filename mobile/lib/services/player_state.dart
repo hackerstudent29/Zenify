@@ -229,8 +229,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
   void _onEngineError(String message) {
     if (_isTransitioning || _pausing) return;
-    if (kDebugMode)
+    if (kDebugMode) {
       debugPrint('[PlayerState] Native engine playback error: $message');
+    }
     _isPlaying = false;
     _isBuffering = false;
     _lastError = 'Playback error: $message';
@@ -241,8 +242,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     // Ignore engine chatter during our own fades and track changes, so the
     // play/pause button never flickers.
     if (_isTransitioning || _pausing) return;
-    if (state == ap.PlayerState.completed)
+    if (state == ap.PlayerState.completed) {
       return; // handled by onPlayerComplete
+    }
     final playing = state == ap.PlayerState.playing;
     if (_isPlaying != playing) {
       _isPlaying = playing;
@@ -495,8 +497,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     if (index < _currentIndex) _currentIndex--;
     final oi = _originalQueue.indexWhere((t) => t.id == removed.id);
     if (oi >= 0) _originalQueue.removeAt(oi);
-    if (_autoplayStartIndex != null && index < _autoplayStartIndex!)
+    if (_autoplayStartIndex != null && index < _autoplayStartIndex!) {
       _autoplayStartIndex = _autoplayStartIndex! - 1;
+    }
     notifyListeners();
   }
 
@@ -585,12 +588,12 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
         _rampVolume(volumeNotifier.value, const Duration(milliseconds: 260)),
       );
       _prefetchNext();
-      _playedSessionTrackIds.add(seed.id);
-      _playedSessionTrackIds.add(seed.id.replaceFirst('yt-', ''));
+      _playedSessionTrackIds.add(track.id);
+      _playedSessionTrackIds.add(track.id.replaceFirst('yt-', ''));
       if (!_collectionLocked &&
           _autoplay &&
           (_queue.length - _currentIndex) <= 3) {
-        unawaited(_prepopulateRadio(seed));
+        unawaited(_prepopulateRadio(track));
       }
     } catch (e) {
       if (token != _playToken) return;
@@ -659,8 +662,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       }
     } catch (e) {
       error = e;
-      if (kDebugMode)
+      if (kDebugMode) {
         debugPrint('[PlayerState] StreamResolverService error: $e');
+      }
     }
 
     // 4. Fallback: Zenify Backend Stream Proxy (/stream-youtube?v=)
@@ -1025,8 +1029,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   Future<void> setVolume(double v) async {
     final value = v.clamp(0.0, 1.0);
     volumeNotifier.value = value;
-    if (_pausing || _isTransitioning)
+    if (_pausing || _isTransitioning) {
       return; // applied by the fade that follows
+    }
     _rampToken++;
     await _applyVolume(value);
   }

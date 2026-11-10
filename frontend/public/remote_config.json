@@ -3,7 +3,7 @@
   "streamMode": "device",
   "minAppVersion": "1.0.0",
   "latestAppVersion": "1.0.2",
-  "updateUrl": "https://listenzenify.com/download/app",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk",
   "releaseNotes": "• Dynamic Island Header with smooth vacuum transition and seamless text marquee\n• Perfect audio sync on auto-transition with native ExoPlayer queue pipeline\n• Personalized infinite radio mix strictly respecting user language preference (Tamil & regional affinity)\n• Standalone search dock bubble with smooth morphing and top-field search animation\n• Apple Music standardized 170px cover cards and search overflow fix\n• Clean artist references and multi-artist tap navigation",
   "message": null
 }

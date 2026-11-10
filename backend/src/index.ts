@@ -343,8 +343,8 @@ const defaultRemoteConfig = {
         homeFeed: false,
     },
     minAppVersion: '1.0.0',
-    latestAppVersion: '1.0.1',
-    updateUrl: 'https://listenzenify.com/download/app',
+    latestAppVersion: '1.0.2',
+    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk',
     releaseNotes: '• Pure YouTube Music Automix: Infinite continuous radio playback from current tracks\n• Native Android getNext queue integration via Dispatchers.IO\n• Enhanced MediaNormalizer artwork scaling and defensive null safety\n• Zero legacy provider dependencies: 100% pure YouTube Music catalog',
     message: null,
 };

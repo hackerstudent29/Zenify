@@ -93,7 +93,7 @@ mobile/
 | Attribute | Specification |
 |---|---|
 | **Package ID** | `com.zenify.mobile` |
-| **Version** | `2.6.0+1` |
+| **Version** | `1.0.2+5` |
 | **Min SDK** | `Android 8.0 (API 26)` |
 | **Target SDK** | `Android 15 (API 35)` |
 | **Engine** | `Flutter 3.44.2 / Dart 3.12.2` |
