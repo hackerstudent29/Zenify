@@ -66,6 +66,14 @@ Install the native **Zenify Android application** directly to your phone for sea
 3. **Allow Unknown Apps**: If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings** and turn on **Allow from this source**.
 4. **Tap Install**: Tap **Install**. In a few seconds, installation will finish. Open Zenify to stream high-bitrate ad-free music with synced lyrics and lock-screen controls!
 
+### 🌟 What's New in Release v1.0.2
+- **Dynamic Island Header**: Floating glass header with smooth vacuum collapse transitions, real-time marquee titles, and edge-to-edge status bar clearance.
+- **Apple Liquid Glass Split Dock**: Spacious 3-tab navigation (`Home`, `Discover`, `Library`) with detached circular search bubble and spring physics.
+- **Full-View Player Animations**: Underdamped spring physics, interactive cover squish feedback, and auto-collapsing lyrics chrome for immersive viewing.
+- **Queue Overhaul & Automix**: Apple Music-style circular toggles for Shuffle, Repeat, and Autoplay with infinite continuous radio tailored to language preference.
+- **StudioFX DSP & Peak Limiter**: Hardware-accelerated parametric equalizer with calibrated presets and zero-clipping limiter.
+- **Deep Media Normalizer**: Automated bracket sanitization, multi-artist link extraction, and high-definition album artwork upscaling.
+
 ### 🍎 Install on iPhone & iPad (PWA)
 1. Open **[listenzenify.com](https://listenzenify.com)** or **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in **Safari**.
 2. Tap the **Share** button (box with an upward arrow) at the bottom.

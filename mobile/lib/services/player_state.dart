@@ -45,7 +45,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
   // ---- Isolated high-frequency notifiers ------------------------------------
   /// Strictly isolated position notifier for 60/120fps scrubbers.
-  final ValueNotifier<Duration> positionNotifier = ValueNotifier<Duration>(Duration.zero);
+  final ValueNotifier<Duration> positionNotifier = ValueNotifier<Duration>(
+    Duration.zero,
+  );
 
   /// Index of the active lyric line (-1 = none). Only fires when the line changes.
   final ValueNotifier<int> lyricIndexNotifier = ValueNotifier<int>(-1);
@@ -156,8 +158,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   String? get lastError => _lastError;
 
   /// Tracks after the current one (the "Up Next" list).
-  List<Track> get upNext =>
-      _queue.length > _currentIndex + 1 ? _queue.sublist(_currentIndex + 1) : const [];
+  List<Track> get upNext => _queue.length > _currentIndex + 1
+      ? _queue.sublist(_currentIndex + 1)
+      : const [];
 
   /// Where the Autoplay section starts inside [queue], or null.
   int? get autoplayStartIndex => _autoplayStartIndex;
@@ -166,16 +169,19 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   List<Track> get history => List.unmodifiable(_history);
 
   @override
-  bool get hasNext => _currentIndex < _queue.length - 1 || _repeatMode == ZenifyRepeatMode.all;
+  bool get hasNext =>
+      _currentIndex < _queue.length - 1 || _repeatMode == ZenifyRepeatMode.all;
   @override
-  bool get hasPrevious => _currentIndex > 0 || _repeatMode == ZenifyRepeatMode.all;
+  bool get hasPrevious =>
+      _currentIndex > 0 || _repeatMode == ZenifyRepeatMode.all;
 
   List<Map<String, dynamic>> get lyricsLines => _lyricsLines;
   bool get isLoadingLyrics => _isLoadingLyrics;
   bool get hasLyrics => _lyricsLines.isNotEmpty;
   bool get lyricsSynced => _lyricsSynced;
 
-  Set<String> get lovedIds => LibraryStore.instance.likedTracks.map((t) => t.id).toSet();
+  Set<String> get lovedIds =>
+      LibraryStore.instance.likedTracks.map((t) => t.id).toSet();
   bool isLoved(Track t) => LibraryStore.instance.isLiked(t);
   @override
   bool isFavorite(Track track) => isLoved(track);
@@ -197,27 +203,34 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   // ---- Engine wiring ------------------------------------------------------------
   void _initAudioPlayer() {
     _subs.add(_audioPlayer.onPlayerStateChanged.listen(_onEngineState));
-    _subs.add(_audioPlayer.onBufferingChanged.listen((b) {
-      if (_isBuffering != b) {
-        _isBuffering = b;
-        notifyListeners();
-      }
-    }));
+    _subs.add(
+      _audioPlayer.onBufferingChanged.listen((b) {
+        if (_isBuffering != b) {
+          _isBuffering = b;
+          notifyListeners();
+        }
+      }),
+    );
     _subs.add(_audioPlayer.onPositionChanged.listen(_onEnginePosition));
-    _subs.add(_audioPlayer.onDurationChanged.listen((d) {
-      if (d > Duration.zero && d != _duration) {
-        _duration = d;
-        notifyListeners();
-      }
-    }));
+    _subs.add(
+      _audioPlayer.onDurationChanged.listen((d) {
+        if (d > Duration.zero && d != _duration) {
+          _duration = d;
+          notifyListeners();
+        }
+      }),
+    );
     _subs.add(_audioPlayer.onPlayerComplete.listen((_) => _onComplete()));
-    _subs.add(_audioPlayer.onAutoTransition.listen((id) => _onAutoTransition(id)));
+    _subs.add(
+      _audioPlayer.onAutoTransition.listen((id) => _onAutoTransition(id)),
+    );
     _subs.add(_audioPlayer.onError.listen(_onEngineError));
   }
 
   void _onEngineError(String message) {
     if (_isTransitioning || _pausing) return;
-    if (kDebugMode) debugPrint('[PlayerState] Native engine playback error: $message');
+    if (kDebugMode)
+      debugPrint('[PlayerState] Native engine playback error: $message');
     _isPlaying = false;
     _isBuffering = false;
     _lastError = 'Playback error: $message';
@@ -228,7 +241,8 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     // Ignore engine chatter during our own fades and track changes, so the
     // play/pause button never flickers.
     if (_isTransitioning || _pausing) return;
-    if (state == ap.PlayerState.completed) return; // handled by onPlayerComplete
+    if (state == ap.PlayerState.completed)
+      return; // handled by onPlayerComplete
     final playing = state == ap.PlayerState.playing;
     if (_isPlaying != playing) {
       _isPlaying = playing;
@@ -257,7 +271,8 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   Future<void> _onComplete() async {
     final now = DateTime.now();
     if (_lastTransitionHandled != null &&
-        now.difference(_lastTransitionHandled!) < const Duration(milliseconds: 1400)) {
+        now.difference(_lastTransitionHandled!) <
+            const Duration(milliseconds: 1400)) {
       return;
     }
     _lastTransitionHandled = now;
@@ -283,7 +298,8 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   Future<void> _onAutoTransition(String mediaId) async {
     final now = DateTime.now();
     if (_lastTransitionHandled != null &&
-        now.difference(_lastTransitionHandled!) < const Duration(milliseconds: 1400)) {
+        now.difference(_lastTransitionHandled!) <
+            const Duration(milliseconds: 1400)) {
       return;
     }
     _lastTransitionHandled = now;
@@ -307,7 +323,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
     if (mediaId.isNotEmpty) {
       final clean = mediaId.replaceFirst('yt-', '').trim();
-      final idx = _queue.indexWhere((t) => t.id.replaceFirst('yt-', '').trim() == clean);
+      final idx = _queue.indexWhere(
+        (t) => t.id.replaceFirst('yt-', '').trim() == clean,
+      );
       if (idx >= 0) {
         nextIndex = idx;
       } else {
@@ -355,7 +373,11 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       trackAlbum: track.album,
       trackDurationMs: track.durationSeconds * 1000,
       artists: [
-        {'artistKey': track.artist, 'artistName': track.artist, 'isPrimary': true}
+        {
+          'artistKey': track.artist,
+          'artistName': track.artist,
+          'isPrimary': true,
+        },
       ],
     );
     notifyListeners();
@@ -367,7 +389,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     unawaited(_resolveAccent(track, token));
     _prefetchNext();
 
-    if (!_collectionLocked && _autoplay && (_queue.length - _currentIndex) <= 4) {
+    if (!_collectionLocked &&
+        _autoplay &&
+        (_queue.length - _currentIndex) <= 4) {
       unawaited(_appendRelated());
     }
   }
@@ -417,7 +441,11 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   /// The big "Shuffle" button on albums and playlists.
   Future<void> shuffleAll(List<Track> tracks) {
     if (tracks.isEmpty) return Future.value();
-    return setQueue(tracks, startIndex: _rng.nextInt(tracks.length), shuffle: true);
+    return setQueue(
+      tracks,
+      startIndex: _rng.nextInt(tracks.length),
+      shuffle: true,
+    );
   }
 
   /// Play one track. If it is in the queue the queue is kept, otherwise it is
@@ -467,7 +495,8 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     if (index < _currentIndex) _currentIndex--;
     final oi = _originalQueue.indexWhere((t) => t.id == removed.id);
     if (oi >= 0) _originalQueue.removeAt(oi);
-    if (_autoplayStartIndex != null && index < _autoplayStartIndex!) _autoplayStartIndex = _autoplayStartIndex! - 1;
+    if (_autoplayStartIndex != null && index < _autoplayStartIndex!)
+      _autoplayStartIndex = _autoplayStartIndex! - 1;
     notifyListeners();
   }
 
@@ -530,7 +559,11 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       trackAlbum: track.album,
       trackDurationMs: track.durationSeconds * 1000,
       artists: [
-        {'artistKey': track.artist, 'artistName': track.artist, 'isPrimary': true}
+        {
+          'artistKey': track.artist,
+          'artistName': track.artist,
+          'isPrimary': true,
+        },
       ],
     );
     notifyListeners();
@@ -548,11 +581,15 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       notifyListeners();
 
       // Apple Music always eases audio in instead of cutting it.
-      unawaited(_rampVolume(volumeNotifier.value, const Duration(milliseconds: 260)));
+      unawaited(
+        _rampVolume(volumeNotifier.value, const Duration(milliseconds: 260)),
+      );
       _prefetchNext();
       _playedSessionTrackIds.add(seed.id);
       _playedSessionTrackIds.add(seed.id.replaceFirst('yt-', ''));
-      if (!_collectionLocked && _autoplay && (_queue.length - _currentIndex) <= 3) {
+      if (!_collectionLocked &&
+          _autoplay &&
+          (_queue.length - _currentIndex) <= 3) {
         unawaited(_prepopulateRadio(seed));
       }
     } catch (e) {
@@ -577,7 +614,10 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
     // 1. TOP PRIORITY: Native ExoPlayer Pipeline with InnerTubeX + PO Token
     // Instant ~200-300ms audio playback directly on device.
     final videoId = track.id.replaceFirst('yt-', '').trim();
-    if (videoId.length == 11 && !videoId.contains(' ') && !videoId.startsWith('http') && !videoId.startsWith('gen-')) {
+    if (videoId.length == 11 &&
+        !videoId.contains(' ') &&
+        !videoId.startsWith('http') &&
+        !videoId.startsWith('gen-')) {
       try {
         if (token != _playToken) return;
         await _audioPlayer.playMedia(
@@ -619,7 +659,8 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       }
     } catch (e) {
       error = e;
-      if (kDebugMode) debugPrint('[PlayerState] StreamResolverService error: $e');
+      if (kDebugMode)
+        debugPrint('[PlayerState] StreamResolverService error: $e');
     }
 
     // 4. Fallback: Zenify Backend Stream Proxy (/stream-youtube?v=)
@@ -634,7 +675,8 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       }
     }
 
-    throw error ?? StateError('Unable to resolve audio stream for "${track.title}"');
+    throw error ??
+        StateError('Unable to resolve audio stream for "${track.title}"');
   }
 
   void _prefetchNext() {
@@ -643,12 +685,14 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       final nextTrack = _queue[n];
       unawaited(ApiService.prefetchLyrics(nextTrack));
       // Gapless next track setup & native engine prefetch with metadata
-      unawaited(_audioPlayer.setNext(
-        nextTrack.id,
-        title: nextTrack.title,
-        artist: nextTrack.artist,
-        artworkUrl: nextTrack.coverUrl,
-      ));
+      unawaited(
+        _audioPlayer.setNext(
+          nextTrack.id,
+          title: nextTrack.title,
+          artist: nextTrack.artist,
+          artworkUrl: nextTrack.coverUrl,
+        ),
+      );
       final lookahead = _queue.skip(n).take(2).map((t) => t.id).toList();
       unawaited(_audioPlayer.prefetch(lookahead));
     } else {
@@ -678,7 +722,9 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
 
   /// Pauses with a short volume fade (no audible click).
   @override
-  Future<void> pause({Duration fade = const Duration(milliseconds: 180)}) async {
+  Future<void> pause({
+    Duration fade = const Duration(milliseconds: 180),
+  }) async {
     if (!_isPlaying) return;
     ListeningTrackerService.instance.onPlaybackStateChanged(false);
     _isPlaying = false;
@@ -714,7 +760,10 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
         await _applyVolume(0);
         await _audioPlayer.resume();
       }
-      await _rampVolume(volumeNotifier.value, const Duration(milliseconds: 240));
+      await _rampVolume(
+        volumeNotifier.value,
+        const Duration(milliseconds: 240),
+      );
     } catch (_) {}
   }
 
@@ -806,9 +855,13 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       final userLang = ListeningHistoryService.instance.primaryLanguage;
       final targetLang = seed.language.isNotEmpty
           ? seed.language
-          : (Track.detectLanguage(seed.title, seed.artist, seed.album) ?? userLang);
+          : (Track.detectLanguage(seed.title, seed.artist, seed.album) ??
+                userLang);
 
-      final related = await InnerTubeService.instance.fetchRelated(seed, targetLanguage: targetLang);
+      final related = await InnerTubeService.instance.fetchRelated(
+        seed,
+        targetLanguage: targetLang,
+      );
       if (related.isEmpty) return;
 
       final existingIds = {
@@ -817,10 +870,14 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
         ..._playedSessionTrackIds,
       };
 
-      final fresh = related.where((t) {
-        final cleanId = t.id.replaceFirst('yt-', '');
-        return !existingIds.contains(t.id) && !existingIds.contains(cleanId);
-      }).take(20).toList();
+      final fresh = related
+          .where((t) {
+            final cleanId = t.id.replaceFirst('yt-', '');
+            return !existingIds.contains(t.id) &&
+                !existingIds.contains(cleanId);
+          })
+          .take(20)
+          .toList();
 
       if (fresh.isNotEmpty) {
         _autoplayStartIndex ??= _queue.length;
@@ -845,28 +902,42 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       final userLang = ListeningHistoryService.instance.primaryLanguage;
       final targetLang = seed.language.isNotEmpty
           ? seed.language
-          : (Track.detectLanguage(seed.title, seed.artist, seed.album) ?? userLang);
+          : (Track.detectLanguage(seed.title, seed.artist, seed.album) ??
+                userLang);
 
-      final related = await InnerTubeService.instance.fetchRelated(seed, targetLanguage: targetLang);
+      final related = await InnerTubeService.instance.fetchRelated(
+        seed,
+        targetLanguage: targetLang,
+      );
       final existingIds = {
         ..._queue.map((t) => t.id),
         ..._queue.map((t) => t.id.replaceFirst('yt-', '')),
         ..._playedSessionTrackIds,
       };
 
-      final fresh = related.where((t) {
-        final cleanId = t.id.replaceFirst('yt-', '');
-        return !existingIds.contains(t.id) && !existingIds.contains(cleanId);
-      }).take(20).toList();
+      final fresh = related
+          .where((t) {
+            final cleanId = t.id.replaceFirst('yt-', '');
+            return !existingIds.contains(t.id) &&
+                !existingIds.contains(cleanId);
+          })
+          .take(20)
+          .toList();
 
       if (fresh.isEmpty) {
         // Infinite mix fallback: if related tracks are exhausted, query radio hits in matching language!
-        final moreQuery = targetLang.isNotEmpty ? '$targetLang hits radio' : '${seed.artist} radio mix';
+        final moreQuery = targetLang.isNotEmpty
+            ? '$targetLang hits radio'
+            : '${seed.artist} radio mix';
         final more = await InnerTubeService.instance.search(moreQuery);
-        final moreFresh = more.where((t) {
-          final cleanId = t.id.replaceFirst('yt-', '');
-          return !existingIds.contains(t.id) && !existingIds.contains(cleanId);
-        }).take(20).toList();
+        final moreFresh = more
+            .where((t) {
+              final cleanId = t.id.replaceFirst('yt-', '');
+              return !existingIds.contains(t.id) &&
+                  !existingIds.contains(cleanId);
+            })
+            .take(20)
+            .toList();
         if (moreFresh.isEmpty) return false;
         _queue.addAll(moreFresh);
         _originalQueue.addAll(moreFresh);
@@ -954,7 +1025,8 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   Future<void> setVolume(double v) async {
     final value = v.clamp(0.0, 1.0);
     volumeNotifier.value = value;
-    if (_pausing || _isTransitioning) return; // applied by the fade that follows
+    if (_pausing || _isTransitioning)
+      return; // applied by the fade that follows
     _rampToken++;
     await _applyVolume(value);
   }
@@ -1040,15 +1112,25 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
       if (token != _playToken) return;
     }
 
-    final synced = lyricsRes?.synced ??
-        (lines.isNotEmpty && lines.any((l) => (l['timeMs'] ?? l['startMs']) is num));
+    final synced =
+        lyricsRes?.synced ??
+        (lines.isNotEmpty &&
+            lines.any((l) => (l['timeMs'] ?? l['startMs']) is num));
     if (synced) {
-      lines.sort((a, b) => (((a['timeMs'] ?? a['startMs']) ?? 0) as num).compareTo(((b['timeMs'] ?? b['startMs']) ?? 0) as num));
+      lines.sort(
+        (a, b) => (((a['timeMs'] ?? a['startMs']) ?? 0) as num).compareTo(
+          ((b['timeMs'] ?? b['startMs']) ?? 0) as num,
+        ),
+      );
     }
 
     _lyricsLines = lines;
     _lyricsSynced = synced;
-    _lyricTimes = synced ? lines.map((l) => (((l['timeMs'] ?? l['startMs']) ?? 0) as num).toInt()).toList() : <int>[];
+    _lyricTimes = synced
+        ? lines
+              .map((l) => (((l['timeMs'] ?? l['startMs']) ?? 0) as num).toInt())
+              .toList()
+        : <int>[];
     _isLoadingLyrics = false;
     _updateLyricIndex(positionNotifier.value);
     notifyListeners();
