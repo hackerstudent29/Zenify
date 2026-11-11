@@ -382,7 +382,7 @@ server.get('/download/app', async (request, reply) => {
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
-    return reply.redirect('https://listenzenify.com/downloads/zenify.apk');
+    return reply.redirect('https://listenzenify.vercel.app/downloads/zenify.apk');
 });
 
 server.get('/api/download/app', async (request, reply) => {
@@ -392,7 +392,7 @@ server.get('/api/download/app', async (request, reply) => {
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
-    return reply.redirect('https://listenzenify.com/downloads/zenify.apk');
+    return reply.redirect('https://listenzenify.vercel.app/downloads/zenify.apk');
 });
 
 server.get('/remote_config.json', async () => {
