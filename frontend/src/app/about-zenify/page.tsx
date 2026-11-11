@@ -1,7 +1,6 @@
 "use client";
 
 import { motion, MotionConfig } from "framer-motion";
-import pkg from "../../../package.json";
 import { ZenifyLogo } from "@/components/shared/ZenifyLogo";
 import { SEO } from "@/components/shared/SEO";
 import { PageHeader, Section, stagger, rise } from "@/components/shared/PageChrome";
@@ -20,7 +19,8 @@ import {
   FileAudio,
   Palette,
   Settings2,
-  Globe
+  Globe,
+  Users
 } from "lucide-react";
 
 const coreFeatures = [
@@ -148,6 +148,11 @@ const platformFeatures = [
     icon: Globe,
     title: "Cross-Platform Sync",
     body: "Create an account to sync playlists, likes, listening history, preferences, and audioFx settings across all your devices seamlessly while maintaining privacy.",
+  },
+  {
+    icon: Users,
+    title: "Room Together & Live Voice",
+    body: "Host synchronized listening rooms with real-time queue control, LiveKit spatial voice chat, synced karaoke lyrics, live reactions, pinned moments, and shareable PNG recaps.",
   },
 ];
 
@@ -380,7 +385,7 @@ export default function AboutZenifyPage() {
           {/* Footer */}
           <motion.div variants={rise} className="pt-8 border-t border-white/10 flex items-center justify-between">
             <div>
-              <p className="text-[13px] text-white/40">Version {pkg.version}</p>
+              <p className="text-[13px] text-white/40">Version 1.0.8</p>
               <p className="text-[12px] text-white/30 mt-1">Built with ❤️ by Ramanathan S</p>
             </div>
             <div className="text-right">

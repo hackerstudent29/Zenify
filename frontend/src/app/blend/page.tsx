@@ -84,8 +84,10 @@ export default function BlendHubPage() {
       style={{ paddingRight: 'calc(var(--rp-w) + var(--row-gutter, 28px))' }}
     >
       <SEO
-        title="Blend - Zenify"
+        title="Blend – Zenify"
         description="Mix your music taste with friends. Two listeners, one shared daily playlist with taste match scores."
+        path="/blend"
+        noindex={true}
       />
 
       <div className="max-w-4xl mx-auto space-y-10">

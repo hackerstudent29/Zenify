@@ -1,6 +1,13 @@
 {
   "name": "frontend",
-  "version": "1.0.1",
+  "version": "1.0.8",
+  "description": "Zenify Web PWA — Free, ad-free music streaming player with sub-second synced lyrics, Studio FX 3-band EQ, 8D spatial audio, local playback, and Room Together.",
+  "homepage": "https://listenzenify.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hackerstudent29/Zenify.git",
+    "directory": "frontend"
+  },
   "private": true,
   "keywords": [
     "music-streaming",
@@ -16,6 +23,9 @@
     "audio-streaming",
     "synced-lyrics",
     "lyrics",
+    "8d-audio",
+    "listen-together",
+    "room-together",
     "apple-music-ui",
     "playlist",
     "equalizer",

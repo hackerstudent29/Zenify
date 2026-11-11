@@ -2,6 +2,32 @@
 
 All notable changes to the Zenify platform are documented in this file.
 
+## [1.0.8] - 2026-11-11
+
+### Added
+- **Dynamic Island In-App Notifications (`IslandNotifier`)**: Queued Dynamic Island header toast and marquee ticker notifications (`_NotifTicker`) across library actions (liked songs, followed artists, saved albums, playlists), queue/player actions (play next, add to queue, queue cleared, sleep timer set/ended/cancelled), auth/profile/audio quality updates, link copies, and settings cache/history clears.
+- **Apple Music Search Experience Redesign**: Rebuilt `SearchScreen` with four spring-animated phases (`landing`, `suggestions`, `loading`, `results`), 10 gradient browse category tiles, trending artist pills, live suggestion query highlighting, shimmer loading skeleton, `Did you mean` typo pill, glassmorphic Top Result card with action controls, intent-ordered `MediaCard` carousels with spring snap physics, filter chips (`All`, `Songs`, `Artists`, `Albums`, `Playlists`, `Videos`), and infinite scroll pagination.
+- **Apple Music Auth & Onboarding Redesign**: Redesigned `WelcomeScreen`, `EmailOtpSheet`, `OnboardingSheet`, and vector `GoogleLogo` with an animated spatial aurora backdrop, breathing logo mark with spring pulse, clipboard 6-digit OTP auto-detection with auto-submit and harmonic shake feedback on error, plus a 4-step onboarding sheet with spring-driven segmented progress bar and keyboard-adaptive sizing.
+- **Canonical Action Pill & Circle Controls**: Added unified `ZenPlayButton`, `ZenShuffleButton`, and `ZenActionCircle` components (`action_buttons.dart`) across Library, Explore, and Search.
+- **Room Together Overhaul (Phase 1 & Phase 2)**:
+  - **Backend Persistence, Versioning & Lifecycle**: Added PostgreSQL/Prisma room models (`TogetherRoom`, `TogetherRoomMember`, `TogetherRoomEvent`, `TogetherRoomAudit`, `TogetherBookmark`, `TogetherReaction`, `TogetherSongRequest`, `TogetherInvite`, `TogetherChatMessage`, `TogetherUserSession`, `TogetherAchievementDef`, `TogetherUserAchievement`, `TogetherRoomRecap`), modular services under `backend/src/services/together/`, `/api/v1/together/*` routes (with `/api/together/*` delegation), versioned `/ws/together` event envelopes with `RESUME { lastSeq }` replay, queue revision conflict detection (`409 QUEUE_CONFLICT`), Android App Links (`/.well-known/assetlinks.json`, `/room/:code`), and `RoomLifecycleScheduler` (90s host failover, stale member cleanup, `ROOM_ENDING_SOON` alerts, expiry, and recap generation).
+  - **Mobile Collaborative Features & Apple Design Kit**: Introduced `apple_tokens.dart` and `apple_kit.dart`, rebuilt `RoomTogetherScreen` with RBAC roles & waiting-room approvals, LiveKit voice rooms (`VoiceController`, `VoiceSheet`), synced room lyrics with translation/romanization toggles, floating reactions & reaction timeline, timestamped moments/bookmarks, song requests & DJ settings, room taste discovery recommendations, customizable room themes, expiring QR/WhatsApp invites & deep links (`zenify://room`, `https://zenify.app/room`, `https://listenzenify.com/room`), chat reply/edit/delete, achievements, insights, and shareable PNG room recap cards.
+- **Automated GitHub Releases CI Workflow**: Added `.github/workflows/release.yml` to build split ARM64 and universal APKs and publish release assets automatically.
+
+### Improved
+- **Complete Native SF Pro Typography Overhaul**: Migrated all remaining screens, modals, bottom sheets, player views, insights cards, settings, and `ZenDropdown` from `GoogleFonts.inter` to bundled `SF Pro` and `SF Pro Display` fonts, completely removing the `google_fonts` package dependency.
+- **Apple Music Weights & Tabular Figures**: Replaced thin/hairline weights (`w100`–`w300`) with balanced medium (`w500`), semibold (`w600`), and bold (`w700`) typography and applied `FontFeature.tabularFigures()` across track numbers, playback timers, and counters.
+- **Scroll-Driven Dock Morphing & Explore Layout**: Updated `ShellScreen` to track `ScrollNotification` deltas (`ScrollUpdateNotification` + `UserScrollNotification`) for responsive 240ms dock morphing across pages regardless of track state, and refreshed `ExploreScreen` section ordering and mood/genre chip category routing.
+- **Non-Intrusive Notification Polish**: Replaced legacy `ScaffoldMessenger` `SnackBar` popups in `ZenDropdown`, `AlbumScreen`, `ArtistScreen`, and `SettingsScreen` with Dynamic Island notifications.
+
+### Fixed
+- **Search Back Navigation & Suggestion Precedence**: Restored `SearchScreen.onBack` handling in `PopScope` and prioritized live suggestions over loading spinners while typing.
+- **InnerTube Automix Null-Safety & Smart Queue Fallback**: Replaced unsafe `get(0)` / `!!` / `getOrThrow()` calls in `YouTube.kt` (`getNext`) with nullable `getOrNull` checks so playlist schema mismatches do not crash queue loading; added an autoplay buffer cap (`autoCount >= 6`) in `QueueState` and multi-tier fallback (`getNextQueue` -> `fetchRelated` -> `ApiService.search` -> `CatalogDataSource`) in `SmartQueueEngine`.
+- **Dynamic Island Ticker Font Resolution**: Updated `_NotifTicker` body spans in `DynamicIslandHeader` to `'SF Pro'` (`w500`) so bundled fonts render reliably without fallback.
+
+### Technical
+- **Release & Distribution Sync (`v1.0.8` / Build `12`)**: Combined Room Together Phase 1 & 2 with `v1.0.8` (bumped Android build number `1.0.8+12` in `pubspec.yaml`, `SettingsScreen`, `UpdateService`, and `remote_config.json`), added `org.webrtc.**` and `io.livekit.**` R8/ProGuard rules (`proguard-rules.pro`), purged legacy APK packages (`v1.0.3`, `v1.0.4`, `v1.0.7`, old `v1.0.8`), published fresh ARM64 & Universal APKs across web/backend/GitHub Releases, updated `README.md`, `download/page.tsx`, `about/page.tsx`, `about-zenify/page.tsx`, `sidebar.tsx`, `sitemap.xml`, `llms.txt`, and `homeSeo.ts`, and added Room Together unit tests (`lyrics_test.dart`, `phase2_test.dart`, `room_models_test.dart`) and backend audit documentation (`docs/together/AUDIT.md`).
+
 ## [1.0.7] - 2026-11-11
 
 ### Added

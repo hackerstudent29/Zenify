@@ -351,8 +351,18 @@ export default function ArtistPage() {
   return (
     <div className="min-h-screen w-full bg-transparent text-white relative">
       <SEO
-        title={`${displayName} - Music, Albums & Songs on Zenify`}
-        description={artist.bio || `Listen to songs and albums by ${displayName} on Zenify.`}
+        title={`${displayName} – Songs, Albums & Lyrics on Zenify`}
+        description={artist.bio || `Listen to songs and albums by ${displayName} with synchronized lyrics and Studio FX on Zenify.`}
+        path={artist.id ? `/artist/${encodeURIComponent(String(artist.id))}` : "/artist"}
+        image={cleanCover || undefined}
+        type="profile"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "MusicGroup",
+          name: displayName,
+          url: artist.id ? `https://listenzenify.vercel.app/artist/${encodeURIComponent(String(artist.id))}` : undefined,
+          description: artist.bio || undefined,
+        }}
       />
 
       {/* ── 1. ARTIST HERO ── */}

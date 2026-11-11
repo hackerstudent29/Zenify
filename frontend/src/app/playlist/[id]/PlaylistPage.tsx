@@ -1,5 +1,5 @@
-import { SEO } from "@/components/shared/SEO";
 "use client";
+import { SEO } from "@/components/shared/SEO";
 
 
 import React from "react";
@@ -217,6 +217,29 @@ export default function PlaylistDetailPage() {
 
  return (
  <div className="min-h-screen w-full bg-transparent text-white relative">
+  <SEO
+    title={playlist?.name ? `${playlist.name} – Playlist on Zenify` : "Playlist"}
+    description={
+      playlist?.description?.trim() ||
+      `Listen to ${playlist?.name || "this playlist"}${playlist?.user?.name ? ` curated by ${playlist.user.name}` : ""} on Zenify with synchronized lyrics and studio FX.`
+    }
+    path={playlistId ? `/playlist/${encodeURIComponent(playlistId)}` : "/playlist"}
+    image={playlist?.coverUrl || undefined}
+    type="music.playlist"
+    noindex={playlist ? !playlist.isPublic : true}
+    jsonLd={
+      playlist?.isPublic
+        ? {
+            "@context": "https://schema.org",
+            "@type": "MusicPlaylist",
+            name: playlist.name,
+            url: `https://listenzenify.vercel.app/playlist/${encodeURIComponent(playlistId || "")}`,
+            numTracks: Array.isArray(playlist.tracks) ? playlist.tracks.length : undefined,
+            creator: playlist.user?.name ? { "@type": "Person", name: playlist.user.name } : undefined,
+          }
+        : null
+    }
+  />
  <div 
    className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden am-layout-transition"
    style={{

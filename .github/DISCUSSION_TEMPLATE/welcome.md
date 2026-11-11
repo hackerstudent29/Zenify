@@ -18,7 +18,7 @@ This is the place to:
 
 ## 📋 Before You Post
 
-1. **Check [TROUBLESHOOTING.md](https://github.com/hackerstudent29/Zenify/blob/main/TROUBLESHOOTING.md)** – Might solve your issue immediately
+1. **Check [docs/TROUBLESHOOTING.md](https://github.com/hackerstudent29/Zenify/blob/main/docs/TROUBLESHOOTING.md)** – Might solve your issue immediately
 2. **Search existing discussions** – Someone might have already asked
 3. **Browse [Issues](https://github.com/hackerstudent29/Zenify/issues)** – For bug reports
 
@@ -44,7 +44,7 @@ Off-topic chat, random thoughts
 
 - Be kind and respectful (see [CODE_OF_CONDUCT.md](https://github.com/hackerstudent29/Zenify/blob/main/CODE_OF_CONDUCT.md))
 - Search before posting (avoid duplicates)
-- Include version number: "Zenify v2.5.0"
+- Include version number (e.g., "Zenify v1.0.8")
 - For bugs: include browser, OS, and error message
 - Use code blocks for code snippets ` ``` `
 

@@ -73,7 +73,8 @@ const softwareAppSchema = {
     "Dual-Buffer Gapless Web Audio Player with Crossfade",
     "Instant Clean CDN Audio Lookup with HTTP 206 Stream Proxy",
     "Dynamic Mood Stations (Deep Focus, Midnight Chill, Energy)",
-    "Offline PWA with Lock-Screen MediaSession API Controls",
+    "Room Together Synchronized Live Listening with Voice, Moments & Recaps",
+    "Native Android APK (v1.0.8) & Offline PWA with Lock-Screen Controls",
   ],
 };
 

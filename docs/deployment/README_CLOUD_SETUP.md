@@ -23,9 +23,8 @@ I've reconfigured your entire Zenify application to run 100% in the cloud with z
 #### 3. **Documentation Created** ✅
 - `QUICK_DEPLOY.md` - 5-minute deployment guide
 - `CLOUD_SETUP_GUIDE.md` - Comprehensive setup instructions
-- `DEPLOYMENT_STATUS.md` - Current status and checklist
-- `deploy.sh` - Automated deployment script (Linux/Mac)
-- `deploy.ps1` - Automated deployment script (Windows)
+- `../../scripts/deploy.sh` - Automated deployment script (Linux/Mac)
+- `../../scripts/deploy.ps1` - Automated deployment script (Windows)
 
 ---
 
@@ -48,13 +47,13 @@ I've reconfigured your entire Zenify application to run 100% in the cloud with z
 
 #### On Windows (PowerShell):
 ```powershell
-.\deploy.ps1
+.\scripts\deploy.ps1
 ```
 
 #### On Linux/Mac (Bash):
 ```bash
-chmod +x deploy.sh
-./deploy.sh
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
 ```
 
 ### Method 2: Manual Git Push
@@ -178,8 +177,6 @@ UPDATE "User" SET "isVerified" = true WHERE email = 'your-email@example.com';
 |------|-------------|
 | `QUICK_DEPLOY.md` | 5-minute quick start guide |
 | `CLOUD_SETUP_GUIDE.md` | Detailed cloud configuration |
-| `DEPLOYMENT_STATUS.md` | Current status & checklist |
-| `FIXED_README.md` | Login fix details |
 
 ---
 
@@ -220,4 +217,4 @@ All services are now cloud-based:
 **Estimated Time**: 3-5 minutes  
 **Availability**: 24/7 worldwide access  
 
-Run `.\deploy.ps1` (Windows) or `./deploy.sh` (Mac/Linux) to deploy now!
+Run `.\scripts\deploy.ps1` (Windows) or `./scripts/deploy.sh` (Mac/Linux) to deploy now!

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
-import pkg from "../../../package.json";
 import { SEO } from "@/components/shared/SEO";
 import { PageHeader, Section, Chevron, stagger, rise, spring } from "@/components/shared/PageChrome";
 import "@fontsource/zalando-sans-semiexpanded/latin-400.css";
@@ -84,7 +83,7 @@ export default function AboutPage() {
                 <motion.img
                   src="/creator.webp"
                   alt="Creator of Zenify"
-                  onError={(e) => ((e.currentTarget as HTMLImageElement).src = "/ram_profile.jpg")}
+                  onError={(e) => ((e.currentTarget as HTMLImageElement).src = "/logo.png")}
                   animate={
                     isBurning
                       ? {
@@ -207,7 +206,7 @@ export default function AboutPage() {
           </Section>
 
           <motion.p variants={rise} className="mt-12 text-xs text-white/30">
-            Version {pkg.version}
+            Version 1.0.8
           </motion.p>
         </motion.main>
       </div>

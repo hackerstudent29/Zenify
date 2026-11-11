@@ -60,7 +60,7 @@ export default function FollowingPage() {
 
   return (
     <div className="min-h-screen px-4 sm:px-8 pt-24 sm:pt-28 md:pt-32 pb-32 max-w-6xl mx-auto space-y-10">
-      <SEO title="Following – Zenify" description="Artists you follow and their latest releases." path="/following" />
+      <SEO title="Following – Zenify" description="Artists you follow and their latest releases." path="/following" noindex={true} />
 
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

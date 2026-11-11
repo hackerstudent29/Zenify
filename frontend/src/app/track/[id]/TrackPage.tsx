@@ -1,4 +1,6 @@
-"use client";
+"use client";
+
+import { SEO } from "@/components/shared/SEO";
 
 /**
  * TrackPage — Apple Music song/album-page style
@@ -556,6 +558,28 @@ export default function TrackPage() {
 
   return (
     <div className="relative min-h-screen w-full text-foreground">
+      <SEO
+        title={
+          formattedTitle
+            ? `${formattedTitle}${artistName ? ` by ${artistName}` : ""} – Lyrics & Stream`
+            : "Song"
+        }
+        description={`Listen to ${formattedTitle || "this track"}${artistName ? ` by ${artistName}` : ""}${albumDisplay ? ` from ${albumDisplay}` : ""} with sub-second synchronized lyrics and Studio FX on Zenify.`}
+        path={`/track/${encodeURIComponent(id || track.id || "")}`}
+        image={coverUrl}
+        type="music.song"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "MusicRecording",
+          name: formattedTitle || track.title,
+          url: `https://listenzenify.vercel.app/track/${encodeURIComponent(id || track.id || "")}`,
+          byArtist: artistName ? { "@type": "MusicGroup", name: artistName } : undefined,
+          inAlbum: albumDisplay ? { "@type": "MusicAlbum", name: albumDisplay } : undefined,
+          duration: durationSec > 0 ? `PT${Math.floor(durationSec / 60)}M${durationSec % 60}S` : undefined,
+          genre: genre || undefined,
+          datePublished: year || undefined,
+        }}
+      />
       {/* Flowing artwork background — full bleed behind everything */}
       <div
         className="am-layout-transition pointer-events-none absolute inset-0 z-0 select-none overflow-hidden"

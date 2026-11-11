@@ -34,7 +34,7 @@ export default function DownloadPage() {
   const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk";
   const absoluteDownloadUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/downloads/zenify.apk`
-    : "https://listenzenify.com/downloads/zenify.apk";
+    : "https://listenzenify.vercel.app/downloads/zenify.apk";
 
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
     absoluteDownloadUrl
@@ -52,9 +52,29 @@ export default function DownloadPage() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen w-full bg-[#030303] pt-24 sm:pt-28 md:pt-32 pb-40 font-sans text-[#F2F2F3] selection:bg-white/15">
         <SEO
-          title="Download Zenify App – Ad-Free Music for Android, iOS & Desktop"
-          description="Download the Zenify Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, synchronized karaoke lyrics, studio equalizer, and offline music."
+          title="Download Zenify APK (v1.0.8) – Ad-Free Music for Android, iOS & Desktop"
+          description="Download the Zenify v1.0.8 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, Room Together, synchronized lyrics, and Studio FX."
+          keywords={[
+            "download zenify apk",
+            "zenify android app",
+            "free ad-free music app apk",
+            "music player with synced lyrics apk",
+            "zenify pwa download"
+          ]}
           path="/download"
+          jsonLd={{
+            "@context": "https://schema.org",
+            "@type": "MobileApplication",
+            name: "Zenify Music Player",
+            operatingSystem: "Android 8.0+",
+            softwareVersion: "1.0.8",
+            applicationCategory: "MultimediaApplication",
+            applicationSubCategory: "Music & Audio",
+            downloadUrl: "https://listenzenify.vercel.app/downloads/zenify.apk",
+            offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            description:
+              "Free ad-free Android music player with 320kbps streaming, Room Together live synced listening rooms, native Studio FX DSP, and syllable-synced lyrics.",
+          }}
         />
 
         <PageHeader title="Download Zenify App" />
@@ -297,7 +317,7 @@ export default function DownloadPage() {
                     <h3 className="text-base font-semibold text-white mt-1">Visit Zenify</h3>
                   </div>
                   <p className="text-[14px] leading-relaxed text-zinc-400">
-                    Open <strong className="text-white">Safari</strong> on your iPhone or iPad and navigate to <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">listenzenify.vercel.app</code> or <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">listenzenify.com</code>.
+                    Open <strong className="text-white">Safari</strong> on your iPhone or iPad and navigate to <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">listenzenify.vercel.app</code>.
                   </p>
                 </div>
 
@@ -415,7 +435,7 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Release Version</span>
-                <span className="text-white">v1.0.4 (Build 7)</span>
+                <span className="text-white">v1.0.8 (Build 12)</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Package Format</span>

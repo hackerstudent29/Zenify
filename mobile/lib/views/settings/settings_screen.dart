@@ -28,7 +28,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
   int _versionTapCount = 0;
-  String _appVersion = 'v1.0.8 (Build 11)';
+  String _appVersion = 'v1.0.8 (Build 12)';
 
   @override
   void initState() {

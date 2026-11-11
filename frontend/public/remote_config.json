@@ -1,27 +1,30 @@
 {
-  "version": 11,
+  "version": 12,
   "streamMode": "device",
   "minAppVersion": "1.0.8",
   "latestAppVersion": "1.0.8",
   "isForceUpdate": true,
   "releaseDate": "November 11, 2026",
-  "releaseTime": "07:25 PM IST",
+  "releaseTime": "10:15 PM IST",
   "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk",
   "features": [
-    "Apple Music SF Pro & SF Pro Display typography across all screens, bottom sheets, and fullview player",
-    "Balanced medium and semibold weights across tracks, subtitles, and lyrics (no hairline fonts)",
-    "Tabular figures on track rankings, countdown timers, and listening insights metrics"
+    "Complete Apple Music SF Pro & SF Pro Display typography with tabular figures across all screens, sheets, and players",
+    "Dynamic Island in-app notifications & marquee ticker for likes, playlists, queue actions, sleep timers, and auth updates",
+    "Redesigned Apple Music Search experience with browse categories, Top Result glass card, live suggestions, and filter chips",
+    "Redesigned Welcome, Email OTP & 4-step Onboarding flows with spatial aurora backdrop and Apple spring motion",
+    "Room Together Phase 1 & 2 overhaul with persistent v1 rooms, LiveKit voice audio, synced karaoke lyrics, moments, song requests, reactions, themes, QR/WhatsApp deep links, achievements, insights & shareable PNG recaps"
   ],
   "fixes": [
-    "Replaced all remaining GoogleFonts/Inter typography on album, artist, login, insights, settings, and action sheets",
-    "Fixed Dynamic Island notification body fallback to render native SF Pro",
-    "Unified fullview player, miniplayer, queue panel, and studio FX typography weights"
+    "Restored Search back navigation (onBack) and prioritized live suggestions while typing",
+    "Fixed InnerTube YouTube.kt automix null-safety crashes and added multi-tier SmartQueueEngine radio fallback",
+    "Eliminated GoogleFonts/Inter fallback across album, artist, login, insights, settings, and Dynamic Island notifications",
+    "Hardened R8/ProGuard keep rules for WebRTC & LiveKit voice media in release APKs"
   ],
   "improvements": [
-    "Removed google_fonts dependency for smaller APK footprint and instant offline font loading",
-    "Sub-millisecond audio streaming demuxing and pristine 320kbps Akamai CDN playback",
-    "Optimized background battery drain with screen-off animation/visualizer suspension"
+    "Removed google_fonts dependency completely for faster cold start, offline font rendering, and native SF Pro fidelity",
+    "Upgraded ShellScreen scroll-driven dock morphing and canonical ZenPlayButton / ZenShuffleButton / ZenActionCircle controls",
+    "Replaced legacy APK bundles with fresh v1.0.8 (Build 12) ARM64 & Universal release packages across web, API, and GitHub Releases"
   ],
-  "releaseNotes": "• Complete Apple Music SF Pro typography across every screen, modal sheet, login & fullview player\n• Clean medium & semibold weights (no thin/washed-out fonts)\n• Removed google_fonts bloat for faster cold start & smaller APK\n• Background playback & battery optimizations",
-  "message": "Update to v1.0.8 for complete Apple Music SF Pro typography and performance improvements"
+  "releaseNotes": "• Complete Apple Music SF Pro typography & removal of google_fonts\n• Dynamic Island in-app notifications across likes, queue, timers & settings\n• Redesigned Apple Music Search, Login, Email OTP & Onboarding with spring motion\n• Room Together Phase 1 & 2 overhaul with LiveKit voice, synced lyrics, moments, requests, themes & PNG recaps\n• Search back-navigation, InnerTube automix, smart queue & R8 LiveKit release build hardening (v1.0.8 Build 12)",
+  "message": "Update to v1.0.8 (Build 12) for Apple Music Search, Auth & Onboarding redesigns, Dynamic Island notifications, SF Pro typography, and Room Together Phase 1 & 2 upgrades"
 }

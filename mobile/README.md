@@ -23,10 +23,10 @@
   - 8D Spatial Audio rotation with customizable orbit speed
   - Dynamic Bass Boost & Stereo Reverb
   - Speed (0.5x – 2.0x) and Pitch Warper (-12 to +12 semitones)
-- **Room Together**: Synchronized multi-device listening rooms with low-drift playback coordination.
+- **Room Together (Phase 1 & 2)**: Persistent synchronized multi-device rooms (`/api/v1/together`, `/ws/together` resume replay) with LiveKit voice chat, synced karaoke lyrics + translation/romanization, floating reactions, pinned moments, song requests, RBAC DJ controls, custom themes, QR/WhatsApp deep links, achievements, insights & shareable PNG recaps.
+- **Bundled SF Pro & Dynamic Island**: Offline bundled `SF Pro` / `SF Pro Display` typography (zero Google Fonts runtime fallback), Dynamic Island in-app marquee notifications, redesigned Search, Email OTP & Onboarding, and tactile spring physics.
 - **Offline Library & Local Music**: Seamlessly cache online tracks or play personal local audio files directly from device storage.
 - **Background & Lock-Screen Playback**: Full native MediaSession notification with cover artwork, track scrubber, skip, and like controls.
-- **Fluid Apple-Inspired UI**: Custom spring physics (`linear()` spring curves), glassmorphism, dynamic artwork mesh gradients, and haptic feedback.
 
 ---
 
@@ -64,26 +64,25 @@
 
 ## 🏗️ Project Architecture
 
-```
+```text
 mobile/
-├── android/               # Native Android project with Kotlin plugins & ExoPlayer Media3
-│   └── app/src/main/kotlin/com/zenify/mobile/
-│       ├── MainActivity.kt
-│       └── audio/         # ZenAudioPlugin & ZenFxProcessor (Native DSP)
-├── assets/                # Local mock catalogs, LRC files, and brand vector assets
+├── android/               # Native Android project, ExoPlayer Media3 & Kotlin engines
+│   └── app/src/main/kotlin/com/
+│       ├── metrolist/innertube/  # Native Kotlin YouTube Music InnerTube parser
+│       └── zenify/mobile/        # MainActivity, audio/, innertube/, yt/
+├── assets/                # Mock catalog, sample LRC lyrics, artwork & letters
 ├── lib/
-│   ├── core/              # Theme tokens, colors, typography, and spacing constants
-│   ├── data/              # Data sources and network catalog integration
-│   ├── design_system/     # Reusable glass surfaces, buttons, springs, and sliders
-│   ├── models/            # Track, ArtistRef, and Player state models
-│   ├── services/          # Audio playback bridge, Innertube resolver, cache, & FX
-│   │   ├── zen_player.dart
-│   │   ├── stream_resolver_service.dart
-│   │   ├── lyrics_service.dart
-│   │   ├── studio_fx_state.dart
-│   │   └── cache_service.dart
-│   └── views/             # Screens: Home, Explore, Search, Player, Lyrics, Profile
-└── pubspec.yaml           # Dependencies and build metadata
+│   ├── core/theme/        # App theme configuration
+│   ├── data/              # Catalog datasources
+│   ├── design_system/     # Apple Glass surfaces, tokens, springs & shared widgets
+│   ├── models/            # Track, ArtistRef, PlaybackContext & Room Together models
+│   ├── services/          # ZenPlayer, InnerTube, Studio FX, Cache & Room Together services
+│   ├── utils/             # Media normalizer & share image helpers
+│   ├── views/             # Home, Explore, Search, Library, Player, Room Together, Insights, Profile
+│   └── main.dart          # App bootstrap & deep link entry
+├── scripts/               # Adaptive icon generation scripts
+├── test/                  # Unit & widget test suites
+└── pubspec.yaml           # Dependencies, SF Pro fonts & release metadata
 ```
 
 ---
@@ -93,8 +92,10 @@ mobile/
 | Attribute | Specification |
 |---|---|
 | **Package ID** | `com.zenify.mobile` |
-| **Version** | `1.0.2+5` |
+| **Version** | `1.0.8+12` |
+| **ARM64 Split APK** | `46.2 MB` (`48,425,457` bytes) — SHA-256: `830ECF4974057D5AC4B83E05AF55C0BED3D1AAE915109844095875B6079FC1D7` |
+| **Universal APK** | `112.5 MB` (`117,980,091` bytes) — SHA-256: `D536EEEF7914E7649AED3C625243AB13522151E78C13D096DF2D878F57991622` |
 | **Min SDK** | `Android 8.0 (API 26)` |
 | **Target SDK** | `Android 15 (API 35)` |
-| **Engine** | `Flutter 3.44.2 / Dart 3.12.2` |
+| **Engine** | `Flutter / Dart (SDK ^3.10)` |
 | **License** | `MIT` |

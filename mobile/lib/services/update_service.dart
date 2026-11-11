@@ -98,7 +98,7 @@ class UpdateService {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version.isNotEmpty ? packageInfo.version : '1.0.8';
-      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 11;
+      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 12;
 
       // Remote config candidates in priority order (raw GitHub first for instantaneous release updates)
       final urls = [
