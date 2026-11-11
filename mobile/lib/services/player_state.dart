@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'zen_player.dart' as ap;
-import 'package:flutter/animation.dart' show Curve, Curves;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' hide RepeatMode;
 
 import '../data/datasources/catalog_datasource.dart';
 import '../models/track.dart';
@@ -28,9 +28,10 @@ typedef ZenifyRepeatMode = RepeatMode;
 /// [positionNotifier]. Everything that changes at frame rate (position, lyric
 /// line, scrubbing, volume, sheet expansion) has its own notifier so the
 /// whole tree never rebuilds for it.
-class PlayerState extends ChangeNotifier implements PlaybackBridge {
+class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements PlaybackBridge {
   PlayerState() {
     _initAudioPlayer();
+    WidgetsBinding.instance.addObserver(this);
     final all = CatalogDataSource.allTracks;
     if (all.isNotEmpty) {
       _queue = List.of(all);
@@ -1180,7 +1181,14 @@ class PlayerState extends ChangeNotifier implements PlaybackBridge {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isForeground = state == AppLifecycleState.resumed;
+    unawaited(_audioPlayer.setLifecycle(isForeground));
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final s in _subs) {
       s.cancel();
     }

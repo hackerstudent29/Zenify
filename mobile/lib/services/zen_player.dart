@@ -150,6 +150,8 @@ class AudioPlayer implements FxEngine {
   Future<void> setVolume(double v) => _call('setVolume', {'v': v});
   Future<void> setPlaybackRate(double rate) => _call('setFx', {'speed': rate});
   Future<void> setBalance(double balance) async {}
+  Future<void> setLifecycle(bool isForeground) =>
+      _call('setLifecycle', {'isForeground': isForeground});
 
   Future<void> dispose() async {
     _state = PlayerState.disposed;
