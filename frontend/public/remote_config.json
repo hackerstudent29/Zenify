@@ -1,27 +1,27 @@
 {
-  "version": 10,
+  "version": 11,
   "streamMode": "device",
-  "minAppVersion": "1.0.7",
-  "latestAppVersion": "1.0.7",
+  "minAppVersion": "1.0.8",
+  "latestAppVersion": "1.0.8",
   "isForceUpdate": true,
   "releaseDate": "November 11, 2026",
-  "releaseTime": "09:50 AM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk",
+  "releaseTime": "07:25 PM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk",
   "features": [
-    "Native Apple San Francisco Pro (SF Pro) typography across all screens and sheets",
-    "Liquid Glass 3-Dock Morphing Island with circular stadium edges",
-    "Smart left dock button: one-tap restoration to normal dock and miniplayer state"
+    "Apple Music SF Pro & SF Pro Display typography across all screens, bottom sheets, and fullview player",
+    "Balanced medium and semibold weights across tracks, subtitles, and lyrics (no hairline fonts)",
+    "Tabular figures on track rankings, countdown timers, and listening insights metrics"
   ],
   "fixes": [
-    "Fixed left dock button redirecting to Explore tab instead of restoring resting dock",
-    "Fixed rectangular squircle edge clipping in three-dock mode",
-    "Fixed Android 14 back-swipe and route transition conflicts"
+    "Replaced all remaining GoogleFonts/Inter typography on album, artist, login, insights, settings, and action sheets",
+    "Fixed Dynamic Island notification body fallback to render native SF Pro",
+    "Unified fullview player, miniplayer, queue panel, and studio FX typography weights"
   ],
   "improvements": [
+    "Removed google_fonts dependency for smaller APK footprint and instant offline font loading",
     "Sub-millisecond audio streaming demuxing and pristine 320kbps Akamai CDN playback",
-    "Ultra-smooth spring-damped morph transitions for miniplayer and Apple dock",
-    "Reduced memory footprint with zero-leak gesture listeners"
+    "Optimized background battery drain with screen-off animation/visualizer suspension"
   ],
-  "releaseNotes": "• Apple San Francisco Pro (SF Pro) Typography across the entire app\n• Perfectly rounded edges in 3-dock island mode\n• Left dock button restores full resting dock & miniplayer state\n• Stability & playback improvements",
-  "message": "Mandatory update required to continue streaming"
+  "releaseNotes": "• Complete Apple Music SF Pro typography across every screen, modal sheet, login & fullview player\n• Clean medium & semibold weights (no thin/washed-out fonts)\n• Removed google_fonts bloat for faster cold start & smaller APK\n• Background playback & battery optimizations",
+  "message": "Update to v1.0.8 for complete Apple Music SF Pro typography and performance improvements"
 }

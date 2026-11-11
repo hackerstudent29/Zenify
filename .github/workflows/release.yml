@@ -16,17 +16,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Fast Upload Pre-built APKs
+      - name: Ensure GitHub Release Exists & Upload Pre-built APKs
         run: |
-          TAG_NAME="${GITHUB_REF_NAME:-v1.0.7}"
+          TAG_NAME="${GITHUB_REF_NAME:-v1.0.8}"
           if [ "$TAG_NAME" = "main" ]; then
-            TAG_NAME="v1.0.7"
+            TAG_NAME="v1.0.8"
           fi
+          gh release view "$TAG_NAME" >/dev/null 2>&1 || gh release create "$TAG_NAME" --title "Zenify $TAG_NAME" --generate-notes
           echo "Uploading pre-built release package to $TAG_NAME..."
           if [ -f "frontend/public/downloads/zenify.apk" ]; then
-            cp frontend/public/downloads/zenify.apk zenify-v1.0.7.apk
+            cp frontend/public/downloads/zenify.apk "zenify-${TAG_NAME}.apk"
             cp frontend/public/downloads/zenify.apk zenify.apk
-            gh release upload "$TAG_NAME" zenify-v1.0.7.apk zenify.apk --clobber
+            gh release upload "$TAG_NAME" "zenify-${TAG_NAME}.apk" zenify.apk --clobber
             echo "Pre-built APKs uploaded successfully to $TAG_NAME!"
           fi
         env:
@@ -48,21 +49,26 @@ jobs:
         working-directory: ./mobile
         run: flutter pub get
 
-      - name: Build Universal FAT-APK
+      - name: Build Split ARM64 & Universal APKs
         working-directory: ./mobile
-        run: flutter build apk
-
-      - name: Upload Universal APKs to GitHub Release
         run: |
-          TAG_NAME="${GITHUB_REF_NAME:-v1.0.7}"
+          flutter build apk --split-per-abi
+          flutter build apk
+
+      - name: Upload Build APKs to GitHub Release
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME:-v1.0.8}"
           if [ "$TAG_NAME" = "main" ]; then
-            TAG_NAME="v1.0.7"
+            TAG_NAME="v1.0.8"
           fi
-          echo "Uploading universal release package to $TAG_NAME..."
-          cp mobile/build/app/outputs/flutter-apk/app-release.apk zenify-v1.0.7-universal.apk
+          gh release view "$TAG_NAME" >/dev/null 2>&1 || gh release create "$TAG_NAME" --title "Zenify $TAG_NAME" --generate-notes
+          echo "Uploading release packages to $TAG_NAME..."
+          cp mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "zenify-${TAG_NAME}.apk"
+          cp mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk zenify.apk
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk "zenify-${TAG_NAME}-universal.apk"
           cp mobile/build/app/outputs/flutter-apk/app-release.apk zenify-universal.apk
-          gh release upload "$TAG_NAME" zenify-v1.0.7-universal.apk zenify-universal.apk --clobber
-          echo "Universal APKs uploaded successfully to $TAG_NAME!"
+          gh release upload "$TAG_NAME" "zenify-${TAG_NAME}.apk" zenify.apk "zenify-${TAG_NAME}-universal.apk" zenify-universal.apk --clobber
+          echo "All APKs uploaded successfully to $TAG_NAME!"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

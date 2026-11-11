@@ -196,8 +196,8 @@ class _NotifTickerState extends State<_NotifTicker> {
           TextSpan(
             text: '  ${n.body}',
             style: const TextStyle(
-              fontFamily: 'SF Pro Text',
-              fontWeight: FontWeight.w400,
+              fontFamily: 'SF Pro',
+              fontWeight: FontWeight.w500,
               fontSize: 13,
               color: Colors.white70,
               letterSpacing: -0.1,

@@ -113,7 +113,8 @@ server.register(cors, {
     credentials: true,
     allowedHeaders: [
         'Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 
-        'Range', 'baggage', 'sentry-trace', 'x-user-language', 'x-user-languages', 'x-user-country', 'x-user-recent-artists', 'x-admin-key'
+        'Range', 'baggage', 'sentry-trace', 'x-user-language', 'x-user-languages', 'x-user-country', 'x-user-recent-artists', 'x-admin-key',
+        'Idempotency-Key', 'X-Timezone', 'X-Together-Ticket', 'X-Guest-Id', 'X-Guest-Name'
     ],
     exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length', 'Content-Type'],
 });
@@ -248,6 +249,8 @@ import { preferencesRoutes } from './routes/preferences.routes';
 import { activityRoutes } from './routes/activity.routes';
 import { queueRoutes } from './routes/queue.routes';
 import { togetherRoutes } from './routes/together.routes';
+import { togetherPublicRoutes, togetherV1Routes } from './routes/together-v1.routes';
+import { RoomLifecycleScheduler } from './services/together/room-lifecycle.scheduler';
 import { registerTogetherWebSocket } from './websocket/together-ws';
 import { HomepageService } from './services/homepage.service';
 import { ScheduledPublishService } from './services/scheduled-publish.service';
@@ -273,6 +276,8 @@ server.register(preferencesRoutes, { prefix: '/api/preferences' });
 server.register(activityRoutes, { prefix: '/api/activity' });
 server.register(queueRoutes, { prefix: '/api/queue' });
 server.register(togetherRoutes, { prefix: '/api/together' });
+server.register(togetherV1Routes, { prefix: '/api/v1/together' });
+server.register(togetherPublicRoutes);
 server.register(registerTogetherWebSocket);
 import { shareRoutes } from './routes/share.routes';
 server.register(shareRoutes);
@@ -342,35 +347,35 @@ const defaultRemoteConfig = {
         preResolve: false,
         homeFeed: false,
     },
-    minAppVersion: '1.0.7',
-    latestAppVersion: '1.0.7',
+    minAppVersion: '1.0.8',
+    latestAppVersion: '1.0.8',
     isForceUpdate: true,
     releaseDate: 'November 11, 2026',
-    releaseTime: '09:50 AM IST',
-    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk',
+    releaseTime: '07:25 PM IST',
+    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk',
     features: [
-        'Native Apple San Francisco Pro (SF Pro) typography across all screens and sheets',
-        'Liquid Glass 3-Dock Morphing Island with circular stadium edges',
-        'Smart left dock button: one-tap restoration to normal dock and miniplayer state',
+        'Apple Music SF Pro & SF Pro Display typography across all screens, sheets, and fullview player',
+        'Balanced medium/semibold type weights with zero thin/hairline text',
+        'Tabular figures on track numbers, playback timers, and telemetry counters',
     ],
     fixes: [
-        'Fixed left dock button redirecting to Explore tab instead of restoring resting dock',
-        'Fixed rectangular squircle edge clipping in three-dock mode',
-        'Fixed Android 14 back-swipe and route transition conflicts',
+        'Eliminated Inter/GoogleFonts fallback on album, artist, login, insights, settings, and bottom sheets',
+        'Fixed Dynamic Island notification body fallback so native SF Pro renders everywhere',
+        'Synchronized fullview player, miniplayer, lyrics sheet, and queue panel weights',
     ],
     improvements: [
+        'Removed google_fonts dependency for smaller APK footprint and offline-instant font rendering',
         'Sub-millisecond audio streaming demuxing and pristine 320kbps Akamai CDN playback',
-        'Ultra-smooth spring-damped morph transitions for miniplayer and Apple dock',
-        'Reduced memory footprint with zero-leak gesture listeners',
+        'Hardware audio offload and optimized background battery usage during locked playback',
     ],
-    releaseNotes: '• Native Apple San Francisco Pro (SF Pro) typography across all screens and sheets\n• Liquid Glass 3-Dock Morphing Island with circular stadium edges\n• Smart left dock button: one-tap restoration to normal dock and miniplayer state\n• Stability & performance improvements',
-    message: 'Mandatory update required to continue streaming',
+    releaseNotes: '• Complete Apple Music SF Pro typography across every screen, modal sheet, login & fullview player\n• Clean medium & semibold weights (no thin/washed-out fonts)\n• Removed google_fonts bloat for faster cold start & smaller APK\n• Battery & background streaming optimizations',
+    message: 'Update to v1.0.8 for complete Apple Music SF Pro typography and battery optimizations',
 };
 
 server.get('/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.7.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.8.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
@@ -380,7 +385,7 @@ server.get('/download/app', async (request, reply) => {
 server.get('/api/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.7.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.8.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
@@ -404,6 +409,7 @@ import { CronService } from './services/cron.service';
 const start = async () => {
     try {
         await server.listen({ port: config.PORT, host: '0.0.0.0' });
+        RoomLifecycleScheduler.start();
         server.log.info(`Server listening on port ${config.PORT}`);
         logBuffer.add({ level: 'INFO', category: 'SYSTEM', message: `Zenify API listening on port ${config.PORT} (${config.NODE_ENV})` });
 

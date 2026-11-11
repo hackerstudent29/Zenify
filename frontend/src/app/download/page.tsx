@@ -30,8 +30,8 @@ export default function DownloadPage() {
 
   // Fallback download URLs
   const apkDownloadUrl = "/downloads/zenify.apk";
-  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.0.7";
-  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk";
+  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.0.8";
+  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk";
   const absoluteDownloadUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/downloads/zenify.apk`
     : "https://listenzenify.com/downloads/zenify.apk";
@@ -69,7 +69,7 @@ export default function DownloadPage() {
           <motion.div variants={rise} className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/20 text-brand text-[11px] font-bold uppercase tracking-wider">
               <Sparkles size={13} className="text-brand" />
-              <span>Mobile Release v1.0.7 Available</span>
+              <span>Mobile Release v1.0.8 Available</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-sans uppercase tracking-tight text-white leading-tight">
@@ -112,7 +112,7 @@ export default function DownloadPage() {
                     className="h-12 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer shadow-lg hover:border-brand/40"
                   >
                     <Download size={18} className="text-brand shrink-0" />
-                    <span>Download APK (24.8 MB)</span>
+                    <span>Download APK (32.4 MB)</span>
                   </a>
 
                   <a
@@ -130,7 +130,7 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-zinc-400">
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Version</span>
-                    <span className="text-white font-medium">v1.0.7 (Build 10)</span>
+                    <span className="text-white font-medium">v1.0.8 (Build 11)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Package Size</span>
@@ -253,7 +253,7 @@ export default function DownloadPage() {
                     <h3 className="text-base font-semibold text-white mt-1">Notification or Files</h3>
                   </div>
                   <p className="text-[14px] leading-relaxed text-zinc-400">
-                    Once the 24.8 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
+                    Once the 32.4 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
                   </p>
                 </div>
 
@@ -458,7 +458,7 @@ export default function DownloadPage() {
                 className="h-11 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 <Download size={16} className="text-brand" />
-                <span>Download Zenify APK (v1.0.7)</span>
+                <span>Download Zenify APK (v1.0.8)</span>
               </a>
             </div>
           </motion.div>
