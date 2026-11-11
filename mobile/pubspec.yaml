@@ -81,7 +81,6 @@ flutter:
     - assets/lrc/
     - assets/mock/
     - assets/mock/lrc/
-    - assets/fonts/
 
   fonts:
     - family: SF Pro
