@@ -404,13 +404,12 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
                                 onSelect: _onDockSelect,
                                 onBack: _onSearchBack,
                                 onSearchTap: () => SearchNav.phase.value = SearchPhase.typing,
-                                onExploreTap: () {
+                                onRestoreDockTap: () {
                                   _dockController.animateTo(
                                     1.0,
                                     duration: const Duration(milliseconds: 280),
                                     curve: Curves.easeOutCubic,
                                   );
-                                  _select(1);
                                 },
                               ),
                             ),

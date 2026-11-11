@@ -2,6 +2,14 @@
 
 All notable changes to the Zenify platform are documented in this file.
 
+## [1.0.7] - 2026-11-11
+
+### Added
+- **Native Apple San Francisco Pro (SF Pro) Typography**: Packaged authentic SF Pro fonts (Text Regular, Medium, Semibold, Bold, and Display Bold) into application assets and bound to global `ThemeData`, eliminating Google Fonts runtime network latency and matching Apple Music's exact visual identity.
+- **Round-Shaped Stadium Edges for 3-Dock Island**: Left dock and right search dock in the collapsed 3-dock island now use pure circular stadium edges ($h / 2 = 27\text{px}$) with zero boxy/squircle corners.
+- **Restoration Action for Left Dock Button**: Tapping the collapsed left dock button now smoothly expands the resting navbar dock, miniplayer, and search dock without inadvertently navigating away to the Explore tab.
+- **In-App Force Update Engine & Rich Release Notice**: Integrated mandatory force update protection with detailed changelog breakdown (Features, Fixes, Improvements), release timestamp, and one-tap auto-update downloading.
+
 ## [1.0.6] - 2026-11-10
 
 ### Added
