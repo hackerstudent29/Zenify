@@ -938,8 +938,10 @@ class _HomeScreenState extends State<HomeScreen> {
     await Future.delayed(const Duration(milliseconds: 1800));
     if (!mounted) return;
     final info = await UpdateService.instance.checkForUpdate(silent: true);
-    if (info != null && info.hasUpdate && !UpdateService.instance.hasDismissedPrompt && mounted) {
-      UpdateService.instance.showUpdateSheet(context, info);
+    if (info != null && info.hasUpdate && mounted) {
+      if (info.isForceUpdate || !UpdateService.instance.hasDismissedPrompt) {
+        UpdateService.instance.showUpdateSheet(context, info);
+      }
     }
   }
 

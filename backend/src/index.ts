@@ -342,17 +342,35 @@ const defaultRemoteConfig = {
         preResolve: false,
         homeFeed: false,
     },
-    minAppVersion: '1.0.0',
-    latestAppVersion: '1.0.2',
-    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.0.2/zenify-v1.0.2.apk',
-    releaseNotes: '• Pure YouTube Music Automix: Infinite continuous radio playback from current tracks\n• Native Android getNext queue integration via Dispatchers.IO\n• Enhanced MediaNormalizer artwork scaling and defensive null safety\n• Zero legacy provider dependencies: 100% pure YouTube Music catalog',
-    message: null,
+    minAppVersion: '1.0.7',
+    latestAppVersion: '1.0.7',
+    isForceUpdate: true,
+    releaseDate: 'November 11, 2026',
+    releaseTime: '09:50 AM IST',
+    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk',
+    features: [
+        'Native Apple San Francisco Pro (SF Pro) typography across all screens and sheets',
+        'Liquid Glass 3-Dock Morphing Island with circular stadium edges',
+        'Smart left dock button: one-tap restoration to normal dock and miniplayer state',
+    ],
+    fixes: [
+        'Fixed left dock button redirecting to Explore tab instead of restoring resting dock',
+        'Fixed rectangular squircle edge clipping in three-dock mode',
+        'Fixed Android 14 back-swipe and route transition conflicts',
+    ],
+    improvements: [
+        'Sub-millisecond audio streaming demuxing and pristine 320kbps Akamai CDN playback',
+        'Ultra-smooth spring-damped morph transitions for miniplayer and Apple dock',
+        'Reduced memory footprint with zero-leak gesture listeners',
+    ],
+    releaseNotes: '• Native Apple San Francisco Pro (SF Pro) typography across all screens and sheets\n• Liquid Glass 3-Dock Morphing Island with circular stadium edges\n• Smart left dock button: one-tap restoration to normal dock and miniplayer state\n• Stability & performance improvements',
+    message: 'Mandatory update required to continue streaming',
 };
 
 server.get('/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.2.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.7.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
@@ -362,7 +380,7 @@ server.get('/download/app', async (request, reply) => {
 server.get('/api/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.2.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.7.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }

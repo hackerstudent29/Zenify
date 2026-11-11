@@ -208,6 +208,7 @@ class AppleDock extends StatefulWidget {
     this.onBack,
     this.dockProgress = 1.0,
     this.onExploreTap,
+    this.onRestoreDockTap,
   });
 
   /// 0 Home · 1 Explore · 2 Library · 3 Search
@@ -227,7 +228,8 @@ class AppleDock extends StatefulWidget {
   /// 1.0 = resting dock [Home · Explore · Library] + Search, 0.0 = three-dock island mode
   final double dockProgress;
 
-  /// tap on the collapsed left explore squircle button
+  /// tap on the collapsed left dock button to restore the resting dock & miniplayer
+  final VoidCallback? onRestoreDockTap;
   final VoidCallback? onExploreTap;
 
   @override
@@ -421,7 +423,8 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
   }
 
   Widget _pill(double h, double fullW, double e, double dp) {
-    final radius = ui.lerpDouble(18.0, h / 2, dp)!;
+    // Round-shaped edges at all times: perfect circle when collapsed (54x54), perfect stadium pill when expanded
+    final radius = h / 2;
     return AppleGlass(
       borderRadius: BorderRadius.circular(radius),
       child: Stack(
@@ -440,7 +443,7 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
                 ),
               ),
             ),
-          // collapsed left dock button: Explore 2x2 grid icon in Zen.rose
+          // collapsed left dock button: restores the resting navbar dock & miniplayer
           if (dp < 0.95 && e < 0.02)
             Positioned.fill(
               child: Opacity(
@@ -450,7 +453,7 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
                   child: PressableScale(
                     onTap: () {
                       HapticFeedback.selectionClick();
-                      widget.onExploreTap?.call();
+                      (widget.onRestoreDockTap ?? widget.onExploreTap)?.call();
                     },
                     child: Center(
                       child: Icon(
@@ -565,7 +568,8 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
   Widget _search(double h, double e, double dp) {
     final selected = widget.index == 3;
     final expanded = widget.searchExpanded;
-    final radius = ui.lerpDouble(18.0, h / 2, dp)!;
+    // Round-shaped edges at all times: perfect circle when collapsed (54x54), perfect stadium pill when search bar expands
+    final radius = h / 2;
     return PressableScale(
       onTap: () {
         HapticFeedback.selectionClick();

@@ -12,8 +12,8 @@
 
   <p>
     <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/🚀_Live_Web_App-listenzenify.com-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.6/zenify-v1.0.6.apk"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v1.0.6-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v1.0.6-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v1.0.7-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v1.0.7-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="MIT License" /></a>
     <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
     <a href="https://github.com/hackerstudent29/Zenify/fork"><img src="https://img.shields.io/github/forks/hackerstudent29/Zenify?style=for-the-badge&color=blueviolet" alt="GitHub Forks" /></a>
@@ -58,19 +58,19 @@ Install the native **Zenify Android application** directly to your smartphone or
 
 <div align="center">
   <br />
-  <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.6/zenify-v1.0.6.apk">
-    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.6)-24.8_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download Zenify APK Package" height="46" />
+  <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk">
+    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.7)-32.4_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download Zenify APK Package" height="46" />
   </a>
   <br />
-  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.6/zenify-v1.0.6.apk">zenify-v1.0.6.apk (ARM64 24.8 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.6/zenify-v1.0.6-universal.apk">Universal APK (65.2 MB)</a> • <a href="https://listenzenify.com/download">Web Direct & QR</a></i></p>
+  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk">zenify-v1.0.7.apk (ARM64 32.4 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7-universal.apk">Universal APK (80.5 MB)</a> • <a href="https://listenzenify.com/download">Web Direct & QR</a></i></p>
   <br />
-  <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fhackerstudent29%2FZenify%2Freleases%2Fdownload%2Fv1.0.6%2Fzenify-v1.0.6.apk&format=svg&color=ffffff&bgcolor=121214" alt="Scan QR Code to Download Zenify APK" width="180" />
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fhackerstudent29%2FZenify%2Freleases%2Fdownload%2Fv1.0.7%2Fzenify-v1.0.7.apk&format=svg&color=ffffff&bgcolor=121214" alt="Scan QR Code to Download Zenify APK" width="180" />
   <p><b>Scan with your phone's camera to download directly</b></p>
 </div>
 
 ### 📲 How to Install the APK on Your Android Device
 
-1. **Download the APK Package**: Tap the **[Download Zenify APK (v1.0.6)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.6/zenify-v1.0.6.apk)** button or scan the QR code above.
+1. **Download the APK Package**: Tap the **[Download Zenify APK (v1.0.7)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk)** button or scan the QR code above.
    > *Note*: If Google Chrome or your browser displays *"File might be harmful"*, tap **Download anyway**. This is standard Android security verification for apps installed outside the Google Play Store.
 2. **Open the File**: When the download completes, tap **Open** from your notification tray, or open your phone's **Files** or **Downloads** folder and tap `zenify.apk`.
 3. **Allow Unknown Apps**: If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings** and turn on **Allow from this source**.
@@ -155,7 +155,7 @@ Install the native **Zenify Android application** directly to your smartphone or
 ## 📲 How to Install Across Devices
 
 ### 🤖 Android (Native APK)
-1. Download **[Zenify APK v1.0.6 (24.8 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.6/zenify-v1.0.6.apk)**.
+1. Download **[Zenify APK v1.0.7 (32.4 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk)**.
 2. Tap the downloaded file in your notification bar or **Downloads** folder.
 3. Enable **Allow from this source** in Settings if prompted.
 4. Tap **Install** and enjoy ad-free music streaming!
@@ -178,7 +178,7 @@ Install the native **Zenify Android application** directly to your smartphone or
 Start listening immediately — **no sign-up, credit card, or subscription required**.
 
 * **Live Web Player**: Open **[listenzenify.com](https://listenzenify.com)** in any modern web browser.
-* **Download APK**: Direct download **[Zenify APK v1.0.6 (24.8 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.6/zenify-v1.0.6.apk)**.
+* **Download APK**: Direct download **[Zenify APK v1.0.7 (32.4 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk)**.
 
 ---
 
