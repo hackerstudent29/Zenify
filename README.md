@@ -62,7 +62,7 @@ Install the native **Zenify Android application** directly to your smartphone or
     <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.7)-32.4_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download Zenify APK Package" height="46" />
   </a>
   <br />
-  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk">zenify-v1.0.7.apk (ARM64 32.4 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7-universal.apk">Universal APK (80.5 MB)</a> • <a href="https://listenzenify.com/download">Web Direct & QR</a></i></p>
+  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7.apk">zenify-v1.0.7.apk (ARM64 32.4 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.7/zenify-v1.0.7-universal.apk">Universal APK (73.1 MB)</a> • <a href="https://listenzenify.com/download">Web Direct & QR</a></i></p>
   <br />
   <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fhackerstudent29%2FZenify%2Freleases%2Fdownload%2Fv1.0.7%2Fzenify-v1.0.7.apk&format=svg&color=ffffff&bgcolor=121214" alt="Scan QR Code to Download Zenify APK" width="180" />
   <p><b>Scan with your phone's camera to download directly</b></p>
