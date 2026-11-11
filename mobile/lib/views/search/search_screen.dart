@@ -250,7 +250,9 @@ enum _SearchViewPhase { landing, suggestions, loading, results }
 // ═════════════════════════════════════════════════════════════════════════════
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({super.key, this.onBack});
+
+  final VoidCallback? onBack;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -672,10 +674,10 @@ class _SearchScreenState extends State<SearchScreen>
         typing && _liveSuggestions.isNotEmpty && _searchResults.isEmpty;
 
     final _SearchViewPhase phase;
-    if (_isLoading && _searchResults.isEmpty) {
-      phase = _SearchViewPhase.loading;
-    } else if (showSuggestions) {
+    if (showSuggestions) {
       phase = _SearchViewPhase.suggestions;
+    } else if (_isLoading && _searchResults.isEmpty) {
+      phase = _SearchViewPhase.loading;
     } else if (hasQuery) {
       phase = _SearchViewPhase.results;
     } else {
@@ -683,13 +685,15 @@ class _SearchScreenState extends State<SearchScreen>
     }
 
     return PopScope(
-      canPop: !typing && !hasQuery,
+      canPop: widget.onBack == null && !typing && !hasQuery,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (typing) {
           _cancelSearch();
         } else if (hasQuery) {
           _clearSearch();
+        } else {
+          widget.onBack?.call();
         }
       },
       child: Scaffold(
