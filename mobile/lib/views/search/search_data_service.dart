@@ -25,6 +25,7 @@ class SearchDataService {
 
   bool _initializedRecents = false;
   int _activeRequestId = 0;
+  String _activeSearchQuery = '';
 
   /// Initializes recent searches and populates the Trie prefix tree.
   Future<void> initRecents() async {
@@ -166,6 +167,7 @@ class SearchDataService {
       if (cached != null) return cached;
     }
 
+    _activeSearchQuery = q;
     final requestId = ++_activeRequestId;
 
     // 2. Fetch raw search payload from InnerTube with exponential backoff
@@ -198,7 +200,8 @@ class SearchDataService {
     }
 
     // Guard against out-of-order responses from cancelled/delayed searches
-    if (requestId != _activeRequestId) {
+    // Never drop if user is still on the same query
+    if (requestId != _activeRequestId && _activeSearchQuery != q) {
       return _lruCache.get(cacheKey) ??
           SearchResult(
             originalQuery: q,

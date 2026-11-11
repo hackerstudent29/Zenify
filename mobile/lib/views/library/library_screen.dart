@@ -25,7 +25,6 @@ import 'package:provider/provider.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_typography.dart';
-import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
@@ -63,7 +62,7 @@ final _dark = CupertinoThemeData(
   scaffoldBackgroundColor: Colors.black,
   textTheme: CupertinoTextThemeData(
     primaryColor: _rose,
-    navLargeTitleTextStyle: _t(34, w: FontWeight.w700, ls: 0.4),
+    navLargeTitleTextStyle: AppTypography.largeTitle.copyWith(color: Colors.white),
     navTitleTextStyle: _t(17, w: FontWeight.w600),
     navActionTextStyle: _t(17, c: _rose),
   ),
@@ -1946,30 +1945,23 @@ class _PlayShuffle extends StatelessWidget {
   const _PlayShuffle({required this.onPlay, required this.onShuffle});
   final VoidCallback onPlay, onShuffle;
 
-  Widget _pill(IconData icon, String label, VoidCallback onTap) => Expanded(
-        child: PressableScale(
-          scale: 0.96,
-          onTap: onTap,
-          child: Container(
-            height: 48,
-            decoration: BoxDecoration(color: _fill, borderRadius: BorderRadius.circular(12)),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: _rose, size: 24),
-                const SizedBox(width: 6),
-                Text(label, style: _t(17, w: FontWeight.w600, c: _rose)),
-              ],
-            ),
-          ),
-        ),
-      );
-
   @override
   Widget build(BuildContext context) => Row(children: [
-        _pill(Icons.play_arrow_rounded, 'Play', onPlay),
+        Expanded(
+          child: ZenPlayButton(
+            height: 48,
+            onTap: onPlay,
+            label: 'Play',
+          ),
+        ),
         const SizedBox(width: 12),
-        _pill(Icons.shuffle_rounded, 'Shuffle', onShuffle),
+        Expanded(
+          child: ZenShuffleButton(
+            height: 48,
+            onTap: onShuffle,
+            label: 'Shuffle',
+          ),
+        ),
       ]);
 }
 

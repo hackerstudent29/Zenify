@@ -7,11 +7,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
@@ -559,8 +557,13 @@ class _AlbumScreenState extends State<AlbumScreen> {
   void _share() {
     HapticFeedback.selectionClick();
     Clipboard.setData(ClipboardData(text: '$_displayAlbumTitle – $_displayArtistName'));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Copied album link to clipboard'), duration: Duration(seconds: 1)),
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'copy_album_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Link copied',
+        body: '$_displayAlbumTitle • $_displayArtistName',
+        leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
+      ),
     );
   }
 
@@ -912,11 +915,12 @@ class _AlbumScreenState extends State<AlbumScreen> {
                                 _loading ? 'ALBUM' : _heroMetadataString,
                                 key: ValueKey('$_loading-$_heroMetadataString'),
                                 textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro',
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.0,
-                                  color: Colors.white.withValues(alpha: 0.72),
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.8,
+                                  color: Colors.white70,
                                 ),
                               ),
                             ),
@@ -1154,9 +1158,10 @@ class _HeroBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: GoogleFonts.inter(
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
+        style: TextStyle(
+          fontFamily: 'SF Pro',
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
           color: isAccent ? AppColors.crimson : Colors.white70,
         ),
@@ -1213,7 +1218,16 @@ class _TrackRow extends StatelessWidget {
                             : Align(
                                 key: const ValueKey('n'),
                                 alignment: Alignment.centerLeft,
-                                child: Text('${index + 1}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 17)),
+                                child: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    fontFamily: 'SF Pro',
+                                    color: AppColors.textSecondary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    fontFeatures: [FontFeature.tabularFigures()],
+                                  ),
+                                ),
                               ),
                       ),
                     ),
@@ -1225,10 +1239,11 @@ class _TrackRow extends StatelessWidget {
                           AnimatedDefaultTextStyle(
                             duration: const Duration(milliseconds: 250),
                             style: TextStyle(
+                              fontFamily: 'SF Pro',
                               color: current ? AppColors.accent : Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w400,
-                              letterSpacing: -0.3,
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: -0.25,
                             ),
                             child: Text(
                               MediaNormalizer.cleanCompactTitle(track.title),
@@ -1239,7 +1254,12 @@ class _TrackRow extends StatelessWidget {
                           if (showArtist)
                             InteractiveArtistsText(
                               artists: track.resolvedArtists,
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro',
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                         ],
                       ),
@@ -1247,7 +1267,13 @@ class _TrackRow extends StatelessWidget {
                     if (track.durationSeconds > 0) ...[
                       Text(
                         _formatDuration(track.durationSeconds),
-                        style: const TextStyle(color: AppColors.textTertiary, fontSize: 13, fontFeatures: [FontFeature.tabularFigures()]),
+                        style: const TextStyle(
+                          fontFamily: 'SF Pro',
+                          color: AppColors.textTertiary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
                       ),
                       const SizedBox(width: 4),
                     ],
@@ -1300,7 +1326,6 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const subtitleStyle = TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5);
     final songsString = '$songsCount ${songsCount == 1 ? 'song' : 'songs'}${formattedDuration.isNotEmpty ? ', $formattedDuration' : ''}';
     final releaseYearString = year != null && year! > 0 ? '$year' : '2024';
 
@@ -1312,9 +1337,10 @@ class _Footer extends StatelessWidget {
           // Total songs & duration
           Text(
             songsString,
-            style: GoogleFonts.inter(
+            style: const TextStyle(
+              fontFamily: 'SF Pro',
               fontSize: 14,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: Colors.white,
               letterSpacing: -0.2,
             ),
@@ -1324,19 +1350,36 @@ class _Footer extends StatelessWidget {
           // Release year and category
           Text(
             'Released $releaseYearString · $albumType · Stereo',
-            style: subtitleStyle,
+            style: const TextStyle(
+              fontFamily: 'SF Pro',
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 2),
 
           // Record label and copyright
           Text(
             '℗ $releaseYearString $label',
-            style: subtitleStyle,
+            style: const TextStyle(
+              fontFamily: 'SF Pro',
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 2),
           const Text(
             '© Zenify Audio Network · Pristine Master Delivery',
-            style: TextStyle(color: AppColors.textTertiary, fontSize: 11),
+            style: TextStyle(
+              fontFamily: 'SF Pro',
+              color: AppColors.textTertiary,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
           ),
 
           // Quality & Fidelity Card
@@ -1356,23 +1399,25 @@ class _Footer extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'LOSSLESS 320 KBPS AUDIO',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
                           fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.0,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
                           color: Colors.white,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Pristine Akamai Clean CDN stream with 24-bit dynamic range and bit-perfect fidelity.',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.white54,
-                          height: 1.3,
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.65),
+                          height: 1.35,
                         ),
                       ),
                     ],
@@ -1384,12 +1429,13 @@ class _Footer extends StatelessWidget {
 
           // Credited Artists & Contributors Chips
           if (creditedArtists.isNotEmpty) ...[
-            Text(
+            const Text(
               'ARTISTS & CONTRIBUTORS',
-              style: GoogleFonts.inter(
+              style: TextStyle(
+                fontFamily: 'SF Pro',
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.0,
                 color: Colors.white70,
               ),
             ),
@@ -1415,8 +1461,9 @@ class _Footer extends StatelessWidget {
                         const SizedBox(width: 6),
                         Text(
                           artist,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),

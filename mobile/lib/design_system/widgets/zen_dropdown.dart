@@ -5,7 +5,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -220,9 +219,11 @@ class ZenDropdown {
                       children: [
                         Text(
                           'Add to Playlist',
-                          style: GoogleFonts.inter(
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro',
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
                             color: Colors.white,
                           ),
                         ),
@@ -259,10 +260,11 @@ class ZenDropdown {
                             ),
                             child: const Icon(CupertinoIcons.add, color: Zen.rose, size: 22),
                           ),
-                          title: Text(
+                          title: const Text(
                             'New Playlist…',
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
+                            style: TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 15.5,
                               fontWeight: FontWeight.w600,
                               color: Zen.rose,
                             ),
@@ -275,17 +277,31 @@ class ZenDropdown {
                               builder: (dCtx) => AlertDialog(
                                 backgroundColor: const Color(0xFF1C1C1E),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                                title: Text(
+                                title: const Text(
                                   'New Playlist',
-                                  style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    fontFamily: 'SF Pro',
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                                 content: TextField(
                                   controller: controller,
                                   autofocus: true,
-                                  style: GoogleFonts.inter(color: Colors.white),
+                                  style: const TextStyle(
+                                    fontFamily: 'SF Pro',
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                   decoration: InputDecoration(
                                     hintText: 'Playlist name',
-                                    hintStyle: GoogleFonts.inter(color: Colors.white38),
+                                    hintStyle: TextStyle(
+                                      fontFamily: 'SF Pro',
+                                      color: Colors.white.withValues(alpha: 0.35),
+                                      fontSize: 16,
+                                    ),
                                     enabledBorder: UnderlineInputBorder(
                                       borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
                                     ),
@@ -297,26 +313,34 @@ class ZenDropdown {
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.pop(dCtx),
-                                    child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white60)),
+                                    child: Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        fontFamily: 'SF Pro',
+                                        color: Colors.white.withValues(alpha: 0.65),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
                                   ),
                                   TextButton(
                                     onPressed: () => Navigator.pop(dCtx, controller.text.trim()),
-                                    child: Text('Create', style: GoogleFonts.inter(color: Zen.rose, fontWeight: FontWeight.bold)),
+                                    child: const Text(
+                                      'Create',
+                                      style: TextStyle(
+                                        fontFamily: 'SF Pro',
+                                        color: Zen.rose,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
                             );
                             if (name != null && name.isNotEmpty && context.mounted) {
-                              final p = store.createPlaylist(name, first: track);
+                              store.createPlaylist(name, first: track);
                               HapticFeedback.lightImpact();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Added to "${p.name}"'),
-                                  behavior: SnackBarBehavior.floating,
-                                  backgroundColor: const Color(0xFF18181B),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
                             }
                           },
                         ),
@@ -337,31 +361,26 @@ class ZenDropdown {
                               playlists[i].name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 15.5,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
                             ),
                             subtitle: Text(
                               '${playlists[i].trackIds.length} songs',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: const Color(0xFFA1A1A6),
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFFA1A1A6),
                               ),
                             ),
                             onTap: () {
-                              final ok = store.addToPlaylist(playlists[i].id, track);
+                              store.addToPlaylist(playlists[i].id, track);
                               HapticFeedback.lightImpact();
                               Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(ok ? 'Added to "${playlists[i].name}"' : 'Already in "${playlists[i].name}"'),
-                                  behavior: SnackBarBehavior.floating,
-                                  backgroundColor: const Color(0xFF18181B),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
                             },
                           ),
                           if (i < playlists.length - 1)
@@ -552,12 +571,12 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                     player.playLast(next);
                   }
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Started mix for "${widget.title}"'),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: const Color(0xFF18181B),
-                    duration: const Duration(seconds: 2),
+                IslandNotifier.instance.show(
+                  IslandNotification(
+                    id: 'mix_${widget.track!.id}',
+                    title: 'Mix started',
+                    body: widget.title,
+                    leading: const Icon(CupertinoIcons.antenna_radiowaves_left_right, color: Color(0xFFE11D48), size: 18),
                   ),
                 );
               }
@@ -569,12 +588,12 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
         icon: CupertinoIcons.flag,
         onTap: widget.onReport ??
             () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Thank you. We have received your report for this track.'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: Color(0xFF18181B),
-                  duration: Duration(seconds: 2),
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'report_${widget.title.hashCode}',
+                  title: 'Feedback received',
+                  body: 'Thank you for reporting this track',
+                  leading: const Icon(CupertinoIcons.checkmark_shield_fill, color: Color(0xFFE11D48), size: 18),
                 ),
               );
             },
@@ -663,11 +682,12 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                             widget.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
+                            style: const TextStyle(
+                              fontFamily: 'SF Pro Display',
+                              fontSize: 16.5,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
-                              letterSpacing: -0.2,
+                              letterSpacing: -0.3,
                             ),
                           ),
                           const SizedBox(height: 3),
@@ -675,10 +695,12 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                             _buildSubtitle(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w400,
-                              color: const Color(0xFFA1A1A6),
+                            style: const TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFFA1A1A6),
+                              letterSpacing: -0.1,
                             ),
                           ),
                         ],
@@ -720,12 +742,12 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                         Clipboard.setData(ClipboardData(text: _shareUrl));
                         HapticFeedback.lightImpact();
                         Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Link copied to clipboard'),
-                            behavior: SnackBarBehavior.floating,
-                            duration: Duration(seconds: 2),
-                            backgroundColor: Color(0xFF18181B),
+                        IslandNotifier.instance.show(
+                          IslandNotification(
+                            id: 'copy_link_${DateTime.now().millisecondsSinceEpoch}',
+                            title: 'Link copied',
+                            body: 'Copied to clipboard',
+                            leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
                           ),
                         );
                       },
@@ -856,10 +878,11 @@ class _QuickShareBtn extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFFA1A1A6),
+            style: const TextStyle(
+              fontFamily: 'SF Pro',
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFA1A1A6),
               letterSpacing: -0.1,
             ),
           ),
@@ -907,7 +930,8 @@ class _ActionMenuRow extends StatelessWidget {
                     item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
                       fontSize: 15.5,
                       fontWeight: item.isSelected ? FontWeight.w600 : FontWeight.w500,
                       color: item.isDestructive ? AppColors.danger : Colors.white,
@@ -920,10 +944,12 @@ class _ActionMenuRow extends StatelessWidget {
                       item.subtitle!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        color: const Color(0xFFA1A1A6),
+                      style: const TextStyle(
+                        fontFamily: 'SF Pro',
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFA1A1A6),
+                        letterSpacing: -0.1,
                       ),
                     ),
                   ],
@@ -1016,11 +1042,12 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
+                        style: const TextStyle(
+                          fontFamily: 'SF Pro Display',
+                          fontSize: 16.5,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
-                          letterSpacing: -0.2,
+                          letterSpacing: -0.3,
                         ),
                       ),
                       if (subtitle != null) ...[
@@ -1030,10 +1057,12 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro',
                             fontSize: 13,
-                            fontWeight: FontWeight.w400,
-                            color: const Color(0xFFA1A1A6),
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFFA1A1A6),
+                            letterSpacing: -0.1,
                           ),
                         ),
                       ],

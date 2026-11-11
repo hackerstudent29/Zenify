@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Color, Colors, Icon;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../design_system/widgets/dynamic_island_header.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
 import 'secure_storage_service.dart';
@@ -147,6 +150,25 @@ class AuthState extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
+      if (result.isNewUser) {
+        IslandNotifier.instance.show(
+          IslandNotification(
+            id: 'auth_create_${_user!.id}',
+            title: 'Account created',
+            body: 'Welcome to Zenify, ${_user!.effectiveName}',
+            leading: const Icon(CupertinoIcons.person_crop_circle_badge_checkmark, color: Color(0xFFE11D48), size: 18),
+          ),
+        );
+      } else {
+        IslandNotifier.instance.show(
+          IslandNotification(
+            id: 'auth_welcome_${_user!.id}',
+            title: 'Welcome back',
+            body: _user!.effectiveName,
+            leading: const Icon(CupertinoIcons.person_crop_circle_fill, color: Color(0xFFE11D48), size: 18),
+          ),
+        );
+      }
       return (success: true, isNewUser: result.isNewUser, error: null);
     } catch (e) {
       _isLoading = false;
@@ -192,6 +214,25 @@ class AuthState extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
+      if (result.isNewUser) {
+        IslandNotifier.instance.show(
+          IslandNotification(
+            id: 'auth_create_${_user!.id}',
+            title: 'Account created',
+            body: 'Welcome to Zenify, ${_user!.effectiveName}',
+            leading: const Icon(CupertinoIcons.person_crop_circle_badge_checkmark, color: Color(0xFFE11D48), size: 18),
+          ),
+        );
+      } else {
+        IslandNotifier.instance.show(
+          IslandNotification(
+            id: 'auth_welcome_${_user!.id}',
+            title: 'Welcome back',
+            body: _user!.effectiveName,
+            leading: const Icon(CupertinoIcons.person_crop_circle_fill, color: Color(0xFFE11D48), size: 18),
+          ),
+        );
+      }
       return (success: true, isNewUser: result.isNewUser, error: null);
     } catch (e) {
       _isLoading = false;
@@ -276,6 +317,14 @@ class AuthState extends ChangeNotifier {
     if (username != null) _user!.username = username;
     if (avatarUrl != null) _user!.avatarUrl = avatarUrl;
     await _persistUser();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'auth_prof_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Profile updated',
+        body: _user!.effectiveName,
+        leading: const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFFE11D48), size: 18),
+      ),
+    );
     notifyListeners();
   }
 
@@ -283,6 +332,15 @@ class AuthState extends ChangeNotifier {
     _audioQuality = quality;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kQualityKey, quality);
+    final label = quality == 'flac' ? 'Lossless FLAC' : (quality == 'high' ? 'Hi-Fi 320 kbps' : 'Standard 160 kbps');
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'audio_qual_$quality',
+        title: 'Audio quality updated',
+        body: label,
+        leading: const Icon(CupertinoIcons.waveform, color: Color(0xFFE11D48), size: 18),
+      ),
+    );
     notifyListeners();
   }
 
@@ -301,6 +359,14 @@ class AuthState extends ChangeNotifier {
     _user = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kUserKey);
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'auth_signout_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Signed out',
+        body: 'See you next time',
+        leading: const Icon(CupertinoIcons.arrow_right_square, color: Colors.white70, size: 18),
+      ),
+    );
     notifyListeners();
   }
 

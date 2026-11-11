@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
@@ -212,7 +211,8 @@ class _HistoryViewState extends State<HistoryView> {
                         children: [
                           Text(
                             dateStr.toUpperCase(),
-                            style: GoogleFonts.inter(
+                            style: const TextStyle(
+                              fontFamily: 'SF Pro',
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.6,

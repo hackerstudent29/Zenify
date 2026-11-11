@@ -65,3 +65,4 @@ jobs:
           echo "Universal APKs uploaded successfully to $TAG_NAME!"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

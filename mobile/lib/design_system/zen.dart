@@ -16,6 +16,8 @@ import 'package:flutter/services.dart';
 import 'motion/zen_page_route.dart';
 import 'tokens/app_colors.dart';
 export 'widgets/marquee_text.dart';
+export 'widgets/dynamic_island_header.dart';
+export 'widgets/action_buttons.dart';
 export 'motion/zen_page_route.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,35 +99,69 @@ abstract final class Zen {
   /// Almost no overshoot — layout changes, entrances.
   static const Curve springSmooth = SpringCurve(damping: 26, stiffness: 190);
 
-  // Type scale
+  // Type scale (Apple Music SF Pro typography)
   static const largeTitle = TextStyle(
+      fontFamily: 'SF Pro Display',
       fontSize: 34,
       fontWeight: FontWeight.w700,
       letterSpacing: -0.8,
       height: 1.1,
       color: label);
-  static const title3 = TextStyle(
-      fontSize: 20,
+  static const title1 = TextStyle(
+      fontFamily: 'SF Pro Display',
+      fontSize: 28,
       fontWeight: FontWeight.w700,
+      letterSpacing: -0.6,
+      height: 1.15,
+      color: label);
+  static const title2 = TextStyle(
+      fontFamily: 'SF Pro',
+      fontSize: 22,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.5,
+      color: label);
+  static const title3 = TextStyle(
+      fontFamily: 'SF Pro',
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
       letterSpacing: -0.3,
       color: label);
   static const headline = TextStyle(
+      fontFamily: 'SF Pro',
       fontSize: 17,
       fontWeight: FontWeight.w600,
-      letterSpacing: -0.2,
+      letterSpacing: -0.3,
       color: label);
   static const body = TextStyle(
-      fontSize: 17,
+      fontFamily: 'SF Pro',
+      fontSize: 16,
       fontWeight: FontWeight.w400,
+      letterSpacing: -0.2,
+      color: label);
+  static const bodyMedium = TextStyle(
+      fontFamily: 'SF Pro',
+      fontSize: 16,
+      fontWeight: FontWeight.w500,
       letterSpacing: -0.2,
       color: label);
   static const subhead = TextStyle(
+      fontFamily: 'SF Pro',
       fontSize: 15,
-      fontWeight: FontWeight.w400,
-      letterSpacing: -0.1,
+      fontWeight: FontWeight.w500,
+      letterSpacing: -0.15,
       color: labelSecondary);
   static const footnote = TextStyle(
-      fontSize: 13, fontWeight: FontWeight.w500, color: labelSecondary);
+      fontFamily: 'SF Pro',
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+      letterSpacing: -0.05,
+      color: labelSecondary);
+  static const caption = TextStyle(
+      fontFamily: 'SF Pro',
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.1,
+      color: labelSecondary);
 
   // Browse-card gradients (rose, graphite and a few muted companions)
   static const List<List<Color>> categoryGradients = [
@@ -386,6 +422,7 @@ ThemeData zenDarkTheme() {
   final base = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
+    fontFamily: 'SF Pro',
     colorScheme: scheme,
     scaffoldBackgroundColor: Zen.bg,
     canvasColor: Zen.bg,
@@ -411,6 +448,11 @@ ThemeData zenDarkTheme() {
 
   return base.copyWith(
     textTheme: base.textTheme.apply(
+      fontFamily: 'SF Pro',
+      bodyColor: Zen.label,
+      displayColor: Zen.label,
+    ),
+    primaryTextTheme: base.primaryTextTheme.apply(
       fontFamily: 'SF Pro',
       bodyColor: Zen.label,
       displayColor: Zen.label,

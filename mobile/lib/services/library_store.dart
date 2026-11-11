@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Color, Colors, Icon, Icons;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/datasources/catalog_datasource.dart';
+import '../design_system/widgets/dynamic_island_header.dart';
 import '../models/track.dart';
 
 /* ------------------------------------------------------------------ */
@@ -315,8 +318,26 @@ class LibraryStore extends ChangeNotifier {
   void toggleLike(Track t) {
     final k = _key(t);
     _seen[k] = t;
-    if (!_liked.remove(k)) {
+    final isAdd = !_liked.remove(k);
+    if (isAdd) {
       _liked.insert(0, k);
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'like_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Added to Liked Songs',
+          body: '${t.title} • ${t.artist}',
+          leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: Icons.favorite_rounded, iconColor: const Color(0xFFE11D48)),
+        ),
+      );
+    } else {
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'unlike_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Removed from Liked Songs',
+          body: '${t.title} • ${t.artist}',
+          leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: Icons.favorite_border_rounded, iconColor: Colors.white70),
+        ),
+      );
     }
     _save();
   }
@@ -333,8 +354,24 @@ class LibraryStore extends ChangeNotifier {
     final i = _artists.indexWhere((a) => a.name.toLowerCase() == clean.toLowerCase());
     if (i >= 0) {
       _artists.removeAt(i);
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'unfollow_${clean}_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Unfollowed $clean',
+          body: 'Removed from followed artists',
+          leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.person_crop_circle, iconColor: Colors.white70),
+        ),
+      );
     } else {
       _artists.insert(0, FollowedArtist(clean, cover));
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'follow_${clean}_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Following $clean',
+          body: 'Added to followed artists',
+          leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.person_crop_circle_badge_checkmark, iconColor: const Color(0xFFE11D48)),
+        ),
+      );
     }
     _save();
   }
@@ -353,8 +390,24 @@ class LibraryStore extends ChangeNotifier {
     );
     if (i >= 0) {
       _albums.removeAt(i);
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'album_rm_${cTitle}_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Album removed from library',
+          body: '$cTitle • $cArtist',
+          leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.music_albums, iconColor: Colors.white70),
+        ),
+      );
     } else {
       _albums.insert(0, SavedAlbum(cTitle, cArtist, cover));
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'album_add_${cTitle}_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Album added to library',
+          body: '$cTitle • $cArtist',
+          leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.music_albums, iconColor: const Color(0xFFE11D48)),
+        ),
+      );
     }
     _save();
   }
@@ -383,6 +436,14 @@ class LibraryStore extends ChangeNotifier {
     }
     _playlists.insert(0, p);
     _save();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'playlist_create_${p.id}',
+        title: 'Playlist created',
+        body: p.name,
+        leading: const Icon(CupertinoIcons.text_badge_plus, color: Color(0xFFE11D48), size: 18),
+      ),
+    );
     return p;
   }
 
@@ -391,11 +452,29 @@ class LibraryStore extends ChangeNotifier {
     if (p == null || name.trim().isEmpty) return;
     p.name = name.trim();
     _save();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'playlist_rename_$id',
+        title: 'Playlist renamed',
+        body: p.name,
+        leading: const Icon(CupertinoIcons.pencil, color: Color(0xFFE11D48), size: 18),
+      ),
+    );
   }
 
   void deletePlaylist(String id) {
+    final p = playlistById(id);
+    final name = p?.name ?? 'Playlist';
     _playlists.removeWhere((p) => p.id == id);
     _save();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'playlist_del_$id',
+        title: 'Playlist deleted',
+        body: name,
+        leading: const Icon(CupertinoIcons.trash, color: Colors.white70, size: 18),
+      ),
+    );
   }
 
   /// Returns false if the song was already in the playlist.
@@ -404,14 +483,43 @@ class LibraryStore extends ChangeNotifier {
     if (p == null) return false;
     final k = _key(t);
     _seen[k] = t;
-    if (p.trackIds.contains(k)) return false;
+    if (p.trackIds.contains(k)) {
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'playlist_exists_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Already in playlist',
+          body: '${t.title} is already in ${p.name}',
+          leading: const Icon(CupertinoIcons.info_circle, color: Color(0xFFFFCC00), size: 18),
+        ),
+      );
+      return false;
+    }
     p.trackIds.add(k);
     _save();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'playlist_add_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Added to ${p.name}',
+        body: '${t.title} • ${t.artist}',
+        leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: CupertinoIcons.music_note_list, iconColor: const Color(0xFFE11D48)),
+      ),
+    );
     return true;
   }
 
   void removeFromPlaylist(String id, Track t) {
-    playlistById(id)?.trackIds.remove(_key(t));
+    final p = playlistById(id);
+    p?.trackIds.remove(_key(t));
     _save();
+    if (p != null) {
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'playlist_rm_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Removed from ${p.name}',
+          body: '${t.title} • ${t.artist}',
+          leading: const Icon(CupertinoIcons.minus_circle, color: Colors.white70, size: 18),
+        ),
+      );
+    }
   }
 }

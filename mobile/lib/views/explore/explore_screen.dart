@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart'
         CupertinoActionSheet,
         CupertinoActionSheetAction,
         CupertinoActivityIndicator,
+        CupertinoIcons,
         CupertinoSliverRefreshControl,
         showCupertinoModalPopup;
 import 'package:flutter/material.dart';
@@ -15,8 +16,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/tokens/app_typography.dart';
-import '../../design_system/widgets/dynamic_island_header.dart';
+import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/media_card.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/section_header.dart';
@@ -29,57 +29,14 @@ import '../../services/innertube_service.dart';
 import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
-import '../details/artist_screen.dart';
 import '../details/artist_popup.dart';
-import '../../design_system/widgets/interactive_artists_text.dart';
+import '../details/artist_screen.dart';
 import 'explore_data_service.dart';
 
 /* ------------------------------------------------------------------ */
-/*  Spring Physics & Reusable Library-style Action Buttons            */
+/*  Horizontal Snap Physics for Apple Music Carousel Snapping         */
 /* ------------------------------------------------------------------ */
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => PressableScale(
-        onTap: onTap,
-        child: Container(
-          height: 46,
-          decoration: ShapeDecoration(
-            shape: ContinuousRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            color: const Color(0x1FFFFFFF), // white 12%
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 22, color: AppColors.accent),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: AppTypography.headline.copyWith(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.accent,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-}
-
-/// Horizontal snap physics for smooth Apple Music carousel snapping
 class _SnapSpringPhysics extends ScrollPhysics {
   const _SnapSpringPhysics({super.parent, required this.itemExtent});
   final double itemExtent;
@@ -112,7 +69,7 @@ class _SnapSpringPhysics extends ScrollPhysics {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Main Explore Screen                                                */
+/*  Main Explore Screen (Editorial Apple Music Design)                */
 /* ------------------------------------------------------------------ */
 
 class ExploreScreen extends StatefulWidget {
@@ -147,10 +104,23 @@ class _ExploreScreenState extends State<ExploreScreen>
   List<Track> _trendingTracks = [];
   bool _isLoading = true;
   int _activeFeaturedIndex = 0;
+  int _selectedMoodChip = 0;
   int _selectedChartTab = 0; // 0: Top Songs, 1: Top Albums, 2: Top Artists, 3: Global
   final Set<String> _followedArtists = {};
 
   final PageController _featuredPageCtrl = PageController(viewportFraction: 0.92);
+
+  static const List<String> _exploreChips = [
+    'Top Hits',
+    'Trending',
+    'New Releases',
+    'Chill',
+    'Workout',
+    'Desi',
+    'Party',
+    'Focus',
+    'Romance',
+  ];
 
   @override
   void initState() {
@@ -252,7 +222,6 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   void _shuffle(List<Track> list) {
     if (list.isEmpty) return;
-    HapticFeedback.lightImpact();
     final ctx = PlaybackContext(
       type: PlaybackContextType.homeSection,
       id: 'explore_trending',
@@ -264,38 +233,49 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   void _toggleFollow(String artistName) {
-    HapticFeedback.mediumImpact();
+    HapticFeedback.selectionClick();
     setState(() {
-      if (!_followedArtists.remove(artistName)) {
+      if (_followedArtists.contains(artistName)) {
+        _followedArtists.remove(artistName);
+      } else {
         _followedArtists.add(artistName);
       }
     });
   }
 
-  Future<void> _onMoodOrGenreTap(String query, String title) async {
+  void _onMoodOrGenreTap(String query, String title) {
     HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Opening $title mix...', style: const TextStyle(color: Colors.white)),
-        backgroundColor: AppColors.surface2,
-        duration: const Duration(seconds: 1),
-      ),
-    );
-    try {
-      final results = await InnerTubeService.instance.search(query);
-      if (results.isNotEmpty && mounted) {
-        context.read<PlayerState>().setQueue(results, startIndex: 0);
-      }
-    } catch (_) {}
+    if (widget.onOpenCategory != null) {
+      widget.onOpenCategory!(query);
+    } else {
+      InnerTubeService.instance.search(query).then((tracks) {
+        if (!mounted || tracks.isEmpty) return;
+        Navigator.push(
+          context,
+          ZenPageRoute(
+            builder: (_) => AlbumScreen(
+              albumTitle: title,
+              artistName: 'Curated by Zenify',
+              coverUrl: tracks.first.coverUrl,
+            ),
+          ),
+        );
+      });
+    }
   }
 
+  // ---------------------------------------------------------------------------
+  // Build Main Explore Body
+  // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final topInset = MediaQuery.paddingOf(context).top;
-    final allTracks = _trendingTracks.isNotEmpty ? _trendingTracks : CatalogDataSource.allTracks;
 
-    // Derived content pools
+    final allTracks = _trendingTracks.isNotEmpty
+        ? _trendingTracks
+        : CatalogDataSource.allTracks;
+
     final featuredItems = _buildFeaturedItems(allTracks);
     final newReleases = _buildNewReleases(allTracks);
     final artists = _buildRecommendedArtists(allTracks);
@@ -310,85 +290,143 @@ class _ExploreScreenState extends State<ExploreScreen>
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
               SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
+
               // 1. iOS Pull-to-refresh
               CupertinoSliverRefreshControl(
                 onRefresh: () => _loadData(force: true),
               ),
 
-              // 2. Main Explore Content
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 8),
+              // 2. Mood & Vibe Chips Row (Apple Music Home Parity)
+              SliverToBoxAdapter(
+                child: _buildChipsRow(),
+              ),
 
-                // Section A: Featured Discovery Carousel
-                _buildFeaturedSection(featuredItems),
+              // 3. Main Explore Content
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
 
-                const SizedBox(height: 28),
+                    // Section A: Featured Discovery Carousel (With Round White Play Button)
+                    _buildFeaturedSection(featuredItems),
 
-                // Section B: Trending Music (with exact Library Play & Shuffle buttons)
-                _buildTrendingSection(allTracks),
+                    const SizedBox(height: 32),
 
-                const SizedBox(height: 32),
+                    // Section B: Trending Music (Unified ZenPlayShuffleRow + 4-Row Column Shelf)
+                    _buildTrendingSection(allTracks),
 
-                // Section C: Top Charts
-                _buildTopChartsSection(allTracks),
+                    const SizedBox(height: 34),
 
-                const SizedBox(height: 32),
+                    // Section C: Top Charts (Ranked Rows with Unified Buttons)
+                    _buildTopChartsSection(allTracks),
 
-                // Section D: New Releases
-                _buildNewReleasesSection(newReleases),
+                    const SizedBox(height: 34),
 
-                const SizedBox(height: 32),
+                    // Section D: New Releases & Hot Drops (Cover Cards Shelf)
+                    _buildNewReleasesSection(newReleases),
 
-                // Section E: Browse by Genre
-                _buildGenresSection(),
+                    const SizedBox(height: 34),
 
-                const SizedBox(height: 32),
+                    // Section E: Spotlight Artists (Circular Avatars + Stadium Follow Pills)
+                    _buildArtistsSection(artists),
 
-                // Section F: Browse by Mood & Activity
-                _buildMoodsSection(),
+                    const SizedBox(height: 34),
 
-                const SizedBox(height: 32),
+                    // Section F: Curated & Discovery Playlists
+                    _buildPlaylistsSection(playlists),
 
-                // Section G: Recommended Artists
-                _buildArtistsSection(artists),
+                    const SizedBox(height: 34),
 
-                const SizedBox(height: 32),
+                    // Section G: Browse by Mood & Activity
+                    _buildMoodsSection(),
 
-                // Section H: Curated & Discovery Playlists
-                _buildPlaylistsSection(playlists),
+                    const SizedBox(height: 34),
 
-                // Clearance for mini player & floating bottom dock
-                SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
-              ],
+                    // Section H: Browse by Genre (Editorial 2-Column Grid)
+                    _buildGenresSection(),
+
+                    // Clearance for floating bottom dock and mini player
+                    SizedBox(height: 180 + MediaQuery.paddingOf(context).bottom),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Dynamic Island Header
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: DynamicIslandHeader(
+              title: 'Explore',
+              subtitle: '${_country.flag} ${_country.name}',
+              showBack: false,
+              isDockPage: true,
+              onCenterTap: _pickCountry,
+              showProfile: true,
+              onProfileTap: widget.onOpenProfile,
+              topPadding: topInset + 4,
             ),
           ),
         ],
       ),
-      Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        child: DynamicIslandHeader(
-          title: 'Explore',
-          subtitle: '${_country.flag} ${_country.code}',
-          showBack: false,
-          isDockPage: true,
-          onCenterTap: _pickCountry,
-          showProfile: true,
-          onProfileTap: widget.onOpenProfile,
-          topPadding: topInset + 4,
-        ),
-      ),
-    ],
-  ),
-);
+    );
   }
 
   // ---------------------------------------------------------------------------
-  // Section A: Featured Discovery
+  // Mood / Genre Chips Row (Parity with Home Screen _Chips)
+  // ---------------------------------------------------------------------------
+  Widget _buildChipsRow() {
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+        itemCount: _exploreChips.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (ctx, i) {
+          final isSelected = i == _selectedMoodChip;
+          final title = _exploreChips[i];
+
+          return PressableScale(
+            scale: 0.94,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _selectedMoodChip = i);
+              if (i > 0) {
+                _onMoodOrGenreTap(title.toLowerCase(), title);
+              }
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: isSelected ? Colors.black : Colors.white.withValues(alpha: 0.9),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section A: Featured Discovery (With Round White Play Button)
   // ---------------------------------------------------------------------------
   Widget _buildFeaturedSection(List<ExploreFeaturedItem> items) {
     if (items.isEmpty) return const SizedBox.shrink();
@@ -397,7 +435,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: 210,
+          height: 220,
           child: PageView.builder(
             controller: _featuredPageCtrl,
             itemCount: items.length,
@@ -405,17 +443,17 @@ class _ExploreScreenState extends State<ExploreScreen>
             itemBuilder: (context, i) {
               final item = items[i];
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 5),
                 child: PressableScale(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    if (item.albumTitle != null && item.artistName != null) {
+                    if (item.albumTitle != null) {
                       Navigator.push(
                         context,
                         ZenPageRoute(
                           builder: (_) => AlbumScreen(
                             albumTitle: item.albumTitle!,
-                            artistName: item.artistName!,
+                            artistName: item.artistName ?? 'Artist',
                             coverUrl: item.coverUrl,
                           ),
                         ),
@@ -425,7 +463,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     }
                   },
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(18),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -445,26 +483,26 @@ class _ExploreScreenState extends State<ExploreScreen>
                               colors: [
                                 Colors.transparent,
                                 Color(0x60000000),
-                                Color(0xE60A0A0C),
+                                Color(0xF00A0A0C),
                               ],
-                              stops: [0.3, 0.65, 1.0],
+                              stops: [0.25, 0.6, 1.0],
                             ),
                           ),
                         ),
                         // Editorial text layout
                         Positioned(
                           left: 18,
-                          right: 18,
+                          right: 74,
                           bottom: 18,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: AppColors.accent,
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
                                   item.badge.toUpperCase(),
@@ -495,11 +533,29 @@ class _ExploreScreenState extends State<ExploreScreen>
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.8),
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                        // Circular White Play Button (Apple Music Hero Parity)
+                        Positioned(
+                          right: 18,
+                          bottom: 18,
+                          child: ZenActionCircle(
+                            size: 46,
+                            icon: CupertinoIcons.play_fill,
+                            backgroundColor: Colors.white,
+                            idleColor: Colors.black,
+                            activeColor: Colors.black,
+                            iconSize: 20,
+                            onTap: () {
+                              if (item.tracks.isNotEmpty) {
+                                _play(item.tracks, 0);
+                              }
+                            },
                           ),
                         ),
                       ],
@@ -536,51 +592,37 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section B: Trending Music
+  // Section B: Trending Music (Unified ZenPlayShuffleRow + 4-Row Column Shelf)
   // ---------------------------------------------------------------------------
   Widget _buildTrendingSection(List<Track> tracks) {
-    final topTrending = tracks.take(12).toList();
+    final topTrending = tracks.take(16).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: SectionHeader(
             title: 'Trending in ${_country.name}',
-            actionTitle: 'Play All',
+            actionTitle: 'See All',
             onActionTap: () => _play(tracks, 0),
           ),
         ),
         const SizedBox(height: 12),
 
-        // Exact Library-style Play and Shuffle buttons
+        // Unified Play & Shuffle Row (Round Shape Parity with Album & Artist Pages)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _ActionButton(
-                  icon: Icons.play_arrow_rounded,
-                  label: 'Play',
-                  onTap: () => _play(topTrending, 0),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _ActionButton(
-                  icon: Icons.shuffle_rounded,
-                  label: 'Shuffle',
-                  onTap: () => _shuffle(topTrending),
-                ),
-              ),
-            ],
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: ZenPlayShuffleRow(
+            onPlay: () => _play(topTrending, 0),
+            onShuffle: () => _shuffle(topTrending),
+            playLabel: 'Play All',
           ),
         ),
 
         const SizedBox(height: 16),
 
-        // Horizontal pages of trending songs (4 rows each)
+        // Horizontal pages of trending songs (4 rows each, matching Home quick picks)
         if (_isLoading)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 36),
@@ -588,11 +630,11 @@ class _ExploreScreenState extends State<ExploreScreen>
           )
         else
           SizedBox(
-            height: 270,
+            height: 272,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               physics: const _SnapSpringPhysics(itemExtent: 310),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: (topTrending.length / 4).ceil(),
               itemBuilder: (context, colIndex) {
                 final start = colIndex * 4;
@@ -621,7 +663,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section C: Top Charts
+  // Section C: Top Charts (Ranked Rows with Unified Buttons)
   // ---------------------------------------------------------------------------
   Widget _buildTopChartsSection(List<Track> tracks) {
     const tabs = ['Top Songs', 'Top Albums', 'Top Artists', 'Global 50'];
@@ -630,7 +672,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: 20),
           child: SectionHeader(title: 'Top Charts'),
         ),
         const SizedBox(height: 12),
@@ -638,7 +680,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         // Filter pills
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
               for (int i = 0; i < tabs.length; i++)
@@ -651,11 +693,11 @@ class _ExploreScreenState extends State<ExploreScreen>
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
                         color: _selectedChartTab == i
                             ? AppColors.accent
-                            : const Color(0x1FFFFFFF),
+                            : Colors.white.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(
@@ -677,7 +719,7 @@ class _ExploreScreenState extends State<ExploreScreen>
 
         // Ranked items
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             children: [
               for (int i = 0; i < math.min(5, tracks.length); i++)
@@ -694,28 +736,28 @@ class _ExploreScreenState extends State<ExploreScreen>
       onTap: () => _play(all, rank - 1),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: const Color(0x0CFFFFFF),
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
           children: [
             SizedBox(
-              width: 32,
+              width: 30,
               child: Text(
                 rank.toString().padLeft(2, '0'),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.accent,
+                style: TextStyle(
+                  color: rank <= 3 ? AppColors.accent : Colors.white54,
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
               child: CachedNetworkImage(
                 imageUrl: track.coverUrl,
                 width: 48,
@@ -751,9 +793,11 @@ class _ExploreScreenState extends State<ExploreScreen>
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.more_horiz_rounded, color: AppColors.textTertiary),
-              onPressed: () {
+            ZenActionCircle(
+              size: 36,
+              icon: CupertinoIcons.ellipsis,
+              iconSize: 18,
+              onTap: () {
                 final player = context.read<PlayerState>();
                 final resolvedArtists = track.resolvedArtists;
                 ZenDropdown.showTrackMenu(
@@ -769,11 +813,16 @@ class _ExploreScreenState extends State<ExploreScreen>
                     } else if (resolvedArtists.isNotEmpty) {
                       Navigator.push(
                         context,
-                        ZenPageRoute(builder: (_) => ArtistScreen(artistName: resolvedArtists.first.name)),
+                        ZenPageRoute(
+                          builder: (_) => ArtistScreen(
+                            artistName: resolvedArtists.first.name,
+                            browseId: resolvedArtists.first.id,
+                          ),
+                        ),
                       );
                     }
                   },
-                  onGoToAlbum: track.album.isNotEmpty && track.album != 'Single'
+                  onGoToAlbum: track.album.isNotEmpty
                       ? () => Navigator.push(
                             context,
                             ZenPageRoute(
@@ -795,7 +844,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section D: New Releases
+  // Section D: New Releases & Hot Drops (Cover Cards Shelf)
   // ---------------------------------------------------------------------------
   Widget _buildNewReleasesSection(List<ExploreReleaseItem> releases) {
     if (releases.isEmpty) return const SizedBox.shrink();
@@ -804,16 +853,16 @@ class _ExploreScreenState extends State<ExploreScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: 20),
           child: SectionHeader(title: 'New Releases'),
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 200,
+          height: 215,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const _SnapSpringPhysics(itemExtent: 160),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: releases.length,
             itemBuilder: (context, i) {
               final rel = releases[i];
@@ -834,7 +883,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     );
                   },
                   child: SizedBox(
-                    width: 145,
+                    width: 150,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -844,8 +893,8 @@ class _ExploreScreenState extends State<ExploreScreen>
                             children: [
                               CachedNetworkImage(
                                 imageUrl: rel.coverUrl,
-                                width: 145,
-                                height: 145,
+                                width: 150,
+                                height: 150,
                                 fit: BoxFit.cover,
                                 placeholder: (_, url) => Container(color: AppColors.surface2),
                               ),
@@ -853,10 +902,10 @@ class _ExploreScreenState extends State<ExploreScreen>
                                 top: 8,
                                 right: 8,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.7),
-                                    borderRadius: BorderRadius.circular(4),
+                                    color: Colors.black.withValues(alpha: 0.75),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text(
                                     rel.type.toUpperCase(),
@@ -864,6 +913,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                                       color: Colors.white,
                                       fontSize: 9,
                                       fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                 ),
@@ -904,61 +954,88 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section E: Browse by Genre
+  // Section E: Spotlight Artists (Circular Avatars + Stadium Follow Pills)
   // ---------------------------------------------------------------------------
-  Widget _buildGenresSection() {
-    final genres = _dataService.genres;
+  Widget _buildArtistsSection(List<Map<String, String>> artists) {
+    if (artists.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: SectionHeader(title: 'Browse by Genre'),
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: SectionHeader(title: 'Recommended Artists'),
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 175,
-          child: GridView.builder(
+          height: 236,
+          child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.52,
-            ),
-            itemCount: genres.length,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: artists.length,
             itemBuilder: (context, i) {
-              final g = genres[i];
-              return PressableScale(
-                onTap: () => _onMoodOrGenreTap(g.searchQuery, g.title),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: g.gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              final a = artists[i];
+              final name = a['name']!;
+              final photo = a['photo']!;
+              final isFollowed = _followedArtists.contains(name);
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 14),
+                child: SizedBox(
+                  width: 160,
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: Text(
-                          g.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
+                      MediaCard(
+                        title: '',
+                        imageUrl: photo,
+                        isCircular: true,
+                        width: 160,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.push(
+                            context,
+                            ZenPageRoute(
+                              builder: (_) => ArtistScreen(
+                                artistName: name,
+                                imageUrl: photo,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      PressableScale(
+                        onTap: () => _toggleFollow(name),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isFollowed ? AppColors.accent : Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            isFollowed ? 'Following' : 'Follow',
+                            style: TextStyle(
+                              color: isFollowed ? Colors.white : AppColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
-                      Icon(g.icon, color: Colors.white.withValues(alpha: 0.8), size: 22),
                     ],
                   ),
                 ),
@@ -971,7 +1048,79 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section F: Browse by Mood & Activity
+  // Section F: Curated & Discovery Playlists
+  // ---------------------------------------------------------------------------
+  Widget _buildPlaylistsSection(List<ExplorePlaylistItem> playlists) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: SectionHeader(title: 'Curated Playlists'),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 220,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const _SnapSpringPhysics(itemExtent: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: playlists.length,
+            itemBuilder: (context, i) {
+              final pl = playlists[i];
+              return Padding(
+                padding: const EdgeInsets.only(right: 14),
+                child: PressableScale(
+                  onTap: () => _onMoodOrGenreTap(pl.searchQuery, pl.title),
+                  child: SizedBox(
+                    width: 155,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: CachedNetworkImage(
+                            imageUrl: pl.coverUrl,
+                            width: 155,
+                            height: 155,
+                            fit: BoxFit.cover,
+                            placeholder: (_, url) => Container(color: AppColors.surface2),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          pl.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          pl.description,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Section G: Browse by Mood & Activity
   // ---------------------------------------------------------------------------
   Widget _buildMoodsSection() {
     final moods = _dataService.moods;
@@ -980,16 +1129,16 @@ class _ExploreScreenState extends State<ExploreScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: 20),
           child: SectionHeader(title: 'Moods & Activities'),
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 175,
+          height: 180,
           child: GridView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               mainAxisSpacing: 10,
@@ -1009,7 +1158,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1053,87 +1202,59 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section G: Recommended Artists
+  // Section H: Browse by Genre (2-Column Grid Matching Home Screen)
   // ---------------------------------------------------------------------------
-  Widget _buildArtistsSection(List<Map<String, String>> artists) {
-    if (artists.isEmpty) return const SizedBox.shrink();
+  Widget _buildGenresSection() {
+    final genres = _dataService.genres;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: SectionHeader(title: 'Recommended Artists'),
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: SectionHeader(title: 'Browse by Genre'),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 236,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: artists.length,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 2.2,
+            ),
+            itemCount: genres.length,
             itemBuilder: (context, i) {
-              final a = artists[i];
-              final name = a['name']!;
-              final photo = a['photo']!;
-              final isFollowed = _followedArtists.contains(name);
-
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: SizedBox(
-                  width: 170,
-                  child: Column(
+              final g = genres[i];
+              return PressableScale(
+                onTap: () => _onMoodOrGenreTap(g.searchQuery, g.title),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: g.gradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      MediaCard(
-                        title: '',
-                        imageUrl: photo,
-                        isCircular: true,
-                        width: 170,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          Navigator.push(
-                            context,
-                            ZenPageRoute(
-                              builder: (_) => ArtistScreen(
-                                artistName: name,
-                                imageUrl: photo,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      PressableScale(
-                        onTap: () => _toggleFollow(name),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isFollowed ? AppColors.accent : const Color(0x1FFFFFFF),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            isFollowed ? 'Following' : 'Follow',
-                            style: TextStyle(
-                              color: isFollowed ? Colors.white : AppColors.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
+                      Expanded(
+                        child: Text(
+                          g.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
+                      Icon(g.icon, color: Colors.white.withValues(alpha: 0.85), size: 22),
                     ],
                   ),
                 ),
@@ -1146,190 +1267,113 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section H: Curated Playlists
-  // ---------------------------------------------------------------------------
-  Widget _buildPlaylistsSection(List<ExplorePlaylistItem> playlists) {
-    if (playlists.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: SectionHeader(title: 'Curated Playlists'),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 195,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const _SnapSpringPhysics(itemExtent: 155),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: playlists.length,
-            itemBuilder: (context, i) {
-              final p = playlists[i];
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: PressableScale(
-                  onTap: () => _onMoodOrGenreTap(p.searchQuery, p.title),
-                  child: SizedBox(
-                    width: 140,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: CachedNetworkImage(
-                            imageUrl: p.coverUrl,
-                            width: 140,
-                            height: 140,
-                            fit: BoxFit.cover,
-                            placeholder: (_, url) => Container(color: AppColors.surface2),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          p.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          p.description,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textTertiary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Content builders & generators
+  // Synthetic Data Helpers
   // ---------------------------------------------------------------------------
   List<ExploreFeaturedItem> _buildFeaturedItems(List<Track> tracks) {
-    if (tracks.isEmpty) return const [];
-    final out = <ExploreFeaturedItem>[];
+    if (tracks.isEmpty) return [];
 
-    final t0 = tracks[0];
-    out.add(ExploreFeaturedItem(
-      badge: 'Editorial Spotlight',
-      title: t0.title,
-      subtitle: '${t0.artist} • Trending ${_country.name}',
-      coverUrl: t0.coverUrl,
-      tracks: tracks,
-      albumTitle: t0.album,
-      artistName: t0.artist,
-    ));
+    final result = <ExploreFeaturedItem>[];
+    final artistsSeen = <String>{};
 
-    if (tracks.length > 3) {
-      final t3 = tracks[3];
-      out.add(ExploreFeaturedItem(
-        badge: 'New & Noteworthy',
-        title: t3.album.isNotEmpty && t3.album != 'Single' ? t3.album : t3.title,
-        subtitle: t3.artist,
-        coverUrl: t3.coverUrl,
-        tracks: tracks.sublist(3),
-        albumTitle: t3.album,
-        artistName: t3.artist,
-      ));
+    for (final t in tracks) {
+      if (artistsSeen.contains(t.artist)) continue;
+      artistsSeen.add(t.artist);
+
+      final related = tracks.where((x) => x.artist == t.artist).toList();
+      result.add(
+        ExploreFeaturedItem(
+          badge: 'Artist Spotlight',
+          title: t.artist,
+          subtitle: 'Featuring "${MediaNormalizer.cleanCompactTitle(t.title)}" and top hits',
+          coverUrl: t.coverUrl,
+          tracks: related,
+          albumTitle: t.album,
+          artistName: t.artist,
+        ),
+      );
+      if (result.length >= 5) break;
     }
-
-    if (tracks.length > 7) {
-      final t7 = tracks[7];
-      out.add(ExploreFeaturedItem(
-        badge: 'Chart Topper',
-        title: t7.title,
-        subtitle: '${t7.artist} • Top Hit',
-        coverUrl: t7.coverUrl,
-        tracks: tracks.sublist(7),
-        albumTitle: t7.album,
-        artistName: t7.artist,
-      ));
-    }
-
-    return out;
+    return result;
   }
 
   List<ExploreReleaseItem> _buildNewReleases(List<Track> tracks) {
-    final releases = <ExploreReleaseItem>[];
+    final list = <ExploreReleaseItem>[];
     final seen = <String>{};
 
     for (final t in tracks) {
-      if (t.album.isNotEmpty && seen.add(t.album)) {
-        releases.add(ExploreReleaseItem(
-          title: t.album,
+      final key = '${t.album}_${t.artist}';
+      if (seen.contains(key)) continue;
+      seen.add(key);
+
+      final albumTracks = tracks.where((x) => x.album == t.album).toList();
+      list.add(
+        ExploreReleaseItem(
+          title: t.album.isNotEmpty ? t.album : t.title,
           artist: t.artist,
           coverUrl: t.coverUrl,
-          type: t.album == 'Single' ? 'Single' : 'Album',
-          year: '2026',
-          tracks: [t],
-        ));
-      }
-      if (releases.length >= 10) break;
+          type: albumTracks.length > 3 ? 'Album' : 'Single',
+          tracks: albumTracks,
+        ),
+      );
+      if (list.length >= 10) break;
     }
-    return releases;
+    return list;
   }
 
   List<Map<String, String>> _buildRecommendedArtists(List<Track> tracks) {
+    final result = <Map<String, String>>[];
     final seen = <String>{};
-    final artists = <Map<String, String>>[];
 
     for (final t in tracks) {
-      final leadArtist = t.artist.split(',').first.trim();
-      if (seen.add(leadArtist.toLowerCase())) {
-        artists.add({
-          'name': leadArtist,
-          'photo': t.coverUrl,
-        });
-      }
-      if (artists.length >= 10) break;
+      if (seen.contains(t.artist)) continue;
+      seen.add(t.artist);
+      result.add({
+        'name': t.artist,
+        'photo': t.coverUrl,
+      });
+      if (result.length >= 8) break;
     }
-    return artists;
+    return result;
   }
 
   List<ExplorePlaylistItem> _buildPlaylists(List<Track> tracks) {
-    if (tracks.isEmpty) return const [];
     return [
       ExplorePlaylistItem(
         title: '${_country.name} Top 50',
-        description: 'The most played songs right now',
-        coverUrl: tracks.first.coverUrl,
-        trackCount: tracks.length,
-        searchQuery: '${_country.query} top songs',
+        description: 'The most streamed tracks right now in ${_country.name}',
+        coverUrl: tracks.isNotEmpty
+            ? tracks.first.coverUrl
+            : 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600',
+        trackCount: 50,
+        searchQuery: '${_country.query} playlist',
       ),
-      if (tracks.length > 2)
-        ExplorePlaylistItem(
-          title: 'Acoustic & Chill',
-          description: 'Mellow vocal tracks and calm rhythms',
-          coverUrl: tracks[2].coverUrl,
-          trackCount: 30,
-          searchQuery: 'acoustic chill relax',
-        ),
-      if (tracks.length > 5)
-        ExplorePlaylistItem(
-          title: 'Night Drive',
-          description: 'Atmospheric late night cruising',
-          coverUrl: tracks[5].coverUrl,
-          trackCount: 25,
-          searchQuery: 'night drive synthwave pop',
-        ),
+      ExplorePlaylistItem(
+        title: 'Today\'s Hits',
+        description: 'The biggest songs across pop, rap and international charts',
+        coverUrl: tracks.length > 1
+            ? tracks[1].coverUrl
+            : 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600',
+        trackCount: 35,
+        searchQuery: 'todays top hits',
+      ),
+      ExplorePlaylistItem(
+        title: 'Late Night Chill',
+        description: 'Acoustic melodies and ambient vibes for unwinding',
+        coverUrl: tracks.length > 2
+            ? tracks[2].coverUrl
+            : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600',
+        trackCount: 40,
+        searchQuery: 'chill acoustic songs',
+      ),
+      ExplorePlaylistItem(
+        title: 'Workout Energy',
+        description: 'High-tempo motivation tracks to keep your momentum high',
+        coverUrl: tracks.length > 3
+            ? tracks[3].coverUrl
+            : 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600',
+        trackCount: 45,
+        searchQuery: 'workout motivation songs',
+      ),
     ];
   }
 }
-

@@ -2965,18 +2965,27 @@ object YouTube {
                         ?.tabbedRenderer
                         ?.watchNextTabbedResultsRenderer
                         ?.tabs
-                        ?.get(0)
+                        ?.getOrNull(0)
                         ?.tabRenderer
                         ?.content
                         ?.musicQueueRenderer
                         ?.content
-                        ?.playlistPanelRenderer!!
+                        ?.playlistPanelRenderer
+                    ?: return@runCatching NextResult(
+                        title = null,
+                        items = emptyList(),
+                        currentIndex = null,
+                        lyricsEndpoint = null,
+                        relatedEndpoint = null,
+                        continuation = null,
+                        endpoint = endpoint,
+                    )
             val title =
                 response.contents.singleColumnMusicWatchNextResultsRenderer
                     ?.tabbedRenderer
                     ?.watchNextTabbedResultsRenderer
                     ?.tabs
-                    ?.get(0)
+                    ?.getOrNull(0)
                     ?.tabRenderer
                     ?.content
                     ?.musicQueueRenderer
@@ -2995,7 +3004,7 @@ object YouTube {
             val songs = items.map { it.first }
             val currentIndex = items.indexOfFirst { it.second }.takeIf { it != -1 }
 
-            // load automix items
+            // load automix items safely without throwing on playlist endpoint schema mismatches
             playlistPanelRenderer.contents
                 .lastOrNull()
                 ?.automixPreviewVideoRenderer
@@ -3004,10 +3013,11 @@ object YouTube {
                 ?.navigationEndpoint
                 ?.watchPlaylistEndpoint
                 ?.let { watchPlaylistEndpoint ->
-                    return@runCatching next(watchPlaylistEndpoint).getOrThrow().let { result ->
-                        result.copy(
+                    val automixResult = next(watchPlaylistEndpoint).getOrNull()
+                    if (automixResult != null) {
+                        return@runCatching automixResult.copy(
                             title = title,
-                            items = songs + result.items,
+                            items = songs + automixResult.items,
                             lyricsEndpoint =
                                 response.contents.singleColumnMusicWatchNextResultsRenderer
                                     ?.tabbedRenderer

@@ -618,7 +618,9 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
                                 softWrap: false,
                                 overflow: TextOverflow.clip,
                                 style: TextStyle(
+                                  fontFamily: 'SF Pro',
                                   fontSize: 16,
+                                  fontWeight: FontWeight.w500,
                                   color: Colors.white.withValues(alpha: 0.65),
                                 ),
                               ),
@@ -660,6 +662,7 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
                 spec.label,
                 maxLines: 1,
                 style: TextStyle(
+                  fontFamily: 'SF Pro',
                   fontSize: 10.5,
                   height: 1.2,
                   fontWeight: FontWeight.w600,

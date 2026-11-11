@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../design_system/tokens/app_colors.dart';
 
@@ -37,10 +36,11 @@ class PersonalityCard extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               'HOW PERSONAS ARE DETERMINED',
-              style: GoogleFonts.inter(
+              style: const TextStyle(
+                fontFamily: 'SF Pro Display',
                 fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.0,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
                 color: Colors.white,
               ),
             ),
@@ -112,12 +112,13 @@ class PersonalityCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: AppColors.crimson.withValues(alpha: 0.40)),
                 ),
-                child: Text(
+                child: const Text(
                   'YOUR MUSIC PERSONA',
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
                     color: AppColors.crimson,
                   ),
                 ),
@@ -131,11 +132,12 @@ class PersonalityCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             title,
-            style: GoogleFonts.inter(
+            style: const TextStyle(
+              fontFamily: 'SF Pro Display',
               fontSize: 24,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: Colors.white,
-              letterSpacing: 0.5,
+              letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 6),

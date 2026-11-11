@@ -6,11 +6,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
@@ -487,10 +485,11 @@ class _SongRow extends StatelessWidget {
                           AnimatedDefaultTextStyle(
                             duration: const Duration(milliseconds: 200),
                             style: TextStyle(
+                              fontFamily: 'SF Pro',
                               color: current ? AppColors.accent : Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w400,
-                              letterSpacing: -0.3,
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: -0.25,
                             ),
                             child: Text(
                               MediaNormalizer.cleanCompactTitle(track.title),
@@ -503,7 +502,12 @@ class _SongRow extends StatelessWidget {
                             track.album.isNotEmpty ? track.album : track.artist,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                            style: const TextStyle(
+                              fontFamily: 'SF Pro',
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -512,8 +516,10 @@ class _SongRow extends StatelessWidget {
                       Text(
                         _formatDuration(track.durationSeconds),
                         style: const TextStyle(
+                          fontFamily: 'SF Pro',
                           color: AppColors.textTertiary,
                           fontSize: 13,
+                          fontWeight: FontWeight.w500,
                           fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
@@ -744,7 +750,12 @@ class _AboutCardState extends State<_AboutCard> {
                 Expanded(
                   child: Text(
                     'Pristine 320kbps Lossless Stream via Akamai Clean CDN Delivery',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.white54),
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.65),
+                    ),
                   ),
                 ),
               ],
@@ -890,8 +901,13 @@ class _ArtistScreenState extends State<ArtistScreen> {
   void _share(String name) {
     HapticFeedback.selectionClick();
     Clipboard.setData(ClipboardData(text: name));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Copied artist link to clipboard'), duration: Duration(seconds: 1)),
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'copy_artist_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Link copied',
+        body: name,
+        leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
+      ),
     );
   }
 

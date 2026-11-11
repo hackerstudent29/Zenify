@@ -857,6 +857,7 @@ class _WordLineState extends State<_WordLine> {
   int _layLines = 0;
 
   TextStyle _style(double fs, Color c) => TextStyle(
+        fontFamily: 'SF Pro Display',
         fontSize: fs,
         height: 1.24,
         fontWeight: FontWeight.w800,

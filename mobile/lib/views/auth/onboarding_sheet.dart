@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
@@ -491,11 +490,15 @@ class _OnboardingSheetState extends State<OnboardingSheet>
             onTap: widget.onCompleted,
             child: Padding(
               padding: const EdgeInsets.all(4),
-              child: Text('Skip',
-                  style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.55))),
+              child: Text(
+                'Skip',
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.65),
+                ),
+              ),
             ),
           ),
         ],
@@ -529,10 +532,12 @@ class _OnboardingSheetState extends State<OnboardingSheet>
                       child: Text(
                         hint,
                         key: ValueKey(hint),
-                        style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withValues(alpha: 0.5)),
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.65),
+                        ),
                       ),
                     ),
                   ),
@@ -560,10 +565,13 @@ class _OnboardingSheetState extends State<OnboardingSheet>
                         child: Text(
                           _step == _steps - 1 ? 'Get Started' : 'Continue',
                           key: ValueKey(_step == _steps - 1),
-                          style: GoogleFonts.inter(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white),
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.2,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
               ),
@@ -582,18 +590,21 @@ class _OnboardingSheetState extends State<OnboardingSheet>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style: GoogleFonts.inter(
+                style: const TextStyle(
+                    fontFamily: 'SF Pro Display',
                     fontSize: 30,
                     height: 1.1,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: -0.8,
                     color: Colors.white)),
             const SizedBox(height: 8),
             Text(subtitle,
-                style: GoogleFonts.inter(
+                style: const TextStyle(
+                    fontFamily: 'SF Pro',
                     fontSize: 15,
                     height: 1.3,
-                    color: Colors.white.withValues(alpha: 0.55))),
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white70)),
           ],
         ),
       );
@@ -617,13 +628,22 @@ class _OnboardingSheetState extends State<OnboardingSheet>
                   controller: c,
                   cursorColor: AppColors.accent,
                   onChanged: (_) => setState(() {}),
-                  style: GoogleFonts.inter(fontSize: 16, color: Colors.white),
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
                   decoration: InputDecoration(
                     isCollapsed: true,
                     border: InputBorder.none,
                     hintText: hint,
-                    hintStyle: GoogleFonts.inter(
-                        fontSize: 16, color: Colors.white54),
+                    hintStyle: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white54,
+                    ),
                   ),
                 ),
               ),
@@ -645,11 +665,12 @@ class _OnboardingSheetState extends State<OnboardingSheet>
   Widget _sectionHeader(String t) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 10, 24, 10),
         child: Text(t,
-            style: GoogleFonts.inter(
+            style: const TextStyle(
+                fontFamily: 'SF Pro',
                 fontSize: 13,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
                 letterSpacing: 0.2,
-                color: Colors.white.withValues(alpha: 0.45))),
+                color: Colors.white70)),
       );
 
   Widget _chipWrap(List<Widget> chips) => Padding(
@@ -670,8 +691,11 @@ class _OnboardingSheetState extends State<OnboardingSheet>
                 size: 36, color: Colors.white.withValues(alpha: 0.3)),
             const SizedBox(height: 10),
             Text(msg,
-                style: GoogleFonts.inter(
-                    fontSize: 15, color: Colors.white.withValues(alpha: 0.5))),
+                style: const TextStyle(
+                    fontFamily: 'SF Pro',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white70)),
           ],
         ),
       );
@@ -729,7 +753,8 @@ class _OnboardingSheetState extends State<OnboardingSheet>
                     ScaleTransition(scale: a, child: FadeTransition(opacity: a, child: c)),
                 child: Text(initial,
                     key: ValueKey(initial),
-                    style: GoogleFonts.inter(
+                    style: const TextStyle(
+                        fontFamily: 'SF Pro Display',
                         fontSize: 48,
                         fontWeight: FontWeight.w700,
                         color: Colors.white)),
@@ -739,23 +764,26 @@ class _OnboardingSheetState extends State<OnboardingSheet>
           const SizedBox(height: 28),
           SpringIn(
             delayMs: 60,
-            child: Text('What should we call you?',
+            child: const Text('What should we call you?',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
+                style: TextStyle(
+                    fontFamily: 'SF Pro Display',
                     fontSize: 28,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: -0.7,
                     color: Colors.white)),
           ),
           const SizedBox(height: 8),
           SpringIn(
             delayMs: 100,
-            child: Text(
+            child: const Text(
                 'This is how you appear on shared playlists and rooms.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
+                style: TextStyle(
+                    fontFamily: 'SF Pro',
                     fontSize: 15,
-                    color: Colors.white.withValues(alpha: 0.55))),
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white70)),
           ),
           const SizedBox(height: 28),
           SpringIn(
@@ -777,7 +805,8 @@ class _OnboardingSheetState extends State<OnboardingSheet>
                 cursorColor: AppColors.accent,
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _next(),
-                style: GoogleFonts.inter(
+                style: const TextStyle(
+                    fontFamily: 'SF Pro',
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
                     color: Colors.white),
@@ -785,10 +814,11 @@ class _OnboardingSheetState extends State<OnboardingSheet>
                   isCollapsed: true,
                   border: InputBorder.none,
                   hintText: 'Your name',
-                  hintStyle: GoogleFonts.inter(
+                  hintStyle: TextStyle(
+                      fontFamily: 'SF Pro',
                       fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.28)),
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.35)),
                 ),
               ),
             ),
@@ -1006,7 +1036,8 @@ class _SelChipState extends State<_SelChip> with TickerProviderStateMixin {
                   ],
                   Text(
                     widget.label,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: Color.lerp(Colors.white70, Colors.white, f),
@@ -1016,7 +1047,8 @@ class _SelChipState extends State<_SelChip> with TickerProviderStateMixin {
                     const SizedBox(width: 6),
                     Text(
                       widget.sub,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                         color: Colors.white
@@ -1101,7 +1133,8 @@ class _CountryRowState extends State<_CountryRow>
                     widget.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
                       fontSize: 16,
                       fontWeight: FontWeight.lerp(
                           FontWeight.w500, FontWeight.w700, f),

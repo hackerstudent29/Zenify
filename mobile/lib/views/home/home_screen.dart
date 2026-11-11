@@ -12,7 +12,6 @@ import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/zen.dart';
-import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
@@ -280,6 +279,7 @@ class _SecHeader extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
+                            fontFamily: 'SF Pro Display',
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.w700,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
@@ -186,11 +185,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> with HideDocksMixin {
                     rise: 28,
                     child: Column(
                       children: [
-                        Text(
+                        const Text(
                           'Zenify',
-                          style: GoogleFonts.inter(
-                            fontSize: 38,
-                            fontWeight: FontWeight.w800,
+                          style: TextStyle(
+                            fontFamily: 'SF Pro Display',
+                            fontSize: 40,
+                            fontWeight: FontWeight.w700,
                             letterSpacing: -1.2,
                             color: Colors.white,
                           ),
@@ -198,10 +198,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with HideDocksMixin {
                         const SizedBox(height: 8),
                         Text(
                           'Music. Elevated to Studio Fidelity.',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
                             fontSize: 15,
-                            fontWeight: FontWeight.w400,
-                            color: Colors.white.withValues(alpha: 0.55),
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.70),
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -224,8 +225,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> with HideDocksMixin {
                         ),
                         child: Text(
                           _errorMessage!,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 12.5,
                             color: AppColors.danger,
                             fontWeight: FontWeight.w500,
                           ),
@@ -269,10 +271,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with HideDocksMixin {
                                   const SizedBox(width: 12),
                                   Text(
                                     'Continue with Google',
-                                    style: GoogleFonts.inter(
+                                    style: const TextStyle(
+                                      fontFamily: 'SF Pro',
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF1F1F1F),
+                                      color: Color(0xFF1F1F1F),
                                       letterSpacing: -0.2,
                                     ),
                                   ),
@@ -305,9 +308,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with HideDocksMixin {
                             const Icon(Icons.mail_outline_rounded,
                                 size: 20, color: Colors.white),
                             const SizedBox(width: 10),
-                            Text(
+                            const Text(
                               'Continue with email',
-                              style: GoogleFonts.inter(
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
@@ -332,10 +336,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with HideDocksMixin {
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         child: Text(
                           'Continue as guest',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
+                          style: TextStyle(
+                            fontFamily: 'SF Pro',
+                            fontSize: 14.5,
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withValues(alpha: 0.55),
+                            color: Colors.white.withValues(alpha: 0.65),
                           ),
                         ),
                       ),
@@ -351,9 +356,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with HideDocksMixin {
                       padding: EdgeInsets.only(bottom: bottomPadding > 0 ? 8 : 16),
                       child: Text(
                         'By continuing you agree to the Terms and Privacy Policy',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: Colors.white.withValues(alpha: 0.35),
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 11.5,
+                          color: Colors.white.withValues(alpha: 0.45),
                           height: 1.4,
                         ),
                         textAlign: TextAlign.center,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../design_system/tokens/app_colors.dart';
 
@@ -184,10 +183,13 @@ class SummaryCards extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: GoogleFonts.inter(
+            style: TextStyle(
+              fontFamily: 'SF Pro Display',
               fontSize: isSecondary ? 16 : 18,
               fontWeight: FontWeight.w700,
               color: Colors.white,
+              letterSpacing: -0.3,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

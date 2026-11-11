@@ -55,7 +55,6 @@ class QueueEntry {
 class QueueState extends ChangeNotifier {
   static const int _historyLimit = 60;
   static const int _autoplayBatch = SmartQueueWeights.targetQueueSize;
-  static const int _autoplayLowWater = SmartQueueWeights.refillThreshold;
 
   /// Manual entries first, autoplay entries (isAutoplay) always trail them.
   final List<QueueEntry> _upNext = [];
@@ -697,7 +696,8 @@ class QueueState extends ChangeNotifier {
     final provider = autoplayProvider;
     final seed = _current;
     if (!_autoplay || _collectionLocked || provider == null || seed == null || _autoplayLoading) return;
-    if (_upNext.length >= _autoplayLowWater) return;
+    final autoCount = _upNext.where((e) => e.isAutoplay).length;
+    if (_upNext.length >= _autoplayBatch || autoCount >= 6) return;
 
     _autoplayLoading = true;
     notifyListeners();

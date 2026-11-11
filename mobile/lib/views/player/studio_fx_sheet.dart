@@ -670,13 +670,22 @@ class _TempoTab extends StatelessWidget {
                   TextSpan(
                     text: s.speed.toStringAsFixed(2),
                     style: const TextStyle(
+                      fontFamily: 'SF Pro Display',
                       color: Colors.white,
                       fontSize: 40,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       fontFeatures: [FontFeature.tabularFigures()],
                     ),
                     children: [
-                      TextSpan(text: ' ×', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 20)),
+                      TextSpan(
+                        text: ' ×',
+                        style: TextStyle(
+                          fontFamily: 'SF Pro Display',
+                          color: Colors.white.withValues(alpha: 0.45),
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),

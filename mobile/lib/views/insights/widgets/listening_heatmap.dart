@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../design_system/tokens/app_colors.dart';
 
@@ -42,7 +41,8 @@ class ListeningHeatmap extends StatelessWidget {
             children: [
               Text(
                 'LISTENING HEATMAP (24 × 7)',
-                style: GoogleFonts.inter(
+                style: const TextStyle(
+                  fontFamily: 'SF Pro',
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
@@ -103,9 +103,10 @@ class ListeningHeatmap extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         'PEAK: ${peakDay!.toUpperCase()} AT ${_formatHour(peakHour!)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
+                        style: const TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: 0.6,
                           color: AppColors.crimson,
                         ),

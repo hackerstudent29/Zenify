@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../design_system/tokens/app_colors.dart';
 
@@ -45,9 +44,10 @@ class DiscoveriesCard extends StatelessWidget {
                   children: [
                     Text(
                       '$discoveriesCount NEW DISCOVERIES',
-                      style: GoogleFonts.inter(
+                      style: const TextStyle(
+                        fontFamily: 'SF Pro Display',
                         fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 0.6,
                         color: Colors.white,
                       ),

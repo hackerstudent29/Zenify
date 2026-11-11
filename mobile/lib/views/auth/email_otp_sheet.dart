@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
@@ -245,7 +244,8 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
       children: [
         Text(
           "What's your email?",
-          style: GoogleFonts.inter(
+          style: const TextStyle(
+            fontFamily: 'SF Pro Display',
             fontSize: 26,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.6,
@@ -255,9 +255,11 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
         const SizedBox(height: 8),
         Text(
           "We'll send you a 6-digit confirmation code.",
-          style: GoogleFonts.inter(
+          style: TextStyle(
+            fontFamily: 'SF Pro',
             fontSize: 15,
-            color: Colors.white.withValues(alpha: 0.55),
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withValues(alpha: 0.65),
           ),
         ),
         const SizedBox(height: 24),
@@ -288,16 +290,19 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
                   keyboardType: TextInputType.emailAddress,
                   autofillHints: const [AutofillHints.email],
                   autocorrect: false,
-                  style: GoogleFonts.inter(
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro',
                     fontSize: 16,
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
                   ),
                   decoration: InputDecoration(
                     hintText: 'name@email.com',
-                    hintStyle: GoogleFonts.inter(
+                    hintStyle: TextStyle(
+                      fontFamily: 'SF Pro',
                       fontSize: 16,
-                      color: Colors.white.withValues(alpha: 0.3),
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white.withValues(alpha: 0.35),
                     ),
                     border: InputBorder.none,
                     isDense: true,
@@ -320,7 +325,8 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
           const SizedBox(height: 10),
           Text(
             _errorMessage!,
-            style: GoogleFonts.inter(
+            style: const TextStyle(
+              fontFamily: 'SF Pro',
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: AppColors.danger,
@@ -353,9 +359,10 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
                       color: Colors.white,
                     ),
                   )
-                : Text(
+                : const Text(
                     'Continue',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -377,7 +384,8 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
       children: [
         Text(
           'Enter the code',
-          style: GoogleFonts.inter(
+          style: const TextStyle(
+            fontFamily: 'SF Pro Display',
             fontSize: 26,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.6,
@@ -390,9 +398,11 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
             Expanded(
               child: Text(
                 'Sent to $email',
-                style: GoogleFonts.inter(
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
                   fontSize: 14,
-                  color: Colors.white.withValues(alpha: 0.55),
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.65),
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -406,11 +416,12 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
                 });
                 _emailFocus.requestFocus();
               },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 child: Text(
                   'Change',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.accentSoft,
@@ -448,7 +459,8 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
                     const SizedBox(width: 6),
                     Text(
                       'Paste code $_clipboardCode',
-                      style: GoogleFonts.inter(
+                      style: const TextStyle(
+                        fontFamily: 'SF Pro',
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: AppColors.accentSoft,
@@ -509,7 +521,8 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
                   alignment: Alignment.center,
                   child: Text(
                     char,
-                    style: GoogleFonts.inter(
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro Display',
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -525,7 +538,8 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
           const SizedBox(height: 12),
           Text(
             _errorMessage!,
-            style: GoogleFonts.inter(
+            style: const TextStyle(
+              fontFamily: 'SF Pro',
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: AppColors.danger,
@@ -541,19 +555,22 @@ class _EmailOtpSheetState extends State<EmailOtpSheet>
           child: _resendSeconds > 0
               ? Text(
                   'Resend code in 0:${_resendSeconds.toString().padLeft(2, '0')}',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'SF Pro',
                     fontSize: 14,
-                    color: Colors.white.withValues(alpha: 0.45),
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withValues(alpha: 0.55),
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 )
               : PressableScale(
                   onTap: _isSubmitting ? null : _sendCode,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
                       'Resend Code',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppColors.accentSoft,

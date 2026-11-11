@@ -7,8 +7,10 @@
 
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import '../data/datasources/catalog_datasource.dart';
 import '../models/track.dart';
 import '../utils/media_normalizer.dart';
+import 'api_service.dart';
 import 'innertube_service.dart';
 
 /// Configurable weights and constants for the Smart Queue Ranking Engine.
@@ -317,24 +319,53 @@ class SmartQueueEngine {
   }) async {
     try {
       final cleanId = seed.id.replaceFirst('yt-', '').trim();
-      List<Track> candidates = await InnerTubeService.instance.getNextQueue(cleanId);
-
-      // If the primary next queue was sparse, supplement with seed artist radio mix
-      if (candidates.length < 15 && seed.artist.isNotEmpty) {
-        final supplement = await InnerTubeService.instance.search('${seed.artist} radio mix');
-        candidates = [...candidates, ...supplement];
+      List<Track> candidates = [];
+      if (cleanId.isNotEmpty) {
+        try {
+          candidates = await InnerTubeService.instance.getNextQueue(cleanId);
+        } catch (_) {}
       }
 
-      return filterAndRank(
+      // 1. Supplement with artist related songs if primary queue is sparse
+      if (candidates.length < 12 && seed.artist.isNotEmpty) {
+        try {
+          final related = await InnerTubeService.instance.fetchRelated(seed);
+          candidates = [...candidates, ...related];
+        } catch (_) {}
+      }
+
+      // 2. Supplement with API search if still sparse
+      if (candidates.length < 12 && seed.artist.isNotEmpty) {
+        try {
+          final cleanArtist = seed.artist.split(',').first.trim();
+          final supplement = await ApiService.search('$cleanArtist radio mix');
+          candidates = [...candidates, ...supplement];
+        } catch (_) {}
+      }
+
+      // 3. Fallback to catalog data so automix never runs out of music
+      if (candidates.isEmpty) {
+        candidates = List<Track>.from(CatalogDataSource.allTracks);
+      }
+
+      final ranked = filterAndRank(
         candidates: candidates,
         seed: seed,
         existingIds: existingIds,
         existingSignatures: existingSignatures,
         count: count,
       );
+
+      if (ranked.isNotEmpty) return ranked;
+
+      // If strict filters eliminated candidates, return non-duplicate songs directly
+      return candidates
+          .where((t) => t.id != seed.id && !existingIds.contains(t.id))
+          .take(count)
+          .toList();
     } catch (e) {
       if (kDebugMode) debugPrint('[SmartQueueEngine] Error fetching candidates: $e');
-      return const [];
+      return CatalogDataSource.allTracks.take(count).toList();
     }
   }
 }
