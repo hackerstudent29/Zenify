@@ -236,7 +236,13 @@ class _QueuePanelState extends State<QueuePanel> {
                 children: [
                   const Text(
                     'History',
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3),
+                    style: TextStyle(
+                      fontFamily: 'SF Pro Display',
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Text('${hist.length}', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 15)),
@@ -296,6 +302,7 @@ class _QueuePanelState extends State<QueuePanel> {
           const Text(
             'Playing Next',
             style: TextStyle(
+              fontFamily: 'SF Pro Display',
               color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -538,7 +545,13 @@ class _SectionTitle extends StatelessWidget {
         padding: const EdgeInsets.only(top: 6, bottom: 6),
         child: Text(
           text,
-          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3),
+          style: const TextStyle(
+            fontFamily: 'SF Pro Display',
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+          ),
         ),
       );
 }

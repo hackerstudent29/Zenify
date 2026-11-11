@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-/// Semantic typography hierarchy (Inter tuned to SF-style tracking).
-/// Every original member name is kept.
+/// Apple Music SF Pro Typography Hierarchy.
+/// Uses native San Francisco Pro Text and Display families bundled in the app.
 class AppTypography {
-  static TextStyle largeTitle = GoogleFonts.inter(
+  static const String fontPro = 'SF Pro';
+  static const String fontDisplay = 'SF Pro Display';
+
+  static const TextStyle largeTitle = TextStyle(
+    fontFamily: fontDisplay,
     fontSize: 34,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.8,
@@ -13,7 +16,8 @@ class AppTypography {
     color: AppColors.textPrimary,
   );
 
-  static TextStyle title1 = GoogleFonts.inter(
+  static const TextStyle title1 = TextStyle(
+    fontFamily: fontDisplay,
     fontSize: 28,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.6,
@@ -21,70 +25,88 @@ class AppTypography {
     color: AppColors.textPrimary,
   );
 
-  static TextStyle title2 = GoogleFonts.inter(
+  static const TextStyle title2 = TextStyle(
+    fontFamily: fontPro,
     fontSize: 22,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.5,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle title3 = GoogleFonts.inter(
+  static const TextStyle title3 = TextStyle(
+    fontFamily: fontPro,
     fontSize: 20,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.4,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle headline = GoogleFonts.inter(
+  static const TextStyle headline = TextStyle(
+    fontFamily: fontPro,
     fontSize: 17,
     fontWeight: FontWeight.w600,
     letterSpacing: -0.3,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle body = GoogleFonts.inter(
-    fontSize: 17,
+  static const TextStyle body = TextStyle(
+    fontFamily: fontPro,
+    fontSize: 16,
     fontWeight: FontWeight.w400,
     letterSpacing: -0.3,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle subhead = GoogleFonts.inter(
+  static const TextStyle bodyMedium = TextStyle(
+    fontFamily: fontPro,
+    fontSize: 16,
+    fontWeight: FontWeight.w500,
+    letterSpacing: -0.2,
+    color: AppColors.textPrimary,
+  );
+
+  static const TextStyle subhead = TextStyle(
+    fontFamily: fontPro,
     fontSize: 15,
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w500,
     letterSpacing: -0.2,
     color: AppColors.textSecondary,
   );
 
-  static TextStyle footnote = GoogleFonts.inter(
+  static const TextStyle footnote = TextStyle(
+    fontFamily: fontPro,
     fontSize: 13,
     fontWeight: FontWeight.w500,
     letterSpacing: -0.1,
     color: AppColors.textTertiary,
   );
 
-  static TextStyle caption = GoogleFonts.inter(
+  static const TextStyle caption = TextStyle(
+    fontFamily: fontPro,
     fontSize: 11,
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w600,
     letterSpacing: 0.1,
     color: AppColors.textTertiary,
   );
 
-  static TextStyle timer = GoogleFonts.inter(
+  static const TextStyle timer = TextStyle(
+    fontFamily: fontPro,
     fontSize: 12,
     fontWeight: FontWeight.w500,
-    fontFeatures: const [FontFeature.tabularFigures()],
+    fontFeatures: [FontFeature.tabularFigures()],
     color: AppColors.textSecondary,
   );
 
-  static TextStyle lyricsActive = GoogleFonts.inter(
+  static const TextStyle lyricsActive = TextStyle(
+    fontFamily: fontDisplay,
     fontSize: 28,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.6,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle lyricsInactive = GoogleFonts.inter(
+  static const TextStyle lyricsInactive = TextStyle(
+    fontFamily: fontDisplay,
     fontSize: 28,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.6,

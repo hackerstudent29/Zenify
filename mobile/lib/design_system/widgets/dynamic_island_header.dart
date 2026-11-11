@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/auth_state.dart';
@@ -13,6 +14,234 @@ import '../../views/profile/profile_screen.dart';
 import 'apple_glass.dart';
 import 'monogram_avatar.dart';
 import 'pressable_scale.dart';
+
+/// Apple Dynamic Island Notification model.
+class IslandNotification {
+  IslandNotification({
+    required this.id,
+    required this.title,
+    this.body,
+    this.leading,
+    this.onTap,
+  });
+
+  final String id;
+  final String title;
+  final String? body;
+  final Widget? leading;
+  final VoidCallback? onTap;
+
+  /// Helper to create a consistent 22x22 thumbnail or icon badge.
+  static Widget trackThumb(
+    String? coverUrl, {
+    IconData fallbackIcon = CupertinoIcons.music_note,
+    Color iconColor = const Color(0xFFE11D48),
+  }) {
+    if (coverUrl != null && coverUrl.startsWith('http')) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: CachedNetworkImage(
+          imageUrl: coverUrl,
+          width: 22,
+          height: 22,
+          fit: BoxFit.cover,
+          errorWidget: (_, _, _) => Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Center(child: Icon(fallbackIcon, color: iconColor, size: 13)),
+          ),
+        ),
+      );
+    }
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: iconColor.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Center(child: Icon(fallbackIcon, color: iconColor, size: 13)),
+    );
+  }
+}
+
+/// Global notifier driving the Dynamic Island Header notification queue.
+/// No internal timer: the [_NotifTicker] widget decides when to dismiss.
+class IslandNotifier extends ChangeNotifier {
+  static final IslandNotifier instance = IslandNotifier._();
+  IslandNotifier._();
+  factory IslandNotifier() => instance;
+
+  final _queue = <IslandNotification>[];
+  IslandNotification? _current;
+
+  IslandNotification? get current => _current;
+
+  /// Helper for firing an in-app Dynamic Island notification from anywhere.
+  static void showNotification(IslandNotification n) => instance.show(n);
+
+  void show(IslandNotification n) {
+    _queue.add(n);
+    if (_current == null) _next();
+  }
+
+  void _next() {
+    if (_queue.isEmpty) return;
+    _current = _queue.removeAt(0);
+    notifyListeners();
+  }
+
+  /// [id] guards against double calls (e.g. two headers alive during a route transition).
+  void dismiss({String? id}) {
+    if (_current == null || (id != null && id != _current!.id)) return;
+    _current = null;
+    notifyListeners();
+    Future.delayed(const Duration(milliseconds: 450), () {
+      if (_current == null) _next();
+    });
+  }
+}
+
+/// Notification ticker widget: 5s hold if text fits, or 1 seamless full marquee loop if long.
+class _NotifTicker extends StatefulWidget {
+  const _NotifTicker({super.key, required this.notif, required this.onDone});
+  final IslandNotification notif;
+  final VoidCallback onDone;
+
+  static const Duration hold = Duration(seconds: 5);
+  static const double speed = 40.0; // px / second
+  static const double gap = 48.0;
+
+  @override
+  State<_NotifTicker> createState() => _NotifTickerState();
+}
+
+class _NotifTickerState extends State<_NotifTicker> {
+  final _ctrl = ScrollController();
+  final _textKey = GlobalKey();
+  bool _loop = false;
+  bool _dead = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _run());
+  }
+
+  @override
+  void dispose() {
+    _dead = true;
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  bool get _ok => !_dead && mounted && _ctrl.hasClients;
+
+  Future<void> _run() async {
+    final sw = Stopwatch()..start();
+
+    // let the pill finish growing so we measure the final width
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!_ok) return;
+
+    final overflow = _ctrl.position.maxScrollExtent > 1;
+
+    if (overflow) {
+      await Future<void>.delayed(const Duration(milliseconds: 700)); // read the start first
+      if (!_ok) return;
+
+      final w = (_textKey.currentContext?.findRenderObject() as RenderBox?)?.size.width ?? 0;
+      if (w > 1) {
+        setState(() => _loop = true); // add the duplicate for a seamless loop
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        if (!_ok) return;
+
+        final dist = w + _NotifTicker.gap;
+        await _ctrl.animateTo(
+          dist,
+          duration: Duration(milliseconds: (dist / _NotifTicker.speed * 1000).round()),
+          curve: Curves.linear,
+        );
+        if (!_ok) return;
+        _ctrl.jumpTo(0); // identical frame, so the loop is invisible
+      }
+    }
+
+    // short messages: hold until 5s total. Long messages: already past 5s, so no extra wait
+    final remaining = _NotifTicker.hold - sw.elapsed;
+    if (remaining > Duration.zero) await Future<void>.delayed(remaining);
+    if (!_dead && mounted) widget.onDone();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final n = widget.notif;
+    final text = Text.rich(
+      TextSpan(children: [
+        TextSpan(
+          text: n.title,
+          style: const TextStyle(
+            fontFamily: 'SF Pro Display',
+            fontWeight: FontWeight.w700,
+            fontSize: 13.5,
+            color: Colors.white,
+            letterSpacing: -0.2,
+          ),
+        ),
+        if (n.body != null)
+          TextSpan(
+            text: '  ${n.body}',
+            style: const TextStyle(
+              fontFamily: 'SF Pro Text',
+              fontWeight: FontWeight.w400,
+              fontSize: 13,
+              color: Colors.white70,
+              letterSpacing: -0.1,
+            ),
+          ),
+      ]),
+      maxLines: 1,
+      softWrap: false,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (n.leading != null) ...[
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: ClipRRect(borderRadius: BorderRadius.circular(6), child: n.leading),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: ClipRect(
+              child: SingleChildScrollView(
+                controller: _ctrl,
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    KeyedSubtree(key: _textKey, child: text),
+                    if (_loop) ...[const SizedBox(width: _NotifTicker.gap), text],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Apple Dynamic Island-style 3-dock floating header.
 ///
@@ -79,11 +308,13 @@ class DynamicIslandHeader extends StatefulWidget {
   State<DynamicIslandHeader> createState() => _DynamicIslandHeaderState();
 }
 
-class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTickerProviderStateMixin {
+class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerProviderStateMixin {
   static const _spring = SpringDescription(mass: 1, stiffness: 300, damping: 21);
 
   late final AnimationController _c =
       AnimationController.unbounded(vsync: this, value: widget.scrollController == null ? 1 : 0);
+  late final AnimationController _n =
+      AnimationController.unbounded(vsync: this, value: IslandNotifier.instance.current == null ? 0.0 : 1.0);
   bool _shown = false;
 
   void _listener() => _check(false);
@@ -102,11 +333,29 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
     }
   }
 
+  void _onNotifChanged() {
+    if (!mounted) return;
+    final active = IslandNotifier.instance.current;
+    final to = active != null ? 1.0 : 0.0;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _n.value = to;
+    } else {
+      _n.animateWith(SpringSimulation(_spring, _n.value, to, 0));
+    }
+    setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
     widget.scrollController?.addListener(_listener);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _check(true));
+    IslandNotifier.instance.addListener(_onNotifChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _check(true);
+      if (IslandNotifier.instance.current != null) {
+        _n.value = 1.0;
+      }
+    });
   }
 
   @override
@@ -130,7 +379,9 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
   @override
   void dispose() {
     widget.scrollController?.removeListener(_listener);
+    IslandNotifier.instance.removeListener(_onNotifChanged);
     _c.dispose();
+    _n.dispose();
     super.dispose();
   }
 
@@ -140,7 +391,8 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
     final top = widget.topPadding ?? (MediaQuery.paddingOf(context).top + 10);
     final canPop = widget.showBack ?? Navigator.canPop(context);
     final isDock = widget.isDockPage ?? (!canPop && widget.showBack != true);
-    final hasTitle = widget.showCenter && (widget.title.trim().isNotEmpty || widget.centerWidget != null);
+    final active = IslandNotifier.instance.current;
+    final hasContent = (widget.showCenter && (widget.title.trim().isNotEmpty || widget.centerWidget != null)) || active != null;
 
     final double h = widget.height;
     // Symmetrical clearance so the Dynamic Island pill remains dead-center relative to screen
@@ -150,80 +402,117 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
     final double rightDockW = widget.trailing != null
         ? 44.0
         : (widget.showProfile ? h : 0.0);
-    final double sideClearance = math.max(leftDockW, rightDockW) + 8.0;
+    final double normalClearance = math.max(leftDockW, rightDockW) + 8.0;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(widget.horizontalMargin, top, widget.horizontalMargin, 0),
       child: SizedBox(
         height: h,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Center Island Pill: 100% mathematically centered relative to screen/camera cutout
-            Positioned.fill(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: sideClearance),
-                child: Center(
-                  child: AnimatedBuilder(
-                    animation: _c,
-                    child: AnimatedOpacity(
-                      opacity: hasTitle ? 1 : 0,
-                      duration: const Duration(milliseconds: 240),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          if (widget.onCenterTap != null) {
-                            HapticFeedback.lightImpact();
-                            widget.onCenterTap!();
-                            return;
-                          }
-                          final sc = widget.scrollController;
-                          if (sc != null && sc.hasClients && sc.offset > 0) {
-                            HapticFeedback.lightImpact();
-                            sc.animateTo(
-                              0,
-                              duration: const Duration(milliseconds: 500),
-                              curve: Curves.easeOutCubic,
-                            );
-                          }
-                        },
-                        child: _buildCenterIsland(context),
-                      ),
-                    ),
-                    builder: (_, child) {
-                      final v = _c.value;
-                      final f = v.clamp(0.0, 1.0).toDouble();
-                      return IgnorePointer(
-                        ignoring: !hasTitle || f < 0.5,
-                        child: Opacity(
-                          opacity: f,
-                          child: Transform.translate(
-                            offset: Offset(0, (1 - v) * 14),
-                            child: Transform.scale(
-                              scale: 0.72 + 0.28 * v,
-                              child: child,
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_c, _n]),
+          builder: (context, _) {
+            final double nVal = _n.value.clamp(0.0, 1.0);
+            final double cVal = _c.value.clamp(0.0, 1.0);
+            final double vis = math.max(cVal, nVal);
+            final double f = vis.clamp(0.0, 1.0).toDouble();
+
+            // Symmetrical clearance smoothly lerps from normal dock clearance down to 24px
+            // when notification is active, letting the Dynamic Island pill widen across screen
+            final double sideClearance = ui.lerpDouble(normalClearance, 24.0, nVal)!;
+            final double dockScale = ui.lerpDouble(1.0, 0.65, nVal)!;
+            final double dockOpacity = ui.lerpDouble(1.0, 0.20, nVal)!;
+
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                // Center Island Pill: 100% mathematically centered relative to screen/camera cutout
+                Positioned.fill(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: sideClearance),
+                    child: Center(
+                      child: AnimatedOpacity(
+                        opacity: hasContent ? 1 : 0,
+                        duration: const Duration(milliseconds: 240),
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            final cur = IslandNotifier.instance.current;
+                            if (cur != null) {
+                              HapticFeedback.lightImpact();
+                              if (cur.onTap != null) {
+                                cur.onTap!();
+                              }
+                              IslandNotifier.instance.dismiss(id: cur.id);
+                              return;
+                            }
+                            if (widget.onCenterTap != null) {
+                              HapticFeedback.lightImpact();
+                              widget.onCenterTap!();
+                              return;
+                            }
+                            final sc = widget.scrollController;
+                            if (sc != null && sc.hasClients && sc.offset > 0) {
+                              HapticFeedback.lightImpact();
+                              sc.animateTo(
+                                0,
+                                duration: const Duration(milliseconds: 500),
+                                curve: Curves.easeOutCubic,
+                              );
+                            }
+                          },
+                          child: IgnorePointer(
+                            ignoring: !hasContent || f < 0.5,
+                            child: Opacity(
+                              opacity: f,
+                              child: Transform.translate(
+                                offset: Offset(0, (1 - f) * 14),
+                                child: Transform.scale(
+                                  scale: 0.72 + 0.28 * f,
+                                  child: _buildCenterIsland(context),
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            // Left Dock
-            Align(
-              alignment: Alignment.centerLeft,
-              child: _buildLeftDock(context, canPop, isDock),
-            ),
+                // Left Dock (shrinks and fades as notification appears)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IgnorePointer(
+                    ignoring: nVal > 0.5,
+                    child: Transform.scale(
+                      scale: dockScale,
+                      alignment: Alignment.centerLeft,
+                      child: Opacity(
+                        opacity: dockOpacity,
+                        child: _buildLeftDock(context, canPop, isDock),
+                      ),
+                    ),
+                  ),
+                ),
 
-            // Right Dock
-            Align(
-              alignment: Alignment.centerRight,
-              child: _buildRightDock(context),
-            ),
-          ],
+                // Right Dock (shrinks and fades as notification appears)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IgnorePointer(
+                    ignoring: nVal > 0.5,
+                    child: Transform.scale(
+                      scale: dockScale,
+                      alignment: Alignment.centerRight,
+                      child: Opacity(
+                        opacity: dockOpacity,
+                        child: _buildRightDock(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -293,37 +582,56 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with SingleTi
 
   Widget _buildCenterIsland(BuildContext context) {
     final h = widget.height;
+    final active = IslandNotifier.instance.current;
+
     return AppleGlass(
       borderRadius: BorderRadius.circular(h / 2),
       tint: const Color(0x30121216),
       child: Container(
         height: h,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Flexible(
-              child: widget.centerWidget ??
-                  _HeaderMarquee(
-                    resetKey: widget.title,
-                    child: Text(
-                      widget.title,
-                      maxLines: 1,
-                      softWrap: false,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ),
-            ),
-          ],
+        padding: active != null
+            ? const EdgeInsets.symmetric(horizontal: 4)
+            : const EdgeInsets.symmetric(horizontal: 14),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: active != null
+              ? _NotifTicker(
+                  key: ValueKey(active.id),
+                  notif: active,
+                  onDone: () => IslandNotifier.instance.dismiss(id: active.id),
+                )
+              : _titleContent(),
         ),
       ),
+    );
+  }
+
+  Widget _titleContent() {
+    return Row(
+      key: const ValueKey('title'),
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Flexible(
+          child: widget.centerWidget ??
+              _HeaderMarquee(
+                resetKey: widget.title,
+                child: Text(
+                  widget.title,
+                  maxLines: 1,
+                  softWrap: false,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ),
+        ),
+      ],
     );
   }
 

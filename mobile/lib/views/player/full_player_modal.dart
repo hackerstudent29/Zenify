@@ -159,7 +159,13 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                               track.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: AppTypography.title2.copyWith(fontSize: 22),
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro Display',
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.45,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             InteractiveArtistsText(
@@ -190,9 +196,10 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                                   track.album,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: AppTypography.caption.copyWith(
+                                  style: AppTypography.footnote.copyWith(
                                     color: AppColors.textTertiary,
                                     fontSize: 13,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),

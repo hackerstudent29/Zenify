@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AchievementsCard extends StatelessWidget {
   const AchievementsCard({
@@ -29,7 +28,8 @@ class AchievementsCard extends StatelessWidget {
             children: [
               Text(
                 'ACHIEVEMENTS & BADGES',
-                style: GoogleFonts.inter(
+                style: const TextStyle(
+                  fontFamily: 'SF Pro',
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,

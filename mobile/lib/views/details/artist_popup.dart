@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../design_system/widgets/monogram_avatar.dart';
 import '../../design_system/widgets/pressable_scale.dart';
@@ -167,7 +166,8 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
                   children: [
                     Text(
                       widget.artists.length > 1 ? 'Featured Artists' : 'Artist',
-                      style: GoogleFonts.inter(
+                      style: const TextStyle(
+                        fontFamily: 'SF Pro',
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -270,9 +270,10 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
                     artist.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: Colors.white,
                       letterSpacing: -0.2,
                     ),
@@ -282,10 +283,11 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
                     statLine,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w400,
-                      color: const Color(0xFFA1A1A6),
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFA1A1A6),
                     ),
                   ),
                 ],
@@ -321,9 +323,10 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
                   ),
                   child: Text(
                     isFollowed ? 'Following' : 'Follow',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       color: isFollowed ? Zen.rose : Colors.white,
                     ),
                   ),
@@ -339,12 +342,13 @@ class _ArtistPopupSheetState extends State<_ArtistPopupSheet> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      const Text(
                         'View',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
+                          fontFamily: 'SF Pro',
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: const Color(0xFFA1A1A6),
+                          color: Color(0xFFA1A1A6),
                         ),
                       ),
                       const SizedBox(width: 2),

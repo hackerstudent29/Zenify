@@ -123,6 +123,7 @@ class ZenifyMobileApp extends StatelessWidget {
         ChangeNotifierProvider<TogetherService>.value(value: together),
         ChangeNotifierProvider(create: (_) => AuthState()),
         ChangeNotifierProvider<SettingsState>.value(value: SettingsState.instance),
+        ChangeNotifierProvider<IslandNotifier>.value(value: IslandNotifier.instance),
       ],
       child: MaterialApp(
         title: 'Zenify',

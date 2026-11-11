@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Apple Music Signature Tokens
@@ -17,6 +16,7 @@ class AppTheme {
   static ThemeData get darkTheme {
     return ThemeData(
       brightness: Brightness.dark,
+      fontFamily: 'SF Pro',
       scaffoldBackgroundColor: canvas,
       canvasColor: canvas,
       cardColor: cardSurface,
@@ -26,46 +26,55 @@ class AppTheme {
         surface: surface,
         onSurface: textPrimary,
       ),
-      textTheme: GoogleFonts.interTextTheme(
-        ThemeData.dark().textTheme,
-      ).copyWith(
-        headlineLarge: GoogleFonts.inter(
+      textTheme: const TextTheme(
+        headlineLarge: TextStyle(
+          fontFamily: 'SF Pro Display',
           fontSize: 28,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           color: textPrimary,
           letterSpacing: -0.5,
         ),
-        headlineMedium: GoogleFonts.inter(
+        headlineMedium: TextStyle(
+          fontFamily: 'SF Pro Display',
           fontSize: 22,
           fontWeight: FontWeight.w700,
           color: textPrimary,
           letterSpacing: -0.3,
         ),
-        titleLarge: GoogleFonts.inter(
+        titleLarge: TextStyle(
+          fontFamily: 'SF Pro',
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: textPrimary,
+          letterSpacing: -0.2,
         ),
-        titleMedium: GoogleFonts.inter(
+        titleMedium: TextStyle(
+          fontFamily: 'SF Pro',
           fontSize: 15,
           fontWeight: FontWeight.w600,
           color: textPrimary,
+          letterSpacing: -0.15,
         ),
-        bodyLarge: GoogleFonts.inter(
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
+        bodyLarge: TextStyle(
+          fontFamily: 'SF Pro',
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
           color: textPrimary,
+          letterSpacing: -0.2,
         ),
-        bodyMedium: GoogleFonts.inter(
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
+        bodyMedium: TextStyle(
+          fontFamily: 'SF Pro',
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
           color: textSecondary,
+          letterSpacing: -0.1,
         ),
-        labelSmall: GoogleFonts.inter(
-          fontSize: 10,
+        labelSmall: TextStyle(
+          fontFamily: 'SF Pro',
+          fontSize: 11,
           fontWeight: FontWeight.w600,
           color: textMuted,
-          letterSpacing: 0.5,
+          letterSpacing: 0.3,
         ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -83,4 +92,3 @@ class AppTheme {
     );
   }
 }
-

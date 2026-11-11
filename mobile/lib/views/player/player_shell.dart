@@ -833,6 +833,7 @@ class PlayerShellState extends State<PlayerShell>
               : MediaNormalizer.cleanCompactTitle(track?.title?.toString()),
           dir: _dir,
           style: TextStyle(
+            fontFamily: 'SF Pro',
             color: Colors.white,
             fontSize: titleSize,
             height: 1.2,
@@ -843,9 +844,11 @@ class PlayerShellState extends State<PlayerShell>
         InteractiveArtistsText(
           artists: _artistsOf(track),
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.58),
+            fontFamily: 'SF Pro',
+            color: Colors.white.withValues(alpha: 0.65),
             fontSize: artistSize,
             height: 1.2,
+            fontWeight: FontWeight.w500,
           ),
           onTapArtist: (artistName) {
             if (widget.onGoToArtist != null) {
@@ -1425,6 +1428,7 @@ class PlayerShellState extends State<PlayerShell>
                           : MediaNormalizer.cleanCompactTitle(track?.title?.toString()),
                       dir: _dir,
                       style: const TextStyle(
+                        fontFamily: 'SF Pro',
                         color: Colors.white,
                         fontSize: 17,
                         height: 22 / 17,
@@ -1438,9 +1442,11 @@ class PlayerShellState extends State<PlayerShell>
                     child: InteractiveArtistsText(
                       artists: _artistsOf(track),
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
+                        fontFamily: 'SF Pro',
+                        color: Colors.white.withValues(alpha: 0.70),
                         fontSize: 15,
                         height: 20 / 15,
+                        fontWeight: FontWeight.w500,
                       ),
                       onTapArtist: _openArtist,
                     ),
@@ -1484,10 +1490,11 @@ class PlayerShellState extends State<PlayerShell>
                           : MediaNormalizer.cleanTitle(track?.title?.toString()),
                       dir: _dir,
                       style: const TextStyle(
+                        fontFamily: 'SF Pro Display',
                         color: Colors.white,
                         fontSize: 22,
                         height: 28 / 22,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: -0.45,
                       ),
                     ),
@@ -1498,9 +1505,11 @@ class PlayerShellState extends State<PlayerShell>
                   child: InteractiveArtistsText(
                     artists: _artistsOf(track),
                     style: TextStyle(
+                      fontFamily: 'SF Pro',
                       color: Colors.white.withValues(alpha: 0.75),
                       fontSize: 17,
                       height: 22 / 17,
+                      fontWeight: FontWeight.w500,
                     ),
                     onTapArtist: _openArtist,
                   ),

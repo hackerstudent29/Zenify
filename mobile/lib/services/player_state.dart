@@ -2,11 +2,15 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'zen_player.dart' as ap;
+
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Color, Colors, Icon;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' hide RepeatMode;
 
 import '../data/datasources/catalog_datasource.dart';
+import '../design_system/widgets/dynamic_island_header.dart';
 import '../models/track.dart';
 import 'api_service.dart';
 import 'innertube_service.dart';
@@ -366,6 +370,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
   Future<void> playTrack(Track track, {bool syncQueue = true}) async {
     if (syncQueue) {
       _queueState?.syncCurrent(track);
+      unawaited(_queueState?.ensureAutoplay());
     }
     final idx = _queue.indexWhere((t) => t.id == track.id);
     if (idx >= 0) {
@@ -391,6 +396,14 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     final oi = _originalQueue.indexWhere((t) => t.id == cur.id);
     _originalQueue.insert(oi >= 0 ? oi + 1 : _originalQueue.length, track);
     HapticFeedback.lightImpact();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'play_next_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Playing next',
+        body: '${track.title} • ${track.artist}',
+        leading: IslandNotification.trackThumb(track.coverUrl, fallbackIcon: CupertinoIcons.arrow_turn_right_up, iconColor: const Color(0xFFE11D48)),
+      ),
+    );
     notifyListeners();
   }
 
@@ -404,6 +417,14 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     _queue.add(track);
     _originalQueue.add(track);
     HapticFeedback.lightImpact();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'add_queue_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Added to queue',
+        body: '${track.title} • ${track.artist}',
+        leading: IslandNotification.trackThumb(track.coverUrl, fallbackIcon: CupertinoIcons.text_badge_plus, iconColor: const Color(0xFFE11D48)),
+      ),
+    );
     notifyListeners();
   }
 
@@ -471,6 +492,14 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     final keep = _queue.map((t) => t.id).toSet();
     _originalQueue.removeWhere((t) => !keep.contains(t.id));
     _autoplayStartIndex = null;
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'queue_clear_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Queue cleared',
+        body: 'Upcoming tracks removed',
+        leading: const Icon(CupertinoIcons.clear_circled, color: Colors.white70, size: 18),
+      ),
+    );
     notifyListeners();
   }
 
@@ -1083,19 +1112,51 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     _sleepTimer = Timer(after, () async {
       _clearSleep();
       await pause(fade: const Duration(seconds: 4));
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'sleep_timer_ended_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Sleep timer ended',
+          body: 'Playback paused',
+          leading: const Icon(CupertinoIcons.moon_zzz_fill, color: Color(0xFFE11D48), size: 18),
+        ),
+      );
       notifyListeners();
     });
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'sleep_timer_set_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Sleep timer set',
+        body: 'Stopping in ${after.inMinutes} minutes',
+        leading: const Icon(CupertinoIcons.moon_zzz_fill, color: Color(0xFFE11D48), size: 18),
+      ),
+    );
     notifyListeners();
   }
 
   void sleepAtEndOfCurrentTrack() {
     _clearSleep();
     _sleepAtEndOfTrack = true;
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'sleep_timer_track_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Sleep timer set',
+        body: 'Stopping at end of this song',
+        leading: const Icon(CupertinoIcons.moon_zzz_fill, color: Color(0xFFE11D48), size: 18),
+      ),
+    );
     notifyListeners();
   }
 
   void cancelSleepTimer() {
     _clearSleep();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'sleep_timer_cancel_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Sleep timer cancelled',
+        body: 'Playback will continue',
+        leading: const Icon(CupertinoIcons.moon_zzz, color: Colors.white70, size: 18),
+      ),
+    );
     notifyListeners();
   }
 

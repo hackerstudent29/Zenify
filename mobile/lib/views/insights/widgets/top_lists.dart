@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../design_system/tokens/app_colors.dart';
 
@@ -78,10 +77,11 @@ class _TopListsState extends State<TopLists> {
       children: [
         Text(
           title,
-          style: GoogleFonts.inter(
+          style: const TextStyle(
+            fontFamily: 'SF Pro Display',
             fontSize: 15,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
             color: Colors.white,
           ),
         ),
@@ -137,10 +137,12 @@ class _TopListsState extends State<TopLists> {
                   width: 24,
                   child: Text(
                     '#${index + 1}',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'SF Pro',
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: index == 0 ? AppColors.crimson : Colors.white38,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                 ),
@@ -250,10 +252,12 @@ class _TopListsState extends State<TopLists> {
                     width: 24,
                     child: Text(
                       '#${index + 1}',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
+                        fontFamily: 'SF Pro',
                         fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: index == 0 ? AppColors.crimson : Colors.white38,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),

@@ -2,13 +2,11 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/apple_glass.dart';
-import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
@@ -407,10 +405,11 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
             Text(
               'YOUR PERSONAL REPLAY & INSIGHTS',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: const TextStyle(
+                fontFamily: 'SF Pro Display',
                 fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.8,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
                 color: Colors.white,
               ),
             ),
@@ -455,10 +454,11 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
                     const SizedBox(width: 10),
                     Text(
                       'SIGN IN / CREATE ACCOUNT',
-                      style: GoogleFonts.inter(
+                      style: const TextStyle(
+                        fontFamily: 'SF Pro',
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                        letterSpacing: 1.0,
                         color: AppColors.crimson,
                       ),
                     ),
@@ -492,10 +492,12 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
             const SizedBox(height: 20),
             Text(
               'No Listening History Yet',
-              style: GoogleFonts.inter(
+              style: const TextStyle(
+                fontFamily: 'SF Pro Display',
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
+                letterSpacing: -0.3,
               ),
             ),
             const SizedBox(height: 8),

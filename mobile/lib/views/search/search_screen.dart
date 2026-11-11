@@ -13,7 +13,6 @@ import 'package:provider/provider.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/media_card.dart';
 import '../../design_system/widgets/monogram_avatar.dart';
 import '../../design_system/widgets/pressable_scale.dart';
@@ -241,18 +240,25 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   void _submitSearch(String query, {SearchFilter filter = SearchFilter.all}) {
-    if (query.trim().isEmpty) return;
+    final clean = query.trim();
+    if (clean.isEmpty) return;
+    _debounceTimer?.cancel();
     _focusNode.unfocus();
-    _textCtrl.text = query;
-    _activeQuery = query;
-    _dataService.addRecent(query);
+    _activeQuery = clean;
+    if (_textCtrl.text.trim() != clean) {
+      _textCtrl.value = TextEditingValue(
+        text: clean,
+        selection: TextSelection.collapsed(offset: clean.length),
+      );
+    }
+    _dataService.addRecent(clean);
     final id = ++_searchRequestId;
     setState(() {
       _isLoading = true;
       _liveSuggestions = [];
       _selectedFilter = filter;
     });
-    _executeSearch(query, id, filter: filter);
+    _executeSearch(clean, id, filter: filter);
   }
 
   void _onFilterSelected(SearchFilter filter) {
@@ -392,7 +398,13 @@ class _SearchScreenState extends State<SearchScreen>
       ),
       child: Row(
         children: [
-          const Icon(CupertinoIcons.search, size: 16, color: Colors.white70),
+          PressableScale(
+            onTap: () => _submitSearch(_textCtrl.text, filter: _selectedFilter),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Icon(CupertinoIcons.search, size: 18, color: Colors.white),
+            ),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -461,9 +473,11 @@ class _SearchScreenState extends State<SearchScreen>
                         const Text(
                           'Recent Searches',
                           style: TextStyle(
+                            fontFamily: 'SF Pro Display',
                             color: AppColors.textPrimary,
-                            fontSize: 18,
+                            fontSize: 19,
                             fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
                           ),
                         ),
                         PressableScale(
@@ -583,9 +597,11 @@ class _SearchScreenState extends State<SearchScreen>
             child: Text(
               'Trending Searches',
               style: TextStyle(
+                fontFamily: 'SF Pro Display',
                 color: AppColors.textPrimary,
-                fontSize: 18,
+                fontSize: 19,
                 fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
               ),
             ),
           ),
@@ -644,9 +660,11 @@ class _SearchScreenState extends State<SearchScreen>
             child: Text(
               'Browse Categories',
               style: TextStyle(
+                fontFamily: 'SF Pro Display',
                 color: AppColors.textPrimary,
-                fontSize: 18,
+                fontSize: 19,
                 fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
               ),
             ),
           ),
@@ -716,9 +734,11 @@ class _SearchScreenState extends State<SearchScreen>
             child: Text(
               'Popular Artists',
               style: TextStyle(
+                fontFamily: 'SF Pro Display',
                 color: AppColors.textPrimary,
-                fontSize: 18,
+                fontSize: 19,
                 fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
               ),
             ),
           ),
@@ -769,9 +789,11 @@ class _SearchScreenState extends State<SearchScreen>
             child: Text(
               'Trending Albums',
               style: TextStyle(
+                fontFamily: 'SF Pro Display',
                 color: AppColors.textPrimary,
-                fontSize: 18,
+                fontSize: 19,
                 fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
               ),
             ),
           ),
@@ -1174,9 +1196,11 @@ class _SearchScreenState extends State<SearchScreen>
           Text(
             title,
             style: const TextStyle(
+              fontFamily: 'SF Pro Display',
               color: AppColors.textPrimary,
               fontSize: 19,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
             ),
           ),
           PressableScale(
@@ -1210,9 +1234,11 @@ class _SearchScreenState extends State<SearchScreen>
           const Text(
             'Top Result',
             style: TextStyle(
+              fontFamily: 'SF Pro Display',
               color: AppColors.textPrimary,
               fontSize: 19,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
             ),
           ),
           const SizedBox(height: 10),
@@ -1287,65 +1313,28 @@ class _SearchScreenState extends State<SearchScreen>
                         // Action Buttons: Play + Radio
                         Row(
                           children: [
-                            GestureDetector(
+                            ZenPlayButton(
+                              height: 38,
+                              fontSize: 13,
+                              iconSize: 18,
+                              label: 'Play',
                               onTap: () {
                                 HapticFeedback.lightImpact();
                                 _handleItemTap(item);
                               },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'PLAY',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ),
                             if (top.radioPlaylistId != null) ...[
                               const SizedBox(width: 8),
-                              GestureDetector(
+                              ZenPlayButton(
+                                height: 38,
+                                fontSize: 13,
+                                iconSize: 18,
+                                label: 'Radio',
+                                isSecondary: true,
                                 onTap: () {
                                   HapticFeedback.lightImpact();
                                   _startRadio(top.radioPlaylistId!);
                                 },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.radio_rounded, color: Colors.white, size: 16),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'RADIO',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                               ),
                             ],
                           ],

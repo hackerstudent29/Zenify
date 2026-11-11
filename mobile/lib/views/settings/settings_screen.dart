@@ -2,13 +2,11 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/widgets/dynamic_island_header.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/zen.dart';
 import '../../services/api_service.dart';
@@ -95,10 +93,11 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
                 children: [
                   Text(
                     'ZENIFY UPDATE CHANNEL',
-                    style: GoogleFonts.inter(
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro Display',
                       fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
                       color: AppColors.crimson,
                     ),
                   ),
@@ -163,10 +162,11 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
               children: [
                 Text(
                   'SYSTEM DIAGNOSTICS',
-                  style: GoogleFonts.inter(
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro Display',
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
                     color: AppColors.crimson,
                   ),
                 ),
@@ -474,18 +474,14 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
                       isDestructive: false,
                       onTap: () async {
                         await CacheService.clearAllMediaAndArtworkCache();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: const Text('All caches cleared successfully',
-                                  style: TextStyle(color: Colors.white, fontSize: 13)),
-                              backgroundColor: const Color(0xFF18181B),
-                              duration: const Duration(seconds: 2),
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          );
-                        }
+                        IslandNotifier.instance.show(
+                          IslandNotification(
+                            id: 'cache_cleared_${DateTime.now().millisecondsSinceEpoch}',
+                            title: 'Cache cleared',
+                            body: 'All cached media, search & artwork purged',
+                            leading: const Icon(CupertinoIcons.trash, color: Color(0xFFE11D48), size: 18),
+                          ),
+                        );
                       },
                     ),
                   ]),
@@ -582,11 +578,12 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
       padding: const EdgeInsets.fromLTRB(6, 0, 0, 8),
       child: Text(
         title,
-        style: GoogleFonts.inter(
-          fontSize: 12,
+        style: const TextStyle(
+          fontFamily: 'SF Pro',
+          fontSize: 12.5,
           fontWeight: FontWeight.w700,
-          letterSpacing: 1.0,
-          color: Colors.white38,
+          letterSpacing: 0.8,
+          color: Colors.white54,
         ),
       ),
     );
@@ -903,11 +900,14 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
             onPressed: () async {
               Navigator.of(ctx).pop();
               final ok = await settings.clearListeningHistory();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(ok ? 'Listening history cleared.' : 'Failed to clear history.')),
-                );
-              }
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'history_cleared_${DateTime.now().millisecondsSinceEpoch}',
+                  title: ok ? 'History cleared' : 'Failed to clear history',
+                  body: ok ? 'Listening data reset' : 'Please try again',
+                  leading: const Icon(CupertinoIcons.trash, color: Color(0xFFE11D48), size: 18),
+                ),
+              );
             },
             child: const Text('Clear'),
           ),
@@ -1009,10 +1009,11 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
               children: [
                 Text(
                   'ACTIVE SESSIONS (${sessions.length})',
-                  style: GoogleFonts.inter(
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro Display',
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
                     color: Colors.white,
                   ),
                 ),

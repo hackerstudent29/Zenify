@@ -308,7 +308,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
                   children: [
                     // 1. Tab views with intelligent scroll awareness & persistent nested Navigators.
                     Positioned.fill(
-                      child: NotificationListener<UserScrollNotification>(
+                      child: NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           // Ignore horizontal lists (albums, artists, pills, shelves, filter tabs)
                           if (notification.metrics.axis != Axis.vertical) return false;
@@ -316,48 +316,57 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
                           final player = _playerShellKey.currentState;
                           if (player != null && player.isOpen) return false;
 
-                          // If no track is present in PlayerState, don't collapse into three docks
-                          final hasTrackNow = context.read<PlayerState>().currentTrack != null;
-                          if (!hasTrackNow) {
-                            if (_dockController.value < 1.0 && !_dockController.isAnimating) {
-                              _dockController.animateTo(
-                                1.0,
-                                duration: const Duration(milliseconds: 280),
-                                curve: Curves.easeOutCubic,
-                              );
-                            }
-                            return false;
-                          }
-
                           // Always restore dock near the top of the page
                           if (notification.metrics.pixels <= 15) {
                             if (_dockController.value < 1.0 && !_dockController.isAnimating) {
                               _dockController.animateTo(
                                 1.0,
-                                duration: const Duration(milliseconds: 280),
+                                duration: const Duration(milliseconds: 240),
                                 curve: Curves.easeOutCubic,
                               );
                             }
                             return false;
                           }
 
-                          if (notification.direction == ScrollDirection.reverse) {
-                            // User is scrolling down: morph into three-dock island layout
-                            if (_dockController.value > 0.0 && !_dockController.isAnimating) {
-                              _dockController.animateTo(
-                                0.0,
-                                duration: const Duration(milliseconds: 280),
-                                curve: Curves.easeOutCubic,
-                              );
+                          if (notification is ScrollUpdateNotification) {
+                            final delta = notification.scrollDelta ?? 0.0;
+                            if (delta > 1.5 && notification.metrics.pixels > 20) {
+                              // User is scrolling down: immediately morph into three-dock island layout
+                              if (_dockController.value > 0.0 && !_dockController.isAnimating) {
+                                _dockController.animateTo(
+                                  0.0,
+                                  duration: const Duration(milliseconds: 240),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              }
+                            } else if (delta < -3.0) {
+                              // User scrolls up: restore to resting dock + floating mini player
+                              if (_dockController.value < 1.0 && !_dockController.isAnimating) {
+                                _dockController.animateTo(
+                                  1.0,
+                                  duration: const Duration(milliseconds: 240),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              }
                             }
-                          } else if (notification.direction == ScrollDirection.forward) {
-                            // User scrolls up: restore to resting dock + floating mini player
-                            if (_dockController.value < 1.0 && !_dockController.isAnimating) {
-                              _dockController.animateTo(
-                                1.0,
-                                duration: const Duration(milliseconds: 280),
-                                curve: Curves.easeOutCubic,
-                              );
+                          } else if (notification is UserScrollNotification) {
+                            if (notification.direction == ScrollDirection.reverse &&
+                                notification.metrics.pixels > 20) {
+                              if (_dockController.value > 0.0 && !_dockController.isAnimating) {
+                                _dockController.animateTo(
+                                  0.0,
+                                  duration: const Duration(milliseconds: 240),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              }
+                            } else if (notification.direction == ScrollDirection.forward) {
+                              if (_dockController.value < 1.0 && !_dockController.isAnimating) {
+                                _dockController.animateTo(
+                                  1.0,
+                                  duration: const Duration(milliseconds: 240),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              }
                             }
                           }
                           return false;
