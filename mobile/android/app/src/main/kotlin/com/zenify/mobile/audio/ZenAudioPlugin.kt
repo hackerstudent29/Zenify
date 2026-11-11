@@ -13,8 +13,10 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
@@ -23,18 +25,20 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.zenify.mobile.yt.YtDataSource
 import com.zenify.mobile.yt.YtEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 /**
  * Channels:
- *  - MethodChannel  zenify/audio           play / setNext / prefetch / prewarm / clearAllCaches / pause / resume / stop / seek / setVolume / setFx / dispose
+ *  - MethodChannel  zenify/audio           play / setNext / prefetch / prewarm / clearAllCaches / pause / resume / stop / seek / setVolume / setFx / dispose / setLifecycle
  *  - EventChannel   zenify/audio/events    {type: state|position|duration|resolved|error, ...}
  *  - EventChannel   zenify/audio/spectrum  List<double>(36) at about 30 fps
  */
 @OptIn(UnstableApi::class)
-class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
+class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
     companion object {
         @Volatile
         var activeHeaders: Map<String, String> = emptyMap()
@@ -49,18 +53,50 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private var lastDuration = -1L
     private var pending = PlaybackParameters(1f, 1f)
 
+    @Volatile
+    private var isAppInForeground: Boolean = true
+    @Volatile
+    private var isTickerScheduled: Boolean = false
+
     private val ticker = object : Runnable {
         override fun run() {
             val p = player
-            if (p != null) {
-                if (p.isPlaying) emit(mapOf("type" to "position", "ms" to p.currentPosition))
+            if (p != null && p.isPlaying) {
+                emit(mapOf("type" to "position", "ms" to p.currentPosition))
                 val d = p.duration
                 if (d != C.TIME_UNSET && d != lastDuration) {
                     lastDuration = d
                     emit(mapOf("type" to "duration", "ms" to d))
                 }
+                // Adaptive frequency: 500ms when user is actively watching UI, 1000ms when in background/screen-off
+                val intervalMs = if (isAppInForeground) 500L else 1000L
+                main.postDelayed(this, intervalMs)
+                isTickerScheduled = true
+            } else {
+                isTickerScheduled = false
             }
-            main.postDelayed(this, 200)
+        }
+    }
+
+    private fun startTicker() {
+        if (!isTickerScheduled) {
+            isTickerScheduled = true
+            main.removeCallbacks(ticker)
+            main.post(ticker)
+        }
+    }
+
+    private fun stopTicker() {
+        isTickerScheduled = false
+        main.removeCallbacks(ticker)
+    }
+
+    private fun updateTickerState() {
+        val p = player
+        if (p != null && p.isPlaying) {
+            startTicker()
+        } else {
+            stopTicker()
         }
     }
 
@@ -86,21 +122,37 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         EventChannel(b.binaryMessenger, "zenify/audio/spectrum").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(args: Any?, sink: EventChannel.EventSink?) {
                 spectrumSink = sink
+                processor.hasSpectrumListener = true
                 main.removeCallbacks(spectrumTicker)
                 main.post(spectrumTicker)
             }
             override fun onCancel(args: Any?) {
                 spectrumSink = null
+                processor.hasSpectrumListener = false
                 main.removeCallbacks(spectrumTicker)
             }
         })
-        main.post(ticker)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        stopTicker()
         main.removeCallbacksAndMessages(null)
         player?.release()
         player = null
+    }
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        isAppInForeground = true
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {}
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        isAppInForeground = true
+    }
+
+    override fun onDetachedFromActivity() {
+        isAppInForeground = false
     }
 
     private fun emit(m: Map<String, Any?>) { events?.success(m) }
@@ -150,22 +202,50 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
         val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
 
+        // Bounded burst buffering: quick startup (2.5s), safe rebuffer (5s), and 60s max buffer
+        // lets Wi-Fi and 4G/5G cellular modems download in bursts and enter low-power sleep (DRX/Idle)
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 15_000,
+                /* maxBufferMs = */ 60_000,
+                /* bufferForPlaybackMs = */ 2_500,
+                /* bufferForPlaybackAfterRebufferMs = */ 5_000
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
         val p = ExoPlayer.Builder(ctx, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
             .setAudioAttributes(
                 AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
                 true,
             )
             .setHandleAudioBecomingNoisy(true)
-            .setWakeMode(C.WAKE_MODE_NETWORK)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
+
+        try {
+            // Enable hardware audio offload scheduling when supported by the device DSP
+            val offloadPrefs = TrackSelectionParameters.AudioOffloadPreferences.Builder()
+                .setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
+                .build()
+            p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+                .setAudioOffloadPreferences(offloadPrefs)
+                .build()
+        } catch (_: Throwable) {}
 
         p.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 emitState()
+                updateTickerState()
             }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 emitState()
+                updateTickerState()
+            }
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                updateTickerState()
             }
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
@@ -178,6 +258,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 }
             }
             override fun onPlayerError(error: PlaybackException) {
+                stopTicker()
                 val is403 = error.message?.contains("403") == true || error.errorCodeName.contains("BAD_HTTP_STATUS")
                 Log.e("ZenAudioPlugin", "ExoPlayer playback error: ${error.errorCodeName} (code=${error.errorCode}, is403=$is403) - ${error.message}", error)
                 emit(mapOf(
@@ -329,10 +410,32 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     YtDataSource.clearCache(ctx)
                     result.success(null)
                 }
-                "pause" -> { player?.pause(); result.success(null) }
-                "resume" -> { player?.play(); result.success(null) }
-                "stop" -> { player?.stop(); player?.clearMediaItems(); result.success(null) }
-                "seek" -> { player?.seekTo(call.argument<Number>("ms")?.toLong() ?: 0L); result.success(null) }
+                "pause" -> {
+                    player?.pause()
+                    stopTicker()
+                    result.success(null)
+                }
+                "resume" -> {
+                    player?.play()
+                    updateTickerState()
+                    result.success(null)
+                }
+                "stop" -> {
+                    player?.stop()
+                    player?.clearMediaItems()
+                    stopTicker()
+                    result.success(null)
+                }
+                "seek" -> {
+                    val ms = call.argument<Number>("ms")?.toLong() ?: 0L
+                    player?.seekTo(ms)
+                    emit(mapOf("type" to "position", "ms" to ms))
+                    result.success(null)
+                }
+                "setLifecycle" -> {
+                    isAppInForeground = call.argument<Boolean>("isForeground") ?: true
+                    result.success(null)
+                }
                 "setVolume" -> { player?.volume = (call.argument<Number>("v")?.toFloat() ?: 1f).coerceIn(0f, 1f); result.success(null) }
                 "setLoudnessDb" -> {
                     val db = call.argument<Number>("loudnessDb")?.toDouble()

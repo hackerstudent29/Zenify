@@ -87,6 +87,10 @@ class PoTokenGenerator(private val context: Context) : TokenProvider {
                                                 visitorData = visitorData
                                             )
                                             cachedResult = result
+                                            try {
+                                                v?.stopLoading()
+                                                v?.pauseTimers()
+                                            } catch (_: Throwable) {}
                                             if (cont.isActive) cont.resume(result)
                                         } else {
                                             if (cont.isActive) cont.resume(null)

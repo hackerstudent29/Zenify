@@ -1057,7 +1057,7 @@ class PlayerShellState extends State<PlayerShell>
                               child: ArtworkMeshBackground(
                                 coverUrl: track?.coverUrl,
                                 fallbackAsset: 'assets/images/z_logo.png',
-                                paused: !_playing,
+                                paused: !_playing || t <= 0.05,
                                 backgroundColor: _palette.isNotEmpty
                                     ? _palette.first
                                     : null,

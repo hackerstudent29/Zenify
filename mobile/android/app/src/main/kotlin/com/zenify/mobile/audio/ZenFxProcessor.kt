@@ -67,6 +67,21 @@ class FxParams(
             )
         }
     }
+
+    fun hasActiveEffects(): Boolean {
+        if (bypass) return false
+        if (is8D) return true
+        if (night) return true
+        if (vocalMode != "off" && vocalAmount > 0.01f) return true
+        if (reverb != "none" && reverbAmount > 0.01f) return true
+        if (echo > 0.01f) return true
+        if (chorus > 0.01f) return true
+        if (abs(filter) > 0.01f) return true
+        if (drive > 0.01f) return true
+        if (abs(width - 1f) > 0.02f) return true
+        if (abs(eq[0]) > 0.05f || abs(eq[1]) > 0.05f || abs(eq[2]) > 0.05f) return true
+        return false
+    }
 }
 
 @UnstableApi
@@ -75,9 +90,18 @@ class ZenFxProcessor : BaseAudioProcessor() {
     @Volatile var bands: FloatArray = FloatArray(BANDS)
     @Volatile var loudnessDb: Double? = null
         private set
+    @Volatile var hasSpectrumListener: Boolean = false
 
     private var engine: Engine? = null
     private var inCh = 2
+
+    fun hasActiveProcessing(): Boolean {
+        if (hasSpectrumListener) return true
+        if (params.hasActiveEffects()) return true
+        val lDb = loudnessDb
+        if (lDb != null && abs(lDb) >= 0.25) return true
+        return false
+    }
 
     fun setLoudnessDb(db: Double?) {
         loudnessDb = db
@@ -104,16 +128,21 @@ class ZenFxProcessor : BaseAudioProcessor() {
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
+        val remaining = inputBuffer.remaining()
+        if (remaining == 0) return
+
         val eng = engine
-        if (eng == null) {
-            val out = replaceOutputBuffer(inputBuffer.remaining())
+        // Ultra-low power zero-copy passthrough when no DSP audio effects are active
+        if (eng == null || !hasActiveProcessing()) {
+            val out = replaceOutputBuffer(remaining)
             out.put(inputBuffer)
             out.flip()
             return
         }
-        val frames = inputBuffer.remaining() / (2 * inCh)
+
+        val frames = remaining / (2 * inCh)
         val out = replaceOutputBuffer(frames * 4)
-        eng.process(params, inputBuffer, inCh, frames, out)
+        eng.process(params, inputBuffer, inCh, frames, out, hasSpectrumListener)
         out.flip()
     }
 }
@@ -741,7 +770,7 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
 
     private fun toShort(x: Float): Short = (x.coerceIn(-1f, 1f) * 32767f).toInt().toShort()
 
-    fun process(p: FxParams, src: ByteBuffer, inCh: Int, frames: Int, out: ByteBuffer) {
+    fun process(p: FxParams, src: ByteBuffer, inCh: Int, frames: Int, out: ByteBuffer, withSpectrum: Boolean = false) {
         var done = 0
         while (done < frames) {
             val n = min(BLOCK, frames - done)
@@ -757,7 +786,9 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
                         io[1] = b + (io[1] - b) * bypassMix
                     }
                 }
-                analyzer.push((io[0] + io[1]) * 0.5f)
+                if (withSpectrum) {
+                    analyzer.push((io[0] + io[1]) * 0.5f)
+                }
                 out.putShort(toShort(io[0])); out.putShort(toShort(io[1]))
             }
             done += n
