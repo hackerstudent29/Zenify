@@ -1,0 +1,67 @@
+name: Build and Release Mobile APKs
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Fast Upload Pre-built APKs
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME:-v1.0.7}"
+          if [ "$TAG_NAME" = "main" ]; then
+            TAG_NAME="v1.0.7"
+          fi
+          echo "Uploading pre-built release package to $TAG_NAME..."
+          if [ -f "frontend/public/downloads/zenify.apk" ]; then
+            cp frontend/public/downloads/zenify.apk zenify-v1.0.7.apk
+            cp frontend/public/downloads/zenify.apk zenify.apk
+            gh release upload "$TAG_NAME" zenify-v1.0.7.apk zenify.apk --clobber
+            echo "Pre-built APKs uploaded successfully to $TAG_NAME!"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Get Dependencies
+        working-directory: ./mobile
+        run: flutter pub get
+
+      - name: Build Universal FAT-APK
+        working-directory: ./mobile
+        run: flutter build apk
+
+      - name: Upload Universal APKs to GitHub Release
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME:-v1.0.7}"
+          if [ "$TAG_NAME" = "main" ]; then
+            TAG_NAME="v1.0.7"
+          fi
+          echo "Uploading universal release package to $TAG_NAME..."
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk zenify-v1.0.7-universal.apk
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk zenify-universal.apk
+          gh release upload "$TAG_NAME" zenify-v1.0.7-universal.apk zenify-universal.apk --clobber
+          echo "Universal APKs uploaded successfully to $TAG_NAME!"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
