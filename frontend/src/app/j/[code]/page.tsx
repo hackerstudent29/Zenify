@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { SEO } from '@/components/shared/SEO';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
 import notify from '@/lib/notify';
@@ -42,6 +43,12 @@ export default function JoinRedirectPage() {
 
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-4 space-y-4">
+      <SEO
+        title={roomCode ? `Join Room ${roomCode} – Zenify` : 'Join Listen Together Room – Zenify'}
+        description="Join a live synchronized Room Together music listening session on Zenify."
+        path={roomCode ? `/j/${encodeURIComponent(roomCode)}` : '/j'}
+        noindex={true}
+      />
       <div className="w-16 h-16 rounded-full bg-brand/15 text-brand flex items-center justify-center animate-pulse">
         <Radio className="w-8 h-8" />
       </div>

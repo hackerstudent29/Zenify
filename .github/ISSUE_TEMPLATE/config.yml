@@ -9,7 +9,7 @@ contact_links:
     about: Read the README and documentation first
 
   - name: 🆘 Troubleshooting Guide
-    url: https://github.com/hackerstudent29/Zenify/blob/main/TROUBLESHOOTING.md
+    url: https://github.com/hackerstudent29/Zenify/blob/main/docs/TROUBLESHOOTING.md
     about: Check common issues and solutions
 
   - name: 💬 Discussions
@@ -24,7 +24,11 @@ contact_links:
     url: https://github.com/hackerstudent29/Zenify/labels/mobile
     about: Report issues with the Android app
 
-  - name: 💬 Chat / Discord
-    url: https://discord.gg/zenify
-    about: Join our community Discord server (if available)
+  - name: 🌐 Launch Zenify Web Player
+    url: https://listenzenify.vercel.app
+    about: Stream music ad-free in your browser or install the PWA
+
+  - name: 📦 Android APK Releases
+    url: https://github.com/hackerstudent29/Zenify/releases
+    about: Download the latest signed Zenify Android APK release
 

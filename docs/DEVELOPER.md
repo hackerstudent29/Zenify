@@ -310,7 +310,7 @@ VITE_APP_URL=http://localhost:3001
 
 ```bash
 # 1. Navigate to mobile directory
-cd ../zenify_app
+cd ../mobile
 
 # 2. Fetch Flutter packages
 flutter pub get
@@ -424,7 +424,7 @@ flutter run
    cd ../frontend && npm run build
    ```
 4. **Follow Conventional Commits:** Use clean, standard commit types (`feat`, `fix`, `docs`, `refactor`, `perf`, `chore`).
-5. **Push and Open a Pull Request:** Open a PR against `main` using our [Pull Request Template](.github/PULL_REQUEST_TEMPLATE.md).
+5. **Push and Open a Pull Request:** Open a PR against `main` using our [Pull Request Template](../.github/PULL_REQUEST_TEMPLATE.md).
 
 ---
 

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUIStore } from "@/store/ui";
+import { SEO } from "@/components/shared/SEO";
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -12,5 +13,5 @@ export default function NotificationsPage() {
     router.replace("/");
   }, [router]);
 
-  return null;
+  return <SEO title="Notifications – Zenify" path="/notifications" noindex={true} />;
 }

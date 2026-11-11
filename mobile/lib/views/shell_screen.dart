@@ -9,6 +9,7 @@ import '../design_system/zen.dart';
 import '../models/track.dart';
 import '../services/dock_visibility.dart';
 import '../services/player_state.dart';
+import '../services/room_deep_links.dart';
 import '../services/search_nav.dart';
 import '../utils/media_normalizer.dart';
 import 'details/album_screen.dart';
@@ -121,10 +122,23 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
       value: 1.0,
       duration: const Duration(milliseconds: 320),
     );
+    RoomDeepLinks.instance.addListener(_onRoomDeepLink);
+    RoomDeepLinks.instance.start().then((_) {
+      if (mounted) _onRoomDeepLink();
+    });
+  }
+
+  void _onRoomDeepLink() {
+    if (RoomDeepLinks.instance.pending == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || RoomDeepLinks.instance.pending == null) return;
+      _openInActiveTab(const RoomTogetherScreen());
+    });
   }
 
   @override
   void dispose() {
+    RoomDeepLinks.instance.removeListener(_onRoomDeepLink);
     _dockController.dispose();
     super.dispose();
   }

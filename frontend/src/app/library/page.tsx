@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { SEO } from "@/components/shared/SEO";
 
 export default function LibraryPage() {
   const router = useRouter();
@@ -10,5 +11,5 @@ export default function LibraryPage() {
     router.replace("/liked");
   }, [router]);
 
-  return null;
+  return <SEO title="Your Library – Zenify" path="/library" noindex={true} />;
 }

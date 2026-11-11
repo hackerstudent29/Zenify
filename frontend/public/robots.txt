@@ -132,14 +132,20 @@ Disallow: /
 
 User-agent: *
 Allow: /
+Allow: /download
+Allow: /together
 Allow: /faq
 Allow: /about
 Allow: /about-zenify
+Allow: /discover
+Allow: /radio
+Allow: /local-library
 Allow: /terms
 Allow: /privacy
 Allow: /llms.txt
 Disallow: /api/
 Disallow: /stream-youtube
+Disallow: /admin
 Disallow: /library
 Disallow: /liked
 Disallow: /payment
@@ -148,7 +154,7 @@ Disallow: /profile
 Disallow: /settings
 Disallow: /history
 Disallow: /notifications
-
-Crawl-delay: 5
+Disallow: /j/
+Disallow: /blend/join/
 
 Sitemap: https://listenzenify.vercel.app/sitemap.xml

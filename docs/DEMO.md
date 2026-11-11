@@ -46,14 +46,14 @@ Access our interactive web demo and start listening immediately:
 ## 📸 Screenshot Gallery
 
 ### Home Dashboard
-![Zenify Home Dashboard](assets/screenshots/zenify_home_dashboard.png)
+![Zenify Home Dashboard](images/zenify_home_dashboard.png)
 
 *Discover new music, manage playlists, and see trending tracks at a glance.*
 
 ---
 
 ### Synced Lyrics Experience
-![Zenify Synced Lyrics](assets/screenshots/zenify_synced_lyrics.png)
+![Zenify Synced Lyrics](images/zenify_synced_lyrics.png)
 
 *Real-time, beat-perfect lyrics that move with the music.*
 

@@ -13,18 +13,26 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: null,
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'favicon.svg'],
       manifest: {
-        name: 'Zenify Music',
+        name: 'Zenify – Free Music Player & Synced Lyrics',
         short_name: 'Zenify',
-        description: 'A premium music streaming experience',
-        theme_color: '#000000',
-        background_color: '#000000',
+        description: 'Free ad-free open-source music streaming platform with sub-second synchronized lyrics, 8D spatial audio, 3-band EQ, Room Together, and local FLAC/MP3 playback.',
+        theme_color: '#030303',
+        background_color: '#030303',
         display: 'standalone',
+        start_url: '/',
+        scope: '/',
+        categories: ['music', 'entertainment'],
         icons: [
           {
-            src: '/favicon_32.png',
+            src: '/favicon-32x32.png',
             sizes: '32x32',
+            type: 'image/png'
+          },
+          {
+            src: '/favicon-192x192.png',
+            sizes: '192x192',
             type: 'image/png'
           },
           {

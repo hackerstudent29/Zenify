@@ -1,422 +1,456 @@
-import { FastifyInstance, FastifyRequest } from 'fastify';
+import crypto from 'crypto';
+import { FastifyInstance } from 'fastify';
 import { WebSocket } from 'ws';
-import { TogetherRoomService, TogetherTicket, TogetherRoomState } from '../services/together-room.service';
+import { prisma } from '../utils/prisma';
+import { QueueManagementService } from '../services/together/queue-management.service';
+import { roomEventService } from '../services/together/room-event.service';
+import { RoomMembershipService } from '../services/together/room-membership.service';
+import { RoomPhase2Service } from '../services/together/room-phase2.service';
+import { RoomSessionService } from '../services/together/room-session.service';
+import { roomStore } from '../services/together/room-store';
+import { RoomWsEnvelope } from '../services/together/room-types';
 
-interface SocketClient {
-  ws: WebSocket;
+interface ConnectedClient {
+  socket: WebSocket;
   userId: string;
   username: string;
-  avatar?: string;
-  role: 'host' | 'listener';
   roomCode: string;
-  isAlive: boolean;
+  role: string;
+  lastHeartbeatAt: number;
 }
 
-// Active connected sockets grouped by roomCode
-const roomSockets = new Map<string, Set<SocketClient>>();
+const roomSockets = new Map<string, Set<ConnectedClient>>();
 
-function broadcastToRoom(roomCode: string, payload: any, excludeUserId?: string) {
-  const sockets = roomSockets.get(roomCode);
-  if (!sockets) return;
+function safeSend(ws: WebSocket, data: any): void {
+  try {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(data));
+    }
+  } catch {
+    // Socket may be mid-close
+  }
+}
 
-  const data = JSON.stringify(payload);
-  for (const client of sockets) {
-    if (excludeUserId && client.userId === excludeUserId) continue;
-    if (client.ws.readyState === WebSocket.OPEN) {
-      try {
-        client.ws.send(data);
-      } catch (err) {
-        console.warn(`[TogetherWS] Broadcast error to ${client.userId}:`, err);
+function broadcastEnvelope(
+  roomCode: string,
+  envelope: RoomWsEnvelope,
+  legacyFlat?: Record<string, any>
+): void {
+  const code = roomCode.toUpperCase();
+  const clients = roomSockets.get(code);
+  if (!clients || clients.size === 0) return;
+
+  const wireObj = legacyFlat ? { ...envelope, ...legacyFlat } : envelope;
+  const serialized = JSON.stringify(wireObj);
+  for (const c of clients) {
+    try {
+      if (c.socket.readyState === WebSocket.OPEN) {
+        c.socket.send(serialized);
       }
+    } catch {
+      // ignore closed socket
     }
   }
 }
 
-export async function registerTogetherWebSocket(server: FastifyInstance) {
-  // 25-second server-initiated heartbeat ping to satisfy Heroku 55-second router timeout
-  const heartbeatInterval = setInterval(() => {
+export async function registerTogetherWebSocket(server: FastifyInstance): Promise<void> {
+  roomEventService.registerBroadcaster(broadcastEnvelope);
+
+  // Server heartbeat loop every 15s (close dead sockets at > 45s)
+  const hbTimer = setInterval(() => {
     const now = Date.now();
     for (const [code, clients] of roomSockets.entries()) {
-      for (const client of clients) {
-        if (!client.isAlive) {
+      for (const c of clients) {
+        if (now - c.lastHeartbeatAt > 60_000) {
           try {
-            client.ws.terminate();
-          } catch (e) {}
-          clients.delete(client);
+            c.socket.terminate();
+          } catch {}
+          clients.delete(c);
           continue;
         }
-        client.isAlive = false;
-        if (client.ws.readyState === WebSocket.OPEN) {
-          try {
-            client.ws.send(JSON.stringify({ type: 'HEARTBEAT', serverTime: now }));
-          } catch (e) {}
-        }
+        safeSend(c.socket, {
+          type: 'HEARTBEAT',
+          roomId: code,
+          schemaVersion: 1,
+          serverTime: now,
+          serverTimestampMs: now,
+        });
       }
-      if (clients.size === 0) {
-        roomSockets.delete(code);
-      }
+      if (clients.size === 0) roomSockets.delete(code);
     }
-  }, 25_000);
-
-  server.addHook('onClose', (_instance, done) => {
-    clearInterval(heartbeatInterval);
-    done();
-  });
+  }, 15_000);
+  hbTimer.unref?.();
 
   server.get(
     '/ws/together',
     { websocket: true },
-    async (connection: any, req: FastifyRequest<{ Querystring: { ticket?: string } }>) => {
-      // Compatibility with @fastify/websocket v11 (connection.socket or connection)
-      const socket: WebSocket = connection.socket || connection;
-      const ticketId = req.query.ticket;
+    async (connection: any, request: any) => {
+      const socket: WebSocket = connection.socket ?? connection;
+      const query = (request.query as Record<string, string>) || {};
 
-      if (!ticketId) {
-        socket.send(JSON.stringify({ type: 'ERROR', message: 'Missing session ticket' }));
-        socket.close(4001, 'Missing ticket');
+      let roomCode = '';
+      let userId = '';
+      let username = 'Listener';
+      let role = 'LISTENER';
+
+      // 1. Ticket auth (primary) OR Bearer JWT + roomCode
+      const ticket = query.ticket;
+      if (ticket) {
+        const verified = RoomSessionService.verifyTicket(ticket);
+        if (!verified) {
+          safeSend(socket, { type: 'ERROR', code: 'INVALID_TICKET', message: 'Invalid or expired session ticket' });
+          socket.close();
+          return;
+        }
+        roomCode = verified.roomCode.toUpperCase();
+        userId = verified.userId;
+        username = verified.username;
+        role = verified.role;
+      } else if (query.token && query.roomCode) {
+        try {
+          const decoded = (await server.jwt.verify(query.token)) as any;
+          userId = String(decoded?.id || decoded?.userId || decoded?.sub || '');
+          roomCode = String(query.roomCode).trim().toUpperCase();
+          username = decoded?.name || 'Listener';
+        } catch {
+          safeSend(socket, { type: 'ERROR', code: 'INVALID_TOKEN', message: 'Invalid auth token' });
+          socket.close();
+          return;
+        }
+      } else {
+        safeSend(socket, { type: 'ERROR', code: 'MISSING_TICKET', message: 'Missing session ticket' });
+        socket.close();
         return;
       }
 
-      const ticket: TogetherTicket | null = await TogetherRoomService.verifyAndConsumeTicket(ticketId);
-      if (!ticket) {
-        socket.send(JSON.stringify({ type: 'ERROR', message: 'Invalid or expired session ticket' }));
-        socket.close(4002, 'Invalid ticket');
+      const room = await prisma.togetherRoom.findUnique({ where: { code: roomCode } }).catch(() => null);
+      if (!room || room.state === 'CLOSED' || room.state === 'EXPIRED') {
+        safeSend(socket, { type: 'ROOM_CLOSED', reason: room?.endedReason || 'EXPIRED', recapReady: true });
+        socket.close();
         return;
       }
 
-      const { roomCode, userId, username, avatar, role } = ticket;
-      const room = await TogetherRoomService.getRoom(roomCode);
-      if (!room) {
-        socket.send(JSON.stringify({ type: 'ERROR', message: 'Room has expired' }));
-        socket.close(4003, 'Room expired');
+      // Ensure membership row is active on reconnect
+      const member = await prisma.togetherRoomMember.findUnique({
+        where: { roomCode_userId: { roomCode, userId } },
+      });
+      if (!member) {
+        safeSend(socket, { type: 'ERROR', code: 'NOT_A_MEMBER', message: 'Not a member of this room' });
+        socket.close();
         return;
       }
-
-      // Add to room socket pool
-      if (!roomSockets.has(roomCode)) {
-        roomSockets.set(roomCode, new Set());
+      if (member.leftAt !== null) {
+        await prisma.togetherRoomMember.update({
+          where: { roomCode_userId: { roomCode, userId } },
+          data: { leftAt: null, lastSeenAt: new Date() },
+        });
+      } else {
+        await prisma.togetherRoomMember.update({
+          where: { roomCode_userId: { roomCode, userId } },
+          data: { lastSeenAt: new Date() },
+        });
       }
-      const client: SocketClient = {
-        ws: socket,
+
+      roomStore.updatePresence(roomCode, userId, {
+        lastSeenMs: Date.now(),
+        isPlaying: room.playbackState === 'playing',
+        bufferReady: true,
+      });
+
+      const client: ConnectedClient = {
+        socket,
         userId,
-        username,
-        avatar,
-        role,
+        username: member.displayName || username,
         roomCode,
-        isAlive: true,
+        role: userId === room.hostId ? 'HOST' : member.role,
+        lastHeartbeatAt: Date.now(),
       };
+
+      if (!roomSockets.has(roomCode)) roomSockets.set(roomCode, new Set());
       roomSockets.get(roomCode)!.add(client);
 
-      // Send initial synchronized room state to the joining client
-      socket.send(
-        JSON.stringify({
-          type: 'INIT_STATE',
-          room,
-          self: { userId, username, avatar, role },
-          serverTime: Date.now(),
-        })
-      );
-
-      // Notify others in the room
-      broadcastToRoom(
-        roomCode,
-        {
-          type: 'MEMBER_JOINED',
-          member: {
-            userId,
-            username,
-            avatar,
-            role,
-            joinedAt: Date.now(),
-            lastPing: Date.now(),
-          },
-          members: room.members,
-        },
-        userId
-      );
-
-      // Handle incoming messages
-      socket.on('message', async (raw: any) => {
-        try {
-          const payload = JSON.parse(raw.toString());
-          client.isAlive = true;
-
-          switch (payload.type) {
-            case 'HEARTBEAT_ACK': {
-              client.isAlive = true;
-              break;
-            }
-
-            // NTP Clock Synchronization
-            case 'SYNC_PING': {
-              const now = Date.now();
-              socket.send(
-                JSON.stringify({
-                  type: 'SYNC_PONG',
-                  t0: payload.t0,
-                  t1: now,
-                  t2: now,
-                })
-              );
-              break;
-            }
-
-            // Playback: Host Play with 1500ms Scheduled Barrier for sub-second sync
-            case 'HOST_PLAY': {
-              const currentRoom = await TogetherRoomService.getRoom(roomCode);
-              if (!currentRoom) return;
-              if (currentRoom.hostId !== userId && currentRoom.mode !== 'collab') {
-                socket.send(JSON.stringify({ type: 'ERROR', message: 'Only DJ or host can control playback' }));
-                return;
-              }
-
-              const startAtServerMs = Date.now() + 1500; // 1.5s barrier for device buffering & lockstep start
-              const track = payload.track || currentRoom.player.track;
-              const positionSec = Number(payload.positionSec) || 0;
-
-              currentRoom.player = {
-                trackId: track?.id || null,
-                track,
-                state: 'playing',
-                positionSec,
-                startedAtServerMs: startAtServerMs,
-              };
-              currentRoom.skipVotes = [];
-              await TogetherRoomService.saveRoom(currentRoom);
-
-              broadcastToRoom(roomCode, {
-                type: 'PLAY_AT',
-                trackId: track?.id,
-                track,
-                positionSec,
-                startAtServerMs,
-                initiatedBy: username,
-                skipVotes: [],
-                seq: currentRoom.seq,
-              });
-              break;
-            }
-
-            // Playback: Host Pause
-            case 'HOST_PAUSE': {
-              const currentRoom = await TogetherRoomService.getRoom(roomCode);
-              if (!currentRoom) return;
-              if (currentRoom.hostId !== userId && currentRoom.mode !== 'collab') return;
-
-              const positionSec = Number(payload.positionSec) || currentRoom.player.positionSec;
-              currentRoom.player.state = 'paused';
-              currentRoom.player.positionSec = positionSec;
-              currentRoom.player.startedAtServerMs = 0;
-              await TogetherRoomService.saveRoom(currentRoom);
-
-              broadcastToRoom(roomCode, {
-                type: 'PAUSE_AT',
-                positionSec,
-                serverTime: Date.now(),
-                initiatedBy: username,
-              });
-              break;
-            }
-
-            // Playback: Seek
-            case 'HOST_SEEK': {
-              const currentRoom = await TogetherRoomService.getRoom(roomCode);
-              if (!currentRoom) return;
-              if (currentRoom.hostId !== userId && currentRoom.mode !== 'collab') return;
-
-              const positionSec = Number(payload.positionSec) || 0;
-              const isPlaying = currentRoom.player.state === 'playing';
-              const startAtServerMs = isPlaying ? Date.now() + 300 : 0;
-
-              currentRoom.player.positionSec = positionSec;
-              currentRoom.player.startedAtServerMs = startAtServerMs;
-              await TogetherRoomService.saveRoom(currentRoom);
-
-              broadcastToRoom(roomCode, {
-                type: 'SEEK_TO',
-                positionSec,
-                state: currentRoom.player.state,
-                startAtServerMs,
-                serverTime: Date.now(),
-              });
-              break;
-            }
-
-            // Queue: Add track
-            case 'QUEUE_ADD': {
-              const currentRoom = await TogetherRoomService.getRoom(roomCode);
-              if (!currentRoom) return;
-              if (!currentRoom.settings.guestCanQueue && currentRoom.hostId !== userId) {
-                socket.send(JSON.stringify({ type: 'ERROR', message: 'Guest queuing is disabled in this room' }));
-                return;
-              }
-
-              const { room: updatedRoom, item } = await TogetherRoomService.addQueueItem(roomCode, payload.track, {
-                id: userId,
-                name: username,
-              });
-
-              broadcastToRoom(roomCode, {
-                type: 'QUEUE_UPDATED',
-                queue: updatedRoom.queue,
-                addedItem: item,
-              });
-              break;
-            }
-
-            // Queue: Remove track
-            case 'QUEUE_REMOVE': {
-              const updatedRoom = await TogetherRoomService.removeQueueItem(roomCode, payload.itemId);
-              broadcastToRoom(roomCode, {
-                type: 'QUEUE_UPDATED',
-                queue: updatedRoom.queue,
-              });
-              break;
-            }
-
-            // Queue: Reorder
-            case 'QUEUE_REORDER': {
-              const updatedRoom = await TogetherRoomService.reorderQueue(
-                roomCode,
-                payload.startIndex,
-                payload.endIndex
-              );
-              broadcastToRoom(roomCode, {
-                type: 'QUEUE_UPDATED',
-                queue: updatedRoom.queue,
-              });
-              break;
-            }
-
-            // Skip Vote with configurable threshold
-            case 'SKIP_VOTE': {
-              const result = await TogetherRoomService.voteSkip(roomCode, userId);
-              if (result.skipped) {
-                broadcastToRoom(roomCode, {
-                  type: 'PLAY_AT',
-                  trackId: result.room.player.trackId,
-                  track: result.room.player.track,
-                  positionSec: 0,
-                  startAtServerMs: result.room.player.startedAtServerMs,
-                  initiatedBy: 'Vote Skip',
-                  skipVotes: [],
-                  seq: result.room.seq,
-                });
-                broadcastToRoom(roomCode, {
-                  type: 'QUEUE_UPDATED',
-                  queue: result.room.queue,
-                  seq: result.room.seq,
-                });
-              } else {
-                broadcastToRoom(roomCode, {
-                  type: 'SKIP_VOTES_UPDATED',
-                  votes: result.votes,
-                  needed: result.needed,
-                  voters: result.room.skipVotes,
-                });
-              }
-              break;
-            }
-
-            // Reaction with real-time aggregated counters (❤️, 🔥, 👏, 😭, 💃, 🎧)
-            case 'REACTION': {
-              const emoji = String(payload.emoji || '❤️').slice(0, 4);
-              const currentRoom = await TogetherRoomService.getRoom(roomCode);
-              if (currentRoom) {
-                if (!currentRoom.reactions) currentRoom.reactions = {};
-                currentRoom.reactions[emoji] = (currentRoom.reactions[emoji] || 0) + 1;
-                await TogetherRoomService.saveRoom(currentRoom);
-              }
-              broadcastToRoom(roomCode, {
-                type: 'REACTION',
-                id: crypto.randomUUID(),
-                userId,
-                username,
-                emoji,
-                reactions: currentRoom?.reactions || {},
-                timestamp: Date.now(),
-              });
-              break;
-            }
-
-            // Client requests full room snapshot (e.g. sequence gap or reconnect)
-            case 'REQUEST_RESYNC': {
-              const currentRoom = await TogetherRoomService.getRoom(roomCode);
-              if (currentRoom) {
-                socket.send(
-                  JSON.stringify({
-                    type: 'INIT_STATE',
-                    room: currentRoom,
-                    self: { userId, username, avatar, role },
-                    serverTime: Date.now(),
-                  })
-                );
-              }
-              break;
-            }
-
-            // Chat Message
-            case 'CHAT_MESSAGE': {
-              const currentRoom = await TogetherRoomService.getRoom(roomCode);
-              if (!currentRoom) return;
-              if (!currentRoom.settings.guestCanChat && currentRoom.hostId !== userId) {
-                return;
-              }
-
-              const text = String(payload.text || '').trim();
-              if (!text) return;
-
-              const { room: updatedRoom, chatItem } = await TogetherRoomService.addChatMessage(roomCode, {
-                userId,
-                username,
-                avatar,
-                text,
-              });
-
-              broadcastToRoom(roomCode, {
-                type: 'CHAT_MESSAGE',
-                chatItem,
-              });
-              break;
-            }
-
-            // Buffer ready acknowledgement from listener
-            case 'BUFFER_READY': {
-              broadcastToRoom(roomCode, {
-                type: 'MEMBER_BUFFER_READY',
-                userId,
-                trackId: payload.trackId,
-              });
-              break;
-            }
+      // Initial snapshot or delta replay if client provided lastSeq
+      const lastSeqParam = query.lastSeq ? parseInt(query.lastSeq, 10) : NaN;
+      if (!Number.isNaN(lastSeqParam) && lastSeqParam > 0) {
+        const replay = await roomEventService.getReplaySince(roomCode, lastSeqParam);
+        if (!replay.requiresResync) {
+          for (const ev of replay.events) {
+            safeSend(socket, ev);
           }
-        } catch (err) {
-          console.warn('[TogetherWS] Message handling error:', err);
+        } else {
+          const snapshot = await RoomSessionService.getRoomSnapshot(roomCode, userId);
+          safeSend(socket, {
+            eventId: crypto.randomUUID(),
+            schemaVersion: 1,
+            roomId: roomCode,
+            type: 'INIT_STATE',
+            seq: snapshot.seq,
+            revision: snapshot.queueRevision,
+            serverTimestampMs: Date.now(),
+            actorId: userId,
+            payload: snapshot,
+            state: snapshot,
+          });
+        }
+      } else {
+        const snapshot = await RoomSessionService.getRoomSnapshot(roomCode, userId);
+        safeSend(socket, {
+          eventId: crypto.randomUUID(),
+          schemaVersion: 1,
+          roomId: roomCode,
+          type: 'INIT_STATE',
+          seq: snapshot.seq,
+          revision: snapshot.queueRevision,
+          serverTimestampMs: Date.now(),
+          actorId: userId,
+          payload: snapshot,
+          state: snapshot,
+        });
+      }
+
+      socket.on('message', async (rawBuf: Buffer) => {
+        let msg: any;
+        try {
+          msg = JSON.parse(rawBuf.toString());
+        } catch {
+          return;
+        }
+        const type = String(msg?.type || '').toUpperCase();
+        const commandId = msg?.commandId as string | undefined;
+        client.lastHeartbeatAt = Date.now();
+        roomStore.updatePresence(roomCode, userId, { lastSeenMs: Date.now() });
+
+        try {
+          switch (type) {
+            case 'HEARTBEAT_ACK': {
+              await prisma.togetherRoomMember
+                .update({
+                  where: { roomCode_userId: { roomCode, userId } },
+                  data: { lastSeenAt: new Date() },
+                })
+                .catch(() => undefined);
+              if (typeof msg.offsetMs === 'number') {
+                roomStore.updatePresence(roomCode, userId, {
+                  offsetMs: Math.round(msg.offsetMs),
+                  isPlaying: msg.isPlaying ?? true,
+                });
+              }
+              break;
+            }
+
+            case 'SYNC_PING': {
+              safeSend(socket, {
+                type: 'SYNC_PONG',
+                roomId: roomCode,
+                schemaVersion: 1,
+                clientSentAtMs: msg.clientSentAtMs ?? Date.now(),
+                serverReceivedAtMs: Date.now(),
+                serverTimestampMs: Date.now(),
+              });
+              break;
+            }
+
+            case 'RESUME': {
+              const lastSeq = Number(msg.lastSeq ?? 0);
+              const replay = await roomEventService.getReplaySince(roomCode, lastSeq);
+              if (!replay.requiresResync) {
+                for (const ev of replay.events) safeSend(socket, ev);
+              } else {
+                const snapshot = await RoomSessionService.getRoomSnapshot(roomCode, userId);
+                safeSend(socket, {
+                  eventId: crypto.randomUUID(),
+                  schemaVersion: 1,
+                  roomId: roomCode,
+                  type: 'INIT_STATE',
+                  seq: snapshot.seq,
+                  revision: snapshot.queueRevision,
+                  serverTimestampMs: Date.now(),
+                  actorId: userId,
+                  payload: snapshot,
+                  state: snapshot,
+                });
+              }
+              break;
+            }
+
+            case 'REQUEST_RESYNC': {
+              const snapshot = await RoomSessionService.getRoomSnapshot(roomCode, userId);
+              safeSend(socket, {
+                eventId: crypto.randomUUID(),
+                schemaVersion: 1,
+                roomId: roomCode,
+                type: 'INIT_STATE',
+                seq: snapshot.seq,
+                revision: snapshot.queueRevision,
+                serverTimestampMs: Date.now(),
+                actorId: userId,
+                payload: snapshot,
+                state: snapshot,
+              });
+              break;
+            }
+
+            case 'HOST_PLAY': {
+              await QueueManagementService.playTrackOrResume(
+                roomCode,
+                userId,
+                msg.trackId,
+                Number(msg.positionSec ?? (msg.positionMs ? msg.positionMs / 1000 : 0)),
+                msg.track
+              );
+              break;
+            }
+
+            case 'HOST_PAUSE': {
+              await QueueManagementService.pausePlayback(
+                roomCode,
+                userId,
+                msg.positionSec !== undefined ? Number(msg.positionSec) : undefined
+              );
+              break;
+            }
+
+            case 'HOST_SEEK':
+            case 'SEEK_TO': {
+              const ms =
+                msg.positionMs !== undefined
+                  ? Number(msg.positionMs)
+                  : Number(msg.positionSec || 0) * 1000;
+              await QueueManagementService.seekPlayback(roomCode, userId, ms);
+              break;
+            }
+
+            case 'QUEUE_ADD': {
+              if (!roomStore.checkRateLimit(`ws_queue:${roomCode}:${userId}`, 5, 1000)) {
+                safeSend(socket, { type: 'ERROR', code: 'RATE_LIMITED', message: 'Slow down adding tracks' });
+                return;
+              }
+              const res = await QueueManagementService.addTrack(
+                roomCode,
+                userId,
+                msg.track || msg
+              );
+              if (res.kind === 'REQUESTED') {
+                safeSend(socket, { type: 'REQUEST_SUBMITTED', request: res.request });
+              }
+              break;
+            }
+
+            case 'QUEUE_REMOVE': {
+              await QueueManagementService.removeQueueItem(
+                roomCode,
+                userId,
+                String(msg.itemId),
+                msg.baseRevision !== undefined ? Number(msg.baseRevision) : undefined
+              );
+              break;
+            }
+
+            case 'QUEUE_REORDER': {
+              await QueueManagementService.reorderQueue(
+                roomCode,
+                userId,
+                Number(msg.fromIndex),
+                Number(msg.toIndex),
+                msg.baseRevision !== undefined ? Number(msg.baseRevision) : undefined
+              );
+              break;
+            }
+
+            case 'SKIP_VOTE': {
+              await QueueManagementService.voteOrForceSkip(
+                roomCode,
+                userId,
+                Boolean(msg.force)
+              );
+              break;
+            }
+
+            case 'CHAT_MESSAGE': {
+              if (!roomStore.checkRateLimit(`ws_chat:${roomCode}:${userId}`, 5, 1000)) {
+                safeSend(socket, { type: 'ERROR', code: 'RATE_LIMITED', message: 'Chat rate limit exceeded' });
+                return;
+              }
+              await RoomPhase2Service.sendChat(
+                roomCode,
+                userId,
+                String(msg.text || ''),
+                msg.replyToId,
+                msg.replyToText
+              );
+              break;
+            }
+
+            case 'REACTION':
+            case 'HOST_REACTION': {
+              if (!roomStore.checkRateLimit(`ws_react:${roomCode}:${userId}`, 10, 1000)) {
+                return;
+              }
+              await RoomPhase2Service.sendReaction(
+                roomCode,
+                userId,
+                String(msg.emoji || '🔥'),
+                msg.positionMs !== undefined ? Number(msg.positionMs) : undefined,
+                msg.trackId
+              );
+              break;
+            }
+
+            case 'BUFFER_READY': {
+              roomStore.updatePresence(roomCode, userId, {
+                bufferReady: msg.ready !== undefined ? Boolean(msg.ready) : true,
+              });
+              broadcastEnvelope(roomCode, roomEventService.buildEphemeral(
+                roomCode,
+                'MEMBER_BUFFER_READY',
+                0,
+                0,
+                { userId, ready: msg.ready !== undefined ? Boolean(msg.ready) : true },
+                userId
+              ), { userId, ready: msg.ready !== undefined ? Boolean(msg.ready) : true });
+              break;
+            }
+
+            case 'HAND_RAISE': {
+              await RoomMembershipService.setHandRaised(
+                roomCode,
+                userId,
+                msg.raised !== undefined ? Boolean(msg.raised) : true
+              );
+              break;
+            }
+
+            case 'LEAVE_ROOM': {
+              await RoomSessionService.leaveRoom(roomCode, userId);
+              socket.close();
+              break;
+            }
+
+            default:
+              break;
+          }
+
+          if (commandId) {
+            safeSend(socket, { type: 'ACK', commandId, ok: true });
+          }
+        } catch (err: any) {
+          safeSend(socket, {
+            type: 'ERROR',
+            commandId,
+            code: err?.code || 'WS_COMMAND_ERROR',
+            message: err?.message || 'Action failed',
+            ...(err?.extra || {}),
+          });
         }
       });
 
-      // Handle socket disconnect
-      socket.on('close', async () => {
-        const sockets = roomSockets.get(roomCode);
-        if (sockets) {
-          sockets.delete(client);
-          if (sockets.size === 0) {
-            roomSockets.delete(roomCode);
-          }
-        }
-
-        const updatedRoom = await TogetherRoomService.removeMember(roomCode, userId);
-        if (updatedRoom) {
-          broadcastToRoom(roomCode, {
-            type: 'MEMBER_LEFT',
-            userId,
-            username,
-            newHostId: updatedRoom.hostId,
-            members: updatedRoom.members,
-          });
+      socket.on('close', () => {
+        const set = roomSockets.get(roomCode);
+        if (set) {
+          set.delete(client);
+          if (set.size === 0) roomSockets.delete(roomCode);
         }
       });
     }
   );
 }
-

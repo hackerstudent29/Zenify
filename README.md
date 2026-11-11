@@ -1,6 +1,6 @@
 <div align="center">
   <br />
-  <a href="https://listenzenify.com">
+  <a href="https://listenzenify.vercel.app">
     <img src="assets/images/zenify_logo_animation.gif" alt="Zenify: Free Ad-Free Music Streaming App & Spotify Alternative" width="560" />
   </a>
   <br />
@@ -11,7 +11,7 @@
   </p>
 
   <p>
-    <a href="https://listenzenify.com"><img src="https://img.shields.io/badge/🚀_Live_Web_App-listenzenify.com-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
+    <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/🚀_Live_Web_App-listenzenify.vercel.app-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
     <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v1.0.8-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
     <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v1.0.8-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="MIT License" /></a>
@@ -59,10 +59,10 @@ Install the native **Zenify Android application** directly to your smartphone or
 <div align="center">
   <br />
   <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk">
-    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.8)-32.4_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download Zenify APK Package" height="46" />
+    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.8)-46.2_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download Zenify APK Package" height="46" />
   </a>
   <br />
-  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk">zenify-v1.0.8.apk (ARM64 32.4 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8-universal.apk">Universal APK (73.0 MB)</a> • <a href="https://listenzenify.com/download">Web Direct & QR</a></i></p>
+  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk">zenify-v1.0.8.apk (ARM64 46.2 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8-universal.apk">Universal APK (112.5 MB)</a> • <a href="https://listenzenify.vercel.app/download">Web Direct & QR</a></i></p>
   <br />
   <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fhackerstudent29%2FZenify%2Freleases%2Fdownload%2Fv1.0.8%2Fzenify-v1.0.8.apk&format=svg&color=ffffff&bgcolor=121214" alt="Scan QR Code to Download Zenify APK" width="180" />
   <p><b>Scan with your phone's camera to download directly</b></p>
@@ -75,6 +75,15 @@ Install the native **Zenify Android application** directly to your smartphone or
 2. **Open the File**: When the download completes, tap **Open** from your notification tray, or open your phone's **Files** or **Downloads** folder and tap `zenify.apk`.
 3. **Allow Unknown Apps**: If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings** and turn on **Allow from this source**.
 4. **Tap Install**: Tap **Install**. In seconds, installation will finish. Open Zenify to stream high-bitrate ad-free music with synced lyrics and lock-screen controls!
+
+### 📦 Package & Checksum Details (`v1.0.8` / Build `12`)
+| Field | Value |
+|---|---|
+| **Application ID** | `com.zenify.mobile` |
+| **Release Version** | `v1.0.8` (Android `versionCode`: `12`, Min SDK: Android 8.0 / API 26) |
+| **ARM64 Split APK (`zenify-v1.0.8.apk`)** | `46.2 MB` (`48,425,457` bytes) — SHA-256: `830ECF4974057D5AC4B83E05AF55C0BED3D1AAE915109844095875B6079FC1D7` |
+| **Universal APK (`zenify-v1.0.8-universal.apk`)** | `112.5 MB` (`117,980,091` bytes) — SHA-256: `D536EEEF7914E7649AED3C625243AB13522151E78C13D096DF2D878F57991622` |
+| **Included Highlights** | Room Together Phase 1 & 2 (LiveKit voice chat, synced lyrics, moments, reactions, song requests, custom themes, QR/WhatsApp deep links, PNG recaps), bundled SF Pro typography, Dynamic Island notifications, Apple Music Search & Auth/Onboarding redesigns |
 
 ---
 
@@ -124,9 +133,10 @@ Install the native **Zenify Android application** directly to your smartphone or
 * **Smooth Spring Physics**: Natural iOS-grade spring transitions and overscroll bounce.
 
 ### 👥 Room Together — Synchronized Live Listening
-* **Listen with Friends**: Host synchronized listening rooms and invite friends anywhere in the world.
-* **Low-Drift Sync Engine**: Clock-drift compensation ensures all participants hear the exact same beat simultaneously.
-* **Shared Queue & Fair Queueing**: Round-robin song requests and real-time chat with song dedication tags.
+* **Listen with Friends in Real Time**: Host or join persistent synchronized rooms (`/api/v1/together`, `/ws/together` with `RESUME` sequence replay and automatic 90-second host failover).
+* **LiveKit Spatial Voice Chat & Reactions**: Built-in low-latency voice channels, mute/speaker controls, live emoji reactions with reaction timeline, and threaded chat messages (reply/edit/delete).
+* **Synced Room Lyrics, Moments & Fair Queueing**: Real-time karaoke lyrics with translation and romanization toggles, pinned timestamped song moments, RBAC waiting-room approvals, song request queue & DJ permissions, and room taste discovery.
+* **Themes, Deep Links, Insights & PNG Recaps**: Custom Apple-inspired room themes, expiring QR & WhatsApp invite deep links (`zenify://room`, `https://listenzenify.vercel.app/together`, `https://listenzenify.vercel.app/j/<code>`), room achievements, analytics, and shareable high-res PNG room recap cards.
 
 ### 📁 Offline Local Music Player
 * **Play Device Audio Files**: Seamlessly play MP3, FLAC, WAV, M4A, and AAC files stored on your phone or computer.
@@ -155,19 +165,19 @@ Install the native **Zenify Android application** directly to your smartphone or
 ## 📲 How to Install Across Devices
 
 ### 🤖 Android (Native APK)
-1. Download **[Zenify APK v1.0.8 (32.4 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk)**.
+1. Download **[Zenify APK v1.0.8 (46.2 MB ARM64)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk)** (or **[Universal 112.5 MB](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8-universal.apk)**).
 2. Tap the downloaded file in your notification bar or **Downloads** folder.
 3. Enable **Allow from this source** in Settings if prompted.
 4. Tap **Install** and enjoy ad-free music streaming!
 
 ### 🍎 iOS & iPadOS (Apple Web App / PWA)
-1. Open **[listenzenify.com](https://listenzenify.com)** in **Safari**.
+1. Open **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in **Safari**.
 2. Tap the **Share** button (box with an upward arrow) in the toolbar.
 3. Scroll down and tap **Add to Home Screen**, then tap **Add**.
 4. Open Zenify directly from your iPhone home screen for an immersive full-screen experience with lock-screen controls!
 
 ### 💻 Desktop (Windows, macOS, Linux PWA)
-1. Open **[listenzenify.com](https://listenzenify.com)** in Google Chrome, Microsoft Edge, or Brave.
+1. Open **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in Google Chrome, Microsoft Edge, or Brave.
 2. Click the **Install** button in the browser address bar (or Menu → *Install Zenify*).
 3. Zenify will launch in a dedicated borderless window with keyboard media key support and taskbar integration.
 
@@ -177,31 +187,45 @@ Install the native **Zenify Android application** directly to your smartphone or
 
 Start listening immediately — **no sign-up, credit card, or subscription required**.
 
-* **Live Web Player**: Open **[listenzenify.com](https://listenzenify.com)** in any modern web browser.
-* **Download APK**: Direct download **[Zenify APK v1.0.8 (32.4 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk)**.
+* **Live Web Player**: Open **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in any modern web browser.
+* **Download APK**: Direct download **[Zenify APK v1.0.8 (46.2 MB ARM64)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk)** • **[Universal APK (112.5 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8-universal.apk)**.
 
 ---
 
-## 🏛️ Architecture & Tech Stack
+## 🏛️ Architecture & Project Structure
 
+> Explore the complete monorepo map in **[`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md)** and system data flows in **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**.
+
+```text
+Zenify/
+├── .github/                  # CI/CD workflows (lint, security, test, release) & templates
+├── assets/                   # Shared logos, display fonts & promotional artwork
+├── backend/                  # API Server (Node.js, Fastify 5, Prisma ORM, PostgreSQL, Redis, WebSockets)
+│   ├── src/routes/           # Tracks, search, albums, artists, auth, lyrics & Room Together v1 endpoints
+│   ├── src/services/         # JioSaavn Clean CDN, InnerTube, personalization & modular together/ engine
+│   └── tests/                # Automated test suites
+├── frontend/                 # Web PWA (React 19, Vite 6, React Router, Tailwind CSS v4, Web Audio API)
+│   ├── public/downloads/     # Distributed Android release APK (zenify.apk) & SEO assets (sitemap, robots, llms.txt)
+│   ├── scripts/              # Build-time sitemap generation, route prerendering & SEO audit scripts
+│   └── src/app/              # Route views (Home, Discover, Download, Room Together, Track, Album, Artist)
+├── mobile/                   # Native Client (Flutter, Dart, Android Media3 ExoPlayer & Kotlin DSP)
+│   ├── android/              # Kotlin plugins (ZenInnerTubePlugin, ZenAudioPlugin, ZenFxProcessor, YtEngine)
+│   └── lib/                  # Design system, Room Together views, services & ZenPlayer engine
+├── scripts/                  # Deployment, secret scanning & mobile launch utilities
+├── docs/                     # Documentation hub, architecture specs, deployment guides & screenshots
+│   ├── README.md             # Documentation index
+│   ├── PROJECT_STRUCTURE.md  # Full monorepo folder tree & file locator
+│   ├── ARCHITECTURE.md       # System design, auth & audio pipeline
+│   └── architecture/         # Backend, frontend, schema & parity technical specs
+└── CHANGELOG.md              # Full release history (through v1.0.8)
 ```
-Zenify Workspace
-├── frontend/               # Web Application (React 19, Vite, Tailwind CSS v4, Framer Motion)
-│   ├── public/downloads/   # Distributed release packages (zenify.apk)
-│   └── src/app/download/   # Interactive download page with dynamic QR code
-├── mobile/                 # Native Mobile Client (Flutter 3.44, Dart 3.12, Android Media3)
-│   ├── android/            # Kotlin audio & streaming plugins (ZenInnerTubePlugin, ZenAudioPlugin, YtEngine)
-│   └── lib/                # Cross-platform views, services, state stores, and player engine
-├── backend/                # API Server (Node.js, Fastify, Prisma ORM, PostgreSQL, WebSockets)
-│   ├── src/routes/         # Tracks, search, albums, artists, auth, lyrics, and downloads
-│   └── src/services/       # JioSaavn Clean CDN, InnerTube, personalization, and cron schedulers
-└── docs/                   # Visual documentation, architectural guides, and screenshots
-```
+
+> **Docs**: [Documentation Hub](docs/README.md) • [Project Structure](docs/PROJECT_STRUCTURE.md) • [Architecture](docs/ARCHITECTURE.md) • [Developer Guide](docs/DEVELOPER.md) • [Troubleshooting](docs/TROUBLESHOOTING.md) • [Changelog](CHANGELOG.md)
 
 - **Frontend**: React 19, Vite, Tailwind CSS v4, Framer Motion, TanStack Query, Zustand, Radix UI.
-- **Mobile**: Flutter 3.44.2, Dart 3.12.2, Android Media3 ExoPlayer, Provider, Cupertino Icons, Google Fonts.
-- **Native Android Engine**: Kotlin coroutine dispatchers, PO-token generator, `RefusedRetryDataSource`, and hardware audio session routing.
-- **Backend API**: Node.js, Fastify, TypeScript, Prisma ORM, PostgreSQL, `@fastify/websocket`, JWT.
+- **Mobile**: Flutter 3.44.2, Dart 3.12.2, Android Media3 ExoPlayer, LiveKit Voice SDK, Provider, Cupertino Icons, Bundled SF Pro & SF Pro Display Typography.
+- **Native Android Engine**: Kotlin coroutine dispatchers, PO-token generator, `RefusedRetryDataSource`, hardware audio session routing, and R8/ProGuard WebRTC rules.
+- **Backend API**: Node.js, Fastify, TypeScript, Prisma ORM, PostgreSQL, `@fastify/websocket`, LiveKit Server SDK, JWT.
 - **Audio Delivery Pipeline**: Pristine JioSaavn Akamai 320kbps CDN resolution + yt-dlp / InnerTube stream proxy.
 
 ---

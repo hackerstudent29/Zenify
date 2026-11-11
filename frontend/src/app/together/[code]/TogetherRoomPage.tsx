@@ -356,7 +356,12 @@ export default function TogetherRoomPage() {
       style={{ fontFamily: FONT }}
       className="relative min-h-[100dvh] select-none overflow-hidden bg-black pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(4.5rem,env(safe-area-inset-top))] text-white antialiased sm:pt-20"
     >
-      <SEO title={`${roomName} – Listen Together – Zenify`} path={`/together/${roomCode}`} />
+      <SEO
+        title={`${roomName} – Listen Together – Zenify`}
+        description="Join a live synchronized Room Together music listening session on Zenify."
+        path={`/together/${encodeURIComponent(roomCode || "")}`}
+        noindex={true}
+      />
 
       {/* Floating reactions */}
       <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" aria-hidden>

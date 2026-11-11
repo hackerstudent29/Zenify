@@ -1,1830 +1,1207 @@
 import 'dart:async';
 import 'dart:math' as math;
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../design_system/widgets/apple_glass.dart';
-import '../../design_system/widgets/pressable_scale.dart';
-import '../../design_system/widgets/zen_button.dart';
-import '../../design_system/zen.dart';
+import '../../design_system/apple/apple_kit.dart';
+import '../../design_system/apple/apple_tokens.dart';
+import '../../models/room_models.dart';
 import '../../models/track.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/innertube_service.dart';
 import '../../services/player_state.dart';
 import '../../services/together_service.dart';
+import '../../models/room_phase2_models.dart';
+import '../../services/room_deep_links.dart';
+import 'achievements/achievements_screen.dart';
+import 'bookmarks/moments_sheet.dart';
+import 'insights/room_insights_screen.dart';
+import 'lyrics/lyrics.dart';
+import 'lyrics/lyrics_view.dart';
+import 'recap/room_recap_screen.dart';
+import 'theme/room_theme_ui.dart';
+import 'room_config_sheet.dart';
+import 'room_sheets.dart';
+import 'voice/voice_controller.dart';
+import 'voice/voice_sheet.dart';
+import 'widgets/floating_reactions.dart';
 
 class RoomTogetherScreen extends StatefulWidget {
   const RoomTogetherScreen({super.key});
-
   @override
   State<RoomTogetherScreen> createState() => _RoomTogetherScreenState();
 }
 
-class _FloatingEmoji {
-  _FloatingEmoji(this.emoji, this.left)
-      : id = DateTime.now().microsecondsSinceEpoch,
-        opacity = 1.0,
-        bottom = 120.0;
-  final int id;
-  final String emoji;
-  final double left;
-  double bottom;
-  double opacity;
-}
+class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksMixin, SingleTickerProviderStateMixin {
+  static const _emojis = ['❤️', '🔥', '👏', '😭', '💃', '🎧'];
 
-class _RoomTogetherScreenState extends State<RoomTogetherScreen>
-    with SingleTickerProviderStateMixin, HideDocksMixin {
-  // Lobby State
-  String _selectedMode = 'dj'; // 'dj' or 'collab'
-  final TextEditingController _joinCodeController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController(text: 'Guest Listener');
-  bool _isBusy = false;
+  // Lobby
+  String _mode = 'dj';
+  final _joinCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController(text: 'Guest Listener');
+  bool _busy = false;
 
-  // Live Room Tabs: 0: Queue, 1: Chat, 2: People, 3: Info
-  int _activeTab = 0;
-  final TextEditingController _chatController = TextEditingController();
-  final ScrollController _chatScrollController = ScrollController();
-  int _lastChatCount = 0;
+  // Live
+  int _tab = 0; // 0 Queue · 1 Chat · 2 People
+  final _chatCtrl = TextEditingController();
+  final _scroll = ScrollController();
+  final _fx = GlobalKey<FloatingReactionsState>();
 
-  // Real-Time Floating Reactions Overlay
-  final List<_FloatingEmoji> _activeEmojis = [];
-  Timer? _emojiTimer;
-  Map<String, int> _lastReactionCounts = {};
+  TogetherService? _together;
+  Map<String, int> _lastReactions = {};
+  int _lastChat = 0;
+  String _queueSig = '';
+  List<String>? _pendingOrder; // optimistic reorder until server echo
 
-  static const List<String> _reactionEmojis = ['❤️', '🔥', '👏', '😭', '💃', '🎧'];
+  // Phase 2
+  LyricsSession? _lyrics;
+  PlayerState? _player;
+  String _lyricsKey = '';
+  String? _lastCode;
+  String? _replyToId;
+  String? _replyToPreview;
+  final _deepLinks = RoomDeepLinks.instance;
 
   @override
-  void initState() {
-    super.initState();
-    _emojiTimer = Timer.periodic(const Duration(milliseconds: 32), (_) => _tickEmojis());
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_together == null) {
+      _together = context.read<TogetherService>()..addListener(_onTogether);
+      _lastReactions = Map.of(_together!.reactions);
+      _lastChat = _together!.chat.length;
+      _queueSig = _sig(_together!);
+      _player = context.read<PlayerState>();
+      _lyrics = LyricsSession(
+        repo: LyricsRepository(({required String title, required String artist, required int durationSec}) => _together!.fetchLyrics(title: title, artist: artist, durationSec: durationSec)),
+        vsync: this,
+        position: () => _player!.livePosition.inMilliseconds,
+      );
+      _deepLinks.addListener(_onDeepLink);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncLyrics(_together!);
+        _onDeepLink();
+      });
+    }
+  }
+
+  void _syncLyrics(TogetherService t) {
+    final cur = t.currentTrack;
+    if (!t.inRoom || cur == null) return;
+    final k = LyricsRepository.key(cur.title, cur.artist);
+    if (k == _lyricsKey) return;
+    _lyricsKey = k;
+    final next = t.queue.isEmpty ? null : t.queue.first.track;
+    _lyrics?.setTrack(title: cur.title, artist: cur.artist, durationSec: cur.durationSeconds, nextTitle: next?.title, nextArtist: next?.artist, nextDurationSec: next?.durationSeconds);
+  }
+
+  void _onDeepLink() {
+    final t = _together;
+    if (t == null || t.inRoom || !mounted) return;
+    final link = _deepLinks.consume();
+    if (link == null) return;
+    _joinCtrl.text = link.code;
+    _join(t, inviteToken: link.token);
   }
 
   @override
   void dispose() {
-    _emojiTimer?.cancel();
-    _chatController.dispose();
-    _chatScrollController.dispose();
-    _joinCodeController.dispose();
-    _nameController.dispose();
+    _together?.removeListener(_onTogether);
+    _deepLinks.removeListener(_onDeepLink);
+    _lyrics?.dispose();
+    _joinCtrl.dispose();
+    _nameCtrl.dispose();
+    _chatCtrl.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
-  void _spawnEmoji(String emoji) {
-    if (!mounted) return;
-    final rng = math.Random();
-    final leftPos = 40.0 + rng.nextDouble() * (MediaQuery.of(context).size.width - 100.0);
-    setState(() {
-      _activeEmojis.add(_FloatingEmoji(emoji, leftPos));
-    });
-  }
+  String _sig(TogetherService t) => t.queue.map((e) => e.id).join(',');
 
-  void _triggerReaction(TogetherService together, String emoji) {
-    HapticFeedback.lightImpact();
-    _spawnEmoji(emoji);
-    together.sendReaction(emoji);
-  }
-
-  void _tickEmojis() {
-    if (_activeEmojis.isEmpty) return;
-    setState(() {
-      for (final e in _activeEmojis) {
-        e.bottom += 4.5;
-        e.opacity -= 0.022;
+  // Side effects live here, never in build().
+  void _onTogether() {
+    final t = _together!;
+    if (t.inRoom) _lastCode = t.roomCode;
+    _syncLyrics(t);
+    if (!t.inRoom) {
+      _lyricsKey = '';
+      // Recap: server says it is ready after a room ends.
+      if (t.recapReady && _lastCode != null && mounted) {
+        final code = _lastCode!;
+        _lastCode = null;
+        t.recapReady = false;
+        t.clearPhase2State();
+        Navigator.of(context).push(CupertinoPageRoute<void>(builder: (_) => RoomRecapScreen(roomRef: code)));
       }
-      _activeEmojis.removeWhere((e) => e.opacity <= 0.05 || e.bottom > 620);
-    });
-  }
+    }
+    // Peer reactions → floating burst
+    for (final e in t.reactions.entries) {
+      final prev = _lastReactions[e.key] ?? 0;
+      if (e.value > prev) _fx.currentState?.burst(e.key, count: math.min(3, e.value - prev));
+    }
+    _lastReactions = Map.of(t.reactions);
 
-  void _sendMessage(TogetherService together) {
-    final text = _chatController.text.trim();
-    if (text.isEmpty) return;
-    HapticFeedback.selectionClick();
-    together.sendChat(text);
-    _chatController.clear();
-  }
-
-  void _copyRoomCode(String code) {
-    Clipboard.setData(ClipboardData(text: code));
-    HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Room code $code copied to clipboard!'),
-        backgroundColor: const Color(0xFF18181B),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _showLeaveDialog(TogetherService together) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF18181B),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        title: const Text(
-          'Leave Session?',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        content: const Text(
-          'You will be disconnected from the synchronized playback room.',
-          style: TextStyle(color: Colors.white70, fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('CANCEL', style: TextStyle(color: Colors.white60, fontSize: 12)),
-          ),
-          ZenButton(
-            label: 'LEAVE',
-            compact: true,
-            accentColor: Zen.rose,
-            onTap: () {
-              Navigator.of(ctx).pop();
-              together.leaveRoom();
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openAddTrackSheet(BuildContext context, TogetherService together) {
-    final userQueuedCount = together.queue.where((i) => i.addedByUserId == together.myUserId).length;
-    if (userQueuedCount >= 3 && !together.isHost) {
-      HapticFeedback.heavyImpact();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Fair Queue Cap: You have 3 active songs in queue. Let others take a turn!'),
-          backgroundColor: Color(0xFF18181B),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
+    // Server echo clears optimistic order
+    final sig = _sig(t);
+    if (sig != _queueSig) {
+      _queueSig = sig;
+      if (_pendingOrder != null && mounted) setState(() => _pendingOrder = null);
     }
 
-    showModalBottomSheet<void>(
+    // Chat: stick to bottom only if user is already near it
+    if (t.chat.length > _lastChat) {
+      _lastChat = t.chat.length;
+      if (_tab == 1) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_scroll.hasClients) return;
+          final nearBottom = _scroll.position.maxScrollExtent - _scroll.offset < 260;
+          if (nearBottom) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
+        });
+      }
+    }
+  }
+
+  // ───────────────────────── Actions ─────────────────────────
+
+  void _react(TogetherService t, String e, {int burst = 1}) {
+    _fx.currentState?.burst(e, count: burst);
+    t.sendReaction(e);
+  }
+
+  String? get _guestName {
+    final n = _nameCtrl.text.trim();
+    return n.isEmpty ? null : n;
+  }
+
+  Future<void> _create(TogetherService t) async {
+    final cfg = await showRoomConfigSheet(context, mode: _mode, hostName: _nameCtrl.text.trim().isEmpty ? 'My' : _nameCtrl.text.trim());
+    if (cfg == null || !mounted) return;
+    setState(() => _busy = true);
+    final ok = await t.createRoom(mode: _mode, guestName: _guestName, config: cfg);
+    if (ok && cfg.coverPath != null) {
+      // Best-effort; room already exists. Failure is surfaced, not silent.
+      final up = await t.uploadRoomCover(t.roomCode, cfg.coverPath!);
+      if (!up && mounted) appleToast(context, 'Room created, but the cover could not upload.');
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!ok) {
+      HapticFeedback.heavyImpact();
+      appleToast(context, _errorText(t.lastRoomError, 'Could not create the room.'), icon: CupertinoIcons.exclamationmark_circle);
+    }
+  }
+
+  Future<void> _join(TogetherService t, {String? password, String? inviteToken}) async {
+    final code = _joinCtrl.text.trim();
+    if (code.length < 6) {
+      HapticFeedback.heavyImpact();
+      appleToast(context, 'Room codes have 6 characters.');
+      return;
+    }
+    setState(() => _busy = true);
+    final ok = await t.joinRoom(code, guestName: _guestName, password: password, inviteToken: inviteToken);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) return;
+    HapticFeedback.heavyImpact();
+    final err = t.lastRoomError;
+    if (err == 'PASSWORD_REQUIRED' || err == 'PASSWORD_INVALID') {
+      final pw = await _askPassword(wrong: err == 'PASSWORD_INVALID');
+      if (pw != null && mounted) await _join(t, password: pw, inviteToken: inviteToken);
+    } else if (err == 'INVITE_INVALID') {
+      appleToast(context, 'This invitation expired or was revoked.', icon: CupertinoIcons.link);
+    } else if (err == 'WAITING_APPROVAL') {
+      appleToast(context, 'Waiting for the host to let you in…', icon: CupertinoIcons.hourglass);
+    } else {
+      appleToast(context, _errorText(err, 'Could not join "$code".'), icon: CupertinoIcons.exclamationmark_circle);
+    }
+  }
+
+  String _errorText(String? code, String fallback) => switch (code) {
+        'ROOM_FULL' => 'This room is full.',
+        'BLOCKED' => 'You cannot join this room.',
+        'ROOM_NOT_FOUND' => 'No room with that code.',
+        'ROOM_ENDED' => 'That room has ended.',
+        'RATE_LIMITED' => 'Too many attempts. Wait a moment.',
+        'NETWORK' => 'No connection. Check your network.',
+        _ => fallback,
+      };
+
+  Future<String?> _askPassword({bool wrong = false}) {
+    final c = TextEditingController();
+    return showCupertinoDialog<String>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _AddTrackModalSheet(together: together),
+      builder: (ctx) => CupertinoAlertDialog(
+        title: const Text('Room password'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(children: [
+            if (wrong) const Padding(padding: EdgeInsets.only(bottom: 8), child: Text('Wrong password. Try again.', style: TextStyle(color: CupertinoColors.systemRed, fontSize: 13))),
+            CupertinoTextField(controller: c, obscureText: true, autofocus: true, placeholder: 'Password'),
+          ]),
+        ),
+        actions: [
+          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          CupertinoDialogAction(isDefaultAction: true, onPressed: () => Navigator.pop(ctx, c.text), child: const Text('Join')),
+        ],
+      ),
+    ).whenComplete(c.dispose);
+  }
+
+  Future<void> _send(TogetherService t) async {
+    final text = _chatCtrl.text.trim();
+    if (text.isEmpty) return;
+    HapticFeedback.selectionClick();
+    final reply = _replyToId;
+    _chatCtrl.clear();
+    setState(() {
+      _replyToId = null;
+      _replyToPreview = null;
+    });
+    if (reply != null) {
+      final ok = await t.sendChatReply(text, reply);
+      if (!ok && mounted) {
+        _chatCtrl.text = text;
+        appleToast(context, 'Message not sent.');
+      }
+    } else {
+      t.sendChat(text);
+    }
+  }
+
+  String? _chatId(TogetherChatMessage m) => m.id.isEmpty ? null : m.id;
+
+  Future<void> _chatActions(TogetherService t, TogetherChatMessage m) async {
+    final id = _chatId(m);
+    final mine = m.userId == t.myUserId;
+    final canMod = t.can(RoomPermission.moderateChat);
+    final choice = await appleActionSheet<String>(context, options: [
+      if (id != null) ('Reply', 'reply', destructive: false),
+      ('Copy', 'copy', destructive: false),
+      if (id != null && mine) ('Edit', 'edit', destructive: false),
+      if (id != null && (mine || canMod)) ('Delete', 'delete', destructive: true),
+    ]);
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case 'reply':
+        setState(() {
+          _replyToId = id;
+          _replyToPreview = '${m.username}: ${m.text}';
+        });
+      case 'copy':
+        Clipboard.setData(ClipboardData(text: m.text));
+        appleToast(context, 'Copied');
+      case 'edit':
+        final c = TextEditingController(text: m.text);
+        final txt = await showCupertinoDialog<String>(
+          context: context,
+          builder: (ctx) => CupertinoAlertDialog(
+            title: const Text('Edit message'),
+            content: Padding(padding: const EdgeInsets.only(top: 12), child: CupertinoTextField(controller: c, maxLength: 500, autofocus: true)),
+            actions: [
+              CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              CupertinoDialogAction(isDefaultAction: true, onPressed: () => Navigator.pop(ctx, c.text.trim()), child: const Text('Save')),
+            ],
+          ),
+        );
+        c.dispose();
+        if (txt != null && txt.isNotEmpty && txt != m.text && id != null) {
+          final ok = await t.editChat(id, txt);
+          if (!ok && mounted) appleToast(context, 'Could not edit.');
+        }
+      case 'delete':
+        if (id != null) {
+          final ok = await t.deleteChat(id);
+          if (!ok && mounted) appleToast(context, 'Could not delete.');
+        }
+    }
+  }
+
+  void _openAdd(TogetherService t) {
+    final mine = t.queue.where((i) => i.addedByUserId == t.myUserId).length;
+    if (mine >= 3 && !t.can(RoomPermission.queueManage)) {
+      HapticFeedback.heavyImpact();
+      appleToast(context, 'You have 3 songs queued. Let others take a turn.', icon: CupertinoIcons.person_2);
+      return;
+    }
+    AppleSheet.show<void>(context, initial: 0.85, builder: (ctx, sc) => _AddTrackBody(scroll: sc, together: t));
+  }
+
+  // ───────────────────────── Build ─────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.watch<TogetherService>();
+    final art = t.inRoom ? (t.currentTrack?.coverUrl ?? '') : '';
+
+    return Scaffold(
+      backgroundColor: AT.bg,
+      resizeToAvoidBottomInset: true,
+      body: RoomThemeScope(
+        theme: t.roomTheme,
+        child: Stack(children: [
+          Positioned.fill(child: RoomAmbient(theme: t.inRoom ? t.roomTheme : const RoomTheme(), artworkUrl: art)),
+          SafeArea(bottom: false, child: t.inRoom ? _live(t) : _lobby(t)),
+          Positioned.fill(child: FloatingReactions(key: _fx)),
+          if (t.inRoom) const AchievementUnlockOverlay(),
+        ]),
+      ),
     );
+  }
+
+  // ───────────────────────── Lobby ─────────────────────────
+
+  Widget _lobby(TogetherService t) {
+    return Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Row(children: [CircleIconButton(icon: CupertinoIcons.chevron_left, onTap: () => Navigator.of(context).pop())]),
+      ),
+      Expanded(
+        child: ListView(
+          physics: const BouncingScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.paddingOf(context).bottom + 32),
+          children: [
+            const Text('Room Together', style: AT.largeTitle),
+            const SizedBox(height: 8),
+            const Text('Listen to the same song at the same moment. Queue, chat and react together.', style: AT.subhead),
+            const SizedBox(height: 28),
+            PillTabs(labels: const ['DJ Session', 'Jam Session'], index: _mode == 'dj' ? 0 : 1, onChanged: (i) => setState(() => _mode = i == 0 ? 'dj' : 'collab')),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: Padding(
+                key: ValueKey(_mode),
+                padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
+                child: Text(_mode == 'dj' ? 'The host and chosen roles control playback. Everyone else listens and votes to skip.' : 'Everyone can play, pause and skip.', style: AT.footnote),
+              ),
+            ),
+            const SizedBox(height: 28),
+            _field(controller: _nameCtrl, placeholder: 'Your name', icon: CupertinoIcons.person_fill),
+            const SizedBox(height: 14),
+            PillButton(label: 'Create Room', icon: CupertinoIcons.plus, expand: true, loading: _busy, onTap: _busy ? null : () => _create(t)),
+            const SizedBox(height: 28),
+            Row(children: [
+              const Expanded(child: Divider(color: AT.hairline, height: 0.5)),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('OR JOIN', style: AT.micro.copyWith(color: AT.label3))),
+              const Expanded(child: Divider(color: AT.hairline, height: 0.5)),
+            ]),
+            const SizedBox(height: 20),
+            Row(children: [
+              Expanded(
+                child: _field(
+                  controller: _joinCtrl,
+                  placeholder: 'ROOM CODE',
+                  icon: CupertinoIcons.number,
+                  formatters: [_CodeFormatter()],
+                  textStyle: AT.headline.copyWith(letterSpacing: 3),
+                  onSubmit: (_) => _busy ? null : _join(t),
+                ),
+              ),
+              const SizedBox(width: 10),
+              PillButton(label: 'Join', style: PillStyle.glass, onTap: _busy ? null : () => _join(t)),
+            ]),
+            const SizedBox(height: 36),
+            Row(children: [
+              Expanded(child: PillButton(label: 'Insights', icon: CupertinoIcons.chart_bar_fill, compact: true, style: PillStyle.glass, onTap: () => Navigator.of(context).push(CupertinoPageRoute<void>(builder: (_) => const RoomInsightsScreen())))),
+              const SizedBox(width: 10),
+              Expanded(child: PillButton(label: 'Achievements', icon: CupertinoIcons.rosette, compact: true, style: PillStyle.glass, onTap: () => Navigator.of(context).push(CupertinoPageRoute<void>(builder: (_) => const AchievementsScreen())))),
+            ]),
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  Widget _field({required TextEditingController controller, required String placeholder, required IconData icon, List<TextInputFormatter>? formatters, TextStyle? textStyle, ValueChanged<String>? onSubmit}) {
+    return CupertinoTextField(
+      controller: controller,
+      placeholder: placeholder,
+      placeholderStyle: AT.callout.copyWith(color: AT.label3),
+      style: textStyle ?? AT.callout,
+      inputFormatters: formatters,
+      onSubmitted: onSubmit,
+      textCapitalization: TextCapitalization.characters,
+      prefix: Padding(padding: const EdgeInsets.only(left: 16), child: Icon(icon, size: 18, color: AT.label2)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+      decoration: BoxDecoration(color: AT.fill, borderRadius: BorderRadius.circular(AT.rPill)),
+    );
+  }
+
+  // ───────────────────────── Live room ─────────────────────────
+
+  Widget _live(TogetherService t) {
+    final player = context.watch<PlayerState>();
+    final cfg = t.roomConfig;
+    final bottom = MediaQuery.paddingOf(context).bottom;
+
+    return Column(children: [
+      _topBar(t, cfg),
+      Expanded(
+        child: CustomScrollView(
+          controller: _scroll,
+          physics: const BouncingScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          slivers: [
+            SliverToBoxAdapter(child: _nowPlaying(t, player)),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: PillTabs(
+                  labels: const ['Queue', 'Chat', 'People'],
+                  index: _tab,
+                  badges: [t.queue.length, null, t.memberCount],
+                  onChanged: (i) {
+                    setState(() => _tab = i);
+                    if (i == 1) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (_scroll.hasClients) _scroll.animateTo(_scroll.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+            ..._tabSlivers(t),
+            SliverToBoxAdapter(child: SizedBox(height: _tab == 1 ? 12 : bottom + 40)),
+          ],
+        ),
+      ),
+      AnimatedSize(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.bottomCenter,
+        child: _tab == 1 ? _composer(t, bottom) : const SizedBox(width: double.infinity),
+      ),
+    ]);
+  }
+
+  Widget _topBar(TogetherService t, RoomConfig? cfg) {
+    final title = (cfg?.name.isNotEmpty ?? false) ? cfg!.name : 'Room Together';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(children: [
+        CircleIconButton(icon: CupertinoIcons.chevron_down, onTap: () => Navigator.of(context).pop(), tooltip: 'Minimise'),
+        Expanded(
+          child: Column(children: [
+            Text(title, style: AT.headline, maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 2),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              _SyncDot(health: t.syncHealth),
+              const SizedBox(width: 6),
+              Text('${t.roomCode} · ${t.mode == 'collab' ? 'Jam' : 'DJ'}', style: AT.caption),
+            ]),
+          ]),
+        ),
+        CircleIconButton(icon: CupertinoIcons.ellipsis, onTap: () => showRoomMenu(context), tooltip: 'Room'),
+      ]),
+    );
+  }
+
+  // ───────────────────────── Now playing ─────────────────────────
+
+  Widget _nowPlaying(TogetherService t, PlayerState player) {
+    final Track? cur = t.currentTrack ?? player.currentTrack;
+    final canPlay = t.can(RoomPermission.playback);
+    final size = math.min(MediaQuery.sizeOf(context).width - 72, 320.0);
+    final cover = cur?.coverUrl ?? '';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Artwork: tap → full screen (shared element), double-tap → hearts
+        Center(
+          child: GestureDetector(
+            onDoubleTap: () {
+              HapticFeedback.mediumImpact();
+              _react(t, '❤️', burst: 5);
+            },
+            onTap: cover.isEmpty ? null : () => Navigator.of(context).push(PageRouteBuilder<void>(opaque: false, barrierColor: Colors.black87, transitionDuration: const Duration(milliseconds: 420), reverseTransitionDuration: const Duration(milliseconds: 320), pageBuilder: (_, a, _) => FadeTransition(opacity: a, child: _FullArtwork(url: cover)))),
+            child: Hero(
+              tag: 'room-artwork',
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 420),
+                switchInCurve: Curves.easeOutCubic,
+                transitionBuilder: (c, a) => FadeTransition(opacity: a, child: ScaleTransition(scale: Tween(begin: 0.96, end: 1.0).animate(a), child: c)),
+                child: _Artwork(key: ValueKey(cover), url: cover, size: size),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+        Text(cur?.title ?? 'Nothing playing', style: AT.title3, maxLines: 1, overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 2),
+        Text(cur?.artist ?? (canPlay ? 'Add a song to start' : 'Waiting for the host'), style: AT.subhead.copyWith(fontSize: 17), maxLines: 1, overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 16),
+        _ProgressBar(durationSeconds: cur?.durationSeconds ?? 0, onSeek: canPlay && cur != null ? (ms) async { final ok = await t.seekRoom(ms); if (!ok && mounted) appleToast(context, 'Could not seek.'); } : null),
+        const SizedBox(height: 14),
+        _controls(t, cur, canPlay),
+        const SizedBox(height: 16),
+        ReactionPill(emojis: _emojis, counts: t.reactions, onReact: (e) => _react(t, e)),
+        const SizedBox(height: 16),
+        if (_lyrics != null && cur != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: LyricsPreview(
+              session: _lyrics!,
+              onOpen: () => openFullscreenLyrics(context, session: _lyrics!, title: cur.title, artist: cur.artist, coverUrl: cur.coverUrl, onSeek: canPlay ? (ms) => t.seekRoom(ms) : null),
+            ),
+          ),
+        _presence(t),
+      ]),
+    );
+  }
+
+  Widget _controls(TogetherService t, Track? cur, bool canPlay) {
+    final detached = t.leaveSync;
+    return Row(children: [
+      Expanded(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: PillButton(
+            label: detached ? 'Rejoin Live' : 'Live',
+            icon: detached ? CupertinoIcons.arrow_2_circlepath : CupertinoIcons.dot_radiowaves_left_right,
+            compact: true,
+            style: detached ? PillStyle.filled : PillStyle.glass,
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              t.toggleLeaveSync();
+            },
+          ),
+        ),
+      ),
+      _PlayPause(
+        playing: t.isPlaying,
+        enabled: canPlay,
+        onTap: () {
+          final pos = context.read<PlayerState>().livePosition.inMilliseconds / 1000.0;
+          if (t.isPlaying) {
+            t.hostPause(pos);
+          } else if (cur != null) {
+            t.hostPlay(cur, pos);
+          }
+        },
+        onDenied: () => appleToast(context, 'Only people with playback control can do that.', icon: CupertinoIcons.lock_fill),
+      ),
+      Expanded(
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: PillButton(
+            label: canPlay ? 'Skip' : 'Skip ${t.skipVotes.length}/${t.skipVotesNeeded}',
+            icon: CupertinoIcons.forward_fill,
+            compact: true,
+            style: t.hasVotedSkip ? PillStyle.filled : PillStyle.glass,
+            onTap: () => canPlay ? t.hostSkipNext() : t.voteSkip(),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _presence(TogetherService t) {
+    final v = context.watch<VoiceController>();
+    final shown = t.members.take(5).toList();
+    final extra = t.members.length - shown.length;
+    return Row(children: [
+      Expanded(
+        child: SpringPressable(
+          onTap: () => setState(() => _tab = 2),
+          child: Row(children: [
+            SizedBox(
+              height: 32,
+              width: 32.0 + (shown.length - 1).clamp(0, 5) * 22 + (extra > 0 ? 22 : 0),
+              child: Stack(children: [
+                for (var i = 0; i < shown.length; i++)
+                  AnimatedPositioned(
+                    key: ValueKey(shown[i].userId),
+                    duration: const Duration(milliseconds: 380),
+                    curve: SpringCurve(),
+                    left: i * 22.0,
+                    child: Container(
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AT.bg, width: 2)),
+                      child: Avatar(name: shown[i].username, size: 32, ring: v.speaking.contains(shown[i].userId) ? AT.green : null),
+                    ),
+                  ),
+                if (extra > 0)
+                  Positioned(
+                    left: shown.length * 22.0,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: AT.surfaceHi, shape: BoxShape.circle, border: Border.all(color: AT.bg, width: 2)),
+                      child: Text('+$extra', style: AT.micro.copyWith(color: AT.label)),
+                    ),
+                  ),
+              ]),
+            ),
+            const SizedBox(width: 10),
+            Text('${t.memberCount} listening', style: AT.footnote),
+          ]),
+        ),
+      ),
+      CircleIconButton(icon: CupertinoIcons.bookmark, size: 36, iconSize: 16, tooltip: 'Moments', onTap: () => showBookmarksSheet(context, momentActionsFor(context))),
+      const SizedBox(width: 8),
+      PillButton(
+        label: v.connected ? (v.micOn ? 'Live' : 'Muted') : 'Voice',
+        icon: v.connected ? (v.micOn ? CupertinoIcons.mic_fill : CupertinoIcons.mic_slash_fill) : CupertinoIcons.mic,
+        compact: true,
+        style: v.connected ? PillStyle.tinted : PillStyle.glass,
+        color: AT.green,
+        onTap: () => showVoiceSheet(context),
+      ),
+    ]);
+  }
+
+  // ───────────────────────── Tabs ─────────────────────────
+
+  List<Widget> _tabSlivers(TogetherService t) {
+    switch (_tab) {
+      case 0:
+        return _queue(t);
+      case 1:
+        return _chat(t);
+      default:
+        return [SliverToBoxAdapter(child: _people(t))];
+    }
+  }
+
+  List<_QItem> _orderedQueue(TogetherService t) {
+    final items = t.queue.map((e) => _QItem(e)).toList();
+    final order = _pendingOrder;
+    if (order == null) return items;
+    items.sort((a, b) {
+      final ia = order.indexOf(a.item.id);
+      final ib = order.indexOf(b.item.id);
+      return (ia < 0 ? 1 << 20 : ia).compareTo(ib < 0 ? 1 << 20 : ib);
+    });
+    return items;
+  }
+
+  List<Widget> _queue(TogetherService t) {
+    final items = _orderedQueue(t);
+    final canManage = t.can(RoomPermission.queueManage);
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          child: Row(children: [
+            const Expanded(child: Text('Up Next', style: AT.title3)),
+            if (t.can(RoomPermission.queueEdit)) PillButton(label: 'Add', icon: CupertinoIcons.plus, compact: true, style: PillStyle.tinted, color: RoomThemeScope.accentOf(context), onTap: () => _openAdd(t)),
+          ]),
+        ),
+      ),
+      if (items.isEmpty)
+        const SliverToBoxAdapter(child: _Empty(icon: CupertinoIcons.music_note_list, title: 'Queue is empty', subtitle: 'Add songs for everyone to hear.'))
+      else
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverReorderableList(
+            itemCount: items.length,
+            onReorderStart: (_) => HapticFeedback.mediumImpact(),
+            proxyDecorator: (child, i, anim) => AnimatedBuilder(
+              animation: anim,
+              builder: (_, c) => Transform.scale(scale: 1 + 0.03 * Curves.easeOut.transform(anim.value), child: Material(color: Colors.transparent, elevation: 8 * anim.value, shadowColor: Colors.black54, borderRadius: BorderRadius.circular(AT.rMd), child: c)),
+              child: child,
+            ),
+            onReorderItem: (from, dest) {
+              if (!canManage || dest == from) return;
+              final ids = items.map((e) => e.item.id as String).toList();
+              final moved = ids.removeAt(from);
+              ids.insert(dest, moved);
+              setState(() => _pendingOrder = ids);
+              t.reorderQueue(moved, dest, t.queueRevision).then((ok) {
+                if (!ok && mounted) {
+                  setState(() => _pendingOrder = null);
+                  appleToast(context, 'Queue changed. Reorder again.');
+                }
+              });
+            },
+            itemBuilder: (ctx, i) {
+              final it = items[i].item;
+              final canRemove = canManage || it.addedByUserId == t.myUserId;
+              return Dismissible(
+                key: ValueKey('q-${it.id}'),
+                direction: canRemove ? DismissDirection.endToStart : DismissDirection.none,
+                background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 24), color: AT.red, child: const Icon(CupertinoIcons.delete, color: Colors.white)),
+                onDismissed: (_) {
+                  HapticFeedback.mediumImpact();
+                  t.removeFromQueue(it.id);
+                },
+                child: _QueueTile(index: i, item: it, reorderable: canManage, mine: it.addedByUserId == t.myUserId),
+              );
+            },
+          ),
+        ),
+    ];
+  }
+
+  List<Widget> _chat(TogetherService t) {
+    if (t.chat.isEmpty) return [const SliverToBoxAdapter(child: _Empty(icon: CupertinoIcons.chat_bubble_2, title: 'No messages yet', subtitle: 'Say hi to the room.'))];
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverList.builder(
+          itemCount: t.chat.length,
+          itemBuilder: (ctx, i) {
+            final m = t.chat[i];
+            final prev = i > 0 ? t.chat[i - 1] : null;
+            final first = prev == null || prev.userId != m.userId;
+            return _Bubble(msg: m, isMe: m.userId == t.myUserId, showName: first, accent: RoomThemeScope.accentOf(context), onLongPress: () => _chatActions(t, m));
+          },
+        ),
+      ),
+    ];
+  }
+
+  Widget _people(TogetherService t) {
+    final v = context.watch<VoiceController>();
+    final members = [...t.members]..sort((a, b) => RoomRole.parse(b.role).rank.compareTo(RoomRole.parse(a.role).rank));
+    return GroupedSection(children: [
+      for (final m in members)
+        AppleRow(
+          leading: Avatar(name: m.username, size: 38, dot: m.lastPing > 0 ? AT.green : AT.label3, ring: v.speaking.contains(m.userId) ? AT.green : null),
+          title: m.userId == t.myUserId ? '${m.username} (You)' : m.username,
+          subtitle: m.lastPing > 0 ? '${m.lastPing} ms' : 'Offline',
+          trailing: RolePill(RoomRole.parse(m.role)),
+          chevron: true,
+          onTap: () => showMemberSheet(context, m),
+        ),
+    ]);
+  }
+
+  Widget _composer(TogetherService t, double bottomInset) {
+    return AppleBlur(
+      borderRadius: BorderRadius.zero,
+      tint: const Color(0xCC000000),
+      border: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 10, 16, math.max(10, bottomInset)),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (_replyToPreview != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                const Icon(CupertinoIcons.reply, size: 14, color: AT.label2),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_replyToPreview!, style: AT.caption, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                SpringPressable(onTap: () => setState(() { _replyToId = null; _replyToPreview = null; }), child: const Padding(padding: EdgeInsets.all(4), child: Icon(CupertinoIcons.xmark_circle_fill, size: 18, color: AT.label3))),
+              ]),
+            ),
+          Row(children: [
+          Expanded(
+            child: CupertinoTextField(
+              controller: _chatCtrl,
+              placeholder: 'Message',
+              placeholderStyle: AT.callout.copyWith(color: AT.label3),
+              style: AT.callout,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _send(t),
+              maxLength: 500,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              decoration: BoxDecoration(color: AT.fill, borderRadius: BorderRadius.circular(AT.rPill)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _chatCtrl,
+            builder: (_, v, _) => CircleIconButton(icon: CupertinoIcons.arrow_up, filled: true, color: RoomThemeScope.accentOf(context), size: 40, onTap: v.text.trim().isEmpty ? null : () => _send(t)),
+          ),
+        ]),
+        ]),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════ Pieces ═══════════════════════════
+
+class _CodeFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue old, TextEditingValue v) {
+    var s = v.text.toUpperCase().replaceAll(RegExp(r'[^0-9A-Z]'), '');
+    if (s.length > 6) s = s.substring(0, 6);
+    return TextEditingValue(text: s, selection: TextSelection.collapsed(offset: s.length));
+  }
+}
+
+class _QItem {
+  _QItem(this.item);
+  final dynamic item; // TogetherQueueItem
+}
+
+class _Artwork extends StatelessWidget {
+  const _Artwork({super.key, required this.url, required this.size});
+  final String url;
+  final double size;
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(color: AT.surfaceHi, borderRadius: BorderRadius.circular(AT.rLg), boxShadow: const [BoxShadow(color: Color(0x80000000), blurRadius: 32, offset: Offset(0, 16))]),
+        child: url.isEmpty
+            ? const Icon(CupertinoIcons.music_note, size: 64, color: AT.label3)
+            : Image.network(url, fit: BoxFit.cover, cacheWidth: 720, gaplessPlayback: true, errorBuilder: (_, _, _) => const Icon(CupertinoIcons.music_note, size: 64, color: AT.label3)),
+      );
+}
+
+class _FullArtwork extends StatelessWidget {
+  const _FullArtwork({required this.url});
+  final String url;
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: () => Navigator.pop(context),
+        onVerticalDragEnd: (d) {
+          if ((d.primaryVelocity ?? 0).abs() > 300) Navigator.pop(context);
+        },
+        behavior: HitTestBehavior.opaque,
+        child: Center(
+          child: Hero(tag: 'room-artwork', child: _Artwork(url: url, size: MediaQuery.sizeOf(context).width - 32)),
+        ),
+      );
+}
+
+class _ProgressBar extends StatefulWidget {
+  const _ProgressBar({required this.durationSeconds, this.onSeek});
+  final int durationSeconds;
+  final Future<void> Function(int ms)? onSeek; // null = read-only (no PLAYBACK permission)
+  @override
+  State<_ProgressBar> createState() => _ProgressBarState();
+}
+
+class _ProgressBarState extends State<_ProgressBar> {
+  double? _drag; // 0..1 while user drags
+
+  String _fmt(int s) => '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    // Only this widget rebuilds with playback position.
+    final pos = context.watch<PlayerState>().livePosition;
+    final total = widget.durationSeconds > 0 ? widget.durationSeconds : 1;
+    final live = (pos.inMilliseconds / 1000 / total).clamp(0.0, 1.0);
+    final f = _drag ?? live;
+    final canSeek = widget.onSeek != null && widget.durationSeconds > 0;
+    final shownSec = (f * total).round();
+
+    return LayoutBuilder(builder: (context, c) {
+      return Column(children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: canSeek ? (d) => setState(() => _drag = (d.localPosition.dx / c.maxWidth).clamp(0.0, 1.0)) : null,
+          onHorizontalDragUpdate: canSeek ? (d) => setState(() => _drag = (d.localPosition.dx / c.maxWidth).clamp(0.0, 1.0)) : null,
+          onHorizontalDragEnd: canSeek
+              ? (_) {
+                  final target = _drag;
+                  setState(() => _drag = null);
+                  if (target != null) {
+                    HapticFeedback.selectionClick();
+                    widget.onSeek!((target * total * 1000).round());
+                  }
+                }
+              : null,
+          onTapUp: canSeek
+              ? (d) {
+                  HapticFeedback.selectionClick();
+                  widget.onSeek!(((d.localPosition.dx / c.maxWidth).clamp(0.0, 1.0) * total * 1000).round());
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                height: _drag != null ? 9 : 5,
+                child: Stack(children: [
+                  Container(color: AT.fillStrong),
+                  FractionallySizedBox(widthFactor: f, child: Container(color: AT.label)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text(_fmt(shownSec), style: AT.caption),
+          Text(widget.durationSeconds > 0 ? '-${_fmt(math.max(0, widget.durationSeconds - shownSec))}' : '--:--', style: AT.caption),
+        ]),
+      ]);
+    });
+  }
+}
+
+class _PlayPause extends StatefulWidget {
+  const _PlayPause({required this.playing, required this.enabled, required this.onTap, required this.onDenied});
+  final bool playing;
+  final bool enabled;
+  final VoidCallback onTap;
+  final VoidCallback onDenied;
+  @override
+  State<_PlayPause> createState() => _PlayPauseState();
+}
+
+class _PlayPauseState extends State<_PlayPause> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 260), value: widget.playing ? 1 : 0);
+
+  @override
+  void didUpdateWidget(covariant _PlayPause old) {
+    super.didUpdateWidget(old);
+    if (old.playing != widget.playing) widget.playing ? _c.forward() : _c.reverse();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final together = context.watch<TogetherService>();
-    final player = context.watch<PlayerState>();
-
-    // Detect incoming peer reactions to trigger floating animations
-    final currentReactions = together.reactions;
-    for (final entry in currentReactions.entries) {
-      final prev = _lastReactionCounts[entry.key] ?? 0;
-      if (entry.value > prev) {
-        final delta = math.min(3, entry.value - prev);
-        for (int i = 0; i < delta; i++) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _spawnEmoji(entry.key);
-          });
-        }
-      }
-    }
-    _lastReactionCounts = Map.from(currentReactions);
-
-    // Auto-scroll chat when new messages arrive
-    if (together.chat.length > _lastChatCount) {
-      _lastChatCount = together.chat.length;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_chatScrollController.hasClients) {
-          _chatScrollController.animateTo(
-            _chatScrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    }
-
-    final topInset = MediaQuery.paddingOf(context).top;
-
-    return Scaffold(
-      backgroundColor: Zen.bg,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // Top Clearance for Floating Header
-              SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
-
-              if (!together.inRoom)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _buildLobbyView(together),
-                )
-              else ...[
-                // Room Code & Sync Status Banner
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                    child: _buildRoomCodeBanner(together),
-                  ),
-                ),
-
-                // Host & Mode Strip
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                    child: _buildHostStrip(together),
-                  ),
-                ),
-
-                // Now Playing Shared Card
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: _buildNowPlayingRoomCard(together, player),
-                  ),
-                ),
-
-                // 4 Segmented Tabs: Queue, Chat, People, Info
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: _buildSegmentedTabs(together),
-                  ),
-                ),
-
-                // Tab Content View
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                    child: _buildActiveTabContent(together, player),
-                  ),
-                ),
-
-                // Bottom padding to clear reaction bar & safe area
-                SliverToBoxAdapter(
-                  child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 180),
-                ),
-              ],
-            ],
-          ),
-
-          // Floating Animated Reaction Emojis
-          ..._activeEmojis.map((e) {
-            return Positioned(
-              left: e.left,
-              bottom: e.bottom,
-              child: Opacity(
-                opacity: e.opacity.clamp(0.0, 1.0),
-                child: Text(e.emoji, style: const TextStyle(fontSize: 34)),
-              ),
-            );
-          }),
-
-          // Persistent Floating Reaction Bar (when in room)
-          if (together.inRoom)
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: MediaQuery.paddingOf(context).bottom + 24,
-              child: _buildReactionBar(together),
-            ),
-
-          // Persistent Floating Dynamic Island Header
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: DynamicIslandHeader(
-              title: 'Room Together',
-              showBack: true,
-              onBack: () => Navigator.of(context).pop(),
-              topPadding: topInset + 4,
-              trailing: together.inRoom
-                  ? PressableScale(
-                      scale: 0.88,
-                      onTap: () => _copyRoomCode(together.roomCode),
-                      child: AppleGlass(
-                        borderRadius: BorderRadius.circular(22),
-                        tint: const Color(0x26121216),
-                        child: const SizedBox(
-                          width: 44,
-                          height: 44,
-                          child: Center(
-                            child: Icon(Icons.share_rounded, color: Colors.white, size: 20),
-                          ),
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ────────────────────────── LOBBY VIEW ──────────────────────────
-
-  Widget _buildLobbyView(TogetherService together) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Zen.rose.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-              border: Border.all(color: Zen.rose.withValues(alpha: 0.35), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Zen.rose.withValues(alpha: 0.25),
-                  blurRadius: 28,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Icon(Icons.spatial_audio_rounded, color: Zen.rose, size: 40),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Room Together',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Listen to pristine 160 kbps Opus audio in sub-millisecond sync with friends. Shared queue, live reactions & drift guard.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Zen.textMuted, fontSize: 13, height: 1.45),
-          ),
-          const SizedBox(height: 28),
-
-          // Session Mode Selector
-          Row(
-            children: [
-              Expanded(
-                child: _buildModeChip(
-                  label: 'DJ SESSION',
-                  sub: 'Host Controls Playback',
-                  icon: Icons.headphones_rounded,
-                  selected: _selectedMode == 'dj',
-                  onTap: () => setState(() => _selectedMode = 'dj'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildModeChip(
-                  label: 'JAM SESSION',
-                  sub: 'Everyone Controls Playback',
-                  icon: Icons.bolt_rounded,
-                  selected: _selectedMode == 'collab',
-                  onTap: () => setState(() => _selectedMode = 'collab'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Display Name Input
-          Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF141416),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-            ),
-            alignment: Alignment.center,
-            child: TextField(
-              controller: _nameController,
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-              decoration: const InputDecoration(
-                hintText: 'YOUR DISPLAY NAME',
-                hintStyle: TextStyle(color: Colors.white38, fontSize: 11, letterSpacing: 1.2),
-                border: InputBorder.none,
-                isDense: true,
-                icon: Icon(Icons.person_outline_rounded, color: Colors.white54, size: 18),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Create Room Button
-          ZenButton(
-            label: _isBusy ? 'CREATING SESSION...' : 'CREATE NEW ROOM',
-            width: double.infinity,
-            disabled: _isBusy,
-            icon: Icons.add_circle_outline_rounded,
-            onTap: () async {
-              HapticFeedback.mediumImpact();
-              setState(() => _isBusy = true);
-              final ok = await together.createRoom(
-                mode: _selectedMode,
-                guestName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
-              );
-              if (mounted) {
-                setState(() => _isBusy = false);
-                if (!ok) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Could not create room. Please verify backend connection.'),
-                      backgroundColor: Color(0xFF18181B),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              }
-            },
-          ),
-          const SizedBox(height: 24),
-
-          // Divider with text
-          Row(
-            children: [
-              Expanded(child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1))),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Text(
-                  'OR JOIN WITH 6-DIGIT CODE',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-              Expanded(child: Container(height: 1, color: Colors.white.withValues(alpha: 0.1))),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Join by Code Input & Button
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141416),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-                  ),
-                  alignment: Alignment.center,
-                  child: TextField(
-                    controller: _joinCodeController,
-                    textCapitalization: TextCapitalization.characters,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 2.0,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'ENTER CODE (e.g. ZEN-4829)',
-                      hintStyle: TextStyle(
-                        color: Colors.white30,
-                        fontSize: 10,
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              ZenButton(
-                label: 'JOIN',
-                disabled: _isBusy,
-                onTap: () async {
-                  final code = _joinCodeController.text.trim();
-                  if (code.isEmpty) return;
-                  HapticFeedback.mediumImpact();
-                  setState(() => _isBusy = true);
-                  final ok = await together.joinRoom(
-                    code,
-                    guestName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
-                  );
-                  if (mounted) {
-                    setState(() => _isBusy = false);
-                    if (!ok) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Could not join room "$code". Verify code and try again.'),
-                          backgroundColor: const Color(0xFF18181B),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Tech badge info
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.shield_outlined, color: Colors.white.withValues(alpha: 0.4), size: 14),
-              const SizedBox(width: 6),
-              Text(
-                'Zero API Keys · Decentralized Stream Resolution · Anti-Drift Guard',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10, fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModeChip({
-    required String label,
-    required String sub,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return PressableScale(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? Zen.rose.withValues(alpha: 0.15) : const Color(0xFF141416),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? Zen.rose.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.08),
-            width: selected ? 1.5 : 1.0,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: selected ? Zen.rose : Colors.white60, size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? Colors.white : Colors.white70,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              sub,
-              style: TextStyle(color: selected ? Colors.white70 : Colors.white38, fontSize: 9),
-            ),
-          ],
+    return Opacity(
+      opacity: widget.enabled ? 1 : 0.5,
+      child: SpringPressable(
+        pressedScale: 0.9,
+        onTap: widget.enabled ? widget.onTap : widget.onDenied,
+        child: Container(
+          width: 68,
+          height: 68,
+          decoration: const BoxDecoration(color: AT.label, shape: BoxShape.circle),
+          child: Center(child: AnimatedIcon(icon: AnimatedIcons.play_pause, progress: _c, size: 34, color: Colors.black)),
         ),
       ),
     );
-  }
-
-  // ────────────────────────── LIVE ROOM BANNER & STRIP ──────────────────────────
-
-  Widget _buildRoomCodeBanner(TogetherService together) {
-    Color syncDotColor;
-    String syncLabel;
-
-    switch (together.syncHealth) {
-      case SyncHealth.connected:
-        syncDotColor = const Color(0xFF10B981);
-        syncLabel = together.pingMs > 0 ? 'Synced · ${together.pingMs}ms' : 'Synced';
-        break;
-      case SyncHealth.syncing:
-        syncDotColor = const Color(0xFFF59E0B);
-        syncLabel = 'Syncing...';
-        break;
-      case SyncHealth.outOfSync:
-        syncDotColor = const Color(0xFFEF4444);
-        syncLabel = 'Catching up';
-        break;
-      case SyncHealth.disconnected:
-        syncDotColor = Colors.white38;
-        syncLabel = 'Offline';
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Room Code + Live Indicator
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF10B981),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'LIVE',
-                style: TextStyle(
-                  color: Color(0xFF10B981),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(width: 10),
-              GestureDetector(
-                onTap: () => _copyRoomCode(together.roomCode),
-                child: Row(
-                  children: [
-                    Text(
-                      together.roomCode,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Icon(Icons.copy_rounded, color: Colors.white38, size: 13),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // Sync Health Pill
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: syncDotColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: syncDotColor.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(color: syncDotColor, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  syncLabel,
-                  style: TextStyle(color: syncDotColor, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.8),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHostStrip(TogetherService together) {
-    final hostMember = together.members.firstWhere(
-      (m) => m.isHost,
-      orElse: () => TogetherMember(userId: '', username: 'Host', role: 'host'),
-    );
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141416),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.stars_rounded, color: Color(0xFFFBBF24), size: 16),
-              const SizedBox(width: 6),
-              Text(
-                together.isHost ? 'You are Host' : 'Host: ${hostMember.username}',
-                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  together.mode == 'collab' ? 'JAM MODE' : 'DJ MODE',
-                  style: TextStyle(
-                    color: Zen.rose,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Text(
-            '👥 ${together.memberCount} Listening',
-            style: TextStyle(color: Zen.textMuted, fontSize: 11, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ────────────────────────── NOW PLAYING SHARED CARD ──────────────────────────
-
-  Widget _buildNowPlayingRoomCard(TogetherService together, PlayerState player) {
-    final current = together.currentTrack ?? player.currentTrack;
-    final isPlaying = together.isPlaying;
-
-    // Time calculations
-    final positionSec = player.livePosition.inMilliseconds / 1000.0;
-    final totalSec = current?.durationSeconds ?? 210;
-    final clampedPos = positionSec.clamp(0.0, totalSec.toDouble());
-    final progress = totalSec > 0 ? (clampedPos / totalSec).clamp(0.0, 1.0) : 0.0;
-
-    final elapsedStr = _formatDuration(Duration(seconds: clampedPos.toInt()));
-    final totalStr = _formatDuration(Duration(seconds: totalSec));
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Cover Artwork
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  color: const Color(0xFF27272A),
-                  child: current?.coverUrl.isNotEmpty == true
-                      ? Image.network(
-                          current!.coverUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => const Icon(Icons.music_note, color: Colors.white54),
-                        )
-                      : const Icon(Icons.music_note, color: Colors.white54, size: 28),
-                ),
-              ),
-              const SizedBox(width: 14),
-
-              // Title, Artist & Dedication
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      current?.title ?? 'No Track Playing',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      current?.artist ?? 'Select a song to start session',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Zen.textMuted, fontSize: 12),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            '160 KBPS OPUS',
-                            style: TextStyle(
-                              color: Color(0xFF10B981),
-                              fontSize: 8,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Decentralized Audio',
-                          style: TextStyle(color: Zen.textMuted, fontSize: 10),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Play / Pause Button
-              IconButton(
-                icon: Icon(
-                  isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
-                  color: Zen.rose,
-                  size: 44,
-                ),
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  if (together.isHost || together.mode == 'collab') {
-                    if (isPlaying) {
-                      together.hostPause(clampedPos);
-                    } else if (current != null) {
-                      together.hostPlay(current, clampedPos);
-                    }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Host controls playback in DJ mode. You can vote to skip below!'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // Shared Progress Scrubber
-          Column(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 4,
-                  backgroundColor: Colors.white.withValues(alpha: 0.08),
-                  valueColor: AlwaysStoppedAnimation<Color>(Zen.rose),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(elapsedStr, style: TextStyle(color: Zen.textMuted, fontSize: 10, fontWeight: FontWeight.w600)),
-                  Text(totalStr, style: TextStyle(color: Zen.textMuted, fontSize: 10, fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Action Pills: Leave Sync & Skip Vote
-          Row(
-            children: [
-              // Leave Sync / Rejoin Live Toggle
-              Expanded(
-                child: PressableScale(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    together.toggleLeaveSync();
-                  },
-                  child: Container(
-                    height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: together.leaveSync ? Zen.rose.withValues(alpha: 0.20) : Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: together.leaveSync ? Zen.rose.withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          together.leaveSync ? Icons.sync_problem_rounded : Icons.sync_rounded,
-                          color: together.leaveSync ? Zen.rose : const Color(0xFF10B981),
-                          size: 14,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          together.leaveSync ? 'REJOIN LIVE ⚡' : 'SYNC: LIVE',
-                          style: TextStyle(
-                            color: together.leaveSync ? Zen.rose : Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-
-              // Skip Vote Button
-              Expanded(
-                child: PressableScale(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    if (together.isHost || together.mode == 'collab') {
-                      together.hostSkipNext();
-                    } else {
-                      together.voteSkip();
-                    }
-                  },
-                  child: Container(
-                    height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: together.hasVotedSkip ? Zen.rose.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: together.hasVotedSkip ? Zen.rose : Colors.white.withValues(alpha: 0.1),
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.skip_next_rounded, color: together.hasVotedSkip ? Zen.rose : Colors.white70, size: 15),
-                        const SizedBox(width: 6),
-                        Text(
-                          together.isHost
-                              ? 'SKIP NEXT'
-                              : 'VOTE SKIP (${together.skipVotes.length}/${together.skipVotesNeeded})',
-                          style: TextStyle(
-                            color: together.hasVotedSkip ? Zen.rose : Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ────────────────────────── SEGMENTED TABS ──────────────────────────
-
-  Widget _buildSegmentedTabs(TogetherService together) {
-    final tabs = [
-      'QUEUE (${together.queue.length})',
-      'CHAT (${together.chat.length})',
-      'PEOPLE (${together.memberCount})',
-      'INFO',
-    ];
-
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141416),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Row(
-        children: List.generate(tabs.length, (i) {
-          final selected = _activeTab == i;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() => _activeTab = i);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected ? Colors.white.withValues(alpha: 0.12) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Text(
-                  tabs[i],
-                  style: TextStyle(
-                    color: selected ? Colors.white : Zen.textMuted,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildActiveTabContent(TogetherService together, PlayerState player) {
-    switch (_activeTab) {
-      case 0:
-        return _buildQueueTab(together);
-      case 1:
-        return _buildChatTab(together);
-      case 2:
-        return _buildPeopleTab(together);
-      case 3:
-      default:
-        return _buildInfoTab(together);
-    }
-  }
-
-  // ────────────────────────── TAB 0: QUEUE ──────────────────────────
-
-  Widget _buildQueueTab(TogetherService together) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'SHARED QUEUE',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              PressableScale(
-                onTap: () => _openAddTrackSheet(context, together),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Zen.rose.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Zen.rose.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add_rounded, color: Zen.rose, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        'ADD SONG',
-                        style: TextStyle(color: Zen.rose, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.0),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          if (together.queue.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.queue_music_rounded, color: Colors.white24, size: 36),
-                    const SizedBox(height: 8),
-                    Text('Shared queue is empty', style: TextStyle(color: Zen.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text('Tap "Add Song" to search and add tracks for everyone.', style: TextStyle(color: Colors.white38, fontSize: 11)),
-                  ],
-                ),
-              ),
-            )
-          else
-            ...together.queue.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final item = entry.value;
-              final canRemove = together.isHost || item.addedByUserId == together.myUserId;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      '#${idx + 1}',
-                      style: TextStyle(color: Zen.textMuted, fontSize: 11, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(width: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        color: const Color(0xFF27272A),
-                        child: item.track.coverUrl.isNotEmpty
-                            ? Image.network(item.track.coverUrl, fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.music_note, color: Colors.white38, size: 20))
-                            : const Icon(Icons.music_note, color: Colors.white38, size: 20),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.track.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  item.track.artist,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: Zen.textMuted, fontSize: 11),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text('•', style: TextStyle(color: Zen.textMuted, fontSize: 10)),
-                              const SizedBox(width: 6),
-                              Text(
-                                'by ${item.addedByName}',
-                                style: TextStyle(color: Zen.rose.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (canRemove)
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Colors.white38, size: 18),
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          together.removeFromQueue(item.id);
-                        },
-                      ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
-    );
-  }
-
-  // ────────────────────────── TAB 1: CHAT ──────────────────────────
-
-  Widget _buildChatTab(TogetherService together) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'REAL-TIME CHAT',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          if (together.chat.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text('Say hi to everyone in the room! 👋', style: TextStyle(color: Zen.textMuted, fontSize: 13)),
-              ),
-            )
-          else
-            SizedBox(
-              height: 240,
-              child: ListView.builder(
-                controller: _chatScrollController,
-                physics: const BouncingScrollPhysics(),
-                itemCount: together.chat.length,
-                itemBuilder: (context, index) {
-                  final m = together.chat[index];
-                  final isMe = m.userId == together.myUserId;
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isMe ? Zen.rose.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isMe ? Zen.rose.withValues(alpha: 0.35) : Colors.white.withValues(alpha: 0.06),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                isMe ? 'You' : m.username,
-                                style: TextStyle(
-                                  color: isMe ? Zen.rose : Colors.white70,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                _formatTimestamp(m.timestamp),
-                                style: TextStyle(color: Colors.white30, fontSize: 8),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(m.text, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.3)),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          const SizedBox(height: 10),
-
-          // Message Input Field
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 42,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                  ),
-                  alignment: Alignment.center,
-                  child: TextField(
-                    controller: _chatController,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message to room...',
-                      hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
-                    onSubmitted: (_) => _sendMessage(together),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              ZenButton(
-                label: 'SEND',
-                compact: true,
-                onTap: () => _sendMessage(together),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ────────────────────────── TAB 2: PEOPLE ──────────────────────────
-
-  Widget _buildPeopleTab(TogetherService together) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'CONNECTED LISTENERS',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              Text(
-                '${together.memberCount} ONLINE',
-                style: const TextStyle(
-                  color: Color(0xFF10B981),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          ...together.members.map((m) {
-            final isMe = m.userId == together.myUserId;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: isMe ? Zen.rose.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.04),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isMe ? Zen.rose.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.05),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: m.isHost ? const Color(0xFFFBBF24).withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: m.isHost ? const Color(0xFFFBBF24).withValues(alpha: 0.6) : Colors.white24,
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      m.username.isNotEmpty ? m.username[0].toUpperCase() : '?',
-                      style: TextStyle(
-                        color: m.isHost ? const Color(0xFFFBBF24) : Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              m.username + (isMe ? ' (You)' : ''),
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                            ),
-                            if (m.isHost) ...[
-                              const SizedBox(width: 6),
-                              const Icon(Icons.stars_rounded, color: Color(0xFFFBBF24), size: 14),
-                            ],
-                          ],
-                        ),
-                        Text(
-                          m.isHost ? 'Host · DJ' : 'Listener',
-                          style: TextStyle(color: Zen.textMuted, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (m.lastPing > 0)
-                    Text('${m.lastPing}ms', style: TextStyle(color: Zen.textMuted, fontSize: 11)),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  // ────────────────────────── TAB 3: INFO ──────────────────────────
-
-  Widget _buildInfoTab(TogetherService together) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'SESSION INFORMATION',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Room Code Card
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('INVITE CODE', style: TextStyle(color: Zen.textMuted, fontSize: 9, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 4),
-                    Text(
-                      together.roomCode,
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 2.0),
-                    ),
-                  ],
-                ),
-                ZenButton(
-                  label: 'COPY',
-                  compact: true,
-                  icon: Icons.copy_rounded,
-                  onTap: () => _copyRoomCode(together.roomCode),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Tech Specs
-          _buildSpecRow('Audio Stream', 'Decentralized 160 kbps Opus (on-device)'),
-          _buildSpecRow('Sync Engine', 'NTP Clock Alignment · 1.5s Barrier Window'),
-          _buildSpecRow('Drift Protection', 'Sub-audible Pitch Nudging (1.02x / 0.98x)'),
-          _buildSpecRow('Fair Queue', 'Democratic 3-Track Cap per Listener'),
-          const SizedBox(height: 20),
-
-          // Leave Room Button
-          ZenButton(
-            label: 'LEAVE SESSION',
-            width: double.infinity,
-            icon: Icons.logout_rounded,
-            accentColor: Colors.white70,
-            onTap: () => _showLeaveDialog(together),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSpecRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(label, style: TextStyle(color: Zen.textMuted, fontSize: 11, fontWeight: FontWeight.w600)),
-          ),
-          Expanded(
-            child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ────────────────────────── FLOATING REACTION BAR ──────────────────────────
-
-  Widget _buildReactionBar(TogetherService together) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181C).withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.50),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: _reactionEmojis.map((emoji) {
-          final count = together.reactions[emoji] ?? 0;
-
-          return PressableScale(
-            onTap: () => _triggerReaction(together, emoji),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(emoji, style: const TextStyle(fontSize: 22)),
-                if (count > 0) ...[
-                  const SizedBox(width: 4),
-                  Text(
-                    '$count',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  String _formatDuration(Duration d) {
-    final minutes = d.inMinutes;
-    final seconds = d.inSeconds % 60;
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  String _formatTimestamp(int ms) {
-    if (ms <= 0) return 'Just now';
-    final diff = DateTime.now().millisecondsSinceEpoch - ms;
-    if (diff < 60000) return 'Just now';
-    final mins = diff ~/ 60000;
-    if (mins < 60) return '${mins}m ago';
-    return '${mins ~/ 60}h ago';
   }
 }
 
-// ────────────────────────── ADD TRACK MODAL SHEET ──────────────────────────
-
-class _AddTrackModalSheet extends StatefulWidget {
-  const _AddTrackModalSheet({required this.together});
-  final TogetherService together;
-
+class _QueueTile extends StatelessWidget {
+  const _QueueTile({required this.index, required this.item, required this.reorderable, required this.mine});
+  final int index;
+  final dynamic item;
+  final bool reorderable;
+  final bool mine;
   @override
-  State<_AddTrackModalSheet> createState() => _AddTrackModalSheetState();
+  Widget build(BuildContext context) {
+    final Track tr = item.track;
+    return Container(
+      color: AT.bg.withValues(alpha: 0.001),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      child: Row(children: [
+        Container(
+          width: 48,
+          height: 48,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(color: AT.surfaceHi, borderRadius: BorderRadius.circular(AT.rSm)),
+          child: tr.coverUrl.isNotEmpty ? Image.network(tr.coverUrl, fit: BoxFit.cover, cacheWidth: 144, errorBuilder: (_, _, _) => const Icon(CupertinoIcons.music_note, size: 20, color: AT.label3)) : const Icon(CupertinoIcons.music_note, size: 20, color: AT.label3),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr.title, style: AT.body.copyWith(fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 1),
+            Text('${tr.artist} · Added by ${mine ? 'you' : item.addedByName}', style: AT.footnote, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ]),
+        ),
+        if (reorderable)
+          ReorderableDragStartListener(index: index, child: const Padding(padding: EdgeInsets.all(10), child: Icon(CupertinoIcons.line_horizontal_3, size: 18, color: AT.label3))),
+      ]),
+    );
+  }
 }
 
-class _AddTrackModalSheetState extends State<_AddTrackModalSheet> {
-  final TextEditingController _searchController = TextEditingController();
+class _Bubble extends StatelessWidget {
+  const _Bubble({required this.msg, required this.isMe, required this.showName, required this.accent, this.onLongPress});
+  final dynamic msg;
+  final bool isMe;
+  final bool showName;
+  final Color accent;
+  final VoidCallback? onLongPress;
+  @override
+  Widget build(BuildContext context) {
+    final maxW = MediaQuery.sizeOf(context).width * 0.74;
+    return Padding(
+      padding: EdgeInsets.only(top: showName ? 10 : 2),
+      child: Column(crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start, children: [
+        if (showName && !isMe) Padding(padding: const EdgeInsets.only(left: 12, bottom: 3), child: Text(msg.username, style: AT.caption)),
+        GestureDetector(
+          onLongPress: onLongPress,
+          child: Container(
+            constraints: BoxConstraints(maxWidth: maxW),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(color: isMe ? accent : AT.surfaceHi, borderRadius: BorderRadius.circular(18)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              if (_replyText(msg) != null) Container(margin: const EdgeInsets.only(bottom: 4), padding: const EdgeInsets.only(left: 8), decoration: const BoxDecoration(border: Border(left: BorderSide(color: Colors.white54, width: 2))), child: Text(_replyText(msg)!, maxLines: 2, overflow: TextOverflow.ellipsis, style: AT.caption.copyWith(color: Colors.white70))),
+              Text(msg.text, style: AT.callout.copyWith(fontSize: 16, color: isMe && accent.computeLuminance() > 0.6 ? Colors.black : Colors.white)),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+String? _replyText(dynamic m) {
+  try {
+    return m.replyToText as String?;
+  } catch (_) {
+    return null;
+  }
+}
+
+class _Empty extends StatelessWidget {
+  const _Empty({required this.icon, required this.title, required this.subtitle});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 32),
+        child: Column(children: [
+          Icon(icon, size: 38, color: AT.label3),
+          const SizedBox(height: 12),
+          Text(title, style: AT.headline),
+          const SizedBox(height: 4),
+          Text(subtitle, style: AT.footnote, textAlign: TextAlign.center),
+        ]),
+      );
+}
+
+class _SyncDot extends StatelessWidget {
+  const _SyncDot({required this.health});
+  final SyncHealth health;
+  @override
+  Widget build(BuildContext context) {
+    final c = switch (health) {
+      SyncHealth.connected => AT.green,
+      SyncHealth.syncing => AT.amber,
+      SyncHealth.outOfSync => AT.red,
+      SyncHealth.disconnected => AT.label3,
+    };
+    return AnimatedContainer(duration: const Duration(milliseconds: 300), width: 7, height: 7, decoration: BoxDecoration(color: c, shape: BoxShape.circle));
+  }
+}
+
+// ═══════════════════════════ Add track sheet ═══════════════════════════
+
+class _AddTrackBody extends StatefulWidget {
+  const _AddTrackBody({required this.scroll, required this.together});
+  final ScrollController scroll;
+  final TogetherService together;
+  @override
+  State<_AddTrackBody> createState() => _AddTrackBodyState();
+}
+
+class _AddTrackBodyState extends State<_AddTrackBody> {
+  final _ctrl = TextEditingController();
   List<Track> _results = [];
   bool _searching = false;
   Timer? _debounce;
+  int _req = 0;
+  final Set<String> _added = {};
+
+  String _key(Track t) => '${t.title}|${t.artist}';
 
   @override
   void dispose() {
     _debounce?.cancel();
-    _searchController.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged(String query) {
+  void _onChanged(String q) {
     _debounce?.cancel();
-    final q = query.trim();
-    if (q.isEmpty) {
+    final query = q.trim();
+    if (query.isEmpty) {
       setState(() {
         _results = [];
         _searching = false;
       });
       return;
     }
-
     _debounce = Timer(const Duration(milliseconds: 350), () async {
+      final my = ++_req;
       setState(() => _searching = true);
       try {
-        final tracks = await InnerTubeService.instance.search(q);
-        if (mounted) {
-          setState(() {
-            _results = tracks;
-            _searching = false;
-          });
-        }
+        final r = await InnerTubeService.instance.search(query);
+        if (mounted && my == _req) setState(() => _results = r);
       } catch (_) {
-        if (mounted) setState(() => _searching = false);
+        if (mounted && my == _req) appleToast(context, 'Search failed. Try again.');
+      } finally {
+        if (mounted && my == _req) setState(() => _searching = false);
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.78,
-      padding: const EdgeInsets.only(top: 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF141416),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    return Column(children: [
+      SheetHeader(title: 'Add to Queue', onClose: () => Navigator.pop(context)),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        child: CupertinoSearchTextField(
+          controller: _ctrl,
+          autofocus: true,
+          placeholder: 'Songs, artists, albums',
+          style: AT.callout,
+          backgroundColor: AT.fill,
+          itemColor: AT.label2,
+          onChanged: _onChanged,
+        ),
       ),
-      child: Column(
-        children: [
-          // Pull bar
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white24,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Add Track to Room Queue',
-                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.white54),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Search Field
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              height: 46,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F1F23),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded, color: Colors.white54, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      autofocus: true,
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                      decoration: const InputDecoration(
-                        hintText: 'Search title, artist or album...',
-                        hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                      onChanged: _onSearchChanged,
-                    ),
-                  ),
-                  if (_searchController.text.isNotEmpty)
-                    GestureDetector(
-                      onTap: () {
-                        _searchController.clear();
-                        _onSearchChanged('');
-                      },
-                      child: const Icon(Icons.clear_rounded, color: Colors.white38, size: 18),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Search Results
-          Expanded(
-            child: _searching
-                ? Center(child: CircularProgressIndicator(color: Zen.rose, strokeWidth: 2.5))
-                : _results.isEmpty
-                    ? Center(
-                        child: Text(
-                          _searchController.text.isEmpty
-                              ? 'Type above to search YouTube Music tracks'
-                              : 'No matching tracks found',
-                          style: TextStyle(color: Zen.textMuted, fontSize: 12),
-                        ),
-                      )
-                    : ListView.builder(
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: _results.length,
-                        itemBuilder: (context, index) {
-                          final track = _results[index];
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                            leading: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                color: const Color(0xFF27272A),
-                                child: track.coverUrl.isNotEmpty
-                                    ? Image.network(track.coverUrl, fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.music_note, color: Colors.white38))
-                                    : const Icon(Icons.music_note, color: Colors.white38),
-                              ),
-                            ),
-                            title: Text(
-                              track.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                            ),
-                            subtitle: Text(
-                              track.artist,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: Zen.textMuted, fontSize: 11),
-                            ),
-                            trailing: ZenButton(
-                              label: 'ADD',
-                              compact: true,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                widget.together.addToQueue(track);
-                                Navigator.of(context).pop();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Added "${track.title}" to shared room queue 🎵'),
-                                    backgroundColor: const Color(0xFF18181B),
-                                    behavior: SnackBarBehavior.floating,
-                                    duration: const Duration(seconds: 2),
+      Expanded(
+        child: _searching && _results.isEmpty
+            ? const Center(child: CupertinoActivityIndicator())
+            : _results.isEmpty
+                ? Center(child: Text(_ctrl.text.isEmpty ? 'Search for something to play together.' : 'No results', style: AT.subhead))
+                : ListView.builder(
+                    controller: widget.scroll,
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    itemCount: _results.length,
+                    itemBuilder: (ctx, i) {
+                      final tr = _results[i];
+                      final added = _added.contains(_key(tr));
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        child: Row(children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(color: AT.surfaceHi, borderRadius: BorderRadius.circular(AT.rSm)),
+                            child: tr.coverUrl.isNotEmpty ? Image.network(tr.coverUrl, fit: BoxFit.cover, cacheWidth: 144, errorBuilder: (_, _, _) => const SizedBox()) : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(tr.title, style: AT.body.copyWith(fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text(tr.artist, style: AT.footnote, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ]),
+                          ),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                            child: added
+                                ? const Padding(key: ValueKey('done'), padding: EdgeInsets.all(8), child: Icon(CupertinoIcons.checkmark_circle_fill, color: AT.green, size: 28))
+                                : CircleIconButton(
+                                    key: const ValueKey('add'),
+                                    icon: CupertinoIcons.plus,
+                                    size: 34,
+                                    iconSize: 16,
+                                    onTap: () {
+                                      // Mark first: blocks rapid duplicate taps.
+                                      if (!_added.add(_key(tr))) return;
+                                      setState(() {});
+                                      HapticFeedback.lightImpact();
+                                      widget.together.addToQueue(tr);
+                                    },
                                   ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
+                          ),
+                        ]),
+                      );
+                    },
+                  ),
       ),
-    );
+    ]);
   }
 }

@@ -13,6 +13,12 @@
 /*.md
 /*.ps1
 /*.sh
+/*.bat
+/*.zip
+/*.exe
+/room_together_guide/
+frontend/public/downloads/*.apk
+!frontend/public/downloads/zenify.apk
 api_keys.txt
 
 # Ignore frontend build caches and node_modules

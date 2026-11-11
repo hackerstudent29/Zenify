@@ -31,3 +31,10 @@
 -dontwarn com.jakewharton.timber.**
 -keep class com.jakewharton.timber.** { *; }
 
+# LiveKit & WebRTC
+-dontwarn org.webrtc.**
+-keep class org.webrtc.** { *; }
+-dontwarn io.livekit.**
+-keep class io.livekit.** { *; }
+
+

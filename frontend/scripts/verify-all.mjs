@@ -10,10 +10,15 @@ const distDir = path.resolve('dist');
 // 1. Check prerendered static files
 const testRoutes = [
   { route: '/', file: 'dist/index.html' },
-  { route:  file: 'dist/pricing/index.html' },
+  { route: '/download', file: 'dist/download/index.html' },
+  { route: '/together', file: 'dist/together/index.html' },
+  { route: '/faq', file: 'dist/faq/index.html' },
   { route: '/search', file: 'dist/search/index.html' },
   { route: '/about-zenify', file: 'dist/about-zenify/index.html' },
+  { route: '/about', file: 'dist/about/index.html' },
   { route: '/discover', file: 'dist/discover/index.html' },
+  { route: '/radio', file: 'dist/radio/index.html' },
+  { route: '/local-library', file: 'dist/local-library/index.html' },
   { route: '/privacy', file: 'dist/privacy/index.html' },
   { route: '/terms', file: 'dist/terms/index.html' }
 ];
@@ -59,9 +64,11 @@ for (const { route, file } of testRoutes) {
 
   if (h1Count !== 1) {
     console.warn(`  [WARN] Expected exactly 1 H1, found ${h1Count}`);
+    allPrerenderOk = false;
   }
   if (canonical === 'NONE') {
     console.warn(`  [WARN] Missing canonical on ${route}`);
+    allPrerenderOk = false;
   }
 }
 
@@ -113,14 +120,21 @@ const privateRoutes = [
   'src/app/library/page.tsx',
   'src/app/history/page.tsx',
   'src/app/notifications/page.tsx',
-  'src/app/payment/callback/page.tsx'
+  'src/app/payment/callback/page.tsx',
+  'src/app/admin/page.tsx',
+  'src/app/blend/page.tsx',
+  'src/app/blend/[id]/page.tsx',
+  'src/app/blend/join/[token]/page.tsx',
+  'src/app/j/[code]/page.tsx'
 ];
 
+let missingNoIndex = 0;
 privateRoutes.forEach(f => {
   if (fs.existsSync(f)) {
     const content = fs.readFileSync(f, 'utf8');
-    const hasNoIndex = content.includes('noindex={true}') || content.includes('noindex');
+    const hasNoIndex = content.includes('noindex={true}') || /\bnoindex\b/.test(content);
     console.log(`  ${f}: ${hasNoIndex ? '[PASS] noindex present' : '[FAIL] missing noindex'}`);
+    if (!hasNoIndex) missingNoIndex++;
   }
 });
 
@@ -151,7 +165,8 @@ if (fs.existsSync(robotsPath)) {
 // 5. Check og-image.png
 console.log('\n--- 5. Checking og-image.png ---');
 const ogPath = path.resolve('public/og-image.png');
-if (fs.existsSync(ogPath)) {
+const ogOk = fs.existsSync(ogPath);
+if (ogOk) {
   const stat = fs.statSync(ogPath);
   console.log(`  og-image.png exists: ${stat.size} bytes (${(stat.size / 1024).toFixed(1)} KB) - [PASS < 300KB]`);
 } else {
@@ -161,3 +176,8 @@ if (fs.existsSync(ogPath)) {
 console.log('\n==================================================');
 console.log('              AUDIT COMPLETED                     ');
 console.log('==================================================');
+
+if (!allPrerenderOk || missingNoIndex > 0 || !ogOk) {
+  console.error(`\n[FAILED] SEO audit found issues (prerenderOk=${allPrerenderOk}, missingNoIndex=${missingNoIndex}, ogOk=${ogOk}).`);
+  process.exit(1);
+}

@@ -219,6 +219,87 @@ const ROUTE_DATA = {
         <p class="text-zinc-400 mb-8 leading-relaxed">Stream your personal audio collection with zero cloud uploads and full Web Audio equalizer support.</p>
       </main>
     `
+  },
+  '/download': {
+    title: 'Download Zenify APK (v1.0.8) & PWA – Ad-Free Music for Android, iOS & Desktop',
+    description: 'Download Zenify v1.0.8 Android APK or install the cross-platform PWA. Enjoy 320kbps streaming, Room Together, synced karaoke lyrics, and Studio FX ad-free.',
+    canonical: 'https://listenzenify.vercel.app/download',
+    content: `
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "MobileApplication",
+        "name": "Zenify Music Player for Android",
+        "operatingSystem": "Android 8.0+",
+        "softwareVersion": "1.0.8",
+        "applicationCategory": "MultimediaApplication",
+        "applicationSubCategory": "Music & Audio",
+        "downloadUrl": "https://listenzenify.vercel.app/downloads/zenify.apk",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "description": "Free ad-free Android music streaming app with 320kbps audio, Room Together synced rooms, native C++ Studio FX DSP, and syllable-synced lyrics."
+      }
+      </script>
+      <main class="px-6 py-16 max-w-4xl mx-auto text-zinc-200">
+        <h1 class="text-3xl font-black text-white mb-4">Get Zenify on Your Phone</h1>
+        <p class="text-zinc-400 mb-8 leading-relaxed">Download Zenify v1.0.8 for Android (com.zenify.mobile) or install as a standalone app on iPhone, iPad, Windows, and macOS.</p>
+      </main>
+    `
+  },
+  '/together': {
+    title: 'Room Together – Listen to Music in Real-Time Sync with Friends | Zenify',
+    description: 'Create or join a live Room Together session on Zenify. Stream music in sub-second sync with friends, live voice rooms, collaborative DJ queues, and shared lyrics.',
+    canonical: 'https://listenzenify.vercel.app/together',
+    content: `
+      <main class="px-6 py-16 max-w-4xl mx-auto text-zinc-200">
+        <h1 class="text-3xl font-black text-white mb-4">Room Together – Listen in Sync</h1>
+        <p class="text-zinc-400 mb-8 leading-relaxed">Host real-time synchronized listening rooms with shared DJ queues, timestamped moments, live reactions, and LiveKit voice across web and Android.</p>
+      </main>
+    `
+  },
+  '/faq': {
+    title: 'Zenify Features & Frequently Asked Questions (FAQ)',
+    description: 'Answers about Zenify free music streaming, 320kbps playback, Studio FX 3-band EQ, 8D spatial audio, multilingual synced lyrics, and Room Together.',
+    canonical: 'https://listenzenify.vercel.app/faq',
+    content: `
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "@id": "https://listenzenify.vercel.app/faq#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is Zenify?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Zenify is a free, modern web and mobile music player featuring instant audio playback, sub-second synchronized lyrics, 8D spatial audio, and dynamic visualizer themes." }
+          },
+          {
+            "@type": "Question",
+            "name": "How can I listen to music on Zenify for free?",
+            "acceptedAnswer": { "@type": "Answer", "text": "You can stream music on Zenify directly in your web browser at listenzenify.vercel.app without paying any subscription fees or encountering audio interruptions." }
+          },
+          {
+            "@type": "Question",
+            "name": "Does Zenify support synchronized lyrics?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes, Zenify includes an AI-powered lyrics alignment engine with syllable-level timing and instrumental solo gap protection across English, Tamil, Tanglish, Hindi, and international tracks." }
+          },
+          {
+            "@type": "Question",
+            "name": "What audio effects and DSP features are built in?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Zenify includes a studio 3-band equalizer, binaural 8D spatial panning, convolution reverb simulations (hall and cathedral), and nightcore/slowed DJ pitch warper." }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I play my own local audio files in Zenify?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes! Zenify includes an in-browser local audio scanner that parses ID3 tags for MP3, FLAC, WAV, and AAC files directly on your device with 100% privacy." }
+          }
+        ]
+      }
+      </script>
+      <main class="px-6 py-16 max-w-4xl mx-auto text-zinc-200">
+        <h1 class="text-3xl font-black text-white mb-4">Zenify Features & FAQ</h1>
+        <p class="text-zinc-400 mb-8 leading-relaxed">Everything you need to know about Zenify ad-free music streaming, synchronized multilingual lyrics, Studio FX audio processing, and local file playback.</p>
+      </main>
+    `
   }
 };
 
@@ -251,7 +332,7 @@ function renderRouteHtml(baseTemplate, route, data) {
     <meta property="og:image:alt" content="${data.title}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:locale" content="en_IN" />
+    <meta property="og:locale" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@zenifymusic" />
     <meta name="twitter:url" content="${data.canonical}" />

@@ -1,23 +1,37 @@
 {
+  "id": "/",
   "name": "Zenify – Free Music Player with Synced Lyrics & 8D Audio",
   "short_name": "Zenify",
-  "description": "Stream millions of songs with sub-second synchronized lyrics in 50+ languages, studio 3-band EQ, 8D spatial audio, and local file playback. Free & ad-free.",
+  "description": "Stream millions of songs with sub-second synchronized lyrics in 50+ languages, studio 3-band EQ, 8D spatial audio, Listen Together rooms, and local file playback. Free & ad-free.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#121214",
-  "theme_color": "#121214",
+  "background_color": "#030303",
+  "theme_color": "#030303",
+  "categories": ["music", "entertainment"],
   "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
     {
       "src": "/favicon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/favicon_z_512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon_z_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

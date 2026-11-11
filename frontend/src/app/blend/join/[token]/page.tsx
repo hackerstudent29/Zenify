@@ -50,7 +50,7 @@ export default function BlendJoinRedirectPage() {
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 text-center select-none font-sans">
-      <SEO title="Joining Blend - Zenify" description="Connecting your shared music taste." />
+      <SEO title="Joining Blend – Zenify" description="Connecting your shared music taste." noindex={true} path="/blend/join" />
 
       {status === 'joining' && (
         <div className="space-y-4 max-w-sm">

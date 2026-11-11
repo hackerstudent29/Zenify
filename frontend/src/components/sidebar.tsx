@@ -435,7 +435,7 @@ export function Sidebar() {
               collapsed && "opacity-0"
             )}
           >
-            <span className="font-zenify not-italic">zenify</span> v1.0.1
+            <span className="font-zenify not-italic">zenify</span> v1.0.8
           </div>
         </div>
       </aside>

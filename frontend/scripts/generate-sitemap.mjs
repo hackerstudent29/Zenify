@@ -9,11 +9,13 @@ const API_BASE = process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_URL || 
 
 const STATIC_ROUTES = [
   '/',
-  '/search',
-    '/about-zenify',
-  '/about',
+  '/download',
+  '/together',
   '/discover',
   '/radio',
+  '/faq',
+  '/about-zenify',
+  '/about',
   '/local-library',
   '/privacy',
   '/terms'

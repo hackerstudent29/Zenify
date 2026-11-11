@@ -27,10 +27,11 @@ body:
     attributes:
       label: Category
       options:
+        - Room Together (Listen Together)
         - Lyrics Engine & Karaoke
-        - Audio Engine & Visualizers
-        - Web UI / Glassmorphism
-        - Mobile App (Flutter)
+        - Audio Engine & Studio FX
+        - Web UI / PWA
+        - Mobile App (Flutter / Android)
         - Performance & Caching
         - Other
     validations:

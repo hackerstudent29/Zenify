@@ -34,8 +34,9 @@ body:
       options:
         - Web Player (Desktop Chrome/Edge)
         - Web Player (Desktop Firefox/Safari)
-        - Web Player (Mobile Browser)
-        - Flutter Android App
+        - Web Player (Mobile Browser / PWA)
+        - Flutter Android App (v1.0.8)
+        - Room Together (WebSockets / LiveKit Voice)
         - Backend API / Self-hosting
     validations:
       required: true

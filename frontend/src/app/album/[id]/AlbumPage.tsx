@@ -393,6 +393,18 @@ export default function AlbumPage() {
       <SEO
         title={`${formatDisplayTitle(album.title)} by ${album.artist?.name || "Artist"} – Zenify`}
         description={albumDescription}
+        path={album.id ? `/album/${encodeURIComponent(String(album.id))}` : "/album"}
+        image={coverUrl || undefined}
+        type="music.album"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "MusicAlbum",
+          name: formatDisplayTitle(album.title),
+          url: album.id ? `https://listenzenify.vercel.app/album/${encodeURIComponent(String(album.id))}` : undefined,
+          byArtist: album.artist?.name ? { "@type": "MusicGroup", name: album.artist.name } : undefined,
+          numTracks: Array.isArray(album.tracks) ? album.tracks.length : undefined,
+          datePublished: rawDate || undefined,
+        }}
       />
       <div 
         className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden am-layout-transition"

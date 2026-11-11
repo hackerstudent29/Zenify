@@ -140,8 +140,10 @@ export default function BlendDetailPage() {
       style={{ paddingRight: 'calc(var(--rp-w) + var(--row-gutter, 28px))' }}
     >
       <SEO
-        title={`Blend with ${partner?.name || 'Friend'} - Zenify`}
+        title={`Blend with ${partner?.name || 'Friend'} – Zenify`}
         description={`Shared musical playlist. ${matchScore}% Taste Match.`}
+        path="/blend"
+        noindex={true}
       />
 
       <div className="max-w-6xl mx-auto space-y-8">

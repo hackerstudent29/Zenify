@@ -143,8 +143,10 @@ export default function DayMixPage() {
       }}
     >
       <SEO
-        title={`${meta?.title || 'Day Mix'} - Zenify`}
+        title={`${meta?.title || 'Day Mix'} – Zenify`}
         description={meta?.subtitle || 'Personalized flow crafted for the rhythms of your day.'}
+        path="/day-mix"
+        noindex={true}
       />
 
       {/* Atmospheric dynamic gradient backdrop */}

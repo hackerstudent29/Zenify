@@ -1,5 +1,5 @@
-import { SEO } from "@/components/shared/SEO";
 "use client";
+import { SEO } from "@/components/shared/SEO";
 
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -83,6 +83,11 @@ export default function ExploreSectionPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0C] pb-32">
+      <SEO
+        title={title ? `${title} – Explore Music` : "Explore Music"}
+        description={`Stream ${title || "curated music charts and releases"}${Array.isArray(sectionTracks) && sectionTracks.length ? ` (${sectionTracks.length} tracks)` : ""} with synchronized lyrics and Studio FX on Zenify.`}
+        path={id ? `/explore/${encodeURIComponent(id)}` : "/explore"}
+      />
       {/* Header */}
       <div className="relative md:sticky md:top-0 z-30 bg-[#0A0A0C]/80 backdrop-blur-xl border-b border-white/5 px-6 py-5 flex items-center gap-4">
         <h1 className="text-xl md:text-2xl font-brand font-bold text-white tracking-tight">{title}</h1>

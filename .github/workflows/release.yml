@@ -2,6 +2,11 @@ name: Build and Release Mobile APKs
 
 on:
   workflow_dispatch:
+    inputs:
+      rebuild_from_ci:
+        description: 'Force CI APK rebuild and overwrite release assets'
+        required: false
+        default: 'false'
   push:
     tags:
       - 'v*'
@@ -23,52 +28,57 @@ jobs:
             TAG_NAME="v1.0.8"
           fi
           gh release view "$TAG_NAME" >/dev/null 2>&1 || gh release create "$TAG_NAME" --title "Zenify $TAG_NAME" --generate-notes
-          echo "Uploading pre-built release package to $TAG_NAME..."
+          echo "Checking pre-built release package for $TAG_NAME..."
           if [ -f "frontend/public/downloads/zenify.apk" ]; then
             cp frontend/public/downloads/zenify.apk "zenify-${TAG_NAME}.apk"
             cp frontend/public/downloads/zenify.apk zenify.apk
             gh release upload "$TAG_NAME" "zenify-${TAG_NAME}.apk" zenify.apk --clobber
-            echo "Pre-built APKs uploaded successfully to $TAG_NAME!"
+            echo "Pre-built ARM64 APKs uploaded successfully to $TAG_NAME!"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Java
+        if: ${{ hashFiles('frontend/public/downloads/zenify.apk') == '' || github.event.inputs.rebuild_from_ci == 'true' }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Flutter
+        if: ${{ hashFiles('frontend/public/downloads/zenify.apk') == '' || github.event.inputs.rebuild_from_ci == 'true' }}
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
       - name: Get Dependencies
+        if: ${{ hashFiles('frontend/public/downloads/zenify.apk') == '' || github.event.inputs.rebuild_from_ci == 'true' }}
         working-directory: ./mobile
         run: flutter pub get
 
       - name: Build Split ARM64 & Universal APKs
+        if: ${{ hashFiles('frontend/public/downloads/zenify.apk') == '' || github.event.inputs.rebuild_from_ci == 'true' }}
         working-directory: ./mobile
         run: |
           flutter build apk --split-per-abi
           flutter build apk
 
-      - name: Upload Build APKs to GitHub Release
+      - name: Upload CI Build APKs to GitHub Release
+        if: ${{ hashFiles('frontend/public/downloads/zenify.apk') == '' || github.event.inputs.rebuild_from_ci == 'true' }}
         run: |
           TAG_NAME="${GITHUB_REF_NAME:-v1.0.8}"
           if [ "$TAG_NAME" = "main" ]; then
             TAG_NAME="v1.0.8"
           fi
           gh release view "$TAG_NAME" >/dev/null 2>&1 || gh release create "$TAG_NAME" --title "Zenify $TAG_NAME" --generate-notes
-          echo "Uploading release packages to $TAG_NAME..."
+          echo "Uploading CI release packages to $TAG_NAME..."
           cp mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "zenify-${TAG_NAME}.apk"
           cp mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk zenify.apk
           cp mobile/build/app/outputs/flutter-apk/app-release.apk "zenify-${TAG_NAME}-universal.apk"
           cp mobile/build/app/outputs/flutter-apk/app-release.apk zenify-universal.apk
           gh release upload "$TAG_NAME" "zenify-${TAG_NAME}.apk" zenify.apk "zenify-${TAG_NAME}-universal.apk" zenify-universal.apk --clobber
-          echo "All APKs uploaded successfully to $TAG_NAME!"
+          echo "All CI APKs uploaded successfully to $TAG_NAME!"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

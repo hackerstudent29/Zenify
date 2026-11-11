@@ -201,7 +201,7 @@
 - Podcast support
 
 ### Q: When is the next release?
-**A**: Monthly releases. Check [CHANGELOG.md](CHANGELOG.md) for dates.
+**A**: Monthly releases. Check [CHANGELOG.md](../CHANGELOG.md) for dates.
 
 ### Q: Can I request a feature?
 **A**: Yes! [Open an issue](https://github.com/hackerstudent29/Zenify/issues) or [discuss on GitHub](https://github.com/hackerstudent29/Zenify/discussions).

@@ -1,6 +1,6 @@
 # Zenify Architecture Overview
 
-This document provides a high-level overview of Zenify's system architecture. For detailed information, see the docs folder: [docs/](docs/)
+This document provides a high-level overview of Zenify's system architecture. For detailed specs, see [`docs/README.md`](./README.md) and [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md).
 
 ---
 
@@ -67,47 +67,70 @@ This document provides a high-level overview of Zenify's system architecture. Fo
 
 ## 📁 Directory Structure
 
-```
+> See [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) for the complete file locator and full monorepo directory tree.
+
+```text
 Zenify/
-├── backend/                    # Node.js + Fastify backend
+├── .github/                    # CI/CD workflows (lint, security, test, release) & templates
+├── assets/                     # Shared logos, display fonts & promotional artwork
+├── backend/                    # Node.js + Fastify 5 + TypeScript backend
 │   ├── src/
-│   │   ├── routes/            # API endpoints
-│   │   ├── services/          # Business logic
-│   │   ├── controllers/       # Route handlers
-│   │   ├── middleware/        # Auth, logging, etc.
-│   │   └── lib/               # Utilities, helpers
+│   │   ├── config/             # Environment validation
+│   │   ├── controllers/        # Route handlers & Zod validation schemas
+│   │   ├── jobs/               # Background catalog & integrity jobs
+│   │   ├── lyrics/             # LRC/TTML parsers & multi-provider orchestrator
+│   │   ├── middleware/         # JWT auth & request guards
+│   │   ├── queues/             # BullMQ workers (home shelves, imports, lyrics)
+│   │   ├── routes/             # REST & Room Together v1 endpoints
+│   │   ├── services/           # Audio resolver, catalog, AI search & together/ modules
+│   │   ├── utils/              # Prisma, Redis, R2/S3, transcoder & security helpers
+│   │   ├── websocket/          # Real-time Room Together WebSocket server
+│   │   └── workers/            # Metadata enrichment worker
 │   ├── prisma/
-│   │   ├── schema.prisma      # Database schema
-│   │   └── migrations/        # DB version control
-│   ├── Dockerfile             # Docker image
+│   │   ├── schema.prisma       # PostgreSQL database schema
+│   │   └── seed*.ts            # Database seed scripts
+│   ├── tests/                  # Automated backend test suites
+│   ├── Dockerfile              # Docker container build
 │   └── package.json
 │
-├── frontend/                   # React 19 + Vite
+├── frontend/                   # React 19 + Vite 6 + React Router PWA
+│   ├── public/                 # Static assets, APK download, sitemap.xml, robots.txt & llms.txt
+│   ├── scripts/                # Build-time SEO sitemap, prerender & verify scripts
 │   ├── src/
-│   │   ├── app/               # Next.js app routes
-│   │   ├── components/        # UI components
-│   │   │   ├── player/        # Player UI
-│   │   │   ├── shared/        # Shared components
-│   │   │   └── ui/            # Reusable UI elements
-│   │   ├── lib/
-│   │   │   ├── audio-engine.ts    # Web Audio API
-│   │   │   ├── api.ts            # API client
-│   │   │   └── utils.ts          # Helpers
-│   │   ├── store/             # Zustand state management
-│   │   ├── styles/            # Tailwind CSS
-│   │   └── public/            # Static assets
-│   ├── vite.config.ts         # Build config
+│   │   ├── app/                # Route page views (Home, Discover, Download, Together, Track, Album, Artist)
+│   │   ├── components/         # UI components (player/, shared/, together/, ui/)
+│   │   ├── hooks/              # Custom React hooks
+│   │   ├── lib/                # Web Audio FX engine, API client, SEO & helpers
+│   │   ├── services/           # Local library & Room Together clients
+│   │   ├── store/              # Zustand state management
+│   │   ├── workers/            # Audio feature & palette extraction Web Workers
+│   │   └── router.tsx          # Client route table
+│   ├── vercel.json             # Hosting headers & SPA rewrites
+│   ├── vite.config.ts          # Vite + VitePWA configuration
 │   └── package.json
 │
-├── docs/                       # Documentation
-│   ├── backend_architecture.md
-│   ├── frontend_architecture.md
-│   ├── database_schema.md
-│   └── deployment/
+├── mobile/                     # Flutter Android/Desktop client + Kotlin audio engine
+│   ├── android/                # Gradle config, InnerTube parser & native C++/JNI Studio FX
+│   ├── assets/                 # Mock catalog, sample lyrics & images
+│   ├── lib/                    # Design system, services (ZenPlayer, Room Together) & views
+│   ├── test/                   # Flutter unit & widget tests
+│   └── pubspec.yaml            # App metadata (v1.0.8+12) & dependencies
 │
-├── docker-compose.yml         # Full-stack local dev
-├── CONTRIBUTING.md            # Contribution guidelines
-├── README.md                  # Main documentation
+├── scripts/                    # Deploy, security scan & dev helper scripts
+├── docs/                       # Documentation hub & internal technical specs
+│   ├── README.md               # Documentation index
+│   ├── PROJECT_STRUCTURE.md    # Complete monorepo structure tree
+│   ├── ARCHITECTURE.md         # System architecture (this document)
+│   ├── architecture/           # Detailed backend, frontend & schema specs
+│   ├── deployment/             # Cloud setup & deployment guides
+│   ├── images/                 # App UI screenshots
+│   └── together/               # Room Together parity audit
+│
+├── CHANGELOG.md                # Release changelog (v1.0.8 latest)
+├── CONTRIBUTING.md             # Contribution guidelines
+├── SECURITY.md                 # Vulnerability disclosure policy
+├── docker-compose.yml          # Full-stack local development stack
+├── README.md                   # Main project documentation
 └── LICENSE
 ```
 
@@ -400,13 +423,13 @@ Lyrics
 
 Interested in improving the architecture?
 
-1. See [docs/](docs/) for detailed architecture docs
+1. See [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) and [architecture/](./architecture/) for detailed specs
 2. Check [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines
 3. Open a discussion: [GitHub Discussions](https://github.com/hackerstudent29/Zenify/discussions)
 4. Submit a PR with changes
 
 ---
 
-**Last Updated**: October 2026  
-**Architecture Version**: 2.5.0
+**Last Updated**: November 2026  
+**Release Alignment**: `v1.0.8`
 

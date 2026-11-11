@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 export interface SEOProps {
   title?: string;
   description?: string;
+  keywords?: string | string[];
   path?: string;
   image?: string;
   imageAlt?: string;
@@ -19,6 +20,7 @@ const DEFAULT_DESCRIPTION = 'Stream millions of songs with sub-second synchroniz
 export function SEO({
   title,
   description = DEFAULT_DESCRIPTION,
+  keywords,
   path = '',
   image = DEFAULT_IMAGE,
   imageAlt = 'Zenify - Free Music Player with Synced Lyrics & 8D Audio',
@@ -33,8 +35,8 @@ export function SEO({
   // Truncate description at 155 chars
   const cleanDescription = description.length > 155 ? `${description.slice(0, 152).trim()}...` : description;
 
-  // Format canonical URL: no trailing slash except root
-  let cleanPath = path || '';
+  // Format canonical URL: strip query/hash and trailing slash (except root)
+  let cleanPath = (path || '').split('?')[0].split('#')[0];
   if (cleanPath && !cleanPath.startsWith('/')) {
     cleanPath = `/${cleanPath}`;
   }
@@ -46,10 +48,14 @@ export function SEO({
   // Image URL formatting
   const fullImage = image.startsWith('http') ? image : `${BASE_URL}${image.startsWith('/') ? '' : '/'}${image}`;
 
+  const keywordContent = Array.isArray(keywords) ? keywords.join(', ') : keywords;
+  const jsonLdItems = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
+
   return (
     <Helmet>
       <title>{fullTitle}</title>
       <meta name="description" content={cleanDescription} />
+      {keywordContent && <meta name="keywords" content={keywordContent} />}
       <link rel="canonical" href={canonicalUrl} />
 
       {/* Robots */}
@@ -78,13 +84,14 @@ export function SEO({
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={cleanDescription} />
       <meta name="twitter:image" content={fullImage} />
+      <meta name="twitter:image:alt" content={imageAlt} />
 
       {/* Structured Data (JSON-LD) */}
-      {jsonLd && (
-        <script type="application/ld+json">
-          {JSON.stringify(jsonLd)}
+      {jsonLdItems.map((schema, idx) => (
+        <script key={idx} type="application/ld+json">
+          {JSON.stringify(schema)}
         </script>
-      )}
+      ))}
     </Helmet>
   );
 }

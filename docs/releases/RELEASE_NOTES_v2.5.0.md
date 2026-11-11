@@ -185,9 +185,9 @@ Want to help improve Zenify?
 ## 📞 Support
 
 - **Documentation**: [README.md](../../README.md)
-- **Troubleshooting**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- **Installation**: [INSTALLATION.md](INSTALLATION.md)
-- **Architecture**: [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Troubleshooting**: [TROUBLESHOOTING.md](../TROUBLESHOOTING.md)
+- **Installation**: [INSTALLATION.md](../INSTALLATION.md)
+- **Architecture**: [ARCHITECTURE.md](../ARCHITECTURE.md)
 
 ---
 
