@@ -18,7 +18,6 @@ import 'requests/requests_sheet.dart';
 import 'stats/room_stats_sheet.dart';
 import 'theme/room_theme_ui.dart';
 import 'room_config_sheet.dart';
-import 'voice/voice_sheet.dart';
 
 Color roleColor(RoomRole r) => switch (r) {
       RoomRole.host => AT.amber,
@@ -262,7 +261,6 @@ class _MenuBody extends StatelessWidget {
             AppleRow(leading: const IconTile(CupertinoIcons.heart_fill, size: 30), title: 'Reaction timeline', chevron: true, onTap: () => showReactionTimelineSheet(context, momentActionsFor(context))),
             AppleRow(leading: const IconTile(CupertinoIcons.music_note_list, size: 30, color: AT.blue), title: 'Song requests', trailing: t.pendingRequestCount == 0 ? null : _Badge(t.pendingRequestCount), chevron: true, onTap: () => showRequestsSheet(context)),
             AppleRow(leading: const IconTile(CupertinoIcons.sparkles, size: 30, color: AT.accent), title: 'Discover', chevron: true, onTap: () => showRecommendationsSheet(context)),
-            AppleRow(leading: const IconTile(CupertinoIcons.mic_fill, size: 30, color: AT.green), title: 'Voice', chevron: true, onTap: () => showVoiceSheet(context)),
           ]),
 
           GroupedSection(title: 'Room', children: [

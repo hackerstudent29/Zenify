@@ -8,6 +8,7 @@ import { uploadToR2 } from '../utils/s3';
 import { LyricsEnhancementService } from './lyrics-enhancement.service';
 import { SystemSettingsService } from './system-settings.service';
 import { safeExecFile, isSafePublicUrl } from '../utils/security';
+import { upgradeInnerTubeArtwork } from '../utils/innertube-artwork';
 
 // Dynamic imports for ESM modules if needed, or stick to require if it's simpler for these libs
 const fetch = require('node-fetch');
@@ -125,6 +126,12 @@ if (process.env.NODE_ENV === 'production') {
 
 export class ExternalMetadataService {
 
+    static clearInnerTubeCaches(): void {
+        youtubeSearchCache.clear();
+        ytMusicFeedCache.clear();
+        audioSearchCache.clear();
+    }
+
 
     static async fetchFromUrl(url: string): Promise<ExtractedMetadata> {
         url = url.trim();
@@ -208,7 +215,10 @@ export class ExternalMetadataService {
                                 const videoId = entry.id || (entry.url && entry.url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1]);
                                 const watchUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : (entry.url || entry.webpage_url);
                                 const streamProxyUrl = watchUrl ? `/api/utils/stream-youtube?url=${encodeURIComponent(watchUrl)}` : undefined;
-                                const trackCover = videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : (entry.thumbnails?.[0]?.url || metadata.cover);
+                                const trackCover = upgradeInnerTubeArtwork(
+                                    entry.thumbnails?.[entry.thumbnails.length - 1]?.url || metadata.cover,
+                                    { videoId, kind: 'song' }
+                                ) || metadata.cover;
 
                                 let rawTitle = (entry.title || `Track ${i + 1}`).trim();
                                 let trackArtist = entry.uploader || entry.channel || metadata.artist;
@@ -265,7 +275,7 @@ export class ExternalMetadataService {
                                         thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
                                         thumbnails: [
                                             { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, width: 1280 },
-                                            { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480 },
+                                            { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, width: 1280 },
                                         ],
                                         duration: null,
                                     };
@@ -277,8 +287,8 @@ export class ExternalMetadataService {
                                         id: videoId,
                                         title: `YouTube Video`,
                                         uploader: 'Unknown Artist',
-                                        thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-                                        thumbnails: [{ url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480 }],
+                                        thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+                                        thumbnails: [{ url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, width: 1280 }],
                                         duration: null,
                                     };
                                 }
@@ -2550,7 +2560,8 @@ export class ExternalMetadataService {
                     }
 
                     const videoId = id || vr.videoId;
-                    const thumb = vr.thumbnail?.thumbnails?.[vr.thumbnail.thumbnails.length - 1]?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+                    const rawThumb = vr.thumbnail?.thumbnails?.[vr.thumbnail.thumbnails.length - 1]?.url || '';
+                    const thumb = upgradeInnerTubeArtwork(rawThumb, { videoId, kind: 'video' }) || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
                     results.push({
                         id: videoId,
                         videoId: videoId,
@@ -2643,7 +2654,7 @@ export class ExternalMetadataService {
 
                 const thumbs = m.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
                 const rawThumb = thumbs[thumbs.length - 1]?.url || '';
-                const highResThumb = rawThumb ? rawThumb.replace(/=w\d+-h\d+/, '=w600-h600') : '';
+                const highResThumb = upgradeInnerTubeArtwork(rawThumb, { videoId, kind: 'song' });
 
                 if (title && videoId) {
                     results.push({
@@ -2654,7 +2665,7 @@ export class ExternalMetadataService {
                         uploader: artist.trim(),
                         album: album.trim(),
                         duration: durationSeconds,
-                        thumbnail: highResThumb || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                        thumbnail: highResThumb || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
                         isYtMusic: true
                     });
                 }
@@ -2786,10 +2797,10 @@ export class ExternalMetadataService {
                 const subRuns = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
                 const artistName = subRuns[0]?.text || 'Trending Artist';
                 
-                // Get high-res square thumbnail
+                // Get high-res square thumbnail (1200x1200)
                 const thumbs = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
                 const rawThumb = thumbs[thumbs.length - 1]?.url || '';
-                const highResThumb = rawThumb ? rawThumb.replace(/=w\d+-h\d+/, '=w600-h600') : (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '');
+                const highResThumb = upgradeInnerTubeArtwork(rawThumb, { videoId, kind: 'song' });
 
                 if (title && videoId) {
                     results.push({
@@ -2855,7 +2866,7 @@ export class ExternalMetadataService {
 
                 const thumbs = r.thumbnailRenderer?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
                 const rawThumb = thumbs[thumbs.length - 1]?.url || '';
-                const highResCover = rawThumb ? rawThumb.replace(/=w\d+-h\d+/, '=w600-h600') : '';
+                const highResCover = upgradeInnerTubeArtwork(rawThumb, { kind: 'album' });
 
                 if (albumTitle && browseId) {
                     results.push({
@@ -2910,7 +2921,8 @@ export class ExternalMetadataService {
                 const subRuns = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.map((x: any) => x.text).join('') || '';
                 const thumbs = r.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
                 const rawThumb = thumbs[thumbs.length - 1]?.url || '';
-                const highResAvatar = rawThumb ? rawThumb.replace(/=w\d+-h\d+/, '=w600-h600') : `https://ui-avatars.com/api/?name=${encodeURIComponent(artistName || 'Artist')}&background=random&color=fff&size=512`;
+                const highResAvatar = upgradeInnerTubeArtwork(rawThumb, { kind: 'artist_avatar' })
+                    || `https://ui-avatars.com/api/?name=${encodeURIComponent(artistName || 'Artist')}&background=random&color=fff&size=512`;
 
                 if (artistName) {
                     results.push({
@@ -2918,6 +2930,7 @@ export class ExternalMetadataService {
                         title: artistName,
                         artist: { name: subRuns || 'Top Artist' },
                         coverUrl: highResAvatar,
+                        imageUrl: highResAvatar,
                         isArtist: true,
                         browseId: browseId,
                         href: `/artist/${encodeURIComponent(artistName)}`
@@ -2932,6 +2945,205 @@ export class ExternalMetadataService {
         } catch (err: any) {
             console.warn('[YTMusic] fetchYoutubeMusicChartsTopArtists failed:', err.message);
             return [];
+        }
+    }
+
+    /**
+     * Searches official music videos on YouTube Music Innertube and returns 1280x720 thumbnails.
+     */
+    public static async searchYoutubeMusicVideosInnertube(query: string): Promise<any[]> {
+        try {
+            const { default: axios } = await import('axios');
+            const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const res = await axios.post('https://music.youtube.com/youtubei/v1/search', {
+                context: {
+                    client: {
+                        clientName: 'WEB_REMIX',
+                        clientVersion: `1.${ymd}.01.00`,
+                        hl: 'en',
+                        gl: 'IN'
+                    }
+                },
+                query,
+                params: 'EgWKAQIQAWoKEAMQBBAKEAkQBQ%3D%3D'
+            }, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Origin': 'https://music.youtube.com',
+                    'Referer': 'https://music.youtube.com/',
+                    'Content-Type': 'application/json'
+                },
+                timeout: 7000
+            });
+
+            const contents = res.data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.musicShelfRenderer?.contents || [];
+            const results: any[] = [];
+            for (const item of contents) {
+                const m = item.musicResponsiveListItemRenderer;
+                if (!m) continue;
+                const flexCols = m.flexColumns || [];
+                const title = flexCols[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
+                const videoId = m.playlistItemData?.videoId || flexCols[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
+                if (!title || !videoId) continue;
+
+                const secondColRuns = flexCols[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
+                const artist = secondColRuns[0]?.text || 'Unknown Artist';
+                let durationSeconds = 210;
+                for (let i = secondColRuns.length - 1; i >= 0; i--) {
+                    const text = secondColRuns[i]?.text || '';
+                    if (text.includes(':')) {
+                        const parts = text.split(':').map((x: string) => parseInt(x, 10));
+                        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                            durationSeconds = parts[0] * 60 + parts[1];
+                        }
+                        break;
+                    }
+                }
+
+                const thumbs = m.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+                const rawThumb = thumbs[thumbs.length - 1]?.url || '';
+                const highResThumb = upgradeInnerTubeArtwork(rawThumb, { videoId, kind: 'video' })
+                    || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
+
+                results.push({
+                    id: videoId,
+                    videoId,
+                    title: title.trim(),
+                    artist: artist.trim(),
+                    uploader: artist.trim(),
+                    duration: durationSeconds,
+                    thumbnail: highResThumb,
+                    isYtMusic: true,
+                    isVideo: true
+                });
+            }
+            return results;
+        } catch (err: any) {
+            console.warn(`[YTMusic] Video search failed for "${query}":`, err.message);
+            return [];
+        }
+    }
+
+    /**
+     * Resolves an artist's HD portrait avatar (1200x1200) and wide hero banner (1920x1080/2880x1200)
+     * plus bio and top songs directly from YouTube Music Innertube.
+     */
+    public static async fetchYoutubeMusicArtistProfile(nameOrBrowseId: string): Promise<{
+        name: string;
+        browseId: string;
+        imageUrl: string;
+        coverUrl: string;
+        bio?: string;
+        topSongs: any[];
+    } | null> {
+        const clean = (nameOrBrowseId || '').trim();
+        if (!clean) return null;
+
+        try {
+            let browseId = clean.startsWith('UC') ? clean : '';
+            let cardAvatar = '';
+            let resolvedName = clean;
+
+            if (!browseId) {
+                const { default: axios } = await import('axios');
+                const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                const searchRes = await axios.post('https://music.youtube.com/youtubei/v1/search', {
+                    context: {
+                        client: {
+                            clientName: 'WEB_REMIX',
+                            clientVersion: `1.${ymd}.01.00`,
+                            hl: 'en',
+                            gl: 'IN'
+                        }
+                    },
+                    query: clean,
+                    params: 'EgWKAQIgAWoKEAUQAxAEEAkQEQ%3D%3D'
+                }, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Origin': 'https://music.youtube.com',
+                        'Referer': 'https://music.youtube.com/',
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 7000
+                });
+
+                const sections = searchRes.data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
+                for (const sec of sections) {
+                    const items = sec?.musicShelfRenderer?.contents || [];
+                    for (const it of items) {
+                        const r = it?.musicResponsiveListItemRenderer;
+                        const bId = r?.navigationEndpoint?.browseEndpoint?.browseId;
+                        if (bId && bId.startsWith('UC')) {
+                            browseId = bId;
+                            resolvedName = r?.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text?.trim() || clean;
+                            const thumbs = r?.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+                            const raw = thumbs[thumbs.length - 1]?.url || '';
+                            cardAvatar = upgradeInnerTubeArtwork(raw, { kind: 'artist_avatar' });
+                            break;
+                        }
+                    }
+                    if (browseId) break;
+                }
+            }
+
+            if (!browseId) return null;
+
+            const data = await ExternalMetadataService.browseYoutubeMusic(browseId);
+            const header = data?.header?.musicImmersiveHeaderRenderer
+                || data?.header?.musicVisualHeaderRenderer
+                || data?.header?.musicHeaderRenderer
+                || {};
+
+            const headerName = header?.title?.runs?.[0]?.text?.trim();
+            if (headerName) resolvedName = headerName;
+
+            const bannerThumbs = header?.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails
+                || header?.thumbnail?.croppedSquareThumbnailRenderer?.thumbnail?.thumbnails
+                || [];
+            const rawBanner = bannerThumbs[bannerThumbs.length - 1]?.url || '';
+            const fgThumbs = header?.foregroundThumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+            const rawFg = fgThumbs[fgThumbs.length - 1]?.url || '';
+
+            const coverUrl = upgradeInnerTubeArtwork(rawBanner || rawFg || cardAvatar, { kind: 'artist_banner' });
+            const imageUrl = upgradeInnerTubeArtwork(rawFg || cardAvatar || rawBanner, { kind: 'artist_avatar' });
+            const bio = header?.description?.runs?.[0]?.text?.trim();
+
+            const tabSections = data?.contents?.singleColumnBrowseResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
+            const topSongs: any[] = [];
+            for (const sec of tabSections) {
+                const items = sec?.musicShelfRenderer?.contents || [];
+                for (const it of items) {
+                    const m = it?.musicResponsiveListItemRenderer;
+                    if (!m) continue;
+                    const flex = m.flexColumns || [];
+                    const title = flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text?.trim();
+                    const videoId = m.playlistItemData?.videoId || flex[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
+                    if (!title || !videoId) continue;
+                    const subRuns = flex[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
+                    const thumbs = m.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+                    const rawThumb = thumbs[thumbs.length - 1]?.url || '';
+                    topSongs.push({
+                        id: videoId,
+                        videoId,
+                        title,
+                        artist: subRuns[0]?.text?.trim() || resolvedName,
+                        thumbnail: upgradeInnerTubeArtwork(rawThumb, { videoId, kind: 'song' })
+                    });
+                }
+            }
+
+            return {
+                name: resolvedName,
+                browseId,
+                imageUrl: imageUrl || coverUrl,
+                coverUrl: coverUrl || imageUrl,
+                bio,
+                topSongs
+            };
+        } catch (err: any) {
+            console.warn(`[YTMusic] fetchYoutubeMusicArtistProfile failed for "${clean}":`, err.message);
+            return null;
         }
     }
 
@@ -2962,7 +3174,7 @@ export class ExternalMetadataService {
                 seen.add(videoId);
 
                 const artistName = item.artist?.name || item.artist || 'Featured Artist';
-                const thumb = item.thumbnail || item.coverUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+                const thumb = upgradeInnerTubeArtwork(item.thumbnail || item.coverUrl, { videoId, kind: 'song' });
 
                 results.push({
                     id: `yt-${videoId}`,
@@ -3131,9 +3343,10 @@ export class ExternalMetadataService {
 
         const videoId = v.id || v.videoId;
         const duration = Number(v.duration) || Number(v.lengthSeconds) || 180;
-        const coverArt = (v.thumbnail && v.thumbnail.includes('googleusercontent.com'))
-            ? v.thumbnail.replace(/=w\d+-h\d+/, '=w600-h600')
-            : (v.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
+        const coverArt = upgradeInnerTubeArtwork(v.thumbnail, {
+            videoId,
+            kind: v.isVideo ? 'video' : 'song'
+        });
         const albumName = v.album || 'Single';
 
         return {

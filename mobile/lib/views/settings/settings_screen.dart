@@ -28,7 +28,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
   int _versionTapCount = 0;
-  String _appVersion = 'v1.0.8 (Build 12)';
+  String _appVersion = 'v1.0.9 (Build 13)';
 
   @override
   void initState() {
@@ -109,7 +109,7 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
               ),
               const SizedBox(height: 16),
               _diagRow('Current Build', _appVersion),
-              _diagRow('Release Channel', 'v1.0.8 Production (ARM64)'),
+              _diagRow('Release Channel', 'v1.0.9 Production (ARM64)'),
               _diagRow('Status', 'Up to date • Latest package installed'),
               _diagRow('Pipeline', 'YouTube Music InnerTube + StudioFX DSP'),
               const SizedBox(height: 24),

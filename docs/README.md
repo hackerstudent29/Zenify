@@ -49,6 +49,6 @@ Welcome to the Zenify documentation hub. Pick a guide below based on what you wa
 | [SUPPORT.md](./SUPPORT.md) | Getting help and reporting bugs |
 | [PRIVACY_POLICY.md](./PRIVACY_POLICY.md) | Data handling & privacy commitments |
 | [ROADMAP.md](./ROADMAP.md) | Upcoming milestones and feature roadmap |
-| [CHANGELOG.md](../CHANGELOG.md) | Complete version history (`v1.0.8` latest) |
+| [CHANGELOG.md](../CHANGELOG.md) | Complete version history (`v1.0.9` latest) |
 | [SECURITY.md](../SECURITY.md) | Security policy & vulnerability reporting |
 

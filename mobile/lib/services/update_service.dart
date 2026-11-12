@@ -21,8 +21,8 @@ class UpdateInfo {
     required this.latestVersion,
     required this.updateUrl,
     required this.releaseNotes,
-    this.releaseDate = 'November 11, 2026',
-    this.releaseTime = '09:50 AM IST',
+    this.releaseDate = 'November 12, 2026',
+    this.releaseTime = '03:00 PM IST',
     this.features = const [],
     this.fixes = const [],
     this.improvements = const [],
@@ -97,8 +97,8 @@ class UpdateService {
 
     try {
       final packageInfo = await PackageInfo.fromPlatform();
-      final currentVersion = packageInfo.version.isNotEmpty ? packageInfo.version : '1.0.8';
-      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 12;
+      final currentVersion = packageInfo.version.isNotEmpty ? packageInfo.version : '1.0.9';
+      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 13;
 
       // Remote config candidates in priority order (raw GitHub first for instantaneous release updates)
       final urls = [
@@ -131,8 +131,8 @@ class UpdateService {
       final latestAppVersion = (configData['latestAppVersion'] ?? configData['version'] ?? currentVersion).toString();
       final minAppVersion = (configData['minAppVersion'] ?? '1.0.0').toString();
       final updateUrl = (configData['updateUrl'] ?? 'https://listenzenify.com/downloads/zenify.apk').toString();
-      final releaseDate = (configData['releaseDate'] ?? 'November 11, 2026').toString();
-      final releaseTime = (configData['releaseTime'] ?? '09:50 AM IST').toString();
+      final releaseDate = (configData['releaseDate'] ?? 'November 12, 2026').toString();
+      final releaseTime = (configData['releaseTime'] ?? '03:00 PM IST').toString();
 
       List<String> parseList(dynamic val) {
         if (val is List) return val.map((e) => e.toString()).toList();
@@ -188,7 +188,10 @@ class UpdateService {
 
   /// Displays an Apple Music / Zenify styled modal bottom sheet detailing the update.
   void showUpdateSheet(BuildContext context, UpdateInfo info) {
-    DockVisibility.hideDocksNotifier.value = true;
+    final dockToken = DockVisibility.acquire(
+      hideNav: true,
+      hideMini: info.isForceUpdate,
+    );
     showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
@@ -204,7 +207,7 @@ class UpdateService {
         );
       },
     ).whenComplete(() {
-      DockVisibility.hideDocksNotifier.value = false;
+      DockVisibility.release(dockToken);
     });
   }
 }

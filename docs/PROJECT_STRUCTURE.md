@@ -120,7 +120,7 @@ Zenify/
 ├── frontend/                             # React 19 + Vite 6 + TypeScript Web PWA
 │   ├── public/                           # Static icons, favicons, APK download, SEO & PWA files
 │   │   ├── assets/letters/               # Monogram avatar assets
-│   │   ├── downloads/zenify.apk          # Latest Android release APK (v1.0.8)
+│   │   ├── downloads/zenify.apk          # Latest Android release APK (v1.0.9)
 │   │   ├── moods/                        # Home mood artwork
 │   │   ├── llms.txt                      # AI crawler overview & primary routes
 │   │   ├── manifest.json                 # PWA web app manifest
@@ -164,7 +164,7 @@ Zenify/
 │   ├── scripts/                          # Adaptive launcher icon generator
 │   ├── test/                             # Flutter unit & widget tests (lyrics, smart queue, rooms, phase 2)
 │   ├── analysis_options.yaml
-│   ├── pubspec.yaml                      # App version (1.0.8+12), SF Pro fonts & dependencies
+│   ├── pubspec.yaml                      # App version (1.0.9+13), SF Pro fonts & dependencies
 │   └── README.md
 │
 ├── scripts/                              # Root deployment, security & dev helper scripts
@@ -179,7 +179,7 @@ Zenify/
 ├── .gitignore
 ├── .vercelignore
 ├── analysis_options.yaml                 # Workspace-level Dart analyzer exclusions
-├── CHANGELOG.md                          # Unified release history (through v1.0.8)
+├── CHANGELOG.md                          # Unified release history (through v1.0.9)
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
 ├── docker-compose.yml                    # Local Redis, PostgreSQL & backend compose stack

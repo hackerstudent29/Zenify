@@ -292,17 +292,24 @@ class CoverImage extends StatelessWidget {
       placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
       errorWidget: (_, _, _) {
         if (cleanUrl.contains('maxresdefault.jpg')) {
-          final fallbackUrl = cleanUrl.replaceAll(
-            'maxresdefault.jpg',
-            'hqdefault.jpg',
-          );
+          final sdUrl = cleanUrl.replaceAll('maxresdefault.jpg', 'sddefault.jpg');
           return CachedNetworkImage(
-            key: ValueKey(fallbackUrl),
-            imageUrl: fallbackUrl,
+            key: ValueKey(sdUrl),
+            imageUrl: sdUrl,
             fit: BoxFit.cover,
             fadeInDuration: Duration.zero,
             placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
-            errorWidget: (_, _, _) => _empty(30),
+            errorWidget: (_, _, _) {
+              final hqUrl = cleanUrl.replaceAll('maxresdefault.jpg', 'hqdefault.jpg');
+              return CachedNetworkImage(
+                key: ValueKey(hqUrl),
+                imageUrl: hqUrl,
+                fit: BoxFit.cover,
+                fadeInDuration: Duration.zero,
+                placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
+                errorWidget: (_, _, _) => _empty(30),
+              );
+            },
           );
         }
         return _empty(34);

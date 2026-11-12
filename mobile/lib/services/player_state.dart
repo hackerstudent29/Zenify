@@ -71,6 +71,12 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
   /// Dominant artwork colour for the animated Now Playing background.
   final ValueNotifier<Color?> accentColorNotifier = ValueNotifier<Color?>(null);
 
+  /// Android native ExoPlayer SurfaceTexture ID for live YouTube video rendering.
+  final ValueNotifier<int?> videoTextureIdNotifier = ValueNotifier<int?>(null);
+
+  /// Natural rendered video dimensions reported by ExoPlayer (0x0 until first frame).
+  final ValueNotifier<Size> videoSizeNotifier = ValueNotifier<Size>(Size.zero);
+
   /// Plug in a palette extractor (e.g. palette_generator) from the UI layer.
   Future<Color?> Function(Track track)? accentResolver;
 
@@ -100,6 +106,12 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
   bool _isTransitioning = false;
   bool _pausing = false;
   double _appliedVolume = 1.0;
+  String? _lastPrefetchedNextKey;
+  bool _isRecoveringError = false;
+  int _consecutiveErrorCount = 0;
+  String? _lastRecoveryAttemptKey;
+
+  bool get isCurrentVideo => _currentTrack?.isVideo ?? false;
 
   // Scrub / seek smoothing
   bool _isScrubbing = false;
@@ -134,10 +146,20 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
 
   void attachQueue(QueueState queue) {
     if (_queueState == queue) return;
+    _queueState?.removeListener(_onQueueStateChanged);
     _queueState = queue;
+    queue.addListener(_onQueueStateChanged);
     if (_currentTrack != null && queue.current == null) {
       queue.syncCurrent(_currentTrack);
     }
+    if (_currentTrack != null) {
+      _prefetchNext();
+    }
+  }
+
+  void _onQueueStateChanged() {
+    if (_currentTrack == null || _isTransitioning) return;
+    _prefetchNext();
   }
 
   void _onStudioFxChanged() {
@@ -246,6 +268,16 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     _subs.add(
       _audioPlayer.onAutoTransition.listen((id) => _onAutoTransition(id)),
     );
+    _subs.add(
+      _audioPlayer.onVideoSizeChanged.listen((sz) {
+        if (sz.width > 0 && sz.height > 0) {
+          videoSizeNotifier.value = Size(
+            sz.width.toDouble(),
+            sz.height.toDouble(),
+          );
+        }
+      }),
+    );
     _subs.add(_audioPlayer.onError.listen(_onEngineError));
   }
 
@@ -254,9 +286,70 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     if (kDebugMode) {
       debugPrint('[PlayerState] Native engine playback error: $message');
     }
+    final track = _currentTrack;
+    if (track != null && !_isRecoveringError) {
+      unawaited(_recoverFromEngineError(track, _playToken, message));
+      return;
+    }
     _isPlaying = false;
     _isBuffering = false;
     _lastError = 'Playback error: $message';
+    notifyListeners();
+  }
+
+  Future<void> _recoverFromEngineError(
+    Track track,
+    int token,
+    String message,
+  ) async {
+    final attemptKey = '${track.id}:$token';
+    if (_lastRecoveryAttemptKey == attemptKey) {
+      await _skipAfterErrorOrStop(track, token, message);
+      return;
+    }
+    _lastRecoveryAttemptKey = attemptKey;
+    _isRecoveringError = true;
+    _isBuffering = true;
+    notifyListeners();
+
+    try {
+      final resumePosMs = livePosition.inMilliseconds;
+      final recovered = await _playViaResolverAndProxy(
+        track,
+        token,
+        startMs: resumePosMs > 1500 ? resumePosMs : null,
+      );
+      if (token != _playToken) return;
+      if (recovered) {
+        _isPlaying = true;
+        _isBuffering = false;
+        _lastError = null;
+        notifyListeners();
+        return;
+      }
+      await _skipAfterErrorOrStop(track, token, message);
+    } finally {
+      _isRecoveringError = false;
+    }
+  }
+
+  Future<void> _skipAfterErrorOrStop(
+    Track track,
+    int token,
+    String message,
+  ) async {
+    if (token != _playToken) return;
+    final hasMore = (_queueState?.hasNext ?? false) ||
+        (_queueState?.autoplay == true && !_collectionLocked) ||
+        _currentIndex < _queue.length - 1;
+    if (hasMore && _consecutiveErrorCount < 3) {
+      _consecutiveErrorCount++;
+      await advance(reason: AdvanceReason.trackCompleted);
+      return;
+    }
+    _isPlaying = false;
+    _isBuffering = false;
+    _lastError = 'Unable to play "${track.title}": $message';
     notifyListeners();
   }
 
@@ -286,6 +379,10 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     }
 
     _setPosition(pos);
+    if (pos > const Duration(seconds: 2) && _isPlaying) {
+      _consecutiveErrorCount = 0;
+      _lastRecoveryAttemptKey = null;
+    }
     if (_isBuffering && pos > Duration.zero) {
       _isBuffering = false;
       notifyListeners();
@@ -327,6 +424,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     if (tracks.isEmpty) return;
     _collectionLocked = collectionLocked;
     _queueState?.setCollectionLocked(collectionLocked);
+    _lastPrefetchedNextKey = '__none__';
     unawaited(_audioPlayer.setNext(null));
 
     final ctx = context ??
@@ -440,7 +538,10 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     await _startCurrentTrack(e.track);
   }
 
-  Future<void> _startCurrentTrack(Track track) async {
+  Future<void> _startCurrentTrack(
+    Track track, {
+    String source = 'manual',
+  }) async {
     _currentTrack = track;
     final idx = _queue.indexWhere((t) => t.id == track.id);
     if (idx >= 0) {
@@ -451,7 +552,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       _originalQueue.add(track);
       _currentIndex = at;
     }
-    await _startCurrent();
+    await _startCurrent(source: source);
   }
 
   void removeFromQueue(int index) {
@@ -539,6 +640,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     _isScrubbing = false;
     scrubbingNotifier.value = false;
     _seekTarget = null;
+    _lastPrefetchedNextKey = null;
+    videoSizeNotifier.value = Size.zero;
     _duration = Duration(seconds: track.durationSeconds);
     _setPosition(startMs != null ? Duration(milliseconds: startMs) : Duration.zero);
     _pushHistory(track);
@@ -561,6 +664,13 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     unawaited(_resolveAccent(track, token));
 
     try {
+      if (track.isVideo) {
+        await _ensureVideoTexturePrepared(token);
+        if (token != _playToken) return;
+      } else if (videoTextureIdNotifier.value != null) {
+        videoTextureIdNotifier.value = null;
+        unawaited(_audioPlayer.releaseVideoSurface());
+      }
       await _applyVolume(0);
       await _playWithFallback(track, token, startMs: startMs);
       if (token != _playToken) return;
@@ -576,7 +686,13 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       _prefetchNext();
       _playedSessionTrackIds.add(track.id);
       _playedSessionTrackIds.add(track.id.replaceFirst('yt-', ''));
-      if (!_collectionLocked &&
+      if (_queueState != null) {
+        if (!_collectionLocked &&
+            _queueState!.autoplay &&
+            _queueState!.upNext.length <= 2) {
+          unawaited(_queueState!.ensureAutoplay());
+        }
+      } else if (!_collectionLocked &&
           _autoplay &&
           (_queue.length - _currentIndex) <= 3) {
         unawaited(_prepopulateRadio(track));
@@ -585,10 +701,23 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       if (token != _playToken) return;
       if (kDebugMode) debugPrint('Audio playback error: $e');
       _isTransitioning = false;
+      if (source == 'auto') {
+        await _skipAfterErrorOrStop(track, token, '$e');
+        return;
+      }
       _isBuffering = false;
       _isPlaying = false;
       _lastError = 'Unable to play "${track.title}".';
       notifyListeners();
+    }
+  }
+
+  Future<void> _ensureVideoTexturePrepared([int? token]) async {
+    if (videoTextureIdNotifier.value != null) return;
+    final tid = await _audioPlayer.getVideoTextureId();
+    if (token != null && token != _playToken) return;
+    if (tid != null) {
+      videoTextureIdNotifier.value = tid;
     }
   }
 
@@ -601,7 +730,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     Object? error;
 
     // 1. TOP PRIORITY: Native ExoPlayer Pipeline with InnerTubeX + PO Token
-    // Instant ~200-300ms audio playback directly on device.
+    // Instant ~200-300ms playback directly on device.
     final videoId = track.id.replaceFirst('yt-', '').trim();
     if (videoId.length == 11 &&
         !videoId.contains(' ') &&
@@ -615,6 +744,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
           artist: track.artist,
           artworkUrl: track.coverUrl,
           startMs: startMs,
+          isVideo: track.isVideo,
         );
         return;
       } catch (e) {
@@ -632,42 +762,94 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
         !track.streamUrl!.contains('stream-youtube')) {
       try {
         if (token != _playToken) return;
-        await _audioPlayer.play(ap.UrlSource(track.streamUrl!));
+        await _audioPlayer.playUrl(
+          url: track.streamUrl!,
+          title: track.title,
+          artist: track.artist,
+          artworkUrl: track.coverUrl,
+          startMs: startMs,
+        );
         return;
       } catch (e) {
         error = e;
       }
     }
 
-    // 3. On-Device Stream Resolver: searches YouTube Music accurately by Title + Artist
+    // 3 & 4. On-device StreamResolverService + Zenify /stream-youtube proxy
+    if (await _playViaResolverAndProxy(track, token, startMs: startMs)) {
+      return;
+    }
+
+    throw error ??
+        StateError('Unable to resolve audio stream for "${track.title}"');
+  }
+
+  Future<bool> _playViaResolverAndProxy(
+    Track track,
+    int token, {
+    int? startMs,
+  }) async {
+    final videoId = track.id.replaceFirst('yt-', '').trim();
+
+    if (track.isVideo && videoId.length == 11 && !videoId.contains(' ')) {
+      try {
+        final streams =
+            await StreamResolverService.instance.resolveVideoStreams(videoId);
+        if (token != _playToken) return false;
+        if (streams != null && streams.audioUrl.isNotEmpty) {
+          await _audioPlayer.playUrl(
+            url: streams.audioUrl,
+            videoUrl: streams.videoUrl,
+            title: track.title,
+            artist: track.artist,
+            artworkUrl: track.coverUrl,
+            startMs: startMs,
+            isVideo: streams.videoUrl != null && streams.videoUrl!.isNotEmpty,
+          );
+          return true;
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[PlayerState] resolveVideoStreams error: $e');
+        }
+      }
+    }
+
     try {
       final resolved = await StreamResolverService.instance.resolveTrack(track);
+      if (token != _playToken) return false;
       if (resolved != null && resolved.url.isNotEmpty) {
-        if (token != _playToken) return;
-        await _audioPlayer.play(ap.UrlSource(resolved.url));
-        return;
+        await _audioPlayer.playUrl(
+          url: resolved.url,
+          title: track.title,
+          artist: track.artist,
+          artworkUrl: track.coverUrl,
+          startMs: startMs,
+        );
+        return true;
       }
     } catch (e) {
-      error = e;
       if (kDebugMode) {
         debugPrint('[PlayerState] StreamResolverService error: $e');
       }
     }
 
-    // 4. Fallback: Zenify Backend Stream Proxy (/stream-youtube?v=)
     if (videoId.length == 11 && !videoId.contains(' ')) {
       try {
         final proxyUrl = '${ApiService.baseUrl}/stream-youtube?v=$videoId';
-        if (token != _playToken) return;
-        await _audioPlayer.play(ap.UrlSource(proxyUrl));
-        return;
-      } catch (e) {
-        error = e;
-      }
+        if (token != _playToken) return false;
+        await _audioPlayer.playUrl(
+          url: proxyUrl,
+          title: track.title,
+          artist: track.artist,
+          artworkUrl: track.coverUrl,
+          startMs: startMs,
+        );
+        return true;
+      } catch (_) {}
     }
 
-    throw error ??
-        StateError('Unable to resolve audio stream for "${track.title}"');
+    return false;
   }
 
   void _prefetchNext() {
@@ -689,8 +871,16 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       }
     }
 
+    final nextKey =
+        nextTrack != null ? '${nextTrack.id}:${nextTrack.isVideo}' : '__none__';
+    if (_lastPrefetchedNextKey == nextKey) return;
+    _lastPrefetchedNextKey = nextKey;
+
     if (nextTrack != null) {
       unawaited(ApiService.prefetchLyrics(nextTrack));
+      if (nextTrack.isVideo && videoTextureIdNotifier.value == null) {
+        unawaited(_ensureVideoTexturePrepared());
+      }
       // Gapless next track setup & native engine prefetch with metadata
       unawaited(
         _audioPlayer.setNext(
@@ -698,6 +888,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
           title: nextTrack.title,
           artist: nextTrack.artist,
           artworkUrl: nextTrack.coverUrl,
+          isVideo: nextTrack.isVideo,
         ),
       );
       if (lookahead.isNotEmpty) {
@@ -851,6 +1042,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       }
 
       // 2. Delegate advance to QueueState single advance path
+      final nextSource =
+          reason == AdvanceReason.trackCompleted ? 'auto' : 'manual';
       final nextEntry = q.advance(reason: reason);
       if (nextEntry != null) {
         final track = nextEntry.track;
@@ -868,6 +1061,16 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
           _isBuffering = false;
           _isPlaying = true;
           _lastError = null;
+          _lastPrefetchedNextKey = null;
+          _consecutiveErrorCount = 0;
+          _lastRecoveryAttemptKey = null;
+          videoSizeNotifier.value = Size.zero;
+          if (track.isVideo) {
+            unawaited(_ensureVideoTexturePrepared(token));
+          } else if (videoTextureIdNotifier.value != null) {
+            videoTextureIdNotifier.value = null;
+            unawaited(_audioPlayer.releaseVideoSurface());
+          }
           _duration = Duration(seconds: track.durationSeconds);
           _setPosition(Duration.zero);
           _pushHistory(track);
@@ -888,10 +1091,13 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
           unawaited(_loadLyricsForTrack(track, token));
           unawaited(_resolveAccent(track, token));
           _prefetchNext();
+          if (!_collectionLocked && q.autoplay && q.upNext.length <= 2) {
+            unawaited(q.ensureAutoplay());
+          }
           return;
         }
 
-        await _startCurrentTrack(track);
+        await _startCurrentTrack(track, source: nextSource);
         return;
       }
 
@@ -900,7 +1106,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
         await q.ensureAutoplay();
         final autoEntry = q.advance(reason: reason);
         if (autoEntry != null) {
-          await _startCurrentTrack(autoEntry.track);
+          await _startCurrentTrack(autoEntry.track, source: nextSource);
           return;
         }
       }
@@ -912,12 +1118,14 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
 
     // Fallback if _queueState is not attached
     if (_queue.isEmpty) return;
+    final fallbackSource =
+        reason == AdvanceReason.trackCompleted ? 'auto' : 'manual';
     if (_currentIndex < _queue.length - 1) {
       _currentIndex++;
-      await _startCurrent();
+      await _startCurrent(source: fallbackSource);
     } else if (_repeatMode == RepeatMode.all) {
       _currentIndex = 0;
-      await _startCurrent();
+      await _startCurrent(source: fallbackSource);
     } else {
       await _endOfQueue();
     }
@@ -1250,6 +1458,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _queueState?.removeListener(_onQueueStateChanged);
     for (final s in _subs) {
       s.cancel();
     }
@@ -1261,6 +1470,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     volumeNotifier.dispose();
     expansionNotifier.dispose();
     accentColorNotifier.dispose();
+    videoTextureIdNotifier.dispose();
+    videoSizeNotifier.dispose();
     super.dispose();
   }
 }

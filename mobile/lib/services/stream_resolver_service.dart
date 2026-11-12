@@ -205,5 +205,75 @@ class StreamResolverService {
     }
   }
 
+  /// Resolves video + audio streams (for YouTube video playback) using on-device
+  /// YouTube clients (prefers <= 720p H.264/VP9 paired with highest audio).
+  Future<({String audioUrl, String? videoUrl})?> resolveVideoStreams(
+    String rawVideoId,
+  ) async {
+    final videoId = rawVideoId.replaceFirst('yt-', '').trim();
+    if (videoId.isEmpty) return null;
+    try {
+      StreamManifest? manifest;
+      for (final clientSet in <List<YoutubeApiClient>>[
+        [YoutubeApiClient.androidSdkless],
+        [YoutubeApiClient.ios],
+        [],
+      ]) {
+        try {
+          manifest = await _yt.videos.streamsClient
+              .getManifest(
+                videoId,
+                ytClients: clientSet.isEmpty ? null : clientSet,
+                requireWatchPage: false,
+              )
+              .timeout(const Duration(seconds: 9));
+          if (manifest.videoOnly.isNotEmpty || manifest.muxed.isNotEmpty) {
+            break;
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('[StreamResolver] video manifest fallback notice: $e');
+          }
+        }
+      }
+      if (manifest == null) return null;
+
+      final audioList = manifest.audioOnly.toList()
+        ..sort((a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond));
+      final videoList = manifest.videoOnly.toList();
+      if (videoList.isNotEmpty && audioList.isNotEmpty) {
+        // Prefer <= 720p for crisp mobile playback without excessive bandwidth
+        final capped = videoList
+            .where((v) => v.videoResolution.height <= 720)
+            .toList();
+        final pool = capped.isNotEmpty ? capped : videoList;
+        pool.sort((a, b) {
+          final hCmp = b.videoResolution.height.compareTo(a.videoResolution.height);
+          if (hCmp != 0) return hCmp;
+          return b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond);
+        });
+        return (
+          audioUrl: audioList.first.url.toString(),
+          videoUrl: pool.first.url.toString(),
+        );
+      }
+
+      if (manifest.muxed.isNotEmpty) {
+        final muxed = manifest.muxed.toList()
+          ..sort((a, b) => b.videoResolution.height.compareTo(a.videoResolution.height));
+        final url = muxed.first.url.toString();
+        return (audioUrl: url, videoUrl: url);
+      }
+
+      if (audioList.isNotEmpty) {
+        return (audioUrl: audioList.first.url.toString(), videoUrl: null);
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) debugPrint('[StreamResolver] video error for $videoId: $e');
+      return null;
+    }
+  }
+
   void clearCache() => _cache.clear();
 }

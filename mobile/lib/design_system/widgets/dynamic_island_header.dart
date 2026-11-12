@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -398,11 +397,12 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     // Symmetrical clearance so the Dynamic Island pill remains dead-center relative to screen
     // On dock root pages, the full transparent logo is ~86px wide.
     // On subpages with back button, left dock is 44px.
-    final double leftDockW = isDock ? 92.0 : h;
+    final double leftDockW = isDock ? 108.0 : (canPop ? h : 0.0);
     final double rightDockW = widget.trailing != null
         ? 44.0
         : (widget.showProfile ? h : 0.0);
-    final double normalClearance = math.max(leftDockW, rightDockW) + 8.0;
+    final double leftClearance = leftDockW > 0 ? leftDockW + 10.0 : 8.0;
+    final double rightClearance = rightDockW > 0 ? rightDockW + 10.0 : 8.0;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(widget.horizontalMargin, top, widget.horizontalMargin, 0),
@@ -416,19 +416,18 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
             final double vis = math.max(cVal, nVal);
             final double f = vis.clamp(0.0, 1.0).toDouble();
 
-            // Symmetrical clearance smoothly lerps from normal dock clearance down to 24px
-            // when notification is active, letting the Dynamic Island pill widen across screen
-            final double sideClearance = ui.lerpDouble(normalClearance, 24.0, nVal)!;
-            final double dockScale = ui.lerpDouble(1.0, 0.65, nVal)!;
-            final double dockOpacity = ui.lerpDouble(1.0, 0.20, nVal)!;
+            // Keep strict non-overlapping clearance around left & right docks so notifications
+            // stay compact in the center space and never overlap Back, Brand, or Profile controls.
+            const double dockScale = 1.0;
+            const double dockOpacity = 1.0;
 
             return Stack(
               alignment: Alignment.center,
               children: [
-                // Center Island Pill: 100% mathematically centered relative to screen/camera cutout
+                // Center Island Pill: strictly bounded inside the open gap between left & right docks
                 Positioned.fill(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: sideClearance),
+                    padding: EdgeInsets.only(left: leftClearance, right: rightClearance),
                     child: Center(
                       child: AnimatedOpacity(
                         opacity: hasContent ? 1 : 0,
@@ -483,7 +482,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
                 Align(
                   alignment: Alignment.centerLeft,
                   child: IgnorePointer(
-                    ignoring: nVal > 0.5,
+                    ignoring: false,
                     child: Transform.scale(
                       scale: dockScale,
                       alignment: Alignment.centerLeft,
@@ -499,7 +498,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
                 Align(
                   alignment: Alignment.centerRight,
                   child: IgnorePointer(
-                    ignoring: nVal > 0.5,
+                    ignoring: false,
                     child: Transform.scale(
                       scale: dockScale,
                       alignment: Alignment.centerRight,

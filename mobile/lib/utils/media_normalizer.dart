@@ -488,38 +488,80 @@ class MediaNormalizer {
     return '${names.sublist(0, names.length - 1).join(', ')} & ${names.last}';
   }
 
-  /// Resolves the highest quality artwork URL (prefers 500x500 or maxresdefault).
-  static String upgradeArtworkUrl(String? url, {String? videoId, int targetSize = 500}) {
-    if (url == null || url.isEmpty || url.contains('lh3.googleusercontent.com/s/v4/g')) {
-      if (videoId != null && videoId.isNotEmpty) {
+  static final RegExp _googleDimRe = RegExp(r'=(?:w(\d+)-h(\d+)|s(\d+))([^?#]*)$', caseSensitive: false);
+  static final RegExp _ytimgIdRe = RegExp(r'(?:ytimg\.com|img\.youtube\.com)/vi(?:_webp)?/([A-Za-z0-9_-]{6,20})/', caseSensitive: false);
+  static final RegExp _ytimgLowRe = RegExp(r'/(?:default|mqdefault|sddefault|hqdefault|hq720)\.(?:jpg|webp)(?:\?.*)?$', caseSensitive: false);
+
+  /// Resolves high-definition InnerTube artwork (1200x1200 square covers/avatars,
+  /// 1920x1080/2880x1200 wide banners, or 1280x720 maxresdefault video thumbnails).
+  static String upgradeArtworkUrl(
+    String? url, {
+    String? videoId,
+    int targetSize = 1200,
+    bool isBanner = false,
+    bool isArtistAvatar = false,
+  }) {
+    if (url == null || url.trim().isEmpty || url.contains('lh3.googleusercontent.com/s/v4/g')) {
+      if (videoId != null && videoId.trim().isNotEmpty) {
         final cleanId = videoId.replaceFirst('yt-', '').trim();
         return 'https://i.ytimg.com/vi/$cleanId/maxresdefault.jpg';
       }
-      return 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=$targetSize';
+      return '';
     }
 
-    var u = url;
+    var u = url.trim();
+    if (u.startsWith('//')) {
+      u = 'https:$u';
+    }
 
-    // Upgrades Google / YouTube Music thumbnail resolutions
+    // 1. Google / YouTube Music CDN (lh3.googleusercontent.com / yt3.ggpht.com / ggpht.com)
     if (u.contains('googleusercontent.com') || u.contains('ggpht.com')) {
-      final hasPortraitParam = u.contains('-p') || u.contains('-c');
-      final param = hasPortraitParam
+      if (RegExp(r'=s0(?:$|[?#])', caseSensitive: false).hasMatch(u)) {
+        return u;
+      }
+
+      final dimMatch = _googleDimRe.firstMatch(u);
+      final w = dimMatch != null ? int.tryParse(dimMatch.group(1) ?? dimMatch.group(3) ?? '0') ?? 0 : 0;
+      final h = dimMatch != null ? int.tryParse(dimMatch.group(2) ?? dimMatch.group(3) ?? '0') ?? 0 : 0;
+      final preserveLandscape = isBanner || (w > h && w >= 1000);
+
+      if (preserveLandscape && !isArtistAvatar) {
+        if (w >= 1920) return u;
+        const bannerSuffix = '=w1920-h1080-p-l90-rj';
+        return dimMatch != null
+            ? u.replaceFirst(_googleDimRe, bannerSuffix)
+            : '$u$bannerSuffix';
+      }
+
+      final keepPortrait = isArtistAvatar || u.contains('-p') || u.contains('-c');
+      final squareSuffix = keepPortrait
           ? '=w$targetSize-h$targetSize-p-l90-rj'
           : '=w$targetSize-h$targetSize-l90-rj';
-      u = u.replaceAll(RegExp(r'=(w\d+-h\d+|s\d+)[^=]*$'), param);
-      if (!u.contains('=w')) {
-        u = '$u$param';
+
+      if (dimMatch != null) {
+        if (w >= targetSize && w == h && !isArtistAvatar) return u;
+        return u.replaceFirst(_googleDimRe, squareSuffix);
       }
-      return u;
+      return '$u$squareSuffix';
     }
 
-    // Upgrade ytimg: use hqdefault.jpg (always available, 480x360 crisp, no 404 delays)
-    if (u.contains('ytimg.com/vi/')) {
-      return u.replaceAll(RegExp(r'/(?:maxresdefault|mqdefault|sddefault|default)\.jpg'), '/hqdefault.jpg');
+    // 2. YouTube Video Thumbnails (i.ytimg.com): upgrade to 1280x720 maxresdefault.jpg
+    // and strip dimension/sqp query params so HD resolution loads cleanly.
+    if (u.contains('ytimg.com') || u.contains('img.youtube.com')) {
+      final idMatch = _ytimgIdRe.firstMatch(u);
+      final resolvedVid = idMatch?.group(1) ?? videoId?.replaceFirst('yt-', '').trim();
+      if (resolvedVid != null && resolvedVid.isNotEmpty && _ytimgLowRe.hasMatch(u)) {
+        return 'https://i.ytimg.com/vi/$resolvedVid/maxresdefault.jpg';
+      }
+      return u.split('?').first;
     }
 
     return u;
   }
+
+  /// Resolves wide hero banners (e.g. artist immersive headers) at 1920px+ landscape.
+  static String upgradeBannerUrl(String? url, {String? videoId}) =>
+      upgradeArtworkUrl(url, videoId: videoId, isBanner: true);
 
   /// Normalizes raw InnerTube title and subtitle runs into a typed, verified [NormalizedMediaItem].
   static NormalizedMediaItem normalize({

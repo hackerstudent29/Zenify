@@ -14,6 +14,7 @@ import { normalizeArtistName, CANONICAL_ARTISTS } from '../utils/artist';
 import { ArtistMappingService } from './artist-mapping.service';
 import { AIArtistService } from './ai-artist.service';
 import { DeduplicationService } from './deduplication.service.js';
+import { upgradeInnerTubeArtwork } from '../utils/innertube-artwork';
 
 const ALLOWED_AUDIO_EXTENSIONS = new Set(['.mp3', '.m4a', '.wav', '.flac', '.aac', '.ogg', '.webm', '.opus']);
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
@@ -204,7 +205,7 @@ export class TrackService {
                 return await this.importExternal({
                     title: meta.title,
                     artistName: meta.artist || 'Unknown Artist',
-                    coverUrl: meta.cover || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+                    coverUrl: upgradeInnerTubeArtwork(meta.cover, { videoId, kind: 'song' }) || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
                     audioUrl: watchUrl,
                     duration: meta.duration || 180,
                 });
@@ -407,7 +408,7 @@ export class TrackService {
                     return await this.importExternal({
                         title: meta.title,
                         artistName: meta.artist || 'Unknown Artist',
-                        coverUrl: meta.cover || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+                        coverUrl: upgradeInnerTubeArtwork(meta.cover, { videoId: id, kind: 'song' }) || `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
                         audioUrl: watchUrl,
                         duration: meta.duration || 180,
                     }) as any;

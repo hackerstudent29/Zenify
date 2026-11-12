@@ -36,6 +36,10 @@ export class RecommendationsService {
   // Session Taste cache: userId -> Array<{ genre?: string; language?: string; artistId?: string; timestamp: number }>
   private static sessionTasteCache = new Map<string, Array<{ genre?: string; language?: string; artistId?: string; timestamp: number }>>();
 
+  static clearSessionTasteCache() {
+    this.sessionTasteCache.clear();
+  }
+
   /**
    * Record a play into session taste (TTL 6 hours)
    */

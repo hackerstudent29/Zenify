@@ -191,6 +191,7 @@ class InnerTubeService {
   // ─────────────────────────────── Search ────────────────────────────────────
 
   static const _songsFilter = 'EgWKAQIIAWoKEAUQAxAEEAkQEQ%3D%3D';
+  static const _videosFilter = 'EgWKAQIQAWoKEAMQBBAKEAkQBQ%3D%3D';
 
   /// Throws [InnerTubeException] on failure so callers can decide whether a
   /// fallback is appropriate (it is NOT when `rateLimited` is true).
@@ -217,6 +218,24 @@ class InnerTubeService {
       return await searchOrThrow(query);
     } catch (e) {
       if (kDebugMode) debugPrint('[InnerTube] search error: $e');
+      return const [];
+    }
+  }
+
+  /// Searches official music videos on YouTube Music InnerTube and upgrades
+  /// video artwork to crisp 1280x720 (`maxresdefault.jpg`) thumbnails.
+  Future<List<Track>> searchVideos(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return const [];
+    try {
+      final res = await post(
+        'search',
+        {'query': q, 'params': _videosFilter},
+        ttl: _tSearch,
+      );
+      return _parseSearchTracks(res);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] searchVideos error: $e');
       return const [];
     }
   }
@@ -699,7 +718,9 @@ class InnerTubeService {
                 name: title,
                 browseId: browseId,
                 audience: audience,
-                thumb: raw != null ? upgradeArtworkUrl(raw) : null,
+                thumb: raw != null
+                    ? MediaNormalizer.upgradeArtworkUrl(raw, isArtistAvatar: true)
+                    : null,
               );
             }
           }
@@ -730,7 +751,9 @@ class InnerTubeService {
                     name: artistTitle,
                     browseId: browseId,
                     audience: null,
-                    thumb: rawThumb != null ? upgradeArtworkUrl(rawThumb) : null,
+                    thumb: rawThumb != null
+                        ? MediaNormalizer.upgradeArtworkUrl(rawThumb, isArtistAvatar: true)
+                        : null,
                   );
                 }
               }
@@ -785,7 +808,9 @@ class InnerTubeService {
                 name: artistTitle,
                 browseId: browseId,
                 audience: null,
-                thumb: rawThumb != null ? upgradeArtworkUrl(rawThumb) : null,
+                thumb: rawThumb != null
+                    ? MediaNormalizer.upgradeArtworkUrl(rawThumb, isArtistAvatar: true)
+                    : null,
               );
             }
           }
@@ -839,7 +864,15 @@ class InnerTubeService {
           final artistMap = Map<String, dynamic>.from(res['artist'] as Map? ?? {});
           final name = MediaNormalizer.cleanTitle(artistMap['title'] as String?);
           final rawThumb = artistMap['thumbnail'] as String?;
-          final thumb = rawThumb != null ? MediaNormalizer.upgradeArtworkUrl(rawThumb) : null;
+          final thumb = rawThumb != null
+              ? MediaNormalizer.upgradeArtworkUrl(rawThumb, isArtistAvatar: true)
+              : null;
+          final rawBanner = res['banner'] as String? ??
+              artistMap['banner'] as String? ??
+              rawThumb;
+          final banner = rawBanner != null
+              ? MediaNormalizer.upgradeBannerUrl(rawBanner)
+              : thumb;
           final bio = res['description'] as String?;
           final subscriberCount = res['subscriberCountText'] as String?;
           final monthlyListenerCount = res['monthlyListenerCount'] as String?;
@@ -906,7 +939,10 @@ class InnerTubeService {
                 related.add({
                   'name': MediaNormalizer.cleanTitle(it['title'] as String?),
                   'subs': 'Artist',
-                  'imageUrl': MediaNormalizer.upgradeArtworkUrl(it['thumbnail'] as String?),
+                  'imageUrl': MediaNormalizer.upgradeArtworkUrl(
+                    it['thumbnail'] as String?,
+                    isArtistAvatar: true,
+                  ),
                   'browseId': it['id'],
                 });
               }
@@ -919,6 +955,7 @@ class InnerTubeService {
             'subscriberCount': subscriberCount,
             'monthlyListenerCount': monthlyListenerCount,
             'thumb': thumb,
+            'banner': banner,
             'topSongs': topSongs,
             'albums': albums,
             'singles': singles,
@@ -951,17 +988,22 @@ class InnerTubeService {
         }
       }
 
-      final thumbs = header?['thumbnail']?['musicThumbnailRenderer']
+      final bannerThumbs = header?['thumbnail']?['musicThumbnailRenderer']
+              ?['thumbnail']?['thumbnails'] as List? ??
+          header?['thumbnail']?['thumbnails'] as List?;
+      final fgThumbs = header?['foregroundThumbnail']?['musicThumbnailRenderer']
               ?['thumbnail']?['thumbnails'] as List? ??
           header?['thumbnail']?['croppedSquareThumbnailRenderer']
               ?['thumbnail']?['thumbnails'] as List? ??
-          header?['foregroundThumbnail']?['musicThumbnailRenderer']
-              ?['thumbnail']?['thumbnails'] as List? ??
           header?['straplineThumbnail']?['musicThumbnailRenderer']
-              ?['thumbnail']?['thumbnails'] as List? ??
-          header?['thumbnail']?['thumbnails'] as List?;
-      final rawThumb =
-          thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String : null;
+              ?['thumbnail']?['thumbnails'] as List?;
+      final thumbs = bannerThumbs ?? fgThumbs;
+      final rawBanner =
+          bannerThumbs?.isNotEmpty == true ? bannerThumbs!.last['url'] as String : null;
+      final rawFg =
+          fgThumbs?.isNotEmpty == true ? fgThumbs!.last['url'] as String : null;
+      final rawThumb = rawFg ?? rawBanner ??
+          (thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String : null);
 
       final topSongs = <Track>[];
       final albums = <Map<String, dynamic>>[];
@@ -1131,7 +1173,12 @@ class InnerTubeService {
         'subscriberCount': header?['subscriptionButton']
                 ?['subscribeButtonRenderer']?['subscriberCountText']?['runs']
             ?[0]?['text'] as String?,
-        'thumb': rawThumb != null ? upgradeArtworkUrl(rawThumb) : null,
+        'thumb': rawThumb != null
+            ? MediaNormalizer.upgradeArtworkUrl(rawThumb, isArtistAvatar: true)
+            : null,
+        'banner': (rawBanner ?? rawThumb) != null
+            ? MediaNormalizer.upgradeBannerUrl((rawBanner ?? rawThumb)!)
+            : null,
         'topSongs': topSongs,
         'albums': albums,
         'singles': singles,

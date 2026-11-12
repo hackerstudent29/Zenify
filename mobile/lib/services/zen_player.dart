@@ -41,6 +41,7 @@ class AudioPlayer implements FxEngine {
   final _doneC = StreamController<void>.broadcast();
   final _autoTransitionC = StreamController<String>.broadcast();
   final _errorC = StreamController<String>.broadcast();
+  final _videoSizeC = StreamController<({int width, int height})>.broadcast();
 
   Stream<PlayerState> get onPlayerStateChanged => _stateC.stream;
   Stream<bool> get onBufferingChanged => _bufferingC.stream;
@@ -49,6 +50,7 @@ class AudioPlayer implements FxEngine {
   Stream<void> get onPlayerComplete => _doneC.stream;
   Stream<String> get onAutoTransition => _autoTransitionC.stream;
   Stream<String> get onError => _errorC.stream;
+  Stream<({int width, int height})> get onVideoSizeChanged => _videoSizeC.stream;
   PlayerState get state => _state;
 
   void _onEvent(dynamic e) {
@@ -86,6 +88,10 @@ class AudioPlayer implements FxEngine {
         _state = PlayerState.stopped;
         _stateC.add(_state);
         _errorC.add(errMsg);
+      case 'videoSize':
+        final w = (e['width'] as num?)?.toInt() ?? 0;
+        final h = (e['height'] as num?)?.toInt() ?? 0;
+        _videoSizeC.add((width: w, height: h));
     }
   }
 
@@ -104,6 +110,7 @@ class AudioPlayer implements FxEngine {
     String? artworkUrl,
     int? startMs,
     double? loudnessDb,
+    bool isVideo = false,
   }) {
     final args = <String, dynamic>{
       'mediaId': mediaId.replaceFirst('yt-', '').trim(),
@@ -111,6 +118,7 @@ class AudioPlayer implements FxEngine {
       'artist': artist ?? '',
       'artworkUrl': artworkUrl ?? '',
       'startMs': startMs,
+      'isVideo': isVideo,
     };
     if (loudnessDb != null) {
       args['loudnessDb'] = loudnessDb;
@@ -126,12 +134,47 @@ class AudioPlayer implements FxEngine {
     String? title,
     String? artist,
     String? artworkUrl,
+    bool isVideo = false,
   }) =>
       _call('setNext', {
         'mediaId': mediaId?.replaceFirst('yt-', '').trim(),
         'title': title ?? '',
         'artist': artist ?? '',
         'artworkUrl': artworkUrl ?? '',
+        'isVideo': isVideo,
+      });
+
+  Future<int?> getVideoTextureId() async {
+    try {
+      return await _method.invokeMethod<int>('getVideoTextureId');
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  Future<void> releaseVideoSurface() => _call('releaseVideoSurface');
+
+  Future<void> playUrl({
+    required String url,
+    String? videoUrl,
+    Map<String, String>? headers,
+    String? title,
+    String? artist,
+    String? artworkUrl,
+    int? startMs,
+    double? loudnessDb,
+    bool isVideo = false,
+  }) =>
+      _call('play', {
+        'url': url,
+        'videoUrl': ?videoUrl,
+        'headers': ?headers,
+        'title': ?title,
+        'artist': ?artist,
+        'artworkUrl': ?artworkUrl,
+        'startMs': ?startMs,
+        'loudnessDb': ?loudnessDb,
+        'isVideo': isVideo,
       });
 
   Future<void> prefetch(List<String> mediaIds) =>
@@ -158,7 +201,7 @@ class AudioPlayer implements FxEngine {
     _fxTimer?.cancel();
     await _sub?.cancel();
     await _call('dispose');
-    for (final c in [_stateC, _bufferingC, _posC, _durC, _errorC]) {
+    for (final c in [_stateC, _bufferingC, _posC, _durC, _errorC, _autoTransitionC, _videoSizeC]) {
       await c.close();
     }
     await _doneC.close();

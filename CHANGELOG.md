@@ -2,6 +2,21 @@
 
 All notable changes to the Zenify platform are documented in this file.
 
+## [1.0.9] - 2026-11-12
+
+### Added
+- **YouTube Video Streaming in MiniPlayer & Fullscreen Player (`ExoPlayer` + Flutter `Texture`)**: Native Android video surface binding in `ZenAudioPlugin` paired with `ZenPlayer.videoTextureIdNotifier` and reactive MiniPlayer / Fullscreen Player video surfaces when playing video tracks.
+- **Redesigned Explore & Search Experience**: Refined `ExploreScreen` and `SearchScreen` layouts, card spacing, mood tiles, and visual hierarchy matching the native Apple Music dark aesthetic.
+
+### Fixed
+- **Artist & Album Verified Badge Placement & Round Buttons**: Fixed verified checkmark positioning next to artist/album names (including missing/blank badge gaps) and standardized pill/round action buttons (`ZenPlayButton`, `ZenShuffleButton`, `ZenActionCircle`).
+- **Dynamic Island Notification Pill Sizing**: Constrained `DynamicIslandHeader` alert pills to a compact center footprint so in-app toast alerts no longer overlap top-bar back or profile buttons.
+- **Single-Song Smart Queue Isolation on Search Selection**: Playing a single song from Search results now initializes a clean single-track context and populates a related Smart Queue instead of queuing unrelated search rows.
+- **Background Playback, Auto-Next & Lock-Screen Real-Time Sync**: Fixed foreground wake mode and `AudioService` queue item removal/addition stability (`ZenAudioPlugin`, `ZenifyAudioHandler`), restored continuous real-time position/play-state updates on system notifications and lock-screen controls, and fixed `DockVisibility` hide/show token imbalance so the miniplayer/dock no longer disappears during active playback.
+
+### Technical
+- **Release & Distribution Sync (`v1.0.9` / Build `13`)**: Bumped app version to `1.0.9+13`, built fresh ARM64 (`33.2 MB`, `34,861,190` bytes, SHA-256 `E0B2DFE50F934BB6E20B639F35F68D4579503D980BAF1801BE481F386E1B20BC`) and Universal (`75.6 MB`, `79,261,404` bytes, SHA-256 `3AD8A6A39C757F05661D58A79683B7A70C110BE3C2896744BBE728A0486BF825`) APKs, and updated web download page, `remote_config.json`, backend `/download/app` headers, docs, and GitHub Releases.
+
 ## [1.0.8] - 2026-11-11
 
 ### Added

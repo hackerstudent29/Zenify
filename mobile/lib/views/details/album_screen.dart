@@ -258,7 +258,7 @@ class _ActionCircle extends StatelessWidget {
           height: 52,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: active ? 0.26 : 0.18),
-            borderRadius: BorderRadius.circular(active ? 26 : 20),
+            shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
           child: child,

@@ -41,22 +41,16 @@ export class RoomMembershipService {
         throw new RoomHttpError(403, 'FORBIDDEN', 'Cannot change role of equal/higher member.');
       }
 
-      const canSpeak = RoomPermissionService.canSpeak(room, {
-        userId: targetUserId,
-        role: newRole,
-        canSpeak: target.canSpeak || newRole === 'SPEAKER',
-      });
-
       await prisma.togetherRoomMember.update({
         where: { roomCode_userId: { roomCode: code, userId: targetUserId } },
-        data: { role: newRole, canSpeak },
+        data: { role: newRole, canSpeak: false },
       });
 
       await roomEventService.emit({
         roomCode: code,
         type: 'MEMBER_ROLE_CHANGED',
         actorId,
-        payload: { userId: targetUserId, role: newRole, canSpeak },
+        payload: { userId: targetUserId, role: newRole },
         auditAction: 'ROLE_CHANGE',
         auditTargetId: targetUserId,
         auditMetadata: {
@@ -66,7 +60,7 @@ export class RoomMembershipService {
         },
       });
 
-      return { userId: targetUserId, role: newRole, canSpeak };
+      return { userId: targetUserId, role: newRole };
     });
   }
 
@@ -289,10 +283,6 @@ export class RoomMembershipService {
       });
 
       if (decision === 'APPROVE') {
-        const canSpeak = RoomPermissionService.canSpeak(room, {
-          userId: reqRow.userId,
-          role: 'LISTENER',
-        });
         await prisma.togetherRoomMember.upsert({
           where: { roomCode_userId: { roomCode: code, userId: reqRow.userId } },
           create: {
@@ -302,13 +292,13 @@ export class RoomMembershipService {
             avatarUrl: reqRow.avatarUrl,
             isGuest: reqRow.userId.startsWith('guest_'),
             role: 'LISTENER',
-            canSpeak,
+            canSpeak: false,
           },
           update: {
             leftAt: null,
             lastSeenAt: new Date(),
             role: 'LISTENER',
-            canSpeak,
+            canSpeak: false,
           },
         });
 
@@ -339,30 +329,6 @@ export class RoomMembershipService {
 
       return { id: requestId, status, userId: reqRow.userId };
     });
-  }
-
-  static async setHandRaised(roomCode: string, userId: string, raised: boolean) {
-    const code = roomCode.trim().toUpperCase();
-    const member = await prisma.togetherRoomMember.findUnique({
-      where: { roomCode_userId: { roomCode: code, userId } },
-    });
-    if (!member || member.leftAt !== null) {
-      throw new RoomHttpError(404, 'NOT_A_MEMBER', 'Not an active member.');
-    }
-
-    await prisma.togetherRoomMember.update({
-      where: { roomCode_userId: { roomCode: code, userId } },
-      data: { isHandRaised: raised },
-    });
-
-    await roomEventService.emit({
-      roomCode: code,
-      type: 'HAND_RAISE_CHANGED',
-      actorId: userId,
-      payload: { userId, raised, displayName: member.displayName },
-    });
-
-    return { userId, raised };
   }
 }
 

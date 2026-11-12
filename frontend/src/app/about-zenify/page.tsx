@@ -385,7 +385,7 @@ export default function AboutZenifyPage() {
           {/* Footer */}
           <motion.div variants={rise} className="pt-8 border-t border-white/10 flex items-center justify-between">
             <div>
-              <p className="text-[13px] text-white/40">Version 1.0.8</p>
+              <p className="text-[13px] text-white/40">Version 1.0.9</p>
               <p className="text-[12px] text-white/30 mt-1">Built with ❤️ by Ramanathan S</p>
             </div>
             <div className="text-right">

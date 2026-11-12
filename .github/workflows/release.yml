@@ -23,17 +23,23 @@ jobs:
 
       - name: Ensure GitHub Release Exists & Upload Pre-built APKs
         run: |
-          TAG_NAME="${GITHUB_REF_NAME:-v1.0.8}"
+          TAG_NAME="${GITHUB_REF_NAME:-v1.0.9}"
           if [ "$TAG_NAME" = "main" ]; then
-            TAG_NAME="v1.0.8"
+            TAG_NAME="v1.0.9"
           fi
           gh release view "$TAG_NAME" >/dev/null 2>&1 || gh release create "$TAG_NAME" --title "Zenify $TAG_NAME" --generate-notes
           echo "Checking pre-built release package for $TAG_NAME..."
           if [ -f "frontend/public/downloads/zenify.apk" ]; then
             cp frontend/public/downloads/zenify.apk "zenify-${TAG_NAME}.apk"
             cp frontend/public/downloads/zenify.apk zenify.apk
-            gh release upload "$TAG_NAME" "zenify-${TAG_NAME}.apk" zenify.apk --clobber
-            echo "Pre-built ARM64 APKs uploaded successfully to $TAG_NAME!"
+            ASSETS=("zenify-${TAG_NAME}.apk" "zenify.apk")
+            if [ -f "backend/public/downloads/zenify-universal.apk" ]; then
+              cp backend/public/downloads/zenify-universal.apk "zenify-${TAG_NAME}-universal.apk"
+              cp backend/public/downloads/zenify-universal.apk zenify-universal.apk
+              ASSETS+=("zenify-${TAG_NAME}-universal.apk" "zenify-universal.apk")
+            fi
+            gh release upload "$TAG_NAME" "${ASSETS[@]}" --clobber
+            echo "Pre-built release APKs uploaded successfully to $TAG_NAME!"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -67,9 +73,9 @@ jobs:
       - name: Upload CI Build APKs to GitHub Release
         if: ${{ hashFiles('frontend/public/downloads/zenify.apk') == '' || github.event.inputs.rebuild_from_ci == 'true' }}
         run: |
-          TAG_NAME="${GITHUB_REF_NAME:-v1.0.8}"
+          TAG_NAME="${GITHUB_REF_NAME:-v1.0.9}"
           if [ "$TAG_NAME" = "main" ]; then
-            TAG_NAME="v1.0.8"
+            TAG_NAME="v1.0.9"
           fi
           gh release view "$TAG_NAME" >/dev/null 2>&1 || gh release create "$TAG_NAME" --title "Zenify $TAG_NAME" --generate-notes
           echo "Uploading CI release packages to $TAG_NAME..."

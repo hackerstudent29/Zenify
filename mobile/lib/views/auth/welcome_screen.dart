@@ -26,6 +26,8 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen>
     with TickerProviderStateMixin, HideDocksMixin {
+  @override
+  bool get hideMiniPlayerWhileActive => true;
   bool _isGoogleLoading = false;
   bool _isGuestLoading = false;
   String? _errorMessage;

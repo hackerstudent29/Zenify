@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Surface
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -14,6 +15,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.VideoSize
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -21,6 +23,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import com.zenify.mobile.yt.YtDataSource
 import com.zenify.mobile.yt.YtEngine
@@ -30,6 +33,14 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.view.TextureRegistry
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Channels:
@@ -48,8 +59,15 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     private val main = Handler(Looper.getMainLooper())
     private val processor = ZenFxProcessor()
     private var player: ExoPlayer? = null
+    private var sourceFactory: ProgressiveMediaSource.Factory? = null
     private var events: EventChannel.EventSink? = null
     private var spectrumSink: EventChannel.EventSink? = null
+    private var textureRegistry: TextureRegistry? = null
+    private var videoTextureEntry: TextureRegistry.SurfaceTextureEntry? = null
+    private var videoSurface: Surface? = null
+    private var pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val playGeneration = AtomicInteger(0)
+    private val nextGeneration = AtomicInteger(0)
     private var lastDuration = -1L
     private var pending = PlaybackParameters(1f, 1f)
 
@@ -61,13 +79,14 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     private val ticker = object : Runnable {
         override fun run() {
             val p = player
-            if (p != null && p.isPlaying) {
-                emit(mapOf("type" to "position", "ms" to p.currentPosition))
-                val d = p.duration
-                if (d != C.TIME_UNSET && d != lastDuration) {
-                    lastDuration = d
-                    emit(mapOf("type" to "duration", "ms" to d))
-                }
+            val active = p != null && (
+                p.isPlaying ||
+                    (p.playWhenReady &&
+                        p.playbackState != Player.STATE_ENDED &&
+                        p.playbackState != Player.STATE_IDLE)
+            )
+            if (active && p != null) {
+                emitProgressSnapshot(p)
                 // Adaptive frequency: 500ms when user is actively watching UI, 1000ms when in background/screen-off
                 val intervalMs = if (isAppInForeground) 500L else 1000L
                 main.postDelayed(this, intervalMs)
@@ -75,6 +94,15 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
             } else {
                 isTickerScheduled = false
             }
+        }
+    }
+
+    private fun emitProgressSnapshot(p: ExoPlayer) {
+        emit(mapOf("type" to "position", "ms" to p.currentPosition.coerceAtLeast(0L)))
+        val d = p.duration
+        if (d != C.TIME_UNSET && d > 0L && d != lastDuration) {
+            lastDuration = d
+            emit(mapOf("type" to "duration", "ms" to d))
         }
     }
 
@@ -93,11 +121,53 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
 
     private fun updateTickerState() {
         val p = player
-        if (p != null && p.isPlaying) {
+        val active = p != null && (
+            p.isPlaying ||
+                (p.playWhenReady &&
+                    p.playbackState != Player.STATE_ENDED &&
+                    p.playbackState != Player.STATE_IDLE)
+        )
+        if (active) {
             startTicker()
         } else {
             stopTicker()
         }
+    }
+
+    private fun getOrCreateVideoTextureId(): Long {
+        val existing = videoTextureEntry
+        if (existing != null && videoSurface != null) {
+            return existing.id()
+        }
+        val entry = textureRegistry?.createSurfaceTexture() ?: return -1L
+        val surface = Surface(entry.surfaceTexture())
+        videoTextureEntry = entry
+        videoSurface = surface
+        return entry.id()
+    }
+
+    private fun attachVideoSurface(p: ExoPlayer) {
+        if (videoSurface == null) {
+            getOrCreateVideoTextureId()
+        }
+        val surface = videoSurface
+        if (surface != null) {
+            p.setVideoSurface(surface)
+        }
+    }
+
+    private fun releaseVideoTexture() {
+        try {
+            player?.clearVideoSurface()
+        } catch (_: Throwable) {}
+        try {
+            videoSurface?.release()
+        } catch (_: Throwable) {}
+        try {
+            videoTextureEntry?.release()
+        } catch (_: Throwable) {}
+        videoSurface = null
+        videoTextureEntry = null
     }
 
     private val spectrumTicker = object : Runnable {
@@ -112,6 +182,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
 
     override fun onAttachedToEngine(b: FlutterPlugin.FlutterPluginBinding) {
         ctx = b.applicationContext
+        textureRegistry = b.textureRegistry
+        pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         YtEngine.init(ctx)
 
         MethodChannel(b.binaryMessenger, "zenify/audio").setMethodCallHandler(this)
@@ -137,8 +209,12 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         stopTicker()
         main.removeCallbacksAndMessages(null)
+        pluginScope.cancel()
+        releaseVideoTexture()
+        textureRegistry = null
         player?.release()
         player = null
+        sourceFactory = null
     }
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
@@ -201,6 +277,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         }
 
         val mediaSourceFactory = ProgressiveMediaSource.Factory(dataSourceFactory)
+        sourceFactory = mediaSourceFactory
 
         // Bounded burst buffering: quick startup (2.5s), safe rebuffer (5s), and 60s max buffer
         // lets Wi-Fi and 4G/5G cellular modems download in bursts and enter low-power sleep (DRX/Idle)
@@ -222,7 +299,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 true,
             )
             .setHandleAudioBecomingNoisy(true)
-            .setWakeMode(C.WAKE_MODE_LOCAL)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
         try {
@@ -238,6 +315,9 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         p.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 emitState()
+                if (state == Player.STATE_READY) {
+                    emitProgressSnapshot(p)
+                }
                 updateTickerState()
             }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -245,7 +325,16 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 updateTickerState()
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                emitState()
+                emitProgressSnapshot(p)
                 updateTickerState()
+            }
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                emit(mapOf(
+                    "type" to "videoSize",
+                    "width" to videoSize.width,
+                    "height" to videoSize.height,
+                ))
             }
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
@@ -256,6 +345,21 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                         player?.removeMediaItems(0, cur)
                     }
                 }
+                lastDuration = -1L
+                val isVideoItem = mediaItem?.localConfiguration?.tag == "video"
+                if (isVideoItem) {
+                    attachVideoSurface(p)
+                } else {
+                    p.clearVideoSurface()
+                    emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
+                }
+                emit(mapOf("type" to "position", "ms" to p.currentPosition.coerceAtLeast(0L)))
+                val d = p.duration
+                if (d != C.TIME_UNSET && d > 0L) {
+                    lastDuration = d
+                    emit(mapOf("type" to "duration", "ms" to d))
+                }
+                emitState()
             }
             override fun onPlayerError(error: PlaybackException) {
                 stopTicker()
@@ -281,38 +385,181 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         artist: String?,
         artworkUrl: String?,
         startMs: Long?,
-        loudnessDb: Double? = null
+        loudnessDb: Double? = null,
+        isVideo: Boolean = false
     ) {
+        val gen = playGeneration.incrementAndGet()
         processor.setLoudnessDb(loudnessDb)
         val p = ensurePlayer()
-        val uri = Uri.parse("zenify://media/$mediaId")
         val metadata = MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)
             .setArtworkUri(if (!artworkUrl.isNullOrBlank()) Uri.parse(artworkUrl) else null)
             .build()
 
-        val mediaItem = MediaItem.Builder()
-            .setMediaId(mediaId)
-            .setCustomCacheKey(mediaId)
-            .setUri(uri)
-            .setMediaMetadata(metadata)
-            .build()
+        if (!isVideo) {
+            p.clearVideoSurface()
+            emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
+            val uri = Uri.parse("zenify://media/$mediaId")
+            val mediaItem = MediaItem.Builder()
+                .setMediaId(mediaId)
+                .setCustomCacheKey(mediaId)
+                .setUri(uri)
+                .setMediaMetadata(metadata)
+                .setTag("audio")
+                .build()
 
+            lastDuration = -1L
+            p.setMediaItem(mediaItem, startMs ?: 0L)
+            p.prepare()
+            p.playWhenReady = true
+            return
+        }
+
+        attachVideoSurface(p)
+        emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
+        emit(mapOf("type" to "state", "value" to "playing", "buffering" to true))
         lastDuration = -1L
-        p.setMediaItem(mediaItem, startMs ?: 0L)
-        p.prepare()
-        p.playWhenReady = true
+
+        pluginScope.launch {
+            try {
+                val resolved = YtEngine.resolve(mediaId, wantVideo = true)
+                withContext(Dispatchers.Main) {
+                    if (gen != playGeneration.get() || player == null) return@withContext
+                    processor.setLoudnessDb(loudnessDb ?: resolved.loudnessDb)
+                    emit(mapOf(
+                        "type" to "resolved",
+                        "id" to mediaId,
+                        "client" to resolved.client,
+                        "ms" to (resolved.expiresInSec * 1000),
+                        "fromCache" to false,
+                        "loudnessDb" to (loudnessDb ?: resolved.loudnessDb),
+                    ))
+
+                    val mf = sourceFactory
+                    val hasVideo = !resolved.videoUrl.isNullOrBlank()
+                    if (hasVideo && resolved.videoUrl != resolved.url && mf != null) {
+                        attachVideoSurface(p)
+                        val videoItem = MediaItem.Builder()
+                            .setMediaId(mediaId)
+                            .setCustomCacheKey("$mediaId#v")
+                            .setUri(Uri.parse("zenify://video/$mediaId"))
+                            .setMediaMetadata(metadata)
+                            .setTag("video")
+                            .build()
+                        val audioItem = MediaItem.Builder()
+                            .setMediaId(mediaId)
+                            .setCustomCacheKey(mediaId)
+                            .setUri(Uri.parse("zenify://media/$mediaId?v=1"))
+                            .setMediaMetadata(metadata)
+                            .setTag("video")
+                            .build()
+                        val merged = MergingMediaSource(
+                            true,
+                            true,
+                            mf.createMediaSource(videoItem),
+                            mf.createMediaSource(audioItem)
+                        )
+                        p.setMediaSource(merged, startMs ?: 0L)
+                    } else if (hasVideo) {
+                        attachVideoSurface(p)
+                        val item = MediaItem.Builder()
+                            .setMediaId(mediaId)
+                            .setCustomCacheKey("$mediaId#v")
+                            .setUri(Uri.parse("zenify://video/$mediaId"))
+                            .setMediaMetadata(metadata)
+                            .setTag("video")
+                            .build()
+                        p.setMediaItem(item, startMs ?: 0L)
+                    } else {
+                        p.clearVideoSurface()
+                        val item = MediaItem.Builder()
+                            .setMediaId(mediaId)
+                            .setCustomCacheKey(mediaId)
+                            .setUri(Uri.parse("zenify://media/$mediaId"))
+                            .setMediaMetadata(metadata)
+                            .setTag("audio")
+                            .build()
+                        p.setMediaItem(item, startMs ?: 0L)
+                    }
+                    p.prepare()
+                    p.playWhenReady = true
+                }
+            } catch (e: Throwable) {
+                Log.e("ZenAudioPlugin", "Video resolve failed for $mediaId: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    if (gen != playGeneration.get()) return@withContext
+                    emit(mapOf(
+                        "type" to "error",
+                        "message" to (e.message ?: "video resolve error"),
+                        "errorCode" to -1,
+                        "is403" to false,
+                    ))
+                }
+            }
+        }
     }
 
-    private fun playUrl(url: String, headers: Map<String, String>? = null) {
+    private fun playUrl(
+        url: String,
+        headers: Map<String, String>? = null,
+        videoUrl: String? = null,
+        title: String? = null,
+        artist: String? = null,
+        artworkUrl: String? = null,
+        startMs: Long? = null,
+        loudnessDb: Double? = null,
+        isVideo: Boolean = false
+    ) {
+        playGeneration.incrementAndGet()
+        processor.setLoudnessDb(loudnessDb)
         val p = ensurePlayer()
         if (headers != null) {
             activeHeaders = headers
         }
-        val mediaItem = MediaItem.fromUri(url)
+        val metadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .setArtworkUri(if (!artworkUrl.isNullOrBlank()) Uri.parse(artworkUrl) else null)
+            .build()
         lastDuration = -1L
-        p.setMediaItem(mediaItem)
+
+        val mf = sourceFactory
+        val wantsVideo = isVideo || !videoUrl.isNullOrBlank()
+        if (!videoUrl.isNullOrBlank() && videoUrl != url && mf != null) {
+            attachVideoSurface(p)
+            emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
+            val videoItem = MediaItem.Builder()
+                .setUri(videoUrl)
+                .setMediaMetadata(metadata)
+                .setTag("video")
+                .build()
+            val audioItem = MediaItem.Builder()
+                .setUri(url)
+                .setMediaMetadata(metadata)
+                .setTag("video")
+                .build()
+            val merged = MergingMediaSource(
+                true,
+                true,
+                mf.createMediaSource(videoItem),
+                mf.createMediaSource(audioItem)
+            )
+            p.setMediaSource(merged, startMs ?: 0L)
+        } else {
+            if (wantsVideo) {
+                attachVideoSurface(p)
+            } else {
+                p.clearVideoSurface()
+            }
+            emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
+            val mediaItem = MediaItem.Builder()
+                .setUri(url)
+                .setMediaMetadata(metadata)
+                .setTag(if (wantsVideo) "video" else "audio")
+                .build()
+            p.setMediaItem(mediaItem, startMs ?: 0L)
+        }
         p.prepare()
         p.playWhenReady = true
     }
@@ -321,8 +568,10 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         mediaId: String?,
         title: String? = null,
         artist: String? = null,
-        artworkUrl: String? = null
+        artworkUrl: String? = null,
+        isVideo: Boolean = false
     ) {
+        val nextGen = nextGeneration.incrementAndGet()
         val p = player ?: return
         val curIndex = p.currentMediaItemIndex
         val nextIndex = curIndex + 1
@@ -330,19 +579,22 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
             if (p.mediaItemCount > nextIndex) {
                 p.removeMediaItems(nextIndex, p.mediaItemCount)
             }
-        } else {
-            val uri = Uri.parse("zenify://media/$mediaId")
-            val metadata = MediaMetadata.Builder()
-                .setTitle(title)
-                .setArtist(artist)
-                .setArtworkUri(if (!artworkUrl.isNullOrBlank()) Uri.parse(artworkUrl) else null)
-                .build()
+            return
+        }
+        val metadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .setArtworkUri(if (!artworkUrl.isNullOrBlank()) Uri.parse(artworkUrl) else null)
+            .build()
 
+        if (!isVideo) {
+            val uri = Uri.parse("zenify://media/$mediaId")
             val mediaItem = MediaItem.Builder()
                 .setMediaId(mediaId)
                 .setCustomCacheKey(mediaId)
                 .setUri(uri)
                 .setMediaMetadata(metadata)
+                .setTag("audio")
                 .build()
 
             if (p.mediaItemCount > nextIndex) {
@@ -351,6 +603,60 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 p.addMediaItem(mediaItem)
             }
             YtEngine.prefetch(listOf(mediaId))
+            return
+        }
+
+        pluginScope.launch {
+            try {
+                val resolved = YtEngine.resolve(mediaId, wantVideo = true)
+                withContext(Dispatchers.Main) {
+                    val activePlayer = player ?: return@withContext
+                    if (nextGen != nextGeneration.get()) return@withContext
+                    val idx = activePlayer.currentMediaItemIndex + 1
+                    val mf = sourceFactory
+                    val hasVideo = !resolved.videoUrl.isNullOrBlank()
+                    val source = if (hasVideo && resolved.videoUrl != resolved.url && mf != null) {
+                        val videoItem = MediaItem.Builder()
+                            .setMediaId(mediaId)
+                            .setCustomCacheKey("$mediaId#v")
+                            .setUri(Uri.parse("zenify://video/$mediaId"))
+                            .setMediaMetadata(metadata)
+                            .setTag("video")
+                            .build()
+                        val audioItem = MediaItem.Builder()
+                            .setMediaId(mediaId)
+                            .setCustomCacheKey(mediaId)
+                            .setUri(Uri.parse("zenify://media/$mediaId?v=1"))
+                            .setMediaMetadata(metadata)
+                            .setTag("video")
+                            .build()
+                        MergingMediaSource(
+                            true,
+                            true,
+                            mf.createMediaSource(videoItem),
+                            mf.createMediaSource(audioItem)
+                        )
+                    } else if (mf != null) {
+                        val item = MediaItem.Builder()
+                            .setMediaId(mediaId)
+                            .setCustomCacheKey(if (hasVideo) "$mediaId#v" else mediaId)
+                            .setUri(Uri.parse(if (hasVideo) "zenify://video/$mediaId" else "zenify://media/$mediaId"))
+                            .setMediaMetadata(metadata)
+                            .setTag(if (hasVideo) "video" else "audio")
+                            .build()
+                        mf.createMediaSource(item)
+                    } else null
+
+                    if (source != null) {
+                        if (activePlayer.mediaItemCount > idx) {
+                            activePlayer.removeMediaItems(idx, activePlayer.mediaItemCount)
+                        }
+                        activePlayer.addMediaSource(idx, source)
+                    }
+                }
+            } catch (e: Throwable) {
+                Log.w("ZenAudioPlugin", "Next video prefetch failed for $mediaId: ${e.message}")
+            }
         }
     }
 
@@ -369,6 +675,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
             when (call.method) {
                 "play" -> {
                     val mediaId = call.argument<String>("mediaId")
+                    val isVideo = call.argument<Boolean>("isVideo") ?: false
                     if (!mediaId.isNullOrBlank()) {
                         playMediaId(
                             mediaId = mediaId,
@@ -376,14 +683,25 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                             artist = call.argument<String>("artist"),
                             artworkUrl = call.argument<String>("artworkUrl"),
                             startMs = call.argument<Number>("startMs")?.toLong(),
-                            loudnessDb = call.argument<Number>("loudnessDb")?.toDouble()
+                            loudnessDb = call.argument<Number>("loudnessDb")?.toDouble(),
+                            isVideo = isVideo
                         )
                     } else {
                         val url = call.argument<String>("url")
                         val rawHeaders = call.argument<Map<String, Any?>>("headers")
                         val headersMap = rawHeaders?.mapNotNull { (k, v) -> if (v != null) k to v.toString() else null }?.toMap()
                         if (!url.isNullOrBlank()) {
-                            playUrl(url, headersMap)
+                            playUrl(
+                                url = url,
+                                headers = headersMap,
+                                videoUrl = call.argument<String>("videoUrl"),
+                                title = call.argument<String>("title"),
+                                artist = call.argument<String>("artist"),
+                                artworkUrl = call.argument<String>("artworkUrl"),
+                                startMs = call.argument<Number>("startMs")?.toLong(),
+                                loudnessDb = call.argument<Number>("loudnessDb")?.toDouble(),
+                                isVideo = isVideo
+                            )
                         }
                     }
                     result.success(null)
@@ -393,7 +711,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                     val title = call.argument<String>("title")
                     val artist = call.argument<String>("artist")
                     val artworkUrl = call.argument<String>("artworkUrl")
-                    setNextMediaId(mediaId, title, artist, artworkUrl)
+                    val isVideo = call.argument<Boolean>("isVideo") ?: false
+                    setNextMediaId(mediaId, title, artist, artworkUrl, isVideo)
                     result.success(null)
                 }
                 "prefetch" -> {
@@ -421,8 +740,12 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                     result.success(null)
                 }
                 "stop" -> {
+                    playGeneration.incrementAndGet()
+                    nextGeneration.incrementAndGet()
                     player?.stop()
                     player?.clearMediaItems()
+                    player?.clearVideoSurface()
+                    emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
                     stopTicker()
                     result.success(null)
                 }
@@ -443,7 +766,17 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                     result.success(null)
                 }
                 "setFx" -> { setFx(call.arguments as Map<String, Any?>); result.success(null) }
-                "dispose" -> { player?.release(); player = null; result.success(null) }
+                "getVideoTextureId" -> { result.success(getOrCreateVideoTextureId()) }
+                "releaseVideoSurface" -> { releaseVideoTexture(); result.success(null) }
+                "dispose" -> {
+                    playGeneration.incrementAndGet()
+                    nextGeneration.incrementAndGet()
+                    releaseVideoTexture()
+                    player?.release()
+                    player = null
+                    sourceFactory = null
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         } catch (e: Exception) {

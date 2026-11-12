@@ -10,7 +10,6 @@ import { RoomPhase2Service } from '../services/together/room-phase2.service';
 import { ActorIdentity, RoomSessionService } from '../services/together/room-session.service';
 import { roomStore } from '../services/together/room-store';
 import { RoomHttpError } from '../services/together/room-types';
-import { VoiceSessionService } from '../services/together/voice-session.service';
 
 async function resolveActor(
   server: FastifyInstance,
@@ -146,7 +145,6 @@ export async function togetherV1Routes(server: FastifyInstance) {
           maxMembers: config.maxMembers ?? config.maxParticipants ?? body.maxMembers ?? body.maxParticipants,
           durationMinutes: rawDur,
           inviteMode: config.inviteMode ?? body.inviteMode,
-          speakPolicy: config.speakPolicy ?? body.speakPolicy,
           allowListenersAddQueue:
             config.allowListenersAddQueue ?? body.allowListenersAddQueue,
           allowListenersSkip: config.allowListenersSkip ?? body.allowListenersSkip,
@@ -595,116 +593,6 @@ export async function togetherV1Routes(server: FastifyInstance) {
   };
   server.post('/rooms/:code/requests/:id/cancel', handleCancelReq);
   server.delete('/rooms/:code/requests/:id', handleCancelReq);
-
-  // ---- VOICE STAGE (LIVEKIT + PERMISSIONS) ------------------------------------
-
-  server.post('/rooms/:code/hand-raise', async (request, reply) => {
-    try {
-      const { code } = request.params as { code: string };
-      const actor = await resolveActor(server, request, reply, false);
-      const body = (request.body as any) || {};
-      const res = await RoomMembershipService.setHandRaised(
-        code,
-        actor.userId,
-        body.raised !== undefined ? Boolean(body.raised) : true
-      );
-      return reply.send(res);
-    } catch (err) {
-      return sendError(reply, err);
-    }
-  });
-
-  const handleVoiceToken = async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const { code } = request.params as { code: string };
-      const actor = await resolveActor(server, request, reply, false);
-      const res = await VoiceSessionService.mintVoiceToken(code, actor.userId);
-      return reply.send(res);
-    } catch (err) {
-      return sendError(reply, err);
-    }
-  };
-  server.get('/rooms/:code/voice/token', handleVoiceToken);
-  server.post('/rooms/:code/voice/token', handleVoiceToken);
-
-  server.patch('/rooms/:code/voice/speakers', async (request, reply) => {
-    try {
-      const { code } = request.params as { code: string };
-      const actor = await resolveActor(server, request, reply, false);
-      const body = (request.body as any) || {};
-      const res = await VoiceSessionService.setSpeakers(
-        code,
-        actor.userId,
-        Array.isArray(body.userIds) ? body.userIds : []
-      );
-      return reply.send(res);
-    } catch (err) {
-      return sendError(reply, err);
-    }
-  });
-
-  server.post('/rooms/:code/voice/members/:userId/grant', async (request, reply) => {
-    try {
-      const { code, userId } = request.params as { code: string; userId: string };
-      const actor = await resolveActor(server, request, reply, false);
-      const res = await VoiceSessionService.grantSpeak(code, actor.userId, userId);
-      return reply.send(res);
-    } catch (err) {
-      return sendError(reply, err);
-    }
-  });
-
-  server.post('/rooms/:code/voice/members/:userId/revoke', async (request, reply) => {
-    try {
-      const { code, userId } = request.params as { code: string; userId: string };
-      const actor = await resolveActor(server, request, reply, false);
-      const res = await VoiceSessionService.revokeSpeak(code, actor.userId, userId);
-      return reply.send(res);
-    } catch (err) {
-      return sendError(reply, err);
-    }
-  });
-
-  server.post('/rooms/:code/voice/members/:userId/mute', async (request, reply) => {
-    try {
-      const { code, userId } = request.params as { code: string; userId: string };
-      const actor = await resolveActor(server, request, reply, false);
-      const res = await VoiceSessionService.muteMember(code, actor.userId, userId, true);
-      return reply.send(res);
-    } catch (err) {
-      return sendError(reply, err);
-    }
-  });
-
-  server.post('/rooms/:code/voice/members/:userId/unmute', async (request, reply) => {
-    try {
-      const { code, userId } = request.params as { code: string; userId: string };
-      const actor = await resolveActor(server, request, reply, false);
-      const res = await VoiceSessionService.muteMember(code, actor.userId, userId, false);
-      return reply.send(res);
-    } catch (err) {
-      return sendError(reply, err);
-    }
-  });
-
-  server.post('/voice/webhook', async (request, reply) => {
-    try {
-      const raw =
-        typeof request.body === 'string'
-          ? request.body
-          : JSON.stringify(request.body || {});
-      const event = VoiceSessionService.verifyWebhook(
-        request.headers.authorization,
-        raw
-      );
-      if (!event) {
-        return reply.status(401).send({ error: 'INVALID_WEBHOOK' });
-      }
-      return reply.send({ ok: true });
-    } catch (err) {
-      return sendError(reply, err);
-    }
-  });
 
   // ---- PHASE 2: LYRICS (Existing LyricsOrchestrator), BOOKMARKS, REACTIONS, INVITES, CHAT, THEME, DJ, RECS ----
 

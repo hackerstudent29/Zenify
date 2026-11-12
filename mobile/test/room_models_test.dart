@@ -63,30 +63,14 @@ void main() {
       expect(c.thresholdOptions(RoomPermission.manageRoles), [RoomRole.host, RoomRole.coHost]);
     });
 
-    test('canSpeak policies', () {
-      final c = RoomConfig(name: 'r');
-      c.speakPolicy = SpeakPolicy.hostOnly;
-      expect(c.canSpeak(RoomRole.host), true);
-      expect(c.canSpeak(RoomRole.coHost), false);
-      c.speakPolicy = SpeakPolicy.hostAndCoHosts;
-      expect(c.canSpeak(RoomRole.coHost), true);
-      expect(c.canSpeak(RoomRole.dj), false);
-      c.speakPolicy = SpeakPolicy.selected;
-      expect(c.canSpeak(RoomRole.member), false);
-      expect(c.canSpeak(RoomRole.member, selected: true), true);
-      c.speakPolicy = SpeakPolicy.everyone;
-      expect(c.canSpeak(RoomRole.listener), true);
-    });
-
     test('json round trip keeps permissions and roles', () {
-      final c = RoomConfig(name: 'Party', durationMinutes: 180, speakPolicy: SpeakPolicy.selected, inviteMode: InviteMode.approval);
+      final c = RoomConfig(name: 'Party', durationMinutes: 180, inviteMode: InviteMode.approval);
       c.permissions[RoomPermission.invite] = RoomRole.coHost;
       final j = c.toJson();
       expect(j.containsKey('password'), false);
       final back = RoomConfig.fromJson(j);
       expect(back.name, 'Party');
       expect(back.durationMinutes, 180);
-      expect(back.speakPolicy, SpeakPolicy.selected);
       expect(back.inviteMode, InviteMode.approval);
       expect(back.permissions[RoomPermission.invite], RoomRole.coHost);
       expect(back.enabledRoles.length, 5);

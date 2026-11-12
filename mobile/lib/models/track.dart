@@ -15,6 +15,7 @@ class Track {
   final bool hasLyrics;
   final String source; // 'youtube', 'local'
   final List<ArtistRef> artists;
+  final bool isVideo;
 
   Track({
     required this.id,
@@ -28,6 +29,7 @@ class Track {
     this.hasLyrics = true,
     this.source = 'youtube',
     this.artists = const [],
+    this.isVideo = false,
   })  : title = MediaNormalizer.cleanTitle(title),
         artist = MediaNormalizer.cleanArtistName(artist),
         album = MediaNormalizer.cleanAlbumTitle(album);
@@ -318,8 +320,11 @@ class Track {
       } else if (cover.startsWith('/')) {
         cover = '$baseUrl$cover';
       }
-      // Upgrades all low-resolution thumbnails into pristine 800x800 HD
-      cover = upgradeArtworkUrl(cover);
+      // Upgrades all low-resolution thumbnails into pristine 1200x1200 HD
+      cover = upgradeArtworkUrl(
+        cover,
+        videoId: id.startsWith('yt-') ? id.substring(3) : null,
+      );
     }
 
     // 6. Audio stream
@@ -369,6 +374,7 @@ class Track {
           json['lyrics'] != null,
       source: source,
       artists: parsedArtists,
+      isVideo: json['isVideo'] == true,
     );
   }
 
@@ -385,6 +391,7 @@ class Track {
       'hasLyrics': hasLyrics,
       'source': source,
       'artists': artists.map((a) => a.toJson()).toList(),
+      if (isVideo) 'isVideo': true,
     };
   }
 
@@ -400,6 +407,7 @@ class Track {
     bool? hasLyrics,
     String? source,
     List<ArtistRef>? artists,
+    bool? isVideo,
   }) {
     return Track(
       id: id ?? this.id,
@@ -413,6 +421,7 @@ class Track {
       hasLyrics: hasLyrics ?? this.hasLyrics,
       source: source ?? this.source,
       artists: artists ?? this.artists,
+      isVideo: isVideo ?? this.isVideo,
     );
   }
 
@@ -496,34 +505,23 @@ int _parseDuration(Map<String, dynamic> json) {
   return fallback;
 }
 
-/// Upgrades low-resolution thumbnails (e.g. 60x60, 120x120) from
-/// YouTube Music and Google CDN into pristine crystal-clear
-/// 800x800 HD artwork.
-String upgradeArtworkUrl(String rawUrl, {String? videoId}) {
-  var url = rawUrl.trim();
-  if (url.isEmpty) {
-    return (videoId != null && videoId.isNotEmpty)
-        ? 'https://i.ytimg.com/vi/$videoId/maxresdefault.jpg'
-        : '';
-  }
-  if (url.startsWith('//')) {
-    url = 'https:$url';
-  }
+/// Upgrades low-resolution thumbnails from YouTube Music and Google CDN
+/// via [MediaNormalizer.upgradeArtworkUrl] into crisp HD artwork.
+String upgradeArtworkUrl(
+  String rawUrl, {
+  String? videoId,
+  int targetSize = 1200,
+  bool isBanner = false,
+  bool isArtistAvatar = false,
+}) =>
+    MediaNormalizer.upgradeArtworkUrl(
+      rawUrl,
+      videoId: videoId,
+      targetSize: targetSize,
+      isBanner: isBanner,
+      isArtistAvatar: isArtistAvatar,
+    );
 
-  // 1. YouTube Music / Google CDN (lh3.googleusercontent.com / ggpht.com):
-  // InnerTube sends small sizes like =w60-h60-l90-rj or =w120-h120-l90-rj.
-  // Google's dynamic image service delivers native 800x800 sharp cover art.
-  if (url.contains('googleusercontent.com') || url.contains('ggpht.com')) {
-    url = url.replaceAll(RegExp(r'=w\d+-h\d+[^?#]*'), '=w800-h800-l90-rj');
-    url = url.replaceAll(RegExp(r'=s\d+[^?#]*'), '=w800-h800-l90-rj');
-  }
-
-  // 2. YouTube Video Thumbnails (i.ytimg.com):
-  // Replace letterboxed 144p/360p defaults with 1080p HD maxresdefault.
-  if (url.contains('ytimg.com')) {
-    url = url.replaceAll(RegExp(r'/(?:default|mqdefault|hqdefault)\.jpg'), '/maxresdefault.jpg');
-    url = url.replaceAll(RegExp(r'=w\d+-h\d+[^?#]*'), '=w800-h800-l90-rj');
-  }
-
-  return url;
-}
+/// Upgrades landscape hero banners (such as artist header banners) via [MediaNormalizer].
+String upgradeBannerUrl(String rawUrl, {String? videoId}) =>
+    MediaNormalizer.upgradeBannerUrl(rawUrl, videoId: videoId);

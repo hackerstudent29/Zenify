@@ -134,13 +134,18 @@ class ArtistService {
             : (ytCard?.name ?? cleanName);
 
         final channelThumb = ytChannel['thumb'] as String?;
+        final channelBanner = ytChannel['banner'] as String?;
         final rawImage = (channelThumb != null && channelThumb.isNotEmpty)
             ? channelThumb
             : ytCard?.thumb;
 
         final imageUrl = (rawImage != null && rawImage.isNotEmpty)
-            ? MediaNormalizer.upgradeArtworkUrl(rawImage)
+            ? MediaNormalizer.upgradeArtworkUrl(rawImage, isArtistAvatar: true)
             : '';
+
+        final coverUrl = (channelBanner != null && channelBanner.isNotEmpty)
+            ? MediaNormalizer.upgradeBannerUrl(channelBanner)
+            : (imageUrl.isNotEmpty ? MediaNormalizer.upgradeBannerUrl(rawImage) : '');
 
         final bio = (ytChannel['bio'] as String?)?.isNotEmpty == true
             ? ytChannel['bio'] as String
@@ -220,7 +225,7 @@ class ArtistService {
         final profile = ArtistProfile(
           name: name,
           imageUrl: imageUrl,
-          coverUrl: imageUrl,
+          coverUrl: coverUrl.isNotEmpty ? coverUrl : imageUrl,
           bio: bio,
           subscriberCount: subscriberCount,
           monthlyAudience: monthlyAudience,
@@ -262,9 +267,13 @@ class ArtistService {
       final cloudData = await _fetchCloud(cleanName);
       if (cloudData != null) {
         final name = cloudData['name'] ?? cleanName;
-        final rawImage = cloudData['imageUrl'] ?? cloudData['coverUrl'];
+        final rawImage = (cloudData['imageUrl'] ?? cloudData['coverUrl'])?.toString();
         final imageUrl = (rawImage != null && rawImage.isNotEmpty)
-            ? upgradeArtworkUrl(rawImage)
+            ? MediaNormalizer.upgradeArtworkUrl(rawImage, isArtistAvatar: true)
+            : '';
+        final rawCover = (cloudData['coverUrl'] ?? rawImage)?.toString();
+        final coverUrl = (rawCover != null && rawCover.isNotEmpty)
+            ? MediaNormalizer.upgradeBannerUrl(rawCover)
             : '';
         final bio = (cloudData['bio'] as String?) ??
             'Official artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, and singles.';
@@ -337,7 +346,7 @@ class ArtistService {
         final profile = ArtistProfile(
           name: name,
           imageUrl: imageUrl,
-          coverUrl: imageUrl,
+          coverUrl: coverUrl.isNotEmpty ? coverUrl : imageUrl,
           bio: bio,
           subscriberCount: subscriberCount,
           monthlyAudience: subscriberCount,

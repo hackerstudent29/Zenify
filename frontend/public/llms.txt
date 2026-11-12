@@ -13,8 +13,8 @@ Zenify offers a seamless, ad-free listening experience directly in the web brows
 - **Local Audio Scanner**: In-browser client-side playback of MP3, FLAC, WAV, and AAC audio files with 100% user privacy.
 - **Offline PWA**: Full progressive web app offline caching with lock-screen MediaSession controls.
 - **Lossless Full-Audio Resolution**: Pristine 320kbps full song playback via clean CDNs with instant playback startup.
-- **Room Together (Collaborative Listening)**: Synchronized live listening rooms with LiveKit voice audio, synced lyrics, timestamped moments, DJ controls, floating reactions, custom themes, and shareable PNG recaps.
-- **Native Android APK (v1.0.8)**: Direct Android download at https://listenzenify.vercel.app/download with background Media3 ExoPlayer, Room Together, and native C++ Studio FX.
+- **Room Together (Collaborative Listening)**: Synchronized live listening rooms with live chat, synced lyrics, timestamped moments, DJ controls, floating reactions, custom themes, and shareable PNG recaps.
+- **Native Android APK (v1.0.9)**: Direct Android download at https://listenzenify.vercel.app/download with background Media3 ExoPlayer, YouTube video streaming in Mini & Fullscreen players, Room Together, and native C++ Studio FX.
 
 ## Frequently Asked Questions (FAQ)
 - **What is Zenify?** Zenify is a free, modern web and mobile music player featuring instant audio playback, sub-second synchronized lyrics, 8D spatial audio, and dynamic visualizer themes.
@@ -25,8 +25,8 @@ Zenify offers a seamless, ad-free listening experience directly in the web brows
 
 ## Primary Pages & Resources
 - [Home Page](https://listenzenify.vercel.app/): Main streaming dashboard, search bar, and curated frequency radio.
-- [Download Android & PWA App](https://listenzenify.vercel.app/download): Direct v1.0.8 Android APK download and iOS/Desktop PWA install guide.
-- [Room Together (Listen Together)](https://listenzenify.vercel.app/together): Real-time synchronized listening rooms with LiveKit voice, shared queues, reactions, and recaps.
+- [Download Android & PWA App](https://listenzenify.vercel.app/download): Direct v1.0.9 Android APK download and iOS/Desktop PWA install guide.
+- [Room Together (Listen Together)](https://listenzenify.vercel.app/together): Real-time synchronized listening rooms with live chat, shared queues, reactions, and recaps.
 - [Features & FAQ](https://listenzenify.vercel.app/faq): Complete overview of DSP audio capabilities and common questions.
 - [About Zenify](https://listenzenify.vercel.app/about-zenify): Architectural principles, open-source mission, and technology overview.
 - [About Creator](https://listenzenify.vercel.app/about): Music producer and developer profile.

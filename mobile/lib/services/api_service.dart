@@ -151,17 +151,27 @@ class ApiService {
     return track.id.replaceFirst('yt-', '');
   }
 
-  /// Right-sized artwork: small for list rows / mini player, large for Now Playing.
-  /// UI should crop YouTube thumbnails to a square (they are 16:9).
+  /// Right-sized artwork: sharp small thumbnails for lists, 1280x720 / 1200x1200 HD for Now Playing.
   static String artworkUrl(Track track, {ArtworkSize size = ArtworkSize.medium}) {
     final url = track.coverUrl;
-    if (!url.contains('ytimg.com/vi/')) return url;
-    const names = {
-      ArtworkSize.thumb: 'mqdefault',
-      ArtworkSize.medium: 'hqdefault',
-      ArtworkSize.large: 'sddefault',
-    };
-    return url.replaceFirst(RegExp(r'/[a-z]+default\.jpg'), '/${names[size]}.jpg');
+    if (url.contains('ytimg.com/vi/')) {
+      const names = {
+        ArtworkSize.thumb: 'hqdefault',
+        ArtworkSize.medium: 'sddefault',
+        ArtworkSize.large: 'maxresdefault',
+      };
+      final clean = url.split('?').first;
+      return clean.replaceFirst(RegExp(r'/[a-z0-9_]+\.(?:jpg|webp)$', caseSensitive: false), '/${names[size]}.jpg');
+    }
+    if (url.contains('googleusercontent.com') || url.contains('ggpht.com')) {
+      final px = switch (size) {
+        ArtworkSize.thumb => 400,
+        ArtworkSize.medium => 800,
+        ArtworkSize.large => 1200,
+      };
+      return upgradeArtworkUrl(url, targetSize: px);
+    }
+    return url;
   }
 
   // ---------------------------------------------------------------------------

@@ -302,7 +302,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
         resizeToAvoidBottomInset: false,
         backgroundColor: Zen.bg,
         body: ValueListenableBuilder<bool>(
-          valueListenable: DockVisibility.hideDocksNotifier,
+          valueListenable: DockVisibility.hideNavDockNotifier,
           builder: (context, hideDocks, _) {
             return AnimatedBuilder(
               animation: _dockController,
@@ -443,13 +443,16 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
 
                     // 3. Morphing PlayerShell (mini player pill morphs into center island).
                     Positioned.fill(
-                      child: PlayerShell(
-                        key: _playerShellKey,
-                        hideMini: hideDocks,
-                        dockProgress: dockProgress,
-                        miniBottomOffset: miniBottom,
-                        onGoToArtist: _goToArtist,
-                        onGoToAlbum: _goToAlbum,
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: DockVisibility.hideMiniPlayerNotifier,
+                        builder: (_, hideMini, _) => PlayerShell(
+                          key: _playerShellKey,
+                          hideMini: hideMini,
+                          dockProgress: dockProgress,
+                          miniBottomOffset: miniBottom,
+                          onGoToArtist: _goToArtist,
+                          onGoToAlbum: _goToAlbum,
+                        ),
                       ),
                     ),
                   ],
@@ -533,7 +536,13 @@ class _AnimatedTabStackState extends State<_AnimatedTabStack> with SingleTickerP
       },
       child: IndexedStack(
         index: widget.index,
-        children: widget.children,
+        children: [
+          for (var i = 0; i < widget.children.length; i++)
+            DockActiveTabScope(
+              isActive: i == widget.index,
+              child: widget.children[i],
+            ),
+        ],
       ),
     );
   }

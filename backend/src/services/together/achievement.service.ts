@@ -10,7 +10,6 @@ export interface AchievementUpdateInput {
   crowdPleaserDelta?: number;
   tracksPlayedDelta?: number;
   bookmarksDelta?: number;
-  voiceRoomsDelta?: number;
   tastemakerDelta?: number;
 }
 
@@ -52,7 +51,9 @@ export class AchievementService {
 
     const progressMap = new Map(rows.map((r) => [r.achievementId, r]));
 
-    return defs.map((d) => {
+    return defs
+      .filter((d) => d.id !== 'VOICE_HOST')
+      .map((d) => {
       const row = progressMap.get(d.id);
       const progress = row?.progress ?? 0;
       const unlocked = row?.unlockedAt != null || progress >= d.threshold;
@@ -103,9 +104,6 @@ export class AchievementService {
     }
     if (input.bookmarksDelta && input.bookmarksDelta > 0) {
       increments.push(['BOOKMARK_KEEPER', input.bookmarksDelta]);
-    }
-    if (input.voiceRoomsDelta && input.voiceRoomsDelta > 0) {
-      increments.push(['VOICE_HOST', input.voiceRoomsDelta]);
     }
     if (input.tastemakerDelta && input.tastemakerDelta > 0) {
       increments.push(['TASTEMAKER', input.tastemakerDelta]);

@@ -46,18 +46,6 @@ enum RoomPermission {
   final IconData icon;
 }
 
-enum SpeakPolicy {
-  hostOnly('HOST_ONLY', 'Host only'),
-  hostAndCoHosts('HOST_AND_CO_HOSTS', 'Host and co-hosts'),
-  selected('SELECTED', 'Selected members'),
-  everyone('EVERYONE', 'Everyone');
-
-  const SpeakPolicy(this.wire, this.label);
-  final String wire;
-  final String label;
-  static SpeakPolicy parse(String? s) => SpeakPolicy.values.firstWhere((e) => e.wire == s, orElse: () => SpeakPolicy.hostAndCoHosts);
-}
-
 enum InviteMode {
   open('OPEN', 'Code'),
   approval('APPROVAL', 'Approval'),
@@ -97,7 +85,6 @@ class RoomConfig {
     this.durationMinutes = 120,
     Set<RoomRole>? enabledRoles,
     Map<RoomPermission, RoomRole>? permissions,
-    this.speakPolicy = SpeakPolicy.hostAndCoHosts,
     this.mode = 'dj',
   })  : enabledRoles = enabledRoles ?? {RoomRole.host, RoomRole.coHost, RoomRole.dj, RoomRole.member, RoomRole.listener},
         permissions = permissions ?? defaultPermissions(mode);
@@ -114,7 +101,6 @@ class RoomConfig {
 
   /// Minimum role (by rank) allowed to use each permission.
   Map<RoomPermission, RoomRole> permissions;
-  SpeakPolicy speakPolicy;
   String mode; // 'dj' | 'collab'
 
   static Map<RoomPermission, RoomRole> defaultPermissions(String mode) => {
@@ -138,19 +124,6 @@ class RoomConfig {
     if (role == RoomRole.listener && p != RoomPermission.invite) return false;
     final min = permissions[p] ?? RoomRole.host;
     return role.rank >= min.rank;
-  }
-
-  bool canSpeak(RoomRole role, {bool selected = false}) {
-    switch (speakPolicy) {
-      case SpeakPolicy.hostOnly:
-        return role == RoomRole.host;
-      case SpeakPolicy.hostAndCoHosts:
-        return role.rank >= RoomRole.coHost.rank;
-      case SpeakPolicy.selected:
-        return role.rank >= RoomRole.coHost.rank || selected;
-      case SpeakPolicy.everyone:
-        return true;
-    }
   }
 
   /// Snap thresholds pointing at disabled roles up to the next enabled role.
@@ -185,7 +158,6 @@ class RoomConfig {
         'durationMinutes': durationMinutes, // null = unlimited
         'enabledRoles': enabledRoles.map((e) => e.wire).toList(),
         'permissions': {for (final e in permissions.entries) e.key.wire: e.value.wire},
-        'speakPolicy': speakPolicy.wire,
       };
 
   factory RoomConfig.fromJson(Map<String, dynamic> j) {
@@ -203,7 +175,6 @@ class RoomConfig {
       durationMinutes: (j['durationMinutes'] as num?)?.toInt(),
       enabledRoles: ((j['enabledRoles'] as List?) ?? const ['OWNER', 'CO_HOST', 'DJ', 'MEMBER', 'LISTENER']).map((e) => RoomRole.parse(e as String)).toSet(),
       permissions: perms,
-      speakPolicy: SpeakPolicy.parse(j['speakPolicy'] as String?),
       mode: (j['mode'] as String?) ?? 'dj',
     );
   }
