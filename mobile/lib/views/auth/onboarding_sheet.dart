@@ -263,6 +263,8 @@ class OnboardingSheet extends StatefulWidget {
 
 class _OnboardingSheetState extends State<OnboardingSheet>
     with TickerProviderStateMixin, HideDocksMixin {
+  @override
+  bool get hideMiniPlayerWhileActive => true;
   static const _steps = 4;
   static const _surface = Color(0xED161619);
 

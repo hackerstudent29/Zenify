@@ -1,15 +1,6 @@
-export type RoomRole = 'HOST' | 'CO_HOST' | 'MODERATOR' | 'DJ' | 'SPEAKER' | 'MEMBER' | 'LISTENER';
+export type RoomRole = 'HOST' | 'CO_HOST' | 'MODERATOR' | 'DJ' | 'MEMBER' | 'LISTENER';
 
 export type InviteMode = 'OPEN' | 'ANYONE' | 'APPROVAL' | 'INVITE_ONLY';
-
-export type SpeakPolicy =
-  | 'ALL'
-  | 'EVERYONE'
-  | 'HOST_AND_MODS'
-  | 'HOST_AND_CO_HOSTS'
-  | 'HOST_ONLY'
-  | 'REQUEST_TO_SPEAK'
-  | 'SELECTED';
 
 export type RequestMode = 'ANYONE' | 'APPROVAL' | 'LIMITED' | 'AUTO' | 'HOST_ONLY';
 
@@ -28,7 +19,6 @@ export type RoomPermission =
   | 'KICK_BAN'
   | 'EDIT_CONFIG'
   | 'MODERATE_CHAT'
-  | 'SPEAK'
   | 'TRANSFER_HOST'
   | 'CLOSE_ROOM'
   | 'APPROVE_JOIN'
@@ -67,9 +57,6 @@ export interface TogetherMemberDTO {
   avatar?: string | null;
   avatarUrl?: string | null;
   role: string;
-  canSpeak: boolean;
-  isMuted: boolean;
-  isHandRaised: boolean;
   isGuest: boolean;
   joinedAt: number;
   lastPing: number;
@@ -90,7 +77,6 @@ export interface RoomConfigDTO {
   durationMinutes: number;
   expiresAtMs: number | null;
   inviteMode: InviteMode;
-  speakPolicy: SpeakPolicy;
   allowListenersAddQueue: boolean;
   allowListenersSkip: boolean;
   state: RoomState;
@@ -148,7 +134,6 @@ export class RoomHttpError extends Error {
 export const ROLE_RANK: Record<RoomRole, number> = {
   LISTENER: 0,
   MEMBER: 1,
-  SPEAKER: 1,
   DJ: 2,
   MODERATOR: 2,
   CO_HOST: 3,
@@ -161,7 +146,6 @@ export function normalizeRole(raw?: string | null): RoomRole {
   if (upper === 'CO_HOST' || upper === 'COHOST') return 'CO_HOST';
   if (upper === 'DJ') return 'DJ';
   if (upper === 'MODERATOR' || upper === 'MOD') return 'MODERATOR';
-  if (upper === 'SPEAKER') return 'SPEAKER';
   if (upper === 'MEMBER') return 'MEMBER';
   return 'LISTENER';
 }
@@ -172,17 +156,6 @@ export function normalizeInviteMode(raw?: string | null): InviteMode {
   if (u === 'INVITE_ONLY' || u === 'INVITE') return 'INVITE_ONLY';
   if (u === 'OPEN') return 'OPEN';
   return 'ANYONE';
-}
-
-export function normalizeSpeakPolicy(raw?: string | null): SpeakPolicy {
-  const u = (raw || '').trim().toUpperCase();
-  if (u === 'HOST_ONLY') return 'HOST_ONLY';
-  if (u === 'HOST_AND_CO_HOSTS') return 'HOST_AND_CO_HOSTS';
-  if (u === 'HOST_AND_MODS' || u === 'MODS') return 'HOST_AND_MODS';
-  if (u === 'REQUEST_TO_SPEAK' || u === 'REQUEST') return 'REQUEST_TO_SPEAK';
-  if (u === 'SELECTED') return 'SELECTED';
-  if (u === 'EVERYONE') return 'EVERYONE';
-  return 'ALL';
 }
 
 export function normalizeRequestMode(raw?: string | null): RequestMode {

@@ -1952,14 +1952,20 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
     });
 
-    // Flush all caches (Redis DB + in-memory cache) - Protected: Admin Only
+    // Flush all caches (Redis DB + in-memory cache + InnerTube/search/recommendation memory caches) - Protected: Admin Only
     server.post('/flush-cache', {
         preHandler: [server.authenticate, server.authorize(['ADMIN'])],
     }, async (request, reply) => {
         try {
             const { flushAllCaches } = await import('../utils/cache.js');
+            const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            const { RecommendationsService } = await import('../services/recommendations.service.js');
+            const { clearSearchCache } = await import('./search.routes.js');
             const result = await flushAllCaches();
-            server.log.info('[Utils] All cache DBs flushed cleanly by admin.');
+            ExternalMetadataService.clearInnerTubeCaches();
+            RecommendationsService.clearSessionTasteCache();
+            clearSearchCache();
+            server.log.info('[Utils] All cache DBs & runtime caches flushed cleanly by admin.');
             return reply.send({ success: true, message: 'All cache DBs flushed cleanly.', result });
         } catch (err: any) {
             server.log.error(`flush-cache error: ${err.message}`);
@@ -1967,40 +1973,61 @@ export async function utilsRoutes(server: FastifyInstance) {
         }
     });
 
-    // Reset catalog data (Tracks, Albums, Artists, Lyrics, Caches) while strictly preserving Users
+    // Reset catalog data (Tracks, Albums, Artists, Recommendations, Activity, Caches) while strictly preserving Users
     server.post('/reset-catalog-data', {
         preHandler: [server.authenticate, server.authorize(['ADMIN'])],
     }, async (request, reply) => {
         try {
             const { prisma } = await import('../utils/prisma.js');
             const { flushAllCaches } = await import('../utils/cache.js');
+            const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+            const { RecommendationsService } = await import('../services/recommendations.service.js');
+            const { clearSearchCache } = await import('./search.routes.js');
 
-            server.log.info('[Maintenance] Beginning catalog reset (preserving users)...');
+            server.log.info('[Maintenance] Beginning catalog & recommendation reset (preserving user accounts)...');
 
-            // 1. Delete dependent records
+            // 1. Delete dependent activity, recommendation profiles, likes, history & caches
             await prisma.lyricEnrichmentJob.deleteMany({}).catch(() => {});
             await prisma.trackVibeProfile.deleteMany({}).catch(() => {});
             await prisma.trackAnalytics.deleteMany({}).catch(() => {});
+            await prisma.listeningEventArtist.deleteMany({}).catch(() => {});
+            await prisma.listeningEvent.deleteMany({}).catch(() => {});
+            await prisma.listenEvent.deleteMany({}).catch(() => {});
+            await prisma.userActivityEvent.deleteMany({}).catch(() => {});
+            await prisma.userInterestProfile.deleteMany({}).catch(() => {});
+            await prisma.userAffinity.deleteMany({}).catch(() => {});
+            await prisma.userDailyStat.deleteMany({}).catch(() => {});
+            await prisma.userArtistStat.deleteMany({}).catch(() => {});
+            await prisma.userHourlyStat.deleteMany({}).catch(() => {});
+            await prisma.replaySnapshot.deleteMany({}).catch(() => {});
+            await prisma.blendSnapshot.deleteMany({}).catch(() => {});
+            await prisma.blendSession.deleteMany({}).catch(() => {});
+            await prisma.artistFollow.deleteMany({}).catch(() => {});
+            await prisma.artistRelease.deleteMany({}).catch(() => {});
             await prisma.playlistTrack.deleteMany({}).catch(() => {});
+            await prisma.playlist.deleteMany({}).catch(() => {});
             await prisma.like.deleteMany({}).catch(() => {});
             await prisma.rating.deleteMany({}).catch(() => {});
             await prisma.userTrackStat.deleteMany({}).catch(() => {});
             await prisma.history.deleteMany({}).catch(() => {});
             await prisma.purchase.deleteMany({}).catch(() => {});
             await prisma.featuredContent.deleteMany({}).catch(() => {});
+            await prisma.providerCache.deleteMany({}).catch(() => {});
+            await prisma.trackArtist.deleteMany({}).catch(() => {});
 
-            // 2. Delete Tracks & Lyrics
+            // 2. Delete Tracks & Albums
             const deletedTracks = await prisma.track.deleteMany({});
-
-            // 3. Delete Albums
             const deletedAlbums = await prisma.album.deleteMany({});
 
-            // 4. Delete Artist Aliases & Artists
+            // 3. Delete Artist Aliases & Artists
             await prisma.artistAlias.deleteMany({}).catch(() => {});
             const deletedArtists = await prisma.artist.deleteMany({});
 
-            // 5. Flush All Caches
+            // 4. Flush All Runtime & Redis Caches
             await flushAllCaches();
+            ExternalMetadataService.clearInnerTubeCaches();
+            RecommendationsService.clearSessionTasteCache();
+            clearSearchCache();
 
             const usersCount = await prisma.user.count();
             const tracksCount = await prisma.track.count();

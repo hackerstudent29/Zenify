@@ -19,7 +19,6 @@ import 'services/settings_service.dart';
 import 'services/cache_migration.dart';
 import 'services/library_store.dart';
 import 'services/zenify_audio_handler.dart';
-import 'views/room_together/voice/voice_controller.dart';
 import 'views/shell_screen.dart';
 import 'views/splash/zenify_splash_screen.dart';
 
@@ -124,7 +123,6 @@ class ZenifyMobileApp extends StatelessWidget {
         ChangeNotifierProvider<PlayerState>.value(value: player),
         ChangeNotifierProvider<QueueState>.value(value: queue),
         ChangeNotifierProvider<TogetherService>.value(value: together),
-        ChangeNotifierProvider<VoiceController>.value(value: VoiceController.instance),
         ChangeNotifierProvider(create: (_) => AuthState()),
         ChangeNotifierProvider<SettingsState>.value(value: SettingsState.instance),
         ChangeNotifierProvider<IslandNotifier>.value(value: IslandNotifier.instance),

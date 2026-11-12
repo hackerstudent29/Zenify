@@ -44,7 +44,7 @@ Off-topic chat, random thoughts
 
 - Be kind and respectful (see [CODE_OF_CONDUCT.md](https://github.com/hackerstudent29/Zenify/blob/main/CODE_OF_CONDUCT.md))
 - Search before posting (avoid duplicates)
-- Include version number (e.g., "Zenify v1.0.8")
+- Include version number (e.g., "Zenify v1.0.9")
 - For bugs: include browser, OS, and error message
 - Use code blocks for code snippets ` ``` `
 

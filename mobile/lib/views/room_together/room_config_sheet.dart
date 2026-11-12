@@ -277,7 +277,6 @@ class _ConfigBodyState extends State<_ConfigBody> {
         ]),
         GroupedSection(title: 'Who can…', children: [
           for (final p in RoomPermission.values) AppleRow(leading: IconTile(p.icon, size: 28), title: p.label, trailing: Text(_thresholdLabel(_c.permissions[p]!), style: AT.subhead)),
-          AppleRow(leading: const IconTile(CupertinoIcons.mic_fill, size: 28, color: AT.green), title: 'Speak on voice', trailing: Text(_c.speakPolicy.label, style: AT.subhead)),
         ]),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
@@ -311,7 +310,7 @@ class _Chip extends StatelessWidget {
       );
 }
 
-/// Permission thresholds + voice policy. Used by creation sheet and by host's live "Room settings".
+/// Permission thresholds. Used by creation sheet and by host's live "Room settings".
 /// When [readOnly], rows show current values without pickers.
 class PermissionEditor extends StatelessWidget {
   const PermissionEditor({super.key, required this.config, required this.onChanged, this.readOnly = false});
@@ -347,27 +346,6 @@ class PermissionEditor extends StatelessWidget {
                       }
                     },
             ),
-        ],
-      ),
-      GroupedSection(
-        title: 'Voice',
-        footer: config.speakPolicy == SpeakPolicy.selected ? 'Pick who can speak from the People list once the room is live.' : null,
-        children: [
-          AppleRow(
-            leading: const IconTile(CupertinoIcons.mic_fill, size: 28, color: AT.green),
-            title: 'Who can speak',
-            trailing: Text(config.speakPolicy.label, style: AT.subhead),
-            chevron: !readOnly,
-            onTap: readOnly
-                ? null
-                : () async {
-                    final r = await appleActionSheet<SpeakPolicy>(context, title: 'Who can speak', options: [for (final s in SpeakPolicy.values) (s.label, s, destructive: false)]);
-                    if (r != null) {
-                      config.speakPolicy = r;
-                      onChanged();
-                    }
-                  },
-          ),
         ],
       ),
     ]);

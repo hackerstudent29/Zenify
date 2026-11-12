@@ -29,6 +29,8 @@ class EmailOtpSheet extends StatefulWidget {
 
 class _EmailOtpSheetState extends State<EmailOtpSheet>
     with TickerProviderStateMixin, HideDocksMixin {
+  @override
+  bool get hideMiniPlayerWhileActive => true;
   int _step = 0; // 0 = email, 1 = otp
   int _dir = 1;
 

@@ -69,16 +69,23 @@ object YtDataSource {
             .setUpstreamDataSourceFactory(defaultFactory)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
-        // 4. ResolvingDataSource: turns zenify://media/$id into signed googlevideo URLs
+        // 4. ResolvingDataSource: turns zenify://media/$id & zenify://video/$id into signed googlevideo URLs
         val resolvingFactory = ResolvingDataSource.Factory(cacheFactory) { dataSpec ->
             val uri = dataSpec.uri
             if (uri.scheme == "zenify") {
+                val isVideoUri = uri.host == "video"
+                val wantVideo = isVideoUri || uri.getQueryParameter("v") == "1"
                 val videoId = uri.lastPathSegment ?: uri.host ?: error("Invalid zenify URI: $uri")
-                val resolved = runBlocking { YtEngine.resolve(videoId) }
+                val resolved = runBlocking { YtEngine.resolve(videoId, wantVideo = wantVideo) }
                 onResolved?.invoke(videoId, resolved)
+                val targetUrl = if (isVideoUri && !resolved.videoUrl.isNullOrBlank()) {
+                    resolved.videoUrl
+                } else {
+                    resolved.url
+                }
                 val headers = StreamHeaders.forClient(resolved.client)
                 dataSpec.buildUpon()
-                    .setUri(Uri.parse(resolved.url))
+                    .setUri(Uri.parse(targetUrl))
                     .setHttpRequestHeaders(headers)
                     .setCustomData(videoId)
                     .build()
@@ -96,7 +103,7 @@ object YtDataSource {
         return RefusedRetryDataSource.Factory(resolvingFactory) { videoId, failedUrl ->
             val denial = DenialClassifier.classify(failedUrl ?: "")
             Log.w(TAG, "Stream denied: $denial for videoId=$videoId")
-            val cached = YtEngine.urlCache[videoId]
+            val cached = YtEngine.urlCache["$videoId#video"] ?: YtEngine.urlCache[videoId]
             val client = cached?.client ?: "UNKNOWN"
             YtEngine.markClientFailed(videoId, client)
         }

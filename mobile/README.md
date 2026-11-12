@@ -92,9 +92,9 @@ mobile/
 | Attribute | Specification |
 |---|---|
 | **Package ID** | `com.zenify.mobile` |
-| **Version** | `1.0.8+12` |
-| **ARM64 Split APK** | `46.2 MB` (`48,425,457` bytes) — SHA-256: `830ECF4974057D5AC4B83E05AF55C0BED3D1AAE915109844095875B6079FC1D7` |
-| **Universal APK** | `112.5 MB` (`117,980,091` bytes) — SHA-256: `D536EEEF7914E7649AED3C625243AB13522151E78C13D096DF2D878F57991622` |
+| **Version** | `1.0.9+13` |
+| **ARM64 Split APK** | `33.2 MB` (`34,861,190` bytes) — SHA-256: `E0B2DFE50F934BB6E20B639F35F68D4579503D980BAF1801BE481F386E1B20BC` |
+| **Universal APK** | `75.6 MB` (`79,261,404` bytes) — SHA-256: `3AD8A6A39C757F05661D58A79683B7A70C110BE3C2896744BBE728A0486BF825` |
 | **Min SDK** | `Android 8.0 (API 26)` |
 | **Target SDK** | `Android 15 (API 35)` |
 | **Engine** | `Flutter / Dart (SDK ^3.10)` |

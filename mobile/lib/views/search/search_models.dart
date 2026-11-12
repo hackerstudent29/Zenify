@@ -345,6 +345,43 @@ class SearchVideoItem extends SearchItem {
   final String durationText;
   final int views;
 
+  Track toTrack() {
+    final cleanId = (videoId != null && videoId!.trim().isNotEmpty)
+        ? videoId!.trim()
+        : id.replaceFirst('yt-', '').trim();
+    final trackId = cleanId.startsWith('yt-') ? cleanId : 'yt-$cleanId';
+    final artistName = (channel != null && channel!.trim().isNotEmpty)
+        ? channel!.trim()
+        : (subtitle.isNotEmpty ? subtitle : 'YouTube');
+    return Track(
+      id: trackId,
+      title: title,
+      artist: artistName,
+      album: 'Video',
+      coverUrl: thumbnailUrlHiRes.isNotEmpty ? thumbnailUrlHiRes : thumbnailUrl,
+      durationSeconds: _parseDurationSeconds(durationText),
+      language: Track.detectLanguage(title, artistName, '') ?? '',
+      source: 'youtube',
+      isVideo: true,
+    );
+  }
+
+  static int _parseDurationSeconds(String raw) {
+    final parts = raw.trim().split(':');
+    if (parts.length == 2) {
+      final m = int.tryParse(parts[0]) ?? 0;
+      final s = int.tryParse(parts[1]) ?? 0;
+      return m * 60 + s;
+    }
+    if (parts.length == 3) {
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts[1]) ?? 0;
+      final s = int.tryParse(parts[2]) ?? 0;
+      return h * 3600 + m * 60 + s;
+    }
+    return 0;
+  }
+
   @override
   SearchVideoItem copyWithScore(double score) {
     return SearchVideoItem(

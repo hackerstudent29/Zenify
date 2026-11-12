@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/datasources/catalog_datasource.dart';
 import '../design_system/widgets/dynamic_island_header.dart';
 import '../models/track.dart';
+import '../utils/media_normalizer.dart';
 
 /* ------------------------------------------------------------------ */
 /*  Storage                                                             */
@@ -191,7 +192,10 @@ class LibraryStore extends ChangeNotifier {
             for (final item in (j['artists'] as List)) {
               if (item is Map) {
                 final name = (item['name'] as String? ?? '').trim();
-                final cover = (item['cover'] as String? ?? '').trim();
+                final cover = MediaNormalizer.upgradeArtworkUrl(
+                  (item['cover'] as String? ?? '').trim(),
+                  isArtistAvatar: true,
+                );
                 if (name.isNotEmpty) {
                   _artists.add(FollowedArtist(name, cover));
                 }
@@ -206,7 +210,9 @@ class LibraryStore extends ChangeNotifier {
               if (item is Map) {
                 final title = (item['title'] as String? ?? '').trim();
                 final artist = (item['artist'] as String? ?? '').trim();
-                final cover = (item['cover'] as String? ?? '').trim();
+                final cover = MediaNormalizer.upgradeArtworkUrl(
+                  (item['cover'] as String? ?? '').trim(),
+                );
                 if (title.isNotEmpty) {
                   _albums.add(SavedAlbum(title, artist, cover));
                 }

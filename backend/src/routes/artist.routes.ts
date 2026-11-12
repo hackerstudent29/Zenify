@@ -3,6 +3,7 @@ import { prisma } from '../utils/prisma';
 import { ArtistController } from '../controllers/artist.controller';
 import { cleanArtistNames, isFakeOrNumericArtistName, CANONICAL_ARTISTS, getCanonicalArtist } from '../utils/artist.js';
 import { CleanCdnAudioService } from '../services/clean-cdn-audio.service.js';
+import { upgradeInnerTubeArtwork } from '../utils/innertube-artwork';
 
 export async function artistRoutes(server: FastifyInstance) {
     const artistController = new ArtistController(server);
@@ -1217,7 +1218,8 @@ export async function artistRoutes(server: FastifyInstance) {
 
                     if (!existingTitles.has(cleanTitle.toLowerCase())) {
                         existingTitles.add(cleanTitle.toLowerCase());
-                        const vThumb = yt.thumbnail || `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`;
+                        const vThumb = upgradeInnerTubeArtwork(yt.thumbnail, { videoId: vId, kind: 'song' })
+                            || `https://i.ytimg.com/vi/${vId}/maxresdefault.jpg`;
                         finalTopTracks.push({
                             id: `yt-${vId}`,
                             title: cleanTitle,

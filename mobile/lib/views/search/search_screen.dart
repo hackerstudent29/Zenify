@@ -27,6 +27,7 @@ import '../../services/player_state.dart';
 import '../../services/search_nav.dart';
 import '../details/album_screen.dart';
 import '../details/artist_screen.dart';
+import '../player/player_shell.dart';
 import 'search_data_service.dart';
 import 'search_models.dart';
 
@@ -542,12 +543,16 @@ class _SearchScreenState extends State<SearchScreen>
 
   void _startRadio(SearchTopResult top) {
     HapticFeedback.mediumImpact();
-    if (_searchResults.songs.isNotEmpty) {
-      _playSong(_searchResults.songs.map((s) => s.toTrack()).toList(), 0);
-      return;
-    }
     if (top.item is SearchSongItem) {
       _playSong([(top.item as SearchSongItem).toTrack()], 0);
+      return;
+    }
+    if (top.item is SearchVideoItem) {
+      _handleItemTap(top.item);
+      return;
+    }
+    if (_searchResults.songs.isNotEmpty) {
+      _playSong([_searchResults.songs.first.toTrack()], 0);
       return;
     }
     _submitSearch('${top.title} songs', filter: SearchFilter.songs);
@@ -558,14 +563,9 @@ class _SearchScreenState extends State<SearchScreen>
     final hiRes = _hiResUrl(item);
 
     if (item is SearchSongItem) {
-      final list = _searchResults.songs.map((s) => s.toTrack()).toList();
-      final track = item.toTrack();
-      final idx = list.indexWhere((t) => t.id == track.id);
-      if (idx >= 0) {
-        _playSong(list, idx);
-      } else {
-        _playSong([track, ...list], 0);
-      }
+      // Seed playback strictly with the chosen song so Smart Queue builds
+      // related recommendations around this track instead of unrelated search hits.
+      _playSong([item.toTrack()], 0);
       return;
     }
 
@@ -616,16 +616,8 @@ class _SearchScreenState extends State<SearchScreen>
     }
 
     if (item is SearchVideoItem) {
-      final t = Track(
-        id: item.videoId != null ? 'yt-${item.videoId}' : item.id,
-        title: item.title,
-        artist: (item.channel?.isNotEmpty ?? false) ? item.channel! : 'YouTube',
-        album: 'Video',
-        coverUrl: hiRes,
-        durationSeconds: _parseDurationSeconds(item.durationText),
-        source: 'youtube',
-      );
-      _playSong([t], 0);
+      _playSong([item.toTrack()], 0);
+      PlayerShell.requestOpen();
     }
   }
 
@@ -633,22 +625,6 @@ class _SearchScreenState extends State<SearchScreen>
     return item.thumbnailUrlHiRes.isNotEmpty
         ? item.thumbnailUrlHiRes
         : item.thumbnailUrl;
-  }
-
-  int _parseDurationSeconds(String raw) {
-    final parts = raw.trim().split(':');
-    if (parts.length == 2) {
-      final m = int.tryParse(parts[0]) ?? 0;
-      final s = int.tryParse(parts[1]) ?? 0;
-      return m * 60 + s;
-    }
-    if (parts.length == 3) {
-      final h = int.tryParse(parts[0]) ?? 0;
-      final m = int.tryParse(parts[1]) ?? 0;
-      final s = int.tryParse(parts[2]) ?? 0;
-      return h * 3600 + m * 60 + s;
-    }
-    return 210;
   }
 
   bool _isTrackActive(Track track, String? activeTrackId) {
@@ -825,7 +801,7 @@ class _SearchScreenState extends State<SearchScreen>
               isDense: true,
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
-              hintText: 'Artists, Songs, Lyrics, and More',
+              hintText: 'Artists, Songs, Lyrics & Videos',
               hintStyle: _bodyStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -895,18 +871,18 @@ class _SearchScreenState extends State<SearchScreen>
                 _focusNode.requestFocus();
               },
               child: AppleGlass(
-                borderRadius: BorderRadius.circular(14),
-                blur: 10,
-                tint: const Color(0x181C1C20),
+                borderRadius: BorderRadius.circular(16),
+                blur: 14,
+                tint: const Color(0x201E1E24),
                 shadow: false,
                 child: Container(
-                  height: 44,
+                  height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.10),
-                      width: 0.6,
+                      color: Colors.white.withValues(alpha: 0.12),
+                      width: 0.7,
                     ),
                   ),
                   child: Row(
@@ -919,7 +895,7 @@ class _SearchScreenState extends State<SearchScreen>
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Artists, Songs, Lyrics, and More',
+                          'Artists, Songs, Lyrics & Videos',
                           style: _bodyStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w500,
@@ -927,6 +903,35 @@ class _SearchScreenState extends State<SearchScreen>
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              CupertinoIcons.sparkles,
+                              size: 11,
+                              color: AppColors.accent,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Apple Music',
+                              style: _bodyStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -1034,26 +1039,24 @@ class _SearchScreenState extends State<SearchScreen>
           },
         ),
 
-        // B. Trending Searches (Stadium Pills)
+        // B. Trending Searches (Sleek Horizontal Strip)
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(title: 'Trending Searches'),
+          child: SectionHeader(title: 'Trending Now'),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            _kCarouselEdge,
-            2,
-            _kCarouselEdge,
-            24,
-          ),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 9,
-            children: List.generate(_kTrendingPills.length, (i) {
+        SizedBox(
+          height: 44,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
+            itemCount: _kTrendingPills.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, i) {
               final pill = _kTrendingPills[i];
               return SpringIn(
-                delayMs: 22 * i,
-                rise: 12,
+                delayMs: 20 * i,
+                rise: 10,
                 child: PressableScale(
                   scale: 0.95,
                   onTap: () {
@@ -1066,10 +1069,10 @@ class _SearchScreenState extends State<SearchScreen>
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(26),
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.10),
+                        color: Colors.white.withValues(alpha: 0.11),
                         width: 0.6,
                       ),
                     ),
@@ -1077,7 +1080,7 @@ class _SearchScreenState extends State<SearchScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
-                          CupertinoIcons.flame_fill,
+                          CupertinoIcons.arrow_up_right,
                           size: 13,
                           color: AppColors.accent,
                         ),
@@ -1095,11 +1098,12 @@ class _SearchScreenState extends State<SearchScreen>
                   ),
                 ),
               );
-            }),
+            },
           ),
         ),
+        const SizedBox(height: 20),
 
-        // C. Browse Categories (2-Column Apple Music Genre Grid)
+        // C. Browse Categories (2-Column Editorial Apple Music Genre Grid)
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 4),
           child: SectionHeader(title: 'Browse Categories'),
@@ -1119,13 +1123,13 @@ class _SearchScreenState extends State<SearchScreen>
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 2.15,
+              childAspectRatio: 1.78,
             ),
             itemBuilder: (context, i) {
               final cat = _kSearchCategories[i];
               return SpringIn(
-                delayMs: (i % 6) * 28,
-                rise: 18,
+                delayMs: (i % 6) * 26,
+                rise: 16,
                 child: _BrowseCategoryTile(
                   spec: cat,
                   onTap: () {
@@ -1665,8 +1669,11 @@ class _SearchScreenState extends State<SearchScreen>
 
   Widget _buildTopResultSection(SearchTopResult top) {
     final isArtist = top.type == SearchItemType.artist;
-    final isSong = top.item is SearchSongItem;
-    final songTrack = isSong ? (top.item as SearchSongItem).toTrack() : null;
+    final songTrack = top.item is SearchSongItem
+        ? (top.item as SearchSongItem).toTrack()
+        : (top.item is SearchVideoItem
+            ? (top.item as SearchVideoItem).toTrack()
+            : null);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1932,11 +1939,12 @@ class _SearchScreenState extends State<SearchScreen>
                   if (songTrack != null &&
                       _isTrackActive(songTrack, active.id)) {
                     context.read<PlayerState>().togglePlay();
-                  } else if (top.item is SearchSongItem) {
+                  } else if (top.item is SearchSongItem ||
+                      top.item is SearchVideoItem) {
                     _handleItemTap(top.item);
                   } else if (_searchResults.songs.isNotEmpty) {
                     _playSong(
-                      _searchResults.songs.map((s) => s.toTrack()).toList(),
+                      [_searchResults.songs.first.toTrack()],
                       0,
                     );
                   } else {
@@ -2132,7 +2140,7 @@ class _SearchScreenState extends State<SearchScreen>
                           isPlaying: isActive && active.playing,
                           onTap: () {
                             HapticFeedback.lightImpact();
-                            _playSong(allTracks, i);
+                            _playSong([track], 0);
                           },
                           onTrailingTap: () {
                             HapticFeedback.lightImpact();
@@ -2392,7 +2400,7 @@ class _SearchScreenState extends State<SearchScreen>
                       isPlaying: isActive && active.playing,
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        _playSong(tracks, i);
+                        _playSong([track], 0);
                       },
                       onTrailingTap: () {
                         HapticFeedback.lightImpact();
@@ -2663,47 +2671,13 @@ class _SearchScreenState extends State<SearchScreen>
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Row(
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Stack(
-                          children: [
-                            SizedBox(
-                              width: 132,
-                              height: 74,
-                              child: img.isNotEmpty
-                                  ? CachedNetworkImage(
-                                      imageUrl: img,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (_, _, _) =>
-                                          Container(color: AppColors.surface),
-                                    )
-                                  : Container(color: AppColors.surface),
-                            ),
-                            if (video.durationText.isNotEmpty)
-                              Positioned(
-                                right: 6,
-                                bottom: 6,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.78),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    video.durationText,
-                                    style: _bodyStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
+                      _VideoThumbBox(
+                        video: video,
+                        imageUrl: img,
+                        width: 140,
+                        height: 78,
+                        borderRadius: 12,
+                        badgeFontSize: 10,
                       ),
                       const SizedBox(width: 13),
                       Expanded(
@@ -3060,7 +3034,7 @@ class _BrowseCategoryTile extends StatelessWidget {
       scale: 0.96,
       onTap: onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -3072,33 +3046,59 @@ class _BrowseCategoryTile extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.14),
               width: 0.6,
             ),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Stack(
             children: [
               Positioned(
-                right: -10,
-                bottom: -10,
-                child: Transform.rotate(
-                  angle: -0.28,
-                  child: Icon(
-                    spec.icon,
-                    size: 62,
-                    color: Colors.white.withValues(alpha: 0.18),
+                right: -18,
+                top: -18,
+                child: Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.22),
+                        Colors.white.withValues(alpha: 0.0),
+                      ],
+                    ),
                   ),
                 ),
               ),
               Positioned(
-                left: 13,
-                right: 26,
-                bottom: 11,
+                right: 12,
+                top: 12,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.20),
+                      width: 0.6,
+                    ),
+                  ),
+                  child: Icon(
+                    spec.icon,
+                    size: 15,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 12,
                 child: Text(
                   spec.title,
                   style: _displayStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
-                    height: 1.1,
+                    height: 1.12,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -3113,8 +3113,148 @@ class _BrowseCategoryTile extends StatelessWidget {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Video Carousel Card
+// Video Carousel Card & Shared Thumbnail Overlay
 // ═════════════════════════════════════════════════════════════════════════════
+
+class _VideoThumbBox extends StatelessWidget {
+  const _VideoThumbBox({
+    required this.video,
+    required this.imageUrl,
+    required this.width,
+    required this.height,
+    this.borderRadius = 14,
+    this.badgeFontSize = 11,
+  });
+
+  final SearchVideoItem video;
+  final String imageUrl;
+  final double width;
+  final double height;
+  final double borderRadius;
+  final double badgeFontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final cleanVid =
+        (video.videoId != null && video.videoId!.isNotEmpty)
+            ? video.videoId!
+            : video.id.replaceFirst('yt-', '');
+    final ytPrefixed = cleanVid.startsWith('yt-') ? cleanVid : 'yt-$cleanVid';
+
+    return Selector<PlayerState, ({String? id, bool playing})>(
+      selector: (_, p) => (id: p.currentTrack?.id, playing: p.isPlaying),
+      builder: (context, active, _) {
+        final isActive = active.id == cleanVid || active.id == ytPrefixed;
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(borderRadius),
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, _, _) =>
+                            Container(color: AppColors.surface),
+                      )
+                    : Container(color: AppColors.surface),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0x28000000),
+                        Colors.transparent,
+                        Color(0x66000000),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.play_fill,
+                          size: 9,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'VIDEO',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (isActive)
+                  ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    child: Center(
+                      child: EqualizerBars(
+                        color: AppColors.accent,
+                        size: 20,
+                        isPlaying: active.playing,
+                      ),
+                    ),
+                  ),
+                if (video.durationText.isNotEmpty)
+                  Positioned(
+                    right: 7,
+                    bottom: 7,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.78),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        video.durationText,
+                        style: _bodyStyle(
+                          fontSize: badgeFontSize,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
 class _VideoCarouselCard extends StatelessWidget {
   const _VideoCarouselCard({
@@ -3144,47 +3284,12 @@ class _VideoCarouselCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Stack(
-                children: [
-                  SizedBox(
-                    width: 256,
-                    height: 144,
-                    child: imageUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            fit: BoxFit.cover,
-                            errorWidget: (_, _, _) =>
-                                Container(color: AppColors.surface),
-                          )
-                        : Container(color: AppColors.surface),
-                  ),
-                  if (video.durationText.isNotEmpty)
-                    Positioned(
-                      right: 8,
-                      bottom: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.78),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          video.durationText,
-                          style: _bodyStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+            _VideoThumbBox(
+              video: video,
+              imageUrl: imageUrl,
+              width: 256,
+              height: 144,
+              borderRadius: 14,
             ),
             const SizedBox(height: 8),
             Text(

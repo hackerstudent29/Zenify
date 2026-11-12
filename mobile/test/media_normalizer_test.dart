@@ -45,14 +45,29 @@ void main() {
       expect(MediaNormalizer.cleanTitle(null), 'Unknown Title');
     });
 
-    test('upgrades low-res image URLs and falls back on broken URLs', () {
+    test('upgrades low-res image URLs to HD 1200x1200, maxresdefault, avatars, and banners', () {
       expect(
         MediaNormalizer.upgradeArtworkUrl('https://lh3.googleusercontent.com/abc=s120'),
-        contains('=w500-h500-l90-rj'),
+        contains('=w1200-h1200-l90-rj'),
       );
       expect(
-        MediaNormalizer.upgradeArtworkUrl('https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg'),
-        'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+        MediaNormalizer.upgradeArtworkUrl(
+          'https://lh3.googleusercontent.com/abc=s120',
+          isArtistAvatar: true,
+        ),
+        contains('=w1200-h1200-p-l90-rj'),
+      );
+      expect(
+        MediaNormalizer.upgradeBannerUrl('https://lh3.googleusercontent.com/abc=w2880-h1200-p-l90-rj'),
+        'https://lh3.googleusercontent.com/abc=w2880-h1200-p-l90-rj',
+      );
+      expect(
+        MediaNormalizer.upgradeBannerUrl('https://lh3.googleusercontent.com/abc=w544-h226-l90-rj'),
+        'https://lh3.googleusercontent.com/abc=w1920-h1080-p-l90-rj',
+      );
+      expect(
+        MediaNormalizer.upgradeArtworkUrl('https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg?sqp=123'),
+        'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
       );
       // Broken dummy url fallback
       expect(
@@ -83,7 +98,7 @@ void main() {
       expect(item.title, 'Banjaare');
       expect(item.subtitle, 'Atif Aslam & Shiraz Uppal');
       expect(item.year, '2024');
-      expect(item.imageUrl, 'https://i.ytimg.com/vi/xyz/hqdefault.jpg');
+      expect(item.imageUrl, 'https://i.ytimg.com/vi/xyz/maxresdefault.jpg');
     });
   });
 }

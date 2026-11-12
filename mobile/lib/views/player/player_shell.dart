@@ -34,18 +34,29 @@ const double _kMiniArt = 40;
 /// Lyrics open + no touch for this long → the bottom controls glide away.
 const Duration _kIdleHide = Duration(seconds: 5);
 
-/// ζ ≈ 1.0 → fluid, no overshoot. For a slower feel: stiffness 180, damping 27.
+/// Cover docking spring (art <-> header). Critically damped (2*sqrt(k) ≈ 45.6):
+/// no bounce, settles in roughly a quarter of a second.
 const SpringDescription _kDockSpring = SpringDescription(
   mass: 1,
-  stiffness: 220,
-  damping: 30,
+  stiffness: 520,
+  damping: 46,
 );
 
-/// Heavy lyrics/queue body mounts when the cover is almost docked.
-const Duration _kMountDelay = Duration(milliseconds: 200);
+/// Sheet close spring. Stiff + critically damped so closing feels instant
+/// and never lingers at the end.
+const SpringDescription _kCloseSpring = SpringDescription(
+  mass: 1,
+  stiffness: 520,
+  damping: 46,
+);
 
-/// Spring-shaped easing for lyrics / queue content arriving.
-const SpringCurve _kPanelIn = SpringCurve(kSnappySpring, 0.5);
+/// Heavy lyrics/queue body mounts almost immediately after the cover starts
+/// flying to the header.
+const Duration _kMountDelay = Duration(milliseconds: 70);
+
+/// The mini player pill (text, buttons, glass) is fully gone once the sheet
+/// is this far open; only the artwork remains visible.
+const double _kMiniFadeSpan = 0.22;
 
 enum _Axis { none, x, y }
 
@@ -60,9 +71,7 @@ enum _Panel { art, lyrics, queue }
 ///  • `_sheet`  0 = docked mini, 1 = fully open. Drives the sheet slide, the
 ///    corner radius, the mini fade AND the artwork morph.
 ///  • `_dock`   0 = big artwork, 1 = artwork docked top-left in the header.
-///    Drives the lyrics / queue transitions (header grows in, title row
-///    collapses, the cover flies to the header). Critically damped: no bounce.
-///    Tapping the docked cover glides it back to the centre.
+///    Drives the lyrics / queue transitions. Critically damped: no bounce.
 ///  • `_chrome` 0 = bottom controls shown, 1 = hidden. Lyrics open and idle for
 ///    5 s → 1. Any touch → 0.
 ///  • ONE artwork widget lives in an overlay, laid out once at the big size and
@@ -70,6 +79,13 @@ enum _Panel { art, lyrics, queue }
 ///    per-frame relayout.
 class PlayerShell extends StatefulWidget {
   static final ValueNotifier<bool> isPlayerOpenNotifier = ValueNotifier<bool>(false);
+  static final ValueNotifier<int> openRequestNotifier = ValueNotifier<int>(0);
+
+  /// Requests any mounted [PlayerShell] to expand smoothly to the full-screen
+  /// Now Playing sheet (e.g., when the user taps a YouTube video card).
+  static void requestOpen() {
+    openRequestNotifier.value++;
+  }
 
   const PlayerShell({
     super.key,
@@ -188,6 +204,7 @@ class PlayerShellState extends State<PlayerShell>
   // values picked with context.select in build() so the shell only rebuilds
   // when something it actually shows changes (not on every PlayerState tick)
   bool _playing = false;
+  bool _isVideo = false;
   bool _shuffle = false;
   ZenifyRepeatMode _repeat = ZenifyRepeatMode.off;
   dynamic _duration;
@@ -200,7 +217,23 @@ class PlayerShellState extends State<PlayerShell>
   bool _artDragging = false;
 
   @override
+  void initState() {
+    super.initState();
+    PlayerShell.openRequestNotifier.addListener(_onOpenRequested);
+  }
+
+  void _onOpenRequested() {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !isOpen) {
+        _openSheet();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    PlayerShell.openRequestNotifier.removeListener(_onOpenRequested);
     _idleTimer?.cancel();
     _mountTimer?.cancel();
     _prevPulse.dispose();
@@ -332,7 +365,7 @@ class PlayerShellState extends State<PlayerShell>
     if (!_open && _sheet.value <= 0.001) return;
     _idleTimer?.cancel();
     _mountTimer?.cancel();
-    _sheet.springTo(0, spring: kSheetSpring, velocity: velocity).then((_) {
+    _sheet.springTo(0, spring: _kCloseSpring, velocity: velocity).then((_) {
       PlayerShell.isPlayerOpenNotifier.value = false;
       if (!mounted) return;
       _dock.value = 0;
@@ -371,10 +404,12 @@ class PlayerShellState extends State<PlayerShell>
         vt > 0.06 ||
         (_startedClosed && (t > 0.03 || _miniAcc.dy < -18))) {
       target = true;
-    } else if (vy > 180 || vt < -0.2) {
+    } else if (vy > 120 || vt < -0.15) {
       target = false;
     } else {
-      target = t > 0.20;
+      // opening from the mini: commit after 20 %.
+      // closing from open: dismiss as soon as it is pulled below ~65 %.
+      target = _startedClosed ? t > 0.20 : t > 0.65;
     }
     target ? _openSheet(velocity: vt) : _close(velocity: vt);
   }
@@ -386,8 +421,8 @@ class PlayerShellState extends State<PlayerShell>
     HapticFeedback.selectionClick();
     _mountTimer?.cancel();
 
-    // Art → panel: let the cover glide first, mount the heavy body once the
-    // cover is almost docked. Panel ↔ panel and → art switch immediately.
+    // Art → panel: let the cover start gliding first, mount the heavy body a
+    // few ms later. Panel ↔ panel and → art switch immediately.
     final immediate = p == _Panel.art || _bodyPanel != _Panel.art;
     setState(() {
       _panel = p;
@@ -515,7 +550,7 @@ class PlayerShellState extends State<PlayerShell>
       if (_miniAxis == _Axis.y) {
         _dragStart();
         if (!_open) setState(() => _open = true);
-        _dragUpdate(_miniAcc.dy);
+        _dragUpdate(-_miniAcc.dy.abs() * (_miniAcc.dy < 0 ? -1 : 1) * 0 + _miniAcc.dy);
         return;
       }
     }
@@ -630,6 +665,7 @@ class PlayerShellState extends State<PlayerShell>
     final track = context.select<PlayerState, dynamic>((p) => p.currentTrack);
     if (track == null) return const SizedBox.shrink();
     _playing = context.select<PlayerState, bool>((p) => p.isPlaying);
+    _isVideo = context.select<PlayerState, bool>((p) => p.isCurrentVideo);
     _shuffle = context.select<PlayerState, bool>((p) => p.isShuffle);
     _repeat = context.select<PlayerState, ZenifyRepeatMode>(
       (p) => p.repeatMode,
@@ -643,7 +679,7 @@ class PlayerShellState extends State<PlayerShell>
     final mq = MediaQuery.of(context);
     final size = mq.size;
     final safe = mq.padding;
-    _travel = size.height * 0.78;
+    _travel = size.height * 0.9; // sheet follows the finger almost 1:1
     if (_open) _queueMeasure();
 
     final isExpanded = _open || _sheet.value > 0.05 || _docked;
@@ -664,7 +700,7 @@ class PlayerShellState extends State<PlayerShell>
           children: [
             _buildMini(player, track, safe),
             _buildSheet(player, track, size, safe),
-            _buildArtOverlay(track, size, safe),
+            _buildArtOverlay(player, track, size, safe),
           ],
         ),
       ),
@@ -672,6 +708,14 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   /* ───────────────────────── MINI PLAYER (Apple Music glass pill) ───────────────────────── */
+
+  /// 1 → fully visible (sheet closed), 0 → gone. Smoothstep over the first
+  /// [_kMiniFadeSpan] of the sheet's travel, so opening fades the pill out
+  /// immediately and closing fades it back in only at the very end.
+  double _miniOpacity(double t) {
+    final x = (t / _kMiniFadeSpan).clamp(0.0, 1.0);
+    return 1 - x * x * (3 - 2 * x);
+  }
 
   Widget _buildMini(PlayerState player, dynamic track, EdgeInsets safe) {
     final dp = widget.dockProgress.clamp(0.0, 1.0);
@@ -682,6 +726,110 @@ class PlayerShellState extends State<PlayerShell>
     final miniArt = lerpDouble(36.0, _kMiniArt, dp)!;
     final miniRadius = lerpDouble(26.0, 29.0, dp)!;
     final padH = lerpDouble(8.0, 9.0, dp)!;
+
+    // Stays mounted at opacity 0 (Opacity(0) skips painting), so there is no
+    // rebuild / glass re-creation hitch when it fades back in on close.
+    final pill = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _openSheet(),
+      onPanStart: _miniStart,
+      onPanUpdate: _miniUpdate,
+      onPanEnd: _miniEnd,
+      onPanCancel: () => _miniEnd(DragEndDetails()),
+      child: AppleGlass(
+        borderRadius: BorderRadius.circular(miniRadius),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(padH, 0, 4, 0),
+          child: Row(
+            children: [
+              // artwork + title/artist, swipe to skip
+              Expanded(
+                child: AnimatedBuilder(
+                  animation: _miniX,
+                  builder: (_, _) => Transform.translate(
+                    offset: Offset(_miniX.value, 0),
+                    child: Row(
+                      children: [
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.28),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              width: miniArt,
+                              height: miniArt,
+                              child: _TrackMediaView(
+                                player: player,
+                                coverUrl: (track.coverUrl as String?) ?? '',
+                                isVideo: _isVideo,
+                                videoFit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: RightEdgeFade(child: _miniText(track, dp)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              PressableScale(
+                onTap: player.togglePlay,
+                scale: 0.88,
+                child: SizedBox(
+                  width: lerpDouble(38.0, 46.0, dp)!,
+                  height: lerpDouble(38.0, 46.0, dp)!,
+                  child: _PlayGlyph(
+                    playing: _playing,
+                    size: lerpDouble(22.0, 28.0, dp)!,
+                  ),
+                ),
+              ),
+              ClipRect(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  widthFactor: dp,
+                  child: Opacity(
+                    opacity: dp,
+                    child: PressableScale(
+                      onTap: _next,
+                      scale: 0.88,
+                      child: SizedBox(
+                        width: 46,
+                        height: 46,
+                        child: Center(
+                          child: SpringPop(
+                            pulse: _nextPulse,
+                            dx: 8,
+                            scale: 0.14,
+                            child: const Icon(
+                              CupertinoIcons.forward_fill,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
 
     return Positioned(
       left: miniLeft,
@@ -697,15 +845,14 @@ class PlayerShellState extends State<PlayerShell>
           duration: const Duration(milliseconds: 200),
           child: AnimatedBuilder(
             animation: _sheet,
+            child: pill,
             builder: (_, child) {
               final t = _sheet.value.clamp(0.0, 1.0);
-              final o = (1 - t * 4).clamp(0.0, 1.0);
-              if (o <= 0.001 && !_dragging) return const SizedBox.shrink();
+              final o = _miniOpacity(t);
               return IgnorePointer(
-                ignoring:
-                    widget.hideMini || (!_dragging && _sheet.value >= 0.8),
+                ignoring: widget.hideMini || (!_dragging && t > 0.3),
                 child: Opacity(
-                  opacity: _dragging ? 1.0 : o,
+                  opacity: o,
                   child: Transform.scale(
                     scale: 1 - 0.04 * (1 - o),
                     child: child,
@@ -713,106 +860,6 @@ class PlayerShellState extends State<PlayerShell>
                 ),
               );
             },
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => _openSheet(),
-              onPanStart: _miniStart,
-              onPanUpdate: _miniUpdate,
-              onPanEnd: _miniEnd,
-              onPanCancel: () => _miniEnd(DragEndDetails()),
-              child: AppleGlass(
-                borderRadius: BorderRadius.circular(miniRadius),
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(padH, 0, 4, 0),
-                  child: Row(
-                    children: [
-                      // artwork + title/artist, swipe to skip
-                      Expanded(
-                        child: AnimatedBuilder(
-                          animation: _miniX,
-                          builder: (_, _) => Transform.translate(
-                            offset: Offset(_miniX.value, 0),
-                            child: Row(
-                              children: [
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.28,
-                                        ),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: SizedBox(
-                                      width: miniArt,
-                                      height: miniArt,
-                                      child: CoverImage(
-                                        (track.coverUrl as String?) ?? '',
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: RightEdgeFade(child: _miniText(track, dp)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      PressableScale(
-                        onTap: player.togglePlay,
-                        scale: 0.88,
-                        child: SizedBox(
-                          width: lerpDouble(38.0, 46.0, dp)!,
-                          height: lerpDouble(38.0, 46.0, dp)!,
-                          child: _PlayGlyph(
-                            playing: _playing,
-                            size: lerpDouble(22.0, 28.0, dp)!,
-                          ),
-                        ),
-                      ),
-                      ClipRect(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          widthFactor: dp,
-                          child: Opacity(
-                            opacity: dp,
-                            child: PressableScale(
-                              onTap: _next,
-                              scale: 0.88,
-                              child: SizedBox(
-                                width: 46,
-                                height: 46,
-                                child: Center(
-                                  child: SpringPop(
-                                    pulse: _nextPulse,
-                                    dx: 8,
-                                    scale: 0.14,
-                                    child: const Icon(
-                                      CupertinoIcons.forward_fill,
-                                      color: Colors.white,
-                                      size: 28,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           ),
         ),
       ),
@@ -869,12 +916,18 @@ class PlayerShellState extends State<PlayerShell>
 
   /* ───────────────────────── ARTWORK OVERLAY (the morphing cover) ───────────────────────── */
 
-  Widget _buildArtOverlay(dynamic track, Size size, EdgeInsets safe) {
+  Widget _buildArtOverlay(
+    PlayerState player,
+    dynamic track,
+    Size size,
+    EdgeInsets safe,
+  ) {
     final url = ((_shownCover?.isNotEmpty == true
             ? _shownCover
             : (track?.coverUrl as String?))) ??
         '';
-    final currentKey = ValueKey<String>('cover-$url');
+    final currentKey =
+        ValueKey<String>('cover-$url-${_isVideo ? 'v' : 'a'}');
 
     final dp = widget.dockProgress.clamp(0.0, 1.0);
     final currentMiniH = lerpDouble(52.0, _kMiniH, dp)!;
@@ -904,7 +957,7 @@ class PlayerShellState extends State<PlayerShell>
         width: side,
         height: side,
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 360),
+          duration: const Duration(milliseconds: 320),
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeIn,
           transitionBuilder: (child, anim) {
@@ -920,7 +973,15 @@ class PlayerShellState extends State<PlayerShell>
               ),
             );
           },
-          child: SizedBox.expand(key: currentKey, child: CoverImage(url)),
+          child: SizedBox.expand(
+            key: currentKey,
+            child: _TrackMediaView(
+              player: player,
+              coverUrl: url,
+              isVideo: _isVideo,
+              videoFit: BoxFit.contain,
+            ),
+          ),
         ),
       ),
     );
@@ -934,18 +995,31 @@ class PlayerShellState extends State<PlayerShell>
           if (!_open && t <= 0.001) return const SizedBox.shrink();
 
           final d = _dock.value.clamp(0.0, 1.0).toDouble(); // no overshoot
-          final rect = Rect.lerp(mini, Rect.lerp(big, docked, d)!, t)!;
+
+          // Where the cover is heading: big centre spot, or the header corner.
+          final target = Rect.lerp(big, docked, d)!;
+
+          // Diagonal flight: horizontal position + size lead (ease-out) while
+          // the vertical position follows the sheet linearly. The cover sweeps
+          // toward its destination instead of rising straight up, and the same
+          // path is retraced when closing.
+          final px = Curves.easeOutQuad.transform(t);
+          final sp = (t + px) / 2;
+          final cx = lerpDouble(mini.center.dx, target.center.dx, px)!;
+          final cy = lerpDouble(mini.center.dy, target.center.dy, t)!;
+          final rw = lerpDouble(mini.width, target.width, sp)!;
+
           final radius = lerpDouble(8, lerpDouble(12, 8, d)!, t)!;
           final pauseScale =
               (1 - (1 - _pause.value) * (1 - d) * t) * _press.value;
           final dx = _artX.value * t * (1 - d);
 
-          final w = rect.width * pauseScale;
+          final w = rw * pauseScale;
           final scale = w / side;
           final m = Matrix4.diagonal3Values(scale, scale, 1)
             ..setTranslationRaw(
-              rect.center.dx + dx - w / 2,
-              rect.center.dy - w / 2,
+              cx + dx - w / 2,
+              cy - w / 2,
               0,
             );
           final r = radius / scale; // keep visual radius constant
@@ -1060,7 +1134,9 @@ class PlayerShellState extends State<PlayerShell>
                               child: ArtworkMeshBackground(
                                 coverUrl: track?.coverUrl,
                                 fallbackAsset: 'assets/images/z_logo.png',
-                                paused: !_playing || t <= 0.05,
+                                // frozen while the sheet is moving: keeps the
+                                // open / close animation free of extra work
+                                paused: !_playing || t < 0.98,
                                 backgroundColor: _palette.isNotEmpty
                                     ? _palette.first
                                     : null,
@@ -1069,7 +1145,7 @@ class PlayerShellState extends State<PlayerShell>
                             // soft scrim keeps lyrics / queue text readable
                             IgnorePointer(
                               child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 450),
+                                duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeOutCubic,
                                 color: Colors.black.withValues(
                                   alpha: _docked ? 0.26 : 0,
@@ -1167,9 +1243,8 @@ class PlayerShellState extends State<PlayerShell>
     }
   }
 
-  /// Lyrics / queue arriving: fades in while rising ~40px and un-shrinking on a
-  /// spring (a hair after the cover starts flying to the corner, so the two
-  /// motions overlap instead of colliding). Leaving is a quick fade.
+  /// Lyrics / queue arriving: quick fade while rising ~28px. Leaving is a
+  /// very quick fade. Short and simple so nothing feels heavy.
   Widget _panelTransition(Widget c, Animation<double> anim) {
     return AnimatedBuilder(
       animation: anim,
@@ -1179,22 +1254,15 @@ class PlayerShellState extends State<PlayerShell>
         if (anim.status == AnimationStatus.reverse) {
           return Opacity(
             opacity: v.clamp(0.0, 1.0),
-            child: Transform.translate(
-              offset: Offset(0, (1 - v) * 14),
-              child: child,
-            ),
+            child: child,
           );
         }
-        final e = _kPanelIn.transform(((v - 0.08) / 0.92).clamp(0.0, 1.0));
+        final e = Curves.easeOutCubic.transform(v.clamp(0.0, 1.0));
         return Opacity(
-          opacity: Curves.easeOut.transform(v.clamp(0.0, 1.0)),
+          opacity: e,
           child: Transform.translate(
-            offset: Offset(0, (1 - e) * 40),
-            child: Transform.scale(
-              scale: 0.94 + 0.06 * e,
-              alignment: Alignment.topCenter,
-              child: child,
-            ),
+            offset: Offset(0, (1 - e) * 28),
+            child: child,
           ),
         );
       },
@@ -1304,8 +1372,8 @@ class PlayerShellState extends State<PlayerShell>
                     _dragEnd(d.velocity.pixelsPerSecond.dy),
                 onVerticalDragCancel: () => _dragEnd(0),
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 420),
-                  reverseDuration: const Duration(milliseconds: 240),
+                  duration: const Duration(milliseconds: 280),
+                  reverseDuration: const Duration(milliseconds: 160),
                   transitionBuilder: _panelTransition,
                   layoutBuilder: (cur, prev) =>
                       Stack(fit: StackFit.expand, children: [...prev, ?cur]),
@@ -1315,8 +1383,7 @@ class PlayerShellState extends State<PlayerShell>
             ),
           ),
 
-          // Bottom block: sits higher than before (bigger bottom inset) and
-          // glides away after 5 s idle while lyrics are open.
+          // Bottom block: glides away after 5 s idle while lyrics are open.
           _chromeCollapse(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -1325,7 +1392,6 @@ class PlayerShellState extends State<PlayerShell>
               onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
               onVerticalDragCancel: () => _dragEnd(0),
               child: Padding(
-                // Shift bottom row buttons slightly down for comfortable reach
                 padding: EdgeInsets.fromLTRB(24, 8, 24, safe.bottom + 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1348,11 +1414,11 @@ class PlayerShellState extends State<PlayerShell>
 
                     // transport glides away while lyrics are open
                     AnimatedSize(
-                      duration: const Duration(milliseconds: 420),
-                      curve: const SpringCurve(kSnappySpring, 0.5),
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
                       alignment: Alignment.topCenter,
                       child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 240),
+                        duration: const Duration(milliseconds: 180),
                         opacity: isLyrics ? 0 : 1,
                         child: isLyrics
                             ? const SizedBox(width: double.infinity)
@@ -1375,7 +1441,7 @@ class PlayerShellState extends State<PlayerShell>
                     ),
 
                     AnimatedPadding(
-                      duration: const Duration(milliseconds: 420),
+                      duration: const Duration(milliseconds: 300),
                       curve: Curves.easeOutCubic,
                       padding: EdgeInsets.only(top: isLyrics ? 14 : 0),
                       child: _tools(isLyrics),
@@ -1392,10 +1458,10 @@ class PlayerShellState extends State<PlayerShell>
 
   Widget _fade(bool show, Widget child) {
     return AnimatedOpacity(
-      duration: const Duration(milliseconds: 240),
+      duration: const Duration(milliseconds: 180),
       opacity: show ? 1 : 0,
       child: AnimatedScale(
-        duration: const Duration(milliseconds: 420),
+        duration: const Duration(milliseconds: 300),
         curve: const SpringCurve(kSnappySpring, 0.5),
         scale: show ? 1 : 0.7,
         child: IgnorePointer(ignoring: !show, child: child),
@@ -1729,6 +1795,66 @@ class _PlayGlyph extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Renders either album artwork or, when [isVideo] is true and native ExoPlayer
+/// has bound a video [SurfaceTexture], streams the live video frames on top
+/// with seamless poster fallback until the first decoded frame arrives.
+class _TrackMediaView extends StatelessWidget {
+  const _TrackMediaView({
+    required this.player,
+    required this.coverUrl,
+    required this.isVideo,
+    required this.videoFit,
+  });
+
+  final PlayerState player;
+  final String coverUrl;
+  final bool isVideo;
+  final BoxFit videoFit;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isVideo) {
+      return CoverImage(coverUrl);
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        CoverImage(coverUrl),
+        ValueListenableBuilder<int?>(
+          valueListenable: player.videoTextureIdNotifier,
+          builder: (_, textureId, _) {
+            if (textureId == null) return const SizedBox.shrink();
+            return ValueListenableBuilder<Size>(
+              valueListenable: player.videoSizeNotifier,
+              builder: (_, vSize, _) {
+                if (vSize.width <= 0 || vSize.height <= 0) {
+                  return const SizedBox.shrink();
+                }
+                return ColoredBox(
+                  color: const Color(0xFF0A0A0D),
+                  child: FittedBox(
+                    fit: videoFit,
+                    clipBehavior: Clip.hardEdge,
+                    child: SizedBox(
+                      width: vSize.width,
+                      height: vSize.height,
+                      child: Texture(
+                        textureId: textureId,
+                        filterQuality: FilterQuality.medium,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 }

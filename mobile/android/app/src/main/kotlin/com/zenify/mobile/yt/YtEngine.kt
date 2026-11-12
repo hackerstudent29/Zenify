@@ -47,6 +47,9 @@ object YtEngine {
         val loudnessDb: Double?,
         val title: String?,
         val artist: String?,
+        val videoUrl: String? = null,
+        val videoWidth: Int? = null,
+        val videoHeight: Int? = null,
     )
 
     private val ktorClient: HttpClient by lazy {
@@ -106,42 +109,63 @@ object YtEngine {
         return extractorInstance ?: error("YtEngine must be initialized with Context via init(context)")
     }
 
-    suspend fun resolve(videoId: String, force: Boolean = false): Resolved {
+    suspend fun resolve(
+        videoId: String,
+        force: Boolean = false,
+        wantVideo: Boolean = false,
+    ): Resolved {
+        val cacheKey = if (wantVideo) "$videoId#video" else videoId
         if (!force) {
-            urlCache[videoId]?.let { return it.toResolved() }
+            urlCache[cacheKey]?.let { cached ->
+                if (!wantVideo || !cached.videoUrl.isNullOrBlank()) {
+                    return cached.toResolved()
+                }
+            }
         }
-        val d = inflight.getOrPut(videoId) {
-            scope.async { doResolve(videoId) }
+        val d = inflight.getOrPut(cacheKey) {
+            scope.async { doResolve(videoId, wantVideo = wantVideo, cacheKey = cacheKey) }
         }
         return try {
             d.await()
         } finally {
-            inflight.remove(videoId, d)
+            inflight.remove(cacheKey, d)
         }
     }
 
-    private suspend fun doResolve(videoId: String): Resolved = withTimeout(RESOLVE_TIMEOUT_MS) {
-        val gen = urlCache.generation(videoId)
+    private suspend fun doResolve(
+        videoId: String,
+        wantVideo: Boolean = false,
+        cacheKey: String = videoId,
+    ): Resolved = withTimeout(RESOLVE_TIMEOUT_MS) {
+        val gen = urlCache.generation(cacheKey)
         val ex = excludedClients(videoId)
 
         val stream = try {
-            extract(videoId, ex, AudioQuality.HIGH)
+            extract(videoId, ex, AudioQuality.HIGH, wantVideo = wantVideo)
         } catch (e: StreamResolveException) {
             if (ex.isEmpty() || e.reason != StreamResolveException.Reason.NO_PLAYABLE_STREAM) {
                 throw e
             }
             // Retry with exclusions cleared and lower quality
-            extract(videoId, emptySet(), AudioQuality.LOW)
+            extract(videoId, emptySet(), AudioQuality.LOW, wantVideo = wantVideo)
         }
 
         check(stream.sabrBootstrap == null) { "SABR-only stream; not supported by this player yet" }
         val r = stream.toResolved()
-        urlCache.put(videoId, r, gen)
+        urlCache.put(cacheKey, r, gen)
         r
     }
 
-    private suspend fun extract(id: String, ex: Set<String>, q: AudioQuality): ExtractedStream {
-        val hints = ContentHints().withStreamCapabilities(
+    private suspend fun extract(
+        id: String,
+        ex: Set<String>,
+        q: AudioQuality,
+        wantVideo: Boolean = false,
+    ): ExtractedStream {
+        val hints = ContentHints(
+            wantVideo = wantVideo,
+            maxVideoHeight = if (wantVideo) 720 else null,
+        ).withStreamCapabilities(
             allowHls = false,
             allowSabr = false,
             allowBoundedRange = false,
@@ -172,7 +196,10 @@ object YtEngine {
             contentLength = contentLengthBytes,
             loudnessDb = loudnessDb,
             title = mediaMetadata?.title,
-            artist = mediaMetadata?.author
+            artist = mediaMetadata?.author,
+            videoUrl = videoUrl,
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
         )
     }
 
@@ -183,6 +210,7 @@ object YtEngine {
             Pair(set, System.currentTimeMillis())
         }
         urlCache.invalidate(videoId)
+        urlCache.invalidate("$videoId#video")
         scope.launch {
             try {
                 cipherService.refreshAfterStreamRejection()

@@ -2,18 +2,15 @@ import crypto from 'crypto';
 import {
   normalizeRole,
   normalizeRoomMode,
-  normalizeSpeakPolicy,
   ROLE_RANK,
   RoomHttpError,
   RoomPermission,
   RoomRole,
-  SpeakPolicy,
 } from './room-types';
 
 export interface PermissionRoomContext {
   hostId: string;
   mode: string;
-  speakPolicy: string;
   allowListenersAddQueue: boolean;
   allowListenersSkip: boolean;
   queueLocked?: boolean;
@@ -23,7 +20,6 @@ export interface PermissionRoomContext {
 export interface PermissionMemberContext {
   userId: string;
   role: string;
-  canSpeak?: boolean;
 }
 
 export class RoomPermissionService {
@@ -45,7 +41,6 @@ export class RoomPermissionService {
     const isCoHost = role === 'CO_HOST';
     const isMod = role === 'MODERATOR';
     const isDj = role === 'DJ';
-    const isSpeaker = role === 'SPEAKER';
     const isMember = role === 'MEMBER';
 
     switch (permission) {
@@ -70,7 +65,7 @@ export class RoomPermissionService {
       case 'REMOVE_QUEUE':
         if (isCoHost || isDj) return true;
         if (mode === 'collab') {
-          return isMod || isSpeaker || isMember || role === 'LISTENER';
+          return isMod || isMember || role === 'LISTENER';
         }
         return false;
 
@@ -83,40 +78,6 @@ export class RoomPermissionService {
         if (isCoHost || isMod || isDj) return true;
         return mode === 'collab' || room.allowListenersSkip;
 
-      case 'SPEAK':
-        return this.canSpeak(room, member);
-
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * Determines voice publish capability (`canPublish`) from SpeakPolicy, Role, and explicit override.
-   */
-  static canSpeak(
-    room: PermissionRoomContext,
-    member: PermissionMemberContext | null | undefined
-  ): boolean {
-    if (!member) return false;
-    const role = member.userId === room.hostId ? 'HOST' : normalizeRole(member.role);
-    if (role === 'HOST') return true;
-
-    const policy: SpeakPolicy = normalizeSpeakPolicy(room.speakPolicy);
-    switch (policy) {
-      case 'ALL':
-      case 'EVERYONE':
-        return true;
-      case 'HOST_ONLY':
-        return false;
-      case 'HOST_AND_MODS':
-        return role === 'CO_HOST' || role === 'MODERATOR';
-      case 'HOST_AND_CO_HOSTS':
-        return role === 'CO_HOST';
-      case 'REQUEST_TO_SPEAK':
-        return role === 'CO_HOST' || role === 'MODERATOR' || role === 'SPEAKER' || !!member.canSpeak;
-      case 'SELECTED':
-        return role === 'CO_HOST' || role === 'SPEAKER' || !!member.canSpeak;
       default:
         return false;
     }

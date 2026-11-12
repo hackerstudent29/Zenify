@@ -206,7 +206,7 @@ export default function AboutPage() {
           </Section>
 
           <motion.p variants={rise} className="mt-12 text-xs text-white/30">
-            Version 1.0.8
+            Version 1.0.9
           </motion.p>
         </motion.main>
       </div>

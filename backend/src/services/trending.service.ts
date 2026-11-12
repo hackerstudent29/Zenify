@@ -1,5 +1,6 @@
 import { prisma } from '../utils/prisma';
 import { setCacheVal, getCacheVal } from '../utils/cache';
+import { upgradeInnerTubeArtwork } from '../utils/innertube-artwork';
 
 export class TrendingService {
     /**
@@ -171,7 +172,7 @@ export class TrendingService {
                     if (cleanTitle && !existingTitles.has(cleanTitle.toLowerCase())) {
                         existingTitles.add(cleanTitle.toLowerCase());
                         const vId = yt.videoId || yt.id?.replace(/^yt-/, '');
-                        const thumb = yt.coverUrl || yt.thumbnail || `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`;
+                        const thumb = upgradeInnerTubeArtwork(yt.coverUrl || yt.thumbnail, { videoId: vId, kind: 'song' });
                         const artistName = yt.artist?.name || yt.artist || 'Trending Artist';
                         formatted.push({
                             id: `yt-${vId}`,

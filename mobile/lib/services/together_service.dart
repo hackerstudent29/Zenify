@@ -3,7 +3,7 @@
 // Real-Time Collaborative Room Engine for Zenify (Phase 1 + Phase 2)
 // Supports NTP clock synchronization, scheduled start barriers,
 // 3-tier drift correction, monotonic seq gap detection + RESUME replay,
-// role-based access control, voice permissions, live chat/reactions, and recap.
+// role-based access control, live chat/reactions, and recap.
 
 import 'dart:async';
 import 'dart:convert';
@@ -37,9 +37,6 @@ class TogetherMember {
   final int joinedAt;
   final int lastPing;
   final bool bufferReady;
-  final bool canSpeak;
-  final bool isMuted;
-  final bool isHandRaised;
   final bool online;
 
   TogetherMember({
@@ -50,9 +47,6 @@ class TogetherMember {
     this.joinedAt = 0,
     this.lastPing = 0,
     this.bufferReady = false,
-    this.canSpeak = false,
-    this.isMuted = false,
-    this.isHandRaised = false,
     this.online = true,
   });
 
@@ -64,9 +58,6 @@ class TogetherMember {
   TogetherMember copyWith({
     String? role,
     bool? bufferReady,
-    bool? canSpeak,
-    bool? isMuted,
-    bool? isHandRaised,
     bool? online,
   }) {
     return TogetherMember(
@@ -77,9 +68,6 @@ class TogetherMember {
       joinedAt: joinedAt,
       lastPing: lastPing,
       bufferReady: bufferReady ?? this.bufferReady,
-      canSpeak: canSpeak ?? this.canSpeak,
-      isMuted: isMuted ?? this.isMuted,
-      isHandRaised: isHandRaised ?? this.isHandRaised,
       online: online ?? this.online,
     );
   }
@@ -93,9 +81,6 @@ class TogetherMember {
       joinedAt: (json['joinedAt'] as num?)?.toInt() ?? 0,
       lastPing: (json['lastPing'] as num?)?.toInt() ?? 0,
       bufferReady: json['bufferReady'] as bool? ?? false,
-      canSpeak: json['canSpeak'] as bool? ?? false,
-      isMuted: json['isMuted'] as bool? ?? false,
-      isHandRaised: json['isHandRaised'] as bool? ?? false,
       online: json['online'] as bool? ?? true,
     );
   }
@@ -587,16 +572,10 @@ class TogetherService extends ChangeNotifier with TogetherRoomAdmin, TogetherPha
         (json['revision'] as num?)?.toInt() ??
         queueRevision;
 
-    // Room Config (RoomConfig + speakerUserIds + endsAtMs)
+    // Room Config (RoomConfig + endsAtMs)
     final rawConfig = json['config'];
     if (rawConfig is Map) {
-      final cfgMap = Map<String, dynamic>.from(rawConfig);
-      if (cfgMap['speakerUserIds'] == null && json['speakerUserIds'] is List) {
-        cfgMap['speakerUserIds'] = json['speakerUserIds'];
-      }
-      applyRoomConfig(cfgMap);
-    } else if (json['speakerUserIds'] is List) {
-      speakerUserIds = {...(json['speakerUserIds'] as List).cast<String>()};
+      applyRoomConfig(Map<String, dynamic>.from(rawConfig));
     }
 
     // Theme & DJ settings
@@ -888,7 +867,7 @@ class TogetherService extends ChangeNotifier with TogetherRoomAdmin, TogetherPha
           if (newHostId != null && newHostId.isNotEmpty) {
             _hostId = newHostId;
             _members = _members
-                .map((m) => m.userId == newHostId ? m.copyWith(role: 'HOST', canSpeak: true) : m)
+                .map((m) => m.userId == newHostId ? m.copyWith(role: 'HOST') : m)
                 .toList();
             if (newHostId == _myUserId) _myRole = 'HOST';
           }
@@ -902,7 +881,7 @@ class TogetherService extends ChangeNotifier with TogetherRoomAdmin, TogetherPha
           if (targetId != null && role != null) {
             _members = _members
                 .map((m) => m.userId == targetId
-                    ? m.copyWith(role: role, canSpeak: (payload['canSpeak'] as bool?) ?? m.canSpeak)
+                    ? m.copyWith(role: role)
                     : m)
                 .toList();
             if (targetId == _myUserId) _myRole = role;
@@ -916,7 +895,7 @@ class TogetherService extends ChangeNotifier with TogetherRoomAdmin, TogetherPha
           if (toUserId != null && toUserId.isNotEmpty) {
             _hostId = toUserId;
             _members = _members.map((m) {
-              if (m.userId == toUserId) return m.copyWith(role: 'HOST', canSpeak: true);
+              if (m.userId == toUserId) return m.copyWith(role: 'HOST');
               if (m.userId == fromUserId) return m.copyWith(role: 'CO_HOST');
               return m;
             }).toList();
@@ -932,51 +911,6 @@ class TogetherService extends ChangeNotifier with TogetherRoomAdmin, TogetherPha
             final cfgMap = Map<String, dynamic>.from(cfg);
             _mode = cfgMap['mode'] as String? ?? _mode;
             applyRoomConfig(cfgMap);
-          }
-          break;
-
-        case 'SPEAKER_CHANGED':
-        case 'SPEAK_GRANTED':
-        case 'SPEAK_REVOKED':
-          final speakers = (payload['speakerUserIds'] as List?)?.cast<String>();
-          if (speakers != null) {
-            speakerUserIds = {...speakers};
-          } else {
-            final uid = payload['userId'] as String?;
-            if (uid != null) {
-              final next = <String>{...speakerUserIds};
-              if (type == 'SPEAK_REVOKED') {
-                next.remove(uid);
-              } else {
-                next.add(uid);
-              }
-              speakerUserIds = next;
-            }
-          }
-          _members = _members
-              .map((m) => m.copyWith(
-                  canSpeak: speakerUserIds.contains(m.userId) ||
-                      RoomConfig(speakPolicy: roomConfig?.speakPolicy ?? SpeakPolicy.hostAndCoHosts)
-                          .canSpeak(RoomRole.parse(m.role), selected: speakerUserIds.contains(m.userId))))
-              .toList();
-          notifyListeners();
-          break;
-
-        case 'VOICE_MUTE_CHANGED':
-          final uid = payload['userId'] as String?;
-          final muted = payload['muted'] as bool?;
-          if (uid != null && muted != null) {
-            _members = _members.map((m) => m.userId == uid ? m.copyWith(isMuted: muted) : m).toList();
-            notifyListeners();
-          }
-          break;
-
-        case 'HAND_RAISE_CHANGED':
-          final uid = payload['userId'] as String?;
-          final raised = payload['raised'] as bool?;
-          if (uid != null && raised != null) {
-            _members = _members.map((m) => m.userId == uid ? m.copyWith(isHandRaised: raised) : m).toList();
-            notifyListeners();
           }
           break;
 
@@ -1261,7 +1195,6 @@ class TogetherService extends ChangeNotifier with TogetherRoomAdmin, TogetherPha
     queueRevision = 0;
     roomConfig = null;
     roomEndsAt = null;
-    speakerUserIds = {};
     _members = [];
     _queue = [];
     _chat = [];

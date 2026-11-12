@@ -29,8 +29,8 @@ Future<ZenifyAudioHandler> initZenifyAudioService(
       androidNotificationChannelDescription: 'Playback controls',
       androidNotificationIcon: 'drawable/zen_ic_notification',
       androidShowNotificationBadge: false,
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
+      androidNotificationOngoing: false,
+      androidStopForegroundOnPause: false,
       notificationColor: Color(0xFFFF375F), // rose accent tints the card
       artDownscaleWidth: 600,
       artDownscaleHeight: 600,
@@ -70,6 +70,7 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
   final PlaybackBridge _bridge;
   late final MultiPressDetector _detector;
   _Snap? _last;
+  DateTime _lastStateSyncAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   // ───────────────────────── Bridge → OS ─────────────────────────
 
@@ -105,21 +106,27 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
       mediaItem.add(null);
       return;
     }
+    final dur = _bridge.duration;
     mediaItem.add(MediaItem(
       id: t.id,
       title: t.title,
       artist: t.artist,
       album: t.album,
-      artUri: Uri.tryParse(t.coverUrl),
-      duration: _bridge.duration,
-      extras: {'source': t.source},
+      artUri: t.coverUrl.isNotEmpty ? Uri.tryParse(t.coverUrl) : null,
+      duration: dur > Duration.zero ? dur : null,
+      extras: {'source': t.source, 'isVideo': t.isVideo},
     ));
   }
 
   void _publishState() {
     final s = _last ?? _snapshot();
-    final pos = _bridge.position.value;
+    final dur = _bridge.duration;
+    var pos = _bridge.position.value;
+    if (pos.isNegative) pos = Duration.zero;
+    if (dur > Duration.zero && pos > dur) pos = dur;
     final hasTrack = s.id != null;
+    final now = DateTime.now();
+    _lastStateSyncAt = now;
 
     playbackState.add(PlaybackState(
       controls: [
@@ -155,6 +162,7 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
       systemActions: const {
         MediaAction.play,
         MediaAction.pause,
+        MediaAction.playPause,
         MediaAction.skipToNext,
         MediaAction.skipToPrevious,
         MediaAction.seek,
@@ -164,13 +172,14 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
       androidCompactActionIndices: const [0, 1, 2],
       processingState: !hasTrack
           ? AudioProcessingState.idle
-          : (s.buffering
-              ? AudioProcessingState.buffering
-              : AudioProcessingState.ready),
+          : (s.playing || !s.buffering
+              ? AudioProcessingState.ready
+              : AudioProcessingState.buffering),
       playing: s.playing,
       updatePosition: pos,
-      bufferedPosition: pos,
+      bufferedPosition: dur > pos ? dur : pos,
       speed: s.playing ? 1.0 : 0.0,
+      updateTime: now,
       shuffleMode:
           s.shuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
       repeatMode: switch (s.repeat) {
@@ -181,13 +190,26 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
     ));
   }
 
-  /// The OS extrapolates the position itself, so we only re-publish when the
-  /// real position drifts (user seeked) — never on every tick.
+  /// Syncs OS playback position whenever real progress drifts (seeking,
+  /// stall recovery, playback start) or periodically while playing.
   void _onPosition() {
     final state = playbackState.valueOrNull;
     if (state == null || _last?.id == null) return;
-    final drift = (_bridge.position.value - state.position).abs();
-    if (drift > const Duration(milliseconds: 1200)) _publishState();
+    final now = DateTime.now();
+    final elapsed = now.difference(state.updateTime);
+    final extrapolated = state.playing && !elapsed.isNegative
+        ? state.updatePosition +
+            Duration(
+              milliseconds: (elapsed.inMilliseconds * state.speed).round(),
+            )
+        : state.updatePosition;
+    final actual = _bridge.position.value;
+    final drift = (actual - extrapolated).abs();
+    final needsPeriodicSync = state.playing &&
+        now.difference(_lastStateSyncAt) >= const Duration(seconds: 5);
+    if (drift > const Duration(milliseconds: 750) || needsPeriodicSync) {
+      _publishState();
+    }
   }
 
   // ───────────────────────── OS → Bridge ─────────────────────────

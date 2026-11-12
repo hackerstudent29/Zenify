@@ -114,7 +114,7 @@ Zenify/
 │   ├── assets/                 # Mock catalog, sample lyrics & images
 │   ├── lib/                    # Design system, services (ZenPlayer, Room Together) & views
 │   ├── test/                   # Flutter unit & widget tests
-│   └── pubspec.yaml            # App metadata (v1.0.8+12) & dependencies
+│   └── pubspec.yaml            # App metadata (v1.0.9+13) & dependencies
 │
 ├── scripts/                    # Deploy, security scan & dev helper scripts
 ├── docs/                       # Documentation hub & internal technical specs
@@ -126,7 +126,7 @@ Zenify/
 │   ├── images/                 # App UI screenshots
 │   └── together/               # Room Together parity audit
 │
-├── CHANGELOG.md                # Release changelog (v1.0.8 latest)
+├── CHANGELOG.md                # Release changelog (v1.0.9 latest)
 ├── CONTRIBUTING.md             # Contribution guidelines
 ├── SECURITY.md                 # Vulnerability disclosure policy
 ├── docker-compose.yml          # Full-stack local development stack
@@ -431,5 +431,5 @@ Interested in improving the architecture?
 ---
 
 **Last Updated**: November 2026  
-**Release Alignment**: `v1.0.8`
+**Release Alignment**: `v1.0.9`
 

@@ -134,7 +134,7 @@ export class RoomLifecycleScheduler {
           : 0;
         const candidates = onlineMembers.filter((m) => m.userId !== room.hostId);
         if (now - hostSeenMs > HOST_FAILOVER_MS && candidates.length > 0) {
-          const priority = { CO_HOST: 4, MODERATOR: 3, SPEAKER: 2, LISTENER: 1 } as Record<string, number>;
+          const priority = { CO_HOST: 4, MODERATOR: 3, DJ: 3, MEMBER: 2, LISTENER: 1 } as Record<string, number>;
           candidates.sort(
             (a, b) =>
               (priority[normalizeRole(b.role)] || 0) - (priority[normalizeRole(a.role)] || 0) ||
@@ -150,7 +150,7 @@ export class RoomLifecycleScheduler {
               }),
               prisma.togetherRoomMember.update({
                 where: { roomCode_userId: { roomCode: code, userId: nextHost.userId } },
-                data: { role: 'HOST', canSpeak: true },
+                data: { role: 'HOST' },
               }),
             ])
             .catch(() => undefined);

@@ -48,7 +48,6 @@ class RoomInsights {
     required this.tracksTogether,
     required this.reactions,
     required this.songsAdded,
-    required this.voiceMinutes,
     required this.timeline,
     required this.roleMinutes,
     required this.topArtists,
@@ -56,7 +55,7 @@ class RoomInsights {
     required this.milestones,
   });
   final int roomsCreated, roomsJoined, sessions, tracksTogether, reactions, songsAdded;
-  final double listeningMinutes, avgSessionMinutes, longestSessionMinutes, voiceMinutes;
+  final double listeningMinutes, avgSessionMinutes, longestSessionMinutes;
   final List<InsightBucket> timeline;
   final Map<RoomRole, double> roleMinutes;
   final List<(String, int)> topArtists;
@@ -76,7 +75,6 @@ class RoomInsights {
       tracksTogether: i('tracksTogether'),
       reactions: i('reactions'),
       songsAdded: i('songsAdded'),
-      voiceMinutes: d('voiceMinutes'),
       timeline: ((j['timeline'] as List?) ?? const []).map((e) => InsightBucket(e['label'] as String, (e['minutes'] as num).toDouble())).toList(),
       roleMinutes: {for (final e in ((j['roleMinutes'] as Map?) ?? const {}).entries) RoomRole.parse(e.key as String): (e.value as num).toDouble()},
       topArtists: ((j['topArtists'] as List?) ?? const []).map((e) => (e['name'] as String, (e['plays'] as num).toInt())).toList(),
@@ -225,7 +223,6 @@ class _RoomInsightsScreenState extends State<RoomInsightsScreen> {
             _Stat('Tracks together', '${d.tracksTogether}'),
             _Stat('Reactions', '${d.reactions}'),
             _Stat('Songs added', '${d.songsAdded}'),
-            _Stat('On voice', fmtMinutes(d.voiceMinutes)),
           ],
         ),
       ),

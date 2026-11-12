@@ -411,15 +411,6 @@ export async function registerTogetherWebSocket(server: FastifyInstance): Promis
               break;
             }
 
-            case 'HAND_RAISE': {
-              await RoomMembershipService.setHandRaised(
-                roomCode,
-                userId,
-                msg.raised !== undefined ? Boolean(msg.raised) : true
-              );
-              break;
-            }
-
             case 'LEAVE_ROOM': {
               await RoomSessionService.leaveRoom(roomCode, userId);
               socket.close();

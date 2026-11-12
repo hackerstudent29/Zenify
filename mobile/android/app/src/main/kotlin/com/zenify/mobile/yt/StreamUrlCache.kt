@@ -19,6 +19,9 @@ class StreamUrlCache(private val maxEntries: Int = 500) {
         val loudnessDb: Double?,
         val title: String?,
         val artist: String?,
+        val videoUrl: String? = null,
+        val videoWidth: Int? = null,
+        val videoHeight: Int? = null,
     ) {
         fun isExpired(nowSec: Long = System.currentTimeMillis() / 1000): Boolean =
             nowSec >= (expiresAtSec - 60) // 60s safety margin
@@ -33,6 +36,9 @@ class StreamUrlCache(private val maxEntries: Int = 500) {
             loudnessDb = loudnessDb,
             title = title,
             artist = artist,
+            videoUrl = videoUrl,
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
         )
     }
 
@@ -68,6 +74,9 @@ class StreamUrlCache(private val maxEntries: Int = 500) {
             loudnessDb = resolved.loudnessDb,
             title = resolved.title,
             artist = resolved.artist,
+            videoUrl = resolved.videoUrl,
+            videoWidth = resolved.videoWidth,
+            videoHeight = resolved.videoHeight,
         )
         return true
     }

@@ -6,6 +6,7 @@ import { CompositeCatalogService, CatalogTrack } from '../services/catalog-provi
 import { PreferencesService } from '../services/preferences.service';
 import { splitArtistString, isFakeOrNumericArtistName, cleanArtistNames } from '../utils/artist';
 import { extractSequelTag, isCompilationOrPlaylist } from '../services/universal-search.service';
+import { upgradeInnerTubeArtwork } from '../utils/innertube-artwork';
 
 const searchSchema = z.object({
   q: z.string().min(1),
@@ -17,6 +18,9 @@ const autocompleteSchema = z.object({
 });
 
 const searchCache = new Map<string, { data: any; expires: number }>();
+export function clearSearchCache() {
+  searchCache.clear();
+}
 const SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 min cache
 
 const COUNTRY_MAP: Record<string, string> = {
@@ -883,7 +887,10 @@ export async function searchRoutes(server: FastifyInstance) {
       const tracks = ytRaw.map((item: any) => {
         const videoId = item.videoId || item.id?.replace(/^yt-/, '');
         const artistName = item.artist?.name || item.artist || 'YouTube Artist';
-        const cover = item.thumbnail || item.coverUrl || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '');
+        const cover = upgradeInnerTubeArtwork(item.thumbnail || item.coverUrl, {
+          videoId,
+          kind: item.isVideo ? 'video' : 'song'
+        });
         const title = item.title || 'YouTube Track';
         const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${title}`)}&trackId=yt-${videoId}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artistName)}`;
         return {
@@ -924,7 +931,10 @@ export async function searchRoutes(server: FastifyInstance) {
         seen.add(videoId);
 
         const artistName = item.artist?.name || item.artist || 'YouTube Artist';
-        const cover = item.thumbnail || item.coverUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+        const cover = upgradeInnerTubeArtwork(item.thumbnail || item.coverUrl, {
+          videoId,
+          kind: item.isVideo ? 'video' : 'song'
+        });
         const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${title}`)}&trackId=yt-${videoId}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artistName)}`;
 
         tracks.push({

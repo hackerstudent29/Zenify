@@ -25,8 +25,6 @@ import 'recap/room_recap_screen.dart';
 import 'theme/room_theme_ui.dart';
 import 'room_config_sheet.dart';
 import 'room_sheets.dart';
-import 'voice/voice_controller.dart';
-import 'voice/voice_sheet.dart';
 import 'widgets/floating_reactions.dart';
 
 class RoomTogetherScreen extends StatefulWidget {
@@ -601,7 +599,6 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
   }
 
   Widget _presence(TogetherService t) {
-    final v = context.watch<VoiceController>();
     final shown = t.members.take(5).toList();
     final extra = t.members.length - shown.length;
     return Row(children: [
@@ -621,7 +618,7 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
                     left: i * 22.0,
                     child: Container(
                       decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AT.bg, width: 2)),
-                      child: Avatar(name: shown[i].username, size: 32, ring: v.speaking.contains(shown[i].userId) ? AT.green : null),
+                      child: Avatar(name: shown[i].username, size: 32),
                     ),
                   ),
                 if (extra > 0)
@@ -643,15 +640,6 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
         ),
       ),
       CircleIconButton(icon: CupertinoIcons.bookmark, size: 36, iconSize: 16, tooltip: 'Moments', onTap: () => showBookmarksSheet(context, momentActionsFor(context))),
-      const SizedBox(width: 8),
-      PillButton(
-        label: v.connected ? (v.micOn ? 'Live' : 'Muted') : 'Voice',
-        icon: v.connected ? (v.micOn ? CupertinoIcons.mic_fill : CupertinoIcons.mic_slash_fill) : CupertinoIcons.mic,
-        compact: true,
-        style: v.connected ? PillStyle.tinted : PillStyle.glass,
-        color: AT.green,
-        onTap: () => showVoiceSheet(context),
-      ),
     ]);
   }
 
@@ -757,12 +745,11 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
   }
 
   Widget _people(TogetherService t) {
-    final v = context.watch<VoiceController>();
     final members = [...t.members]..sort((a, b) => RoomRole.parse(b.role).rank.compareTo(RoomRole.parse(a.role).rank));
     return GroupedSection(children: [
       for (final m in members)
         AppleRow(
-          leading: Avatar(name: m.username, size: 38, dot: m.lastPing > 0 ? AT.green : AT.label3, ring: v.speaking.contains(m.userId) ? AT.green : null),
+          leading: Avatar(name: m.username, size: 38, dot: m.lastPing > 0 ? AT.green : AT.label3),
           title: m.userId == t.myUserId ? '${m.username} (You)' : m.username,
           subtitle: m.lastPing > 0 ? '${m.lastPing} ms' : 'Offline',
           trailing: RolePill(RoomRole.parse(m.role)),

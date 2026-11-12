@@ -29,14 +29,12 @@ mixin TogetherRoomAdmin on ChangeNotifier {
   RoomConfig? roomConfig;
   DateTime? roomEndsAt; // server-provided, null = unlimited
   String? lastRoomError; // wire code, e.g. PASSWORD_REQUIRED, WAITING_APPROVAL, ROOM_FULL, BLOCKED
-  Set<String> speakerUserIds = {}; // when speakPolicy == SELECTED
   int queueRevision = 0; // set from every QUEUE_* event / snapshot
 
   void applyRoomConfig(Map<String, dynamic> json) {
     roomConfig = RoomConfig.fromJson(json);
     final end = json['endsAtMs'];
     roomEndsAt = end is num ? DateTime.fromMillisecondsSinceEpoch(end.toInt()) : null;
-    speakerUserIds = {...((json['speakerUserIds'] as List?) ?? const []).cast<String>()};
     notifyListeners();
   }
 
@@ -59,8 +57,6 @@ mixin TogetherRoomAdmin on ChangeNotifier {
     }
     return cfg.allows(myRole, p);
   }
-
-  bool get canSpeak => roomConfig?.canSpeak(myRole, selected: speakerUserIds.contains(myUserId)) ?? isHost;
 
   // ── REST helper ──
   Future<Map<String, dynamic>?> apiCall(String method, String path, [Map<String, dynamic>? body]) async {
@@ -107,13 +103,6 @@ mixin TogetherRoomAdmin on ChangeNotifier {
 
   // ── Queue ──
   Future<bool> reorderQueue(String itemId, int toIndex, int queueRevision) async => await apiCall('POST', '/rooms/$roomCode/queue/reorder', {'itemId': itemId, 'toIndex': toIndex, 'baseRevision': queueRevision}) != null;
-
-  // ── Voice ──
-  /// Returns {url, token} for LiveKit, or null if voice not configured / not permitted.
-  Future<Map<String, dynamic>?> fetchVoiceToken() => apiCall('POST', '/rooms/$roomCode/voice/token');
-  Future<bool> setSpeakers(Set<String> userIds) async => await apiCall('PATCH', '/rooms/$roomCode/voice/speakers', {'userIds': userIds.toList()}) != null;
-  Future<bool> muteMemberMic(String userId, {required bool muted}) async => await apiCall('POST', '/rooms/$roomCode/voice/members/$userId/${muted ? 'mute' : 'unmute'}') != null;
-  Future<bool> revokeSpeaking(String userId) async => await apiCall('POST', '/rooms/$roomCode/voice/members/$userId/revoke') != null;
 
   // ── Cover upload (multipart) ──
   Future<bool> uploadRoomCover(String code, String path) async {

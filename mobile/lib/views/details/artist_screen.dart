@@ -167,15 +167,34 @@ class _Img extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolved = MediaNormalizer.upgradeArtworkUrl(url, isArtistAvatar: circular);
     final img = CachedNetworkImage(
-      imageUrl: url,
+      imageUrl: resolved,
       fit: BoxFit.cover,
       fadeInDuration: const Duration(milliseconds: 220),
       placeholder: (context, url) => Container(color: AppColors.surface2),
-      errorWidget: (context, url, error) => Container(
-        color: AppColors.surface2,
-        child: Icon(circular ? CupertinoIcons.person_fill : CupertinoIcons.music_note, color: AppColors.textTertiary),
-      ),
+      errorWidget: (context, errUrl, error) {
+        if (errUrl.contains('maxresdefault.jpg')) {
+          return CachedNetworkImage(
+            imageUrl: errUrl.replaceAll('maxresdefault.jpg', 'sddefault.jpg'),
+            fit: BoxFit.cover,
+            fadeInDuration: const Duration(milliseconds: 220),
+            placeholder: (_, _) => Container(color: AppColors.surface2),
+            errorWidget: (_, sdUrl, _) => CachedNetworkImage(
+              imageUrl: sdUrl.replaceAll('sddefault.jpg', 'hqdefault.jpg'),
+              fit: BoxFit.cover,
+              errorWidget: (_, _, _) => Container(
+                color: AppColors.surface2,
+                child: Icon(circular ? CupertinoIcons.person_fill : CupertinoIcons.music_note, color: AppColors.textTertiary),
+              ),
+            ),
+          );
+        }
+        return Container(
+          color: AppColors.surface2,
+          child: Icon(circular ? CupertinoIcons.person_fill : CupertinoIcons.music_note, color: AppColors.textTertiary),
+        );
+      },
     );
     return circular ? ClipOval(child: img) : ClipPath(clipper: ShapeBorderClipper(shape: _sq(radius)), child: img);
   }
@@ -320,7 +339,7 @@ class _ActionCircle extends StatelessWidget {
           height: 52,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: active ? 0.24 : 0.14),
-            borderRadius: BorderRadius.circular(active ? 26 : 20),
+            shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
           child: AnimatedSwitcher(
@@ -639,19 +658,31 @@ class _AboutCardState extends State<_AboutCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              widget.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.4),
+                      Text.rich(
+                        TextSpan(
+                          text: widget.name,
+                          children: const [
+                            WidgetSpan(
+                              alignment: PlaceholderAlignment.middle,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: 6),
+                                child: Icon(
+                                  CupertinoIcons.checkmark_seal_fill,
+                                  color: AppColors.crimson,
+                                  size: 18,
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(CupertinoIcons.checkmark_seal_fill, color: AppColors.crimson, size: 18),
-                        ],
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.4,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       const Text('Verified Artist · Zenify Artist Direct', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
@@ -804,6 +835,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
   bool _loading = true;
   bool _showAll = false;
   String? _resolvedImage;
+  String? _resolvedBanner;
   String? _resolvedBio;
 
   @override
@@ -846,6 +878,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
             _artistProfile = info;
             _tracks = songs;
             if (info.imageUrl.isNotEmpty) _resolvedImage = info.imageUrl;
+            if (info.coverUrl.isNotEmpty) _resolvedBanner = info.coverUrl;
             if (info.bio.isNotEmpty) _resolvedBio = info.bio;
             _loading = false;
           });
@@ -1044,11 +1077,17 @@ class _ArtistScreenState extends State<ArtistScreen> {
             .toList()
         : relMap.entries.toList();
 
-    final img = _resolvedImage ??
-        widget.imageUrl ??
-        (_tracks.isNotEmpty
-            ? _tracks.first.coverUrl
-            : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800');
+    final img = MediaNormalizer.upgradeArtworkUrl(
+      _resolvedImage ??
+          widget.imageUrl ??
+          (_tracks.isNotEmpty
+              ? _tracks.first.coverUrl
+              : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200'),
+      isArtistAvatar: true,
+    );
+    final bannerImg = MediaNormalizer.upgradeBannerUrl(
+      _resolvedBanner ?? _resolvedImage ?? widget.imageUrl ?? img,
+    );
     final bio = (_resolvedBio ?? widget.bio ?? '').trim();
 
     // Hero detail lines
@@ -1099,12 +1138,20 @@ class _ArtistScreenState extends State<ArtistScreen> {
                               fit: StackFit.expand,
                               children: [
                                 CachedNetworkImage(
-                                  imageUrl: img,
+                                  imageUrl: bannerImg,
                                   fit: BoxFit.cover,
                                   alignment: const Alignment(0, -0.35),
                                   fadeInDuration: const Duration(milliseconds: 350),
                                   placeholder: (c, u) => const ColoredBox(color: Colors.black),
-                                  errorWidget: (c, u, e) => const ColoredBox(color: AppColors.surface2),
+                                  errorWidget: (c, u, e) => bannerImg != img
+                                      ? CachedNetworkImage(
+                                          imageUrl: img,
+                                          fit: BoxFit.cover,
+                                          alignment: const Alignment(0, -0.35),
+                                          errorWidget: (_, _, _) =>
+                                              const ColoredBox(color: AppColors.surface2),
+                                        )
+                                      : const ColoredBox(color: AppColors.surface2),
                                 ),
                                 // Gradient scrim for dynamic island clearance + bottom fade
                                 DecoratedBox(
@@ -1147,25 +1194,32 @@ class _ArtistScreenState extends State<ArtistScreen> {
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        name,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 38,
-                                          height: 1.05,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: -1.2,
+                                Text.rich(
+                                  TextSpan(
+                                    text: name,
+                                    children: const [
+                                      WidgetSpan(
+                                        alignment: PlaceholderAlignment.middle,
+                                        child: Padding(
+                                          padding: EdgeInsets.only(left: 8),
+                                          child: Icon(
+                                            CupertinoIcons.checkmark_seal_fill,
+                                            color: AppColors.crimson,
+                                            size: 24,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Icon(CupertinoIcons.checkmark_seal_fill, color: AppColors.crimson, size: 24),
-                                  ],
+                                    ],
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 38,
+                                    height: 1.05,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1.2,
+                                  ),
                                 ),
                                 const SizedBox(height: 6),
                                 AnimatedSwitcher(

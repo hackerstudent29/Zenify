@@ -10,7 +10,6 @@ import {
   normalizeRequestMode,
   normalizeRole,
   normalizeRoomMode,
-  normalizeSpeakPolicy,
   RoomHttpError,
   RoomState,
   TogetherQueueItemDTO,
@@ -94,7 +93,6 @@ export interface CreateRoomInput {
   maxParticipants?: number;
   durationMinutes?: number | null;
   inviteMode?: string;
-  speakPolicy?: string;
   allowListenersAddQueue?: boolean;
   allowListenersSkip?: boolean;
   enabledRoles?: string[];
@@ -163,7 +161,6 @@ export class RoomSessionService {
     }
     const passwordHash = passwordRaw ? await RoomPermissionService.hashPassword(passwordRaw) : null;
     const inviteMode = normalizeInviteMode(input.inviteMode);
-    const speakPolicy = normalizeSpeakPolicy(input.speakPolicy);
     const qEditRole = String(input.permissions?.QUEUE_EDIT || '').toUpperCase();
     const playbackRole = String(input.permissions?.PLAYBACK || '').toUpperCase();
     const allowListenersAddQueue =
@@ -178,8 +175,6 @@ export class RoomSessionService {
         : playbackRole
           ? playbackRole === 'MEMBER' || playbackRole === 'LISTENER'
           : false;
-
-    const livekitRoomName = `zenify_${code}_${crypto.randomBytes(4).toString('hex')}`;
 
     if (input.enabledRoles || input.permissions) {
       await roomStore.setJson(
@@ -207,7 +202,6 @@ export class RoomSessionService {
           durationMinutes,
           expiresAt,
           inviteMode,
-          speakPolicy,
           allowListenersAddQueue,
           allowListenersSkip,
           state: 'ACTIVE',
@@ -216,7 +210,6 @@ export class RoomSessionService {
           playbackState: 'paused',
           playbackPositionMs: BigInt(0),
           seq: BigInt(1),
-          livekitRoomName,
         },
       });
 
@@ -228,7 +221,7 @@ export class RoomSessionService {
           avatarUrl: RoomPermissionService.validateSafeUrl(actor.avatarUrl),
           isGuest: actor.isGuest,
           role: 'HOST',
-          canSpeak: true,
+          canSpeak: false,
         },
       });
 
@@ -399,12 +392,6 @@ export class RoomSessionService {
           }
         }
 
-        const speakByPolicy = RoomPermissionService.canSpeak(room, {
-          userId: actor.userId,
-          role: assignedRole,
-          canSpeak: existingMember?.canSpeak,
-        });
-
         await tx.togetherRoomMember.upsert({
           where: { roomCode_userId: { roomCode: code, userId: actor.userId } },
           create: {
@@ -415,7 +402,7 @@ export class RoomSessionService {
             avatarUrl: RoomPermissionService.validateSafeUrl(actor.avatarUrl),
             isGuest: actor.isGuest,
             role: assignedRole,
-            canSpeak: speakByPolicy,
+            canSpeak: false,
           },
           update: {
             displayName:
@@ -424,7 +411,7 @@ export class RoomSessionService {
             leftAt: null,
             lastSeenAt: new Date(),
             role: assignedRole,
-            canSpeak: speakByPolicy,
+            canSpeak: false,
           },
         });
 
@@ -502,7 +489,7 @@ export class RoomSessionService {
           orderBy: { joinedAt: 'asc' },
         });
         if (remaining.length > 0) {
-          const priority = { CO_HOST: 4, MODERATOR: 3, SPEAKER: 2, LISTENER: 1 } as Record<string, number>;
+          const priority = { CO_HOST: 4, MODERATOR: 3, DJ: 3, MEMBER: 2, LISTENER: 1 } as Record<string, number>;
           remaining.sort(
             (a, b) =>
               (priority[normalizeRole(b.role)] || 0) - (priority[normalizeRole(a.role)] || 0) ||
@@ -516,7 +503,7 @@ export class RoomSessionService {
             }),
             prisma.togetherRoomMember.update({
               where: { roomCode_userId: { roomCode: code, userId: nextHost.userId } },
-              data: { role: 'HOST', canSpeak: true },
+              data: { role: 'HOST' },
             }),
           ]);
 
@@ -638,7 +625,6 @@ export class RoomSessionService {
       visibility: string;
       durationMinutes: number | null;
       inviteMode: string;
-      speakPolicy: string;
       allowListenersAddQueue: boolean;
       allowListenersSkip: boolean;
       enabledRoles: string[];
@@ -704,9 +690,6 @@ export class RoomSessionService {
       if (patch.inviteMode !== undefined) {
         data.inviteMode = normalizeInviteMode(patch.inviteMode);
       }
-      if (patch.speakPolicy !== undefined) {
-        data.speakPolicy = normalizeSpeakPolicy(patch.speakPolicy);
-      }
       if (patch.allowListenersAddQueue !== undefined) {
         data.allowListenersAddQueue = Boolean(patch.allowListenersAddQueue);
       } else if ((patch as any).permissions?.QUEUE_EDIT !== undefined) {
@@ -732,22 +715,6 @@ export class RoomSessionService {
         where: { code },
         data,
       });
-
-      // Recompute member speak grants when speakPolicy changes
-      if (patch.speakPolicy !== undefined) {
-        const members = await prisma.togetherRoomMember.findMany({
-          where: { roomCode: code, leftAt: null },
-        });
-        for (const m of members) {
-          const canSpeak = RoomPermissionService.canSpeak(updated, m);
-          if (m.canSpeak !== canSpeak) {
-            await prisma.togetherRoomMember.update({
-              where: { roomCode_userId: { roomCode: code, userId: m.userId } },
-              data: { canSpeak },
-            });
-          }
-        }
-      }
 
       const snapshot = await this.getRoomSnapshot(code);
       await roomEventService.emit({
@@ -878,9 +845,6 @@ export class RoomSessionService {
         avatar: m.avatarUrl,
         avatarUrl: m.avatarUrl,
         role: m.userId === room.hostId ? 'HOST' : normalizeRole(m.role),
-        canSpeak: RoomPermissionService.canSpeak(room, m),
-        isMuted: m.isMuted,
-        isHandRaised: m.isHandRaised,
         isGuest: m.isGuest,
         joinedAt: m.joinedAt.getTime(),
         lastPing: pres?.lastSeenMs ?? m.lastSeenAt.getTime(),
@@ -891,9 +855,6 @@ export class RoomSessionService {
       };
     });
 
-    const speakerUserIds = members
-      .filter((m) => normalizeRole(m.role) === 'SPEAKER' || m.canSpeak)
-      .map((m) => m.userId);
     const acl = (await roomStore.getJson<any>(`room_acl:${code}`)) || {};
     const djExtra = (await roomStore.getJson<any>(`dj_extra:${code}`)) || {};
     const modeNormalized = normalizeRoomMode(room.mode);
@@ -915,7 +876,6 @@ export class RoomSessionService {
       revision: room.queueRevision,
       queueRevision: room.queueRevision,
       serverTimestampMs: Date.now(),
-      livekitRoomName: room.livekitRoomName,
       settings: {
         requiresApproval: normalizeInviteMode(room.inviteMode) === 'APPROVAL',
         guestCanQueue: room.allowListenersAddQueue,
@@ -935,12 +895,10 @@ export class RoomSessionService {
         expiresAtMs: room.expiresAt ? room.expiresAt.getTime() : null,
         endsAtMs: room.expiresAt ? room.expiresAt.getTime() : null,
         inviteMode: normalizeInviteMode(room.inviteMode),
-        speakPolicy: normalizeSpeakPolicy(room.speakPolicy),
         allowListenersAddQueue: room.allowListenersAddQueue,
         allowListenersSkip: room.allowListenersSkip,
         enabledRoles: acl.enabledRoles || ['OWNER', 'CO_HOST', 'DJ', 'MEMBER', 'LISTENER'],
         permissions: { ...defaultPermissions, ...(acl.permissions || {}) },
-        speakerUserIds,
         state: room.state,
       },
       theme: {
@@ -966,7 +924,6 @@ export class RoomSessionService {
             : room.announceText,
         announceUntilMs: room.announceUntilMs ? Number(room.announceUntilMs) : null,
       },
-      speakerUserIds,
       members: memberDTOs,
       queue,
       player: {

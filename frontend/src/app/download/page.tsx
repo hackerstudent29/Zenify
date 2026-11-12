@@ -31,9 +31,9 @@ export default function DownloadPage() {
 
   // Fallback download URLs
   const apkDownloadUrl = "/downloads/zenify.apk";
-  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.0.8";
-  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8.apk";
-  const universalApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.8/zenify-v1.0.8-universal.apk";
+  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.0.9";
+  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk";
+  const universalApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk";
   const absoluteDownloadUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/downloads/zenify.apk`
     : "https://listenzenify.vercel.app/downloads/zenify.apk";
@@ -54,8 +54,8 @@ export default function DownloadPage() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen w-full bg-[#030303] pt-24 sm:pt-28 md:pt-32 pb-40 font-sans text-[#F2F2F3] selection:bg-white/15">
         <SEO
-          title="Download Zenify APK (v1.0.8) – Ad-Free Music for Android, iOS & Desktop"
-          description="Download the Zenify v1.0.8 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, Room Together, synchronized lyrics, and Studio FX."
+          title="Download Zenify APK (v1.0.9) – Ad-Free Music for Android, iOS & Desktop"
+          description="Download the Zenify v1.0.9 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, YouTube video streaming, Room Together, synchronized lyrics, and Studio FX."
           keywords={[
             "download zenify apk",
             "zenify android app",
@@ -69,7 +69,7 @@ export default function DownloadPage() {
             "@type": "MobileApplication",
             name: "Zenify Music Player",
             operatingSystem: "Android 8.0+",
-            softwareVersion: "1.0.8",
+            softwareVersion: "1.0.9",
             applicationCategory: "MultimediaApplication",
             applicationSubCategory: "Music & Audio",
             downloadUrl: "https://listenzenify.vercel.app/downloads/zenify.apk",
@@ -91,7 +91,7 @@ export default function DownloadPage() {
           <motion.div variants={rise} className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/20 text-brand text-[11px] font-bold uppercase tracking-wider">
               <Sparkles size={13} className="text-brand" />
-              <span>Mobile Release v1.0.8 Available</span>
+              <span>Mobile Release v1.0.9 Available</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-sans uppercase tracking-tight text-white leading-tight">
@@ -134,7 +134,7 @@ export default function DownloadPage() {
                     className="h-12 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer shadow-lg hover:border-brand/40"
                   >
                     <Download size={18} className="text-brand shrink-0" />
-                    <span>Download APK (46.2 MB)</span>
+                    <span>Download APK (33.2 MB)</span>
                   </a>
 
                   <a
@@ -144,7 +144,7 @@ export default function DownloadPage() {
                     className="h-12 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-xs font-semibold tracking-wider transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Download size={15} className="text-zinc-400" />
-                    <span>Universal (112.5 MB)</span>
+                    <span>Universal (75.6 MB)</span>
                   </a>
 
                   <a
@@ -162,11 +162,11 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-zinc-400">
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Version</span>
-                    <span className="text-white font-medium">v1.0.8 (Build 12)</span>
+                    <span className="text-white font-medium">v1.0.9 (Build 13)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Package Size</span>
-                    <span className="text-white font-medium">46.2 MB (ARM64)</span>
+                    <span className="text-white font-medium">33.2 MB (ARM64)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Compatibility</span>
@@ -285,7 +285,7 @@ export default function DownloadPage() {
                     <h3 className="text-base font-semibold text-white mt-1">Notification or Files</h3>
                   </div>
                   <p className="text-[14px] leading-relaxed text-zinc-400">
-                    Once the 46.2 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
+                    Once the 33.2 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
                   </p>
                 </div>
 
@@ -467,7 +467,7 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Release Version</span>
-                <span className="text-white">v1.0.8 (Build 12) — November 11, 2026</span>
+                <span className="text-white">v1.0.9 (Build 13) — November 12, 2026</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Package Format</span>
@@ -475,15 +475,15 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">File Size</span>
-                <span className="text-white">46.2 MB (ARM64) • 112.5 MB (Universal)</span>
+                <span className="text-white">33.2 MB (ARM64) • 75.6 MB (Universal)</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">ARM64 SHA-256</span>
-                <span className="text-white font-mono text-[11px] break-all">830ECF4974057D5AC4B83E05AF55C0BED3D1AAE915109844095875B6079FC1D7</span>
+                <span className="text-white font-mono text-[11px] break-all">E0B2DFE50F934BB6E20B639F35F68D4579503D980BAF1801BE481F386E1B20BC</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Universal SHA-256</span>
-                <span className="text-white font-mono text-[11px] break-all">D536EEEF7914E7649AED3C625243AB13522151E78C13D096DF2D878F57991622</span>
+                <span className="text-white font-mono text-[11px] break-all">3AD8A6A39C757F05661D58A79683B7A70C110BE3C2896744BBE728A0486BF825</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Minimum Operating System</span>
@@ -491,12 +491,12 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Engine & Architecture</span>
-                <span className="text-white">Flutter 3.44.2 • Dart 3.12.2 • Kotlin • Android Media3 ExoPlayer • LiveKit WebRTC</span>
+                <span className="text-white">Flutter 3.44.2 • Dart 3.12.2 • Kotlin • Android Media3 ExoPlayer</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
-                <span className="text-zinc-500 font-medium">What&apos;s Included in v1.0.8</span>
+                <span className="text-zinc-500 font-medium">What&apos;s Included in v1.0.9</span>
                 <span className="text-zinc-300 leading-relaxed">
-                  Room Together Phase 1 &amp; 2 (LiveKit voice, synced karaoke lyrics with translation, pinned moments, reactions, song requests, custom themes, QR/WhatsApp deep links, achievements &amp; PNG recaps), bundled SF Pro typography, Dynamic Island notifications, Search &amp; Auth redesigns, and InnerTube stability fixes.
+                  YouTube video streaming in MiniPlayer &amp; Fullscreen Player, redesigned Explore &amp; Search layouts, fixed Artist/Album verified badge placement &amp; round action buttons, compact Dynamic Island notification pill without nav overlap, single-song Smart Queue isolation from search results, and reliable background/auto-next playback with real-time lock-screen &amp; miniplayer sync.
                 </span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
@@ -524,7 +524,7 @@ export default function DownloadPage() {
                 className="h-11 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 <Download size={16} className="text-brand" />
-                <span>Download Zenify APK (v1.0.8 • 46.2 MB)</span>
+                <span>Download Zenify APK (v1.0.9 • 33.2 MB)</span>
               </a>
             </div>
           </motion.div>

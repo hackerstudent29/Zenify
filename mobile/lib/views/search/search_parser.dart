@@ -752,8 +752,8 @@ class SearchParser {
       highestUrl = thumbs.last['url']?.toString() ?? '';
     }
 
-    final std = MediaNormalizer.upgradeArtworkUrl(highestUrl, targetSize: 256);
-    final hiRes = MediaNormalizer.upgradeArtworkUrl(highestUrl, targetSize: 544);
+    final std = MediaNormalizer.upgradeArtworkUrl(highestUrl, targetSize: 600);
+    final hiRes = MediaNormalizer.upgradeArtworkUrl(highestUrl, targetSize: 1200);
     return (std, hiRes);
   }
 

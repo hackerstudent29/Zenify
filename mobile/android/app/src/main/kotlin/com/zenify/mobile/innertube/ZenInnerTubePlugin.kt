@@ -177,8 +177,33 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                 if ((artistData["title"] as? String).isNullOrBlank() && artistName.isNotBlank()) {
                                     artistData["title"] = artistName
                                 }
+                                val bannerUrl = (artistData["thumbnail"] as? String).orEmpty()
+                                var avatarUrl = bannerUrl
+                                val lookupName = (artistData["title"] as? String)?.takeIf { it.isNotBlank() } ?: artistName
+                                val whMatch = Regex("=w(\\d+)-h(\\d+)").find(bannerUrl)
+                                val isWideBanner = whMatch != null &&
+                                    (whMatch.groupValues[1].toIntOrNull() ?: 0) >
+                                    (whMatch.groupValues[2].toIntOrNull() ?: 0)
+                                if (lookupName.isNotBlank() && (isWideBanner || bannerUrl.isBlank())) {
+                                    val matchedAvatar = runCatching {
+                                        YouTube.search(lookupName, YouTube.SearchFilter.FILTER_ARTIST)
+                                            .getOrNull()?.items
+                                            ?.filterIsInstance<ArtistItem>()
+                                            ?.firstOrNull()?.thumbnail
+                                    }.getOrNull()
+                                    if (!matchedAvatar.isNullOrBlank()) {
+                                        avatarUrl = matchedAvatar
+                                    }
+                                }
+                                if (avatarUrl.isNotBlank()) {
+                                    artistData["thumbnail"] = avatarUrl
+                                }
+                                if (bannerUrl.isNotBlank()) {
+                                    artistData["banner"] = bannerUrl
+                                }
                                 val artistMap = mapOf(
                                     "artist" to artistData,
+                                    "banner" to bannerUrl,
                                     "description" to (page.description ?: "Official artist profile for ${artistData["title"] ?: artistName} on Zenify."),
                                     "subscriberCountText" to (page.subscriberCountText ?: "Official Artist"),
                                     "monthlyListenerCount" to page.monthlyListenerCount,

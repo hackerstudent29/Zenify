@@ -3,7 +3,11 @@ import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
-    show CupertinoActivityIndicator, CupertinoSliverRefreshControl, RefreshIndicatorMode;
+    show
+        CupertinoActivityIndicator,
+        CupertinoIcons,
+        CupertinoSliverRefreshControl,
+        RefreshIndicatorMode;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
@@ -177,15 +181,34 @@ class _Img extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolved = MediaNormalizer.upgradeArtworkUrl(url, isArtistAvatar: circular);
     final img = CachedNetworkImage(
-      imageUrl: MediaNormalizer.upgradeArtworkUrl(url),
+      imageUrl: resolved,
       fit: BoxFit.cover,
       fadeInDuration: const Duration(milliseconds: 220),
       placeholder: (context, url) => Container(color: AppColors.surface2),
-      errorWidget: (context, url, error) => Container(
-        color: AppColors.surface2,
-        child: const Icon(Icons.music_note_rounded, color: AppColors.textTertiary),
-      ),
+      errorWidget: (context, errUrl, error) {
+        if (errUrl.contains('maxresdefault.jpg')) {
+          return CachedNetworkImage(
+            imageUrl: errUrl.replaceAll('maxresdefault.jpg', 'sddefault.jpg'),
+            fit: BoxFit.cover,
+            fadeInDuration: const Duration(milliseconds: 220),
+            placeholder: (_, _) => Container(color: AppColors.surface2),
+            errorWidget: (_, sdUrl, _) => CachedNetworkImage(
+              imageUrl: sdUrl.replaceAll('sddefault.jpg', 'hqdefault.jpg'),
+              fit: BoxFit.cover,
+              errorWidget: (_, _, _) => Container(
+                color: AppColors.surface2,
+                child: Icon(circular ? CupertinoIcons.person_fill : Icons.music_note_rounded, color: AppColors.textTertiary),
+              ),
+            ),
+          );
+        }
+        return Container(
+          color: AppColors.surface2,
+          child: const Icon(Icons.music_note_rounded, color: AppColors.textTertiary),
+        );
+      },
     );
     return circular ? ClipOval(child: img) : ClipRRect(borderRadius: BorderRadius.circular(radius), child: img);
   }

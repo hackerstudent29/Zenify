@@ -108,7 +108,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   int _selectedChartTab = 0; // 0: Top Songs, 1: Top Albums, 2: Top Artists, 3: Global
   final Set<String> _followedArtists = {};
 
-  final PageController _featuredPageCtrl = PageController(viewportFraction: 0.92);
+  final PageController _featuredPageCtrl = PageController(viewportFraction: 0.89);
 
   static const List<String> _exploreChips = [
     'Top Hits',
@@ -381,41 +381,97 @@ class _ExploreScreenState extends State<ExploreScreen>
   Widget _buildChipsRow() {
     return SizedBox(
       height: 52,
-      child: ListView.separated(
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-        itemCount: _exploreChips.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (ctx, i) {
+        itemCount: _exploreChips.length + 1,
+        itemBuilder: (ctx, idx) {
+          if (idx == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: PressableScale(
+                scale: 0.94,
+                onTap: _pickCountry,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      width: 0.7,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_country.flag, style: const TextStyle(fontSize: 13)),
+                      const SizedBox(width: 5),
+                      Text(
+                        _country.code,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        CupertinoIcons.chevron_down,
+                        size: 11,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          final i = idx - 1;
           final isSelected = i == _selectedMoodChip;
           final title = _exploreChips[i];
 
-          return PressableScale(
-            scale: 0.94,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _selectedMoodChip = i);
-              if (i > 0) {
-                _onMoodOrGenreTap(title.toLowerCase(), title);
-              }
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white.withValues(alpha: 0.9),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.2,
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: PressableScale(
+              scale: 0.94,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                setState(() => _selectedMoodChip = i);
+                if (i > 0) {
+                  _onMoodOrGenreTap(title.toLowerCase(), title);
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                  border: isSelected
+                      ? null
+                      : Border.all(
+                          color: Colors.white.withValues(alpha: 0.09),
+                          width: 0.6,
+                        ),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: isSelected
+                        ? Colors.black
+                        : Colors.white.withValues(alpha: 0.9),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
                 ),
               ),
             ),
@@ -426,7 +482,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section A: Featured Discovery (With Round White Play Button)
+  // Section A: Featured Editorial Spotlight (Apple Music Tall Browse Hero)
   // ---------------------------------------------------------------------------
   Widget _buildFeaturedSection(List<ExploreFeaturedItem> items) {
     if (items.isEmpty) return const SizedBox.shrink();
@@ -435,7 +491,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: 220,
+          height: 304,
           child: PageView.builder(
             controller: _featuredPageCtrl,
             itemCount: items.length,
@@ -443,8 +499,9 @@ class _ExploreScreenState extends State<ExploreScreen>
             itemBuilder: (context, i) {
               final item = items[i];
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: PressableScale(
+                  scale: 0.98,
                   onTap: () {
                     HapticFeedback.lightImpact();
                     if (item.albumTitle != null) {
@@ -463,102 +520,121 @@ class _ExploreScreenState extends State<ExploreScreen>
                     }
                   },
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // Cover art
-                        CachedNetworkImage(
-                          imageUrl: item.coverUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (_, url) => Container(color: AppColors.surface2),
-                          errorWidget: (_, url, error) => Container(color: AppColors.surface2),
+                    borderRadius: BorderRadius.circular(20),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          width: 0.7,
                         ),
-                        // Dark glass gradient overlay
-                        Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Color(0x60000000),
-                                Color(0xF00A0A0C),
-                              ],
-                              stops: [0.25, 0.6, 1.0],
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CachedNetworkImage(
+                            imageUrl: item.coverUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (_, url) =>
+                                Container(color: AppColors.surface2),
+                            errorWidget: (_, url, error) =>
+                                Container(color: AppColors.surface2),
+                          ),
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Color(0x55000000),
+                                  Colors.transparent,
+                                  Color(0x88000000),
+                                  Color(0xF208080A),
+                                ],
+                                stops: [0.0, 0.28, 0.62, 1.0],
+                              ),
                             ),
                           ),
-                        ),
-                        // Editorial text layout
-                        Positioned(
-                          left: 18,
-                          right: 74,
-                          bottom: 18,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  item.badge.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.8,
-                                  ),
+                          Positioned(
+                            left: 16,
+                            top: 16,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.52),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.16),
+                                  width: 0.6,
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: Text(
+                                item.badge.toUpperCase(),
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 21,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.4,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.9,
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                item.subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Positioned(
+                            left: 18,
+                            right: 78,
+                            bottom: 18,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  item.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.5,
+                                    height: 1.12,
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  item.subtitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.78),
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        // Circular White Play Button (Apple Music Hero Parity)
-                        Positioned(
-                          right: 18,
-                          bottom: 18,
-                          child: ZenActionCircle(
-                            size: 46,
-                            icon: CupertinoIcons.play_fill,
-                            backgroundColor: Colors.white,
-                            idleColor: Colors.black,
-                            activeColor: Colors.black,
-                            iconSize: 20,
-                            onTap: () {
-                              if (item.tracks.isNotEmpty) {
-                                _play(item.tracks, 0);
-                              }
-                            },
+                          Positioned(
+                            right: 18,
+                            bottom: 18,
+                            child: ZenActionCircle(
+                              size: 46,
+                              icon: CupertinoIcons.play_fill,
+                              backgroundColor: Colors.white,
+                              idleColor: Colors.black,
+                              activeColor: Colors.black,
+                              iconSize: 20,
+                              onTap: () {
+                                if (item.tracks.isNotEmpty) {
+                                  _play(item.tracks, 0);
+                                }
+                              },
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -566,8 +642,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             },
           ),
         ),
-        const SizedBox(height: 10),
-        // Dots indicator
+        const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -576,13 +651,13 @@ class _ExploreScreenState extends State<ExploreScreen>
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOutCubic,
                 margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: _activeFeaturedIndex == i ? 18 : 6,
+                width: _activeFeaturedIndex == i ? 20 : 6,
                 height: 5,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(3),
                   color: _activeFeaturedIndex == i
                       ? AppColors.accent
-                      : Colors.white.withValues(alpha: 0.2),
+                      : Colors.white.withValues(alpha: 0.22),
                 ),
               ),
           ],
@@ -592,7 +667,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section B: Trending Music (Unified ZenPlayShuffleRow + 4-Row Column Shelf)
+  // Section B: Trending Music (Inline Header Controls + 4-Row Column Shelf)
   // ---------------------------------------------------------------------------
   Widget _buildTrendingSection(List<Track> tracks) {
     final topTrending = tracks.take(16).toList();
@@ -602,25 +677,37 @@ class _ExploreScreenState extends State<ExploreScreen>
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: SectionHeader(
-            title: 'Trending in ${_country.name}',
-            actionTitle: 'See All',
-            onActionTap: () => _play(tracks, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: SectionHeader(
+                  title: 'Trending in ${_country.name}',
+                ),
+              ),
+              if (topTrending.isNotEmpty) ...[
+                ZenActionCircle(
+                  size: 34,
+                  icon: CupertinoIcons.play_fill,
+                  iconSize: 15,
+                  backgroundColor: Colors.white,
+                  idleColor: Colors.black,
+                  activeColor: Colors.black,
+                  onTap: () => _play(topTrending, 0),
+                ),
+                const SizedBox(width: 8),
+                ZenActionCircle(
+                  size: 34,
+                  icon: CupertinoIcons.shuffle,
+                  iconSize: 15,
+                  backgroundColor: Colors.white.withValues(alpha: 0.11),
+                  idleColor: Colors.white,
+                  onTap: () => _shuffle(topTrending),
+                ),
+              ],
+            ],
           ),
         ),
-        const SizedBox(height: 12),
-
-        // Unified Play & Shuffle Row (Round Shape Parity with Album & Artist Pages)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: ZenPlayShuffleRow(
-            onPlay: () => _play(topTrending, 0),
-            onShuffle: () => _shuffle(topTrending),
-            playLabel: 'Play All',
-          ),
-        ),
-
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
 
         // Horizontal pages of trending songs (4 rows each, matching Home quick picks)
         if (_isLoading)
@@ -663,19 +750,90 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section C: Top Charts (Ranked Rows with Unified Buttons)
+  // Section C: Top Charts (Interactive Filter Tabs + Hairline Ranked Rows)
   // ---------------------------------------------------------------------------
   Widget _buildTopChartsSection(List<Track> tracks) {
     const tabs = ['Top Songs', 'Top Albums', 'Top Artists', 'Global 50'];
 
+    Widget body;
+    if (_selectedChartTab == 1) {
+      final albums = _buildNewReleases(tracks).take(5).toList();
+      body = Column(
+        children: [
+          for (int i = 0; i < albums.length; i++)
+            _buildGenericRankRow(
+              rank: i + 1,
+              title: MediaNormalizer.cleanCompactTitle(albums[i].title),
+              subtitle: MediaNormalizer.formatArtists(albums[i].artist),
+              imageUrl: albums[i].coverUrl,
+              showDivider: i < albums.length - 1,
+              onTap: () => Navigator.push(
+                context,
+                ZenPageRoute(
+                  builder: (_) => AlbumScreen(
+                    albumTitle: albums[i].title,
+                    artistName: albums[i].artist,
+                    coverUrl: albums[i].coverUrl,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    } else if (_selectedChartTab == 2) {
+      final artists = _buildRecommendedArtists(tracks).take(5).toList();
+      body = Column(
+        children: [
+          for (int i = 0; i < artists.length; i++)
+            _buildGenericRankRow(
+              rank: i + 1,
+              title: artists[i]['name'] ?? '',
+              subtitle: 'Artist',
+              imageUrl: artists[i]['photo'] ?? '',
+              isCircular: true,
+              showDivider: i < artists.length - 1,
+              onTap: () => Navigator.push(
+                context,
+                ZenPageRoute(
+                  builder: (_) => ArtistScreen(
+                    artistName: artists[i]['name'] ?? '',
+                    imageUrl: artists[i]['photo'] ?? '',
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    } else {
+      final chartTracks = _selectedChartTab == 3 && tracks.length > 5
+          ? tracks.skip(5).toList()
+          : tracks;
+      final count = math.min(5, chartTracks.length);
+      body = Column(
+        children: [
+          for (int i = 0; i < count; i++)
+            _buildRankRow(
+              chartTracks[i],
+              i + 1,
+              chartTracks,
+              showDivider: i < count - 1,
+            ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: SectionHeader(title: 'Top Charts'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: SectionHeader(
+            title: 'Top Charts',
+            actionTitle: tracks.isNotEmpty ? 'Play' : null,
+            onActionTap: tracks.isNotEmpty ? () => _play(tracks, 0) : null,
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
         // Filter pills
         SingleChildScrollView(
@@ -687,23 +845,35 @@ class _ExploreScreenState extends State<ExploreScreen>
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: PressableScale(
+                    scale: 0.94,
                     onTap: () {
                       HapticFeedback.selectionClick();
                       setState(() => _selectedChartTab = i);
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: _selectedChartTab == i
-                            ? AppColors.accent
-                            : Colors.white.withValues(alpha: 0.12),
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(18),
+                        border: _selectedChartTab == i
+                            ? null
+                            : Border.all(
+                                color: Colors.white.withValues(alpha: 0.09),
+                                width: 0.6,
+                              ),
                       ),
                       child: Text(
                         tabs[i],
                         style: TextStyle(
-                          color: _selectedChartTab == i ? Colors.white : AppColors.textSecondary,
+                          color: _selectedChartTab == i
+                              ? Colors.black
+                              : AppColors.textSecondary,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -715,136 +885,233 @@ class _ExploreScreenState extends State<ExploreScreen>
           ),
         ),
 
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
-        // Ranked items
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: [
-              for (int i = 0; i < math.min(5, tracks.length); i++)
-                _buildRankRow(tracks[i], i + 1, tracks),
-            ],
-          ),
+          child: body,
         ),
       ],
     );
   }
 
-  Widget _buildRankRow(Track track, int rank, List<Track> all) {
-    return PressableScale(
-      onTap: () => _play(all, rank - 1),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 5),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 30,
-              child: Text(
-                rank.toString().padLeft(2, '0'),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: rank <= 3 ? AppColors.accent : Colors.white54,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
+  Widget _buildGenericRankRow({
+    required int rank,
+    required String title,
+    required String subtitle,
+    required String imageUrl,
+    required VoidCallback onTap,
+    bool isCircular = false,
+    bool showDivider = true,
+  }) {
+    return Column(
+      children: [
+        PressableScale(
+          scale: 0.985,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 30,
+                  child: Text(
+                    '$rank',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: rank <= 3 ? AppColors.accent : AppColors.textSecondary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: CachedNetworkImage(
-                imageUrl: track.coverUrl,
-                width: 48,
-                height: 48,
-                fit: BoxFit.cover,
-                placeholder: (_, url) => Container(color: AppColors.surface2),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    MediaNormalizer.cleanCompactTitle(track.title),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+                const SizedBox(width: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(isCircular ? 26 : 10),
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                    placeholder: (_, url) => Container(color: AppColors.surface2),
+                    errorWidget: (_, url, err) =>
+                        Container(color: AppColors.surface2),
                   ),
-                  const SizedBox(height: 2),
-                  InteractiveArtistsText(
-                    artists: track.resolvedArtists,
-                    maxLines: 1,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ZenActionCircle(
-              size: 36,
-              icon: CupertinoIcons.ellipsis,
-              iconSize: 18,
-              onTap: () {
-                final player = context.read<PlayerState>();
-                final resolvedArtists = track.resolvedArtists;
-                ZenDropdown.showTrackMenu(
-                  context: context,
-                  trackTitle: track.title,
-                  artistName: track.artist,
-                  albumName: track.album,
-                  onPlayNext: () => player.playNext(track),
-                  onPlayLater: () => player.playLast(track),
-                  onGoToArtist: () {
-                    if (resolvedArtists.length > 1) {
-                      showArtistPopup(context, artists: resolvedArtists);
-                    } else if (resolvedArtists.isNotEmpty) {
-                      Navigator.push(
-                        context,
-                        ZenPageRoute(
-                          builder: (_) => ArtistScreen(
-                            artistName: resolvedArtists.first.name,
-                            browseId: resolvedArtists.first.id,
-                          ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w600,
                         ),
-                      );
-                    }
-                  },
-                  onGoToAlbum: track.album.isNotEmpty
-                      ? () => Navigator.push(
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  CupertinoIcons.chevron_right,
+                  size: 15,
+                  color: Colors.white.withValues(alpha: 0.35),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (showDivider)
+          Divider(
+            height: 1,
+            indent: 104,
+            color: Colors.white.withValues(alpha: 0.07),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRankRow(
+    Track track,
+    int rank,
+    List<Track> all, {
+    bool showDivider = true,
+  }) {
+    return Column(
+      children: [
+        PressableScale(
+          scale: 0.985,
+          onTap: () => _play(all, rank - 1),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 30,
+                  child: Text(
+                    '$rank',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: rank <= 3 ? AppColors.accent : AppColors.textSecondary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: CachedNetworkImage(
+                    imageUrl: track.coverUrl,
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                    placeholder: (_, url) => Container(color: AppColors.surface2),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        MediaNormalizer.cleanCompactTitle(track.title),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      InteractiveArtistsText(
+                        artists: track.resolvedArtists,
+                        maxLines: 1,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ZenActionCircle(
+                  size: 36,
+                  icon: CupertinoIcons.ellipsis,
+                  iconSize: 18,
+                  onTap: () {
+                    final player = context.read<PlayerState>();
+                    final resolvedArtists = track.resolvedArtists;
+                    ZenDropdown.showTrackMenu(
+                      context: context,
+                      trackTitle: track.title,
+                      artistName: track.artist,
+                      albumName: track.album,
+                      onPlayNext: () => player.playNext(track),
+                      onPlayLater: () => player.playLast(track),
+                      onGoToArtist: () {
+                        if (resolvedArtists.length > 1) {
+                          showArtistPopup(context, artists: resolvedArtists);
+                        } else if (resolvedArtists.isNotEmpty) {
+                          Navigator.push(
                             context,
                             ZenPageRoute(
-                              builder: (_) => AlbumScreen(
-                                albumTitle: track.album,
-                                artistName: track.artist,
-                                coverUrl: track.coverUrl,
+                              builder: (_) => ArtistScreen(
+                                artistName: resolvedArtists.first.name,
+                                browseId: resolvedArtists.first.id,
                               ),
                             ),
-                          )
-                      : null,
-                );
-              },
+                          );
+                        }
+                      },
+                      onGoToAlbum: track.album.isNotEmpty
+                          ? () => Navigator.push(
+                                context,
+                                ZenPageRoute(
+                                  builder: (_) => AlbumScreen(
+                                    albumTitle: track.album,
+                                    artistName: track.artist,
+                                    coverUrl: track.coverUrl,
+                                  ),
+                                ),
+                              )
+                          : null,
+                    );
+                  },
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+        if (showDivider)
+          Divider(
+            height: 1,
+            indent: 104,
+            color: Colors.white.withValues(alpha: 0.07),
+          ),
+      ],
     );
   }
 
   // ---------------------------------------------------------------------------
-  // Section D: New Releases & Hot Drops (Cover Cards Shelf)
+  // Section D: New Releases & Hot Drops (Canonical MediaCard Shelf)
   // ---------------------------------------------------------------------------
   Widget _buildNewReleasesSection(List<ExploreReleaseItem> releases) {
     if (releases.isEmpty) return const SizedBox.shrink();
@@ -858,93 +1125,34 @@ class _ExploreScreenState extends State<ExploreScreen>
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 215,
-          child: ListView.builder(
+          height: 234,
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            physics: const _SnapSpringPhysics(itemExtent: 160),
+            physics: const _SnapSpringPhysics(itemExtent: 176),
             padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: releases.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
             itemBuilder: (context, i) {
               final rel = releases[i];
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: PressableScale(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.push(
-                      context,
-                      ZenPageRoute(
-                        builder: (_) => AlbumScreen(
-                          albumTitle: rel.title,
-                          artistName: rel.artist,
-                          coverUrl: rel.coverUrl,
-                        ),
+              return MediaCard(
+                width: 162,
+                twoLineTitle: true,
+                title: MediaNormalizer.cleanCompactTitle(rel.title),
+                subtitle: '${rel.type.toUpperCase()} • ${MediaNormalizer.formatArtists(rel.artist)}',
+                imageUrl: rel.coverUrl,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.push(
+                    context,
+                    ZenPageRoute(
+                      builder: (_) => AlbumScreen(
+                        albumTitle: rel.title,
+                        artistName: rel.artist,
+                        coverUrl: rel.coverUrl,
                       ),
-                    );
-                  },
-                  child: SizedBox(
-                    width: 150,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Stack(
-                            children: [
-                              CachedNetworkImage(
-                                imageUrl: rel.coverUrl,
-                                width: 150,
-                                height: 150,
-                                fit: BoxFit.cover,
-                                placeholder: (_, url) => Container(color: AppColors.surface2),
-                              ),
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.75),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    rel.type.toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          MediaNormalizer.cleanCompactTitle(rel.title),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          MediaNormalizer.formatArtists(rel.artist),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
                     ),
-                  ),
-                ),
+                  );
+                },
               );
             },
           ),
@@ -954,7 +1162,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section E: Spotlight Artists (Circular Avatars + Stadium Follow Pills)
+  // Section E: Spotlight Artists (Circular Avatars + Pill Follow Buttons)
   // ---------------------------------------------------------------------------
   Widget _buildArtistsSection(List<Map<String, String>> artists) {
     if (artists.isEmpty) return const SizedBox.shrink();
@@ -968,76 +1176,88 @@ class _ExploreScreenState extends State<ExploreScreen>
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 236,
-          child: ListView.builder(
+          height: 248,
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
+            physics: const _SnapSpringPhysics(itemExtent: 164),
             padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: artists.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
             itemBuilder: (context, i) {
               final a = artists[i];
               final name = a['name']!;
               final photo = a['photo']!;
               final isFollowed = _followedArtists.contains(name);
 
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: SizedBox(
-                  width: 160,
-                  child: Column(
-                    children: [
-                      MediaCard(
-                        title: '',
-                        imageUrl: photo,
-                        isCircular: true,
-                        width: 160,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          Navigator.push(
-                            context,
-                            ZenPageRoute(
-                              builder: (_) => ArtistScreen(
-                                artistName: name,
-                                imageUrl: photo,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      PressableScale(
-                        onTap: () => _toggleFollow(name),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isFollowed ? AppColors.accent : Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            isFollowed ? 'Following' : 'Follow',
-                            style: TextStyle(
-                              color: isFollowed ? Colors.white : AppColors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+              return SizedBox(
+                width: 150,
+                child: Column(
+                  children: [
+                    MediaCard(
+                      title: '',
+                      imageUrl: photo,
+                      isCircular: true,
+                      width: 150,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          ZenPageRoute(
+                            builder: (_) => ArtistScreen(
+                              artistName: name,
+                              imageUrl: photo,
                             ),
                           ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    PressableScale(
+                      scale: 0.94,
+                      onTap: () => _toggleFollow(name),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isFollowed
+                              ? AppColors.accent
+                              : Colors.white.withValues(alpha: 0.09),
+                          borderRadius: BorderRadius.circular(18),
+                          border: isFollowed
+                              ? null
+                              : Border.all(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                  width: 0.6,
+                                ),
+                        ),
+                        child: Text(
+                          isFollowed ? 'Following' : 'Follow',
+                          style: TextStyle(
+                            color: isFollowed
+                                ? Colors.white
+                                : AppColors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               );
             },
@@ -1048,7 +1268,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section F: Curated & Discovery Playlists
+  // Section F: Curated & Discovery Playlists (Canonical MediaCard Shelf)
   // ---------------------------------------------------------------------------
   Widget _buildPlaylistsSection(List<ExplorePlaylistItem> playlists) {
     return Column(
@@ -1060,57 +1280,22 @@ class _ExploreScreenState extends State<ExploreScreen>
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 220,
-          child: ListView.builder(
+          height: 234,
+          child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            physics: const _SnapSpringPhysics(itemExtent: 160),
+            physics: const _SnapSpringPhysics(itemExtent: 176),
             padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: playlists.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
             itemBuilder: (context, i) {
               final pl = playlists[i];
-              return Padding(
-                padding: const EdgeInsets.only(right: 14),
-                child: PressableScale(
-                  onTap: () => _onMoodOrGenreTap(pl.searchQuery, pl.title),
-                  child: SizedBox(
-                    width: 155,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: CachedNetworkImage(
-                            imageUrl: pl.coverUrl,
-                            width: 155,
-                            height: 155,
-                            fit: BoxFit.cover,
-                            placeholder: (_, url) => Container(color: AppColors.surface2),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          pl.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          pl.description,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              return MediaCard(
+                width: 162,
+                twoLineTitle: true,
+                title: pl.title,
+                subtitle: pl.description,
+                imageUrl: pl.coverUrl,
+                onTap: () => _onMoodOrGenreTap(pl.searchQuery, pl.title),
               );
             },
           ),
@@ -1134,7 +1319,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 180,
+          height: 184,
           child: GridView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -1143,56 +1328,17 @@ class _ExploreScreenState extends State<ExploreScreen>
               crossAxisCount: 2,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: 0.52,
+              childAspectRatio: 0.48,
             ),
             itemCount: moods.length,
             itemBuilder: (context, i) {
               final m = moods[i];
-              return PressableScale(
+              return _buildCategoryTile(
+                title: m.title,
+                subtitle: m.subtitle,
+                icon: m.icon,
+                gradient: m.gradient,
                 onTap: () => _onMoodOrGenreTap(m.searchQuery, m.title),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: m.gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              m.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              m.subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.7),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(m.icon, color: Colors.white.withValues(alpha: 0.75), size: 22),
-                    ],
-                  ),
-                ),
               );
             },
           ),
@@ -1202,7 +1348,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // Section H: Browse by Genre (2-Column Grid Matching Home Screen)
+  // Section H: Browse by Genre (Editorial 2-Column Apple Music Grid)
   // ---------------------------------------------------------------------------
   Widget _buildGenresSection() {
     final genres = _dataService.genres;
@@ -1224,45 +1370,124 @@ class _ExploreScreenState extends State<ExploreScreen>
               crossAxisCount: 2,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 2.2,
+              childAspectRatio: 1.85,
             ),
             itemCount: genres.length,
             itemBuilder: (context, i) {
               final g = genres[i];
-              return PressableScale(
+              return _buildCategoryTile(
+                title: g.title,
+                icon: g.icon,
+                gradient: g.gradient,
                 onTap: () => _onMoodOrGenreTap(g.searchQuery, g.title),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: g.gradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          g.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      Icon(g.icon, color: Colors.white.withValues(alpha: 0.85), size: 22),
-                    ],
-                  ),
-                ),
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCategoryTile({
+    required String title,
+    String? subtitle,
+    required IconData icon,
+    required List<Color> gradient,
+    required VoidCallback onTap,
+  }) {
+    return PressableScale(
+      scale: 0.96,
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.14),
+              width: 0.6,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -18,
+                top: -18,
+                child: Container(
+                  width: 82,
+                  height: 82,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.22),
+                        Colors.white.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 12,
+                top: 12,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      width: 0.6,
+                    ),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 14),
+                ),
+              ),
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    if (subtitle != null && subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.75),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
