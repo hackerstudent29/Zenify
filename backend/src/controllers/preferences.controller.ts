@@ -16,13 +16,15 @@ const updatePreferencesSchema = z.object({
     })
   ).min(3, 'Select at least 3 favorite artists').max(10, 'Maximum 10 favorite artists allowed'),
 
-  preferredGenres: z.array(z.string()).min(4, 'Select at least 4 genres').max(5, 'Maximum 5 genres allowed'),
+  preferredGenres: z.array(z.string()).min(1, 'Select at least 1 genre').max(8, 'Maximum 8 genres allowed'),
 
-  languages: z.array(z.string()).min(1, 'Select at least 1 language').max(5, 'Maximum 5 languages allowed'),
+  languages: z.array(z.string()).min(1, 'Select at least 1 language').max(6, 'Maximum 6 languages allowed'),
 
   country: z.string().min(1, 'Please select your country'),
 
-  age: z.coerce.number().int().min(13, 'Age must be at least 13').max(100, 'Age must be 100 or below')
+  age: z.coerce.number().int().min(13, 'Age must be at least 13').max(100, 'Age must be 100 or below').optional(),
+
+  gender: z.string().max(40).optional()
 });
 
 export class PreferencesController {
@@ -80,7 +82,7 @@ export class PreferencesController {
       where: { id: userId },
       data: {
         country: data.country,
-        age: data.age
+        ...(data.age !== undefined ? { age: data.age } : {})
       }
     });
 

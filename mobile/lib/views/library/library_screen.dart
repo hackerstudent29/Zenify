@@ -5,19 +5,10 @@ import 'dart:ui' show lerpDouble;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
     show
-        CupertinoActionSheet,
-        CupertinoActionSheetAction,
         CupertinoActivityIndicator,
-        CupertinoAlertDialog,
-        CupertinoDialogAction,
+        CupertinoIcons,
         CupertinoSearchTextField,
-        CupertinoSliverRefreshControl,
-        CupertinoTextField,
-        CupertinoTextThemeData,
-        CupertinoTheme,
-        CupertinoThemeData,
-        showCupertinoDialog,
-        showCupertinoModalPopup;
+        CupertinoSliverRefreshControl;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -55,18 +46,6 @@ void _spring(AnimationController c, double to, {double v = 0}) {
 
 TextStyle _t(double size, {FontWeight w = FontWeight.w400, Color c = Colors.white, double? ls}) =>
     AppTypography.headline.copyWith(fontSize: size, fontWeight: w, color: c, letterSpacing: ls);
-
-final _dark = CupertinoThemeData(
-  brightness: Brightness.dark,
-  primaryColor: _rose,
-  scaffoldBackgroundColor: Colors.black,
-  textTheme: CupertinoTextThemeData(
-    primaryColor: _rose,
-    navLargeTitleTextStyle: AppTypography.largeTitle.copyWith(color: Colors.white),
-    navTitleTextStyle: _t(17, w: FontWeight.w600),
-    navActionTextStyle: _t(17, c: _rose),
-  ),
-);
 
 String _n(int n, String one, String many) => '$n ${n == 1 ? one : many}';
 
@@ -269,98 +248,32 @@ void _openAlbum(BuildContext c, String title, String artist, String cover) => _p
       ),
     );
 
-void _toast(BuildContext c, String msg) {
-  ScaffoldMessenger.of(c)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(
-      content: Text(msg),
-      duration: const Duration(milliseconds: 1400),
-      behavior: SnackBarBehavior.floating,
-    ));
-}
-
-class _A {
-  const _A(this.key, this.icon, this.label, {this.danger = false});
-  final String key, label;
-  final IconData icon;
-  final bool danger;
-}
-
-Future<String?> _sheet(BuildContext c, List<_A> actions, {String? title, String? message}) =>
-    showCupertinoModalPopup<String>(
+Future<String?> _promptName(
+  BuildContext c, {
+  required String title,
+  String initial = '',
+  required String confirm,
+}) =>
+    ZenDropdown.showInputSheet(
       context: c,
-      builder: (ctx) => CupertinoTheme(
-        data: _dark,
-        child: CupertinoActionSheet(
-          title: title == null ? null : Text(title),
-          message: message == null ? null : Text(message),
-          actions: [
-            for (final a in actions)
-              CupertinoActionSheetAction(
-                isDestructiveAction: a.danger,
-                onPressed: () => Navigator.pop(ctx, a.key),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [Flexible(child: Text(a.label, overflow: TextOverflow.ellipsis)), Icon(a.icon, size: 20)],
-                ),
-              ),
-          ],
-          cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        ),
-      ),
+      title: title,
+      initialValue: initial,
+      hintText: 'Playlist Name',
+      confirmLabel: confirm,
     );
 
-Future<String?> _promptName(BuildContext c, {required String title, String initial = '', required String confirm}) {
-  final ctl = TextEditingController(text: initial);
-  return showCupertinoDialog<String>(
-    context: c,
-    builder: (ctx) => CupertinoTheme(
-      data: _dark,
-      child: CupertinoAlertDialog(
-        title: Text(title),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
-            controller: ctl,
-            autofocus: true,
-            placeholder: 'Playlist Name',
-            maxLength: 40,
-            style: const TextStyle(color: Colors.white),
-            cursorColor: _rose,
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(ctx).pop(ctl.text.trim()),
-            child: Text(confirm),
-          ),
-        ],
-      ),
-    ),
-  ).whenComplete(ctl.dispose);
-}
-
-Future<bool> _confirm(BuildContext c, {required String title, required String message, required String action}) async {
-  final r = await showCupertinoDialog<bool>(
-    context: c,
-    builder: (ctx) => CupertinoTheme(
-      data: _dark,
-      child: CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          CupertinoDialogAction(
-              isDestructiveAction: true, onPressed: () => Navigator.of(ctx).pop(true), child: Text(action)),
-        ],
-      ),
-    ),
-  );
-  return r ?? false;
-}
+Future<bool> _confirm(
+  BuildContext c, {
+  required String title,
+  required String message,
+  required String action,
+}) =>
+    ZenDropdown.showConfirmSheet(
+      context: c,
+      title: title,
+      message: message,
+      confirmLabel: action,
+    );
 
 Future<UserPlaylist?> _createPlaylist(BuildContext c, {Track? first}) async {
   final n = await _promptName(c, title: 'New Playlist', confirm: 'Create');
@@ -373,92 +286,88 @@ Future<UserPlaylist?> _createPlaylist(BuildContext c, {Track? first}) async {
 }
 
 /// Long-press / ellipsis menu for any song.
-Future<void> _trackActions(BuildContext c, Track t) async {
-  ZenDropdown.showTrackMenu(
-    context: c,
-    track: t,
-    onAddToPlaylist: () => _addToPlaylist(c, t),
-  );
-}
-
-Future<void> _addToPlaylist(BuildContext c, Track t) async {
-  final store = LibraryStore.instance;
-  final lists = store.playlists.toList();
-  final pick = await _sheet(
-    c,
-    [
-      const _A('__new', Icons.add_rounded, 'New Playlist…'),
-      for (var i = 0; i < lists.length; i++) _A('$i', Icons.queue_music_rounded, lists[i].name),
-    ],
-    title: 'Add to Playlist',
-  );
-  if (!c.mounted || pick == null) return;
-  if (pick == '__new') {
-    final n = await _promptName(c, title: 'New Playlist', confirm: 'Create');
-    if (n == null || n.isEmpty || !c.mounted) return;
-    store.createPlaylist(n, first: t);
-    _toast(c, 'Added to “$n”');
-    return;
-  }
-  final idx = int.tryParse(pick);
-  if (idx == null || idx >= lists.length) return;
-  final p = lists[idx];
-  final ok = store.addToPlaylist(p.id, t);
-  _toast(c, ok ? 'Added to “${p.name}”' : 'Already in this playlist');
-}
+Future<void> _trackActions(BuildContext c, Track t) =>
+    ZenDropdown.showTrackMenu(context: c, track: t);
 
 Future<void> _playlistMenu(BuildContext c, UserPlaylist p, {bool inDetail = false}) async {
   HapticFeedback.mediumImpact();
   final store = LibraryStore.instance;
   final tracks = store.playlistTracks(p);
-  final act = await _sheet(
-    c,
-    [
-      if (tracks.isNotEmpty) const _A('play', Icons.play_arrow_rounded, 'Play'),
-      if (tracks.isNotEmpty) const _A('shuffle', Icons.shuffle_rounded, 'Shuffle'),
-      if (inDetail) const _A('add', Icons.add_rounded, 'Add Songs…'),
-      const _A('rename', Icons.edit_rounded, 'Rename'),
-      const _A('delete', Icons.delete_outline_rounded, 'Delete Playlist', danger: true),
-    ],
+  final firstCover = tracks.isNotEmpty ? tracks.first.coverUrl : null;
+  await ZenDropdown.show<void>(
+    context: c,
     title: p.name,
+    subtitle: _n(tracks.length, 'Song', 'Songs'),
+    coverUrl: firstCover,
+    shareText: '${p.name} playlist on Zenify',
+    shareUrl: 'https://zenify.app/playlist/${Uri.encodeComponent(p.name)}',
+    items: [
+      if (tracks.isNotEmpty)
+        ZenDropdownItem(
+          title: 'Play',
+          icon: CupertinoIcons.play_fill,
+          onTap: () => _play(c, tracks, 0),
+        ),
+      if (tracks.isNotEmpty)
+        ZenDropdownItem(
+          title: 'Shuffle',
+          icon: CupertinoIcons.shuffle,
+          onTap: () => _shuffle(c, tracks),
+        ),
+      if (inDetail)
+        ZenDropdownItem(
+          title: 'Add Songs…',
+          icon: CupertinoIcons.plus_circle,
+          onTap: () => _push(c, _AddSongsPage(p), modal: true),
+        ),
+      ZenDropdownItem(
+        title: 'Rename',
+        icon: CupertinoIcons.pencil,
+        onTap: () async {
+          if (!c.mounted) return;
+          final n = await _promptName(c, title: 'Rename Playlist', initial: p.name, confirm: 'Save');
+          if (n != null && n.isNotEmpty) store.renamePlaylist(p.id, n);
+        },
+      ),
+      ZenDropdownItem(
+        title: 'Delete Playlist',
+        icon: CupertinoIcons.trash,
+        isDestructive: true,
+        onTap: () async {
+          if (!c.mounted) return;
+          final ok = await _confirm(
+            c,
+            title: 'Delete “${p.name}”?',
+            message: 'This playlist will be removed from your library.',
+            action: 'Delete',
+          );
+          if (!ok || !c.mounted) return;
+          HapticFeedback.mediumImpact();
+          if (inDetail) Navigator.of(c).pop();
+          store.deletePlaylist(p.id);
+        },
+      ),
+    ],
   );
-  if (!c.mounted || act == null) return;
-  switch (act) {
-    case 'play':
-      _play(c, tracks, 0);
-    case 'shuffle':
-      _shuffle(c, tracks);
-    case 'add':
-      await _push(c, _AddSongsPage(p), modal: true);
-    case 'rename':
-      final n = await _promptName(c, title: 'Rename Playlist', initial: p.name, confirm: 'Save');
-      if (n != null && n.isNotEmpty) store.renamePlaylist(p.id, n);
-    case 'delete':
-      final ok = await _confirm(c,
-          title: 'Delete “${p.name}”?', message: 'This playlist will be removed from your library.', action: 'Delete');
-      if (!ok || !c.mounted) return;
-      HapticFeedback.mediumImpact();
-      if (inDetail) Navigator.of(c).pop();
-      store.deletePlaylist(p.id);
-  }
 }
 
 Future<void> _sortSheet(BuildContext c, _Sort cur, ValueChanged<_Sort> onPick) async {
-  final r = await _sheet(
-    c,
-    [
-      _A('recent', Icons.access_time_rounded, '${cur == _Sort.recent ? '✓  ' : ''}Recently Added'),
-      _A('title', Icons.sort_by_alpha_rounded, '${cur == _Sort.title ? '✓  ' : ''}Title'),
-      _A('artist', Icons.person_outline_rounded, '${cur == _Sort.artist ? '✓  ' : ''}Artist'),
-    ],
+  ZenDropdown.showSortMenu<_Sort>(
+    context: c,
     title: 'Sort By',
+    selected: cur,
+    options: const [
+      (value: _Sort.recent, label: 'Recently Added', icon: CupertinoIcons.clock),
+      (value: _Sort.title, label: 'Title', icon: CupertinoIcons.textformat_abc),
+      (value: _Sort.artist, label: 'Artist', icon: CupertinoIcons.person),
+    ],
+    onSelected: (s) {
+      if (s != cur) {
+        HapticFeedback.selectionClick();
+        onPick(s);
+      }
+    },
   );
-  if (r == null) return;
-  final s = _Sort.values.firstWhere((e) => e.name == r);
-  if (s != cur) {
-    HapticFeedback.selectionClick();
-    onPick(s);
-  }
 }
 
 List<Track> _filterTracks(List<Track> src, String query, _Sort sort) {
@@ -517,7 +426,6 @@ Widget _page({
                     onBack: () => Navigator.maybePop(context),
                     showProfile: root,
                     onProfileTap: onOpenProfile,
-                    topPadding: top + 4,
                     trailing: trailing,
                   ),
                 ),

@@ -351,25 +351,27 @@ const defaultRemoteConfig = {
     latestAppVersion: '1.0.9',
     isForceUpdate: true,
     releaseDate: 'November 12, 2026',
-    releaseTime: '03:00 PM IST',
+    releaseTime: '08:15 PM IST',
     updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk',
     features: [
-        'YouTube video streaming playback directly inside the MiniPlayer and Fullscreen Player via native ExoPlayer Texture',
-        'Redesigned Explore & Search layouts with sharper card hierarchy, browse mood tiles, and streamlined typography',
-        'Single-song Smart Queue isolation when tapping a search result so related mixes play instead of unrelated search rows',
+        'YouTube H.264 video streaming playback directly inside the MiniPlayer and Fullscreen Player via native ExoPlayer Texture',
+        'Redesigned Explore, Search, Profile, Settings & Insights with region-aware onboarding preferences seeding Day-1 Home feeds',
+        'Unified Layer-1 ZenDropdown action/input sheets, Rose-White liquid aurora Welcome screen, and Dedicated Artist Search',
     ],
     fixes: [
-        'Fixed background playback & auto-next stalls with persistent wake lock and ExoPlayer media item queue synchronization',
-        'Fixed notification & lock-screen real-time play/pause state and seekbar position updates plus DockVisibility miniplayer hiding bug',
-        'Fixed Dynamic Island notification pill width so alerts never overlap top-bar back or profile buttons',
-        'Fixed Artist & Album verified badge alignment and standardized rounded/pill action buttons',
+        'Fixed songs starting at the last 50s, failing on start-of-track scrub, or auto-skipping via ExoPlayer DSP offload disable, itag SimpleCache keying/eviction, and /api/utils/stream-youtube fallback',
+        'Fixed YouTube video playback & fullscreen video rendering by selecting H.264/MP4 + AAC streams and falling back cleanly on native video resolution failure',
+        'Fixed MiniPlayer & Bottom Dock overlapping sheets, Profile, Room Together, Settings, Insights & Welcome screens via DockVisibility.runModal and root-navigator dialogs',
+        'Fixed Dynamic Island center alignment across all dock pages, prevented scrolled collapsed MiniPlayer from overlapping an expanded Search bar, and fixed WelcomeScreen compact viewport scroll layout',
+        'Fixed background auto-next playback, real-time notification/lock-screen seekbar & state updates, Dynamic Island alert pill sizing, Artist/Album verified badges, and Smart Queue isolation',
     ],
     improvements: [
         'Improved MiniPlayer-to-Fullscreen seamless video surface handoff with smooth aspect-ratio rendering',
-        'Published fresh v1.0.9 (Build 13) ARM64 & Universal release APKs across web, API, and GitHub Releases',
+        'Ultra-compressed APK packaging (jniLibs compression, split debug symbols & subsetted SF Pro fonts), cutting ARM64 APK from 33.2 MB to 13.7 MB',
+        'Published fresh clean-built v1.0.9 (Build 13) ARM64 (13.7 MB) & Universal (30.6 MB) APKs across web, API, and GitHub Releases',
     ],
-    releaseNotes: '• YouTube video streaming in MiniPlayer & Fullscreen Player\n• Redesigned Explore & Search layouts plus fixed Artist verified badge & rounded action buttons\n• Compact Dynamic Island notification pill (zero overlap with navigation buttons)\n• Single-song Smart Queue on search selection instead of queuing unrelated search results\n• Reliable background auto-next playback, real-time lock-screen seekbar/state & miniplayer dock fix (v1.0.9 Build 13)',
-    message: 'Update to v1.0.9 (Build 13) for YouTube video streaming in Mini & Fullscreen Players, Explore/Search redesigns, Smart Queue fix, and reliable background/lock-screen playback',
+    releaseNotes: '• Fixed start-of-track playback, seeking from 0:00 & backend stream fallback\n• Fixed playable H.264 YouTube videos in MiniPlayer & Fullscreen Player\n• Hid MiniPlayer & Bottom Dock behind sheets, Profile & Room Together\n• Dead-centered Dynamic Island headers & de-overlapped scrolled Search/MiniPlayer dock\n• Single-song Smart Queue, reliable auto-next & real-time lock-screen controls (v1.0.9 Build 13)',
+    message: 'Update to v1.0.9 (Build 13) for start-of-track playback/seek fixes, fullscreen YouTube video playback, sheet/subpage dock isolation, centered Dynamic Island headers, and Smart Queue fixes',
 };
 
 server.get('/download/app', async (request, reply) => {

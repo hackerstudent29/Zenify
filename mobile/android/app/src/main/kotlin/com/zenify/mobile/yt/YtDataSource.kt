@@ -36,6 +36,25 @@ object YtDataSource {
     }
 
     @Synchronized
+    fun evictMedia(context: Context, mediaId: String) {
+        if (mediaId.isBlank()) return
+        try {
+            val cache = getCache(context.applicationContext)
+            val matchingKeys = cache.keys.filter { key ->
+                key == mediaId || key.startsWith("$mediaId#")
+            }
+            for (key in matchingKeys) {
+                cache.removeResource(key)
+            }
+            if (matchingKeys.isNotEmpty()) {
+                Log.d(TAG, "Evicted ${matchingKeys.size} cached span(s) for $mediaId")
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Failed evicting cache for $mediaId: ${e.message}")
+        }
+    }
+
+    @Synchronized
     fun clearCache(context: Context) {
         try {
             simpleCache?.release()
@@ -84,16 +103,26 @@ object YtDataSource {
                     resolved.url
                 }
                 val headers = StreamHeaders.forClient(resolved.client)
+                val cacheKey = if ((resolved.itag ?: 0) > 0) {
+                    "${videoId}${if (isVideoUri) "#v" else ""}#${resolved.itag}"
+                } else {
+                    "${videoId}${if (isVideoUri) "#v" else ""}"
+                }
                 dataSpec.buildUpon()
                     .setUri(Uri.parse(targetUrl))
+                    .setKey(cacheKey)
                     .setHttpRequestHeaders(headers)
                     .setCustomData(videoId)
                     .build()
             } else if (uri.host?.contains("googlevideo.com") == true) {
-                val headers = StreamHeaders.forClient("WEB_REMIX", com.zenify.mobile.audio.ZenAudioPlugin.activeHeaders)
-                dataSpec.buildUpon()
-                    .setHttpRequestHeaders(headers)
-                    .build()
+                val active = com.zenify.mobile.audio.ZenAudioPlugin.activeHeaders
+                if (active.isNotEmpty()) {
+                    dataSpec.buildUpon()
+                        .setHttpRequestHeaders(active)
+                        .build()
+                } else {
+                    dataSpec
+                }
             } else {
                 dataSpec
             }

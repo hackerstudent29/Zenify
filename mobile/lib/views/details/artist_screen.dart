@@ -937,7 +937,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'copy_artist_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Link copied',
+        title: 'Copied',
         body: name,
         leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
       ),
@@ -947,49 +947,38 @@ class _ArtistScreenState extends State<ArtistScreen> {
   void _menu(String name, List<Track> songs, String img) {
     HapticFeedback.selectionClick();
     final following = LibraryStore.instance.isFollowing(name);
-    showCupertinoModalPopup<void>(
+    ZenDropdown.show<void>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(name),
-        message: Text(_audienceLine.isNotEmpty ? _audienceLine : 'Artist'),
-        actions: [
-          if (songs.isNotEmpty)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _play(songs, 0);
-              },
-              child: const Text('Play Top Songs'),
-            ),
-          if (songs.isNotEmpty)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _play(songs, 0, shuffle: true);
-              },
-              child: const Text('Shuffle Artist'),
-            ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              LibraryStore.instance.toggleFollow(name, img);
-            },
-            child: Text(following ? 'Unfollow Artist' : 'Follow Artist'),
+      title: name,
+      subtitle: _audienceLine.isNotEmpty ? _audienceLine : 'Artist',
+      coverUrl: img,
+      isCircularCover: true,
+      shareText: '$name on Zenify',
+      shareUrl: 'https://zenify.app/artist/${Uri.encodeComponent(name)}',
+      items: [
+        if (songs.isNotEmpty)
+          ZenDropdownItem(
+            title: 'Play Top Songs',
+            icon: CupertinoIcons.play_fill,
+            onTap: () => _play(songs, 0),
           ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _share(name);
-            },
-            child: const Text('Share Artist'),
+        if (songs.isNotEmpty)
+          ZenDropdownItem(
+            title: 'Shuffle Artist',
+            icon: CupertinoIcons.shuffle,
+            onTap: () => _play(songs, 0, shuffle: true),
           ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
+        ZenDropdownItem(
+          title: following ? 'Unfollow Artist' : 'Follow Artist',
+          icon: following ? CupertinoIcons.star_fill : CupertinoIcons.star,
+          onTap: () => LibraryStore.instance.toggleFollow(name, img),
         ),
-      ),
+        ZenDropdownItem(
+          title: 'Copy Artist Link',
+          icon: CupertinoIcons.link,
+          onTap: () => _share(name),
+        ),
+      ],
     );
   }
 

@@ -1,8 +1,12 @@
-import 'package:flutter/material.dart';
-
-import '../../../design_system/tokens/app_colors.dart';
+import 'package:flutter/cupertino.dart';
+import '../../../design_system/apple/apple_tokens.dart';
 
 class ListeningHeatmap extends StatelessWidget {
+  final List<List<double>> heatmapNormalized;
+  final String? peakDay;
+  final int? peakHour;
+  final String? heatmapInsight;
+
   const ListeningHeatmap({
     super.key,
     required this.heatmapNormalized,
@@ -10,11 +14,6 @@ class ListeningHeatmap extends StatelessWidget {
     this.peakHour,
     this.heatmapInsight,
   });
-
-  final List<List<int>> heatmapNormalized;
-  final String? peakDay;
-  final int? peakHour;
-  final String? heatmapInsight;
 
   String _formatHour(int h) {
     if (h == 0) return '12 AM';
@@ -25,98 +24,121 @@ class ListeningHeatmap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
+    final days = const ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'LISTENING HEATMAP (24 × 7)',
-                style: const TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  color: Colors.white,
-                ),
-              ),
-              const Text(
-                'Local Time',
-                style: TextStyle(fontSize: 10, color: Colors.white38),
-              ),
-            ],
-          ),
-          if (heatmapInsight != null && heatmapInsight!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              heatmapInsight!,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.white70,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 120,
-            child: CustomPaint(
-              size: const Size(double.infinity, 120),
-              painter: _HeatmapPainter(levels: heatmapNormalized),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('12 AM', style: TextStyle(fontSize: 9, color: Colors.white38)),
-              Text('6 AM', style: TextStyle(fontSize: 9, color: Colors.white38)),
-              Text('12 PM', style: TextStyle(fontSize: 9, color: Colors.white38)),
-              Text('6 PM', style: TextStyle(fontSize: 9, color: Colors.white38)),
-              Text('11 PM', style: TextStyle(fontSize: 9, color: Colors.white38)),
-            ],
-          ),
-          if (peakDay != null && peakHour != null) ...[
-            const SizedBox(height: 14),
-            Row(
+          Padding(
+            padding: const EdgeInsets.only(left: 14, bottom: 8, right: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.crimson.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.crimson.withValues(alpha: 0.3)),
+                Text(
+                  'LISTENING RHYTHM',
+                  style: AT.caption.copyWith(
+                    color: AT.label2,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.6,
                   ),
+                ),
+                if (peakDay != null && peakHour != null)
+                  Text(
+                    'Peak: $peakDay · ${_formatHour(peakHour!)}',
+                    style: AT.caption.copyWith(
+                      color: AT.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AT.surface,
+              borderRadius: BorderRadius.circular(AT.rMd),
+              border: Border.all(color: AT.hairline, width: 0.6),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(7, (d) {
+                        return SizedBox(
+                          height: 18,
+                          width: 16,
+                          child: Center(
+                            child: Text(
+                              days[d],
+                              style: AT.micro.copyWith(
+                                color: AT.label3,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 126,
+                        child: CustomPaint(
+                          painter: _HeatmapPainter(heatmap: heatmapNormalized),
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.only(left: 24),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.bolt_rounded, color: AppColors.crimson, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        'PEAK: ${peakDay!.toUpperCase()} AT ${_formatHour(peakHour!)}',
-                        style: const TextStyle(
-                          fontFamily: 'SF Pro',
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.6,
-                          color: AppColors.crimson,
+                      Text('12a', style: AT.micro.copyWith(color: AT.label3)),
+                      Text('6a', style: AT.micro.copyWith(color: AT.label3)),
+                      Text('12p', style: AT.micro.copyWith(color: AT.label3)),
+                      Text('6p', style: AT.micro.copyWith(color: AT.label3)),
+                      Text('11p', style: AT.micro.copyWith(color: AT.label3)),
+                    ],
+                  ),
+                ),
+                if (heatmapInsight != null && heatmapInsight!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 0.5,
+                    color: AT.hairline,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        CupertinoIcons.bolt_fill,
+                        color: AT.accent,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          heatmapInsight!,
+                          style: AT.footnote.copyWith(color: AT.label2),
                         ),
                       ),
                     ],
                   ),
-                ),
+                ],
               ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -124,51 +146,39 @@ class ListeningHeatmap extends StatelessWidget {
 }
 
 class _HeatmapPainter extends CustomPainter {
-  _HeatmapPainter({required this.levels});
+  final List<List<double>> heatmap;
 
-  final List<List<int>> levels;
+  _HeatmapPainter({required this.heatmap});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (levels.isEmpty) return;
+    final cellW = size.width / 24;
+    final cellH = size.height / 7;
+    const gap = 2.0;
 
-    final days = levels.length; // 7
-    final hours = levels[0].length; // 24
-
-    final cellWidth = (size.width - (hours - 1) * 3) / hours;
-    final cellHeight = (size.height - (days - 1) * 3) / days;
-
-    final basePaint = Paint()..style = PaintingStyle.fill;
-
-    // Percentile level colors: 0=dark neutral, 1=muted red, 2=mid, 3=radiant, 4=bright crimson
-    final levelColors = [
-      const Color(0xFF242428),
-      AppColors.crimson.withValues(alpha: 0.30),
-      AppColors.crimson.withValues(alpha: 0.55),
-      AppColors.crimson.withValues(alpha: 0.80),
-      const Color(0xFFFF2D55),
-    ];
-
-    for (int d = 0; d < days; d++) {
-      for (int h = 0; h < hours; h++) {
-        final level = levels[d][h].clamp(0, 4);
-
-        final x = h * (cellWidth + 3);
-        final y = d * (cellHeight + 3);
+    for (var d = 0; d < 7; d++) {
+      for (var h = 0; h < 24; h++) {
+        final norm =
+            (d < heatmap.length && h < heatmap[d].length) ? heatmap[d][h] : 0.0;
         final rect = RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, y, cellWidth, cellHeight),
-          const Radius.circular(3),
+          Rect.fromLTWH(
+            h * cellW + gap / 2,
+            d * cellH + gap / 2,
+            (cellW - gap).clamp(2.0, 40.0),
+            (cellH - gap).clamp(2.0, 40.0),
+          ),
+          const Radius.circular(3.5),
         );
 
-        basePaint.color = levelColors[level];
-        canvas.drawRRect(rect, basePaint);
+        final color = norm <= 0.0
+            ? AT.fill
+            : AT.accent.withValues(alpha: 0.18 + (norm * 0.82));
+        canvas.drawRRect(rect, Paint()..color = color);
       }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _HeatmapPainter oldDelegate) {
-    return oldDelegate.levels != levels;
-  }
+  bool shouldRepaint(covariant _HeatmapPainter oldDelegate) =>
+      oldDelegate.heatmap != heatmap;
 }
-

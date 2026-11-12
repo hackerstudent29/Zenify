@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
@@ -10,13 +10,11 @@ import 'package:provider/provider.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/equalizer_bars.dart';
 import '../../design_system/widgets/media_card.dart';
 import '../../design_system/widgets/monogram_avatar.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/section_header.dart';
-import '../../design_system/widgets/song_tile.dart';
 import '../../design_system/widgets/spring_kit.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
@@ -31,7 +29,7 @@ import '../player/player_shell.dart';
 import 'search_data_service.dart';
 import 'search_models.dart';
 
-// ── Typography Helpers (Strictly SF Pro Display / SF Pro, w500–w700) ─────────
+// ── Typography ───────────────────────────────────────────────────────────────
 
 TextStyle _displayStyle({
   double fontSize = 20,
@@ -67,7 +65,111 @@ TextStyle _bodyStyle({
   );
 }
 
-// ── Spring Curve Wrapper for Fluid Transitions ───────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+SearchResult _emptyResult() => SearchResult(
+      originalQuery: '',
+      intent: const SearchIntent(
+        originalQuery: '',
+        normalizedQuery: '',
+        entityText: '',
+      ),
+    );
+
+/// Removes filler such as "Unknown artist", "Artist", "Song", "Single".
+String _cleanSub(String? s) {
+  if (s == null || s.trim().isEmpty) return '';
+  const bad = {
+    'unknown artist',
+    'unknown',
+    'artist',
+    'artists',
+    'song',
+    'songs',
+    'video',
+    'videos',
+    'single',
+    'album',
+    'playlist',
+    'ep',
+  };
+  final parts = s
+      .split(RegExp(r'\s*[·•|]\s*'))
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty && !bad.contains(e.toLowerCase()))
+      .toList();
+  return parts.join(' · ');
+}
+
+String _albumSub(SearchAlbumItem a) {
+  final parts = <String>[
+    if (_cleanSub(a.subtitle).isNotEmpty) _cleanSub(a.subtitle),
+    if (a.year != null) '${a.year}',
+  ];
+  return parts.join(' · ');
+}
+
+String _playlistSub(SearchPlaylistItem p) {
+  final author = p.author;
+  if (author != null && author.isNotEmpty) return author;
+  final sub = _cleanSub(p.subtitle);
+  if (sub.isNotEmpty) return sub;
+  return p.songCountText ?? '';
+}
+
+String _videoMeta(SearchVideoItem v) {
+  final channel = v.channel;
+  final views = v.viewCountText;
+  return [
+    if (channel != null && channel.isNotEmpty) channel,
+    if (views != null && views.isNotEmpty) views,
+  ].join(' · ');
+}
+
+String _norm(String s) => s
+    .toLowerCase()
+    .replaceAll(RegExp(r'[^\p{L}\p{N}\s]', unicode: true), ' ')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
+
+/// 0..1 confidence that [title] (+ [secondary]) is what [q] is looking for.
+double _matchScore(String q, String title, String secondary) {
+  final t = _norm(title);
+  if (q.isEmpty || t.isEmpty) return 0;
+  if (t == q) return 1.0;
+  double best = 0;
+  if (t.startsWith(q)) {
+    best = 0.78 + 0.18 * (q.length / t.length);
+  } else if (t.length >= 3 && q.startsWith(t)) {
+    best = 0.74;
+  } else if (t.contains(q)) {
+    best = 0.58;
+  }
+  final qTokens = q.split(' ');
+  final hay = '$t ${_norm(secondary)}'.split(' ').toSet();
+  final hit = qTokens
+      .where((w) =>
+          hay.contains(w) ||
+          (w.length >= 3 && hay.any((h) => h.startsWith(w))))
+      .length;
+  final cov = hit / qTokens.length;
+  final tTokens = t.split(' ');
+  final titleHit = tTokens.where(qTokens.contains).length / tTokens.length;
+  if (cov >= 1) {
+    best = math.max(best, 0.5 + 0.3 * titleHit);
+  } else {
+    best = math.max(best, cov * 0.45);
+  }
+  return best.clamp(0.0, 1.0);
+}
+
+class _TopCand {
+  const _TopCand(this.item, this.score);
+  final SearchItem item;
+  final double score;
+}
+
+// ── Spring curve ─────────────────────────────────────────────────────────────
 
 class _SpringCurve extends Curve {
   const _SpringCurve([this.spring = Springs.smooth]);
@@ -82,13 +184,10 @@ class _SpringCurve extends Curve {
   }
 }
 
-// ── Horizontal Snap Scroll Physics (Matching HomeScreen & ExploreScreen) ─────
+// ── Horizontal snap physics ──────────────────────────────────────────────────
 
 class _SearchSnapPhysics extends ScrollPhysics {
-  const _SearchSnapPhysics({
-    required this.itemExtent,
-    super.parent,
-  });
+  const _SearchSnapPhysics({required this.itemExtent, super.parent});
 
   final double itemExtent;
 
@@ -112,10 +211,7 @@ class _SearchSnapPhysics extends ScrollPhysics {
       page += 0.45;
     }
     final target = page.roundToDouble() * itemExtent;
-    return target.clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
+    return target.clamp(position.minScrollExtent, position.maxScrollExtent);
   }
 
   @override
@@ -145,7 +241,7 @@ class _SearchSnapPhysics extends ScrollPhysics {
   bool get allowImplicitScrolling => false;
 }
 
-// ── Browse Category & Trending Specs ─────────────────────────────────────────
+// ── Category / trending specs ────────────────────────────────────────────────
 
 class _SearchCategorySpec {
   const _SearchCategorySpec({
@@ -244,7 +340,10 @@ const List<({SearchFilter filter, String label})> _kResultFilters = [
   (filter: SearchFilter.videos, label: 'Videos'),
 ];
 
-enum _SearchViewPhase { landing, suggestions, loading, results }
+enum _SearchViewPhase { landing, suggestions, loading, results, category }
+
+const double _kEdge = 20.0;
+const double _kGap = 14.0;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SearchScreen
@@ -269,26 +368,32 @@ class _SearchScreenState extends State<SearchScreen>
   final ScrollController _scrollCtrl = ScrollController();
   final SearchDataService _dataService = SearchDataService.instance;
 
-  Timer? _debounceTimer;
-  int _searchRequestId = 0;
+  // Suggestions
+  Timer? _suggestTimer;
+  int _suggestId = 0;
+  String _lastTyped = '';
+  List<String> _liveSuggestions = [];
 
+  // Search results (keyed by query+filter so stale/duplicate requests are safe)
+  String _submittedQuery = '';
+  String _wantedKey = '';
+  String _resultsKey = '';
+  final Map<String, Future<SearchResult>> _inflight = {};
   bool _isLoading = false;
   bool _isLoadingMore = false;
-  String _activeQuery = '';
-
-  List<String> _liveSuggestions = [];
-  SearchResult _searchResults = SearchResult(
-    originalQuery: '',
-    intent: const SearchIntent(
-      originalQuery: '',
-      normalizedQuery: '',
-      entityText: '',
-    ),
-  );
+  SearchResult _searchResults = _emptyResult();
   SearchFilter _selectedFilter = SearchFilter.all;
 
-  static const double _kCarouselEdge = 20.0;
-  static const double _kCarouselGap = 14.0;
+  // Category page
+  _SearchCategorySpec? _activeCategory;
+  bool _catLoading = false;
+  bool _catSongsExpanded = false;
+  int _catRequestId = 0;
+  List<SearchSongItem> _catSongs = const [];
+  List<SearchAlbumItem> _catAlbums = const [];
+  List<SearchArtistItem> _catArtists = const [];
+  List<SearchPlaylistItem> _catPlaylists = const [];
+  List<SearchVideoItem> _catVideos = const [];
 
   @override
   void initState() {
@@ -305,7 +410,7 @@ class _SearchScreenState extends State<SearchScreen>
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
+    _suggestTimer?.cancel();
     _textCtrl.removeListener(_onTextChanged);
     _focusNode.removeListener(_onFocusChanged);
     _scrollCtrl.removeListener(_onScroll);
@@ -316,9 +421,13 @@ class _SearchScreenState extends State<SearchScreen>
     super.dispose();
   }
 
+  // ── Listeners ──────────────────────────────────────────────────────────────
+
   void _onFocusChanged() {
     if (!_focusNode.hasFocus && mounted) {
-      if (SearchNav.phase.value == SearchPhase.typing && _activeQuery.isEmpty) {
+      if (SearchNav.phase.value == SearchPhase.typing &&
+          _textCtrl.text.trim().isEmpty &&
+          _submittedQuery.isEmpty) {
         SearchNav.phase.value = SearchPhase.bar;
       }
     }
@@ -334,7 +443,9 @@ class _SearchScreenState extends State<SearchScreen>
       });
     } else {
       _focusNode.unfocus();
-      if (_activeQuery.isNotEmpty) _clearSearch();
+      if (_submittedQuery.isNotEmpty || _textCtrl.text.isNotEmpty) {
+        _clearSearch();
+      }
     }
     setState(() {});
   }
@@ -344,7 +455,6 @@ class _SearchScreenState extends State<SearchScreen>
     if (_isLoading || _isLoadingMore) return;
     final token = _searchResults.continuation;
     if (token == null || token.isEmpty) return;
-
     if (_scrollCtrl.hasClients &&
         _scrollCtrl.position.pixels >=
             _scrollCtrl.position.maxScrollExtent - 380) {
@@ -354,87 +464,82 @@ class _SearchScreenState extends State<SearchScreen>
 
   Future<void> _loadMore() async {
     if (_isLoadingMore) return;
-    final id = _searchRequestId;
+    final key = _wantedKey;
     setState(() => _isLoadingMore = true);
     try {
       final updated = await _dataService.loadMore(
         currentResult: _searchResults,
         filter: _selectedFilter,
       );
-      if (mounted && id == _searchRequestId) {
+      if (mounted && key == _wantedKey) {
         setState(() {
           _searchResults = updated;
           _isLoadingMore = false;
         });
       }
     } catch (_) {
-      if (mounted && id == _searchRequestId) {
+      if (mounted && key == _wantedKey) {
         setState(() => _isLoadingMore = false);
       }
     }
   }
 
-  // ── Preserved Search & First-Try Submit Logic ──────────────────────────────
+  // ── Typing / suggestions (no deep search while typing) ─────────────────────
 
   void _onTextChanged() {
-    final query = _textCtrl.text.trim();
-    if (query == _activeQuery) return;
-    _activeQuery = query;
+    final q = _textCtrl.text.trim();
+    if (q == _lastTyped) return;
+    _lastTyped = q;
+    _suggestTimer?.cancel();
+    final id = ++_suggestId;
 
-    _debounceTimer?.cancel();
-    if (query.isEmpty) {
+    if (q.isEmpty) {
       setState(() {
         _liveSuggestions = [];
-        _searchResults = SearchResult(
-          originalQuery: '',
-          intent: const SearchIntent(
-            originalQuery: '',
-            normalizedQuery: '',
-            entityText: '',
-          ),
-        );
-        _isLoading = false;
+        if (_submittedQuery.isNotEmpty) {
+          _submittedQuery = '';
+          _searchResults = _emptyResult();
+          _resultsKey = '';
+          _wantedKey = '';
+          _isLoading = false;
+          _selectedFilter = SearchFilter.all;
+        }
       });
       return;
     }
 
-    final id = ++_searchRequestId;
+    setState(() => _liveSuggestions = _dataService.getInstantLocalSuggestions(q));
 
-    // 1. Instant local Trie suggestions (0ms)
-    final localSuggestions = _dataService.getInstantLocalSuggestions(query);
-    setState(() {
-      _liveSuggestions = localSuggestions;
-      _isLoading = true;
-    });
-
-    // 2. Fetch merged online suggestions
-    _dataService.getSuggestions(query).then((suggestions) {
-      if (mounted && id == _searchRequestId) {
-        setState(() => _liveSuggestions = suggestions);
-      }
-    });
-
-    // 3. Debounced deep search
-    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
-      _executeSearch(query, id, filter: _selectedFilter);
+    _suggestTimer = Timer(const Duration(milliseconds: 120), () async {
+      try {
+        final s = await _dataService.getSuggestions(q);
+        if (mounted && id == _suggestId) {
+          setState(() => _liveSuggestions = s);
+        }
+      } catch (_) {}
     });
   }
 
-  Future<void> _executeSearch(
-    String query,
-    int id, {
-    SearchFilter filter = SearchFilter.all,
-  }) async {
+  // ── Search execution ───────────────────────────────────────────────────────
+
+  String _keyOf(String q, SearchFilter f) => '${f.name}|${q.toLowerCase()}';
+
+  Future<void> _executeSearch(String query, SearchFilter filter) async {
+    final key = _keyOf(query, filter);
+    _wantedKey = key;
+    final future = _inflight[key] ??= _dataService
+        .search(query: query, filter: filter)
+        .whenComplete(() => _inflight.remove(key));
     try {
-      final results = await _dataService.search(query: query, filter: filter);
-      if (mounted && id == _searchRequestId) {
-        setState(() {
-          _searchResults = results;
-          _isLoading = false;
-        });
-      }
+      final results = await future;
+      if (!mounted || _wantedKey != key) return;
+      setState(() {
+        _searchResults = results;
+        _resultsKey = key;
+        _isLoading = false;
+      });
     } catch (_) {
-      if (mounted && id == _searchRequestId) {
+      if (mounted && _wantedKey == key) {
         setState(() => _isLoading = false);
       }
     }
@@ -443,9 +548,10 @@ class _SearchScreenState extends State<SearchScreen>
   void _submitSearch(String query, {SearchFilter filter = SearchFilter.all}) {
     final clean = query.trim();
     if (clean.isEmpty) return;
-    _debounceTimer?.cancel();
+    _suggestTimer?.cancel();
+    _suggestId++;
     _focusNode.unfocus();
-    _activeQuery = clean;
+    _lastTyped = clean;
     if (_textCtrl.text.trim() != clean) {
       _textCtrl.value = TextEditingValue(
         text: clean,
@@ -453,24 +559,27 @@ class _SearchScreenState extends State<SearchScreen>
       );
     }
     _dataService.addRecent(clean);
-    final id = ++_searchRequestId;
+
+    final key = _keyOf(clean, filter);
+    final cached = _resultsKey == key && !_searchResults.isEmpty;
     setState(() {
-      _isLoading = true;
+      _submittedQuery = clean;
+      _activeCategory = null;
+      _catRequestId++;
       _liveSuggestions = [];
       _selectedFilter = filter;
+      _isLoading = !cached;
+      if (!cached) {
+        _searchResults = _emptyResult();
+        _resultsKey = '';
+      }
     });
-    if (_scrollCtrl.hasClients && _scrollCtrl.offset > 0) {
-      _scrollCtrl.animateTo(
-        0,
-        duration: const Duration(milliseconds: 340),
-        curve: const _SpringCurve(Springs.smooth),
-      );
-    }
-    _executeSearch(clean, id, filter: filter);
+    _scrollTop();
+    if (!cached) _executeSearch(clean, filter);
   }
 
   void _onFilterSelected(SearchFilter filter) {
-    if (_selectedFilter == filter) return;
+    if (_selectedFilter == filter || _submittedQuery.isEmpty) return;
     HapticFeedback.selectionClick();
     final hasCachedForFilter = switch (filter) {
       SearchFilter.all => !_searchResults.isEmpty,
@@ -482,35 +591,24 @@ class _SearchScreenState extends State<SearchScreen>
         _searchResults.playlists.length >= 6,
       SearchFilter.videos => _searchResults.videos.length >= 6,
     };
-
     setState(() {
       _selectedFilter = filter;
-      if (!hasCachedForFilter) {
-        _isLoading = true;
-      }
+      if (!hasCachedForFilter) _isLoading = true;
     });
-
-    if (_activeQuery.isNotEmpty) {
-      final id = ++_searchRequestId;
-      _executeSearch(_activeQuery, id, filter: filter);
-    }
+    _executeSearch(_submittedQuery, filter);
   }
 
   void _clearSearch() {
-    _debounceTimer?.cancel();
-    _searchRequestId++;
-    _activeQuery = '';
+    _suggestTimer?.cancel();
+    _suggestId++;
+    _wantedKey = '';
+    _resultsKey = '';
+    _submittedQuery = '';
+    _lastTyped = '';
     _textCtrl.clear();
     setState(() {
       _liveSuggestions = [];
-      _searchResults = SearchResult(
-        originalQuery: '',
-        intent: const SearchIntent(
-          originalQuery: '',
-          normalizedQuery: '',
-          entityText: '',
-        ),
-      );
+      _searchResults = _emptyResult();
       _isLoading = false;
       _isLoadingMore = false;
       _selectedFilter = SearchFilter.all;
@@ -518,21 +616,107 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   void _cancelSearch() {
-    _debounceTimer?.cancel();
+    _suggestTimer?.cancel();
     _focusNode.unfocus();
     SearchNav.phase.value = SearchPhase.bar;
     _clearSearch();
   }
 
-  void _playSong(List<Track> list, int index) {
+  bool get _isTyping =>
+      SearchNav.phase.value == SearchPhase.typing || _focusNode.hasFocus;
+
+  void _goBack() {
+    if (_isTyping) {
+      _cancelSearch();
+    } else if (_submittedQuery.isNotEmpty) {
+      _clearSearch();
+    } else if (_activeCategory != null) {
+      _closeCategory();
+    } else {
+      widget.onBack?.call();
+    }
+  }
+
+  void _scrollTop() {
+    if (_scrollCtrl.hasClients && _scrollCtrl.offset > 0) {
+      _scrollCtrl.animateTo(
+        0,
+        duration: const Duration(milliseconds: 340),
+        curve: const _SpringCurve(Springs.smooth),
+      );
+    }
+  }
+
+  // ── Category page ──────────────────────────────────────────────────────────
+
+  Future<void> _openCategory(_SearchCategorySpec spec) async {
+    HapticFeedback.lightImpact();
+    _focusNode.unfocus();
+    if (SearchNav.phase.value != SearchPhase.bar) {
+      SearchNav.phase.value = SearchPhase.bar;
+    }
+    final id = ++_catRequestId;
+    if (_scrollCtrl.hasClients) _scrollCtrl.jumpTo(0);
+    setState(() {
+      _activeCategory = spec;
+      _catLoading = true;
+      _catSongsExpanded = false;
+      _catSongs = const [];
+      _catAlbums = const [];
+      _catArtists = const [];
+      _catPlaylists = const [];
+      _catVideos = const [];
+    });
+
+    Future<SearchResult> safe(SearchFilter f) async {
+      try {
+        return await _dataService.search(query: spec.query, filter: f);
+      } catch (_) {
+        return _emptyResult();
+      }
+    }
+
+    final res = await Future.wait([
+      safe(SearchFilter.all),
+      safe(SearchFilter.songs),
+      safe(SearchFilter.albums),
+      safe(SearchFilter.artists),
+      safe(SearchFilter.featuredPlaylists),
+    ]);
+    if (!mounted || id != _catRequestId) return;
+    setState(() {
+      _catSongs = res[1].songs.isNotEmpty ? res[1].songs : res[0].songs;
+      _catAlbums = res[2].albums.isNotEmpty ? res[2].albums : res[0].albums;
+      _catArtists =
+          res[3].artists.isNotEmpty ? res[3].artists : res[0].artists;
+      _catPlaylists =
+          res[4].playlists.isNotEmpty ? res[4].playlists : res[0].playlists;
+      _catVideos = res[0].videos;
+      _catLoading = false;
+    });
+  }
+
+  void _closeCategory() {
+    _catRequestId++;
+    setState(() {
+      _activeCategory = null;
+      _catLoading = false;
+    });
+  }
+
+  // ── Playback / navigation ──────────────────────────────────────────────────
+
+  void _playSong(List<Track> list, int index, {String? title}) {
     if (list.isEmpty) return;
     final startIdx = index.clamp(0, list.length - 1);
+    final label = title ??
+        (_submittedQuery.isNotEmpty ? _submittedQuery : 'search');
     final ctx = PlaybackContext(
       type: PlaybackContextType.search,
-      id: _textCtrl.text.trim().isNotEmpty ? _textCtrl.text.trim() : 'search',
+      id: label,
       tracks: list,
       startTrack: list[startIdx],
-      title: _textCtrl.text.trim(),
+      title: label,
     );
     context.read<PlayerState>().setQueue(
           list,
@@ -541,21 +725,30 @@ class _SearchScreenState extends State<SearchScreen>
         );
   }
 
-  void _startRadio(SearchTopResult top) {
+  List<Track> _tracksForAlbum(SearchAlbumItem a) => _searchResults.songs
+      .map((s) => s.toTrack())
+      .where((t) => t.album.toLowerCase() == a.title.toLowerCase())
+      .toList();
+
+  List<Track> _tracksForArtist(String name) => _searchResults.songs
+      .map((s) => s.toTrack())
+      .where((t) => t.artist.toLowerCase().contains(name.toLowerCase()))
+      .toList();
+
+  void _playCollection(SearchItem item, {bool shuffle = false}) {
+    List<Track> tracks = switch (item) {
+      SearchAlbumItem a => _tracksForAlbum(a),
+      SearchArtistItem a => _tracksForArtist(a.title),
+      _ => const <Track>[],
+    };
+    if (tracks.isEmpty) {
+      _handleItemTap(item);
+      return;
+    }
+    tracks = [...tracks];
+    if (shuffle) tracks.shuffle();
     HapticFeedback.mediumImpact();
-    if (top.item is SearchSongItem) {
-      _playSong([(top.item as SearchSongItem).toTrack()], 0);
-      return;
-    }
-    if (top.item is SearchVideoItem) {
-      _handleItemTap(top.item);
-      return;
-    }
-    if (_searchResults.songs.isNotEmpty) {
-      _playSong([_searchResults.songs.first.toTrack()], 0);
-      return;
-    }
-    _submitSearch('${top.title} songs', filter: SearchFilter.songs);
+    _playSong(tracks, 0, title: item.title);
   }
 
   void _handleItemTap(SearchItem item) {
@@ -563,18 +756,16 @@ class _SearchScreenState extends State<SearchScreen>
     final hiRes = _hiResUrl(item);
 
     if (item is SearchSongItem) {
-      // Seed playback strictly with the chosen song so Smart Queue builds
-      // related recommendations around this track instead of unrelated search hits.
+      // Seed with the chosen song so Smart Queue builds around it.
       _playSong([item.toTrack()], 0);
       return;
     }
-
     if (item is SearchArtistItem) {
       Navigator.push(
         context,
         ZenPageRoute(
           builder: (_) => ArtistScreen(
-            artistName: item.name,
+            artistName: item.title,
             imageUrl: hiRes,
             browseId: item.browseId,
           ),
@@ -582,7 +773,6 @@ class _SearchScreenState extends State<SearchScreen>
       );
       return;
     }
-
     if (item is SearchAlbumItem) {
       Navigator.push(
         context,
@@ -597,16 +787,15 @@ class _SearchScreenState extends State<SearchScreen>
       );
       return;
     }
-
     if (item is SearchPlaylistItem) {
       Navigator.push(
         context,
         ZenPageRoute(
           builder: (_) => AlbumScreen(
             albumTitle: item.title,
-            artistName: (item.author?.isNotEmpty ?? false)
-                ? item.author!
-                : (item.subtitle.isNotEmpty ? item.subtitle : 'Playlist'),
+            artistName: _playlistSub(item).isNotEmpty
+                ? _playlistSub(item)
+                : 'Playlist',
             coverUrl: hiRes,
             browseId: item.browseId,
           ),
@@ -614,24 +803,84 @@ class _SearchScreenState extends State<SearchScreen>
       );
       return;
     }
-
     if (item is SearchVideoItem) {
       _playSong([item.toTrack()], 0);
       PlayerShell.requestOpen();
     }
   }
 
-  String _hiResUrl(SearchItem item) {
-    return item.thumbnailUrlHiRes.isNotEmpty
-        ? item.thumbnailUrlHiRes
-        : item.thumbnailUrl;
-  }
+  String _hiResUrl(SearchItem item) => item.thumbnailUrlHiRes.isNotEmpty
+      ? item.thumbnailUrlHiRes
+      : item.thumbnailUrl;
 
   bool _isTrackActive(Track track, String? activeTrackId) {
     if (activeTrackId == null || activeTrackId.isEmpty) return false;
     return activeTrackId == track.id ||
         activeTrackId == 'yt-${track.id}' ||
         track.id == 'yt-$activeTrackId';
+  }
+
+  void _showMore(SearchItem item) {
+    HapticFeedback.mediumImpact();
+    if (item is SearchSongItem) {
+      ZenDropdown.showTrackMenu(context: context, track: item.toTrack());
+      return;
+    }
+    if (item is SearchVideoItem) {
+      ZenDropdown.showTrackMenu(context: context, track: item.toTrack());
+      return;
+    }
+    final store = LibraryStore.instance;
+    final img = _hiResUrl(item);
+    final items = <ZenDropdownItem>[
+      ZenDropdownItem(
+        title: 'Play',
+        icon: CupertinoIcons.play_fill,
+        onTap: () => _playCollection(item),
+      ),
+      ZenDropdownItem(
+        title: 'Shuffle',
+        icon: CupertinoIcons.shuffle,
+        onTap: () => _playCollection(item, shuffle: true),
+      ),
+      if (item is SearchArtistItem)
+        ZenDropdownItem(
+          title: store.isFollowing(item.title)
+              ? 'Unfollow Artist'
+              : 'Follow Artist',
+          icon: store.isFollowing(item.title)
+              ? CupertinoIcons.star_fill
+              : CupertinoIcons.star,
+          onTap: () => store.toggleFollow(item.title, img),
+        ),
+      if (item is SearchAlbumItem)
+        ZenDropdownItem(
+          title: store.isAlbumSaved(item.title, item.subtitle)
+              ? 'Remove from Library'
+              : 'Add to Library',
+          icon: store.isAlbumSaved(item.title, item.subtitle)
+              ? CupertinoIcons.checkmark_circle_fill
+              : CupertinoIcons.plus_circle,
+          onTap: () => store.toggleAlbum(item.title, item.subtitle, img),
+        ),
+      ZenDropdownItem(
+        title: 'View Details',
+        icon: CupertinoIcons.arrow_up_right_circle,
+        onTap: () => _handleItemTap(item),
+      ),
+    ];
+    final sub = _cleanSub(item.subtitle);
+    final shareKind = item is SearchArtistItem ? 'artist' : 'album';
+    ZenDropdown.show(
+      context: context,
+      title: item.title,
+      subtitle: sub.isNotEmpty ? sub : null,
+      coverUrl: img,
+      isCircularCover: item is SearchArtistItem,
+      shareText: sub.isNotEmpty ? '${item.title} – $sub' : item.title,
+      shareUrl: 'https://zenify.app/$shareKind/${Uri.encodeComponent(item.title)}',
+      items: items,
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -643,34 +892,34 @@ class _SearchScreenState extends State<SearchScreen>
     super.build(context);
     final bottomPad = MediaQuery.paddingOf(context).bottom;
     final topPad = MediaQuery.paddingOf(context).top;
-    final typing =
-        SearchNav.phase.value == SearchPhase.typing || _focusNode.hasFocus;
-    final hasQuery = _activeQuery.isNotEmpty;
-    final showSuggestions =
-        typing && _liveSuggestions.isNotEmpty && _searchResults.isEmpty;
+    final typing = _isTyping;
+    final text = _textCtrl.text.trim();
+    final hasQuery = _submittedQuery.isNotEmpty;
+    final category = _activeCategory;
+
+    final editing =
+        _focusNode.hasFocus && text.isNotEmpty && text != _submittedQuery;
 
     final _SearchViewPhase phase;
-    if (showSuggestions) {
+    if (editing) {
       phase = _SearchViewPhase.suggestions;
-    } else if (_isLoading && _searchResults.isEmpty) {
-      phase = _SearchViewPhase.loading;
     } else if (hasQuery) {
-      phase = _SearchViewPhase.results;
+      phase = (_isLoading && _searchResults.isEmpty)
+          ? _SearchViewPhase.loading
+          : _SearchViewPhase.results;
+    } else if (category != null) {
+      phase = _SearchViewPhase.category;
     } else {
       phase = _SearchViewPhase.landing;
     }
 
+    final showBack = typing || hasQuery || category != null;
+
     return PopScope(
-      canPop: widget.onBack == null && !typing && !hasQuery,
+      canPop: widget.onBack == null && !showBack,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        if (typing) {
-          _cancelSearch();
-        } else if (hasQuery) {
-          _clearSearch();
-        } else {
-          widget.onBack?.call();
-        }
+        _goBack();
       },
       child: Scaffold(
         backgroundColor: AppColors.bg,
@@ -684,7 +933,9 @@ class _SearchScreenState extends State<SearchScreen>
               ),
               slivers: [
                 SliverToBoxAdapter(
-                  child: SizedBox(height: topPad + 60),
+                  child: SizedBox(
+                    height: phase == _SearchViewPhase.category ? 0 : topPad + 60,
+                  ),
                 ),
                 SliverToBoxAdapter(
                   child: AnimatedSwitcher(
@@ -694,10 +945,7 @@ class _SearchScreenState extends State<SearchScreen>
                     layoutBuilder: (currentChild, previousChildren) {
                       return Stack(
                         alignment: Alignment.topCenter,
-                        children: [
-                          ...previousChildren,
-                          ?currentChild,
-                        ],
+                        children: [...previousChildren, ?currentChild],
                       );
                     },
                     transitionBuilder: (child, anim) {
@@ -711,17 +959,22 @@ class _SearchScreenState extends State<SearchScreen>
                       );
                     },
                     child: switch (phase) {
-                      _SearchViewPhase.landing => _buildLandingSection(
+                      _SearchViewPhase.landing => _buildLanding(
                           key: const ValueKey('phase_landing'),
                         ),
-                      _SearchViewPhase.suggestions => _buildSuggestionsSection(
+                      _SearchViewPhase.suggestions => _buildSuggestions(
                           key: const ValueKey('phase_suggestions'),
                         ),
                       _SearchViewPhase.loading => const _SearchShimmerView(
                           key: ValueKey('phase_loading'),
                         ),
-                      _SearchViewPhase.results => _buildResultsSection(
-                          key: ValueKey('phase_results_$_activeQuery'),
+                      _SearchViewPhase.results => _buildResults(
+                          key: ValueKey('phase_results_$_submittedQuery'),
+                        ),
+                      _SearchViewPhase.category => _buildCategoryPage(
+                          category!,
+                          topPad,
+                          key: ValueKey('phase_category_${category.title}'),
                         ),
                     },
                   ),
@@ -735,31 +988,23 @@ class _SearchScreenState extends State<SearchScreen>
                       ),
                     ),
                   ),
-                SliverToBoxAdapter(
-                  child: SizedBox(height: 180 + bottomPad),
-                ),
+                SliverToBoxAdapter(child: SizedBox(height: 180 + bottomPad)),
               ],
             ),
-
-            // Sticky Dynamic Island Header
             Positioned(
               top: 0,
               left: 0,
               right: 0,
               child: DynamicIslandHeader(
-                title: 'Search',
-                showBack: typing || hasQuery,
-                isDockPage: !(typing || hasQuery),
+                title: category != null && !typing && !hasQuery
+                    ? category.title
+                    : 'Search',
+                showBack: showBack,
+                isDockPage: !showBack,
                 showProfile: true,
                 topPadding: topPad + 4,
                 centerWidget: (typing || hasQuery) ? _topField() : null,
-                onBack: () {
-                  if (typing) {
-                    _cancelSearch();
-                  } else {
-                    _clearSearch();
-                  }
-                },
+                onBack: _goBack,
               ),
             ),
           ],
@@ -788,13 +1033,15 @@ class _SearchScreenState extends State<SearchScreen>
           child: TextField(
             controller: _textCtrl,
             focusNode: _focusNode,
+            // Normal keyboard: no enableSuggestions:false (that flips Android
+            // into a password-style keyboard).
+            keyboardType: TextInputType.text,
             textInputAction: TextInputAction.search,
+            textCapitalization: TextCapitalization.none,
             autocorrect: false,
-            enableSuggestions: false,
             cursorColor: AppColors.accent,
             style: _bodyStyle(
               fontSize: 15,
-              fontWeight: FontWeight.w500,
               color: AppColors.textPrimary,
             ),
             decoration: InputDecoration(
@@ -804,7 +1051,6 @@ class _SearchScreenState extends State<SearchScreen>
               hintText: 'Artists, Songs, Lyrics & Videos',
               hintStyle: _bodyStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w500,
                 color: AppColors.textTertiary,
               ),
             ),
@@ -843,106 +1089,291 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
+  List<String> _catalogCovers(List<Track> src) {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final t in src) {
+      final u = t.coverUrl;
+      if (u.isNotEmpty && seen.add(u)) out.add(u);
+      if (out.length >= 60) break;
+    }
+    return out;
+  }
+
+  // ── Small shared builders ──────────────────────────────────────────────────
+
+  Widget _sectionHeader(
+    String title, {
+    String? actionTitle,
+    VoidCallback? onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: SectionHeader(
+        title: title,
+        actionTitle: actionTitle,
+        onActionTap: onTap,
+      ),
+    );
+  }
+
+  Widget _divider(double indent) => Divider(
+        height: 1,
+        indent: indent,
+        endIndent: _kEdge,
+        color: Colors.white.withValues(alpha: 0.06),
+      );
+
+  Widget _carousel({
+    required String title,
+    required double height,
+    required double extent,
+    required int count,
+    required Widget Function(int i) item,
+    VoidCallback? onSeeAll,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(
+          title,
+          actionTitle: onSeeAll == null ? null : 'See All',
+          onTap: onSeeAll,
+        ),
+        SizedBox(
+          height: height,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: _SearchSnapPhysics(itemExtent: extent + _kGap),
+            padding: const EdgeInsets.symmetric(horizontal: _kEdge),
+            itemCount: count,
+            separatorBuilder: (_, _) => const SizedBox(width: _kGap),
+            itemBuilder: (context, i) => SpringIn(
+              delayMs: (i % 5) * 32,
+              rise: 18,
+              child: item(i),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+
+  Widget _albumsCarousel(List<SearchAlbumItem> albums, {VoidCallback? seeAll}) {
+    return _carousel(
+      title: 'Albums',
+      height: 256,
+      extent: 170,
+      count: albums.length,
+      onSeeAll: seeAll,
+      item: (i) {
+        final a = albums[i];
+        return MediaCard(
+          width: 170.0,
+          twoLineTitle: true,
+          title: a.title,
+          subtitle: _albumSub(a),
+          imageUrl: _hiResUrl(a),
+          onTap: () => _handleItemTap(a),
+        );
+      },
+    );
+  }
+
+  Widget _playlistsCarousel(
+    List<SearchPlaylistItem> playlists, {
+    VoidCallback? seeAll,
+  }) {
+    return _carousel(
+      title: 'Playlists',
+      height: 256,
+      extent: 170,
+      count: playlists.length,
+      onSeeAll: seeAll,
+      item: (i) {
+        final p = playlists[i];
+        return MediaCard(
+          width: 170.0,
+          twoLineTitle: true,
+          title: p.title,
+          subtitle: _playlistSub(p),
+          imageUrl: _hiResUrl(p),
+          onTap: () => _handleItemTap(p),
+        );
+      },
+    );
+  }
+
+  Widget _artistsCarousel(
+    List<SearchArtistItem> artists, {
+    VoidCallback? seeAll,
+  }) {
+    return _carousel(
+      title: 'Artists',
+      height: 186,
+      extent: 130,
+      count: artists.length,
+      onSeeAll: seeAll,
+      item: (i) {
+        final a = artists[i];
+        return PressableScale(
+          scale: 0.96,
+          onTap: () => _handleItemTap(a),
+          child: SizedBox(
+            width: 130,
+            child: Column(
+              children: [
+                _Artwork(
+                  url: _hiResUrl(a),
+                  title: a.title,
+                  size: 130,
+                  circle: true,
+                ),
+                const SizedBox(height: 9),
+                Text(
+                  a.title,
+                  style: _displayStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _videosCarousel(List<SearchVideoItem> videos, {VoidCallback? seeAll}) {
+    return _carousel(
+      title: 'Videos',
+      height: 214,
+      extent: 256,
+      count: videos.length,
+      onSeeAll: seeAll,
+      item: (i) {
+        final v = videos[i];
+        final meta = _videoMeta(v);
+        return PressableScale(
+          scale: 0.96,
+          onTap: () => _handleItemTap(v),
+          child: SizedBox(
+            width: 256,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _VideoThumb(video: v, imageUrl: _hiResUrl(v)),
+                const SizedBox(height: 8),
+                Text(
+                  v.title,
+                  style: _displayStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (meta.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    meta,
+                    style: _bodyStyle(fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Song rows: artwork, title, artist, vertical three-dot menu.
+  Widget _songRows(List<SearchSongItem> songs, {bool ranked = false}) {
+    return Selector<PlayerState, ({String? id, bool playing})>(
+      selector: (_, p) => (id: p.currentTrack?.id, playing: p.isPlaying),
+      builder: (context, active, _) {
+        return Column(
+          children: List.generate(songs.length, (i) {
+            final s = songs[i];
+            final track = s.toTrack();
+            final isActive = _isTrackActive(track, active.id);
+            return SpringIn(
+              delayMs: i < 10 ? i * 22 : 0,
+              rise: 12,
+              child: Column(
+                children: [
+                  _SongRow(
+                    item: s,
+                    rank: ranked ? i + 1 : null,
+                    isActive: isActive,
+                    isPlaying: isActive && active.playing,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _playSong([track], 0);
+                    },
+                    onMore: () => _showMore(s),
+                  ),
+                  if (i < songs.length - 1) _divider(ranked ? 117 : 87),
+                ],
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
+  Widget _likeCircle(Track track) {
+    final store = LibraryStore.instance;
+    return AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        final liked = store.isLiked(track);
+        return ZenActionCircle(
+          size: 44,
+          iconSize: 20,
+          active: liked,
+          icon: liked ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+          onTap: () => store.toggleLike(track),
+        );
+      },
+    );
+  }
+
+  Widget _moreButton(VoidCallback onTap) {
+    return PressableScale(
+      scale: 0.88,
+      onTap: onTap,
+      child: const Padding(
+        padding: EdgeInsets.all(8),
+        child: Icon(
+          Icons.more_vert_rounded,
+          size: 22,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
-  // Phase 1: Landing / Browse Categories View
+  // Phase: Landing  (recents · trending · categories)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildLandingSection({Key? key}) {
+  Widget _buildLanding({Key? key}) {
     return Column(
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Inline Apple Music Search Entry Pill
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            _kCarouselEdge,
-            4,
-            _kCarouselEdge,
-            18,
-          ),
-          child: SpringIn(
-            delayMs: 0,
-            rise: 12,
-            child: PressableScale(
-              scale: 0.985,
-              onTap: () {
-                HapticFeedback.lightImpact();
-                SearchNav.phase.value = SearchPhase.typing;
-                _focusNode.requestFocus();
-              },
-              child: AppleGlass(
-                borderRadius: BorderRadius.circular(16),
-                blur: 14,
-                tint: const Color(0x201E1E24),
-                shadow: false,
-                child: Container(
-                  height: 48,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      width: 0.7,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        CupertinoIcons.search,
-                        size: 18,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Artists, Songs, Lyrics & Videos',
-                          style: _bodyStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textTertiary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              CupertinoIcons.sparkles,
-                              size: 11,
-                              color: AppColors.accent,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Apple Music',
-                              style: _bodyStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // A. Recent Searches
         ValueListenableBuilder<List<String>>(
           valueListenable: _dataService.recentsNotifier,
           builder: (context, recents, _) {
@@ -951,16 +1382,13 @@ class _SearchScreenState extends State<SearchScreen>
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: SectionHeader(
-                    title: 'Recent Searches',
-                    actionTitle: 'Clear',
-                    onActionTap: () {
-                      HapticFeedback.lightImpact();
-                      _dataService.clearRecents();
-                    },
-                  ),
+                _sectionHeader(
+                  'Recent Searches',
+                  actionTitle: 'Clear',
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _dataService.clearRecents();
+                  },
                 ),
                 const SizedBox(height: 2),
                 ...List.generate(visible.length, (i) {
@@ -973,7 +1401,7 @@ class _SearchScreenState extends State<SearchScreen>
                       onTap: () => _submitSearch(q),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: _kCarouselEdge,
+                          horizontal: _kEdge,
                           vertical: 11,
                         ),
                         decoration: BoxDecoration(
@@ -1005,7 +1433,6 @@ class _SearchScreenState extends State<SearchScreen>
                                 q,
                                 style: _bodyStyle(
                                   fontSize: 15,
-                                  fontWeight: FontWeight.w500,
                                   color: AppColors.textPrimary,
                                 ),
                                 maxLines: 1,
@@ -1038,18 +1465,13 @@ class _SearchScreenState extends State<SearchScreen>
             );
           },
         ),
-
-        // B. Trending Searches (Sleek Horizontal Strip)
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(title: 'Trending Now'),
-        ),
+        _sectionHeader('Trending Now'),
         SizedBox(
           height: 44,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
+            padding: const EdgeInsets.symmetric(horizontal: _kEdge),
             itemCount: _kTrendingPills.length,
             separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemBuilder: (context, i) {
@@ -1102,19 +1524,9 @@ class _SearchScreenState extends State<SearchScreen>
           ),
         ),
         const SizedBox(height: 20),
-
-        // C. Browse Categories (2-Column Editorial Apple Music Genre Grid)
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(title: 'Browse Categories'),
-        ),
+        _sectionHeader('Browse Categories'),
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-            _kCarouselEdge,
-            2,
-            _kCarouselEdge,
-            26,
-          ),
+          padding: const EdgeInsets.fromLTRB(_kEdge, 2, _kEdge, 26),
           child: GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -1123,196 +1535,53 @@ class _SearchScreenState extends State<SearchScreen>
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 1.78,
+              childAspectRatio: 1.42,
             ),
             itemBuilder: (context, i) {
               final cat = _kSearchCategories[i];
               return SpringIn(
                 delayMs: (i % 6) * 26,
                 rise: 16,
-                child: _BrowseCategoryTile(
-                  spec: cat,
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    _submitSearch(cat.query);
-                  },
+                child: ValueListenableBuilder<List<Track>>(
+                  valueListenable: CatalogDataSource.tracksNotifier,
+                  builder: (context, catalog, _) => _BrowseCategoryTile(
+                    spec: cat,
+                    index: i,
+                    covers: _catalogCovers(
+                      catalog.isNotEmpty ? catalog : CatalogDataSource.allTracks,
+                    ),
+                    onTap: () => _openCategory(cat),
+                  ),
                 ),
               );
             },
           ),
         ),
-
-        // D & E. Popular Artists & Trending Albums from CatalogDataSource
-        ValueListenableBuilder<List<Track>>(
-          valueListenable: CatalogDataSource.tracksNotifier,
-          builder: (context, catalog, _) {
-            final source =
-                catalog.isNotEmpty ? catalog : CatalogDataSource.allTracks;
-            final popularArtists = _extractPopularArtists(source);
-            final popularAlbums = _extractPopularAlbums(source);
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (popularArtists.isNotEmpty) ...[
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: SectionHeader(title: 'Popular Artists'),
-                  ),
-                  SizedBox(
-                    height: 236,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      physics: const _SearchSnapPhysics(
-                        itemExtent: 150 + _kCarouselGap,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: _kCarouselEdge,
-                      ),
-                      itemCount: popularArtists.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(width: _kCarouselGap),
-                      itemBuilder: (context, i) {
-                        final a = popularArtists[i];
-                        final name = a['name'] ?? '';
-                        final photo = a['photo'] ?? '';
-                        return SpringIn(
-                          delayMs: (i % 5) * 35,
-                          rise: 18,
-                          child: MediaCard(
-                            width: 150.0,
-                            isCircular: true,
-                            twoLineTitle: true,
-                            title: name,
-                            subtitle: 'Artist',
-                            imageUrl: photo,
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              Navigator.push(
-                                context,
-                                ZenPageRoute(
-                                  builder: (_) => ArtistScreen(
-                                    artistName: name,
-                                    imageUrl: photo,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                ],
-                if (popularAlbums.isNotEmpty) ...[
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 4),
-                    child: SectionHeader(title: 'Trending Albums'),
-                  ),
-                  SizedBox(
-                    height: 256,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      physics: const _SearchSnapPhysics(
-                        itemExtent: 170 + _kCarouselGap,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: _kCarouselEdge,
-                      ),
-                      itemCount: popularAlbums.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(width: _kCarouselGap),
-                      itemBuilder: (context, i) {
-                        final al = popularAlbums[i];
-                        final title = al['title'] ?? '';
-                        final artist = al['artist'] ?? '';
-                        final cover = al['cover'] ?? '';
-                        return SpringIn(
-                          delayMs: (i % 5) * 35,
-                          rise: 18,
-                          child: MediaCard(
-                            width: 170.0,
-                            twoLineTitle: true,
-                            title: title,
-                            subtitle: artist,
-                            imageUrl: cover,
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              Navigator.push(
-                                context,
-                                ZenPageRoute(
-                                  builder: (_) => AlbumScreen(
-                                    albumTitle: title,
-                                    artistName: artist,
-                                    coverUrl: cover,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ],
-            );
-          },
-        ),
       ],
     );
   }
 
-  List<Map<String, String>> _extractPopularArtists(List<Track> catalog) {
-    final map = <String, Map<String, String>>{};
-    for (final t in catalog) {
-      if (t.artist.isNotEmpty && !map.containsKey(t.artist.toLowerCase())) {
-        map[t.artist.toLowerCase()] = {
-          'name': t.artist,
-          'photo': t.coverUrl,
-        };
-      }
-    }
-    return map.values.take(10).toList();
-  }
-
-  List<Map<String, String>> _extractPopularAlbums(List<Track> catalog) {
-    final map = <String, Map<String, String>>{};
-    for (final t in catalog) {
-      if (t.album.isNotEmpty &&
-          t.album != 'Single' &&
-          !map.containsKey(t.album.toLowerCase())) {
-        map[t.album.toLowerCase()] = {
-          'title': t.album,
-          'artist': t.artist,
-          'cover': t.coverUrl,
-        };
-      }
-    }
-    return map.values.take(10).toList();
-  }
-
   // ═══════════════════════════════════════════════════════════════════════════
-  // Phase 2: Live Suggestions View
+  // Phase: Suggestions
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildSuggestionsSection({Key? key}) {
-    final typed = _textCtrl.text.trim().toLowerCase();
+  Widget _buildSuggestions({Key? key}) {
+    final typed = _textCtrl.text.trim();
+    final list = _liveSuggestions.isEmpty ? [typed] : _liveSuggestions;
     return Column(
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(_liveSuggestions.length, (i) {
-        final s = _liveSuggestions[i];
+      children: List.generate(list.length, (i) {
+        final s = list[i];
         return SpringIn(
           delayMs: i * 18,
           rise: 12,
           child: PressableScale(
             scale: 0.985,
-            onTap: () => _submitSearch(s, filter: _selectedFilter),
+            onTap: () => _submitSearch(s),
             child: Container(
               padding: const EdgeInsets.symmetric(
-                horizontal: _kCarouselEdge,
+                horizontal: _kEdge,
                 vertical: 13,
               ),
               decoration: BoxDecoration(
@@ -1331,9 +1600,7 @@ class _SearchScreenState extends State<SearchScreen>
                     color: AppColors.textTertiary,
                   ),
                   const SizedBox(width: 14),
-                  Expanded(
-                    child: _buildHighlightedSuggestion(s, typed),
-                  ),
+                  Expanded(child: _highlighted(s, typed.toLowerCase())),
                   PressableScale(
                     scale: 0.90,
                     onTap: () {
@@ -1361,63 +1628,120 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildHighlightedSuggestion(String text, String queryLower) {
-    if (queryLower.isEmpty) {
-      return Text(
-        text,
-        style: _bodyStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      );
-    }
-    final idx = text.toLowerCase().indexOf(queryLower);
+  Widget _highlighted(String text, String queryLower) {
+    final idx = queryLower.isEmpty ? -1 : text.toLowerCase().indexOf(queryLower);
     if (idx < 0) {
       return Text(
         text,
-        style: _bodyStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
-        ),
+        style: _bodyStyle(fontSize: 16, color: AppColors.textPrimary),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       );
     }
+    final end = idx + queryLower.length;
     return RichText(
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       text: TextSpan(
-        style: _bodyStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textSecondary,
-        ),
+        style: _bodyStyle(fontSize: 16),
         children: [
           if (idx > 0) TextSpan(text: text.substring(0, idx)),
           TextSpan(
-            text: text.substring(idx, idx + queryLower.length),
+            text: text.substring(idx, end),
             style: _bodyStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
           ),
-          if (idx + queryLower.length < text.length)
-            TextSpan(text: text.substring(idx + queryLower.length)),
+          if (end < text.length) TextSpan(text: text.substring(end)),
         ],
       ),
     );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Phase 4: Search Results View
+  // Phase: Category page (own layout: hero + browse sections)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildResultsSection({Key? key}) {
+  Widget _buildCategoryPage(
+    _SearchCategorySpec spec,
+    double topPad, {
+    Key? key,
+  }) {
+    final songs = _catSongs;
+    final visibleSongs = _catSongsExpanded || songs.length <= 10
+        ? songs
+        : songs.take(10).toList();
+    final catIndex = _kSearchCategories.indexOf(spec);
+    final loaded = <String>[
+      for (final s in _catSongs)
+        if (s.thumbnailUrl.isNotEmpty) s.thumbnailUrl,
+      for (final a in _catAlbums)
+        if (_hiResUrl(a).isNotEmpty) _hiResUrl(a),
+    ];
+    final covers = loaded.isNotEmpty
+        ? loaded
+        : _catalogCovers(CatalogDataSource.allTracks);
+    final nothing = !_catLoading &&
+        songs.isEmpty &&
+        _catAlbums.isEmpty &&
+        _catArtists.isEmpty &&
+        _catPlaylists.isEmpty &&
+        _catVideos.isEmpty;
+
+    return Column(
+      key: key,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CategoryHero(
+          spec: spec,
+          index: catIndex < 0 ? 0 : catIndex,
+          covers: covers,
+          topPad: topPad,
+          onPlay: () {
+            if (songs.isEmpty) return;
+            HapticFeedback.mediumImpact();
+            _playSong(songs.map((s) => s.toTrack()).toList(), 0,
+                title: spec.title);
+          },
+          onShuffle: () {
+            if (songs.isEmpty) return;
+            HapticFeedback.mediumImpact();
+            final t = songs.map((s) => s.toTrack()).toList()..shuffle();
+            _playSong(t, 0, title: spec.title);
+          },
+        ),
+        if (_catLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: Center(child: CupertinoActivityIndicator(radius: 13)),
+          ),
+        if (nothing) _buildEmptyNotice('Nothing found in ${spec.title}.'),
+        if (songs.isNotEmpty) ...[
+          _sectionHeader(
+            'Top Songs',
+            actionTitle: songs.length > 10
+                ? (_catSongsExpanded ? 'Show Less' : 'Show All')
+                : null,
+            onTap: () => setState(() => _catSongsExpanded = !_catSongsExpanded),
+          ),
+          _songRows(visibleSongs, ranked: true),
+          const SizedBox(height: 18),
+        ],
+        if (_catAlbums.isNotEmpty) _albumsCarousel(_catAlbums),
+        if (_catArtists.isNotEmpty) _artistsCarousel(_catArtists),
+        if (_catPlaylists.isNotEmpty) _playlistsCarousel(_catPlaylists),
+        if (_catVideos.isNotEmpty) _videosCarousel(_catVideos),
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Phase: Results
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildResults({Key? key}) {
     final r = _searchResults;
     final hasAny = !r.isEmpty;
 
@@ -1430,7 +1754,7 @@ class _SearchScreenState extends State<SearchScreen>
           onSelected: _onFilterSelected,
         ),
         if (r.correctedQuery != null && r.correctedQuery!.isNotEmpty)
-          _buildDidYouMeanPill(r.correctedQuery!),
+          _buildDidYouMean(r.correctedQuery!),
         if (_isLoading && hasAny)
           const Padding(
             padding: EdgeInsets.only(top: 4),
@@ -1441,7 +1765,7 @@ class _SearchScreenState extends State<SearchScreen>
             ),
           ),
         if (!hasAny)
-          _buildEmptyResultsState()
+          _buildEmptyResults()
         else
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
@@ -1450,10 +1774,7 @@ class _SearchScreenState extends State<SearchScreen>
             layoutBuilder: (currentChild, previousChildren) {
               return Stack(
                 alignment: Alignment.topCenter,
-                children: [
-                  ...previousChildren,
-                  ?currentChild,
-                ],
+                children: [...previousChildren, ?currentChild],
               );
             },
             transitionBuilder: (child, anim) {
@@ -1469,14 +1790,14 @@ class _SearchScreenState extends State<SearchScreen>
             child: KeyedSubtree(
               key: ValueKey('filter_${_selectedFilter.name}'),
               child: switch (_selectedFilter) {
-                SearchFilter.all => _buildDynamicOverviewSections(r),
-                SearchFilter.songs => _buildFilteredSongsList(r.songs),
-                SearchFilter.artists => _buildFilteredArtistsList(r.artists),
-                SearchFilter.albums => _buildFilteredAlbumsGrid(r.albums),
+                SearchFilter.all => _buildOverview(r),
+                SearchFilter.songs => _buildFilteredSongs(r.songs),
+                SearchFilter.artists => _buildFilteredArtists(r.artists),
+                SearchFilter.albums => _buildFilteredAlbums(r.albums),
                 SearchFilter.featuredPlaylists ||
                 SearchFilter.communityPlaylists =>
-                  _buildFilteredPlaylistsGrid(r.playlists),
-                SearchFilter.videos => _buildFilteredVideosList(r.videos),
+                  _buildFilteredPlaylists(r.playlists),
+                SearchFilter.videos => _buildFilteredVideos(r.videos),
               },
             ),
           ),
@@ -1484,50 +1805,33 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildDidYouMeanPill(String correction) {
+  Widget _buildDidYouMean(String correction) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        _kCarouselEdge,
-        10,
-        _kCarouselEdge,
-        4,
-      ),
-      child: SpringIn(
-        delayMs: 20,
-        rise: 10,
-        child: PressableScale(
-          scale: 0.97,
-          onTap: () => _submitSearch(correction, filter: _selectedFilter),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(26),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.09),
-                width: 0.6,
-              ),
-            ),
-            child: RichText(
-              text: TextSpan(
-                style: _bodyStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
-                children: [
-                  const TextSpan(text: 'Did you mean '),
-                  TextSpan(
-                    text: correction,
-                    style: _bodyStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.accent,
-                    ),
+      padding: const EdgeInsets.fromLTRB(_kEdge, 10, _kEdge, 4),
+      child: PressableScale(
+        scale: 0.97,
+        onTap: () => _submitSearch(correction, filter: _selectedFilter),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(26),
+          ),
+          child: RichText(
+            text: TextSpan(
+              style: _bodyStyle(fontSize: 13.5),
+              children: [
+                const TextSpan(text: 'Did you mean '),
+                TextSpan(
+                  text: correction,
+                  style: _bodyStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
                   ),
-                  const TextSpan(text: '?'),
-                ],
-              ),
+                ),
+                const TextSpan(text: '?'),
+              ],
             ),
           ),
         ),
@@ -1535,504 +1839,542 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildEmptyResultsState() {
+  Widget _buildEmptyResults() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 68, 32, 48),
       child: Center(
-        child: SpringIn(
-          delayMs: 40,
-          rise: 18,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  CupertinoIcons.search,
-                  size: 30,
-                  color: AppColors.textTertiary,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'No Results for "$_activeQuery"',
-                style: _displayStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Check the spelling or try a new search.',
-                style: _bodyStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 22),
-              PressableScale(
-                onTap: () {
-                  _clearSearch();
-                  _focusNode.requestFocus();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 22,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(26),
-                  ),
-                  child: Text(
-                    'Clear Search',
-                    style: _bodyStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'No Results for "$_submittedQuery"',
+              style: _displayStyle(fontSize: 20),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Check the spelling or try a new search.',
+              style: _bodyStyle(fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // ── Overview Sections Ordered by Intent ────────────────────────────────────
-
-  Widget _buildDynamicOverviewSections(SearchResult r) {
-    final sections = <Widget>[];
-
-    if (r.topResult != null) {
-      sections.add(_buildTopResultSection(r.topResult!));
+  Widget _buildEmptyNotice(String text) {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: CupertinoActivityIndicator(radius: 12)),
+      );
     }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+      child: Center(
+        child: Text(
+          text,
+          style: _bodyStyle(fontSize: 15),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
 
-    final Widget? songsSec =
-        r.songs.isNotEmpty ? _buildSongsOverviewSection(r.songs) : null;
-    final Widget? artistsSec =
-        r.artists.isNotEmpty ? _buildArtistsCarouselSection(r.artists) : null;
-    final Widget? albumsSec =
-        r.albums.isNotEmpty ? _buildAlbumsCarouselSection(r.albums) : null;
-    final Widget? playlistsSec = r.playlists.isNotEmpty
-        ? _buildPlaylistsCarouselSection(r.playlists)
-        : null;
-    final Widget? videosSec =
-        r.videos.isNotEmpty ? _buildVideosCarouselSection(r.videos) : null;
+  // ── Overview ("All") ───────────────────────────────────────────────────────
+
+  Widget _buildOverview(SearchResult r) {
+    final queries = <String>{
+      _norm(_submittedQuery),
+      if (r.correctedQuery != null) _norm(r.correctedQuery!),
+    }..removeWhere((e) => e.isEmpty);
+    final tops = _rankTopResults(r, queries.toList());
+
+    final topSec = tops.isEmpty ? null : _buildTopResults(tops);
+    final songsSec = r.songs.isEmpty
+        ? null
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionHeader(
+                'Songs',
+                actionTitle: 'See All',
+                onTap: () => _onFilterSelected(SearchFilter.songs),
+              ),
+              _songRows(r.songs.take(5).toList()),
+              const SizedBox(height: 14),
+            ],
+          );
+    final albumsSec = r.albums.isEmpty
+        ? null
+        : _albumsCarousel(
+            r.albums,
+            seeAll: () => _onFilterSelected(SearchFilter.albums),
+          );
+    final artistsSec = r.artists.isEmpty
+        ? null
+        : _artistsCarousel(
+            r.artists,
+            seeAll: () => _onFilterSelected(SearchFilter.artists),
+          );
+    final playlistsSec = r.playlists.isEmpty
+        ? null
+        : _playlistsCarousel(
+            r.playlists,
+            seeAll: () => _onFilterSelected(SearchFilter.featuredPlaylists),
+          );
+    final videosSec = r.videos.isEmpty
+        ? null
+        : _videosCarousel(
+            r.videos,
+            seeAll: () => _onFilterSelected(SearchFilter.videos),
+          );
 
     final ordered = switch (r.intent.layoutMode) {
       SearchLayoutMode.exactArtist || SearchLayoutMode.artistType => [
-          songsSec,
-          albumsSec,
-          artistsSec,
-          playlistsSec,
-          videosSec,
+          songsSec, albumsSec, artistsSec, playlistsSec, videosSec,
         ],
       SearchLayoutMode.albumOrPlaylist => [
-          albumsSec,
-          playlistsSec,
-          songsSec,
-          artistsSec,
-          videosSec,
+          albumsSec, playlistsSec, songsSec, artistsSec, videosSec,
         ],
       SearchLayoutMode.songTitle || SearchLayoutMode.generic => [
-          songsSec,
-          albumsSec,
-          artistsSec,
-          playlistsSec,
-          videosSec,
+          songsSec, albumsSec, artistsSec, playlistsSec, videosSec,
         ],
     };
 
-    for (final w in ordered) {
-      if (w != null) sections.add(w);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ?topSec,
+        for (final w in ordered) ?w,
+      ],
+    );
+  }
+
+  // ── Top-result ranking: only genuine matches, 0..5 of them ─────────────────
+
+  double _scoreItem(SearchItem item, List<String> queries, SearchLayoutMode m) {
+    final artistMode =
+        m == SearchLayoutMode.exactArtist || m == SearchLayoutMode.artistType;
+    final secondary = item is SearchArtistItem ? '' : item.subtitle;
+    var s = 0.0;
+    for (final q in queries) {
+      s = math.max(s, _matchScore(q, item.title, secondary));
+    }
+    final w = switch (item) {
+      SearchArtistItem _ => artistMode ? 1.05 : 1.0,
+      SearchSongItem _ => m == SearchLayoutMode.songTitle
+          ? 1.04
+          : (artistMode ? 0.9 : 1.0),
+      SearchAlbumItem _ => m == SearchLayoutMode.albumOrPlaylist ? 1.04 : 0.97,
+      SearchPlaylistItem _ =>
+        m == SearchLayoutMode.albumOrPlaylist ? 0.98 : 0.85,
+      SearchVideoItem _ => 0.9,
+      _ => 0.8,
+    };
+    return (s * w).clamp(0.0, 1.0);
+  }
+
+  List<_TopCand> _rankTopResults(SearchResult r, List<String> queries) {
+    if (queries.isEmpty) return const [];
+    final mode = r.intent.layoutMode;
+    final cands = <String, _TopCand>{};
+
+    String keyOf(SearchItem i) =>
+        '${i.runtimeType}|${_norm(i.title)}|${_norm(i.subtitle)}';
+
+    final serviceTop = r.topResult?.item;
+    final serviceKey = serviceTop == null ? null : keyOf(serviceTop);
+
+    void add(SearchItem item) {
+      final k = keyOf(item);
+      if (cands.containsKey(k)) return;
+      var score = _scoreItem(item, queries, mode);
+      if (k == serviceKey && score >= 0.5) score = math.min(1.0, score + 0.04);
+      cands[k] = _TopCand(item, score);
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: sections,
-    );
+    if (serviceTop != null) add(serviceTop);
+    r.artists.take(10).forEach(add);
+    r.songs.take(15).forEach(add);
+    r.albums.take(10).forEach(add);
+    r.playlists.take(8).forEach(add);
+    r.videos.take(8).forEach(add);
+
+    final sorted = cands.values.toList()
+      ..sort((a, b) => b.score.compareTo(a.score));
+    if (sorted.isEmpty || sorted.first.score < 0.6) return const [];
+
+    final best = sorted.first.score;
+    final out = <_TopCand>[sorted.first];
+    for (final c in sorted.skip(1)) {
+      if (out.length >= 5) break;
+      if (c.score >= 0.7 && c.score >= best - 0.15) out.add(c);
+    }
+    return out;
   }
 
-  // ── 1. Editorial Top Result Hero Card (AppleGlass + Stadium & Circle Controls)
+  // ── Top results UI: one distinct layout per type, no cards, no tags ────────
 
-  Widget _buildTopResultSection(SearchTopResult top) {
-    final isArtist = top.type == SearchItemType.artist;
-    final songTrack = top.item is SearchSongItem
-        ? (top.item as SearchSongItem).toTrack()
-        : (top.item is SearchVideoItem
-            ? (top.item as SearchVideoItem).toTrack()
-            : null);
-
+  Widget _buildTopResults(List<_TopCand> tops) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(title: 'Top Result'),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            _kCarouselEdge,
-            0,
-            _kCarouselEdge,
-            18,
+        _sectionHeader(tops.length > 1 ? 'Top Results' : 'Top Result'),
+        SpringIn(
+          delayMs: 20,
+          rise: 20,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(_kEdge, 4, _kEdge, 8),
+            child: _buildHero(tops.first.item),
           ),
-          child: SpringIn(
-            delayMs: 20,
-            rise: 22,
-            child: PressableScale(
-              scale: 0.985,
-              onTap: () => _handleItemTap(top.item),
-              child: Stack(
-                children: [
-                  if (top.imageUrl.isNotEmpty)
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Opacity(
-                              opacity: 0.24,
-                              child: ImageFiltered(
-                                imageFilter: ImageFilter.blur(
-                                  sigmaX: 28,
-                                  sigmaY: 28,
-                                ),
-                                child: CachedNetworkImage(
-                                  imageUrl: top.imageUrl,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, _, _) =>
-                                      const SizedBox.shrink(),
-                                ),
-                              ),
+        ),
+        for (var i = 1; i < tops.length; i++) _compactRow(tops[i].item),
+        const SizedBox(height: 18),
+      ],
+    );
+  }
+
+  Widget _buildHero(SearchItem item) {
+    return switch (item) {
+      SearchSongItem s => _songHero(s),
+      SearchArtistItem a => _artistHero(a),
+      SearchAlbumItem a => _albumHero(a),
+      SearchPlaylistItem p => _playlistHero(p),
+      SearchVideoItem v => _videoHero(v),
+      _ => const SizedBox.shrink(),
+    };
+  }
+
+  Widget _heroLayout({
+    required Widget art,
+    required String title,
+    String subtitle = '',
+    bool verified = false,
+    required VoidCallback onTap,
+    required VoidCallback onMore,
+    required Widget actions,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        PressableScale(
+          scale: 0.985,
+          onTap: onTap,
+          child: Row(
+            children: [
+              art,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: _displayStyle(
+                              fontSize: 22,
+                              letterSpacing: -0.5,
+                              height: 1.15,
                             ),
-                            DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    const Color(0xFF141418)
-                                        .withValues(alpha: 0.72),
-                                    const Color(0xFF0C0C0F)
-                                        .withValues(alpha: 0.90),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  AppleGlass(
-                    borderRadius: BorderRadius.circular(22),
-                    blur: 14,
-                    tint: const Color(0x1C141418),
-                    shadow: true,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          width: 0.7,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Selector<PlayerState,
-                                  ({String? id, bool playing})>(
-                                selector: (_, p) => (
-                                  id: p.currentTrack?.id,
-                                  playing: p.isPlaying,
-                                ),
-                                builder: (context, active, _) {
-                                  final isCurrent = songTrack != null &&
-                                      _isTrackActive(songTrack, active.id);
-                                  return _TopResultArtwork(
-                                    imageUrl: top.imageUrl,
-                                    title: top.title,
-                                    isArtist: isArtist,
-                                    isActive: isCurrent,
-                                    isPlaying: isCurrent && active.playing,
-                                  );
-                                },
-                              ),
-                              const SizedBox(width: 15),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildTopResultBadges(top),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      top.title,
-                                      style: _displayStyle(
-                                        fontSize: 21,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.textPrimary,
-                                        letterSpacing: -0.4,
-                                        height: 1.15,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    if (top.subtitle.isNotEmpty) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        top.subtitle,
-                                        style: _bodyStyle(
-                                          fontSize: 13.5,
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textSecondary,
-                                          height: 1.25,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Align(
-                                alignment: Alignment.topRight,
-                                child: ZenActionCircle(
-                                  icon: CupertinoIcons.ellipsis,
-                                  size: 36,
-                                  iconSize: 17,
-                                  backgroundColor:
-                                      Colors.white.withValues(alpha: 0.11),
-                                  idleColor: AppColors.textPrimary,
-                                  onTap: () => _showTopResultDropdown(top),
-                                ),
-                              ),
-                            ],
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 16),
-                          _buildTopResultActions(top, songTrack),
+                        ),
+                        if (verified) ...[
+                          const SizedBox(width: 6),
+                          const Icon(
+                            CupertinoIcons.checkmark_seal_fill,
+                            size: 16,
+                            color: AppColors.accent,
+                          ),
                         ],
-                      ),
+                      ],
                     ),
-                  ),
-                ],
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: _bodyStyle(fontSize: 14.5, height: 1.25),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
+              _moreButton(onMore),
+            ],
           ),
         ),
+        const SizedBox(height: 16),
+        actions,
       ],
     );
   }
 
-  Widget _buildTopResultBadges(SearchTopResult top) {
-    final typeLabel = switch (top.type) {
-      SearchItemType.artist => 'ARTIST',
-      SearchItemType.song => 'SONG',
-      SearchItemType.album => 'ALBUM',
-      SearchItemType.playlist => 'PLAYLIST',
-      SearchItemType.video => 'VIDEO',
-      SearchItemType.podcast || SearchItemType.episode => 'PODCAST',
-      SearchItemType.topResult => 'TOP RESULT',
-    };
-
-    final bool isExplicit = switch (top.item) {
-      SearchSongItem s => s.isExplicit,
-      SearchAlbumItem a => a.isExplicit,
-      _ => false,
-    };
-
-    final bool isVerified = switch (top.item) {
-      SearchArtistItem a => a.isVerified,
-      _ => false,
-    };
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(
-            color: AppColors.accent.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(
-              color: AppColors.accent.withValues(alpha: 0.35),
-              width: 0.5,
-            ),
-          ),
-          child: Text(
-            typeLabel,
-            style: _bodyStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w700,
-              color: AppColors.accent,
-              letterSpacing: 0.7,
-            ),
-          ),
-        ),
-        if (isVerified) ...[
-          const SizedBox(width: 6),
-          const Icon(
-            CupertinoIcons.checkmark_seal_fill,
-            size: 14,
-            color: AppColors.accent,
-          ),
-        ],
-        if (isExplicit) ...[
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: Text(
-              'E',
-              style: _bodyStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildTopResultActions(SearchTopResult top, Track? songTrack) {
-    final store = LibraryStore.instance;
+  Widget _songHero(SearchSongItem s) {
+    final track = s.toTrack();
     return Selector<PlayerState, ({String? id, bool playing})>(
       selector: (_, p) => (id: p.currentTrack?.id, playing: p.isPlaying),
       builder: (context, active, _) {
-        final isPlayingThisSong = songTrack != null &&
-            _isTrackActive(songTrack, active.id) &&
-            active.playing;
+        final isCurrent = _isTrackActive(track, active.id);
+        final playing = isCurrent && active.playing;
+        return _heroLayout(
+          art: _Artwork(
+            url: _hiResUrl(s),
+            title: s.title,
+            size: 108,
+            radius: 12,
+            active: isCurrent,
+            playing: playing,
+          ),
+          title: s.title,
+          subtitle: _cleanSub(s.subtitle),
+          onTap: () => _handleItemTap(s),
+          onMore: () => _showMore(s),
+          actions: Row(
+            children: [
+              Expanded(
+                child: ZenPlayButton(
+                  height: 44,
+                  fontSize: 15,
+                  iconSize: 18,
+                  isPlaying: playing,
+                  label: playing ? 'Pause' : 'Play',
+                  expanded: true,
+                  onTap: () {
+                    if (isCurrent) {
+                      context.read<PlayerState>().togglePlay();
+                    } else {
+                      _handleItemTap(s);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              _likeCircle(track),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-        return Row(
+  Widget _artistHero(SearchArtistItem a) {
+    final store = LibraryStore.instance;
+    return _heroLayout(
+      art: _Artwork(
+        url: _hiResUrl(a),
+        title: a.title,
+        size: 108,
+        circle: true,
+      ),
+      title: a.title,
+      verified: a.isVerified,
+      onTap: () => _handleItemTap(a),
+      onMore: () => _showMore(a),
+      actions: Row(
+        children: [
+          Expanded(
+            child: ZenPlayButton(
+              height: 44,
+              fontSize: 15,
+              iconSize: 18,
+              isPlaying: false,
+              label: 'Play',
+              expanded: true,
+              onTap: () => _playCollection(a),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ZenShuffleButton(
+              height: 44,
+              fontSize: 15,
+              iconSize: 17,
+              expanded: true,
+              label: 'Shuffle',
+              onTap: () => _playCollection(a, shuffle: true),
+            ),
+          ),
+          const SizedBox(width: 10),
+          AnimatedBuilder(
+            animation: store,
+            builder: (context, _) {
+              final followed = store.isFollowing(a.title);
+              return ZenActionCircle(
+                size: 44,
+                iconSize: 20,
+                active: followed,
+                icon: followed ? CupertinoIcons.star_fill : CupertinoIcons.star,
+                onTap: () => store.toggleFollow(a.title, _hiResUrl(a)),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _albumHero(SearchAlbumItem a) {
+    final store = LibraryStore.instance;
+    return _heroLayout(
+      art: _Artwork(url: _hiResUrl(a), title: a.title, size: 128, radius: 12),
+      title: a.title,
+      subtitle: _albumSub(a),
+      onTap: () => _handleItemTap(a),
+      onMore: () => _showMore(a),
+      actions: Row(
+        children: [
+          Expanded(
+            child: ZenPlayButton(
+              height: 44,
+              fontSize: 15,
+              iconSize: 18,
+              isPlaying: false,
+              label: 'Play',
+              expanded: true,
+              onTap: () => _playCollection(a),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: ZenShuffleButton(
+              height: 44,
+              fontSize: 15,
+              iconSize: 17,
+              expanded: true,
+              label: 'Shuffle',
+              onTap: () => _playCollection(a, shuffle: true),
+            ),
+          ),
+          const SizedBox(width: 10),
+          AnimatedBuilder(
+            animation: store,
+            builder: (context, _) {
+              final saved = store.isAlbumSaved(a.title, a.subtitle);
+              return ZenActionCircle(
+                size: 44,
+                iconSize: 20,
+                active: saved,
+                icon: saved ? CupertinoIcons.checkmark : CupertinoIcons.plus,
+                onTap: () =>
+                    store.toggleAlbum(a.title, a.subtitle, _hiResUrl(a)),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _playlistHero(SearchPlaylistItem p) {
+    return _heroLayout(
+      art: _Artwork(url: _hiResUrl(p), title: p.title, size: 128, radius: 12),
+      title: p.title,
+      subtitle: _playlistSub(p),
+      onTap: () => _handleItemTap(p),
+      onMore: () => _showMore(p),
+      actions: Row(
+        children: [
+          Expanded(
+            child: ZenPlayButton(
+              height: 44,
+              fontSize: 15,
+              iconSize: 18,
+              isPlaying: false,
+              label: 'Open',
+              expanded: true,
+              onTap: () => _handleItemTap(p),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _videoHero(SearchVideoItem v) {
+    final track = v.toTrack();
+    final meta = _videoMeta(v);
+    return Selector<PlayerState, ({String? id, bool playing})>(
+      selector: (_, p) => (id: p.currentTrack?.id, playing: p.isPlaying),
+      builder: (context, active, _) {
+        final isCurrent = _isTrackActive(track, active.id);
+        final playing = isCurrent && active.playing;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: ZenPlayButton(
-                height: 44,
-                fontSize: 15,
-                iconSize: 18,
-                isPlaying: isPlayingThisSong,
-                label: isPlayingThisSong ? 'Pause' : 'Play',
-                expanded: true,
-                onTap: () {
-                  if (songTrack != null &&
-                      _isTrackActive(songTrack, active.id)) {
-                    context.read<PlayerState>().togglePlay();
-                  } else if (top.item is SearchSongItem ||
-                      top.item is SearchVideoItem) {
-                    _handleItemTap(top.item);
-                  } else if (_searchResults.songs.isNotEmpty) {
-                    _playSong(
-                      [_searchResults.songs.first.toTrack()],
-                      0,
-                    );
-                  } else {
-                    _handleItemTap(top.item);
-                  }
-                },
+            PressableScale(
+              scale: 0.985,
+              onTap: () => _handleItemTap(v),
+              child: _VideoThumb(
+                video: v,
+                imageUrl: _hiResUrl(v),
+                radius: 14,
+                bigPlay: true,
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: top.type == SearchItemType.album ||
-                      top.type == SearchItemType.playlist
-                  ? ZenShuffleButton(
-                      height: 44,
-                      fontSize: 15,
-                      iconSize: 17,
-                      expanded: true,
-                      label: 'Shuffle',
-                      onTap: () {
-                        if (_searchResults.songs.isNotEmpty) {
-                          final tracks = _searchResults.songs
-                              .map((s) => s.toTrack())
-                              .toList()
-                            ..shuffle();
-                          _playSong(tracks, 0);
-                        } else {
-                          _handleItemTap(top.item);
-                        }
-                      },
-                    )
-                  : ZenPlayButton(
-                      height: 44,
-                      fontSize: 15,
-                      iconSize: 17,
-                      isSecondary: true,
-                      expanded: true,
-                      label: 'Radio',
-                      onTap: () => _startRadio(top),
-                    ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        v.title,
+                        style: _displayStyle(
+                          fontSize: 19,
+                          letterSpacing: -0.4,
+                          height: 1.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (meta.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          meta,
+                          style: _bodyStyle(fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                _moreButton(() => _showMore(v)),
+              ],
             ),
-            const SizedBox(width: 10),
-            AnimatedBuilder(
-              animation: store,
-              builder: (context, _) {
-                if (songTrack != null) {
-                  final liked = store.isLiked(songTrack);
-                  return ZenActionCircle(
-                    size: 44,
-                    iconSize: 20,
-                    active: liked,
-                    icon: liked
-                        ? CupertinoIcons.heart_fill
-                        : CupertinoIcons.heart,
-                    onTap: () => store.toggleLike(songTrack),
-                  );
-                }
-                if (top.item is SearchArtistItem) {
-                  final followed = store.isFollowing(top.title);
-                  return ZenActionCircle(
-                    size: 44,
-                    iconSize: 20,
-                    active: followed,
-                    icon: followed
-                        ? CupertinoIcons.star_fill
-                        : CupertinoIcons.star,
-                    onTap: () => store.toggleFollow(top.title, top.imageUrl),
-                  );
-                }
-                if (top.item is SearchAlbumItem) {
-                  final saved = store.isAlbumSaved(top.title, top.subtitle);
-                  return ZenActionCircle(
-                    size: 44,
-                    iconSize: 20,
-                    active: saved,
-                    icon: saved
-                        ? CupertinoIcons.checkmark
-                        : CupertinoIcons.plus,
-                    onTap: () =>
-                        store.toggleAlbum(top.title, top.subtitle, top.imageUrl),
-                  );
-                }
-                return ZenActionCircle(
-                  size: 44,
-                  iconSize: 20,
-                  icon: CupertinoIcons.arrow_up_right,
-                  onTap: () => _handleItemTap(top.item),
-                );
-              },
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: ZenPlayButton(
+                    height: 44,
+                    fontSize: 15,
+                    iconSize: 18,
+                    isPlaying: playing,
+                    label: playing ? 'Pause' : 'Play',
+                    expanded: true,
+                    onTap: () {
+                      if (isCurrent) {
+                        context.read<PlayerState>().togglePlay();
+                      } else {
+                        _handleItemTap(v);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _likeCircle(track),
+              ],
             ),
           ],
         );
@@ -2040,379 +2382,155 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  void _showTopResultDropdown(SearchTopResult top) {
-    HapticFeedback.mediumImpact();
-    if (top.item is SearchSongItem) {
-      ZenDropdown.showTrackMenu(
-        context: context,
-        track: (top.item as SearchSongItem).toTrack(),
-      );
-      return;
+  /// Secondary top results (#2–#5): compact row in each type's own style.
+  Widget _compactRow(SearchItem item) {
+    switch (item) {
+      case SearchSongItem s:
+        return Column(
+          children: [
+            _songRows([s]),
+            _divider(87),
+          ],
+        );
+      case SearchArtistItem a:
+        return Column(
+          children: [
+            _ListRow(
+              leading: _Artwork(
+                url: _hiResUrl(a),
+                title: a.title,
+                size: 56,
+                circle: true,
+              ),
+              title: a.title,
+              verified: a.isVerified,
+              onTap: () => _handleItemTap(a),
+            ),
+            _divider(90),
+          ],
+        );
+      case SearchAlbumItem a:
+        return Column(
+          children: [
+            _ListRow(
+              leading:
+                  _Artwork(url: _hiResUrl(a), title: a.title, size: 56, radius: 8),
+              title: a.title,
+              subtitle: _albumSub(a),
+              onTap: () => _handleItemTap(a),
+            ),
+            _divider(90),
+          ],
+        );
+      case SearchPlaylistItem p:
+        return Column(
+          children: [
+            _ListRow(
+              leading:
+                  _Artwork(url: _hiResUrl(p), title: p.title, size: 56, radius: 8),
+              title: p.title,
+              subtitle: _playlistSub(p),
+              onTap: () => _handleItemTap(p),
+            ),
+            _divider(90),
+          ],
+        );
+      case SearchVideoItem v:
+        return Column(
+          children: [
+            _ListRow(
+              leading: SizedBox(
+                width: 112,
+                child: _VideoThumb(
+                  video: v,
+                  imageUrl: _hiResUrl(v),
+                  radius: 8,
+                  small: true,
+                ),
+              ),
+              title: v.title,
+              subtitle: _videoMeta(v),
+              onTap: () => _handleItemTap(v),
+            ),
+            _divider(146),
+          ],
+        );
+      default:
+        return const SizedBox.shrink();
     }
+  }
 
-    final store = LibraryStore.instance;
-    final items = <ZenDropdownItem>[
-      ZenDropdownItem(
-        title: 'Play',
-        icon: CupertinoIcons.play_fill,
-        onTap: () {
-          if (_searchResults.songs.isNotEmpty) {
-            _playSong(_searchResults.songs.map((s) => s.toTrack()).toList(), 0);
-          } else {
-            _handleItemTap(top.item);
-          }
-        },
-      ),
-      ZenDropdownItem(
-        title: 'Create Station',
-        icon: CupertinoIcons.antenna_radiowaves_left_right,
-        onTap: () => _startRadio(top),
-      ),
-      if (top.item is SearchArtistItem)
-        ZenDropdownItem(
-          title: store.isFollowing(top.title)
-              ? 'Unfollow Artist'
-              : 'Follow Artist',
-          icon: store.isFollowing(top.title)
-              ? CupertinoIcons.star_fill
-              : CupertinoIcons.star,
-          onTap: () => store.toggleFollow(top.title, top.imageUrl),
-        ),
-      if (top.item is SearchAlbumItem)
-        ZenDropdownItem(
-          title: store.isAlbumSaved(top.title, top.subtitle)
-              ? 'Remove from Library'
-              : 'Add to Library',
-          icon: store.isAlbumSaved(top.title, top.subtitle)
-              ? CupertinoIcons.checkmark_circle_fill
-              : CupertinoIcons.plus_circle,
-          onTap: () => store.toggleAlbum(top.title, top.subtitle, top.imageUrl),
-        ),
-      ZenDropdownItem(
-        title: 'View Details',
-        icon: CupertinoIcons.arrow_up_right_circle,
-        onTap: () => _handleItemTap(top.item),
-      ),
-    ];
+  // ── Filtered full views ────────────────────────────────────────────────────
 
-    ZenDropdown.show(
-      context: context,
-      title: top.title,
-      subtitle: top.subtitle.isNotEmpty ? top.subtitle : null,
-      items: items,
+  Widget _buildFilteredSongs(List<SearchSongItem> songs) {
+    if (songs.isEmpty) return _buildEmptyNotice('No songs found.');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [_sectionHeader('Songs'), _songRows(songs)],
     );
   }
 
-  // ── 2. Songs Section (Canonical SongTile + EqualizerBars + ZenDropdown) ────
-
-  Widget _buildSongsOverviewSection(List<SearchSongItem> songs) {
-    final visibleCount = songs.length > 5 ? 5 : songs.length;
-    final allTracks = songs.map((s) => s.toTrack()).toList();
-
+  Widget _buildFilteredArtists(List<SearchArtistItem> artists) {
+    if (artists.isEmpty) return _buildEmptyNotice('No artists found.');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(
-            title: 'Songs',
-            actionTitle: 'See All',
-            onActionTap: () => _onFilterSelected(SearchFilter.songs),
-          ),
-        ),
-        Selector<PlayerState, ({String? id, bool playing})>(
-          selector: (_, p) => (id: p.currentTrack?.id, playing: p.isPlaying),
-          builder: (context, active, _) {
-            return Column(
-              children: List.generate(visibleCount, (i) {
-                final track = allTracks[i];
-                final isActive = _isTrackActive(track, active.id);
-                return SpringIn(
-                  delayMs: 55 + i * 28,
-                  rise: 16,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: SongTile(
-                          track: track,
-                          isActive: isActive,
-                          isPlaying: isActive && active.playing,
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            _playSong([track], 0);
-                          },
-                          onTrailingTap: () {
-                            HapticFeedback.lightImpact();
-                            ZenDropdown.showTrackMenu(
-                              context: context,
-                              track: track,
-                            );
-                          },
-                        ),
-                      ),
-                      if (i < visibleCount - 1)
-                        Divider(
-                          height: 1,
-                          indent: 84,
-                          endIndent: _kCarouselEdge,
-                          color: Colors.white.withValues(alpha: 0.06),
-                        ),
-                    ],
+        _sectionHeader('Artists'),
+        ...List.generate(artists.length, (i) {
+          final a = artists[i];
+          return SpringIn(
+            delayMs: i < 10 ? i * 24 : 0,
+            rise: 14,
+            child: Column(
+              children: [
+                _ListRow(
+                  leading: _Artwork(
+                    url: _hiResUrl(a),
+                    title: a.title,
+                    size: 58,
+                    circle: true,
                   ),
-                );
-              }),
-            );
-          },
-        ),
-        const SizedBox(height: 14),
-      ],
-    );
-  }
-
-  // ── 3. Albums Snap Carousel (MediaCard width: 170.0) ───────────────────────
-
-  Widget _buildAlbumsCarouselSection(List<SearchAlbumItem> albums) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(
-            title: 'Albums',
-            actionTitle: 'See All',
-            onActionTap: () => _onFilterSelected(SearchFilter.albums),
-          ),
-        ),
-        SizedBox(
-          height: 256,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const _SearchSnapPhysics(itemExtent: 170 + _kCarouselGap),
-            padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
-            itemCount: albums.length,
-            separatorBuilder: (_, _) => const SizedBox(width: _kCarouselGap),
-            itemBuilder: (context, i) {
-              final album = albums[i];
-              final subtitleParts = <String>[
-                if (album.subtitle.isNotEmpty) album.subtitle,
-                if (album.year != null) '${album.year}',
-              ];
-              return SpringIn(
-                delayMs: (i % 5) * 32,
-                rise: 18,
-                child: MediaCard(
-                  width: 170.0,
-                  twoLineTitle: true,
-                  title: album.title,
-                  subtitle: subtitleParts.isNotEmpty
-                      ? subtitleParts.join(' · ')
-                      : album.albumType,
-                  imageUrl: _hiResUrl(album),
-                  onTap: () => _handleItemTap(album),
+                  title: a.title,
+                  verified: a.isVerified,
+                  onTap: () => _handleItemTap(a),
                 ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 14),
+                if (i < artists.length - 1) _divider(92),
+              ],
+            ),
+          );
+        }),
       ],
     );
   }
 
-  // ── 4. Artists Snap Carousel (MediaCard width: 150.0, isCircular: true) ────
-
-  Widget _buildArtistsCarouselSection(List<SearchArtistItem> artists) {
+  Widget _grid({
+    required String title,
+    required int count,
+    required Widget Function(int i, double cardWidth) item,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(
-            title: 'Artists',
-            actionTitle: 'See All',
-            onActionTap: () => _onFilterSelected(SearchFilter.artists),
-          ),
-        ),
-        SizedBox(
-          height: 236,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const _SearchSnapPhysics(itemExtent: 150 + _kCarouselGap),
-            padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
-            itemCount: artists.length,
-            separatorBuilder: (_, _) => const SizedBox(width: _kCarouselGap),
-            itemBuilder: (context, i) {
-              final artist = artists[i];
-              final sub = artist.subscriberText;
-              return SpringIn(
-                delayMs: (i % 5) * 32,
-                rise: 18,
-                child: MediaCard(
-                  width: 150.0,
-                  isCircular: true,
-                  twoLineTitle: true,
-                  title: artist.title,
-                  subtitle: (sub != null && sub.isNotEmpty) ? sub : 'Artist',
-                  imageUrl: _hiResUrl(artist),
-                  onTap: () => _handleItemTap(artist),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 14),
-      ],
-    );
-  }
-
-  // ── 5. Playlists / Mixes Snap Carousel (MediaCard width: 170.0) ────────────
-
-  Widget _buildPlaylistsCarouselSection(List<SearchPlaylistItem> playlists) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(
-            title: 'Playlists',
-            actionTitle: 'See All',
-            onActionTap: () =>
-                _onFilterSelected(SearchFilter.featuredPlaylists),
-          ),
-        ),
-        SizedBox(
-          height: 256,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const _SearchSnapPhysics(itemExtent: 170 + _kCarouselGap),
-            padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
-            itemCount: playlists.length,
-            separatorBuilder: (_, _) => const SizedBox(width: _kCarouselGap),
-            itemBuilder: (context, i) {
-              final pl = playlists[i];
-              final author = pl.author;
-              final count = pl.songCountText;
-              final sub = (author != null && author.isNotEmpty)
-                  ? author
-                  : (pl.subtitle.isNotEmpty
-                      ? pl.subtitle
-                      : (count ?? 'Playlist'));
-              return SpringIn(
-                delayMs: (i % 5) * 32,
-                rise: 18,
-                child: MediaCard(
-                  width: 170.0,
-                  twoLineTitle: true,
-                  title: pl.title,
-                  subtitle: sub.isNotEmpty ? sub : 'Playlist',
-                  imageUrl: _hiResUrl(pl),
-                  onTap: () => _handleItemTap(pl),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 14),
-      ],
-    );
-  }
-
-  // ── 6. Videos Snap Carousel ────────────────────────────────────────────────
-
-  Widget _buildVideosCarouselSection(List<SearchVideoItem> videos) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(
-            title: 'Videos',
-            actionTitle: 'See All',
-            onActionTap: () => _onFilterSelected(SearchFilter.videos),
-          ),
-        ),
-        SizedBox(
-          height: 214,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const _SearchSnapPhysics(itemExtent: 256 + _kCarouselGap),
-            padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
-            itemCount: videos.length,
-            separatorBuilder: (_, _) => const SizedBox(width: _kCarouselGap),
-            itemBuilder: (context, i) {
-              final video = videos[i];
-              return SpringIn(
-                delayMs: (i % 4) * 32,
-                rise: 18,
-                child: _VideoCarouselCard(
-                  video: video,
-                  imageUrl: _hiResUrl(video),
-                  onTap: () => _handleItemTap(video),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 14),
-      ],
-    );
-  }
-
-  // ── Full Filtered Views (Songs / Artists / Albums / Playlists / Videos) ────
-
-  Widget _buildFilteredSongsList(List<SearchSongItem> songs) {
-    if (songs.isEmpty) return _buildEmptyFilterNotice('songs');
-    final tracks = songs.map((s) => s.toTrack()).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(title: 'Songs'),
-        ),
-        Selector<PlayerState, ({String? id, bool playing})>(
-          selector: (_, p) => (id: p.currentTrack?.id, playing: p.isPlaying),
-          builder: (context, active, _) {
-            return ListView.separated(
+        _sectionHeader(title),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = (constraints.maxWidth - 40 - 14) / 2;
+            return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              itemCount: songs.length,
-              separatorBuilder: (_, _) => Divider(
-                height: 1,
-                indent: 84,
-                endIndent: _kCarouselEdge,
-                color: Colors.white.withValues(alpha: 0.06),
+              padding: const EdgeInsets.symmetric(horizontal: _kEdge),
+              itemCount: count,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 18,
+                mainAxisExtent: cardWidth + 74,
               ),
-              itemBuilder: (context, i) {
-                final track = tracks[i];
-                final isActive = _isTrackActive(track, active.id);
-                return SpringIn(
-                  delayMs: i < 10 ? i * 22 : 0,
-                  rise: 12,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: SongTile(
-                      track: track,
-                      index: i + 1,
-                      isActive: isActive,
-                      isPlaying: isActive && active.playing,
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _playSong([track], 0);
-                      },
-                      onTrailingTap: () {
-                        HapticFeedback.lightImpact();
-                        ZenDropdown.showTrackMenu(
-                          context: context,
-                          track: track,
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
+              itemBuilder: (context, i) => SpringIn(
+                delayMs: i < 8 ? i * 26 : 0,
+                rise: 16,
+                child: item(i, cardWidth),
+              ),
             );
           },
         ),
@@ -2420,320 +2538,921 @@ class _SearchScreenState extends State<SearchScreen>
     );
   }
 
-  Widget _buildFilteredArtistsList(List<SearchArtistItem> artists) {
-    if (artists.isEmpty) return _buildEmptyFilterNotice('artists');
+  Widget _buildFilteredAlbums(List<SearchAlbumItem> albums) {
+    if (albums.isEmpty) return _buildEmptyNotice('No albums found.');
+    return _grid(
+      title: 'Albums',
+      count: albums.length,
+      item: (i, w) {
+        final a = albums[i];
+        return MediaCard(
+          width: w,
+          twoLineTitle: true,
+          title: a.title,
+          subtitle: _albumSub(a),
+          imageUrl: _hiResUrl(a),
+          onTap: () => _handleItemTap(a),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilteredPlaylists(List<SearchPlaylistItem> playlists) {
+    if (playlists.isEmpty) return _buildEmptyNotice('No playlists found.');
+    return _grid(
+      title: 'Playlists',
+      count: playlists.length,
+      item: (i, w) {
+        final p = playlists[i];
+        return MediaCard(
+          width: w,
+          twoLineTitle: true,
+          title: p.title,
+          subtitle: _playlistSub(p),
+          imageUrl: _hiResUrl(p),
+          onTap: () => _handleItemTap(p),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilteredVideos(List<SearchVideoItem> videos) {
+    if (videos.isEmpty) return _buildEmptyNotice('No videos found.');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(title: 'Artists'),
-        ),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
-          itemCount: artists.length,
-          separatorBuilder: (_, _) => Divider(
-            height: 1,
-            indent: 72,
-            color: Colors.white.withValues(alpha: 0.06),
-          ),
-          itemBuilder: (context, i) {
-            final artist = artists[i];
-            final img = _hiResUrl(artist);
-            final sub = artist.subscriberText;
-            return SpringIn(
-              delayMs: i < 10 ? i * 24 : 0,
-              rise: 14,
-              child: PressableScale(
-                scale: 0.985,
-                onTap: () => _handleItemTap(artist),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Row(
-                    children: [
-                      ClipOval(
-                        child: SizedBox(
-                          width: 58,
-                          height: 58,
-                          child: img.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: img,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, _, _) => MonogramAvatar(
-                                    name: artist.title,
-                                    size: 58,
-                                  ),
-                                )
-                              : MonogramAvatar(
-                                  name: artist.title,
-                                  size: 58,
-                                ),
-                        ),
+        _sectionHeader('Videos'),
+        ...List.generate(videos.length, (i) {
+          final v = videos[i];
+          final meta = _videoMeta(v);
+          return SpringIn(
+            delayMs: i < 6 ? i * 28 : 0,
+            rise: 14,
+            child: PressableScale(
+              scale: 0.985,
+              onTap: () => _handleItemTap(v),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(_kEdge, 0, _kEdge, 22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _VideoThumb(video: v, imageUrl: _hiResUrl(v), radius: 14),
+                    const SizedBox(height: 10),
+                    Text(
+                      v.title,
+                      style: _displayStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    artist.title,
-                                    style: _displayStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (artist.isVerified) ...[
-                                  const SizedBox(width: 5),
-                                  const Icon(
-                                    CupertinoIcons.checkmark_seal_fill,
-                                    size: 14,
-                                    color: AppColors.accent,
-                                  ),
-                                ],
-                              ],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        meta,
+                        style: _bodyStyle(fontSize: 13.5),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Reusable rows / artwork
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _Artwork extends StatelessWidget {
+  const _Artwork({
+    required this.url,
+    required this.title,
+    required this.size,
+    this.radius = 10,
+    this.circle = false,
+    this.active = false,
+    this.playing = false,
+  });
+
+  final String url;
+  final String title;
+  final double size;
+  final double radius;
+  final bool circle;
+  final bool active;
+  final bool playing;
+
+  @override
+  Widget build(BuildContext context) {
+    final br = BorderRadius.circular(circle ? size / 2 : radius);
+    final fallback = MonogramAvatar(name: title, size: size, isCircle: circle);
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipRRect(
+        borderRadius: br,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            url.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: url,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, _, _) => fallback,
+                  )
+                : fallback,
+            if (active)
+              ColoredBox(
+                color: Colors.black.withValues(alpha: 0.46),
+                child: Center(
+                  child: EqualizerBars(
+                    color: AppColors.accent,
+                    size: size > 70 ? 22 : 16,
+                    isPlaying: playing,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SongRow extends StatelessWidget {
+  const _SongRow({
+    required this.item,
+    required this.isActive,
+    required this.isPlaying,
+    required this.onTap,
+    required this.onMore,
+    this.rank,
+  });
+
+  final SearchSongItem item;
+  final bool isActive;
+  final bool isPlaying;
+  final VoidCallback onTap;
+  final VoidCallback onMore;
+  final int? rank;
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = _cleanSub(item.subtitle);
+    return PressableScale(
+      scale: 0.985,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: _kEdge, vertical: 8),
+        child: Row(
+          children: [
+            if (rank != null)
+              SizedBox(
+                width: 30,
+                child: Text(
+                  '$rank',
+                  style: _displayStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+            _Artwork(
+              url: item.thumbnailUrl.isNotEmpty
+                  ? item.thumbnailUrl
+                  : item.thumbnailUrlHiRes,
+              title: item.title,
+              size: 54,
+              radius: 8,
+              active: isActive,
+              playing: isPlaying,
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: _displayStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isActive
+                          ? AppColors.accent
+                          : AppColors.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (sub.isNotEmpty || item.isExplicit) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        if (item.isExplicit) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 1,
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              (sub != null && sub.isNotEmpty)
-                                  ? 'Artist · $sub'
-                                  : 'Artist',
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              'E',
                               style: _bodyStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
                               ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        if (sub.isNotEmpty)
+                          Flexible(
+                            child: Text(
+                              sub,
+                              style: _bodyStyle(fontSize: 13.5),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        CupertinoIcons.chevron_right,
-                        size: 16,
-                        color: AppColors.textTertiary,
-                      ),
-                    ],
-                  ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            PressableScale(
+              scale: 0.88,
+              onTap: onMore,
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(
+                  Icons.more_vert_rounded,
+                  size: 22,
+                  color: AppColors.textSecondary,
                 ),
               ),
-            );
-          },
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
+}
 
-  Widget _buildFilteredAlbumsGrid(List<SearchAlbumItem> albums) {
-    if (albums.isEmpty) return _buildEmptyFilterNotice('albums');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(title: 'Albums'),
-        ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth = (constraints.maxWidth - 40 - 14) / 2;
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
-              itemCount: albums.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 18,
-                mainAxisExtent: cardWidth + 74,
-              ),
-              itemBuilder: (context, i) {
-                final album = albums[i];
-                final sub = <String>[
-                  if (album.subtitle.isNotEmpty) album.subtitle,
-                  if (album.year != null) '${album.year}',
-                ].join(' · ');
-                return SpringIn(
-                  delayMs: i < 8 ? i * 26 : 0,
-                  rise: 16,
-                  child: MediaCard(
-                    width: cardWidth,
-                    twoLineTitle: true,
-                    title: album.title,
-                    subtitle: sub.isNotEmpty ? sub : album.albumType,
-                    imageUrl: _hiResUrl(album),
-                    onTap: () => _handleItemTap(album),
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
+class _ListRow extends StatelessWidget {
+  const _ListRow({
+    required this.leading,
+    required this.title,
+    required this.onTap,
+    this.subtitle = '',
+    this.verified = false,
+  });
 
-  Widget _buildFilteredPlaylistsGrid(List<SearchPlaylistItem> playlists) {
-    if (playlists.isEmpty) return _buildEmptyFilterNotice('playlists');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(title: 'Playlists'),
-        ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth = (constraints.maxWidth - 40 - 14) / 2;
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
-              itemCount: playlists.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 18,
-                mainAxisExtent: cardWidth + 74,
-              ),
-              itemBuilder: (context, i) {
-                final pl = playlists[i];
-                final author = pl.author;
-                final count = pl.songCountText;
-                final sub = (author != null && author.isNotEmpty)
-                    ? author
-                    : (pl.subtitle.isNotEmpty
-                        ? pl.subtitle
-                        : (count ?? 'Playlist'));
-                return SpringIn(
-                  delayMs: i < 8 ? i * 26 : 0,
-                  rise: 16,
-                  child: MediaCard(
-                    width: cardWidth,
-                    twoLineTitle: true,
-                    title: pl.title,
-                    subtitle: sub.isNotEmpty ? sub : 'Playlist',
-                    imageUrl: _hiResUrl(pl),
-                    onTap: () => _handleItemTap(pl),
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      ],
-    );
-  }
+  final Widget leading;
+  final String title;
+  final String subtitle;
+  final bool verified;
+  final VoidCallback onTap;
 
-  Widget _buildFilteredVideosList(List<SearchVideoItem> videos) {
-    if (videos.isEmpty) return _buildEmptyFilterNotice('videos');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: SectionHeader(title: 'Music Videos'),
-        ),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: _kCarouselEdge),
-          itemCount: videos.length,
-          separatorBuilder: (_, _) => Divider(
-            height: 1,
-            color: Colors.white.withValues(alpha: 0.06),
-          ),
-          itemBuilder: (context, i) {
-            final video = videos[i];
-            final img = _hiResUrl(video);
-            final channel = video.channel;
-            final views = video.viewCountText;
-            final meta = [
-              if (channel != null && channel.isNotEmpty) channel,
-              if (views != null && views.isNotEmpty) views,
-            ].join(' · ');
-            return SpringIn(
-              delayMs: i < 8 ? i * 24 : 0,
-              rise: 14,
-              child: PressableScale(
-                scale: 0.985,
-                onTap: () => _handleItemTap(video),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Row(
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      scale: 0.985,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: _kEdge, vertical: 8),
+        child: Row(
+          children: [
+            leading,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      _VideoThumbBox(
-                        video: video,
-                        imageUrl: img,
-                        width: 140,
-                        height: 78,
-                        borderRadius: 12,
-                        badgeFontSize: 10,
-                      ),
-                      const SizedBox(width: 13),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              video.title,
-                              style: _displayStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                                height: 1.2,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (meta.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                meta,
-                                style: _bodyStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textSecondary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ],
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: _displayStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (verified) ...[
+                        const SizedBox(width: 5),
+                        const Icon(
+                          CupertinoIcons.checkmark_seal_fill,
+                          size: 14,
+                          color: AppColors.accent,
+                        ),
+                      ],
                     ],
                   ),
-                ),
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: _bodyStyle(fontSize: 13.5),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
               ),
-            );
-          },
+            ),
+            const Icon(
+              CupertinoIcons.chevron_right,
+              size: 15,
+              color: AppColors.textTertiary,
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+/// Full 16:9 video thumbnail (never cropped to 1:1).
+class _VideoThumb extends StatelessWidget {
+  const _VideoThumb({
+    required this.video,
+    required this.imageUrl,
+    this.radius = 12,
+    this.bigPlay = false,
+    this.small = false,
+  });
+
+  final SearchVideoItem video;
+  final String imageUrl;
+  final double radius;
+  final bool bigPlay;
+  final bool small;
+
+  @override
+  Widget build(BuildContext context) {
+    final clean = (video.videoId != null && video.videoId!.isNotEmpty)
+        ? video.videoId!
+        : video.id.replaceFirst('yt-', '');
+    final prefixed = clean.startsWith('yt-') ? clean : 'yt-$clean';
+
+    return Selector<PlayerState, ({String? id, bool playing})>(
+      selector: (_, p) => (id: p.currentTrack?.id, playing: p.isPlaying),
+      builder: (context, active, _) {
+        final isActive = active.id == clean || active.id == prefixed;
+        return AspectRatio(
+          aspectRatio: 16 / 9,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(radius),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, _, _) =>
+                            const ColoredBox(color: AppColors.surface),
+                      )
+                    : const ColoredBox(color: AppColors.surface),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Color(0x55000000)],
+                    ),
+                  ),
+                ),
+                if (bigPlay && !isActive)
+                  Center(
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: const Icon(
+                        CupertinoIcons.play_fill,
+                        size: 22,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                if (isActive)
+                  ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    child: Center(
+                      child: EqualizerBars(
+                        color: AppColors.accent,
+                        size: small ? 14 : 22,
+                        isPlaying: active.playing,
+                      ),
+                    ),
+                  ),
+                if (video.durationText.isNotEmpty)
+                  Positioned(
+                    right: small ? 4 : 8,
+                    bottom: small ? 4 : 8,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: small ? 4 : 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.78),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        video.durationText,
+                        style: _bodyStyle(
+                          fontSize: small ? 9.5 : 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Category hero + tile
+// ═════════════════════════════════════════════════════════════════════════════
+
+Color _hue(Color c, double deg, {double l = 0}) {
+  final hsl = HSLColor.fromColor(c);
+  return hsl
+      .withHue((hsl.hue + deg + 360) % 360)
+      .withLightness((hsl.lightness + l).clamp(0.0, 1.0))
+      .toColor();
+}
+
+/// Animated mesh gradient: drifting soft colour blobs on a dark base.
+class _MeshPainter extends CustomPainter {
+  _MeshPainter({required this.t, required this.pal, required this.seed});
+
+  final double t;
+  final List<Color> pal;
+  final int seed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    canvas.drawRect(rect, Paint()..color = pal[0]);
+    const fx = [1, 1, 2, 1];
+    const fy = [1, 2, 1, 2];
+    final r = math.max(size.width, size.height) * 0.8;
+    for (var i = 0; i < 4; i++) {
+      final ph = seed * 1.7 + i * 1.57;
+      final c = Offset(
+        size.width * (0.5 + 0.55 * math.sin(2 * math.pi * t * fx[i] + ph)),
+        size.height * (0.5 + 0.55 * math.cos(2 * math.pi * t * fy[i] + ph * 1.3)),
+      );
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              pal[i + 1].withValues(alpha: 0.95),
+              pal[i + 1].withValues(alpha: 0.0),
+            ],
+          ).createShader(Rect.fromCircle(center: c, radius: r * (0.7 + 0.1 * i))),
+      );
+    }
+    // Legibility shade (bottom-left) for the title.
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.bottomLeft,
+          end: Alignment.topRight,
+          colors: [Colors.black.withValues(alpha: 0.40), Colors.transparent],
+          stops: const [0.0, 0.62],
+        ).createShader(rect),
     );
   }
 
-  Widget _buildEmptyFilterNotice(String kind) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
-      child: Center(
-        child: Text(
-          'No $kind found for "$_activeQuery".',
-          style: _bodyStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+  @override
+  bool shouldRepaint(covariant _MeshPainter old) =>
+      old.t != t || old.seed != seed;
+}
+
+/// Small artwork card used inside category art (cover image or gradient+icon).
+class _MiniCard extends StatelessWidget {
+  const _MiniCard({
+    required this.url,
+    required this.size,
+    required this.pal,
+    required this.icon,
+    this.circle = false,
+  });
+
+  final String url;
+  final double size;
+  final List<Color> pal;
+  final IconData icon;
+  final bool circle;
+
+  @override
+  Widget build(BuildContext context) {
+    final br = BorderRadius.circular(circle ? size / 2 : size * 0.18);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: br,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.35),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
-          textAlign: TextAlign.center,
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: br,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [pal[2], pal[3]],
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: size * 0.4,
+                color: Colors.white.withValues(alpha: 0.85),
+              ),
+            ),
+            if (url.isNotEmpty)
+              CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                fadeInDuration: const Duration(milliseconds: 220),
+                errorWidget: (_, _, _) => const SizedBox.shrink(),
+              ),
+            if (circle)
+              Center(
+                child: Container(
+                  width: size * 0.16,
+                  height: size * 0.16,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0C0C0F),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      width: 1,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Mesh background + floating cover cards. Each category gets its own palette
+/// and one of 4 layouts: fan · cascade · spinning vinyl · diagonal trio.
+class _CategoryArt extends StatefulWidget {
+  const _CategoryArt({
+    required this.spec,
+    required this.index,
+    required this.covers,
+    this.areaFrac = 0.82,
+    this.topInset = 0,
+  });
+
+  final _SearchCategorySpec spec;
+  final int index;
+  final List<String> covers;
+  final double areaFrac;
+  final double topInset;
+
+  @override
+  State<_CategoryArt> createState() => _CategoryArtState();
+}
+
+class _CategoryArtState extends State<_CategoryArt>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final List<Color> _pal;
+
+  @override
+  void initState() {
+    super.initState();
+    final a = widget.spec.colors[0];
+    final b = widget.spec.colors[1];
+    _pal = [b, a, _hue(a, 40, l: 0.04), _hue(a, -35, l: 0.08), _hue(b, 28, l: 0.10)];
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: 10 + (widget.index % 3) * 3),
+    )
+      ..value = (widget.index * 0.17) % 1.0
+      ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  List<Widget> _cards(double aw, double top, double ah, double t) {
+    final cs = math.min(aw * 0.34, ah * 0.58);
+    double fl(double ph) => math.sin(2 * math.pi * t + ph) * 3.5;
+
+    Widget card(
+      int k,
+      double cx,
+      double cy,
+      double size,
+      double rot, {
+      double ph = 0,
+      bool circle = false,
+      double spin = 0,
+    }) {
+      final c = widget.covers;
+      final url = c.isEmpty ? '' : c[(widget.index * 3 + k) % c.length];
+      Widget child = _MiniCard(
+        url: url,
+        size: size,
+        pal: _pal,
+        icon: widget.spec.icon,
+        circle: circle,
+      );
+      if (spin != 0) child = Transform.rotate(angle: spin, child: child);
+      return Positioned(
+        left: cx - size / 2,
+        top: cy - size / 2 + fl(ph),
+        child: Transform.rotate(angle: rot, child: child),
+      );
+    }
+
+    switch (widget.index % 4) {
+      case 0: // fan
+        final cx = aw * 0.70;
+        final cy = top + ah * 0.52;
+        return [
+          card(0, cx - cs * 0.46, cy + cs * 0.04, cs * 0.86, -0.24),
+          card(1, cx + cs * 0.46, cy + cs * 0.06, cs * 0.86, 0.20, ph: 1.5),
+          card(2, cx, cy - cs * 0.06, cs * 1.06, -0.03, ph: 3),
+        ];
+      case 1: // cascade
+        return [
+          card(0, aw * 0.62, top + ah * 0.30, cs * 0.92, 0.14),
+          card(1, aw * 0.80, top + ah * 0.68, cs * 0.92, -0.12, ph: 2),
+        ];
+      case 2: // vinyl
+        return [
+          card(1, aw * 0.54, top + ah * 0.30, cs * 0.6, -0.2, ph: 1),
+          card(0, aw * 0.80, top + ah * 0.60, cs * 1.3, 0,
+              circle: true, spin: 2 * math.pi * t),
+        ];
+      default: // trio
+        return [
+          card(0, aw * 0.58, top + ah * 0.26, cs * 0.62, 0.10),
+          card(1, aw * 0.76, top + ah * 0.52, cs * 0.72, -0.08, ph: 1),
+          card(2, aw * 0.92, top + ah * 0.78, cs * 0.82, 0.12, ph: 2),
+        ];
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final w = c.maxWidth;
+          final h = c.maxHeight;
+          final top = widget.topInset;
+          final ah = h * widget.areaFrac - top;
+          return AnimatedBuilder(
+            animation: _ctrl,
+            builder: (context, _) {
+              final t = _ctrl.value;
+              return Stack(
+                clipBehavior: Clip.hardEdge,
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _MeshPainter(
+                        t: t,
+                        pal: _pal,
+                        seed: widget.index,
+                      ),
+                    ),
+                  ),
+                  ..._cards(w, top, ah, t),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CategoryHero extends StatelessWidget {
+  const _CategoryHero({
+    required this.spec,
+    required this.index,
+    required this.covers,
+    required this.topPad,
+    required this.onPlay,
+    required this.onShuffle,
+  });
+
+  final _SearchCategorySpec spec;
+  final int index;
+  final List<String> covers;
+  final double topPad;
+  final VoidCallback onPlay;
+  final VoidCallback onShuffle;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: topPad + 330,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: _CategoryArt(
+              spec: spec,
+              index: index,
+              covers: covers,
+              areaFrac: 0.80,
+              topInset: topPad + 52,
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, AppColors.bg],
+                    stops: const [0.55, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: _kEdge,
+            right: _kEdge,
+            bottom: 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  spec.title,
+                  style: _displayStyle(
+                    fontSize: 36,
+                    color: Colors.white,
+                    letterSpacing: -0.9,
+                    height: 1.05,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ZenPlayButton(
+                        height: 44,
+                        fontSize: 15,
+                        iconSize: 18,
+                        isPlaying: false,
+                        label: 'Play',
+                        expanded: true,
+                        onTap: onPlay,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ZenShuffleButton(
+                        height: 44,
+                        fontSize: 15,
+                        iconSize: 17,
+                        expanded: true,
+                        label: 'Shuffle',
+                        onTap: onShuffle,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrowseCategoryTile extends StatelessWidget {
+  const _BrowseCategoryTile({
+    required this.spec,
+    required this.index,
+    required this.covers,
+    required this.onTap,
+  });
+
+  final _SearchCategorySpec spec;
+  final int index;
+  final List<String> covers;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      scale: 0.96,
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _CategoryArt(spec: spec, index: index, covers: covers),
+            IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    width: 0.7,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: 12,
+              child: Text(
+                spec.title,
+                style: _displayStyle(
+                  fontSize: 17,
+                  color: Colors.white,
+                  height: 1.1,
+                ).copyWith(
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2741,7 +3460,7 @@ class _SearchScreenState extends State<SearchScreen>
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Spring-Animated Stadium Filter Pill Bar
+// Spring-animated filter pill bar
 // ═════════════════════════════════════════════════════════════════════════════
 
 class _SearchFilterBar extends StatefulWidget {
@@ -2819,15 +3538,14 @@ class _SearchFilterBarState extends State<_SearchFilterBar>
 
   void _measureAndAnimate({required bool snap}) {
     final rowBox = _rowKey.currentContext?.findRenderObject() as RenderBox?;
-    final pillBox =
-        _pillKeys[_selectedIndex].currentContext?.findRenderObject() as RenderBox?;
+    final pillBox = _pillKeys[_selectedIndex].currentContext?.findRenderObject()
+        as RenderBox?;
     if (rowBox == null ||
         pillBox == null ||
         !rowBox.hasSize ||
         !pillBox.hasSize) {
       return;
     }
-
     final origin = pillBox.localToGlobal(Offset.zero, ancestor: rowBox);
     final nextRect = origin & pillBox.size;
 
@@ -2839,7 +3557,6 @@ class _SearchFilterBarState extends State<_SearchFilterBar>
       });
       return;
     }
-
     _fromRect = _currentRect;
     _toRect = nextRect;
     _slideCtrl.value = 0.0;
@@ -2869,13 +3586,6 @@ class _SearchFilterBarState extends State<_SearchFilterBar>
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(26),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.28),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
                   ),
                 ),
               ),
@@ -2905,12 +3615,6 @@ class _SearchFilterBarState extends State<_SearchFilterBar>
                                 ? Colors.transparent
                                 : Colors.white.withValues(alpha: 0.07),
                         borderRadius: BorderRadius.circular(26),
-                        border: selected
-                            ? null
-                            : Border.all(
-                                color: Colors.white.withValues(alpha: 0.08),
-                                width: 0.6,
-                              ),
                       ),
                       child: AnimatedDefaultTextStyle(
                         duration: const Duration(milliseconds: 180),
@@ -2935,396 +3639,7 @@ class _SearchFilterBarState extends State<_SearchFilterBar>
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Editorial Top Result Artwork (Square-Rounded or Circular Artist + Live EQ)
-// ═════════════════════════════════════════════════════════════════════════════
-
-class _TopResultArtwork extends StatelessWidget {
-  const _TopResultArtwork({
-    required this.imageUrl,
-    required this.title,
-    required this.isArtist,
-    required this.isActive,
-    required this.isPlaying,
-  });
-
-  final String imageUrl;
-  final String title;
-  final bool isArtist;
-  final bool isActive;
-  final bool isPlaying;
-
-  @override
-  Widget build(BuildContext context) {
-    const double size = 104.0;
-    final BorderRadius radius = BorderRadius.circular(isArtist ? size / 2 : 16);
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: isArtist ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: isArtist ? null : radius,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ClipRRect(
-            borderRadius: radius,
-            child: imageUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, _, _) => MonogramAvatar(
-                      name: title,
-                      size: size,
-                      isCircle: isArtist,
-                    ),
-                  )
-                : MonogramAvatar(
-                    name: title,
-                    size: size,
-                    isCircle: isArtist,
-                  ),
-          ),
-          if (isActive)
-            ClipRRect(
-              borderRadius: radius,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.46),
-                ),
-                child: Center(
-                  child: EqualizerBars(
-                    color: AppColors.accent,
-                    size: 20,
-                    isPlaying: isPlaying,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// Browse Category Tile (Apple Music Gradient Genre Card)
-// ═════════════════════════════════════════════════════════════════════════════
-
-class _BrowseCategoryTile extends StatelessWidget {
-  const _BrowseCategoryTile({
-    required this.spec,
-    required this.onTap,
-  });
-
-  final _SearchCategorySpec spec;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      scale: 0.96,
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: spec.colors,
-            ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.14),
-              width: 0.6,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -18,
-                top: -18,
-                child: Container(
-                  width: 84,
-                  height: 84,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        Colors.white.withValues(alpha: 0.22),
-                        Colors.white.withValues(alpha: 0.0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 12,
-                top: 12,
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.20),
-                      width: 0.6,
-                    ),
-                  ),
-                  child: Icon(
-                    spec.icon,
-                    size: 15,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 14,
-                right: 14,
-                bottom: 12,
-                child: Text(
-                  spec.title,
-                  style: _displayStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    height: 1.12,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// Video Carousel Card & Shared Thumbnail Overlay
-// ═════════════════════════════════════════════════════════════════════════════
-
-class _VideoThumbBox extends StatelessWidget {
-  const _VideoThumbBox({
-    required this.video,
-    required this.imageUrl,
-    required this.width,
-    required this.height,
-    this.borderRadius = 14,
-    this.badgeFontSize = 11,
-  });
-
-  final SearchVideoItem video;
-  final String imageUrl;
-  final double width;
-  final double height;
-  final double borderRadius;
-  final double badgeFontSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final cleanVid =
-        (video.videoId != null && video.videoId!.isNotEmpty)
-            ? video.videoId!
-            : video.id.replaceFirst('yt-', '');
-    final ytPrefixed = cleanVid.startsWith('yt-') ? cleanVid : 'yt-$cleanVid';
-
-    return Selector<PlayerState, ({String? id, bool playing})>(
-      selector: (_, p) => (id: p.currentTrack?.id, playing: p.isPlaying),
-      builder: (context, active, _) {
-        final isActive = active.id == cleanVid || active.id == ytPrefixed;
-
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(borderRadius),
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                imageUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, _, _) =>
-                            Container(color: AppColors.surface),
-                      )
-                    : Container(color: AppColors.surface),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0x28000000),
-                        Colors.transparent,
-                        Color(0x66000000),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.65),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.14),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          CupertinoIcons.play_fill,
-                          size: 9,
-                          color: Colors.white,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'VIDEO',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (isActive)
-                  ColoredBox(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    child: Center(
-                      child: EqualizerBars(
-                        color: AppColors.accent,
-                        size: 20,
-                        isPlaying: active.playing,
-                      ),
-                    ),
-                  ),
-                if (video.durationText.isNotEmpty)
-                  Positioned(
-                    right: 7,
-                    bottom: 7,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.78),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        video.durationText,
-                        style: _bodyStyle(
-                          fontSize: badgeFontSize,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _VideoCarouselCard extends StatelessWidget {
-  const _VideoCarouselCard({
-    required this.video,
-    required this.imageUrl,
-    required this.onTap,
-  });
-
-  final SearchVideoItem video;
-  final String imageUrl;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final channel = video.channel;
-    final views = video.viewCountText;
-    final meta = [
-      if (channel != null && channel.isNotEmpty) channel,
-      if (views != null && views.isNotEmpty) views,
-    ].join(' · ');
-
-    return PressableScale(
-      scale: 0.96,
-      onTap: onTap,
-      child: SizedBox(
-        width: 256,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _VideoThumbBox(
-              video: video,
-              imageUrl: imageUrl,
-              width: 256,
-              height: 144,
-              borderRadius: 14,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              video.title,
-              style: _displayStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                height: 1.2,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (meta.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                meta,
-                style: _bodyStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// Shimmer Loading Skeleton
+// Shimmer skeleton
 // ═════════════════════════════════════════════════════════════════════════════
 
 class _SearchShimmerView extends StatefulWidget {
@@ -3353,14 +3668,24 @@ class _SearchShimmerViewState extends State<_SearchShimmerView>
     super.dispose();
   }
 
+  Widget _bone(Color c, double w, double h, {double r = 6, bool circle = false}) {
+    return Container(
+      width: w,
+      height: h,
+      decoration: BoxDecoration(
+        color: c,
+        shape: circle ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: circle ? null : BorderRadius.circular(r),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _ctrl,
       builder: (context, _) {
-        final alpha = 0.05 + (_ctrl.value * 0.06);
-        final bone = Colors.white.withValues(alpha: alpha);
-
+        final bone = Colors.white.withValues(alpha: 0.05 + _ctrl.value * 0.06);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -3368,221 +3693,74 @@ class _SearchShimmerViewState extends State<_SearchShimmerView>
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 18),
               child: Row(
                 children: [62.0, 74.0, 74.0, 78.0, 86.0]
-                    .map(
-                      (w) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Container(
-                          width: w,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: bone,
-                            borderRadius: BorderRadius.circular(26),
-                          ),
-                        ),
-                      ),
-                    )
+                    .map((w) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _bone(bone, w, 34, r: 26),
+                        ))
                     .toList(),
               ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                width: 112,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: bone,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
+              child: _bone(bone, 112, 22),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.07),
-                    width: 0.6,
+              child: Row(
+                children: [
+                  _bone(bone, 108, 108, r: 12),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _bone(bone, 170, 22),
+                        const SizedBox(height: 10),
+                        _bone(bone, 120, 15),
+                      ],
+                    ),
                   ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 104,
-                          height: 104,
-                          decoration: BoxDecoration(
-                            color: bone,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 58,
-                                height: 18,
-                                decoration: BoxDecoration(
-                                  color: bone,
-                                  borderRadius: BorderRadius.circular(26),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Container(
-                                width: 170,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  color: bone,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                width: 120,
-                                height: 15,
-                                decoration: BoxDecoration(
-                                  color: bone,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: bone,
-                              borderRadius: BorderRadius.circular(26),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Container(
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: bone,
-                              borderRadius: BorderRadius.circular(26),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: bone,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                width: 84,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: bone,
-                  borderRadius: BorderRadius.circular(6),
-                ),
+              child: Row(
+                children: [
+                  Expanded(child: _bone(bone, double.infinity, 44, r: 26)),
+                  const SizedBox(width: 10),
+                  _bone(bone, 44, 44, circle: true),
+                ],
               ),
+            ),
+            const SizedBox(height: 26),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _bone(bone, 84, 22),
             ),
             const SizedBox(height: 10),
             ...List.generate(
               4,
               (_) => Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
                   children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: bone,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
+                    _bone(bone, 54, 54, r: 8),
+                    const SizedBox(width: 13),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 185,
-                            height: 15,
-                            decoration: BoxDecoration(
-                              color: bone,
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          ),
+                          _bone(bone, 185, 15, r: 5),
                           const SizedBox(height: 7),
-                          Container(
-                            width: 120,
-                            height: 13,
-                            decoration: BoxDecoration(
-                              color: bone,
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          ),
+                          _bone(bone, 120, 13, r: 5),
                         ],
                       ),
                     ),
                   ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 22),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: List.generate(
-                  2,
-                  (i) => Padding(
-                    padding: EdgeInsets.only(right: i == 0 ? 14 : 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 150,
-                          height: 150,
-                          decoration: BoxDecoration(
-                            color: bone,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          width: 105,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: bone,
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             ),

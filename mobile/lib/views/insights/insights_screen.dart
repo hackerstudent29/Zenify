@@ -5,10 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
-import '../../design_system/tokens/app_colors.dart';
-import '../../design_system/widgets/apple_glass.dart';
-import '../../design_system/widgets/pressable_scale.dart';
-import '../../design_system/zen.dart';
+import '../../design_system/apple/apple_kit.dart';
+import '../../design_system/apple/apple_tokens.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/api_service.dart';
@@ -35,12 +33,20 @@ class InsightsScreen extends StatefulWidget {
 }
 
 class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
-  String _selectedView = 'insights'; // 'insights' | 'history'
-  String _selectedRange = 'all'; // week, month, year, all
-  bool _isLoading = true;
+  @override
+  bool get hideMiniPlayerWhileActive => true;
+
+  static const _ranges = ['week', 'month', 'year', 'all'];
+  static const _rangeLabels = ['Week', 'Month', 'Year', 'All Time'];
+
+  int _viewIndex = 0; // 0 = Replay, 1 = History
+  int _rangeIndex = 0;
+  bool _loading = true;
   String? _error;
   Map<String, dynamic>? _insightsData;
   List<dynamic> _achievements = [];
+
+  String get _selectedRange => _ranges[_rangeIndex];
 
   @override
   void initState() {
@@ -49,86 +55,96 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   }
 
   Future<void> _fetchInsights() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    final token = await AuthService.instance.getAccessToken();
-    if (token == null) {
+    final auth = context.read<AuthState>();
+    if (!auth.isLoggedIn) {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _loading = false;
+          _insightsData = null;
+          _error = null;
         });
       }
       return;
     }
 
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
     try {
-      final results = await Future.wait([
+      final token = await AuthService.instance.getAccessToken();
+      if (token == null) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = 'Authentication required';
+        });
+        return;
+      }
+
+      final responses = await Future.wait([
         http.get(
           Uri.parse('${ApiService.baseUrl}/api/me/insights?range=$_selectedRange'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-        ).timeout(const Duration(seconds: 10)),
+          headers: {'Authorization': 'Bearer $token'},
+        ),
         http.get(
           Uri.parse('${ApiService.baseUrl}/api/me/achievements'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-        ).timeout(const Duration(seconds: 10)).catchError((_) => http.Response('[]', 200)),
+          headers: {'Authorization': 'Bearer $token'},
+        ),
       ]);
 
+      final insightsRes = responses[0];
+      final achRes = responses[1];
+
       if (!mounted) return;
-
-      final resInsights = results[0];
-      final resAchievements = results[1];
-
-      if (resInsights.statusCode == 200) {
-        final data = jsonDecode(resInsights.body) as Map<String, dynamic>;
-        List<dynamic> achList = [];
-        if (resAchievements.statusCode == 200) {
-          try {
-            achList = jsonDecode(resAchievements.body) as List<dynamic>? ?? [];
-          } catch (_) {}
+      if (insightsRes.statusCode == 200) {
+        final data = jsonDecode(insightsRes.body) as Map<String, dynamic>;
+        var ach = _achievements;
+        if (achRes.statusCode == 200) {
+          final achData = jsonDecode(achRes.body) as Map<String, dynamic>;
+          ach = achData['achievements'] as List<dynamic>? ?? [];
         }
         setState(() {
           _insightsData = data;
-          _achievements = achList;
-          _isLoading = false;
+          _achievements = ach;
+          _loading = false;
         });
       } else {
         setState(() {
-          _error = 'Failed to load insights. Please try again.';
-          _isLoading = false;
+          _error = 'Unable to load your Replay stats right now.';
+          _loading = false;
         });
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Network error. Please check your connection.';
-          _isLoading = false;
-        });
-      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Check your connection and try again.';
+        _loading = false;
+      });
     }
   }
 
-  void _onRangeChanged(String newRange) {
-    if (_selectedRange == newRange) return;
-    HapticFeedback.selectionClick();
-    setState(() => _selectedRange = newRange);
-    _fetchInsights();
+  List<List<double>> _parseHeatmap(dynamic raw) {
+    if (raw is! List) {
+      return List.generate(7, (_) => List.filled(24, 0.0));
+    }
+    return raw.map<List<double>>((row) {
+      if (row is List) {
+        return row.map<double>((v) => (v as num? ?? 0).toDouble()).toList();
+      }
+      return List.filled(24, 0.0);
+    }).toList();
   }
 
   void _onPlayTrack(Map<String, dynamic> trackData) {
     final track = Track(
-      id: trackData['trackId'] ?? 'top_track',
-      title: trackData['trackTitle'] ?? 'Unknown Track',
-      artist: trackData['artistName'] ?? 'Unknown Artist',
-      album: trackData['trackAlbum'] ?? '',
+      id: trackData['trackId']?.toString() ?? 'top_track',
+      title: trackData['trackTitle']?.toString() ?? 'Unknown Track',
+      artist: trackData['artistName']?.toString() ?? 'Unknown Artist',
+      album: trackData['trackAlbum']?.toString() ?? '',
       coverUrl: '',
       durationSeconds: 210,
     );
@@ -138,298 +154,225 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
       startIndex: 0,
       context: PlaybackContext(
         type: PlaybackContextType.library,
-        id: 'insights_top',
+        id: 'replay_top_songs',
         tracks: [track],
         startTrack: track,
+        title: 'Replay Top Songs',
       ),
     );
+  }
+
+  String _subtitleForState(bool isSignedIn) {
+    if (!isSignedIn) return 'Your personal listening story in Zenify.';
+    switch (_selectedRange) {
+      case 'week':
+        return 'Your highlights from the past 7 days.';
+      case 'month':
+        return 'Your highlights from the past 30 days.';
+      case 'year':
+        return 'Your listening story this year.';
+      default:
+        return 'Your all-time music footprint.';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
-    final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
-      backgroundColor: Zen.bg,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(child: SizedBox(height: topInset + 56)),
-
-              // Auth Guard Check
-              if (!auth.isLoggedIn)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _buildAuthPrompt(context),
-                )
-              else ...[
-                // View Mode Selector: Insights vs History
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-                child: CupertinoSlidingSegmentedControl<String>(
-                  groupValue: _selectedView,
-                  backgroundColor: const Color(0xFF1E1E22),
-                  thumbColor: AppColors.crimson,
-                  padding: const EdgeInsets.all(4),
-                  children: {
-                    'insights': _buildSegmentText('Replay & Insights', _selectedView == 'insights'),
-                    'history': _buildSegmentText('Listening History', _selectedView == 'history'),
-                  },
-                  onValueChanged: (val) {
-                    if (val != null) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _selectedView = val);
-                    }
-                  },
-                ),
+      backgroundColor: AT.bg,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Row(
+                children: [
+                  CircleIconButton(
+                    icon: CupertinoIcons.chevron_left,
+                    tooltip: 'Back',
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                  const Spacer(),
+                  if (auth.isLoggedIn && _viewIndex == 0)
+                    CircleIconButton(
+                      icon: CupertinoIcons.refresh,
+                      tooltip: 'Refresh Replay',
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        _fetchInsights();
+                      },
+                    ),
+                ],
               ),
             ),
-
-            if (_selectedView == 'history')
-              const SliverToBoxAdapter(
-                child: HistoryView(),
-              )
-            else ...[
-              // Range Selector Segmented Control
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                  child: CupertinoSlidingSegmentedControl<String>(
-                    groupValue: _selectedRange,
-                    backgroundColor: const Color(0xFF18181B),
-                    thumbColor: Colors.white12,
-                    padding: const EdgeInsets.all(3),
-                    children: {
-                      'week': _buildRangeText('Week', _selectedRange == 'week'),
-                      'month': _buildRangeText('Month', _selectedRange == 'month'),
-                      'year': _buildRangeText('Year', _selectedRange == 'year'),
-                      'all': _buildRangeText('All Time', _selectedRange == 'all'),
-                    },
-                    onValueChanged: (val) {
-                      if (val != null) _onRangeChanged(val);
-                    },
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Replay', style: AT.largeTitle),
+                  const SizedBox(height: 4),
+                  Text(
+                    _subtitleForState(auth.isLoggedIn),
+                    style: AT.subhead.copyWith(color: AT.label2),
                   ),
+                ],
+              ),
+            ),
+            if (auth.isLoggedIn) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: PillTabs(
+                  labels: const ['Replay', 'History'],
+                  index: _viewIndex,
+                  onChanged: (i) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _viewIndex = i);
+                  },
                 ),
               ),
-
-              // Body Content
-              if (_isLoading)
-                const SliverFillRemaining(
-                  child: Center(
-                    child: CupertinoActivityIndicator(color: AppColors.crimson, radius: 14),
-                  ),
-                )
-              else if (_error != null)
-                SliverFillRemaining(
-                  child: _buildErrorState(),
-                )
-              else if ((_insightsData?['totalPlays'] as int? ?? 0) == 0)
-                SliverFillRemaining(
-                  child: _buildEmptyState(),
-                )
-              else
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Persona & Music Personality Card
-                        PersonalityCard(
-                          musicPersonality: _insightsData?['musicPersonality'] as Map<String, dynamic>? ?? {},
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Key Stats Grid (Summary Cards)
-                        SummaryCards(
-                          totalListeningMs: _insightsData?['totalListeningMs'] as int? ?? 0,
-                          totalPlays: _insightsData?['totalPlays'] as int? ?? 0,
-                          streakDays: _insightsData?['streakDays'] as int? ?? 0,
-                          uniqueTracks: _insightsData?['uniqueTracks'] as int? ?? 0,
-                          uniqueArtists: _insightsData?['uniqueArtists'] as int? ?? 0,
-                          skipRatePct: _insightsData?['skipRatePct'] as int? ?? 0,
-                          timeDeltaPct: _insightsData?['comparisons']?['time']?['deltaPct'],
-                          playsDeltaPct: _insightsData?['comparisons']?['plays']?['deltaPct'],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Listening Heatmap
-                        ListeningHeatmap(
-                          heatmapNormalized: _parseHeatmap(
-                            _insightsData?['heatmapNormalized'] ?? _insightsData?['timeOfDayHeatmap'],
-                          ),
-                          peakDay: _insightsData?['peakDay'] as String?,
-                          peakHour: _insightsData?['peakHour'] as int?,
-                          heatmapInsight: _insightsData?['heatmapInsight'] as String?,
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Listening Activity Timeline
-                        ListeningTimeline(
-                          timeline: _insightsData?['timeline'] as List<dynamic>? ?? [],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Top Artists & Songs Lists
-                        TopLists(
-                          topArtists: _insightsData?['topArtists'] as List<dynamic>? ?? [],
-                          topTracks: _insightsData?['topTracks'] as List<dynamic>? ?? [],
-                          onTrackTapped: _onPlayTrack,
-                        ),
-                        const SizedBox(height: 20),
-
-                        // New Discoveries Card
-                        DiscoveriesCard(
-                          discoveriesCount: _insightsData?['discoveriesCount'] as int? ?? 0,
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Top Genres & Languages
-                        BreakdownChart(
-                          genres: _insightsData?['topGenres'] as List<dynamic>? ?? [],
-                          languages: _insightsData?['topLanguages'] as List<dynamic>? ?? [],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Achievements Card
-                        AchievementsCard(
-                          achievements: _achievements,
-                        ),
-                        const SizedBox(height: 48),
-                      ],
-                    ),
+              if (_viewIndex == 0)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: PillTabs(
+                    labels: _rangeLabels,
+                    index: _rangeIndex,
+                    onChanged: (i) {
+                      if (i == _rangeIndex) return;
+                      HapticFeedback.selectionClick();
+                      setState(() => _rangeIndex = i);
+                      _fetchInsights();
+                    },
                   ),
                 ),
             ],
+            Expanded(
+              child: !auth.isLoggedIn
+                  ? _buildAuthPrompt()
+                  : _viewIndex == 1
+                      ? const HistoryView()
+                      : _buildInsightsBody(),
+            ),
           ],
-        ],
-      ),
-
-      // Floating Dynamic Island Header
-      Positioned(
-        top: 0,
-        left: 0,
-        right: 0,
-        child: DynamicIslandHeader(
-          title: 'Insights & Replay',
-          showBack: true,
-          onBack: () => Navigator.of(context).pop(),
-          showProfile: false,
-          topPadding: topInset + 4,
-          trailing: auth.isLoggedIn
-              ? PressableScale(
-                  scale: 0.88,
-                  onTap: _fetchInsights,
-                  child: AppleGlass(
-                    borderRadius: BorderRadius.circular(22),
-                    tint: const Color(0x26121216),
-                    child: const SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Center(
-                        child: Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                      ),
-                    ),
-                  ),
-                )
-              : null,
         ),
       ),
-    ],
-  ),
-);
+    );
   }
 
-  List<List<int>> _parseHeatmap(dynamic raw) {
-    if (raw is! List) return [];
-    final List<List<int>> out = [];
-    for (final row in raw) {
-      if (row is List) {
-        out.add(row.map((e) => (e as num).toInt()).toList());
-      }
+  Widget _buildInsightsBody() {
+    if (_loading) {
+      return const Center(
+        child: CupertinoActivityIndicator(radius: 14, color: AT.label2),
+      );
     }
-    return out;
-  }
+    if (_error != null) return _buildErrorState();
+    if ((_insightsData?['totalPlays'] as int? ?? 0) == 0) {
+      return _buildEmptyState();
+    }
 
-  Widget _buildSegmentText(String text, bool isSelected) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.white60,
-          fontSize: 12,
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        ),
+    final data = _insightsData!;
+    final personality = data['musicPersonality'] as Map<String, dynamic>?;
+    final totalMs = (data['totalListeningMs'] as num? ?? 0).toInt();
+    final totalPlays = (data['totalPlays'] as num? ?? 0).toInt();
+    final streakDays = (data['streakDays'] as num? ?? 0).toInt();
+    final uniqueTracks = (data['uniqueTracks'] as num? ?? 0).toInt();
+    final uniqueArtists = (data['uniqueArtists'] as num? ?? 0).toInt();
+    final skipRatePct = (data['skipRatePct'] as num? ?? 0).toInt();
+    final timeDeltaPct = (data['comparisons']?['time']?['deltaPct'] as num?)?.toInt();
+    final playsDeltaPct = (data['comparisons']?['plays']?['deltaPct'] as num?)?.toInt();
+
+    final heatmap = _parseHeatmap(
+      data['heatmapNormalized'] ?? data['heatmapMatrix'],
+    );
+    final peakDay = data['peakDay'] as String?;
+    final peakHour = (data['peakHour'] as num?)?.toInt();
+    final heatmapInsight = data['heatmapInsight'] as String?;
+
+    final timeline = data['timeline'] as List<dynamic>? ?? const [];
+    final topArtists = data['topArtists'] as List<dynamic>? ?? const [];
+    final topTracks = data['topTracks'] as List<dynamic>? ?? const [];
+    final discoveriesCount = (data['discoveriesCount'] as num? ?? 0).toInt();
+    final topGenres = data['topGenres'] as List<dynamic>? ?? const [];
+    final topLanguages = data['topLanguages'] as List<dynamic>? ?? const [];
+
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
       ),
+      slivers: [
+        CupertinoSliverRefreshControl(onRefresh: _fetchInsights),
+        SliverPadding(
+          padding: const EdgeInsets.only(top: 6, bottom: 48),
+          sliver: SliverList.list(
+            children: [
+              if (personality != null)
+                PersonalityCard(musicPersonality: personality),
+              SummaryCards(
+                totalListeningMs: totalMs,
+                totalPlays: totalPlays,
+                streakDays: streakDays,
+                uniqueTracks: uniqueTracks,
+                uniqueArtists: uniqueArtists,
+                skipRatePct: skipRatePct,
+                timeDeltaPct: timeDeltaPct,
+                playsDeltaPct: playsDeltaPct,
+              ),
+              ListeningHeatmap(
+                heatmapNormalized: heatmap,
+                peakDay: peakDay,
+                peakHour: peakHour,
+                heatmapInsight: heatmapInsight,
+              ),
+              ListeningTimeline(timeline: timeline),
+              TopLists(
+                topArtists: topArtists,
+                topTracks: topTracks,
+                onTrackTapped: _onPlayTrack,
+              ),
+              DiscoveriesCard(discoveriesCount: discoveriesCount),
+              BreakdownChart(
+                genres: topGenres,
+                languages: topLanguages,
+              ),
+              AchievementsCard(achievements: _achievements),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildRangeText(String text, bool isSelected) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.white54,
-          fontSize: 11,
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAuthPrompt(BuildContext context) {
+  Widget _buildAuthPrompt() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.crimson.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.crimson.withValues(alpha: 0.35)),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(Icons.insights_rounded, color: AppColors.crimson, size: 40),
+            const IconTile(
+              CupertinoIcons.sparkles,
+              color: AT.accent,
+              size: 56,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            const Text('Sign In for Replay', style: AT.title2),
+            const SizedBox(height: 8),
             Text(
-              'YOUR PERSONAL REPLAY & INSIGHTS',
+              'Track your top artists, songs, listening rhythm, and unlocked milestones across devices.',
+              style: AT.subhead.copyWith(color: AT.label2),
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: 'SF Pro Display',
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-                color: Colors.white,
-              ),
             ),
-            const SizedBox(height: 12),
-            const Text(
-              'Sign in to Zenify to analyze your music habits, view your 24x7 local listening heatmap, discover your music persona, and sync your replay stats across all devices.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 13,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 28),
-            PressableScale(
-              scale: 0.95,
+            const SizedBox(height: 22),
+            PillButton(
+              label: 'Sign In',
+              icon: CupertinoIcons.person_crop_circle,
               onTap: () {
-                HapticFeedback.lightImpact();
                 Navigator.of(context).push(
-                  ZenPageRoute(
+                  MaterialPageRoute(
                     builder: (_) => WelcomeScreen(
                       onFinished: () {
                         Navigator.of(context).pop();
@@ -439,32 +382,6 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
                   ),
                 );
               },
-              child: Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF18181B),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.login_rounded, color: AppColors.crimson, size: 18),
-                    const SizedBox(width: 10),
-                    Text(
-                      'SIGN IN / CREATE ACCOUNT',
-                      style: const TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.0,
-                        color: AppColors.crimson,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),
@@ -475,40 +392,22 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.crimson.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Icon(Icons.music_note_rounded, color: AppColors.crimson, size: 36),
+            const IconTile(
+              CupertinoIcons.headphones,
+              color: AT.accent,
+              size: 56,
             ),
-            const SizedBox(height: 20),
-            Text(
-              'No Listening History Yet',
-              style: const TextStyle(
-                fontFamily: 'SF Pro Display',
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: -0.3,
-              ),
-            ),
+            const SizedBox(height: 16),
+            const Text('Nothing Recorded Yet', style: AT.title2),
             const SizedBox(height: 8),
-            const Text(
-              'Start playing your favorite tracks and check back here to see your personal Replay and habits.',
+            Text(
+              'Play a few songs to start building your Replay profile and daily activity.',
+              style: AT.subhead.copyWith(color: AT.label2),
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white54,
-                fontSize: 13,
-                height: 1.4,
-              ),
             ),
           ],
         ),
@@ -519,31 +418,27 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   Widget _buildErrorState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.white38, size: 48),
-            const SizedBox(height: 16),
-            Text(
-              _error ?? 'Unable to load insights',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70, fontSize: 14),
+            const Icon(
+              CupertinoIcons.exclamationmark_circle,
+              color: AT.label3,
+              size: 44,
             ),
-            const SizedBox(height: 20),
-            PressableScale(
+            const SizedBox(height: 12),
+            Text(
+              _error ?? 'Something went wrong.',
+              style: AT.subhead.copyWith(color: AT.label2),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            PillButton(
+              label: 'Try Again',
+              style: PillStyle.tinted,
+              compact: true,
               onTap: _fetchInsights,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.crimson,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Retry',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-              ),
             ),
           ],
         ),

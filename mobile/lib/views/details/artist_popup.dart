@@ -10,6 +10,7 @@ import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/zen.dart';
 import '../../models/artist_ref.dart';
 import '../../services/artist_service.dart';
+import '../../services/dock_visibility.dart';
 import '../../services/library_store.dart';
 import 'artist_screen.dart';
 
@@ -40,26 +41,28 @@ Future<void> showArtistPopup(
 
   final callerNav = Navigator.of(context);
 
-  await showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black.withValues(alpha: 0.50),
-    isScrollControlled: true,
-    enableDrag: true,
-    builder: (ctx) => _ArtistPopupSheet(
-      artists: effectiveList,
-      onOpenArtist: (artist) {
-        Navigator.of(ctx).pop();
-        callerNav.push(
-          ZenPageRoute(
-            builder: (_) => ArtistScreen(
-              artistName: artist.name,
-              imageUrl: artist.imageUrl,
+  await DockVisibility.runModal(
+    () => showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.50),
+      isScrollControlled: true,
+      enableDrag: true,
+      builder: (ctx) => _ArtistPopupSheet(
+        artists: effectiveList,
+        onOpenArtist: (artist) {
+          Navigator.of(ctx).pop();
+          callerNav.push(
+            ZenPageRoute(
+              builder: (_) => ArtistScreen(
+                artistName: artist.name,
+                imageUrl: artist.imageUrl,
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     ),
   );
 }

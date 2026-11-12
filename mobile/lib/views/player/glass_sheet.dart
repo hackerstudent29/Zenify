@@ -3,11 +3,14 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../services/dock_visibility.dart';
 import 'player_kit.dart';
 
 /// Pushes a glass bottom sheet that opens with a real spring curve.
 Future<T?> showGlassSheet<T>(BuildContext context, {required WidgetBuilder builder}) {
-  return Navigator.of(context, rootNavigator: true).push<T>(GlassSheetRoute<T>(builder: builder));
+  return DockVisibility.runModal(
+    () => Navigator.of(context, rootNavigator: true).push<T>(GlassSheetRoute<T>(builder: builder)),
+  );
 }
 
 class GlassSheetRoute<T> extends PopupRoute<T> {

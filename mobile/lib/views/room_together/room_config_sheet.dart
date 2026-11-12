@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../design_system/apple/apple_kit.dart';
 import '../../design_system/apple/apple_tokens.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../models/room_models.dart';
 
 /// Shows the creation sheet. Returns a validated config or null if dismissed.
@@ -335,13 +336,23 @@ class PermissionEditor extends StatelessWidget {
               onTap: readOnly
                   ? null
                   : () async {
-                      final r = await appleActionSheet<RoomRole>(
-                        context,
+                      RoomRole? r;
+                      await ZenDropdown.show<void>(
+                        context: context,
                         title: p.label,
-                        options: [for (final o in config.thresholdOptions(p)) (_thresholdLabel(o), o, destructive: false)],
+                        subtitle: p.subtitle,
+                        items: [
+                          for (final o in config.thresholdOptions(p))
+                            ZenDropdownItem(
+                              title: _thresholdLabel(o),
+                              icon: CupertinoIcons.shield,
+                              isSelected: o == config.permissions[p],
+                              onTap: () => r = o,
+                            ),
+                        ],
                       );
                       if (r != null) {
-                        config.permissions[p] = r;
+                        config.permissions[p] = r!;
                         onChanged();
                       }
                     },

@@ -282,7 +282,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
   }
 
   void _onEngineError(String message) {
-    if (_isTransitioning || _pausing) return;
+    if (_pausing) return;
+    _isTransitioning = false;
     if (kDebugMode) {
       debugPrint('[PlayerState] Native engine playback error: $message');
     }
@@ -314,10 +315,14 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
 
     try {
       final resumePosMs = livePosition.inMilliseconds;
+      final canResumeAtOffset = _lastReportedPosition > const Duration(seconds: 2) &&
+          resumePosMs > 2000 &&
+          (_duration.inMilliseconds <= 10000 ||
+              resumePosMs < (_duration.inMilliseconds - 5000));
       final recovered = await _playViaResolverAndProxy(
         track,
         token,
-        startMs: resumePosMs > 1500 ? resumePosMs : null,
+        startMs: canResumeAtOffset ? resumePosMs : null,
       );
       if (token != _playToken) return;
       if (recovered) {
@@ -497,8 +502,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'play_next_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Playing next',
-        body: '${track.title} • ${track.artist}',
+        title: 'Playing Next',
+        body: IslandNotification.artistOrTitle(artist: track.artist, title: track.title),
         leading: IslandNotification.trackThumb(track.coverUrl, fallbackIcon: CupertinoIcons.arrow_turn_right_up, iconColor: const Color(0xFFE11D48)),
       ),
     );
@@ -518,8 +523,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'add_queue_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Added to queue',
-        body: '${track.title} • ${track.artist}',
+        title: 'Queued',
+        body: IslandNotification.artistOrTitle(artist: track.artist, title: track.title),
         leading: IslandNotification.trackThumb(track.coverUrl, fallbackIcon: CupertinoIcons.text_badge_plus, iconColor: const Color(0xFFE11D48)),
       ),
     );
@@ -596,8 +601,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'queue_clear_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Queue cleared',
-        body: 'Upcoming tracks removed',
+        title: 'Queue Cleared',
         leading: const Icon(CupertinoIcons.clear_circled, color: Colors.white70, size: 18),
       ),
     );
@@ -836,7 +840,12 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
 
     if (videoId.length == 11 && !videoId.contains(' ')) {
       try {
-        final proxyUrl = '${ApiService.baseUrl}/stream-youtube?v=$videoId';
+        final ytWatchUrl = 'https://www.youtube.com/watch?v=$videoId';
+        final proxyUrl = '${ApiService.baseUrl}/api/utils/stream-youtube'
+            '?url=${Uri.encodeQueryComponent(ytWatchUrl)}'
+            '&title=${Uri.encodeQueryComponent(track.title)}'
+            '&artist=${Uri.encodeQueryComponent(track.artist)}'
+            '&trackId=${Uri.encodeQueryComponent(track.id)}';
         if (token != _playToken) return false;
         await _audioPlayer.playUrl(
           url: proxyUrl,
@@ -969,6 +978,12 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
   @override
   Future<void> seek(Duration pos) async {
     final clamped = _clampPosition(pos);
+    if (_currentTrack != null &&
+        _audioPlayer.state == ap.PlayerState.stopped &&
+        !_isTransitioning) {
+      await _startCurrent(startMs: clamped.inMilliseconds);
+      return;
+    }
     _seekTarget = clamped;
     _seekGuardUntil = DateTime.now().add(const Duration(milliseconds: 450));
     _setPosition(clamped);
@@ -1323,8 +1338,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'sleep_timer_ended_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Sleep timer ended',
-          body: 'Playback paused',
+          title: 'Timer Ended',
           leading: const Icon(CupertinoIcons.moon_zzz_fill, color: Color(0xFFE11D48), size: 18),
         ),
       );
@@ -1333,8 +1347,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'sleep_timer_set_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Sleep timer set',
-        body: 'Stopping in ${after.inMinutes} minutes',
+        title: 'Sleep Timer',
+        body: '${after.inMinutes}m',
         leading: const Icon(CupertinoIcons.moon_zzz_fill, color: Color(0xFFE11D48), size: 18),
       ),
     );
@@ -1347,8 +1361,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'sleep_timer_track_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Sleep timer set',
-        body: 'Stopping at end of this song',
+        title: 'Sleep Timer',
+        body: 'End of song',
         leading: const Icon(CupertinoIcons.moon_zzz_fill, color: Color(0xFFE11D48), size: 18),
       ),
     );
@@ -1360,8 +1374,7 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'sleep_timer_cancel_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Sleep timer cancelled',
-        body: 'Playback will continue',
+        title: 'Timer Off',
         leading: const Icon(CupertinoIcons.moon_zzz, color: Colors.white70, size: 18),
       ),
     );

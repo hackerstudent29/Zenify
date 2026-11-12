@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../design_system/apple/apple_kit.dart';
 import '../../design_system/apple/apple_tokens.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../models/room_models.dart';
 import '../../services/together_service.dart';
 import 'achievements/achievements_screen.dart';
@@ -66,6 +67,7 @@ class _MemberBody extends StatelessWidget {
   Future<bool> _confirm(BuildContext context, String title, String msg, String action) async {
     final r = await showCupertinoDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => CupertinoAlertDialog(
         title: Text(title),
         content: Text(msg),
@@ -124,8 +126,21 @@ class _MemberBody extends StatelessWidget {
                   appleToast(context, 'No other roles are enabled in this room.');
                   return;
                 }
-                final r = await appleActionSheet<RoomRole>(context, title: 'Role for ${m.username}', options: [for (final o in opts) (o == role ? '${o.label}  ✓' : o.label, o, destructive: false)]);
-                if (r != null && r != role) await run(() => t.setMemberRole(m.userId, r), 'Could not change role.');
+                RoomRole? r;
+                await ZenDropdown.show<void>(
+                  context: context,
+                  title: 'Role for ${m.username}',
+                  items: [
+                    for (final o in opts)
+                      ZenDropdownItem(
+                        title: o.label,
+                        icon: CupertinoIcons.person_badge_plus,
+                        isSelected: o == role,
+                        onTap: () => r = o,
+                      ),
+                  ],
+                );
+                if (r != null && r != role) await run(() => t.setMemberRole(m.userId, r!), 'Could not change role.');
               },
             ),
           if (t.isHost && !isMe)
@@ -184,6 +199,7 @@ class _MenuBody extends StatelessWidget {
     final host = t.isHost;
     final ok = await showCupertinoDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('Leave room?'),
         content: Text(host ? 'The room keeps playing for everyone else. Host will pass to the next eligible person.' : 'You will stop listening. The room continues without you.'),
@@ -202,6 +218,7 @@ class _MenuBody extends StatelessWidget {
   Future<void> _close(BuildContext context, TogetherService t) async {
     final ok = await showCupertinoDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('Close room for everyone?'),
         content: const Text('The session ends now for all ${''}participants. This cannot be undone.'),

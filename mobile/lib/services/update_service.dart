@@ -190,7 +190,7 @@ class UpdateService {
   void showUpdateSheet(BuildContext context, UpdateInfo info) {
     final dockToken = DockVisibility.acquire(
       hideNav: true,
-      hideMini: info.isForceUpdate,
+      hideMini: true,
     );
     showModalBottomSheet<void>(
       context: context,

@@ -342,6 +342,7 @@ class _PrivacyBodyState extends State<_PrivacyBody> {
           onTap: () async {
             final yes = await showCupertinoDialog<bool>(
               context: context,
+              useRootNavigator: true,
               builder: (ctx) => CupertinoAlertDialog(
                 title: const Text('Delete history?'),
                 content: const Text('All your Room Together stats are permanently removed.'),

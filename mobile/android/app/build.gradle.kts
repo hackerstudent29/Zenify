@@ -31,6 +31,20 @@ android {
         checkReleaseBuilds = false
     }
 
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+        resources {
+            excludes += setOf(
+                "META-INF/**/LICENSE.txt",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "DebugProbesKt.bin"
+            )
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

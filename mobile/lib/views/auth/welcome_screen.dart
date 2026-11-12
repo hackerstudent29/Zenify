@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
@@ -5,12 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../design_system/apple/apple_tokens.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/apple_glass.dart';
+import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/spring_kit.dart';
 import '../../services/auth_state.dart';
 import '../../services/dock_visibility.dart';
+import '../../services/user_preferences_service.dart';
+import '../splash/zenify_splash_screen.dart';
 import 'email_otp_sheet.dart';
 import 'google_logo.dart';
 import 'onboarding_sheet.dart';
@@ -28,13 +33,35 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     with TickerProviderStateMixin, HideDocksMixin {
   @override
   bool get hideMiniPlayerWhileActive => true;
+
+  /// Strawberry Rose + Blush Pink + Pure White wave palette for the free-flowing
+  /// ArtworkMeshBackground behind the transparent ZENIFY logo.
+  static const List<Color> _roseWhitePalette = [
+    Color(0xFFE11D48), // Strawberry Rose
+    Color(0xFFFF4D79), // Bright Strawberry Pink
+    Color(0xFFFFFFFF), // Luminous White wave
+    Color(0xFFFFDCE5), // Rose Pearl White blend
+    Color(0xFFFB7185), // Warm Pastel Rose
+    Color(0xFF881337), // Deep Berry undertone
+  ];
+
   bool _isGoogleLoading = false;
   bool _isGuestLoading = false;
   String? _errorMessage;
 
-  late final AnimationController _auroraCtrl = AnimationController(
+  late final AnimationController _bgIntroCtrl = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 18),
+    duration: const Duration(milliseconds: 1150),
+  );
+
+  late final AnimationController _taglineIntroCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+
+  late final AnimationController _ctaEntranceCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 950),
   );
 
   late final AnimationController _markSpringCtrl = AnimationController.unbounded(
@@ -42,26 +69,58 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     value: 1.0,
   );
 
+  Timer? _ctaFallbackTimer;
+  Timer? _taglineTimer;
+  bool _ctaStarted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bgIntroCtrl.forward();
+    _taglineTimer = Timer(const Duration(milliseconds: 520), () {
+      if (mounted) _taglineIntroCtrl.forward();
+    });
+    // Guarantee CTA placement triggers right after the intro beat even if frame rate varies.
+    _ctaFallbackTimer = Timer(const Duration(milliseconds: 1350), _startCtaEntrance);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (MediaQuery.disableAnimationsOf(context)) {
-      _auroraCtrl.stop();
-    } else if (!_auroraCtrl.isAnimating) {
-      _auroraCtrl.repeat();
+      _bgIntroCtrl.value = 1.0;
+      _taglineIntroCtrl.value = 1.0;
+      _ctaEntranceCtrl.value = 1.0;
+      _ctaStarted = true;
     }
   }
 
   @override
   void dispose() {
-    _auroraCtrl.dispose();
+    _ctaFallbackTimer?.cancel();
+    _taglineTimer?.cancel();
+    _bgIntroCtrl.dispose();
+    _taglineIntroCtrl.dispose();
+    _ctaEntranceCtrl.dispose();
     _markSpringCtrl.dispose();
     super.dispose();
   }
 
+  void _onLogoIntroSettled() {
+    if (!mounted) return;
+    _startCtaEntrance();
+  }
+
+  void _startCtaEntrance() {
+    if (_ctaStarted || !mounted) return;
+    _ctaStarted = true;
+    if (!_taglineIntroCtrl.isCompleted) _taglineIntroCtrl.forward();
+    _ctaEntranceCtrl.forward();
+  }
+
   void _pulseMark() {
     HapticFeedback.lightImpact();
-    _markSpringCtrl.value = 0.88;
+    _markSpringCtrl.value = 0.90;
     springTo(_markSpringCtrl, 1.0, Springs.bouncy);
   }
 
@@ -76,7 +135,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     final result = await auth.signInWithGoogle();
 
     if (!mounted) return;
-
     setState(() => _isGoogleLoading = false);
 
     if (result.success) {
@@ -97,38 +155,36 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   void _openEmailSheet() {
     if (_isGoogleLoading || _isGuestLoading) return;
     setState(() => _errorMessage = null);
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.65),
-      builder: (ctx) => EmailOtpSheet(
-        onAuthenticated: (isNewUser) {
-          Navigator.of(ctx).pop();
-          if (isNewUser) {
-            _showOnboarding();
-          } else {
-            _done();
-          }
-        },
+    DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.65),
+        builder: (ctx) => EmailOtpSheet(
+          onAuthenticated: (isNewUser) {
+            Navigator.of(ctx).pop();
+            if (isNewUser) {
+              _showOnboarding();
+            } else {
+              _done();
+            }
+          },
+        ),
       ),
     );
   }
 
   void _showOnboarding() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.72),
-      builder: (ctx) => OnboardingSheet(
-        onCompleted: () {
-          Navigator.of(ctx).pop();
-          _done();
-        },
-      ),
+    OnboardingSheet.show(
+      context,
+      onCompleted: () {
+        if (Navigator.of(context, rootNavigator: true).canPop()) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+        _done();
+      },
     );
   }
 
@@ -141,10 +197,16 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     final auth = context.read<AuthState>();
     await auth.continueAsGuest();
+    await UserPreferencesService.instance.ensureLoaded();
 
     if (!mounted) return;
     setState(() => _isGuestLoading = false);
-    _done();
+
+    if (!UserPreferencesService.instance.hasCompleted) {
+      _showOnboarding();
+    } else {
+      _done();
+    }
   }
 
   void _done() {
@@ -155,37 +217,93 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     }
   }
 
+  Widget _staggeredButton({
+    required double begin,
+    required double end,
+    required Widget child,
+  }) {
+    final curve = CurvedAnimation(
+      parent: _ctaEntranceCtrl,
+      curve: Interval(begin, end, curve: Curves.easeOutBack),
+    );
+    final opacityCurve = CurvedAnimation(
+      parent: _ctaEntranceCtrl,
+      curve: Interval(begin, (begin + (end - begin) * 0.65).clamp(0.0, 1.0), curve: Curves.easeOut),
+    );
+    return AnimatedBuilder(
+      animation: _ctaEntranceCtrl,
+      builder: (_, builtChild) {
+        final t = curve.value;
+        final op = opacityCurve.value.clamp(0.0, 1.0);
+        return IgnorePointer(
+          ignoring: op < 0.2,
+          child: Opacity(
+            opacity: op,
+            child: Transform.translate(
+              offset: Offset(0, (1.0 - t) * 30.0),
+              child: Transform.scale(
+                scale: 0.94 + 0.06 * t.clamp(0.0, 1.05),
+                child: builtChild,
+              ),
+            ),
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.of(context).canPop();
     final busy = _isGoogleLoading || _isGuestLoading;
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: const Color(0xFF19060D),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Ambient Apple Music spatial aurora motion
-          RepaintBoundary(
-            child: CustomPaint(
-              painter: _AuroraBackdropPainter(_auroraCtrl),
-              child: const SizedBox.expand(),
+          // 1. Free-flowing Strawberry Rose & White ArtMesh background (same liquid
+          // physics engine as Full-Screen Player) with smooth bloom intro animation.
+          AnimatedBuilder(
+            animation: _bgIntroCtrl,
+            builder: (context, child) {
+              final t = Curves.easeOutCubic.transform(_bgIntroCtrl.value);
+              return Opacity(
+                opacity: t.clamp(0.0, 1.0),
+                child: Transform.scale(
+                  scale: 1.08 - (0.08 * t),
+                  child: child,
+                ),
+              );
+            },
+            child: const ArtworkMeshBackground(
+              palette: _roseWhitePalette,
+              speed: 1.25,
+              intensity: 0.35,
+              interactive: true,
+              dither: true,
+              scrimOpacity: 0.28,
+              backgroundColor: Color(0xFF1F0610),
             ),
           ),
 
-          // Subtle top-to-bottom readability vignette
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x330A0A0C),
-                  Color(0x000A0A0C),
-                  Color(0x880A0A0C),
-                  Color(0xF00A0A0C),
-                ],
-                stops: [0.0, 0.32, 0.68, 1.0],
+          // Soft lower-edge contrast gradient so CTA controls pop effortlessly
+          // while letting strawberry rose & white waves shine above.
+          const IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x2414040A),
+                    Color(0x0014040A),
+                    Color(0x52120409),
+                    Color(0xC20D0307),
+                  ],
+                  stops: [0.0, 0.35, 0.72, 1.0],
+                ),
               ),
             ),
           ),
@@ -196,7 +314,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 final isCompactHeight = constraints.maxHeight < 640;
                 final isNarrowWidth = constraints.maxWidth < 360;
                 final horizontalPad = isNarrowWidth ? 20.0 : 28.0;
-                final markSize = isCompactHeight ? 76.0 : 92.0;
+                final logoWidth = math.min(
+                  (constraints.maxWidth - horizontalPad * 2) * 0.84,
+                  isCompactHeight ? 248.0 : 292.0,
+                );
 
                 return SingleChildScrollView(
                   physics: const BouncingScrollPhysics(
@@ -214,259 +335,156 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Top navigation / dismissal bar
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  if (canPop)
-                                    SpringIn(
-                                      delayMs: 40,
-                                      rise: 12,
-                                      child: _GlassCircleIconButton(
-                                        icon: CupertinoIcons.xmark,
-                                        size: 38,
-                                        iconSize: 16,
-                                        semanticLabel: 'Close',
-                                        onTap: () => Navigator.of(context).maybePop(),
-                                      ),
-                                    )
-                                  else
-                                    const SizedBox(height: 38),
-                                ],
-                              ),
-                            ),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Optional top-right close button only when pushed over an existing route
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      if (canPop)
+                                        SpringIn(
+                                          delayMs: 80,
+                                          rise: 10,
+                                          child: _GlassCircleIconButton(
+                                            icon: CupertinoIcons.xmark,
+                                            size: 38,
+                                            iconSize: 16,
+                                            semanticLabel: 'Close',
+                                            onTap: () => Navigator.of(context).maybePop(),
+                                          ),
+                                        )
+                                      else
+                                        const SizedBox(height: 38),
+                                    ],
+                                  ),
+                                ),
 
-                            // Hero Identity Group
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                vertical: isCompactHeight ? 20 : 36,
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // 1. App Mark with breathing aura & spring tap bounce
-                                  SpringIn(
-                                    delayMs: 0,
-                                    rise: 32,
-                                    child: PressableScale(
-                                      scale: 0.94,
-                                      onTap: _pulseMark,
-                                      child: AnimatedBuilder(
-                                        animation: Listenable.merge([
-                                          _auroraCtrl,
-                                          _markSpringCtrl,
-                                        ]),
+                                // Center-Top Hero Identity Group:
+                                // Transparent full ZENIFY animated logo looping smoothly
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    top: isCompactHeight ? 12 : 28,
+                                    bottom: isCompactHeight ? 16 : 24,
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      PressableScale(
+                                        scale: 0.96,
+                                        onTap: _pulseMark,
+                                        child: AnimatedBuilder(
+                                          animation: _markSpringCtrl,
+                                          builder: (context, child) => Transform.scale(
+                                            scale: _markSpringCtrl.value.clamp(0.86, 1.10),
+                                            child: child,
+                                          ),
+                                          child: ZenifyAnimatedLogo(
+                                            width: logoWidth,
+                                            loop: true,
+                                            onIntroSettled: _onLogoIntroSettled,
+                                          ),
+                                        ),
+                                      ),
+
+                                      SizedBox(height: isCompactHeight ? 16 : 22),
+
+                                      // Tagline enters cleanly beneath the full logo
+                                      AnimatedBuilder(
+                                        animation: _taglineIntroCtrl,
                                         builder: (context, child) {
-                                          final breath = 0.5 +
-                                              0.5 *
-                                                  math.sin(
-                                                    _auroraCtrl.value *
-                                                        math.pi *
-                                                        2,
-                                                  );
-                                          return Transform.scale(
-                                            scale: _markSpringCtrl.value
-                                                .clamp(0.84, 1.12),
-                                            child: Stack(
-                                              alignment: Alignment.center,
-                                              children: [
-                                                // Ambient pulsing halo
-                                                Container(
-                                                  width: markSize +
-                                                      44 +
-                                                      breath * 10,
-                                                  height: markSize +
-                                                      44 +
-                                                      breath * 10,
-                                                  decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    gradient: RadialGradient(
-                                                      colors: [
-                                                        AppColors.accent
-                                                            .withValues(
-                                                          alpha:
-                                                              0.26 + 0.1 * breath,
-                                                        ),
-                                                        AppColors.accentMaroon
-                                                            .withValues(
-                                                          alpha: 0.08,
-                                                        ),
-                                                        Colors.transparent,
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                                child!,
-                                              ],
+                                          final t = Curves.easeOutCubic.transform(
+                                            _taglineIntroCtrl.value,
+                                          );
+                                          return Opacity(
+                                            opacity: t.clamp(0.0, 1.0),
+                                            child: Transform.translate(
+                                              offset: Offset(0, (1.0 - t) * 14.0),
+                                              child: child,
                                             ),
                                           );
                                         },
-                                        child: Container(
-                                          width: markSize,
-                                          height: markSize,
-                                          decoration: ShapeDecoration(
-                                            shape: ContinuousRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                markSize * 0.44,
-                                              ),
-                                              side: BorderSide(
-                                                color: Colors.white
-                                                    .withValues(alpha: 0.18),
-                                                width: 1,
-                                              ),
-                                            ),
-                                            gradient: const LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                Color(0xFF232328),
-                                                Color(0xFF141417),
-                                              ],
-                                            ),
+                                        child: Text(
+                                          'Music. Elevated to Studio Fidelity.',
+                                          textAlign: TextAlign.center,
+                                          style: AT.callout.copyWith(
+                                            color: Colors.white.withValues(alpha: 0.88),
+                                            fontWeight: FontWeight.w500,
                                             shadows: [
-                                              BoxShadow(
-                                                color: AppColors.accent
-                                                    .withValues(alpha: 0.30),
-                                                blurRadius: 34,
-                                                spreadRadius: -4,
-                                                offset: const Offset(0, 14),
-                                              ),
-                                              BoxShadow(
-                                                color: Colors.black
-                                                    .withValues(alpha: 0.55),
-                                                blurRadius: 24,
-                                                offset: const Offset(0, 12),
+                                              Shadow(
+                                                color: Colors.black.withValues(alpha: 0.35),
+                                                blurRadius: 10,
                                               ),
                                             ],
                                           ),
-                                          alignment: Alignment.center,
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              markSize * 0.22,
-                                            ),
-                                            child: Image.asset(
-                                              'assets/images/z_logo.png',
-                                              width: markSize * 0.64,
-                                              height: markSize * 0.64,
-                                              fit: BoxFit.contain,
-                                              errorBuilder: (_, _, _) => Icon(
-                                                CupertinoIcons.waveform,
-                                                size: markSize * 0.50,
-                                                color: AppColors.accent,
-                                              ),
-                                            ),
-                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
 
-                                  SizedBox(height: isCompactHeight ? 20 : 26),
-
-                                  // 2. Title & Tagline
-                                  SpringIn(
-                                    delayMs: 70,
-                                    rise: 24,
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          'Zenify',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontFamily: 'SF Pro Display',
-                                            fontSize: isCompactHeight ? 36 : 42,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: -1.2,
-                                            height: 1.08,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        Text(
-                                          'Music. Elevated to Studio Fidelity.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontFamily: 'SF Pro',
-                                            fontSize: isCompactHeight ? 15 : 16,
-                                            fontWeight: FontWeight.w500,
-                                            letterSpacing: -0.2,
-                                            height: 1.35,
-                                            color: Colors.white
-                                                .withValues(alpha: 0.74),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // 3. Spring-revealed error banner
-                                  SpringReveal(
-                                    visible: _errorMessage != null,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(top: 18),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 14,
-                                          vertical: 10,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.danger
-                                              .withValues(alpha: 0.14),
-                                          borderRadius:
-                                              BorderRadius.circular(16),
-                                          border: Border.all(
-                                            color: AppColors.danger
-                                                .withValues(alpha: 0.38),
-                                            width: 0.8,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              CupertinoIcons
-                                                  .exclamationmark_circle_fill,
-                                              size: 16,
-                                              color: AppColors.danger,
+                                      // Error Banner
+                                      SpringReveal(
+                                        visible: _errorMessage != null,
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(top: 18),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                              vertical: 10,
                                             ),
-                                            const SizedBox(width: 8),
-                                            Flexible(
-                                              child: Text(
-                                                _errorMessage ?? '',
-                                                style: const TextStyle(
-                                                  fontFamily: 'SF Pro',
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Color(0xFFFF7D75),
-                                                  height: 1.3,
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withValues(alpha: 0.45),
+                                              borderRadius: BorderRadius.circular(16),
+                                              border: Border.all(
+                                                color: AppColors.danger.withValues(alpha: 0.55),
+                                                width: 0.9,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  CupertinoIcons.exclamationmark_circle_fill,
+                                                  size: 16,
+                                                  color: AppColors.danger,
                                                 ),
-                                              ),
+                                                const SizedBox(width: 8),
+                                                Flexible(
+                                                  child: Text(
+                                                    _errorMessage ?? '',
+                                                    style: AT.footnote.copyWith(
+                                                      color: const Color(0xFFFFB4AF),
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                          ],
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
 
-                            // Bottom CTA Stack + Footer
+                            const SizedBox(height: 12),
+
+                            // Sequenced Bottom CTA Buttons (animated into place right after intro)
                             Padding(
                               padding: EdgeInsets.only(
-                                bottom: isCompactHeight ? 14 : 20,
+                                bottom: isCompactHeight ? 14 : 22,
                               ),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  // Primary CTA 1: Continue with Google
-                                  SpringIn(
-                                    delayMs: 130,
-                                    rise: 22,
+                                  // 1. Continue with Google
+                                  _staggeredButton(
+                                    begin: 0.0,
+                                    end: 0.52,
                                     child: PressableScale(
                                       scale: 0.96,
                                       onTap: busy ? null : _handleGoogleSignIn,
@@ -477,12 +495,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                         ),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(26),
+                                          borderRadius: BorderRadius.circular(26),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black
-                                                  .withValues(alpha: 0.28),
+                                              color: Colors.black.withValues(alpha: 0.28),
                                               blurRadius: 18,
                                               offset: const Offset(0, 8),
                                             ),
@@ -490,44 +506,35 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                         ),
                                         alignment: Alignment.center,
                                         child: AnimatedSwitcher(
-                                          duration:
-                                              const Duration(milliseconds: 220),
+                                          duration: const Duration(milliseconds: 220),
                                           child: _isGoogleLoading
                                               ? const Row(
                                                   key: ValueKey('google_load'),
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
+                                                  mainAxisAlignment: MainAxisAlignment.center,
                                                   children: [
                                                     SizedBox(
                                                       width: 19,
                                                       height: 19,
-                                                      child:
-                                                          CircularProgressIndicator(
+                                                      child: CircularProgressIndicator(
                                                         strokeWidth: 2.2,
-                                                        color:
-                                                            Color(0xFF111113),
+                                                        color: Color(0xFF111113),
                                                       ),
                                                     ),
                                                     SizedBox(width: 10),
                                                     Text(
                                                       'Signing in...',
                                                       style: TextStyle(
-                                                        fontFamily:
-                                                            'SF Pro Display',
                                                         fontSize: 16,
-                                                        fontWeight:
-                                                            FontWeight.w700,
+                                                        fontWeight: FontWeight.w700,
                                                         letterSpacing: -0.2,
-                                                        color:
-                                                            Color(0xFF111113),
+                                                        color: Color(0xFF111113),
                                                       ),
                                                     ),
                                                   ],
                                                 )
                                               : const Row(
                                                   key: ValueKey('google_idle'),
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
+                                                  mainAxisAlignment: MainAxisAlignment.center,
                                                   children: [
                                                     GoogleLogo(size: 20),
                                                     SizedBox(width: 12),
@@ -535,17 +542,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                                       child: Text(
                                                         'Continue with Google',
                                                         maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
+                                                        overflow: TextOverflow.ellipsis,
                                                         style: TextStyle(
-                                                          fontFamily:
-                                                              'SF Pro Display',
                                                           fontSize: 16,
-                                                          fontWeight:
-                                                              FontWeight.w700,
+                                                          fontWeight: FontWeight.w700,
                                                           letterSpacing: -0.2,
-                                                          color:
-                                                              Color(0xFF111113),
+                                                          color: Color(0xFF111113),
                                                         ),
                                                       ),
                                                     ),
@@ -558,10 +560,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                                   const SizedBox(height: 12),
 
-                                  // Primary CTA 2: Continue with Email
-                                  SpringIn(
-                                    delayMs: 185,
-                                    rise: 22,
+                                  // 2. Continue with Email
+                                  _staggeredButton(
+                                    begin: 0.16,
+                                    end: 0.68,
                                     child: PressableScale(
                                       scale: 0.96,
                                       onTap: busy ? null : _openEmailSheet,
@@ -571,25 +573,23 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                           horizontal: 20,
                                         ),
                                         decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(26),
+                                          borderRadius: BorderRadius.circular(26),
                                           gradient: const LinearGradient(
                                             begin: Alignment.topCenter,
                                             end: Alignment.bottomCenter,
                                             colors: [
-                                              AppColors.accent,
-                                              AppColors.crimson,
+                                              Color(0xFFFF3B6B),
+                                              Color(0xFFE11D48),
                                             ],
                                           ),
                                           border: Border.all(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.18),
+                                            color: Colors.white.withValues(alpha: 0.22),
                                             width: 0.6,
                                           ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: AppColors.accent
-                                                  .withValues(alpha: 0.36),
+                                              color: const Color(0xFFE11D48)
+                                                  .withValues(alpha: 0.42),
                                               blurRadius: 22,
                                               offset: const Offset(0, 8),
                                             ),
@@ -597,8 +597,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                         ),
                                         alignment: Alignment.center,
                                         child: const Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
+                                          mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
                                             Icon(
                                               CupertinoIcons.mail_solid,
@@ -612,7 +611,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
-                                                  fontFamily: 'SF Pro Display',
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w700,
                                                   letterSpacing: -0.2,
@@ -628,10 +626,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                                   const SizedBox(height: 12),
 
-                                  // Secondary Pill: Continue as Guest
-                                  SpringIn(
-                                    delayMs: 240,
-                                    rise: 18,
+                                  // 3. Continue as Guest
+                                  _staggeredButton(
+                                    begin: 0.32,
+                                    end: 0.84,
                                     child: PressableScale(
                                       scale: 0.96,
                                       onTap: busy ? null : _handleGuest,
@@ -641,46 +639,37 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                           horizontal: 20,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.10),
-                                          borderRadius:
-                                              BorderRadius.circular(26),
+                                          color: Colors.white.withValues(alpha: 0.14),
+                                          borderRadius: BorderRadius.circular(26),
                                           border: Border.all(
-                                            color: Colors.white
-                                                .withValues(alpha: 0.14),
+                                            color: Colors.white.withValues(alpha: 0.24),
                                             width: 0.8,
                                           ),
                                         ),
                                         alignment: Alignment.center,
                                         child: AnimatedSwitcher(
-                                          duration:
-                                              const Duration(milliseconds: 200),
+                                          duration: const Duration(milliseconds: 200),
                                           child: _isGuestLoading
                                               ? const SizedBox(
                                                   key: ValueKey('guest_load'),
                                                   width: 19,
                                                   height: 19,
-                                                  child:
-                                                      CircularProgressIndicator(
+                                                  child: CircularProgressIndicator(
                                                     strokeWidth: 2.2,
                                                     color: Colors.white,
                                                   ),
                                                 )
                                               : Text(
                                                   'Continue as Guest',
-                                                  key: const ValueKey(
-                                                      'guest_idle'),
+                                                  key: const ValueKey('guest_idle'),
                                                   maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
+                                                  overflow: TextOverflow.ellipsis,
                                                   style: TextStyle(
-                                                    fontFamily: 'SF Pro',
                                                     fontSize: 15.5,
                                                     fontWeight: FontWeight.w600,
                                                     letterSpacing: -0.2,
                                                     color: Colors.white
-                                                        .withValues(
-                                                            alpha: 0.90),
+                                                        .withValues(alpha: 0.95),
                                                   ),
                                                 ),
                                         ),
@@ -691,18 +680,14 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                   const SizedBox(height: 18),
 
                                   // Footer: Terms & Privacy
-                                  SpringIn(
-                                    delayMs: 290,
-                                    rise: 12,
+                                  _staggeredButton(
+                                    begin: 0.45,
+                                    end: 1.0,
                                     child: Text(
                                       'By continuing, you agree to the Terms and Privacy Policy.',
-                                      style: TextStyle(
-                                        fontFamily: 'SF Pro',
-                                        fontSize: 12,
+                                      style: AT.caption.copyWith(
+                                        color: Colors.white.withValues(alpha: 0.65),
                                         fontWeight: FontWeight.w500,
-                                        color:
-                                            Colors.white.withValues(alpha: 0.56),
-                                        height: 1.38,
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
@@ -756,7 +741,7 @@ class _GlassCircleIconButton extends StatelessWidget {
           padding: const EdgeInsets.all(3),
           child: AppleGlass(
             borderRadius: BorderRadius.circular(size / 2),
-            tint: Colors.white.withValues(alpha: 0.14),
+            tint: Colors.white.withValues(alpha: 0.16),
             shadow: false,
             child: Container(
               width: size,
@@ -770,86 +755,4 @@ class _GlassCircleIconButton extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Slow orbital Apple Music crimson/plum ambient aurora painted without widget rebuilds.
-class _AuroraBackdropPainter extends CustomPainter {
-  _AuroraBackdropPainter(this.progress) : super(repaint: progress);
-
-  final Animation<double> progress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final t = progress.value * math.pi * 2;
-    final w = size.width;
-    final h = size.height;
-    final longest = math.max(w, h);
-
-    // Orb 1: Primary Rose-Crimson behind hero mark
-    _drawOrb(
-      canvas,
-      center: Offset(
-        w * (0.50 + 0.14 * math.sin(t)),
-        h * (0.28 + 0.06 * math.cos(t * 1.2)),
-      ),
-      radius: longest * 0.56,
-      color: AppColors.crimson.withValues(alpha: 0.28),
-    );
-
-    // Orb 2: Deep Maroon-Berry spatial depth
-    _drawOrb(
-      canvas,
-      center: Offset(
-        w * (0.20 + 0.16 * math.cos(t * 0.9 + 1.1)),
-        h * (0.18 + 0.10 * math.sin(t * 1.1 + 0.6)),
-      ),
-      radius: longest * 0.52,
-      color: AppColors.accentMaroon.withValues(alpha: 0.34),
-    );
-
-    // Orb 3: Twilight plum undertone
-    _drawOrb(
-      canvas,
-      center: Offset(
-        w * (0.82 + 0.12 * math.sin(t * 0.8 + 2.4)),
-        h * (0.42 + 0.08 * math.cos(t * 0.7 + 1.8)),
-      ),
-      radius: longest * 0.48,
-      color: const Color(0xFF4C0D38).withValues(alpha: 0.30),
-    );
-
-    // Orb 4: Warm soft rose shimmer
-    _drawOrb(
-      canvas,
-      center: Offset(
-        w * (0.54 + 0.18 * math.cos(t + 3.2)),
-        h * (0.34 + 0.07 * math.sin(t * 1.3 + 2.0)),
-      ),
-      radius: longest * 0.34,
-      color: AppColors.accentSoft.withValues(alpha: 0.12),
-    );
-  }
-
-  void _drawOrb(
-    Canvas canvas, {
-    required Offset center,
-    required double radius,
-    required Color color,
-  }) {
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final paint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          color,
-          color.withValues(alpha: color.a * 0.35),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.48, 1.0],
-      ).createShader(rect);
-    canvas.drawCircle(center, radius, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _AuroraBackdropPainter oldDelegate) =>
-      oldDelegate.progress != progress;
 }

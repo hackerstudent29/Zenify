@@ -1,122 +1,123 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-
-import '../../../design_system/tokens/app_colors.dart';
+import '../../../design_system/apple/apple_tokens.dart';
 
 class ListeningTimeline extends StatelessWidget {
-  const ListeningTimeline({
-    super.key,
-    required this.timeline,
-  });
+  final List<dynamic> timeline;
 
-  final List<dynamic> timeline; // [{ date: '2026-11-09', minutes: 84 }, ...]
+  const ListeningTimeline({super.key, required this.timeline});
+
+  String _formatDateLabel(dynamic raw) {
+    final s = raw?.toString() ?? '';
+    if (s.length >= 10) return s.substring(5, 10);
+    return s;
+  }
 
   @override
   Widget build(BuildContext context) {
     if (timeline.isEmpty) return const SizedBox.shrink();
 
-    int maxMinutes = 1;
+    var maxMins = 1;
     for (final item in timeline) {
       final mins = (item['minutes'] as num? ?? 0).toInt();
-      if (mins > maxMinutes) maxMinutes = mins;
+      if (mins > maxMins) maxMins = mins;
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'LISTENING ACTIVITY',
-                style: const TextStyle(
-                  fontFamily: 'SF Pro',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  color: Colors.white,
-                ),
-              ),
-              Text(
-                'Peak: ${maxMinutes}m',
-                style: const TextStyle(fontSize: 10, color: Colors.white38),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 90,
+          Padding(
+            padding: const EdgeInsets.only(left: 14, bottom: 8, right: 4),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                for (int i = 0; i < timeline.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 4),
-                  Expanded(
-                    child: _buildBar(timeline[i], maxMinutes),
+                Text(
+                  'DAILY ACTIVITY',
+                  style: AT.caption.copyWith(
+                    color: AT.label2,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.6,
                   ),
-                ],
+                ),
+                Text(
+                  'Peak: $maxMins min',
+                  style: AT.caption.copyWith(color: AT.label2),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _formatDateLabel(timeline.first['date']),
-                style: const TextStyle(fontSize: 9, color: Colors.white38),
-              ),
-              Text(
-                _formatDateLabel(timeline.last['date']),
-                style: const TextStyle(fontSize: 9, color: Colors.white38),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBar(dynamic item, int maxMinutes) {
-    final mins = (item['minutes'] as num? ?? 0).toInt();
-    final ratio = (mins / maxMinutes).clamp(0.06, 1.0);
-    final isPeak = mins == maxMinutes && maxMinutes > 0;
-
-    return Tooltip(
-      message: '${_formatDateLabel(item['date'])}: $mins min',
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
           Container(
-            height: 80 * ratio,
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: isPeak
-                  ? AppColors.crimson
-                  : (mins > 0 ? AppColors.crimson.withValues(alpha: 0.45) : const Color(0xFF27272A)),
-              borderRadius: BorderRadius.circular(4),
+              color: AT.surface,
+              borderRadius: BorderRadius.circular(AT.rMd),
+              border: Border.all(color: AT.hairline, width: 0.6),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 92,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: timeline.map((item) {
+                          final mins = (item['minutes'] as num? ?? 0).toInt();
+                          final heightFactor = max(0.06, mins / maxMins);
+                          final isPeak = mins == maxMins && mins > 0;
+                          return Expanded(
+                            child: Tooltip(
+                              message:
+                                  '${_formatDateLabel(item['date'])}: $mins min',
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 1.5),
+                                child: FractionallySizedBox(
+                                  heightFactor: heightFactor,
+                                  alignment: Alignment.bottomCenter,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: isPeak
+                                          ? AT.accent
+                                          : AT.accent.withValues(
+                                              alpha: mins > 0 ? 0.55 : 0.14,
+                                            ),
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(3.5),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _formatDateLabel(timeline.first['date']),
+                      style: AT.micro.copyWith(color: AT.label3),
+                    ),
+                    Text(
+                      _formatDateLabel(timeline.last['date']),
+                      style: AT.micro.copyWith(color: AT.label3),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-
-  String _formatDateLabel(dynamic dateStr) {
-    if (dateStr == null) return '';
-    try {
-      final parts = dateStr.toString().split('-');
-      if (parts.length >= 3) {
-        return '${parts[1]}/${parts[2]}';
-      }
-    } catch (_) {}
-    return dateStr.toString();
-  }
 }
-

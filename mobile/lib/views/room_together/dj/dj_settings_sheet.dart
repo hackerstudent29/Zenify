@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../design_system/apple/apple_kit.dart';
 import '../../../design_system/apple/apple_tokens.dart';
+import '../../../design_system/widgets/zen_dropdown.dart';
 import '../../../models/room_models.dart';
 import '../../../models/room_phase2_models.dart';
 import '../../../services/together_service.dart';
@@ -80,8 +81,21 @@ class _BodyState extends State<_Body> {
                 onTap: !canEdit
                     ? null
                     : () async {
-                        final r = await appleActionSheet<RequestMode>(context, title: 'Song requests', options: [for (final m in RequestMode.values) (m.label, m, destructive: false)]);
-                        if (r != null) setState(() => _s.requestMode = r);
+                        RequestMode? r;
+                        await ZenDropdown.show<void>(
+                          context: context,
+                          title: 'Song requests',
+                          items: [
+                            for (final m in RequestMode.values)
+                              ZenDropdownItem(
+                                title: m.label,
+                                icon: CupertinoIcons.music_note_list,
+                                isSelected: m == _s.requestMode,
+                                onTap: () => r = m,
+                              ),
+                          ],
+                        );
+                        if (r != null) setState(() => _s.requestMode = r!);
                       },
               ),
               if (_s.requestMode == RequestMode.limited)
@@ -135,6 +149,7 @@ class _BodyState extends State<_Body> {
                   onTap: () async {
                     final yes = await showCupertinoDialog<bool>(
                       context: context,
+                      useRootNavigator: true,
                       builder: (ctx) => CupertinoAlertDialog(
                         title: Text('Hand over to ${m.username}?'),
                         actions: [

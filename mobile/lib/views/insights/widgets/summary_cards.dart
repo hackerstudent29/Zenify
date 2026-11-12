@@ -1,8 +1,16 @@
-import 'package:flutter/material.dart';
-
-import '../../../design_system/tokens/app_colors.dart';
+import 'package:flutter/cupertino.dart';
+import '../../../design_system/apple/apple_tokens.dart';
 
 class SummaryCards extends StatelessWidget {
+  final int totalListeningMs;
+  final int totalPlays;
+  final int streakDays;
+  final int uniqueTracks;
+  final int uniqueArtists;
+  final int skipRatePct;
+  final int? timeDeltaPct;
+  final int? playsDeltaPct;
+
   const SummaryCards({
     super.key,
     required this.totalListeningMs,
@@ -15,194 +23,84 @@ class SummaryCards extends StatelessWidget {
     this.playsDeltaPct,
   });
 
-  final int totalListeningMs;
-  final int totalPlays;
-  final int streakDays;
-  final int uniqueTracks;
-  final int uniqueArtists;
-  final int skipRatePct;
-  final dynamic timeDeltaPct; // num or String ('new')
-  final dynamic playsDeltaPct;
-
   String _formatDuration(int ms) {
-    if (ms <= 0) return '0 min';
-    final totalSec = ms ~/ 1000;
-    final hours = totalSec ~/ 3600;
-    final minutes = (totalSec % 3600) ~/ 60;
-    if (hours > 0) {
-      return '$hours hr ${minutes > 0 ? '$minutes min' : ''}';
-    }
-    return '$minutes min';
-  }
-
-  Widget _buildDeltaBadge(dynamic delta) {
-    if (delta == null || delta == 'new') {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: const Text(
-          'NEW',
-          style: TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            color: Colors.white70,
-            letterSpacing: 0.5,
-          ),
-        ),
-      );
-    }
-    final numVal = delta is num ? delta : num.tryParse(delta.toString()) ?? 0;
-    final isPos = numVal >= 0;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: (isPos ? const Color(0xFF10B981) : AppColors.crimson).withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isPos ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
-            color: isPos ? const Color(0xFF10B981) : AppColors.crimson,
-            size: 14,
-          ),
-          Text(
-            '${numVal.abs()}%',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              color: isPos ? const Color(0xFF10B981) : AppColors.crimson,
-            ),
-          ),
-        ],
-      ),
-    );
+    final totalMinutes = (ms / 60000).floor();
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    if (hours > 0) return '${hours}h ${minutes}m';
+    return '${minutes}m';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Primary 3-card Row
-        Row(
-          children: [
-            Expanded(
-              child: _buildTile(
-                label: 'TIME PLAYED',
-                value: _formatDuration(totalListeningMs),
-                icon: Icons.timer_outlined,
-                badge: _buildDeltaBadge(timeDeltaPct),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildTile(
-                label: 'QUALIFIED PLAYS',
-                value: '$totalPlays',
-                icon: Icons.play_circle_outline_rounded,
-                badge: _buildDeltaBadge(playsDeltaPct),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildTile(
-                label: 'STREAK',
-                value: streakDays > 0 ? '$streakDays Days' : '1 Day',
-                icon: Icons.local_fire_department_rounded,
-                iconColor: Colors.amberAccent,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        // Secondary 3-card Row
-        Row(
-          children: [
-            Expanded(
-              child: _buildTile(
-                label: 'UNIQUE SONGS',
-                value: '$uniqueTracks',
-                icon: Icons.queue_music_rounded,
-                isSecondary: true,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildTile(
-                label: 'UNIQUE ARTISTS',
-                value: '$uniqueArtists',
-                icon: Icons.people_outline_rounded,
-                isSecondary: true,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildTile(
-                label: 'SKIP RATE',
-                value: '$skipRatePct%',
-                icon: Icons.skip_next_rounded,
-                iconColor: skipRatePct > 20 ? AppColors.crimson : Colors.white60,
-                isSecondary: true,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTile({
-    required String label,
-    required String value,
-    required IconData icon,
-    Color? iconColor,
-    Widget? badge,
-    bool isSecondary = false,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: isSecondary ? 12 : 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+    final items = [
+      _MetricItem(
+        label: 'Time Played',
+        value: _formatDuration(totalListeningMs),
+        deltaPct: timeDeltaPct,
+        icon: CupertinoIcons.clock_fill,
+        color: AT.accent,
       ),
+      _MetricItem(
+        label: 'Qualified Plays',
+        value: '$totalPlays',
+        deltaPct: playsDeltaPct,
+        icon: CupertinoIcons.play_circle_fill,
+        color: AT.blue,
+      ),
+      _MetricItem(
+        label: 'Current Streak',
+        value: '$streakDays ${streakDays == 1 ? 'day' : 'days'}',
+        icon: CupertinoIcons.flame_fill,
+        color: AT.amber,
+      ),
+      _MetricItem(
+        label: 'Unique Songs',
+        value: '$uniqueTracks',
+        icon: CupertinoIcons.music_note,
+        color: AT.green,
+      ),
+      _MetricItem(
+        label: 'Unique Artists',
+        value: '$uniqueArtists',
+        icon: CupertinoIcons.person_2_fill,
+        color: AT.label2,
+      ),
+      _MetricItem(
+        label: 'Skip Rate',
+        value: '$skipRatePct%',
+        icon: CupertinoIcons.forward_end_fill,
+        color: AT.label3,
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: iconColor ?? AppColors.crimson, size: isSecondary ? 16 : 18),
-              ?badge,
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'SF Pro Display',
-              fontSize: isSecondary ? 16 : 18,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: -0.3,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          Padding(
+            padding: const EdgeInsets.only(left: 14, bottom: 8),
+            child: Text(
+              'AT A GLANCE',
+              style: AT.caption.copyWith(
+                color: AT.label2,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 8.5,
-              fontWeight: FontWeight.w600,
-              color: Colors.white38,
-              letterSpacing: 0.6,
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              mainAxisExtent: 86,
             ),
+            itemBuilder: (_, i) => _MetricCard(item: items[i]),
           ),
         ],
       ),
@@ -210,3 +108,81 @@ class SummaryCards extends StatelessWidget {
   }
 }
 
+class _MetricItem {
+  final String label;
+  final String value;
+  final int? deltaPct;
+  final IconData icon;
+  final Color color;
+
+  const _MetricItem({
+    required this.label,
+    required this.value,
+    this.deltaPct,
+    required this.icon,
+    required this.color,
+  });
+}
+
+class _MetricCard extends StatelessWidget {
+  final _MetricItem item;
+
+  const _MetricCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final delta = item.deltaPct;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AT.surface,
+        borderRadius: BorderRadius.circular(AT.rMd),
+        border: Border.all(color: AT.hairline, width: 0.6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(item.icon, size: 13, color: item.color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AT.footnote.copyWith(color: AT.label2),
+                ),
+              ),
+              if (delta != null && delta != 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (delta > 0 ? AT.green : AT.red).withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(AT.rPill),
+                  ),
+                  child: Text(
+                    '${delta > 0 ? '+' : ''}$delta%',
+                    style: AT.micro.copyWith(
+                      color: delta > 0 ? AT.green : AT.red,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          Text(
+            item.value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AT.title2.copyWith(
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

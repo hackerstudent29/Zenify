@@ -560,8 +560,8 @@ class _AlbumScreenState extends State<AlbumScreen> {
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'copy_album_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Link copied',
-        body: '$_displayAlbumTitle • $_displayArtistName',
+        title: 'Copied',
+        body: IslandNotification.artistOrTitle(artist: _displayArtistName, title: _displayAlbumTitle),
         leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
       ),
     );
@@ -569,47 +569,35 @@ class _AlbumScreenState extends State<AlbumScreen> {
 
   void _showMore(bool saved, String cover) {
     HapticFeedback.selectionClick();
-    showCupertinoModalPopup<void>(
+    ZenDropdown.show<void>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(_displayAlbumTitle),
-        message: Text('$_displayArtistName · $_heroMetadataString'),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _toggleSaved(cover);
-            },
-            child: Text(saved ? 'Remove from Library' : 'Add to Library'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _play(0, shuffle: true);
-            },
-            child: const Text('Shuffle Album'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _openArtist();
-            },
-            child: const Text('Go to Artist'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _share();
-            },
-            child: const Text('Share Album'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
+      title: _displayAlbumTitle,
+      subtitle: '$_displayArtistName · $_heroMetadataString',
+      coverUrl: cover,
+      shareText: '$_displayAlbumTitle – $_displayArtistName',
+      shareUrl: 'https://zenify.app/album/${Uri.encodeComponent(_displayAlbumTitle)}',
+      items: [
+        ZenDropdownItem(
+          title: saved ? 'Remove from Library' : 'Add to Library',
+          icon: saved ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.plus_circle,
+          onTap: () => _toggleSaved(cover),
         ),
-      ),
+        ZenDropdownItem(
+          title: 'Shuffle Album',
+          icon: CupertinoIcons.shuffle,
+          onTap: () => _play(0, shuffle: true),
+        ),
+        ZenDropdownItem(
+          title: 'Go to Artist',
+          icon: CupertinoIcons.person_circle,
+          onTap: _openArtist,
+        ),
+        ZenDropdownItem(
+          title: 'Copy Album Link',
+          icon: CupertinoIcons.link,
+          onTap: _share,
+        ),
+      ],
     );
   }
 
