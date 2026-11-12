@@ -12,6 +12,7 @@ import 'services/together_service.dart';
 import 'services/studio_fx_state.dart';
 import 'services/auth_state.dart';
 import 'services/country_service.dart';
+import 'services/user_preferences_service.dart';
 import 'services/listening_history_service.dart';
 import 'services/listening_tracker_service.dart';
 import 'services/room_deep_links.dart';
@@ -19,6 +20,7 @@ import 'services/settings_service.dart';
 import 'services/cache_migration.dart';
 import 'services/library_store.dart';
 import 'services/zenify_audio_handler.dart';
+import 'views/auth/welcome_screen.dart';
 import 'views/shell_screen.dart';
 import 'views/splash/zenify_splash_screen.dart';
 
@@ -26,9 +28,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await runCacheMigration();
   await CountryService.instance.init();
+  await UserPreferencesService.instance.init();
   await ListeningHistoryService.instance.init();
   await SettingsState.instance.initialize();
   await ListeningTrackerService.instance.initialize();
+  final authState = AuthState();
+  await authState.ensureLoaded();
   CatalogDataSource.initialize(); // non-blocking background initialization
 
   final playerState = PlayerState();
@@ -82,6 +87,7 @@ void main() async {
         playerState: playerState,
         studioFxState: studioFxState,
         queueState: queueState,
+        authState: authState,
       ),
     ),
   );
@@ -93,11 +99,13 @@ class ZenifyMobileApp extends StatelessWidget {
     this.playerState,
     this.studioFxState,
     this.queueState,
+    this.authState,
   });
 
   final PlayerState? playerState;
   final StudioFxState? studioFxState;
   final QueueState? queueState;
+  final AuthState? authState;
 
   static final ThemeData _theme = zenDarkTheme();
 
@@ -106,6 +114,7 @@ class ZenifyMobileApp extends StatelessWidget {
     final fx = studioFxState ?? StudioFxState();
     final player = playerState ?? (PlayerState()..attachStudioFx(fx));
     final queue = queueState ?? QueueState();
+    final auth = authState ?? AuthState();
     queue.autoplayProvider ??= (seed, excludeIds, excludeSignatures) =>
         SmartQueueEngine.fetchAndRank(
           seed: seed,
@@ -123,7 +132,7 @@ class ZenifyMobileApp extends StatelessWidget {
         ChangeNotifierProvider<PlayerState>.value(value: player),
         ChangeNotifierProvider<QueueState>.value(value: queue),
         ChangeNotifierProvider<TogetherService>.value(value: together),
-        ChangeNotifierProvider(create: (_) => AuthState()),
+        ChangeNotifierProvider<AuthState>.value(value: auth),
         ChangeNotifierProvider<SettingsState>.value(value: SettingsState.instance),
         ChangeNotifierProvider<IslandNotifier>.value(value: IslandNotifier.instance),
       ],
@@ -149,7 +158,8 @@ class ZenifyMobileApp extends StatelessWidget {
 }
 
 /// Orchestrated luxury launch entrance: Zenify 6-letter luxury entrance animation
-/// runs first, then fluidly cross-fades into the main app shell with a smooth spring.
+/// runs first, then shows the Sign-In / Guest gate on launch (or every 3 days for
+/// guests, never for signed-in accounts), and fluidly enters the main app shell.
 class _AppEntrance extends StatefulWidget {
   const _AppEntrance({required this.child});
   final Widget child;
@@ -160,18 +170,46 @@ class _AppEntrance extends StatefulWidget {
 
 class _AppEntranceState extends State<_AppEntrance> {
   bool _splashDone = false;
+  bool _showWelcomeGate = false;
+
+  Future<void> _onSplashFinished() async {
+    final auth = context.read<AuthState>();
+    await auth.ensureLoaded();
+    if (!mounted) return;
+    setState(() {
+      _splashDone = true;
+      _showWelcomeGate = auth.shouldShowSignInPromptOnLaunch;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     if (!_splashDone) {
       return ZenifySplashScreen(
-        onFinished: () {
-          if (mounted) setState(() => _splashDone = true);
-        },
+        onFinished: _onSplashFinished,
+      );
+    }
+
+    if (_showWelcomeGate) {
+      return TweenAnimationBuilder<double>(
+        key: const ValueKey('welcome_gate'),
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 520),
+        curve: Curves.easeOutCubic,
+        builder: (context, t, child) => Opacity(
+          opacity: t.clamp(0.0, 1.0),
+          child: child,
+        ),
+        child: WelcomeScreen(
+          onFinished: () {
+            if (mounted) setState(() => _showWelcomeGate = false);
+          },
+        ),
       );
     }
 
     return TweenAnimationBuilder<double>(
+      key: const ValueKey('app_shell'),
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 650),
       curve: Curves.easeOutCubic,

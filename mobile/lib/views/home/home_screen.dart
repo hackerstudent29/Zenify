@@ -28,6 +28,7 @@ import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../services/country_service.dart';
 import '../../services/listening_history_service.dart';
 import '../../services/innertube_service.dart';
+import '../../services/user_preferences_service.dart';
 import '../../services/update_service.dart';
 import '../../utils/media_normalizer.dart';
 
@@ -569,9 +570,11 @@ class _SongRow extends StatelessWidget {
                       final resolvedArtists = track is Track ? track.resolvedArtists : ArtistRef.splitFromName(track.artist as String?);
                       ZenDropdown.showTrackMenu(
                         context: context,
+                        track: track is Track ? track : null,
                         trackTitle: track.title,
                         artistName: track.artist,
                         albumName: track.album,
+                        coverUrl: track.coverUrl,
                         onPlayNext: () => p.playNext(track),
                         onPlayLater: () => p.playLast(track),
                         onGoToArtist: () {
@@ -950,6 +953,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     CountryService.instance.countryNotifier.addListener(_onCountryChanged);
+    UserPreferencesService.instance.prefsNotifier.addListener(_onCountryChanged);
     ListeningHistoryService.instance.historyNotifier.addListener(_onHistoryChanged);
     _loadAllHomeData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -972,13 +976,20 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadAllHomeData(refresh: true);
   }
 
+  String get _effectivePrimaryLanguage {
+    final hist = ListeningHistoryService.instance.primaryLanguage;
+    if (hist.isNotEmpty) return hist;
+    return UserPreferencesService.instance.current?.primaryLanguage ?? '';
+  }
+
   void _onHistoryChanged() {
     if (mounted) {
       setState(() {
+        final onboard = UserPreferencesService.instance.current;
         _recentHistory = ListeningHistoryService.instance.getRecentTracks();
         _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
-        final fav = ListeningHistoryService.instance.getFavoriteArtist();
-        final secondFav = ListeningHistoryService.instance.getSecondFavoriteArtist();
+        final fav = ListeningHistoryService.instance.getFavoriteArtist() ?? onboard?.primaryArtist;
+        final secondFav = ListeningHistoryService.instance.getSecondFavoriteArtist() ?? onboard?.secondaryArtist;
         if (fav != _favoriteArtist) {
           _favoriteArtist = fav;
           if (fav != null) _loadFavoriteArtistTracks(fav);
@@ -994,6 +1005,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     CountryService.instance.countryNotifier.removeListener(_onCountryChanged);
+    UserPreferencesService.instance.prefsNotifier.removeListener(_onCountryChanged);
     ListeningHistoryService.instance.historyNotifier.removeListener(_onHistoryChanged);
     super.dispose();
   }
@@ -1005,12 +1017,13 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final country = CountryService.instance.currentCountry;
 
-      // 1. Load User Listening Telemetry
+      // 1. Load User Listening Telemetry (with saved onboarding tastes as Day-1 seed)
+      final onboard = UserPreferencesService.instance.current;
       _recentHistory = ListeningHistoryService.instance.getRecentTracks();
       _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
-      _favoriteArtist = ListeningHistoryService.instance.getFavoriteArtist();
-      _secondFavoriteArtist = ListeningHistoryService.instance.getSecondFavoriteArtist();
-      final userLang = ListeningHistoryService.instance.primaryLanguage;
+      _favoriteArtist = ListeningHistoryService.instance.getFavoriteArtist() ?? onboard?.primaryArtist;
+      _secondFavoriteArtist = ListeningHistoryService.instance.getSecondFavoriteArtist() ?? onboard?.secondaryArtist;
+      final userLang = _effectivePrimaryLanguage;
 
       // 2. Time-of-Day Context & Greeting
       final timeCtx = ListeningHistoryService.getTimeOfDayContext(userLang);
@@ -1145,7 +1158,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     final mood = _moods[index];
-    final userLang = ListeningHistoryService.instance.primaryLanguage;
+    final userLang = _effectivePrimaryLanguage;
     final country = CountryService.instance.currentCountry;
     final langPrefix = userLang.isNotEmpty ? '$userLang ' : '${country.name} ';
     final query = '$langPrefix$mood hits';
@@ -1166,7 +1179,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _playMix(String mixType) {
     HapticFeedback.mediumImpact();
-    final userLang = ListeningHistoryService.instance.primaryLanguage;
+    final userLang = _effectivePrimaryLanguage;
     final country = CountryService.instance.currentCountry;
     final langPrefix = userLang.isNotEmpty ? '$userLang ' : '${country.name} ';
 
@@ -1606,8 +1619,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           _SecHeader(
                             title: 'New releases',
-                            overline: ListeningHistoryService.instance.primaryLanguage.isNotEmpty
-                                ? 'Fresh drops in ${ListeningHistoryService.instance.primaryLanguage.toUpperCase()}'
+                            overline: _effectivePrimaryLanguage.isNotEmpty
+                                ? 'Fresh drops in ${_effectivePrimaryLanguage.toUpperCase()}'
                                 : 'Just dropped',
                             onMore: () {},
                           ),
@@ -1723,7 +1736,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               onTap: () {
                                 HapticFeedback.selectionClick();
                                 final genre = _genres[i].name;
-                                final userLang = ListeningHistoryService.instance.primaryLanguage;
+                                final userLang = _effectivePrimaryLanguage;
                                 final q = userLang.isNotEmpty ? '$userLang $genre hits' : '$genre hits';
                                 InnerTubeService.instance.search(q).then((tracks) {
                                   if (tracks.isNotEmpty) play(tracks, 0);
@@ -1752,7 +1765,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     showBack: false,
                     isDockPage: true,
                     showProfile: true,
-                    topPadding: top + 4,
                   ),
                 ),
               ],

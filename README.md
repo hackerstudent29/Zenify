@@ -59,10 +59,10 @@ Install the native **Zenify Android application** directly to your smartphone or
 <div align="center">
   <br />
   <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk">
-    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.9)-33.2_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download Zenify APK Package" height="46" />
+    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.9)-13.7_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download Zenify APK Package" height="46" />
   </a>
   <br />
-  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk">zenify-v1.0.9.apk (ARM64 33.2 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk">Universal APK (75.6 MB)</a> • <a href="https://listenzenify.vercel.app/download">Web Direct & QR</a></i></p>
+  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk">zenify-v1.0.9.apk (ARM64 13.7 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk">Universal APK (30.6 MB)</a> • <a href="https://listenzenify.vercel.app/download">Web Direct & QR</a></i></p>
   <br />
   <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fhackerstudent29%2FZenify%2Freleases%2Fdownload%2Fv1.0.9%2Fzenify-v1.0.9.apk&format=svg&color=ffffff&bgcolor=121214" alt="Scan QR Code to Download Zenify APK" width="180" />
   <p><b>Scan with your phone's camera to download directly</b></p>
@@ -81,9 +81,9 @@ Install the native **Zenify Android application** directly to your smartphone or
 |---|---|
 | **Application ID** | `com.zenify.mobile` |
 | **Release Version** | `v1.0.9` (Android `versionCode`: `13`, Min SDK: Android 8.0 / API 26) |
-| **ARM64 Split APK (`zenify-v1.0.9.apk`)** | `33.2 MB` (`34,861,190` bytes) — SHA-256: `E0B2DFE50F934BB6E20B639F35F68D4579503D980BAF1801BE481F386E1B20BC` |
-| **Universal APK (`zenify-v1.0.9-universal.apk`)** | `75.6 MB` (`79,261,404` bytes) — SHA-256: `3AD8A6A39C757F05661D58A79683B7A70C110BE3C2896744BBE728A0486BF825` |
-| **Included Highlights** | YouTube video streaming in MiniPlayer & Fullscreen Player, redesigned Explore & Search layouts, fixed Artist/Album verified badge placement & round action buttons, compact Dynamic Island notification pill without nav overlap, single-song Smart Queue isolation on search tap, and reliable background/auto-next playback with real-time lock-screen & miniplayer sync |
+| **ARM64 Split APK (`zenify-v1.0.9.apk`)** | `13.7 MB` (`14,373,365` bytes) — SHA-256: `1FB85A84F66C301F3ED0121D1158DA647C1EB65420DDE6474B37A394192F0F5D` |
+| **Universal APK (`zenify-v1.0.9-universal.apk`)** | `30.6 MB` (`32,133,871` bytes) — SHA-256: `F0A77CB5712BDB5B89BA9E7CD4110242245A2180D24C5608411A4D674EDC4CE9` |
+| **Included Highlights** | YouTube H.264 video streaming in MiniPlayer & Fullscreen Player, reliable start-of-track playback & scrubbing (`SimpleCache` `itag` keying, cache eviction & backend fallback fix), sheet/page miniplayer & dock isolation (`Profile`, `Room Together`, modal sheets), dead-centered Dynamic Island headers across dock pages, collapsed scroll MiniPlayer & Search dock de-overlap, Explore & Search redesigns, Artist/Album verified badge & round button fixes, and single-song Smart Queue isolation |
 
 ---
 
@@ -165,7 +165,7 @@ Install the native **Zenify Android application** directly to your smartphone or
 ## 📲 How to Install Across Devices
 
 ### 🤖 Android (Native APK)
-1. Download **[Zenify APK v1.0.9 (33.2 MB ARM64)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk)** (or **[Universal 75.6 MB](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk)**).
+1. Download **[Zenify APK v1.0.9 (13.7 MB ARM64)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk)** (or **[Universal 30.6 MB](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk)**).
 2. Tap the downloaded file in your notification bar or **Downloads** folder.
 3. Enable **Allow from this source** in Settings if prompted.
 4. Tap **Install** and enjoy ad-free music streaming!
@@ -188,7 +188,7 @@ Install the native **Zenify Android application** directly to your smartphone or
 Start listening immediately — **no sign-up, credit card, or subscription required**.
 
 * **Live Web Player**: Open **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in any modern web browser.
-* **Download APK**: Direct download **[Zenify APK v1.0.9 (33.2 MB ARM64)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk)** • **[Universal APK (75.6 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk)**.
+* **Download APK**: Direct download **[Zenify APK v1.0.9 (13.7 MB ARM64)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk)** • **[Universal APK (30.6 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk)**.
 
 ---
 

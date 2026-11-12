@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/auth_state.dart';
+import '../../utils/media_normalizer.dart';
 import '../../views/profile/profile_screen.dart';
 import 'apple_glass.dart';
 import 'monogram_avatar.dart';
@@ -29,6 +30,17 @@ class IslandNotification {
   final String? body;
   final Widget? leading;
   final VoidCallback? onTap;
+
+  /// Picks cleaned artist name when known, otherwise cleaned track title.
+  static String artistOrTitle({String? artist, String? title}) {
+    final a = MediaNormalizer.formatArtists(artist ?? '').trim();
+    if (a.isNotEmpty &&
+        a.toLowerCase() != 'unknown artist' &&
+        a.toLowerCase() != 'unknown') {
+      return a;
+    }
+    return MediaNormalizer.cleanTitle(title ?? '').trim();
+  }
 
   /// Helper to create a consistent 22x22 thumbnail or icon badge.
   static Widget trackThumb(
@@ -69,7 +81,7 @@ class IslandNotification {
 }
 
 /// Global notifier driving the Dynamic Island Header notification queue.
-/// No internal timer: the [_NotifTicker] widget decides when to dismiss.
+/// Coordinates enter/exit animations with [_NotifTicker] & [DynamicIslandHeader].
 class IslandNotifier extends ChangeNotifier {
   static final IslandNotifier instance = IslandNotifier._();
   IslandNotifier._();
@@ -77,63 +89,91 @@ class IslandNotifier extends ChangeNotifier {
 
   final _queue = <IslandNotification>[];
   IslandNotification? _current;
+  bool _isClosing = false;
+  Timer? _closeTimer;
+  Timer? _nextTimer;
 
   IslandNotification? get current => _current;
+  bool get isClosing => _isClosing;
 
   /// Helper for firing an in-app Dynamic Island notification from anywhere.
   static void showNotification(IslandNotification n) => instance.show(n);
 
   void show(IslandNotification n) {
     _queue.add(n);
-    if (_current == null) _next();
+    if (_current == null && !_isClosing) _next();
   }
 
   void _next() {
     if (_queue.isEmpty) return;
+    _isClosing = false;
     _current = _queue.removeAt(0);
     notifyListeners();
   }
 
-  /// [id] guards against double calls (e.g. two headers alive during a route transition).
+  /// Animates the active notification closed (~280ms) before dequeuing the next item.
+  /// [id] guards against double calls when multiple headers are mounted.
   void dismiss({String? id}) {
-    if (_current == null || (id != null && id != _current!.id)) return;
-    _current = null;
+    if (_current == null || _isClosing || (id != null && id != _current!.id)) return;
+    _isClosing = true;
     notifyListeners();
-    Future.delayed(const Duration(milliseconds: 450), () {
-      if (_current == null) _next();
+
+    _closeTimer?.cancel();
+    _nextTimer?.cancel();
+    _closeTimer = Timer(const Duration(milliseconds: 280), () {
+      _isClosing = false;
+      _current = null;
+      notifyListeners();
+      _nextTimer = Timer(const Duration(milliseconds: 120), () {
+        if (_current == null && !_isClosing) _next();
+      });
     });
   }
 }
 
-/// Notification ticker widget: 5s hold if text fits, or 1 seamless full marquee loop if long.
+/// Notification ticker widget:
+/// - Fast ~220ms intro animation for icon + text
+/// - 3s duration for short text, 3–5s with smooth right-to-left scroll for longer text
+/// - Symmetric close transition when [isClosing] becomes true.
 class _NotifTicker extends StatefulWidget {
-  const _NotifTicker({super.key, required this.notif, required this.onDone});
+  const _NotifTicker({
+    super.key,
+    required this.notif,
+    required this.isClosing,
+    required this.onDone,
+  });
+
   final IslandNotification notif;
+  final bool isClosing;
   final VoidCallback onDone;
 
-  static const Duration hold = Duration(seconds: 5);
-  static const double speed = 40.0; // px / second
-  static const double gap = 48.0;
+  static const Duration minHold = Duration(milliseconds: 3000);
+  static const Duration maxHold = Duration(milliseconds: 5000);
+  static const double speed = 55.0; // px / second
 
   @override
   State<_NotifTicker> createState() => _NotifTickerState();
 }
 
-class _NotifTickerState extends State<_NotifTicker> {
+class _NotifTickerState extends State<_NotifTicker> with SingleTickerProviderStateMixin {
   final _ctrl = ScrollController();
-  final _textKey = GlobalKey();
-  bool _loop = false;
+  late final AnimationController _introCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+  );
   bool _dead = false;
 
   @override
   void initState() {
     super.initState();
+    _introCtrl.forward();
     WidgetsBinding.instance.addPostFrameCallback((_) => _run());
   }
 
   @override
   void dispose() {
     _dead = true;
+    _introCtrl.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -141,38 +181,48 @@ class _NotifTickerState extends State<_NotifTicker> {
   bool get _ok => !_dead && mounted && _ctrl.hasClients;
 
   Future<void> _run() async {
-    final sw = Stopwatch()..start();
+    var elapsedMs = 0;
 
-    // let the pill finish growing so we measure the final width
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    // Wait for intro + pill resize to finish before measuring horizontal overflow.
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    elapsedMs += 260;
     if (!_ok) return;
 
-    final overflow = _ctrl.position.maxScrollExtent > 1;
+    final overflow = _ctrl.position.maxScrollExtent;
 
-    if (overflow) {
-      await Future<void>.delayed(const Duration(milliseconds: 700)); // read the start first
+    if (overflow > 2.0) {
+      // Brief pause so user sees the action title first before scrolling.
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+      elapsedMs += 450;
       if (!_ok) return;
 
-      final w = (_textKey.currentContext?.findRenderObject() as RenderBox?)?.size.width ?? 0;
-      if (w > 1) {
-        setState(() => _loop = true); // add the duplicate for a seamless loop
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        if (!_ok) return;
+      // Fit right-to-left scroll cleanly inside the 3s..5s total lifetime budget.
+      final idealScrollMs = (overflow / _NotifTicker.speed * 1000).round();
+      final maxScrollBudgetMs =
+          (_NotifTicker.maxHold.inMilliseconds - elapsedMs - 350).clamp(1200, 3900);
+      final scrollMs = idealScrollMs.clamp(1200, maxScrollBudgetMs);
 
-        final dist = w + _NotifTicker.gap;
-        await _ctrl.animateTo(
-          dist,
-          duration: Duration(milliseconds: (dist / _NotifTicker.speed * 1000).round()),
-          curve: Curves.linear,
-        );
-        if (!_ok) return;
-        _ctrl.jumpTo(0); // identical frame, so the loop is invisible
+      await _ctrl.animateTo(
+        overflow,
+        duration: Duration(milliseconds: scrollMs),
+        curve: Curves.linear,
+      );
+      elapsedMs += scrollMs;
+      if (!_ok) return;
+
+      final postPauseMs =
+          (_NotifTicker.maxHold.inMilliseconds - elapsedMs).clamp(0, 350);
+      if (postPauseMs > 0) {
+        await Future<void>.delayed(Duration(milliseconds: postPauseMs));
+        elapsedMs += postPauseMs;
       }
     }
 
-    // short messages: hold until 5s total. Long messages: already past 5s, so no extra wait
-    final remaining = _NotifTicker.hold - sw.elapsed;
-    if (remaining > Duration.zero) await Future<void>.delayed(remaining);
+    // Ensure minimum 3s display time while capping strictly at 5s.
+    final minRemainingMs = _NotifTicker.minHold.inMilliseconds - elapsedMs;
+    if (minRemainingMs > 0) {
+      await Future<void>.delayed(Duration(milliseconds: minRemainingMs));
+    }
     if (!_dead && mounted) widget.onDone();
   }
 
@@ -191,9 +241,9 @@ class _NotifTickerState extends State<_NotifTicker> {
             letterSpacing: -0.2,
           ),
         ),
-        if (n.body != null)
+        if (n.body != null && n.body!.trim().isNotEmpty)
           TextSpan(
-            text: '  ${n.body}',
+            text: '  ${n.body!.trim()}',
             style: const TextStyle(
               fontFamily: 'SF Pro',
               fontWeight: FontWeight.w500,
@@ -207,36 +257,57 @@ class _NotifTickerState extends State<_NotifTicker> {
       softWrap: false,
     );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (n.leading != null) ...[
-            SizedBox(
-              width: 22,
-              height: 22,
-              child: ClipRRect(borderRadius: BorderRadius.circular(6), child: n.leading),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: ClipRect(
-              child: SingleChildScrollView(
-                controller: _ctrl,
-                scrollDirection: Axis.horizontal,
-                physics: const NeverScrollableScrollPhysics(),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    KeyedSubtree(key: _textKey, child: text),
-                    if (_loop) ...[const SizedBox(width: _NotifTicker.gap), text],
-                  ],
+    return AnimatedOpacity(
+      opacity: widget.isClosing ? 0.0 : 1.0,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInCubic,
+      child: AnimatedScale(
+        scale: widget.isClosing ? 0.88 : 1.0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeInCubic,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (n.leading != null) ...[
+                FadeTransition(
+                  opacity: _introCtrl,
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.65, end: 1.0).animate(
+                      CurvedAnimation(parent: _introCtrl, curve: Curves.easeOutBack),
+                    ),
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: ClipRRect(borderRadius: BorderRadius.circular(6), child: n.leading),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: FadeTransition(
+                  opacity: _introCtrl,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.08, 0),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(parent: _introCtrl, curve: Curves.easeOutCubic)),
+                    child: ClipRect(
+                      child: SingleChildScrollView(
+                        controller: _ctrl,
+                        scrollDirection: Axis.horizontal,
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: text,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -334,12 +405,22 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 
   void _onNotifChanged() {
     if (!mounted) return;
-    final active = IslandNotifier.instance.current;
-    final to = active != null ? 1.0 : 0.0;
+    final notifier = IslandNotifier.instance;
+    final showNotif = notifier.current != null && !notifier.isClosing;
+    final to = showNotif ? 1.0 : 0.0;
     if (MediaQuery.disableAnimationsOf(context)) {
       _n.value = to;
     } else {
-      _n.animateWith(SpringSimulation(_spring, _n.value, to, 0));
+      _n.animateWith(
+        SpringSimulation(
+          showNotif
+              ? const SpringDescription(mass: 1, stiffness: 320, damping: 19)
+              : const SpringDescription(mass: 1, stiffness: 360, damping: 26),
+          _n.value,
+          to,
+          0,
+        ),
+      );
     }
     setState(() {});
   }
@@ -395,14 +476,15 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 
     final double h = widget.height;
     // Symmetrical clearance so the Dynamic Island pill remains dead-center relative to screen
-    // On dock root pages, the full transparent logo is ~86px wide.
+    // On dock root pages, the full transparent logo is ~82px wide.
     // On subpages with back button, left dock is 44px.
-    final double leftDockW = isDock ? 108.0 : (canPop ? h : 0.0);
+    final double leftDockW = isDock ? 96.0 : (canPop ? h : 0.0);
     final double rightDockW = widget.trailing != null
         ? 44.0
         : (widget.showProfile ? h : 0.0);
-    final double leftClearance = leftDockW > 0 ? leftDockW + 10.0 : 8.0;
-    final double rightClearance = rightDockW > 0 ? rightDockW + 10.0 : 8.0;
+    final double leftClearance = leftDockW > 0 ? leftDockW + 8.0 : 8.0;
+    final double rightClearance = rightDockW > 0 ? rightDockW + 8.0 : 8.0;
+    final double symmetricClearance = math.max(leftClearance, rightClearance);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(widget.horizontalMargin, top, widget.horizontalMargin, 0),
@@ -424,10 +506,10 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
             return Stack(
               alignment: Alignment.center,
               children: [
-                // Center Island Pill: strictly bounded inside the open gap between left & right docks
+                // Center Island Pill: strictly bounded symmetrically so it sits dead-center on every page
                 Positioned.fill(
                   child: Padding(
-                    padding: EdgeInsets.only(left: leftClearance, right: rightClearance),
+                    padding: EdgeInsets.symmetric(horizontal: symmetricClearance),
                     child: Center(
                       child: AnimatedOpacity(
                         opacity: hasContent ? 1 : 0,
@@ -581,25 +663,51 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 
   Widget _buildCenterIsland(BuildContext context) {
     final h = widget.height;
-    final active = IslandNotifier.instance.current;
+    final notifier = IslandNotifier.instance;
+    final active = notifier.current;
+    final closing = notifier.isClosing;
+    final nVal = _n.value.clamp(0.0, 1.0);
+    // Subtle spring expansion + rose tint pulse when notification is active
+    final pillScale = active != null ? (0.92 + 0.08 * nVal) : 1.0;
 
-    return AppleGlass(
-      borderRadius: BorderRadius.circular(h / 2),
-      tint: const Color(0x30121216),
-      child: Container(
-        height: h,
-        padding: active != null
-            ? const EdgeInsets.symmetric(horizontal: 4)
-            : const EdgeInsets.symmetric(horizontal: 14),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          child: active != null
-              ? _NotifTicker(
-                  key: ValueKey(active.id),
-                  notif: active,
-                  onDone: () => IslandNotifier.instance.dismiss(id: active.id),
+    return Transform.scale(
+      scale: pillScale,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(h / 2),
+          border: nVal > 0.02
+              ? Border.all(
+                  color: const Color(0xFFE11D48).withValues(alpha: 0.34 * nVal),
+                  width: 0.8,
                 )
-              : _titleContent(),
+              : null,
+        ),
+        child: AppleGlass(
+          borderRadius: BorderRadius.circular(h / 2),
+          tint: Color.lerp(const Color(0x30121216), const Color(0x4D1E0A12), nVal)!,
+          child: Container(
+            height: h,
+            padding: active != null
+                ? const EdgeInsets.symmetric(horizontal: 4)
+                : const EdgeInsets.symmetric(horizontal: 14),
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: active != null
+                    ? _NotifTicker(
+                        key: ValueKey(active.id),
+                        notif: active,
+                        isClosing: closing,
+                        onDone: () => IslandNotifier.instance.dismiss(id: active.id),
+                      )
+                    : _titleContent(),
+              ),
+            ),
+          ),
         ),
       ),
     );

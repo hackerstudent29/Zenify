@@ -8,6 +8,7 @@ import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/scrubber_slider.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
+import '../../services/dock_visibility.dart';
 import '../../services/player_state.dart';
 import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
@@ -26,20 +27,26 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
   bool _isLiked = false;
 
   void _openStudioFx(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const StudioFxSheet(),
+    DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const StudioFxSheet(),
+      ),
     );
   }
 
   void _openLyrics(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const LyricsSheet(),
+    DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const LyricsSheet(),
+      ),
     );
   }
 

@@ -404,15 +404,16 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
           return AnimatedBuilder(
             animation: _exp,
             builder: (_, _) {
-              final e = _exp.value.clamp(0.0, 1.0);
+              final rawE = _exp.value.clamp(0.0, 1.0);
+              final effE = rawE * dp;
               final normalPillW = ui.lerpDouble(h, fullPill, dp)!;
-              final pillW = ui.lerpDouble(normalPillW, h, e)!;
-              final searchW = e > 0.01 ? (total - gap - pillW) : h;
+              final pillW = ui.lerpDouble(normalPillW, h, effE)!;
+              final searchW = effE > 0.01 ? (total - gap - pillW) : h;
               return Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  SizedBox(width: pillW, height: h, child: _pill(h, fullPill, e, dp)),
-                  SizedBox(width: searchW, height: h, child: _search(h, e, dp)),
+                  SizedBox(width: pillW, height: h, child: _pill(h, fullPill, effE, rawE, dp)),
+                  SizedBox(width: searchW, height: h, child: _search(h, effE, dp)),
                 ],
               );
             },
@@ -422,7 +423,7 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
     );
   }
 
-  Widget _pill(double h, double fullW, double e, double dp) {
+  Widget _pill(double h, double fullW, double e, double rawE, double dp) {
     // Round-shaped edges at all times: perfect circle when collapsed (54x54), perfect stadium pill when expanded
     final radius = h / 2;
     return AppleGlass(
@@ -430,11 +431,11 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
       child: Stack(
         children: [
           // normal tabs: keep their full width (no squishing) and smoothly fade out
-          if (dp > 0.05)
+          if (dp > 0.05 && rawE < 0.95)
             IgnorePointer(
-              ignoring: e > 0.02 || dp < 0.6,
+              ignoring: rawE > 0.02 || dp < 0.6,
               child: Opacity(
-                opacity: (dp * (1 - e * 1.8)).clamp(0.0, 1.0),
+                opacity: (dp * (1 - rawE * 1.8)).clamp(0.0, 1.0),
                 child: OverflowBox(
                   alignment: Alignment.centerLeft,
                   minWidth: fullW,
@@ -444,10 +445,10 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
               ),
             ),
           // collapsed left dock button: restores the resting navbar dock & miniplayer
-          if (dp < 0.95 && e < 0.02)
+          if (dp < 0.95)
             Positioned.fill(
               child: Opacity(
-                opacity: ((1.0 - dp * 1.8)).clamp(0.0, 1.0),
+                opacity: ((1.0 - dp * 1.8) * (1.0 - e * 1.2)).clamp(0.0, 1.0),
                 child: IgnorePointer(
                   ignoring: dp >= 0.6,
                   child: PressableScale(
@@ -466,21 +467,24 @@ class _AppleDockState extends State<AppleDock> with TickerProviderStateMixin {
                 ),
               ),
             ),
-          // back button fades in as the pill becomes a circle
+          // back button fades in when search expands and hides cleanly as dock collapses on scroll
           if (e > 0.02)
             Positioned.fill(
-              child: Opacity(
-                opacity: ((e - 0.45) / 0.55).clamp(0.0, 1.0),
-                child: PressableScale(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    widget.onBack?.call();
-                  },
-                  child: const Center(
-                    child: Icon(
-                      CupertinoIcons.chevron_back,
-                      size: 24,
-                      color: Colors.white,
+              child: IgnorePointer(
+                ignoring: dp < 0.6 || e < 0.5,
+                child: Opacity(
+                  opacity: (((e - 0.45) / 0.55) * dp).clamp(0.0, 1.0),
+                  child: PressableScale(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      widget.onBack?.call();
+                    },
+                    child: const Center(
+                      child: Icon(
+                        CupertinoIcons.chevron_back,
+                        size: 24,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),

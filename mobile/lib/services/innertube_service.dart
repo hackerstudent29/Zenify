@@ -824,6 +824,100 @@ class InnerTubeService {
     }
   }
 
+  /// Searches YouTube Music specifically for artist profiles (name + browseId + avatar).
+  /// Uses native Android FILTER_ARTIST channel when available, with WEB_REMIX fallback.
+  Future<List<({String id, String name, String image})>> searchArtists(
+    String query, {
+    int limit = 12,
+  }) async {
+    final q = query.trim();
+    if (q.isEmpty) return const [];
+
+    final out = <({String id, String name, String image})>[];
+    final seenNames = <String>{};
+
+    if (_useNative) {
+      try {
+        final raw = await _nativeChannel
+            .invokeMethod<List<dynamic>>('searchArtists', {'query': q});
+        if (raw != null && raw.isNotEmpty) {
+          for (final item in raw) {
+            if (item is! Map) continue;
+            final name = MediaNormalizer.cleanTitle(item['title'] as String?);
+            final id = (item['id'] as String?) ?? name;
+            final thumb = item['thumbnail'] as String?;
+            if (name.isEmpty || !seenNames.add(name.toLowerCase())) continue;
+            out.add((
+              id: id,
+              name: name,
+              image: thumb != null && thumb.isNotEmpty
+                  ? MediaNormalizer.upgradeArtworkUrl(thumb, isArtistAvatar: true)
+                  : '',
+            ));
+            if (out.length >= limit) return out;
+          }
+          if (out.isNotEmpty) return out;
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[InnerTube] Native searchArtists error: $e');
+      }
+    }
+
+    try {
+      final res = await post(
+        'search',
+        {
+          'query': q,
+          'params': 'EgWKAQIgAWoKEAUQAxAEEAkQEQ%3D%3D',
+        },
+        ttl: _tArtistCard,
+      );
+      final sections = res['contents']?['tabbedSearchResultsRenderer']
+              ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
+              ?['contents'] ??
+          res['contents']?['sectionListRenderer']?['contents'];
+
+      if (sections is List) {
+        for (final sec in sections) {
+          if (sec is! Map) continue;
+          final items = <dynamic>[
+            ...?sec['musicShelfRenderer']?['contents'] as List?,
+            ...?sec['itemSectionRenderer']?['contents'] as List?,
+          ];
+          for (final item in items) {
+            if (item is! Map) continue;
+            final r = item['musicResponsiveListItemRenderer'];
+            if (r is! Map) continue;
+            final flexCols = r['flexColumns'] as List?;
+            final titleCol = flexCols?.firstWhere(
+              (c) => c is Map && c['musicResponsiveListItemFlexColumnRenderer'] != null,
+              orElse: () => null,
+            );
+            final titleRuns = titleCol?['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
+            final name = titleRuns?.isNotEmpty == true
+                ? MediaNormalizer.cleanTitle(titleRuns![0]['text'] as String?)
+                : '';
+            final browseId = r['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+            final thumbs = r['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails'] as List?;
+            final rawThumb = thumbs?.isNotEmpty == true ? thumbs!.last['url'] as String? : null;
+            if (name.isEmpty || !seenNames.add(name.toLowerCase())) continue;
+            out.add((
+              id: (browseId != null && browseId.isNotEmpty) ? browseId : name,
+              name: name,
+              image: rawThumb != null && rawThumb.isNotEmpty
+                  ? MediaNormalizer.upgradeArtworkUrl(rawThumb, isArtistAvatar: true)
+                  : '',
+            ));
+            if (out.length >= limit) return out;
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] searchArtists fallback error: $e');
+    }
+    return out;
+  }
+
   Map<String, dynamic>? _twoRowCard(dynamic item) {
     final row = item['musicTwoRowItemRenderer'];
     if (row == null) return null;

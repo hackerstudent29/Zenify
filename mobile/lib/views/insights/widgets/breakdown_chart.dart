@@ -1,86 +1,89 @@
-import 'package:flutter/material.dart';
-
-import '../../../design_system/tokens/app_colors.dart';
+import 'package:flutter/cupertino.dart';
+import '../../../design_system/apple/apple_tokens.dart';
 
 class BreakdownChart extends StatelessWidget {
+  final List<dynamic> genres;
+  final List<dynamic> languages;
+
   const BreakdownChart({
     super.key,
     required this.genres,
     required this.languages,
   });
 
-  final List<dynamic> genres;
-  final List<dynamic> languages;
-
   @override
   Widget build(BuildContext context) {
     if (genres.isEmpty && languages.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'GENRES & TASTES',
-            style: const TextStyle(
-              fontFamily: 'SF Pro',
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: Colors.white,
+          Padding(
+            padding: const EdgeInsets.only(left: 14, bottom: 8),
+            child: Text(
+              'GENRES & LANGUAGES',
+              style: AT.caption.copyWith(
+                color: AT.label2,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.6,
+              ),
             ),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final g in genres)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF27272A),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                  ),
-                  child: Text(
-                    '${g['genre']} (${g['count']})',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AT.surface,
+              borderRadius: BorderRadius.circular(AT.rMd),
+              border: Border.all(color: AT.hairline, width: 0.6),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final g in genres)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AT.surfaceHi,
+                      borderRadius: BorderRadius.circular(AT.rPill),
+                    ),
+                    child: Text(
+                      '${g['genre']} · ${g['count']}',
+                      style: AT.footnote.copyWith(
+                        color: AT.label,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-              for (final l in languages)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.crimson.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.crimson.withValues(alpha: 0.25)),
-                  ),
-                  child: Text(
-                    '${l['language'].toString().toUpperCase()} (${l['count']})',
-                    style: const TextStyle(
-                      color: AppColors.crimson,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                for (final l in languages)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AT.accent.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(AT.rPill),
+                    ),
+                    child: Text(
+                      '${l['language'].toString().toUpperCase()} · ${l['count']}',
+                      style: AT.footnote.copyWith(
+                        color: AT.accent,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 }
-

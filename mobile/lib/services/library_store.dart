@@ -324,14 +324,15 @@ class LibraryStore extends ChangeNotifier {
   void toggleLike(Track t) {
     final k = _key(t);
     _seen[k] = t;
+    final target = IslandNotification.artistOrTitle(artist: t.artist, title: t.title);
     final isAdd = !_liked.remove(k);
     if (isAdd) {
       _liked.insert(0, k);
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'like_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Added to Liked Songs',
-          body: '${t.title} • ${t.artist}',
+          title: 'Liked',
+          body: target,
           leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: Icons.favorite_rounded, iconColor: const Color(0xFFE11D48)),
         ),
       );
@@ -339,8 +340,8 @@ class LibraryStore extends ChangeNotifier {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'unlike_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Removed from Liked Songs',
-          body: '${t.title} • ${t.artist}',
+          title: 'Unliked',
+          body: target,
           leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: Icons.favorite_border_rounded, iconColor: Colors.white70),
         ),
       );
@@ -363,8 +364,8 @@ class LibraryStore extends ChangeNotifier {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'unfollow_${clean}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Unfollowed $clean',
-          body: 'Removed from followed artists',
+          title: 'Unfollowed',
+          body: clean,
           leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.person_crop_circle, iconColor: Colors.white70),
         ),
       );
@@ -373,8 +374,8 @@ class LibraryStore extends ChangeNotifier {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'follow_${clean}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Following $clean',
-          body: 'Added to followed artists',
+          title: 'Following',
+          body: clean,
           leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.person_crop_circle_badge_checkmark, iconColor: const Color(0xFFE11D48)),
         ),
       );
@@ -391,6 +392,7 @@ class LibraryStore extends ChangeNotifier {
     final cTitle = title.trim();
     final cArtist = artist.trim();
     if (cTitle.isEmpty) return;
+    final target = IslandNotification.artistOrTitle(artist: cArtist, title: cTitle);
     final i = _albums.indexWhere(
       (a) => a.title.toLowerCase() == cTitle.toLowerCase() && a.artist.toLowerCase() == cArtist.toLowerCase(),
     );
@@ -399,8 +401,8 @@ class LibraryStore extends ChangeNotifier {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'album_rm_${cTitle}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Album removed from library',
-          body: '$cTitle • $cArtist',
+          title: 'Removed',
+          body: target,
           leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.music_albums, iconColor: Colors.white70),
         ),
       );
@@ -409,8 +411,8 @@ class LibraryStore extends ChangeNotifier {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'album_add_${cTitle}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Album added to library',
-          body: '$cTitle • $cArtist',
+          title: 'Saved',
+          body: target,
           leading: IslandNotification.trackThumb(cover, fallbackIcon: CupertinoIcons.music_albums, iconColor: const Color(0xFFE11D48)),
         ),
       );
@@ -445,7 +447,7 @@ class LibraryStore extends ChangeNotifier {
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_create_${p.id}',
-        title: 'Playlist created',
+        title: 'Created',
         body: p.name,
         leading: const Icon(CupertinoIcons.text_badge_plus, color: Color(0xFFE11D48), size: 18),
       ),
@@ -461,7 +463,7 @@ class LibraryStore extends ChangeNotifier {
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_rename_$id',
-        title: 'Playlist renamed',
+        title: 'Renamed',
         body: p.name,
         leading: const Icon(CupertinoIcons.pencil, color: Color(0xFFE11D48), size: 18),
       ),
@@ -476,7 +478,7 @@ class LibraryStore extends ChangeNotifier {
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_del_$id',
-        title: 'Playlist deleted',
+        title: 'Deleted',
         body: name,
         leading: const Icon(CupertinoIcons.trash, color: Colors.white70, size: 18),
       ),
@@ -489,12 +491,13 @@ class LibraryStore extends ChangeNotifier {
     if (p == null) return false;
     final k = _key(t);
     _seen[k] = t;
+    final target = IslandNotification.artistOrTitle(artist: t.artist, title: t.title);
     if (p.trackIds.contains(k)) {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'playlist_exists_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Already in playlist',
-          body: '${t.title} is already in ${p.name}',
+          title: 'In ${p.name}',
+          body: target,
           leading: const Icon(CupertinoIcons.info_circle, color: Color(0xFFFFCC00), size: 18),
         ),
       );
@@ -505,8 +508,8 @@ class LibraryStore extends ChangeNotifier {
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_add_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Added to ${p.name}',
-        body: '${t.title} • ${t.artist}',
+        title: 'Added',
+        body: target,
         leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: CupertinoIcons.music_note_list, iconColor: const Color(0xFFE11D48)),
       ),
     );
@@ -521,8 +524,8 @@ class LibraryStore extends ChangeNotifier {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'playlist_rm_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Removed from ${p.name}',
-          body: '${t.title} • ${t.artist}',
+          title: 'Removed',
+          body: IslandNotification.artistOrTitle(artist: t.artist, title: t.title),
           leading: const Icon(CupertinoIcons.minus_circle, color: Colors.white70, size: 18),
         ),
       );

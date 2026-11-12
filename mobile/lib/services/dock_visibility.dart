@@ -69,6 +69,16 @@ class DockVisibility {
     }
   }
 
+  /// Acquires a dock/miniplayer hide lease for the lifetime of [openModal].
+  static Future<T> runModal<T>(
+    Future<T> Function() openModal, {
+    bool hideNav = true,
+    bool hideMini = true,
+  }) {
+    final token = acquire(hideNav: hideNav, hideMini: hideMini);
+    return openModal().whenComplete(() => release(token));
+  }
+
   static void push({bool hideNav = true, bool hideMini = false, Object? token}) {
     final key = token ?? Object();
     if (token == null) {

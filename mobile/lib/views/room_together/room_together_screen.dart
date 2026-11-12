@@ -8,12 +8,15 @@ import 'package:provider/provider.dart';
 
 import '../../design_system/apple/apple_kit.dart';
 import '../../design_system/apple/apple_tokens.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../models/room_models.dart';
 import '../../models/track.dart';
+import '../../services/auth_state.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/innertube_service.dart';
 import '../../services/player_state.dart';
 import '../../services/together_service.dart';
+import '../../services/user_preferences_service.dart';
 import '../../models/room_phase2_models.dart';
 import '../../services/room_deep_links.dart';
 import 'achievements/achievements_screen.dart';
@@ -34,12 +37,16 @@ class RoomTogetherScreen extends StatefulWidget {
 }
 
 class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksMixin, SingleTickerProviderStateMixin {
+  @override
+  bool get hideMiniPlayerWhileActive => true;
+
   static const _emojis = ['❤️', '🔥', '👏', '😭', '💃', '🎧'];
 
   // Lobby
   String _mode = 'dj';
   final _joinCtrl = TextEditingController();
-  final _nameCtrl = TextEditingController(text: 'Guest Listener');
+  final _nameCtrl = TextEditingController();
+  bool _nameEdited = false;
   bool _busy = false;
 
   // Live
@@ -78,10 +85,36 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
         position: () => _player!.livePosition.inMilliseconds,
       );
       _deepLinks.addListener(_onDeepLink);
+      UserPreferencesService.instance.prefsNotifier.addListener(_syncUsername);
+      _syncUsername();
+      UserPreferencesService.instance.ensureLoaded().then((_) => _syncUsername());
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncUsername();
         _syncLyrics(_together!);
         _onDeepLink();
       });
+    }
+  }
+
+  String _resolveAccountUsername() {
+    if (!mounted) return 'Listener';
+    final authUser = context.read<AuthState>().user;
+    final resolved = UserPreferencesService.resolveDisplayName(
+      accountName: authUser?.name,
+      displayName: authUser?.displayName,
+      username: authUser?.username,
+    );
+    if (resolved != 'Listener') return resolved;
+    final rawUsername = authUser?.username.trim() ?? '';
+    if (rawUsername.isNotEmpty && rawUsername != 'guest') return rawUsername;
+    return 'Listener';
+  }
+
+  void _syncUsername() {
+    if (!mounted || _nameEdited) return;
+    final target = _resolveAccountUsername();
+    if (_nameCtrl.text != target) {
+      _nameCtrl.text = target;
     }
   }
 
@@ -108,6 +141,7 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
   void dispose() {
     _together?.removeListener(_onTogether);
     _deepLinks.removeListener(_onDeepLink);
+    UserPreferencesService.instance.prefsNotifier.removeListener(_syncUsername);
     _lyrics?.dispose();
     _joinCtrl.dispose();
     _nameCtrl.dispose();
@@ -170,11 +204,14 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
 
   String? get _guestName {
     final n = _nameCtrl.text.trim();
-    return n.isEmpty ? null : n;
+    if (n.isNotEmpty) return n;
+    final resolved = _resolveAccountUsername();
+    return resolved.isNotEmpty ? resolved : null;
   }
 
   Future<void> _create(TogetherService t) async {
-    final cfg = await showRoomConfigSheet(context, mode: _mode, hostName: _nameCtrl.text.trim().isEmpty ? 'My' : _nameCtrl.text.trim());
+    final hostName = _nameCtrl.text.trim().isEmpty ? _resolveAccountUsername() : _nameCtrl.text.trim();
+    final cfg = await showRoomConfigSheet(context, mode: _mode, hostName: hostName);
     if (cfg == null || !mounted) return;
     setState(() => _busy = true);
     final ok = await t.createRoom(mode: _mode, guestName: _guestName, config: cfg);
@@ -231,6 +268,7 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
     final c = TextEditingController();
     return showCupertinoDialog<String>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => CupertinoAlertDialog(
         title: const Text('Room password'),
         content: Padding(
@@ -275,12 +313,38 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
     final id = _chatId(m);
     final mine = m.userId == t.myUserId;
     final canMod = t.can(RoomPermission.moderateChat);
-    final choice = await appleActionSheet<String>(context, options: [
-      if (id != null) ('Reply', 'reply', destructive: false),
-      ('Copy', 'copy', destructive: false),
-      if (id != null && mine) ('Edit', 'edit', destructive: false),
-      if (id != null && (mine || canMod)) ('Delete', 'delete', destructive: true),
-    ]);
+    String? choice;
+    await ZenDropdown.show<void>(
+      context: context,
+      title: m.username,
+      subtitle: m.text,
+      items: [
+        if (id != null)
+          ZenDropdownItem(
+            title: 'Reply',
+            icon: CupertinoIcons.reply,
+            onTap: () => choice = 'reply',
+          ),
+        ZenDropdownItem(
+          title: 'Copy',
+          icon: CupertinoIcons.doc_on_doc,
+          onTap: () => choice = 'copy',
+        ),
+        if (id != null && mine)
+          ZenDropdownItem(
+            title: 'Edit',
+            icon: CupertinoIcons.pencil,
+            onTap: () => choice = 'edit',
+          ),
+        if (id != null && (mine || canMod))
+          ZenDropdownItem(
+            title: 'Delete',
+            icon: CupertinoIcons.trash,
+            isDestructive: true,
+            onTap: () => choice = 'delete',
+          ),
+      ],
+    );
     if (!mounted || choice == null) return;
     switch (choice) {
       case 'reply':
@@ -295,6 +359,7 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
         final c = TextEditingController(text: m.text);
         final txt = await showCupertinoDialog<String>(
           context: context,
+          useRootNavigator: true,
           builder: (ctx) => CupertinoAlertDialog(
             title: const Text('Edit message'),
             content: Padding(padding: const EdgeInsets.only(top: 12), child: CupertinoTextField(controller: c, maxLength: 500, autofocus: true)),
@@ -377,7 +442,13 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
               ),
             ),
             const SizedBox(height: 28),
-            _field(controller: _nameCtrl, placeholder: 'Your name', icon: CupertinoIcons.person_fill),
+            _field(
+              controller: _nameCtrl,
+              placeholder: 'Your username',
+              icon: CupertinoIcons.person_fill,
+              capitalization: TextCapitalization.words,
+              onChanged: (v) => _nameEdited = v.trim().isNotEmpty,
+            ),
             const SizedBox(height: 14),
             PillButton(label: 'Create Room', icon: CupertinoIcons.plus, expand: true, loading: _busy, onTap: _busy ? null : () => _create(t)),
             const SizedBox(height: 28),
@@ -413,7 +484,16 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
     ]);
   }
 
-  Widget _field({required TextEditingController controller, required String placeholder, required IconData icon, List<TextInputFormatter>? formatters, TextStyle? textStyle, ValueChanged<String>? onSubmit}) {
+  Widget _field({
+    required TextEditingController controller,
+    required String placeholder,
+    required IconData icon,
+    List<TextInputFormatter>? formatters,
+    TextStyle? textStyle,
+    ValueChanged<String>? onSubmit,
+    ValueChanged<String>? onChanged,
+    TextCapitalization capitalization = TextCapitalization.characters,
+  }) {
     return CupertinoTextField(
       controller: controller,
       placeholder: placeholder,
@@ -421,7 +501,8 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
       style: textStyle ?? AT.callout,
       inputFormatters: formatters,
       onSubmitted: onSubmit,
-      textCapitalization: TextCapitalization.characters,
+      onChanged: onChanged,
+      textCapitalization: capitalization,
       prefix: Padding(padding: const EdgeInsets.only(left: 16), child: Icon(icon, size: 18, color: AT.label2)),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
       decoration: BoxDecoration(color: AT.fill, borderRadius: BorderRadius.circular(AT.rPill)),

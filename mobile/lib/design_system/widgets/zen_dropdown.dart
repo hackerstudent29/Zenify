@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../models/track.dart';
+import '../../services/dock_visibility.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
@@ -46,32 +47,102 @@ class ZenDropdownItem {
 class ZenDropdown {
   ZenDropdown._();
 
-  /// Displays a liquid-glass Apple Music modal bottom sheet.
+  /// Displays a liquid-glass Apple Music modal bottom sheet as Layer 1 above
+  /// the miniplayer and bottom dock.
   static Future<T?> show<T>({
     required BuildContext context,
     String? title,
     String? subtitle,
+    String? coverUrl,
+    bool isCircularCover = false,
+    String? shareText,
+    String? shareUrl,
     Widget? header,
     required List<ZenDropdownItem> items,
   }) {
     HapticFeedback.mediumImpact();
 
-    return showModalBottomSheet<T>(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.50),
-      isScrollControlled: true,
-      enableDrag: true,
-      builder: (ctx) {
-        return _GenericActionSheetContent<T>(
+    return DockVisibility.runModal(
+      () => showModalBottomSheet<T>(
+        context: context,
+        useRootNavigator: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.50),
+        isScrollControlled: true,
+        enableDrag: true,
+        builder: (ctx) {
+          return _GenericActionSheetContent<T>(
+            title: title,
+            subtitle: subtitle,
+            coverUrl: coverUrl,
+            isCircularCover: isCircularCover,
+            shareText: shareText,
+            shareUrl: shareUrl,
+            header: header,
+            items: items,
+          );
+        },
+      ),
+    );
+  }
+
+  /// Displays a unified liquid-glass input bottom sheet (e.g. Create / Rename Playlist).
+  static Future<String?> showInputSheet({
+    required BuildContext context,
+    required String title,
+    String? subtitle,
+    String initialValue = '',
+    String hintText = 'Playlist Name',
+    String confirmLabel = 'Create',
+    IconData icon = CupertinoIcons.music_note_list,
+    int maxLength = 40,
+  }) {
+    HapticFeedback.lightImpact();
+    return DockVisibility.runModal(
+      () => showModalBottomSheet<String>(
+        context: context,
+        useRootNavigator: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.55),
+        isScrollControlled: true,
+        enableDrag: true,
+        builder: (ctx) => _InputBottomSheetContent(
           title: title,
           subtitle: subtitle,
-          header: header,
-          items: items,
-        );
-      },
+          initialValue: initialValue,
+          hintText: hintText,
+          confirmLabel: confirmLabel,
+          icon: icon,
+          maxLength: maxLength,
+        ),
+      ),
     );
+  }
+
+  /// Displays a unified liquid-glass confirmation bottom sheet.
+  static Future<bool> showConfirmSheet({
+    required BuildContext context,
+    required String title,
+    required String message,
+    required String confirmLabel,
+    bool isDestructive = true,
+    IconData icon = CupertinoIcons.trash,
+  }) async {
+    var confirmed = false;
+    await show<void>(
+      context: context,
+      title: title,
+      subtitle: message,
+      items: [
+        ZenDropdownItem(
+          title: confirmLabel,
+          icon: icon,
+          isDestructive: isDestructive,
+          onTap: () => confirmed = true,
+        ),
+      ],
+    );
+    return confirmed;
   }
 
   /// Flagship: Apple Music Contextual Song Action Sheet.
@@ -113,33 +184,39 @@ class ZenDropdown {
     final resolvedCover = (track != null && track.coverUrl.isNotEmpty) ? track.coverUrl : (coverUrl ?? '');
     final resolvedDur = track != null ? track.durationSeconds : (durationSeconds ?? 0);
 
-    return showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.50),
-      isScrollControlled: true,
-      enableDrag: true,
-      builder: (ctx) {
-        return _TrackActionSheetContent(
-          track: track,
-          title: resolvedTitle,
-          artist: resolvedArtist,
-          album: resolvedAlbum,
-          coverUrl: resolvedCover,
-          durationSeconds: resolvedDur,
-          onPlayNext: onPlayNext,
-          onPlayLater: onPlayLater,
-          onAddToPlaylist: onAddToPlaylist,
-          onGoToArtist: onGoToArtist,
-          onGoToAlbum: onGoToAlbum,
-          onStartMix: onStartMix,
-          onReport: onReport,
-          onToggleLike: onToggleLike,
-          initialLiked: isLiked,
-          extraItems: extraItems,
-        );
-      },
+    final callerNav = Navigator.of(context);
+
+    return DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.50),
+        isScrollControlled: true,
+        enableDrag: true,
+        builder: (ctx) {
+          return _TrackActionSheetContent(
+            track: track,
+            callerContext: context,
+            callerNav: callerNav,
+            title: resolvedTitle,
+            artist: resolvedArtist,
+            album: resolvedAlbum,
+            coverUrl: resolvedCover,
+            durationSeconds: resolvedDur,
+            onPlayNext: onPlayNext,
+            onPlayLater: onPlayLater,
+            onAddToPlaylist: onAddToPlaylist,
+            onGoToArtist: onGoToArtist,
+            onGoToAlbum: onGoToAlbum,
+            onStartMix: onStartMix,
+            onReport: onReport,
+            onToggleLike: onToggleLike,
+            initialLiked: isLiked,
+            extraItems: extraItems,
+          );
+        },
+      ),
     );
   }
 
@@ -171,13 +248,14 @@ class ZenDropdown {
     HapticFeedback.lightImpact();
     final store = LibraryStore.instance;
 
-    await showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.50),
-      isScrollControlled: true,
-      builder: (ctx) {
+    await DockVisibility.runModal(
+      () => showModalBottomSheet<void>(
+        context: context,
+        useRootNavigator: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.50),
+        isScrollControlled: true,
+        builder: (ctx) {
         final playlists = store.playlists;
         final safeBottom = MediaQuery.paddingOf(ctx).bottom;
 
@@ -271,76 +349,28 @@ class ZenDropdown {
                           ),
                           onTap: () async {
                             Navigator.pop(ctx);
-                            final controller = TextEditingController();
-                            final name = await showDialog<String>(
+                            final name = await ZenDropdown.showInputSheet(
                               context: context,
-                              builder: (dCtx) => AlertDialog(
-                                backgroundColor: const Color(0xFF1C1C1E),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                                title: const Text(
-                                  'New Playlist',
-                                  style: TextStyle(
-                                    fontFamily: 'SF Pro',
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                content: TextField(
-                                  controller: controller,
-                                  autofocus: true,
-                                  style: const TextStyle(
-                                    fontFamily: 'SF Pro',
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: 'Playlist name',
-                                    hintStyle: TextStyle(
-                                      fontFamily: 'SF Pro',
-                                      color: Colors.white.withValues(alpha: 0.35),
-                                      fontSize: 16,
-                                    ),
-                                    enabledBorder: UnderlineInputBorder(
-                                      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                    ),
-                                    focusedBorder: const UnderlineInputBorder(
-                                      borderSide: BorderSide(color: Zen.rose),
-                                    ),
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(dCtx),
-                                    child: Text(
-                                      'Cancel',
-                                      style: TextStyle(
-                                        fontFamily: 'SF Pro',
-                                        color: Colors.white.withValues(alpha: 0.65),
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(dCtx, controller.text.trim()),
-                                    child: const Text(
-                                      'Create',
-                                      style: TextStyle(
-                                        fontFamily: 'SF Pro',
-                                        color: Zen.rose,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              title: 'New Playlist',
+                              subtitle: 'Add “${MediaNormalizer.cleanTitle(track.title)}”',
+                              hintText: 'Playlist name',
+                              confirmLabel: 'Create',
                             );
-                            if (name != null && name.isNotEmpty && context.mounted) {
+                            if (name != null && name.isNotEmpty) {
                               store.createPlaylist(name, first: track);
                               HapticFeedback.lightImpact();
+                              IslandNotifier.instance.show(
+                                IslandNotification(
+                                  id: 'pl_create_${DateTime.now().millisecondsSinceEpoch}',
+                                  title: 'Created',
+                                  body: name,
+                                  leading: const Icon(
+                                    CupertinoIcons.music_note_list,
+                                    color: Zen.rose,
+                                    size: 18,
+                                  ),
+                                ),
+                              );
                             }
                           },
                         ),
@@ -395,6 +425,7 @@ class ZenDropdown {
           ),
         );
       },
+      ),
     );
   }
 }
@@ -403,6 +434,8 @@ class ZenDropdown {
 class _TrackActionSheetContent extends StatefulWidget {
   const _TrackActionSheetContent({
     required this.track,
+    required this.callerContext,
+    required this.callerNav,
     required this.title,
     required this.artist,
     required this.album,
@@ -421,6 +454,8 @@ class _TrackActionSheetContent extends StatefulWidget {
   });
 
   final Track? track;
+  final BuildContext callerContext;
+  final NavigatorState callerNav;
   final String title;
   final String artist;
   final String album;
@@ -492,7 +527,22 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
   @override
   Widget build(BuildContext context) {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    final player = context.read<PlayerState>();
+    PlayerState? player;
+    try {
+      player = Provider.of<PlayerState>(context, listen: false);
+    } catch (_) {
+      player = null;
+    }
+
+    final effectiveTrack = widget.track ??
+        Track(
+          id: 'trk_${widget.title.hashCode}_${widget.artist.hashCode}',
+          title: widget.title,
+          artist: widget.artist,
+          album: widget.album,
+          coverUrl: widget.coverUrl,
+          durationSeconds: widget.durationSeconds,
+        );
 
     // Build Action Menu Rows
     final List<ZenDropdownItem> rows = [
@@ -500,15 +550,18 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
       ZenDropdownItem(
         title: 'Play next',
         icon: CupertinoIcons.arrow_turn_right_up,
-        onTap: widget.onPlayNext ??
-            (widget.track != null ? () => player.playNext(widget.track!) : null),
+        onTap: widget.onPlayNext ?? () => player?.playNext(effectiveTrack),
       ),
       // 2. Add to playlist
       ZenDropdownItem(
         title: 'Add to playlist',
         icon: CupertinoIcons.text_badge_plus,
         onTap: widget.onAddToPlaylist ??
-            (widget.track != null ? () => ZenDropdown.showPlaylistPicker(context, widget.track!) : null),
+            () {
+              if (widget.callerContext.mounted) {
+                ZenDropdown.showPlaylistPicker(widget.callerContext, effectiveTrack);
+              }
+            },
       ),
       // 3. Go to artist
       ZenDropdownItem(
@@ -516,24 +569,15 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
         icon: CupertinoIcons.person,
         onTap: widget.onGoToArtist ??
             () {
-              if (widget.track != null) {
-                final resolved = widget.track!.resolvedArtists;
-                if (resolved.length > 1) {
-                  showArtistPopup(context, artists: resolved);
-                } else if (resolved.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    ZenPageRoute(builder: (_) => ArtistScreen(artistName: resolved.first.name)),
-                  );
-                } else {
-                  Navigator.push(
-                    context,
-                    ZenPageRoute(builder: (_) => ArtistScreen(artistName: widget.artist)),
-                  );
-                }
+              final resolved = effectiveTrack.resolvedArtists;
+              if (resolved.length > 1 && widget.callerContext.mounted) {
+                showArtistPopup(widget.callerContext, artists: resolved);
+              } else if (resolved.isNotEmpty) {
+                widget.callerNav.push(
+                  ZenPageRoute(builder: (_) => ArtistScreen(artistName: resolved.first.name)),
+                );
               } else {
-                Navigator.push(
-                  context,
+                widget.callerNav.push(
                   ZenPageRoute(builder: (_) => ArtistScreen(artistName: widget.artist)),
                 );
               }
@@ -546,8 +590,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
           icon: CupertinoIcons.music_albums,
           onTap: widget.onGoToAlbum ??
               () {
-                Navigator.push(
-                  context,
+                widget.callerNav.push(
                   ZenPageRoute(
                     builder: (_) => AlbumScreen(
                       albumTitle: widget.album,
@@ -564,22 +607,22 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
         icon: CupertinoIcons.antenna_radiowaves_left_right,
         onTap: widget.onStartMix ??
             () {
+              player?.playMedia(effectiveTrack);
               if (widget.track != null) {
-                player.playMedia(widget.track!);
                 InnerTubeService.instance.getNextQueue(widget.track!.id).then((nextTracks) {
                   for (final next in nextTracks) {
-                    player.playLast(next);
+                    player?.playLast(next);
                   }
                 });
-                IslandNotifier.instance.show(
-                  IslandNotification(
-                    id: 'mix_${widget.track!.id}',
-                    title: 'Mix started',
-                    body: widget.title,
-                    leading: const Icon(CupertinoIcons.antenna_radiowaves_left_right, color: Color(0xFFE11D48), size: 18),
-                  ),
-                );
               }
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'mix_${effectiveTrack.id}',
+                  title: 'Mix',
+                  body: IslandNotification.artistOrTitle(artist: widget.artist, title: widget.title),
+                  leading: const Icon(CupertinoIcons.antenna_radiowaves_left_right, color: Color(0xFFE11D48), size: 18),
+                ),
+              );
             },
       ),
       // 6. Report
@@ -591,8 +634,8 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
               IslandNotifier.instance.show(
                 IslandNotification(
                   id: 'report_${widget.title.hashCode}',
-                  title: 'Feedback received',
-                  body: 'Thank you for reporting this track',
+                  title: 'Reported',
+                  body: IslandNotification.artistOrTitle(artist: widget.artist, title: widget.title),
                   leading: const Icon(CupertinoIcons.checkmark_shield_fill, color: Color(0xFFE11D48), size: 18),
                 ),
               );
@@ -745,8 +788,8 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                         IslandNotifier.instance.show(
                           IslandNotification(
                             id: 'copy_link_${DateTime.now().millisecondsSinceEpoch}',
-                            title: 'Link copied',
-                            body: 'Copied to clipboard',
+                            title: 'Copied',
+                            body: IslandNotification.artistOrTitle(artist: widget.artist, title: widget.title),
                             leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
                           ),
                         );
@@ -974,24 +1017,36 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
   const _GenericActionSheetContent({
     this.title,
     this.subtitle,
+    this.coverUrl,
+    this.isCircularCover = false,
+    this.shareText,
+    this.shareUrl,
     this.header,
     required this.items,
   });
 
   final String? title;
   final String? subtitle;
+  final String? coverUrl;
+  final bool isCircularCover;
+  final String? shareText;
+  final String? shareUrl;
   final Widget? header;
   final List<ZenDropdownItem> items;
 
   @override
   Widget build(BuildContext context) {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final hasRichHeader = coverUrl != null || shareUrl != null || shareText != null;
+    final effectiveShareUrl = shareUrl ?? 'https://listenzenify.com';
+    final effectiveShareMsg = shareText ??
+        (title != null ? 'Check out "$title" on Zenify: $effectiveShareUrl' : effectiveShareUrl);
 
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.80,
         ),
         decoration: BoxDecoration(
           color: const Color(0xF21C1C1E),
@@ -1020,7 +1075,7 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                 child: Container(
                   width: 36,
                   height: 4.5,
-                  margin: const EdgeInsets.only(top: 10, bottom: 12),
+                  margin: const EdgeInsets.only(top: 10, bottom: 10),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(2.5),
@@ -1028,10 +1083,129 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                 ),
               ),
 
-              // Optional Header
+              // Header
               if (header != null)
                 header!
-              else if (title != null) ...[
+              else if (hasRichHeader && title != null) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(isCircularCover ? 25 : 12),
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          color: const Color(0xFF2C2C2E),
+                          child: (coverUrl != null && coverUrl!.isNotEmpty)
+                              ? CachedNetworkImage(
+                                  imageUrl: coverUrl!,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, _, _) => MonogramAvatar(
+                                    name: title!,
+                                    size: 50,
+                                  ),
+                                )
+                              : MonogramAvatar(name: title!, size: 50),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro Display',
+                                fontSize: 16.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            if (subtitle != null && subtitle!.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                subtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFFA1A1A6),
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (shareUrl != null || shareText != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _QuickShareBtn(
+                          icon: CupertinoIcons.link,
+                          label: 'Copy Link',
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: effectiveShareMsg));
+                            HapticFeedback.lightImpact();
+                            Navigator.of(context, rootNavigator: true).pop();
+                            IslandNotifier.instance.show(
+                              IslandNotification(
+                                id: 'copy_link_${DateTime.now().millisecondsSinceEpoch}',
+                                title: 'Copied',
+                                body: title ?? subtitle,
+                                leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
+                              ),
+                            );
+                          },
+                        ),
+                        _QuickShareBtn(
+                          icon: CupertinoIcons.paperplane,
+                          label: 'Message',
+                          onTap: () {
+                            Navigator.of(context, rootNavigator: true).pop();
+                            SharePlus.instance.share(ShareParams(text: effectiveShareMsg));
+                          },
+                        ),
+                        _QuickShareBtn(
+                          icon: CupertinoIcons.camera,
+                          label: 'Stories',
+                          gradient: const LinearGradient(
+                            begin: Alignment.bottomLeft,
+                            end: Alignment.topRight,
+                            colors: [Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF)],
+                          ),
+                          onTap: () {
+                            Navigator.of(context, rootNavigator: true).pop();
+                            SharePlus.instance.share(ShareParams(text: effectiveShareMsg));
+                          },
+                        ),
+                        _QuickShareBtn(
+                          icon: CupertinoIcons.share,
+                          label: 'Share',
+                          color: const Color(0xFF1877F2),
+                          onTap: () {
+                            Navigator.of(context, rootNavigator: true).pop();
+                            SharePlus.instance.share(ShareParams(text: effectiveShareMsg));
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                const Divider(height: 0.5, thickness: 0.5, color: Color(0xFF38383A)),
+              ] else if (title != null) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                   child: Column(
@@ -1095,6 +1269,250 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Liquid glass input bottom sheet (used for New Playlist, Rename Playlist, etc.).
+class _InputBottomSheetContent extends StatefulWidget {
+  const _InputBottomSheetContent({
+    required this.title,
+    this.subtitle,
+    required this.initialValue,
+    required this.hintText,
+    required this.confirmLabel,
+    required this.icon,
+    required this.maxLength,
+  });
+
+  final String title;
+  final String? subtitle;
+  final String initialValue;
+  final String hintText;
+  final String confirmLabel;
+  final IconData icon;
+  final int maxLength;
+
+  @override
+  State<_InputBottomSheetContent> createState() => _InputBottomSheetContentState();
+}
+
+class _InputBottomSheetContentState extends State<_InputBottomSheetContent> {
+  late final TextEditingController _ctrl =
+      TextEditingController(text: widget.initialValue);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final trimmed = _ctrl.text.trim();
+    if (trimmed.isEmpty) return;
+    HapticFeedback.lightImpact();
+    Navigator.of(context, rootNavigator: true).pop(trimmed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.viewInsetsOf(context).bottom;
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: viewInsets),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xF21C1C1E),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withValues(alpha: 0.12),
+                width: 0.6,
+              ),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 36,
+                offset: const Offset(0, -6),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 10, 20, math.max(18, safeBottom + 10)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4.5,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(2.5),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Zen.rose.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(widget.icon, color: Zen.rose, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro Display',
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.subtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFFA1A1A6),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      PressableScale(
+                        onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const ShapeDecoration(
+                            shape: CircleBorder(),
+                            color: Color(0x1FFFFFFF),
+                          ),
+                          child: const Icon(Icons.close_rounded, size: 18, color: Colors.white70),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  CupertinoTextField(
+                    controller: _ctrl,
+                    autofocus: true,
+                    maxLength: widget.maxLength,
+                    placeholder: widget.hintText,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _submit(),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    placeholderStyle: TextStyle(
+                      fontFamily: 'SF Pro',
+                      color: Colors.white.withValues(alpha: 0.35),
+                      fontSize: 16,
+                    ),
+                    cursorColor: Zen.rose,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PressableScale(
+                          onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+                          child: Container(
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2C2C2E),
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
+                                color: Colors.white,
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _ctrl,
+                          builder: (_, val, _) {
+                            final canSubmit = val.text.trim().isNotEmpty;
+                            return PressableScale(
+                              onTap: canSubmit ? _submit : null,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 160),
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: canSubmit
+                                      ? Zen.rose
+                                      : Zen.rose.withValues(alpha: 0.35),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  widget.confirmLabel,
+                                  style: TextStyle(
+                                    fontFamily: 'SF Pro',
+                                    color: Colors.white.withValues(alpha: canSubmit ? 1.0 : 0.6),
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

@@ -11,6 +11,7 @@ import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../models/track.dart';
+import '../../services/dock_visibility.dart';
 
 /* ------------------------------------------------------------------ */
 /*  Springs                                                             */
@@ -808,10 +809,12 @@ Future<T?> showSpringSheet<T>(
   required WidgetBuilder builder,
   bool barrierDismissible = true,
 }) {
-  return Navigator.of(context, rootNavigator: true).push<T>(
-    _SpringSheetRoute<T>(
-      builder: builder,
-      barrierDismissible: barrierDismissible,
+  return DockVisibility.runModal(
+    () => Navigator.of(context, rootNavigator: true).push<T>(
+      _SpringSheetRoute<T>(
+        builder: builder,
+        barrierDismissible: barrierDismissible,
+      ),
     ),
   );
 }

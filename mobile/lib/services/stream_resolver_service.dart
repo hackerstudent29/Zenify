@@ -239,23 +239,50 @@ class StreamResolverService {
       if (manifest == null) return null;
 
       final audioList = manifest.audioOnly.toList()
-        ..sort((a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond));
-      final videoList = manifest.videoOnly.toList();
+        ..sort((a, b) {
+          final aMp4 = a.container.name.toLowerCase() == 'mp4' ? 1 : 0;
+          final bMp4 = b.container.name.toLowerCase() == 'mp4' ? 1 : 0;
+          if (aMp4 != bMp4) return bMp4.compareTo(aMp4);
+          return b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond);
+        });
+
+      final allVideos = manifest.videoOnly
+          .where((v) => !v.videoCodec.toLowerCase().contains('av01'))
+          .toList();
+      final videoList = allVideos.isNotEmpty ? allVideos : manifest.videoOnly.toList();
+
+      int videoScore(VideoOnlyStreamInfo v) {
+        final codec = v.videoCodec.toLowerCase();
+        final isAvc = codec.contains('avc') || codec.contains('h264');
+        final isMp4 = v.container.name.toLowerCase() == 'mp4';
+        if (isAvc && isMp4) return 3;
+        if (isMp4 || isAvc) return 2;
+        if (codec.contains('vp9') || codec.contains('vp09')) return 1;
+        return 0;
+      }
+
       if (videoList.isNotEmpty && audioList.isNotEmpty) {
-        // Prefer <= 720p for crisp mobile playback without excessive bandwidth
+        // Prefer H.264 / MP4 <= 720p for universal hardware decoding & smooth sync
         final capped = videoList
             .where((v) => v.videoResolution.height <= 720)
             .toList();
         final pool = capped.isNotEmpty ? capped : videoList;
         pool.sort((a, b) {
+          final sCmp = videoScore(b).compareTo(videoScore(a));
+          if (sCmp != 0) return sCmp;
           final hCmp = b.videoResolution.height.compareTo(a.videoResolution.height);
           if (hCmp != 0) return hCmp;
           return b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond);
         });
-        return (
-          audioUrl: audioList.first.url.toString(),
-          videoUrl: pool.first.url.toString(),
-        );
+        final chosen = pool.first;
+        // If best separate video is still WebM/VP9 and a 720p/360p MP4 muxed stream exists,
+        // prefer muxed MP4 to guarantee ExoPlayer SurfaceTexture compatibility.
+        if (videoScore(chosen) >= 2 || manifest.muxed.isEmpty) {
+          return (
+            audioUrl: audioList.first.url.toString(),
+            videoUrl: chosen.url.toString(),
+          );
+        }
       }
 
       if (manifest.muxed.isNotEmpty) {

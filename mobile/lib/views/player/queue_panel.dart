@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/widgets/pressable_scale.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/motion/zen_page_route.dart';
 import '../../models/playback_context.dart';
@@ -15,7 +16,6 @@ import '../../models/track.dart';
 import '../../services/player_state.dart';
 import '../../services/queue_state.dart';
 import '../../utils/media_normalizer.dart';
-import '../details/artist_screen.dart';
 import '../details/album_screen.dart';
 import 'player_kit.dart';
 
@@ -464,72 +464,43 @@ class _QueuePanelState extends State<QueuePanel> {
 
   void _menu(QueueState q, QueueEntry e) {
     HapticFeedback.mediumImpact();
-    showCupertinoModalPopup<void>(
+    ZenDropdown.showTrackMenu(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: Text(MediaNormalizer.cleanTitle(e.title)),
-        message: Text(MediaNormalizer.formatArtists(e.artist)),
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              q.moveToTop(e);
-            },
-            child: const Text('Play Next'),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              q.moveToBottom(e);
-            },
-            child: const Text('Move to Bottom'),
-          ),
-          for (final artist in e.track.artistNames)
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(ctx);
-                if (widget.onGoToArtist != null) {
-                  widget.onGoToArtist!(artist);
-                } else {
-                  Navigator.push(
-                    context,
-                    ZenPageRoute(builder: (_) => ArtistScreen(artistName: artist)),
-                  );
-                }
-              },
-              child: Text('Go to $artist'),
+      track: e.track,
+      trackTitle: e.title,
+      artistName: e.artist,
+      albumName: e.track.album,
+      coverUrl: e.track.coverUrl,
+      onPlayNext: () => q.moveToTop(e),
+      onPlayLater: () => q.moveToBottom(e),
+      onGoToArtist: widget.onGoToArtist != null
+          ? () {
+              final names = e.track.artistNames;
+              widget.onGoToArtist!(names.isNotEmpty ? names.first : e.artist);
+            }
+          : null,
+      onGoToAlbum: () {
+        Navigator.push(
+          context,
+          ZenPageRoute(
+            builder: (_) => AlbumScreen(
+              albumTitle: MediaNormalizer.cleanAlbumTitle(
+                e.track.album.isNotEmpty ? e.track.album : e.title,
+              ),
+              artistName: MediaNormalizer.formatArtists(e.artist),
+              coverUrl: e.track.coverUrl,
             ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.push(
-                context,
-                ZenPageRoute(
-                  builder: (_) => AlbumScreen(
-                    albumTitle: MediaNormalizer.cleanAlbumTitle(e.track.album.isNotEmpty ? e.track.album : e.title),
-                    artistName: MediaNormalizer.formatArtists(e.artist),
-                    coverUrl: e.track.coverUrl as String?,
-                  ),
-                ),
-              );
-            },
-            child: const Text('Go to Album'),
           ),
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.pop(ctx);
-              q.remove(e);
-            },
-            child: const Text('Remove from Queue'),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
+        );
+      },
+      extraItems: [
+        ZenDropdownItem(
+          title: 'Remove from Queue',
+          icon: CupertinoIcons.trash,
+          isDestructive: true,
+          onTap: () => q.remove(e),
         ),
-      ),
+      ],
     );
   }
 }

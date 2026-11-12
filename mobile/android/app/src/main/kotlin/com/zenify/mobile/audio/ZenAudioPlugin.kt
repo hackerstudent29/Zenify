@@ -68,6 +68,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     private var pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val playGeneration = AtomicInteger(0)
     private val nextGeneration = AtomicInteger(0)
+    @Volatile
+    private var currentMediaId: String? = null
     private var lastDuration = -1L
     private var pending = PlaybackParameters(1f, 1f)
 
@@ -303,9 +305,10 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
             .build()
 
         try {
-            // Enable hardware audio offload scheduling when supported by the device DSP
+            // Disable hardware DSP offload so AudioProcessor (Studio FX) and progressive
+            // container seeking remain sample-accurate across all devices and streams.
             val offloadPrefs = TrackSelectionParameters.AudioOffloadPreferences.Builder()
-                .setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
+                .setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED)
                 .build()
             p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
                 .setAudioOffloadPreferences(offloadPrefs)
@@ -363,6 +366,9 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
             }
             override fun onPlayerError(error: PlaybackException) {
                 stopTicker()
+                currentMediaId?.let { failedId ->
+                    YtDataSource.evictMedia(ctx, failedId)
+                }
                 val is403 = error.message?.contains("403") == true || error.errorCodeName.contains("BAD_HTTP_STATUS")
                 Log.e("ZenAudioPlugin", "ExoPlayer playback error: ${error.errorCodeName} (code=${error.errorCode}, is403=$is403) - ${error.message}", error)
                 emit(mapOf(
@@ -389,6 +395,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         isVideo: Boolean = false
     ) {
         val gen = playGeneration.incrementAndGet()
+        currentMediaId = mediaId
         processor.setLoudnessDb(loudnessDb)
         val p = ensurePlayer()
         val metadata = MediaMetadata.Builder()
@@ -472,15 +479,13 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                             .build()
                         p.setMediaItem(item, startMs ?: 0L)
                     } else {
-                        p.clearVideoSurface()
-                        val item = MediaItem.Builder()
-                            .setMediaId(mediaId)
-                            .setCustomCacheKey(mediaId)
-                            .setUri(Uri.parse("zenify://media/$mediaId"))
-                            .setMediaMetadata(metadata)
-                            .setTag("audio")
-                            .build()
-                        p.setMediaItem(item, startMs ?: 0L)
+                        emit(mapOf(
+                            "type" to "error",
+                            "message" to "No video stream returned by primary extractor for $mediaId",
+                            "errorCode" to -1,
+                            "is403" to false,
+                        ))
+                        return@withContext
                     }
                     p.prepare()
                     p.playWhenReady = true
@@ -512,6 +517,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         isVideo: Boolean = false
     ) {
         playGeneration.incrementAndGet()
+        currentMediaId = null
         processor.setLoudnessDb(loudnessDb)
         val p = ensurePlayer()
         if (headers != null) {
@@ -742,6 +748,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 "stop" -> {
                     playGeneration.incrementAndGet()
                     nextGeneration.incrementAndGet()
+                    currentMediaId = null
                     player?.stop()
                     player?.clearMediaItems()
                     player?.clearVideoSurface()
@@ -750,9 +757,22 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                     result.success(null)
                 }
                 "seek" -> {
-                    val ms = call.argument<Number>("ms")?.toLong() ?: 0L
-                    player?.seekTo(ms)
-                    emit(mapOf("type" to "position", "ms" to ms))
+                    val ms = (call.argument<Number>("ms")?.toLong() ?: 0L).coerceAtLeast(0L)
+                    val p = player
+                    if (p != null) {
+                        if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) {
+                            p.seekTo(p.currentMediaItemIndex, ms)
+                            p.prepare()
+                            p.playWhenReady = true
+                        } else if (p.playbackState == Player.STATE_ENDED) {
+                            p.seekTo(p.currentMediaItemIndex, ms)
+                            p.playWhenReady = true
+                        } else {
+                            p.seekTo(ms)
+                        }
+                        emit(mapOf("type" to "position", "ms" to ms))
+                        updateTickerState()
+                    }
                     result.success(null)
                 }
                 "setLifecycle" -> {

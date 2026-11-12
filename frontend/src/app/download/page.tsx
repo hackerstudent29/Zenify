@@ -134,7 +134,7 @@ export default function DownloadPage() {
                     className="h-12 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer shadow-lg hover:border-brand/40"
                   >
                     <Download size={18} className="text-brand shrink-0" />
-                    <span>Download APK (33.2 MB)</span>
+                    <span>Download APK (13.7 MB)</span>
                   </a>
 
                   <a
@@ -144,7 +144,7 @@ export default function DownloadPage() {
                     className="h-12 px-5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-xs font-semibold tracking-wider transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Download size={15} className="text-zinc-400" />
-                    <span>Universal (75.6 MB)</span>
+                    <span>Universal (30.6 MB)</span>
                   </a>
 
                   <a
@@ -166,7 +166,7 @@ export default function DownloadPage() {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Package Size</span>
-                    <span className="text-white font-medium">33.2 MB (ARM64)</span>
+                    <span className="text-white font-medium">13.7 MB (ARM64)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Compatibility</span>
@@ -285,7 +285,7 @@ export default function DownloadPage() {
                     <h3 className="text-base font-semibold text-white mt-1">Notification or Files</h3>
                   </div>
                   <p className="text-[14px] leading-relaxed text-zinc-400">
-                    Once the 33.2 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
+                    Once the 13.7 MB download completes, tap <strong className="text-white">Open</strong> from your notification drawer, or launch your phone's <strong className="text-white">Files</strong> / <strong className="text-white">Downloads</strong> application and tap <code className="px-1.5 py-0.5 rounded bg-white/10 text-white text-xs">zenify.apk</code>.
                   </p>
                 </div>
 
@@ -475,15 +475,15 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">File Size</span>
-                <span className="text-white">33.2 MB (ARM64) • 75.6 MB (Universal)</span>
+                <span className="text-white">13.7 MB (ARM64) • 30.6 MB (Universal)</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">ARM64 SHA-256</span>
-                <span className="text-white font-mono text-[11px] break-all">E0B2DFE50F934BB6E20B639F35F68D4579503D980BAF1801BE481F386E1B20BC</span>
+                <span className="text-white font-mono text-[11px] break-all">1FB85A84F66C301F3ED0121D1158DA647C1EB65420DDE6474B37A394192F0F5D</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Universal SHA-256</span>
-                <span className="text-white font-mono text-[11px] break-all">3AD8A6A39C757F05661D58A79683B7A70C110BE3C2896744BBE728A0486BF825</span>
+                <span className="text-white font-mono text-[11px] break-all">F0A77CB5712BDB5B89BA9E7CD4110242245A2180D24C5608411A4D674EDC4CE9</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Minimum Operating System</span>
@@ -496,7 +496,7 @@ export default function DownloadPage() {
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">What&apos;s Included in v1.0.9</span>
                 <span className="text-zinc-300 leading-relaxed">
-                  YouTube video streaming in MiniPlayer &amp; Fullscreen Player, redesigned Explore &amp; Search layouts, fixed Artist/Album verified badge placement &amp; round action buttons, compact Dynamic Island notification pill without nav overlap, single-song Smart Queue isolation from search results, and reliable background/auto-next playback with real-time lock-screen &amp; miniplayer sync.
+                  YouTube H.264 video streaming in MiniPlayer &amp; Fullscreen Player, reliable start-of-track playback &amp; scrubbing (`SimpleCache` `itag` keying, cache eviction &amp; backend fallback URL fix), sheet/page miniplayer &amp; dock isolation (`Profile`, `Room Together`, modal sheets), dead-centered Dynamic Island headers across dock tabs, collapsed scroll MiniPlayer &amp; Search dock de-overlap, Explore &amp; Search redesigns, Artist/Album verified badge &amp; round button fixes, and single-song Smart Queue isolation.
                 </span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
@@ -524,7 +524,7 @@ export default function DownloadPage() {
                 className="h-11 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 <Download size={16} className="text-brand" />
-                <span>Download Zenify APK (v1.0.9 • 33.2 MB)</span>
+                <span>Download Zenify APK (v1.0.9 • 13.7 MB)</span>
               </a>
             </div>
           </motion.div>

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
+import '../../services/dock_visibility.dart';
 import 'apple_tokens.dart';
 
 // ═══════════════════════════ SpringPressable ═══════════════════════════
@@ -306,13 +307,16 @@ abstract final class AppleSheet {
     double max = 0.94,
   }) {
     HapticFeedback.selectionClick();
-    return showModalBottomSheet<T>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black54,
-      useSafeArea: false,
-      builder: (ctx) => _SheetBody(initial: initial, max: max, builder: builder),
+    return DockVisibility.runModal(
+      () => showModalBottomSheet<T>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black54,
+        useSafeArea: false,
+        builder: (ctx) => _SheetBody(initial: initial, max: max, builder: builder),
+      ),
     );
   }
 }
@@ -354,8 +358,9 @@ class _SheetBody extends StatelessWidget {
 
 /// Sheet title row.
 class SheetHeader extends StatelessWidget {
-  const SheetHeader({super.key, required this.title, this.leading, this.trailing, this.onClose});
+  const SheetHeader({super.key, required this.title, this.subtitle, this.leading, this.trailing, this.onClose});
   final String title;
+  final String? subtitle;
   final Widget? leading;
   final Widget? trailing;
   final VoidCallback? onClose;
@@ -366,7 +371,19 @@ class SheetHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 14, 16, 8),
       child: Row(children: [
         if (leading != null) ...[leading!, const SizedBox(width: 12)],
-        Expanded(child: Text(title, style: AT.title2, maxLines: 1, overflow: TextOverflow.ellipsis)),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title, style: AT.title2, maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(subtitle!, style: AT.footnote.copyWith(color: AT.label2), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
+            ],
+          ),
+        ),
         ?trailing,
         if (onClose != null) CircleIconButton(icon: CupertinoIcons.xmark, size: 32, iconSize: 14, onTap: onClose),
       ]),
@@ -621,20 +638,4 @@ void appleToast(BuildContext context, String message, {IconData? icon}) {
         Flexible(child: Text(message, style: AT.footnote.copyWith(color: AT.label), maxLines: 2, overflow: TextOverflow.ellipsis)),
       ]),
     ));
-}
-
-/// Cupertino action sheet helper. Returns chosen value or null.
-Future<T?> appleActionSheet<T>(BuildContext context, {String? title, String? message, required List<(String, T, {bool destructive})> options}) {
-  return showCupertinoModalPopup<T>(
-    context: context,
-    builder: (ctx) => CupertinoActionSheet(
-      title: title == null ? null : Text(title),
-      message: message == null ? null : Text(message),
-      actions: [
-        for (final o in options)
-          CupertinoActionSheetAction(isDestructiveAction: o.destructive, onPressed: () => Navigator.pop(ctx, o.$2), child: Text(o.$1)),
-      ],
-      cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-    ),
-  );
 }

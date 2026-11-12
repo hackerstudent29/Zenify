@@ -1,8 +1,12 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import '../../../design_system/apple/apple_kit.dart';
+import '../../../design_system/apple/apple_tokens.dart';
 
-import '../../../design_system/tokens/app_colors.dart';
+class TopLists extends StatelessWidget {
+  final List<dynamic> topArtists;
+  final List<dynamic> topTracks;
+  final ValueChanged<Map<String, dynamic>>? onTrackTapped;
 
-class TopLists extends StatefulWidget {
   const TopLists({
     super.key,
     required this.topArtists,
@@ -10,27 +14,12 @@ class TopLists extends StatefulWidget {
     this.onTrackTapped,
   });
 
-  final List<dynamic> topArtists;
-  final List<dynamic> topTracks;
-  final ValueChanged<Map<String, dynamic>>? onTrackTapped;
-
-  @override
-  State<TopLists> createState() => _TopListsState();
-}
-
-class _TopListsState extends State<TopLists> {
-  bool _expandedArtists = false;
-  bool _expandedTracks = false;
-
   String _formatDuration(int ms) {
-    if (ms <= 0) return '0 min';
-    final totalSec = ms ~/ 1000;
-    final hours = totalSec ~/ 3600;
-    final minutes = (totalSec % 3600) ~/ 60;
-    if (hours > 0) {
-      return '$hours hr ${minutes > 0 ? '$minutes min' : ''}';
-    }
-    return '$minutes min';
+    final totalMinutes = (ms / 60000).floor();
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    if (hours > 0) return '${hours}h ${minutes}m';
+    return '${minutes}m';
   }
 
   @override
@@ -38,274 +27,105 @@ class _TopListsState extends State<TopLists> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Top Artists Section
-        if (widget.topArtists.isNotEmpty) ...[
-          _buildHeader(
+        if (topArtists.isNotEmpty)
+          GroupedSection(
             title: 'TOP ARTISTS',
-            canExpand: widget.topArtists.length > 5,
-            isExpanded: _expandedArtists,
-            onToggleExpand: () => setState(() => _expandedArtists = !_expandedArtists),
-          ),
-          const SizedBox(height: 12),
-          _buildArtistsCard(),
-          const SizedBox(height: 24),
-        ],
+            children: List.generate(topArtists.length, (i) {
+              final art = topArtists[i] as Map<String, dynamic>? ?? const {};
+              final name = art['artistName']?.toString() ?? 'Unknown Artist';
+              final plays = (art['plays'] as num? ?? 0).toInt();
+              final ms = (art['listenedMs'] as num? ?? 0).toInt();
+              final percentage = (art['percentage'] as num? ?? 0).toInt();
 
-        // Top Tracks Section
-        if (widget.topTracks.isNotEmpty) ...[
-          _buildHeader(
-            title: 'TOP SONGS',
-            canExpand: widget.topTracks.length > 5,
-            isExpanded: _expandedTracks,
-            onToggleExpand: () => setState(() => _expandedTracks = !_expandedTracks),
-          ),
-          const SizedBox(height: 12),
-          _buildTracksCard(),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildHeader({
-    required String title,
-    required bool canExpand,
-    required bool isExpanded,
-    required VoidCallback onToggleExpand,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontFamily: 'SF Pro Display',
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
-            color: Colors.white,
-          ),
-        ),
-        if (canExpand)
-          GestureDetector(
-            onTap: onToggleExpand,
-            child: Text(
-              isExpanded ? 'Show Less' : 'See All (10)',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.crimson,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildArtistsCard() {
-    final count = _expandedArtists
-        ? widget.topArtists.length.clamp(0, 10)
-        : widget.topArtists.length.clamp(0, 5);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: count,
-        separatorBuilder: (_, _) => Divider(
-          color: Colors.white.withValues(alpha: 0.06),
-          height: 1,
-          indent: 64,
-        ),
-        itemBuilder: (context, index) {
-          final art = widget.topArtists[index] as Map<String, dynamic>;
-          final name = art['artistName'] ?? 'Unknown Artist';
-          final plays = art['plays'] ?? 0;
-          final ms = art['listenedMs'] ?? 0;
-          final percentage = art['percentage'] ?? 0;
-
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 24,
-                  child: Text(
-                    '#${index + 1}',
-                    style: TextStyle(
-                      fontFamily: 'SF Pro',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: index == 0 ? AppColors.crimson : Colors.white38,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+              return AppleRow(
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 22,
+                      child: Text(
+                        '${i + 1}',
+                        style: AT.footnote.copyWith(
+                          color: i == 0 ? AT.accent : AT.label3,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    Avatar(name: name, size: 34),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF27272A),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : 'A',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
+                title: name,
+                subtitle: '$plays plays · ${_formatDuration(ms)}',
+                trailing: percentage > 0
+                    ? Text(
+                        '$percentage%',
+                        style: AT.subhead.copyWith(
+                          color: i == 0 ? AT.accent : AT.label2,
                           fontWeight: FontWeight.w600,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '$plays plays · ${_formatDuration(ms)}',
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (percentage > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.crimson.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
+                      )
+                    : null,
+              );
+            }),
+          ),
+        if (topTracks.isNotEmpty)
+          GroupedSection(
+            title: 'TOP SONGS',
+            children: List.generate(topTracks.length, (i) {
+              final track = topTracks[i] as Map<String, dynamic>? ?? const {};
+              final title = track['trackTitle']?.toString() ?? 'Unknown Track';
+              final artist = track['artistName']?.toString() ?? '';
+              final album = track['trackAlbum']?.toString() ?? '';
+              final plays = (track['plays'] as num? ?? 0).toInt();
+
+              final subParts = <String>[];
+              if (artist.isNotEmpty) subParts.add(artist);
+              if (album.isNotEmpty) subParts.add(album);
+
+              return AppleRow(
+                leading: SizedBox(
+                  width: 22,
+                  child: Center(
                     child: Text(
-                      '$percentage%',
-                      style: const TextStyle(
-                        color: AppColors.crimson,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildTracksCard() {
-    final count = _expandedTracks
-        ? widget.topTracks.length.clamp(0, 10)
-        : widget.topTracks.length.clamp(0, 5);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF18181B),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: count,
-        separatorBuilder: (_, _) => Divider(
-          color: Colors.white.withValues(alpha: 0.06),
-          height: 1,
-          indent: 48,
-        ),
-        itemBuilder: (context, index) {
-          final track = widget.topTracks[index] as Map<String, dynamic>;
-          final title = track['trackTitle'] ?? 'Unknown Track';
-          final album = track['trackAlbum'] ?? '';
-          final plays = track['plays'] ?? 0;
-
-          return InkWell(
-            onTap: widget.onTrackTapped != null ? () => widget.onTrackTapped!(track) : null,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 24,
-                    child: Text(
-                      '#${index + 1}',
-                      style: TextStyle(
-                        fontFamily: 'SF Pro',
-                        fontSize: 13,
+                      '${i + 1}',
+                      style: AT.footnote.copyWith(
+                        color: i == 0 ? AT.accent : AT.label3,
                         fontWeight: FontWeight.w700,
-                        color: index == 0 ? AppColors.crimson : Colors.white38,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (album.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            album,
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 11,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
+                ),
+                title: title,
+                subtitle: subParts.isEmpty ? null : subParts.join(' · '),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$plays ${plays == 1 ? 'play' : 'plays'}',
+                      style: AT.footnote.copyWith(
+                        color: AT.label2,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
-                  ),
-                  Text(
-                    '$plays plays',
-                    style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+                    if (onTrackTapped != null) ...[
+                      const SizedBox(width: 8),
+                      const Icon(
+                        CupertinoIcons.play_fill,
+                        size: 13,
+                        color: AT.accent,
+                      ),
+                    ],
+                  ],
+                ),
+                onTap: onTrackTapped != null ? () => onTrackTapped!(track) : null,
+              );
+            }),
+          ),
+      ],
     );
   }
 }
-

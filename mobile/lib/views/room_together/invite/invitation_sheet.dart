@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../design_system/apple/apple_kit.dart';
 import '../../../design_system/apple/apple_tokens.dart';
+import '../../../design_system/widgets/zen_dropdown.dart';
 import '../../../models/room_models.dart';
 import '../../../models/room_phase2_models.dart';
 import '../../../services/together_service.dart';
@@ -47,14 +48,31 @@ class _BodyState extends State<_Body> {
   }
 
   Future<void> _create() async {
-    final d = await appleActionSheet<Duration>(context, title: 'Link expires after', options: [
-      ('1 hour', const Duration(hours: 1), destructive: false),
-      ('24 hours', const Duration(hours: 24), destructive: false),
-      ('7 days', const Duration(days: 7), destructive: false),
-    ]);
+    Duration? d;
+    await ZenDropdown.show<void>(
+      context: context,
+      title: 'Link expires after',
+      items: [
+        ZenDropdownItem(
+          title: '1 hour',
+          icon: CupertinoIcons.clock,
+          onTap: () => d = const Duration(hours: 1),
+        ),
+        ZenDropdownItem(
+          title: '24 hours',
+          icon: CupertinoIcons.clock,
+          onTap: () => d = const Duration(hours: 24),
+        ),
+        ZenDropdownItem(
+          title: '7 days',
+          icon: CupertinoIcons.clock,
+          onTap: () => d = const Duration(days: 7),
+        ),
+      ],
+    );
     if (d == null || !mounted) return;
     setState(() => _creating = true);
-    final inv = await context.read<TogetherService>().createInvite(expiresIn: d);
+    final inv = await context.read<TogetherService>().createInvite(expiresIn: d!);
     if (!mounted) return;
     setState(() => _creating = false);
     if (inv == null) {

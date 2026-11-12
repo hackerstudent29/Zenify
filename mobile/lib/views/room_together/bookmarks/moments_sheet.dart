@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../design_system/apple/apple_kit.dart';
 import '../../../design_system/apple/apple_tokens.dart';
+import '../../../design_system/widgets/zen_dropdown.dart';
 import '../../../models/room_phase2_models.dart';
 import '../../../models/room_models.dart';
 import '../../../services/player_state.dart';
@@ -104,10 +105,25 @@ class _BookmarksBodyState extends State<_BookmarksBody> {
       appleToast(context, 'That moment is from a different song.', icon: CupertinoIcons.music_note);
       return;
     }
-    final choice = await appleActionSheet<String>(context, title: '${b.trackTitle} · ${fmtPos(b.positionMs)}', options: [
-      if (a.canSeekRoom) ('Jump for everyone', 'room', destructive: false),
-      ('Replay just for me', 'local', destructive: false),
-    ]);
+    String? choice;
+    await ZenDropdown.show<void>(
+      context: context,
+      title: b.trackTitle,
+      subtitle: fmtPos(b.positionMs),
+      items: [
+        if (a.canSeekRoom)
+          ZenDropdownItem(
+            title: 'Jump for everyone',
+            icon: CupertinoIcons.person_2,
+            onTap: () => choice = 'room',
+          ),
+        ZenDropdownItem(
+          title: 'Replay just for me',
+          icon: CupertinoIcons.play_circle,
+          onTap: () => choice = 'local',
+        ),
+      ],
+    );
     if (choice == 'room') {
       final ok = await a.onRoomSeek(b.positionMs);
       if (!ok && mounted) appleToast(context, 'You cannot seek in this room.');
@@ -221,10 +237,25 @@ class _TimelineBodyState extends State<_TimelineBody> {
                                 trailing: widget.actions.currentTitle == t.trackTitle ? const Icon(CupertinoIcons.play_circle, size: 20, color: AT.label2) : null,
                                 onTap: widget.actions.currentTitle == t.trackTitle
                                     ? () async {
-                                        final choice = await appleActionSheet<String>(context, title: fmtPos(m.positionMs), options: [
-                                          if (widget.actions.canSeekRoom) ('Jump for everyone', 'room', destructive: false),
-                                          ('Replay just for me', 'local', destructive: false),
-                                        ]);
+                                        String? choice;
+                                        await ZenDropdown.show<void>(
+                                          context: context,
+                                          title: t.trackTitle,
+                                          subtitle: fmtPos(m.positionMs),
+                                          items: [
+                                            if (widget.actions.canSeekRoom)
+                                              ZenDropdownItem(
+                                                title: 'Jump for everyone',
+                                                icon: CupertinoIcons.person_2,
+                                                onTap: () => choice = 'room',
+                                              ),
+                                            ZenDropdownItem(
+                                              title: 'Replay just for me',
+                                              icon: CupertinoIcons.play_circle,
+                                              onTap: () => choice = 'local',
+                                            ),
+                                          ],
+                                        );
                                         if (choice == 'room') await widget.actions.onRoomSeek(m.positionMs);
                                         if (choice == 'local') widget.actions.onLocalReplay(m.positionMs);
                                       }

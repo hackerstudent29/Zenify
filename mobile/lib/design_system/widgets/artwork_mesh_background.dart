@@ -50,6 +50,8 @@ class ArtworkMeshBackground extends StatefulWidget {
     this.imageProviderBuilder,
     this.fallbackAsset = 'assets/images/z_logo.png',
     this.backgroundColor,
+    this.palette,
+    this.scrimOpacity = 1.0,
   });
 
   /// Cover artwork. Falls back to `covers.first`, then to [fallbackAsset].
@@ -90,6 +92,14 @@ class ArtworkMeshBackground extends StatefulWidget {
   final String fallbackAsset;
 
   final Color? backgroundColor;
+
+  /// Optional explicit color palette (e.g. strawberry rose + white) used instead
+  /// of decoding a cover image. Generates a soft fluid tile baked with the same
+  /// spring-physics multi-directional mesh engine.
+  final List<Color>? palette;
+
+  /// Multiplier (0..1) for the bottom readability scrim overlay.
+  final double scrimOpacity;
 
   @override
   State<ArtworkMeshBackground> createState() => _ArtworkMeshBackgroundState();
@@ -323,6 +333,52 @@ Future<({ui.Image tile, Color avg})> _makeLayer(ui.Image img, _Crop crop) async 
   return (tile: tile, avg: avg);
 }
 
+Future<ui.Image> _buildPaletteSourceImage(List<Color> palette) async {
+  const int size = _sample;
+  final colors = palette.isNotEmpty
+      ? palette
+      : const [Color(0xFFE11D48), Color(0xFFFFFFFF)];
+  final base = colors.first;
+  final recorder = ui.PictureRecorder();
+  final rect = Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
+  final canvas = Canvas(recorder, rect);
+
+  canvas.drawRect(rect, Paint()..color = base);
+
+  // Paint overlapping soft radial color pools so crops sample distinct
+  // multi-directional mixtures (e.g. strawberry rose + white waves).
+  final offsets = <Offset>[
+    const Offset(0.22, 0.25),
+    const Offset(0.78, 0.22),
+    const Offset(0.52, 0.52),
+    const Offset(0.24, 0.78),
+    const Offset(0.80, 0.76),
+    const Offset(0.50, 0.16),
+  ];
+
+  for (var i = 0; i < offsets.length; i++) {
+    final c = colors[i % colors.length];
+    final center = Offset(offsets[i].dx * size, offsets[i].dy * size);
+    final radius = size * 0.68;
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..shader = ui.Gradient.radial(
+          center,
+          radius,
+          [c, c.withValues(alpha: 0.0)],
+          const [0.0, 1.0],
+        ),
+    );
+  }
+
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(size, size);
+  picture.dispose();
+  return image;
+}
+
 Future<_Tile> _bake(ui.Image img) async {
   final layers = <ui.Image>[];
   var avg = AppColors.bg;
@@ -370,6 +426,28 @@ abstract final class _TileCache {
     return _pending[key] ??= _load(key, provider()).whenComplete(() {
       _pending.remove(key);
     });
+  }
+
+  static Future<_Tile> getPalette(String key, List<Color> palette) {
+    final hit = peek(key);
+    if (hit != null) return Future.value(hit);
+    return _pending[key] ??= _loadPalette(key, palette).whenComplete(() {
+      _pending.remove(key);
+    });
+  }
+
+  static Future<_Tile> _loadPalette(String key, List<Color> palette) async {
+    final img = await _buildPaletteSourceImage(palette);
+    try {
+      final tile = await _bake(img);
+      _cache[key] = tile;
+      if (_cache.length > _max) {
+        _cache.remove(_cache.keys.first)!.release();
+      }
+      return tile;
+    } finally {
+      img.dispose();
+    }
   }
 
   static Future<_Tile> _load(String key, ImageProvider provider) async {
@@ -683,6 +761,12 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
   String get _fallbackKey => 'asset:${widget.fallbackAsset}';
 
   String _sourceKey(ArtworkMeshBackground w) {
+    if (w.palette != null && w.palette!.isNotEmpty) {
+      final sig = w.palette!
+          .map((c) => c.toARGB32().toRadixString(16).padLeft(8, '0'))
+          .join('_');
+      return 'palette:$sig';
+    }
     final raw = (w.coverUrl != null && w.coverUrl!.isNotEmpty)
         ? w.coverUrl!
         : (w.covers != null && w.covers!.isNotEmpty ? w.covers!.first : '');
@@ -707,7 +791,9 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
     }
 
     try {
-      final tile = await _TileCache.get(key, () => _providerFor(key));
+      final tile = key.startsWith('palette:') && widget.palette != null
+          ? await _TileCache.getPalette(key, widget.palette!)
+          : await _TileCache.get(key, () => _providerFor(key));
       if (token == _loadToken) _applyTile(tile);
     } catch (_) {
       if (key == _fallbackKey || token != _loadToken) return;
@@ -922,20 +1008,21 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
                 ),
 
                 // Readability scrim
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.15),
-                        Colors.black.withValues(alpha: 0.30),
-                        bg.withValues(alpha: 0.65),
-                      ],
-                      stops: const [0, 0.6, 1],
+                if (widget.scrimOpacity > 0)
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.15 * widget.scrimOpacity),
+                          Colors.black.withValues(alpha: 0.30 * widget.scrimOpacity),
+                          bg.withValues(alpha: (0.65 * widget.scrimOpacity).clamp(0.0, 1.0)),
+                        ],
+                        stops: const [0, 0.6, 1],
+                      ),
                     ),
                   ),
-                ),
 
                 if (widget.dither) const _DitherLayer(),
               ],
