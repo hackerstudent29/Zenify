@@ -70,6 +70,14 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                 }
                 handleWhatsApp(path, text, result)
             }
+            "shareToSnapchat" -> {
+                val path = call.argument<String>("filePath")
+                if (path.isNullOrBlank()) {
+                    result.error("BAD_ARGS", "filePath is missing", null)
+                    return
+                }
+                handleSnapchat(path, result)
+            }
             "saveToGallery" -> {
                 val path = call.argument<String>("filePath")
                 val title = call.argument<String>("title") ?: "Zenify_Story"
@@ -85,6 +93,9 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
 
     private fun isPackageInstalled(packageName: String): Boolean {
         return try {
+            if (context.packageManager.getLaunchIntentForPackage(packageName) != null) {
+                return true
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 context.packageManager.getPackageInfo(
                     packageName,
@@ -117,15 +128,15 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
             return
         }
 
-        if (!isPackageInstalled("com.instagram.android")) {
-            result.error("NOT_INSTALLED", "Instagram is not installed", null)
-            return
-        }
-
+        val igPkg = "com.instagram.android"
         try {
             val contentUri = getFileUri(file)
-            val intent = Intent("com.instagram.share.ADD_TO_STORY").apply {
+            context.grantUriPermission(igPkg, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+            // 1. Try dedicated Instagram Story Intent
+            val storyIntent = Intent("com.instagram.share.ADD_TO_STORY").apply {
                 setDataAndType(contentUri, "image/png")
+                setPackage(igPkg)
                 flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                 putExtra("interactive_asset_uri", contentUri)
                 if (!topColor.isNullOrBlank()) {
@@ -137,16 +148,23 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                 putExtra("source_application", context.packageName)
             }
 
-            context.grantUriPermission(
-                "com.instagram.android",
-                contentUri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
+            if (storyIntent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(storyIntent)
+                result.success(true)
+                return
+            }
 
-            context.startActivity(intent)
+            // 2. Fallback to direct Instagram Image Send Intent
+            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                setPackage(igPkg)
+                putExtra(Intent.EXTRA_STREAM, contentUri)
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(sendIntent)
             result.success(true)
         } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message, null)
+            result.error("SHARE_FAILED", e.message ?: "Instagram share failed", null)
         }
     }
 
@@ -161,49 +179,43 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
             return
         }
 
-        val fbInstalled = isPackageInstalled("com.facebook.katana")
-        if (!fbInstalled) {
-            result.error("NOT_INSTALLED", "Facebook is not installed", null)
-            return
+        val fbPkg = when {
+            isPackageInstalled("com.facebook.katana") -> "com.facebook.katana"
+            isPackageInstalled("com.facebook.lite") -> "com.facebook.lite"
+            else -> "com.facebook.katana"
         }
 
         try {
             val contentUri = getFileUri(file)
+            context.grantUriPermission(fbPkg, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
-            // If a valid Meta App ID is provided, use the dedicated story intent
-            if (!appId.isNullOrBlank()) {
+            // If a valid Meta App ID is provided, try dedicated story intent
+            if (!appId.isNullOrBlank() && fbPkg == "com.facebook.katana") {
                 val storyIntent = Intent("com.facebook.stories.ADD_TO_STORY").apply {
                     setDataAndType(contentUri, "image/png")
+                    setPackage(fbPkg)
                     flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                     putExtra("com.facebook.platform.extra.APPLICATION_ID", appId)
                     putExtra("interactive_asset_uri", contentUri)
                 }
-                context.grantUriPermission(
-                    "com.facebook.katana",
-                    contentUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                context.startActivity(storyIntent)
-                result.success(true)
-                return
+                if (storyIntent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(storyIntent)
+                    result.success(true)
+                    return
+                }
             }
 
-            // Fallback: Share directly as an image intent targeting Facebook
+            // Fallback: Direct image send intent targeting Facebook
             val sendIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
-                setPackage("com.facebook.katana")
+                setPackage(fbPkg)
                 putExtra(Intent.EXTRA_STREAM, contentUri)
                 flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
             }
-            context.grantUriPermission(
-                "com.facebook.katana",
-                contentUri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
             context.startActivity(sendIntent)
             result.success(true)
         } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message, null)
+            result.error("SHARE_FAILED", e.message ?: "Facebook share failed", null)
         }
     }
 
@@ -221,16 +233,13 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
         val waPkg = when {
             isPackageInstalled("com.whatsapp") -> "com.whatsapp"
             isPackageInstalled("com.whatsapp.w4b") -> "com.whatsapp.w4b"
-            else -> null
-        }
-
-        if (waPkg == null) {
-            result.error("NOT_INSTALLED", "WhatsApp is not installed", null)
-            return
+            else -> "com.whatsapp"
         }
 
         try {
             val contentUri = getFileUri(file)
+            context.grantUriPermission(waPkg, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
                 setPackage(waPkg)
@@ -240,15 +249,38 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                 }
                 flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
             }
-            context.grantUriPermission(
-                waPkg,
-                contentUri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
             context.startActivity(intent)
             result.success(true)
         } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message, null)
+            result.error("SHARE_FAILED", e.message ?: "WhatsApp share failed", null)
+        }
+    }
+
+    private fun handleSnapchat(
+        filePath: String,
+        result: MethodChannel.Result
+    ) {
+        val file = File(filePath)
+        if (!file.exists()) {
+            result.error("FILE_NOT_FOUND", "Story image file does not exist", null)
+            return
+        }
+
+        val snapPkg = "com.snapchat.android"
+        try {
+            val contentUri = getFileUri(file)
+            context.grantUriPermission(snapPkg, contentUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                setPackage(snapPkg)
+                putExtra(Intent.EXTRA_STREAM, contentUri)
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("SHARE_FAILED", e.message ?: "Snapchat share failed", null)
         }
     }
 

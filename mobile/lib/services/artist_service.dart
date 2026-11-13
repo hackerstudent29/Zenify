@@ -65,6 +65,7 @@ class ArtistProfile {
     required this.singles,
     required this.featuredPlaylists,
     required this.relatedArtists,
+    this.musicVideos = const [],
   });
 
   final String name;
@@ -79,6 +80,7 @@ class ArtistProfile {
   final List<ArtistReleaseItem> singles;
   final List<ArtistPlaylistItem> featuredPlaylists;
   final List<RelatedArtistItem> relatedArtists;
+  final List<Track> musicVideos;
 }
 
 class ArtistService {
@@ -222,6 +224,13 @@ class ArtistService {
           }
         }
 
+        // Music Videos
+        final musicVideos = <Track>[];
+        try {
+          final vids = await InnerTubeService.instance.searchVideos('$name music video');
+          musicVideos.addAll(vids.take(12));
+        } catch (_) {}
+
         final profile = ArtistProfile(
           name: name,
           imageUrl: imageUrl,
@@ -235,6 +244,7 @@ class ArtistService {
           singles: singles,
           featuredPlaylists: playlists,
           relatedArtists: related,
+          musicVideos: musicVideos,
         );
 
         _cache[cacheKey] = (profile: profile, expires: DateTime.now().add(const Duration(hours: 12)));
@@ -244,6 +254,11 @@ class ArtistService {
       // If channel not found but card was returned, build artist profile from card + YouTube search
       if (ytCard != null) {
         final ytSongs = await InnerTubeService.instance.search(cleanName);
+        final musicVideos = <Track>[];
+        try {
+          final vids = await InnerTubeService.instance.searchVideos('$cleanName music video');
+          musicVideos.addAll(vids.take(12));
+        } catch (_) {}
         final img = ytCard.thumb != null ? upgradeArtworkUrl(ytCard.thumb!) : '';
         final profile = ArtistProfile(
           name: ytCard.name,
@@ -258,6 +273,7 @@ class ArtistService {
           singles: const [],
           featuredPlaylists: const [],
           relatedArtists: const [],
+          musicVideos: musicVideos,
         );
         _cache[cacheKey] = (profile: profile, expires: DateTime.now().add(const Duration(hours: 6)));
         return profile;
@@ -343,6 +359,12 @@ class ArtistService {
           }
         }
 
+        final musicVideos = <Track>[];
+        try {
+          final vids = await InnerTubeService.instance.searchVideos('$name music video');
+          musicVideos.addAll(vids.take(12));
+        } catch (_) {}
+
         final profile = ArtistProfile(
           name: name,
           imageUrl: imageUrl,
@@ -356,6 +378,7 @@ class ArtistService {
           singles: singles,
           featuredPlaylists: playlists,
           relatedArtists: related,
+          musicVideos: musicVideos,
         );
 
         _cache[cacheKey] = (profile: profile, expires: DateTime.now().add(const Duration(minutes: 30)));

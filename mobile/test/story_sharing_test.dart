@@ -2,15 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/features/story_sharing/models/story_customization.dart';
-import 'package:mobile/features/story_sharing/models/story_share_content.dart';
-import 'package:mobile/features/story_sharing/models/story_template.dart';
-import 'package:mobile/features/story_sharing/screens/lyrics_selection_screen.dart';
-import 'package:mobile/features/story_sharing/services/artwork_palette_service.dart';
-import 'package:mobile/features/story_sharing/services/story_image_renderer.dart';
-import 'package:mobile/features/story_sharing/services/story_sharing_service.dart';
-import 'package:mobile/features/story_sharing/widgets/story_card_preview.dart';
-import 'package:mobile/features/story_sharing/widgets/zenify_story_brand.dart';
+import 'package:mobile/features/story_sharing/story_sharing.dart';
 import 'package:mobile/models/track.dart';
 import 'package:mobile/services/lyrics_service.dart';
 
@@ -197,7 +189,8 @@ void main() {
         ),
       );
 
-      expect(find.text('Zenify'), findsOneWidget);
+      expect(find.byType(ZenifyStoryBrand), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
     });
 
     testWidgets('StoryCardPreview renders Classic Song Template with Zenify brand and title', (tester) async {
@@ -222,7 +215,8 @@ void main() {
 
       expect(find.text('Die For You'), findsOneWidget);
       expect(find.text('Joji'), findsOneWidget);
-      expect(find.text('Zenify'), findsOneWidget);
+      expect(find.byType(ZenifyStoryBrand), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
     });
 
     testWidgets('StoryCardPreview renders Liquid Glass Song Template with waveform', (tester) async {
@@ -246,7 +240,8 @@ void main() {
       await tester.pump();
 
       expect(find.text('Die For You'), findsOneWidget);
-      expect(find.text('Zenify'), findsOneWidget);
+      expect(find.byType(ZenifyStoryBrand), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
     });
 
     testWidgets('StoryCardPreview renders Classic Lyrics Template with stacked lines', (tester) async {
@@ -279,7 +274,8 @@ void main() {
       expect(find.text("It's what I've always wanted"), findsOneWidget);
       expect(find.text("Could never have too many of these"), findsOneWidget);
       expect(find.text('Die For You'), findsOneWidget);
-      expect(find.text('Zenify'), findsOneWidget);
+      expect(find.byType(ZenifyStoryBrand), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
     });
 
     testWidgets('StoryCardPreview renders Artist Profile Template', (tester) async {
@@ -310,7 +306,8 @@ void main() {
 
       expect(find.text('Joji'), findsOneWidget);
       expect(find.text('31.2M monthly listeners'), findsOneWidget);
-      expect(find.text('Zenify'), findsOneWidget);
+      expect(find.byType(ZenifyStoryBrand), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
     });
 
     testWidgets('StoryCardPreview renders Stacked Album Template', (tester) async {
@@ -343,7 +340,8 @@ void main() {
       expect(find.text('SMITHEREENS'), findsOneWidget);
       expect(find.text('Joji'), findsOneWidget);
       expect(find.textContaining('2022'), findsOneWidget);
-      expect(find.text('Zenify'), findsOneWidget);
+      expect(find.byType(ZenifyStoryBrand), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
     });
 
     testWidgets('StoryCardPreview renders Collage Playlist Template', (tester) async {
@@ -374,7 +372,8 @@ void main() {
 
       expect(find.text('Late Night Chill'), findsOneWidget);
       expect(find.textContaining('Curated by You'), findsOneWidget);
-      expect(find.text('Zenify'), findsOneWidget);
+      expect(find.byType(ZenifyStoryBrand), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
     });
 
     testWidgets('Missing artwork and empty metadata do not crash any template', (tester) async {

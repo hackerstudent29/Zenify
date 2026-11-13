@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../features/story_sharing/screens/story_options_sheet.dart';
+import '../../features/story_sharing/story_sharing.dart';
 import '../../models/track.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/innertube_service.dart';
@@ -550,7 +550,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
       // 1. Add to Story
       ZenDropdownItem(
         title: 'Add to Story',
-        icon: CupertinoIcons.camera,
+        icon: CupertinoIcons.sparkles,
         onTap: () {
           Navigator.of(context).pop();
           if (widget.callerContext.mounted) {
@@ -810,20 +810,9 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                         );
                       },
                     ),
-                    // Message
+                    // Stories (Instagram / Social Story)
                     _QuickShareBtn(
-                      icon: CupertinoIcons.paperplane,
-                      label: 'Message',
-                      onTap: () {
-                        Navigator.of(context).pop();
-                        SharePlus.instance.share(ShareParams(
-                          text: 'Listening to "${widget.title}" by ${widget.artist} on Zenify: $_shareUrl',
-                        ));
-                      },
-                    ),
-                    // Instagram Stories
-                    _QuickShareBtn(
-                      icon: CupertinoIcons.camera,
+                      icon: CupertinoIcons.sparkles,
                       label: 'Stories',
                       gradient: const LinearGradient(
                         begin: Alignment.bottomLeft,
@@ -840,10 +829,25 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                         }
                       },
                     ),
+                    // WhatsApp
+                    _QuickShareBtn(
+                      icon: CupertinoIcons.chat_bubble_fill,
+                      label: 'WhatsApp',
+                      color: const Color(0xFF25D366),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        if (widget.callerContext.mounted) {
+                          StoryOptionsSheet.show(
+                            context: widget.callerContext,
+                            track: effectiveTrack,
+                          );
+                        }
+                      },
+                    ),
                     // Facebook Stories
                     _QuickShareBtn(
                       icon: CupertinoIcons.share,
-                      label: 'Stories',
+                      label: 'Facebook',
                       color: const Color(0xFF1877F2),
                       onTap: () {
                         Navigator.of(context).pop();
@@ -1201,7 +1205,7 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                           },
                         ),
                         _QuickShareBtn(
-                          icon: CupertinoIcons.camera,
+                          icon: CupertinoIcons.sparkles,
                           label: 'Stories',
                           gradient: const LinearGradient(
                             begin: Alignment.bottomLeft,

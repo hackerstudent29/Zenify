@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/datasources/catalog_datasource.dart';
 import '../../models/track.dart';
 import '../../services/innertube_service.dart';
+import '../../services/user_preferences_service.dart';
 
 class ExploreCountry {
   const ExploreCountry({
@@ -287,15 +288,82 @@ class ExploreDataService {
     _initialized = true;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final code = prefs.getString(_countryPrefKey);
-      if (code != null) {
+      var code = prefs.getString(_countryPrefKey);
+      if (code == null || code.isEmpty) {
+        await UserPreferencesService.instance.ensureLoaded();
+        code = UserPreferencesService.instance.currentPrefs.countryCode;
+      }
+      if (code.isNotEmpty) {
         final match = kExploreCountries.firstWhere(
-          (c) => c.code == code,
+          (c) => c.code.toUpperCase() == code!.toUpperCase(),
           orElse: () => kExploreCountries[0],
         );
         _currentCountry = match;
       }
     } catch (_) {}
+  }
+
+  /// Sorts and prioritizes genres dynamically so user-selected onboarding genres
+  /// and language-specific genres appear first.
+  List<ExploreGenreItem> getSortedGenres({
+    List<String> preferredGenres = const [],
+    List<String> preferredLanguages = const [],
+  }) {
+    if (preferredGenres.isEmpty && preferredLanguages.isEmpty) return genres;
+    final copy = List<ExploreGenreItem>.from(genres);
+    final prefSet = preferredGenres.map((g) => g.toLowerCase().trim()).toSet();
+    final langSet = preferredLanguages.map((l) => l.toLowerCase().trim()).toSet();
+
+    copy.sort((a, b) {
+      final aPref = prefSet.contains(a.title.toLowerCase()) ||
+          prefSet.contains(a.id.toLowerCase()) ||
+          langSet.any((l) => a.title.toLowerCase().contains(l) || a.searchQuery.toLowerCase().contains(l))
+          ? 0
+          : 1;
+      final bPref = prefSet.contains(b.title.toLowerCase()) ||
+          prefSet.contains(b.id.toLowerCase()) ||
+          langSet.any((l) => b.title.toLowerCase().contains(l) || b.searchQuery.toLowerCase().contains(l))
+          ? 0
+          : 1;
+      return aPref.compareTo(bPref);
+    });
+    return copy;
+  }
+
+  /// Fetches personalized seed tracks matching the user's selected artists,
+  /// languages, and genres.
+  Future<List<Track>> getPersonalizedRecommendations({bool forceRefresh = false}) async {
+    final prefs = UserPreferencesService.instance.currentPrefs;
+    final queries = <String>[];
+    for (final artist in prefs.favoriteArtists.take(3)) {
+      queries.add('${artist.name} hits');
+    }
+    for (final genre in prefs.genres.take(2)) {
+      queries.add('$genre top songs');
+    }
+    for (final lang in prefs.languages.take(2)) {
+      queries.add('$lang trending hits');
+    }
+
+    if (queries.isEmpty) {
+      queries.add(_currentCountry.query);
+    }
+
+    final tracks = <Track>[];
+    final seen = <String>{};
+
+    for (final q in queries.take(4)) {
+      try {
+        final res = await InnerTubeService.instance.search(q);
+        for (final t in res) {
+          if (seen.add(t.id)) tracks.add(t);
+          if (tracks.length >= 24) break;
+        }
+      } catch (_) {}
+      if (tracks.length >= 24) break;
+    }
+
+    return tracks;
   }
 
   Future<void> setCountry(ExploreCountry country) async {

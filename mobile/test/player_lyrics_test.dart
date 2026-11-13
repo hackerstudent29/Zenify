@@ -199,12 +199,12 @@ void main() {
     );
 
     await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('Second'), findsOneWidget);
 
     // Tap line -> immediately triggers onSeek to that line's start time
     await tester.tap(find.text('Second'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
     expect(seekedTo, equals(const Duration(seconds: 6)));
 
     // Toggle immersive -> hides sync pill smoothly

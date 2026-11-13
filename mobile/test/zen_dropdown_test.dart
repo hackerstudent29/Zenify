@@ -53,8 +53,9 @@ void main() {
     expect(find.text('Starboy'), findsAtLeastNWidgets(1));
     expect(find.textContaining('The Weeknd'), findsOneWidget);
     expect(find.text('Copy Link'), findsOneWidget);
-    expect(find.text('Message'), findsOneWidget);
-    expect(find.text('Stories'), findsNWidgets(2));
+    expect(find.text('Stories'), findsAtLeastNWidgets(1));
+    expect(find.text('WhatsApp'), findsOneWidget);
+    expect(find.text('Facebook'), findsOneWidget);
 
     Navigator.of(capturedContext, rootNavigator: true).pop();
     await tester.pump();
@@ -128,6 +129,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     final submitted = await inputFuture;
+    await tester.pumpAndSettle();
 
     expect(submitted, equals('Late Night Study'));
     expect(DockVisibility.hideNavDockNotifier.value, isFalse);

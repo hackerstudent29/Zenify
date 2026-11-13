@@ -6,7 +6,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../features/story_sharing/screens/lyrics_selection_screen.dart';
+import '../../features/story_sharing/story_sharing.dart';
 import '../../services/lyrics_service.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart'
@@ -25,7 +25,8 @@ import '../../services/player_state.dart';
 /// Instrumental gaps shorter than this get NO dots.
 const double _kInterludeMin = 5.0;
 
-/// Long held word => per-letter wave.
+/// Long held word => per-letter wave (Latin/Greek/Cyrillic) or whole-word
+/// swell (every other script, so shaping is never broken).
 const double _kWaveMinDuration = 1.0; // seconds
 const int _kWaveMinLetters = 2;
 const int _kWaveMaxLetters = 9;
@@ -34,13 +35,63 @@ const double _kWaveScale = 0.08;
 const double _kWaveGlow = 0.7;
 const double _kWaveSpread = 0.4; // portion of word time used for the stagger
 
+/// Apple-style "waterfall": every line below the active one starts its glide a
+/// little later than the one above it.
+const int _kGlideStaggerMs = 38;
+const int _kGlideMaxLines = 9;
+
 /// Typography (Apple Music / SF Pro style).
-/// On iOS/macOS the system SF Pro is used automatically (".SF Pro ...").
-/// On Android bundle SF Pro in pubspec.yaml under the family names
-/// "SF Pro Display" and "SF Pro Text"; otherwise it falls back to Roboto.
 const double _kWordGap = 0.27; // space between words, x font size
 const double _kLineHeight = 1.2;
-const double _kTracking = 0.008; // letter spacing, x font size (was negative = cramped)
+const double _kTracking = 0.008; // letter spacing, x font size
+
+/// Universal fallback fonts for Indic, Asian, Arabic, Hebrew and Emoji scripts.
+/// For 100% consistent glyphs on Android, bundle Noto Sans families in
+/// pubspec.yaml (see notes) - system fallback differs per device/OEM.
+const List<String> _kFontFamilyFallback = [
+  'Noto Sans Tamil',
+  'Noto Sans Devanagari',
+  'Noto Sans Telugu',
+  'Noto Sans Malayalam',
+  'Noto Sans Kannada',
+  'Noto Sans Bengali',
+  'Noto Sans Gurmukhi',
+  'Noto Sans Gujarati',
+  'Noto Sans Oriya',
+  'Noto Sans Hebrew',
+  'Noto Sans Arabic',
+  'Noto Sans JP',
+  'Noto Sans KR',
+  'Nirmala UI',
+  'Tamil Sangam MN',
+  'Kohinoor Devanagari',
+  'Kohinoor Telugu',
+  'Kohinoor Bangla',
+  'Apple Color Emoji',
+  'Noto Color Emoji',
+  'Roboto',
+  'sans-serif',
+];
+
+/// Scripts / sequences where splitting into separate widgets or adding
+/// letter-spacing breaks shaping: Arabic, Indic, Thai, Lao, Tibetan, Myanmar,
+/// Khmer, Hebrew, combining marks, ZWJ/ZWNJ, variation selectors, Hangul Jamo
+/// and emoji.
+final RegExp _complexScriptRe = RegExp(
+  r'[\u0300-\u036F\u0590-\u06FF\u0750-\u077F\u08A0-\u08FF\u0900-\u0DFF\u0E00-\u0E7F\u0E80-\u0EFF\u0F00-\u0FFF\u1000-\u109F\u1100-\u11FF\u1780-\u17FF\u200C\u200D\uFE00-\uFE0F\u{1F000}-\u{1FAFF}]',
+  unicode: true,
+);
+
+bool _hasComplexScript(String s) => _complexScriptRe.hasMatch(s);
+
+/// A word is safe to split into per-letter widgets ONLY when every code point is
+/// a precomposed Latin / Greek / Cyrillic letter, digit or basic punctuation.
+/// Everything else gets the whole-word swell instead (same glyphs, no splitting).
+final RegExp _waveSafeRe = RegExp(
+  r'^[\u0021-\u007E\u00A0-\u024F\u0370-\u03FF\u0400-\u04FF\u2018-\u201D\u2026]+$',
+);
+
+bool _isWaveSafe(String s) => _waveSafeRe.hasMatch(s);
 
 /// Controls auto-hide after this much time without touching the screen.
 const Duration _kIdleHide = Duration(seconds: 3);
@@ -77,11 +128,6 @@ class LyricWord {
   final Duration end;
 }
 
-/// One lyric line. [end] and [words] are optional; without them timing is
-/// estimated (start -> next line, split across words by character count).
-///
-/// [singer] is optional. When the song has 2+ distinct singers, the first
-/// singer is shown on the left and every other singer on the right.
 class LyricLine {
   const LyricLine({
     required this.start,
@@ -117,15 +163,21 @@ class LyricsSheet extends StatelessWidget {
     super.key,
     this.onImmersiveChanged,
     this.immersiveListenable,
+    this.open = true,
+    this.revealAnimation,
   });
 
-  /// Called with true when the screen was idle for 3s (controls hidden) and
-  /// false when the user touches it again. Use it to hide/show your own
-  /// player chrome (header, transport controls...) if you want.
   final ValueChanged<bool>? onImmersiveChanged;
-
-  /// Optional external 3s idle state synchronized with the enclosing player.
   final ValueListenable<bool>? immersiveListenable;
+
+  /// Flip to false to play the liquid "close" cascade, true to play "open".
+  /// Ignored when [revealAnimation] is supplied.
+  final bool open;
+
+  /// Optional 0..1 animation owned by the parent (e.g. the side panel / sheet
+  /// transition). When given, every line is driven by it, so lyrics open and
+  /// close in perfect sync with the container.
+  final Animation<double>? revealAnimation;
 
   static Duration _ms(dynamic v) =>
       Duration(milliseconds: (v is num ? v : 0).toInt());
@@ -152,6 +204,7 @@ class LyricsSheet extends StatelessWidget {
             Text('Loading lyrics...',
                 style: TextStyle(
                     fontFamily: _kTextFont,
+                    fontFamilyFallback: _kFontFamilyFallback,
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: Colors.white.withValues(alpha: 0.65),
@@ -175,6 +228,7 @@ class LyricsSheet extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontFamily: _kDisplayFont,
+                      fontFamilyFallback: _kFontFamilyFallback,
                       fontSize: 21,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -187,6 +241,7 @@ class LyricsSheet extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontFamily: _kTextFont,
+                    fontFamilyFallback: _kFontFamilyFallback,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: Colors.white.withValues(alpha: 0.55),
@@ -267,6 +322,8 @@ class LyricsSheet extends StatelessWidget {
       onImmersiveChanged: onImmersiveChanged,
       immersiveListenable: immersiveListenable,
       onShareLyrics: openShareLyrics,
+      open: open,
+      revealAnimation: revealAnimation,
     );
   }
 }
@@ -292,16 +349,12 @@ class _Depth {
   int get hashCode => Object.hash(o, b, s);
 }
 
-// Upcoming lines.
 const _after = [
   _Depth(0.62, 0, 0.97),
   _Depth(0.40, 1.2, 0.94),
   _Depth(0.24, 2.6, 0.92),
   _Depth(0.14, 4.0, 0.90),
 ];
-// Finished lines. Their text is drawn in the dim colour (not white), so these
-// opacities are higher than before to keep them about as visible as upcoming
-// lines.
 const _before = [
   _Depth(0.80, 0.8, 0.96),
   _Depth(0.60, 2.2, 0.93),
@@ -311,26 +364,50 @@ const _before = [
 _Depth _depthFor(int dist, bool current, bool manual, bool unsynced,
     bool reduce) {
   if (current || unsynced) return const _Depth(1, 0, 1);
-  if (manual) return const _Depth(1, 0, 1);
+  if (manual) return const _Depth(0.86, 0, 0.97);
   final d = dist > 0
       ? _after[math.min(dist, _after.length) - 1]
       : _before[math.min(-dist, _before.length) - 1];
   return reduce ? _Depth(d.o, 0, 1) : d;
 }
 
-/// Spring sampled as a Curve (slight overshoot, settles ~0.8s).
+/// A real damped spring sampled as a Curve. [settle] is how many seconds of
+/// simulation time the 0..1 range maps to - pick it so the spring has settled
+/// by t = 1 (about 4 / (ratio * sqrt(stiffness)) seconds).
 class _SpringCurve extends Curve {
-  _SpringCurve()
-      : _sim = SpringSimulation(
+  _SpringCurve({
+    double stiffness = 170,
+    double ratio = 0.82,
+    this._settle = 0.85,
+  })  : _sim = SpringSimulation(
           SpringDescription.withDampingRatio(
-              mass: 1, stiffness: 170, ratio: 0.82),
+              mass: 1, stiffness: stiffness, ratio: ratio),
           0,
           1,
           0,
         );
   final SpringSimulation _sim;
+  final double _settle;
   @override
-  double transformInternal(double t) => t >= 1 ? 1 : _sim.x(t * 0.85);
+  double transformInternal(double t) => t >= 1 ? 1 : _sim.x(t * _settle);
+}
+
+/// Springs used across the file.
+final Curve _depthSpring = _SpringCurve();
+final Curve _glideSpring = _SpringCurve(stiffness: 120, ratio: 0.8, settle: 0.7);
+final Curve _revealSpring =
+    _SpringCurve(stiffness: 150, ratio: 0.74, settle: 0.7);
+final Curve _popSpring = _SpringCurve(stiffness: 240, ratio: 0.58, settle: 0.5);
+final Curve _dotSpring = _SpringCurve(stiffness: 230, ratio: 0.52, settle: 0.5);
+final Curve _thumbSpring = _SpringCurve(stiffness: 220, ratio: 0.7, settle: 0.6);
+const Curve _liquidCurve = Cubic(0.16, 1.0, 0.30, 1.0);
+
+/// One "scroll happened" event. Every tile turns it into its own spring.
+class _Glide {
+  const _Glide(this.id, this.delta, this.active);
+  final int id;
+  final double delta; // scroll distance in px (positive = content moved up)
+  final int active;
 }
 
 // ---------------------------------------------------------------------------
@@ -350,14 +427,9 @@ class _Item {
   final double start; // seconds
   final double end; // seconds
   final LyricLine? line;
-
-  /// Duet: this line sits on the right side.
   final bool right;
-
-  /// "( ... )" line.
   final bool backing;
 
-  /// Takes no space unless it is the current item (dots + bracket lines).
   bool get collapsible => interlude || backing;
 }
 
@@ -365,17 +437,6 @@ class _Item {
 // LyricsView
 // ---------------------------------------------------------------------------
 
-/// Apple Music style lyrics.
-///
-/// - SF Pro Bold, per-word left-to-right fill with soft edge + glow.
-/// - Only TWO font sizes: primary, and a smaller secondary for long lines.
-/// - Long held words get a per-letter wave (lift + scale + glow).
-/// - Finished lines fade back to the dim colour (never stay white).
-/// - Interlude dots (>= 5s gaps) and "( )" lines pop in only while current,
-///   then pop out and take no space.
-/// - Duets: first singer left, other singer right.
-/// - After 3s without touching, the bottom controls slide away and the lyrics
-///   take the whole area. Touch again and they come back.
 class LyricsView extends StatefulWidget {
   const LyricsView({
     super.key,
@@ -390,6 +451,8 @@ class LyricsView extends StatefulWidget {
     this.onImmersiveChanged,
     this.immersiveListenable,
     this.onShareLyrics,
+    this.open = true,
+    this.revealAnimation,
   });
 
   final List<LyricLine> lines;
@@ -403,6 +466,8 @@ class LyricsView extends StatefulWidget {
   final ValueChanged<bool>? onImmersiveChanged;
   final ValueListenable<bool>? immersiveListenable;
   final VoidCallback? onShareLyrics;
+  final bool open;
+  final Animation<double>? revealAnimation;
 
   @override
   State<LyricsView> createState() => _LyricsViewState();
@@ -412,11 +477,21 @@ class _LyricsViewState extends State<LyricsView>
     with TickerProviderStateMixin {
   static const _step = 500;
   static const _maxOffset = 15000;
-  static const Curve _liquidCurve = Cubic(0.16, 1.0, 0.30, 1.0);
 
   final _scroll = ScrollController();
-  final _clock = ValueNotifier<double>(0); // effective seconds (offset applied)
+  final _clock = ValueNotifier<double>(0);
   late final Ticker _ticker = createTicker(_onFrame);
+
+  /// Own open/close controller, used when the parent gives no animation.
+  late final AnimationController _revealCtl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 950),
+    reverseDuration: const Duration(milliseconds: 520),
+  );
+  Animation<double> get _reveal => widget.revealAnimation ?? _revealCtl;
+
+  final _glide = ValueNotifier<_Glide?>(null);
+  int _glideId = 0;
 
   late List<_Item> _items;
   late List<GlobalKey> _keys;
@@ -429,7 +504,6 @@ class _LyricsViewState extends State<LyricsView>
   bool _manual = false;
   Timer? _resume;
 
-  // Idle / immersive (controls hidden) state.
   late bool _immersive = widget.immersiveListenable?.value ?? false;
   Timer? _idle;
   int _pointers = 0;
@@ -460,6 +534,13 @@ class _LyricsViewState extends State<LyricsView>
       WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
     }
     if (widget.immersiveListenable == null) _armIdle();
+
+    // Lines start hidden, then cascade in after the first (jump) positioning.
+    if (widget.revealAnimation == null && widget.open) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _revealCtl.forward();
+      });
+    }
   }
 
   @override
@@ -490,6 +571,10 @@ class _LyricsViewState extends State<LyricsView>
       WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
     }
     if (old.isPlaying != widget.isPlaying) _syncTicker();
+
+    if (old.open != widget.open && widget.revealAnimation == null) {
+      widget.open ? _revealCtl.forward() : _revealCtl.reverse();
+    }
   }
 
   @override
@@ -497,10 +582,12 @@ class _LyricsViewState extends State<LyricsView>
     widget.immersiveListenable?.removeListener(_onExternalImmersive);
     widget.position.removeListener(_onPosition);
     _ticker.dispose();
+    _revealCtl.dispose();
     _resume?.cancel();
     _idle?.cancel();
     _scroll.dispose();
     _clock.dispose();
+    _glide.dispose();
     super.dispose();
   }
 
@@ -515,7 +602,6 @@ class _LyricsViewState extends State<LyricsView>
     if (_immersive == v || !mounted) return;
     setState(() => _immersive = v);
     widget.onImmersiveChanged?.call(v);
-    // Keep the active line smoothly centered as viewport space breathes.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _follow();
     });
@@ -555,7 +641,6 @@ class _LyricsViewState extends State<LyricsView>
     }
     double s(Duration d) => d.inMicroseconds / 1e6;
 
-    // Real end of a line (null when unknown).
     double? knownEnd(LyricLine l) {
       if (l.end != null) return s(l.end!);
       final w = l.words;
@@ -563,7 +648,6 @@ class _LyricsViewState extends State<LyricsView>
       return null;
     }
 
-    // Duet detection: first singer left, others right.
     final singers = <String>[];
     for (final l in L) {
       final sg = _normSinger(l.singer);
@@ -590,7 +674,7 @@ class _LyricsViewState extends State<LyricsView>
       if (!duet) {
         right = false;
       } else if (sg == null) {
-        right = lastRight; // inherit side (backing vocals follow their parent)
+        right = lastRight;
       } else if (_kGroupSingers.contains(sg)) {
         right = false;
       } else {
@@ -600,7 +684,6 @@ class _LyricsViewState extends State<LyricsView>
 
       _items.add(_Item.line(start, end, L[i], right: right, backing: backing));
 
-      // Interlude only when the real line end is known and gap >= 5s.
       if (known != null && hasNext && nextStart - known >= _kInterludeMin) {
         _items.add(_Item.gap(known, nextStart));
       }
@@ -646,9 +729,6 @@ class _LyricsViewState extends State<LyricsView>
     _publish(_raw());
   }
 
-  /// Effective lyric time = playback time + offset.
-  /// "+0.5s" makes the lyrics run 0.5s EARLIER (forward),
-  /// "-0.5s" makes them run 0.5s LATER.
   void _publish(double raw) {
     final eff = raw + _offsetMs / 1000;
     _clock.value = eff;
@@ -667,8 +747,6 @@ class _LyricsViewState extends State<LyricsView>
     return -1;
   }
 
-  /// Distance from the active item, counting only items that take space
-  /// (collapsed dots / bracket lines don't push lines further "away").
   int _distFor(int i) {
     if (!widget.isSynced || i == _active) return 0;
     var n = 0;
@@ -685,7 +763,13 @@ class _LyricsViewState extends State<LyricsView>
     }
   }
 
-  // ----- scrolling: silky liquid glide to the active line -----
+  // ----- scrolling -----
+  //
+  // Apple Music does NOT animate one big scroll. The scroll position snaps to
+  // the new place and every line springs from its old screen position to the
+  // new one, with a small extra delay for each line further down. That is the
+  // "liquid waterfall". We do exactly that (small moves) and fall back to a
+  // smooth expo-out scroll for long jumps (e.g. after manual scrolling).
 
   void _follow({bool forceAnimated = false}) {
     if (!widget.isSynced || !mounted || _manual || !_scroll.hasClients) return;
@@ -699,8 +783,8 @@ class _LyricsViewState extends State<LyricsView>
     }
     final pos = _scroll.position;
     target = target.clamp(pos.minScrollExtent, pos.maxScrollExtent).toDouble();
-    final d = (target - pos.pixels).abs();
-    if (d < 0.5) return;
+    final delta = target - pos.pixels;
+    if (delta.abs() < 0.5) return;
 
     final reduce = MediaQuery.disableAnimationsOf(context);
     if ((!_didFirstFollow && !forceAnimated) || reduce) {
@@ -708,15 +792,21 @@ class _LyricsViewState extends State<LyricsView>
       _didFirstFollow = true;
       return;
     }
-
     _didFirstFollow = true;
+
     final vh = math.max(1.0, pos.viewportDimension);
-    final ms = (380 + (d / vh).clamp(0.0, 2.5) * 260).round().clamp(380, 680);
-    _scroll.animateTo(
-      target,
-      duration: Duration(milliseconds: ms),
-      curve: _liquidCurve,
-    );
+    if (delta.abs() <= vh * 0.9) {
+      _scroll.jumpTo(target);
+      _glide.value = _Glide(++_glideId, delta, _active);
+    } else {
+      final ms =
+          (420 + (delta.abs() / vh).clamp(0.0, 2.5) * 260).round().clamp(420, 760);
+      _scroll.animateTo(
+        target,
+        duration: Duration(milliseconds: ms),
+        curve: _liquidCurve,
+      );
+    }
   }
 
   // ----- offset / language -----
@@ -758,140 +848,168 @@ class _LyricsViewState extends State<LyricsView>
     final h = MediaQuery.sizeOf(context).height;
     final showControls = _hasTranslation || widget.isSynced;
 
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => _pointerDown(),
-      onPointerUp: (_) => _pointerUp(),
-      onPointerCancel: (_) => _pointerUp(),
-      child: Column(
-        children: [
-          Expanded(
-            child: ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (r) => const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0x00000000),
-                  Color(0xFF000000),
-                  Color(0xFF000000),
-                  Color(0x00000000),
-                ],
-                stops: [0, 0.06, 0.92, 1],
-              ).createShader(r),
-              child: NotificationListener<ScrollNotification>(
-                onNotification: (n) {
-                  if (n is ScrollStartNotification && n.dragDetails != null) {
-                    _resume?.cancel();
-                    if (!_manual) setState(() => _manual = true);
-                  } else if (n is UserScrollNotification &&
-                      n.direction != ScrollDirection.idle) {
-                    _resume?.cancel();
-                    if (!_manual) setState(() => _manual = true);
-                  } else if (n is ScrollEndNotification && _manual) {
-                    _onUserScrollEnd();
-                  }
-                  return false;
-                },
-                child: SingleChildScrollView(
-                  controller: _scroll,
-                  physics: const BouncingScrollPhysics(
-                    decelerationRate: ScrollDecelerationRate.fast,
-                    parent: AlwaysScrollableScrollPhysics(),
-                  ),
-                  padding: EdgeInsets.only(top: 28, bottom: h * 0.36),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var i = 0; i < _items.length; i++)
-                        _LineTile(
-                          key: _keys[i],
-                          item: _items[i],
-                          lang: _lang,
-                          clock: _clock,
-                          synced: widget.isSynced,
-                          current: widget.isSynced && i == _active,
-                          past: widget.isSynced && i < _active,
-                          dist: _distFor(i),
-                          manual: _manual,
-                          onCollapsed: () => WidgetsBinding.instance
-                              .addPostFrameCallback((_) => _follow()),
-                          onTap: () {
-                            final line = _items[i].line;
-                            if (!widget.isSynced || line == null) return;
-                            HapticFeedback.selectionClick();
-                            _resume?.cancel();
-                            final seekMs = math.max(
-                                0, line.start.inMilliseconds - _offsetMs);
-                            _anchorPos = seekMs / 1000.0;
-                            _anchorAt = _lastElapsed;
-                            _clock.value = line.start.inMicroseconds / 1e6;
-                            setState(() {
-                              _manual = false;
-                              _active = i;
-                            });
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (mounted) _follow(forceAnimated: true);
-                            });
-                            widget.onSeek?.call(Duration(milliseconds: seekMs));
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (showControls)
-            ClipRect(
-              child: AnimatedAlign(
-                alignment: Alignment.topCenter,
-                heightFactor: _immersive ? 0.0 : 1.0,
-                duration: const Duration(milliseconds: 420),
-                curve: _liquidCurve,
-                child: AnimatedOpacity(
-                  opacity: _immersive ? 0.0 : 1.0,
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeOutCubic,
-                  child: IgnorePointer(
-                    ignoring: _immersive,
-                    child: _Controls(
-                      lang: _lang,
-                      showLang: _hasTranslation,
-                      showOffset: widget.isSynced,
-                      offsetLabel: _offsetLabel,
-                      offsetIsZero: _offsetMs == 0,
-                      onLang: (l) {
-                        HapticFeedback.selectionClick();
-                        setState(() => _lang = l);
-                        WidgetsBinding.instance.addPostFrameCallback(
-                            (_) => _follow(forceAnimated: true));
-                      },
-                      onMinus: () => _changeOffset(-_step),
-                      onPlus: () => _changeOffset(_step),
-                      onReset: _resetOffset,
-                      onShareLyrics: widget.onShareLyrics,
+    // MaterialType.transparency => no fill, no elevation, but ink/text styles
+    // still work. The lyrics now draw on whatever is behind them.
+    return Material(
+      type: MaterialType.transparency,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _pointerDown(),
+        onPointerUp: (_) => _pointerUp(),
+        onPointerCancel: (_) => _pointerUp(),
+        child: Column(
+          children: [
+            Expanded(
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (r) => const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x00000000),
+                    Color(0xFF000000),
+                    Color(0xFF000000),
+                    Color(0x00000000),
+                  ],
+                  stops: [0, 0.06, 0.92, 1],
+                ).createShader(r),
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (n) {
+                    if (n is ScrollStartNotification && n.dragDetails != null) {
+                      _resume?.cancel();
+                      if (!_manual) setState(() => _manual = true);
+                    } else if (n is UserScrollNotification &&
+                        n.direction != ScrollDirection.idle) {
+                      _resume?.cancel();
+                      if (!_manual) setState(() => _manual = true);
+                    } else if (n is ScrollEndNotification && _manual) {
+                      _onUserScrollEnd();
+                    }
+                    return false;
+                  },
+                  child: SingleChildScrollView(
+                    controller: _scroll,
+                    physics: const BouncingScrollPhysics(
+                      decelerationRate: ScrollDecelerationRate.fast,
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    padding: EdgeInsets.only(top: 28, bottom: h * 0.36),
+                    child: Column(
+                      // stretch => every tile is full width, so duet
+                      // right-alignment and scale pivots work correctly.
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < _items.length; i++)
+                          _LineTile(
+                            key: _keys[i],
+                            item: _items[i],
+                            index: i,
+                            lang: _lang,
+                            clock: _clock,
+                            reveal: _reveal,
+                            glide: _glide,
+                            synced: widget.isSynced,
+                            current: widget.isSynced && i == _active,
+                            past: widget.isSynced && i < _active,
+                            dist: _distFor(i),
+                            manual: _manual,
+                            onCollapsed: () => WidgetsBinding.instance
+                                .addPostFrameCallback((_) => _follow()),
+                            onTap: () {
+                              final line = _items[i].line;
+                              if (!widget.isSynced || line == null) return;
+                              HapticFeedback.selectionClick();
+                              _resume?.cancel();
+                              final seekMs = math.max(
+                                  0, line.start.inMilliseconds - _offsetMs);
+                              _anchorPos = seekMs / 1000.0;
+                              _anchorAt = _lastElapsed;
+                              _clock.value = line.start.inMicroseconds / 1e6;
+                              setState(() {
+                                _manual = false;
+                                _active = i;
+                              });
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) _follow(forceAnimated: true);
+                              });
+                              widget.onSeek
+                                  ?.call(Duration(milliseconds: seekMs));
+                            },
+                          ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
-        ],
+            if (showControls)
+              AnimatedBuilder(
+                animation: _reveal,
+                builder: (context, child) {
+                  final v =
+                      Curves.easeOut.transform(_reveal.value.clamp(0.0, 1.0));
+                  return Opacity(
+                    opacity: v,
+                    child: Transform.translate(
+                        offset: Offset(0, (1 - v) * 18), child: child),
+                  );
+                },
+                child: ClipRect(
+                  child: AnimatedAlign(
+                    alignment: Alignment.topCenter,
+                    heightFactor: _immersive ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 460),
+                    curve: _liquidCurve,
+                    child: AnimatedOpacity(
+                      opacity: _immersive ? 0.0 : 1.0,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      child: IgnorePointer(
+                        ignoring: _immersive,
+                        child: _Controls(
+                          lang: _lang,
+                          showLang: _hasTranslation,
+                          showOffset: widget.isSynced,
+                          offsetLabel: _offsetLabel,
+                          offsetIsZero: _offsetMs == 0,
+                          onLang: (l) {
+                            HapticFeedback.selectionClick();
+                            setState(() => _lang = l);
+                            WidgetsBinding.instance.addPostFrameCallback(
+                                (_) => _follow(forceAnimated: true));
+                          },
+                          onMinus: () => _changeOffset(-_step),
+                          onPlus: () => _changeOffset(_step),
+                          onReset: _resetOffset,
+                          onShareLyrics: widget.onShareLyrics,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Line tile: depth (opacity/blur/scale) + waterfall spring + pop in/out
+// Line tile
+//   depth (opacity/blur/scale) spring  +  waterfall glide  +  open/close
+//   reveal cascade  +  pop in/out  +  tap highlight border
 // ---------------------------------------------------------------------------
 
 class _LineTile extends StatefulWidget {
   const _LineTile({
     super.key,
     required this.item,
+    required this.index,
     required this.lang,
     required this.clock,
+    required this.reveal,
+    required this.glide,
     required this.synced,
     required this.current,
     required this.past,
@@ -902,8 +1020,11 @@ class _LineTile extends StatefulWidget {
   });
 
   final _Item item;
+  final int index;
   final LyricsLang lang;
   final ValueListenable<double> clock;
+  final Animation<double> reveal;
+  final ValueListenable<_Glide?> glide;
   final bool synced, current, past, manual;
   final int dist;
   final VoidCallback onTap;
@@ -914,17 +1035,19 @@ class _LineTile extends StatefulWidget {
 }
 
 class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
-  static final _curve = _SpringCurve();
-
-  late final AnimationController _d;
-  late final AnimationController _pop;
+  late final AnimationController _d; // depth
+  late final AnimationController _pop; // collapsible pop in/out
+  late final AnimationController _g; // waterfall glide
   late final CurvedAnimation _popCurve;
 
   late _Depth _from, _to;
   bool _ready = false;
   bool _present = true; // takes layout space
   bool _pressed = false;
-  Timer? _dt, _exit;
+  bool _hl = false; // highlight border visible
+  bool _hover = false;
+  double _gFrom = 0; // px offset the glide starts from
+  Timer? _dt, _exit, _glideT, _hlT;
 
   @override
   void initState() {
@@ -933,28 +1056,82 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
         vsync: this, duration: const Duration(milliseconds: 700));
     _pop = AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 380),
-        reverseDuration: const Duration(milliseconds: 220));
+        duration: const Duration(milliseconds: 420),
+        reverseDuration: const Duration(milliseconds: 240));
     _popCurve = CurvedAnimation(
-        parent: _pop,
-        curve: Curves.easeOutBack,
-        reverseCurve: Curves.easeInCubic);
+        parent: _pop, curve: _popSpring, reverseCurve: Curves.easeInCubic);
+    _g = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 760), value: 1);
+    widget.glide.addListener(_onGlide);
   }
 
   bool get _collapsible => widget.synced && widget.item.collapsible;
 
   _Depth get _cur =>
-      _Depth.lerp(_from, _to, _curve.transform(_d.value.clamp(0.0, 1.0)));
+      _Depth.lerp(_from, _to, _depthSpring.transform(_d.value.clamp(0.0, 1.0)));
 
   bool get _reduce => MediaQuery.disableAnimationsOf(context);
 
   _Depth _target() => _depthFor(widget.dist, widget.current, widget.manual,
       !widget.synced, _reduce);
 
-  // Subtle waterfall stagger across nearby upcoming lines during playback.
   int get _waterfall => (!widget.current && widget.dist > 0 && !widget.manual)
       ? math.min(widget.dist, 5) * 32
       : 0;
+
+  double get _glideY =>
+      _gFrom * (1 - _glideSpring.transform(_g.value.clamp(0.0, 1.0)));
+
+  /// Reveal (open/close) progress for THIS line: lines cascade top -> bottom
+  /// when opening (spring) and bottom -> top when closing.
+  double _revealP() {
+    final v = widget.reveal.value;
+    if (v >= 1.0) return 1.0;
+    if (v <= 0.0) return 0.0;
+    if (_reduce) return v;
+    final rank = widget.synced
+        ? (widget.dist + 3).clamp(0, 11)
+        : math.min(widget.index, 11);
+    final begin = rank / 11 * 0.45;
+    final local = ((v - begin) / 0.55).clamp(0.0, 1.0).toDouble();
+    return widget.reveal.status == AnimationStatus.reverse
+        ? Curves.easeInOutCubic.transform(local)
+        : _revealSpring.transform(local);
+  }
+
+  void _onGlide() {
+    final g = widget.glide.value;
+    if (g == null || !mounted) return;
+    final rel = widget.index - g.active;
+    if (rel.abs() > 12) return;
+    final cur = _glideY;
+    // The tile must visually stay where it was: offset = old leftover + delta.
+    _gFrom = cur + g.delta;
+    _g.value = 0;
+    _glideT?.cancel();
+    final delay = _reduce
+        ? 0
+        : (rel > 0 ? math.min(rel, _kGlideMaxLines) * _kGlideStaggerMs : 0);
+    _glideT = Timer(Duration(milliseconds: delay), () {
+      if (mounted) _g.forward(from: 0);
+    });
+  }
+
+  void _setPressed(bool down) {
+    _hlT?.cancel();
+    if (down) {
+      setState(() {
+        _pressed = true;
+        _hl = true;
+      });
+    } else {
+      if (_pressed) setState(() => _pressed = false);
+      // Keep the border a moment after release, then let it melt away.
+      _hlT = Timer(const Duration(milliseconds: 420), () {
+        if (mounted && _hl) setState(() => _hl = false);
+      });
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -981,10 +1158,10 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
       } else if (!widget.current && old.current) {
         _pop.reverse();
         _exit?.cancel();
-        _exit = Timer(const Duration(milliseconds: 240), () {
+        // Let the pop-out play, THEN collapse the height with AnimatedSize.
+        _exit = Timer(const Duration(milliseconds: 260), () {
           if (!mounted) return;
           setState(() => _present = false);
-          widget.onCollapsed();
         });
       }
     }
@@ -996,7 +1173,6 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
       _d.value = 0;
       _dt?.cancel();
       if (widget.manual) {
-        // Sharpen all lines rapidly on drag start to keep scrolling 120fps.
         _d.animateTo(
           1,
           duration: Duration(milliseconds: _reduce ? 0 : 180),
@@ -1012,17 +1188,32 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    widget.glide.removeListener(_onGlide);
     _dt?.cancel();
     _exit?.cancel();
+    _glideT?.cancel();
+    _hlT?.cancel();
     _d.dispose();
     _popCurve.dispose();
     _pop.dispose();
+    _g.dispose();
     super.dispose();
   }
 
+  Widget _sized(Widget child) => AnimatedSize(
+        duration: const Duration(milliseconds: 560),
+        curve: _liquidCurve,
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.none,
+        onEnd: widget.onCollapsed,
+        child: child,
+      );
+
   @override
   Widget build(BuildContext context) {
-    if (_collapsible && !_present) return const SizedBox.shrink();
+    if (_collapsible && !_present) {
+      return _sized(const SizedBox(width: double.infinity, height: 0));
+    }
 
     final it = widget.item;
     final line = it.line;
@@ -1052,7 +1243,12 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
 
     Widget content;
     if (it.interlude) {
-      content = const _Dots();
+      content = _Dots(
+        clock: widget.clock,
+        pop: _pop,
+        start: it.start,
+        end: it.end,
+      );
     } else {
       content = Column(
         crossAxisAlignment:
@@ -1067,7 +1263,6 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
             current: widget.current,
             past: widget.past,
             plain: !widget.synced,
-            // strict 2 lines total: with a translation the original gets 1.
             maxLines: sub != null ? 1 : 2,
             backing: backing,
             right: right,
@@ -1083,10 +1278,11 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
                 softWrap: false,
                 style: TextStyle(
                   fontFamily: _kTextFont,
+                  fontFamilyFallback: _kFontFamilyFallback,
                   fontSize: 18,
-                  height: 1.2,
+                  height: _hasComplexScript(sub) ? 1.32 : 1.2,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 0.1,
+                  letterSpacing: _hasComplexScript(sub) ? 0.0 : 0.1,
                   color: Colors.white
                       .withValues(alpha: widget.current ? 0.85 : 0.6),
                 ),
@@ -1098,16 +1294,21 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
     }
 
     final alignment = right ? Alignment.centerRight : Alignment.centerLeft;
+    final interactive = widget.synced && widget.item.line != null;
 
-    return RepaintBoundary(
+    // Inner: depth + press highlight. Lives inside a RepaintBoundary so the
+    // glide / reveal transforms below are cheap compositor transforms.
+    final inner = RepaintBoundary(
       child: AnimatedBuilder(
         animation: Listenable.merge([_d, _pop]),
         child: content,
         builder: (context, child) {
           final dp = _cur;
-          final pv = _collapsible ? _popCurve.value : 1.0;
-          final popScale = _collapsible ? 0.5 + 0.5 * pv : 1.0;
-          final popOpacity = _collapsible ? pv.clamp(0.0, 1.0) : 1.0;
+          // Interlude dots animate themselves; bracket lines use a tile pop.
+          final pv = (_collapsible && !it.interlude) ? _popCurve.value : 1.0;
+          final popScale = (_collapsible && !it.interlude) ? 0.5 + 0.5 * pv : 1.0;
+          final popOpacity =
+              (_collapsible && !it.interlude) ? pv.clamp(0.0, 1.0) : 1.0;
 
           Widget w = Transform.scale(
             scale: dp.s * popScale,
@@ -1122,53 +1323,83 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
             );
           }
           w = Opacity(opacity: (dp.o * popOpacity).clamp(0.0, 1.0), child: w);
-          final interactive = widget.synced && widget.item.line != null;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: interactive
-                ? (_) {
-                    if (!_pressed) setState(() => _pressed = true);
-                  }
-                : null,
-            onTapUp: interactive
-                ? (_) {
-                    if (_pressed) setState(() => _pressed = false);
-                  }
-                : null,
-            onTapCancel: interactive
-                ? () {
-                    if (_pressed) setState(() => _pressed = false);
-                  }
-                : null,
-            onTap: widget.onTap,
-            child: AnimatedScale(
-              scale: _pressed ? 0.96 : 1.0,
-              duration: Duration(milliseconds: _pressed ? 100 : 280),
-              curve: _pressed ? Curves.easeOutCubic : Curves.easeOutBack,
-              alignment: alignment,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: _pressed
-                      ? Colors.white.withValues(alpha: 0.10)
-                      : Colors.transparent,
+
+          final fillA = interactive ? (_hl ? 0.10 : (_hover ? 0.06 : 0.0)) : 0.0;
+          final borderA = interactive && _hl ? 0.26 : 0.0;
+
+          Widget tile = AnimatedScale(
+            scale: _pressed ? 0.965 : 1.0,
+            duration: Duration(milliseconds: _pressed ? 110 : 420),
+            curve: _pressed ? Curves.easeOutCubic : _popSpring,
+            alignment: alignment,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                color: Colors.white.withValues(alpha: fillA),
+                // Always 1.2px so layout never jumps; only the colour fades.
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: borderA),
+                  width: 1.2,
                 ),
-                child: w,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.white
+                        .withValues(alpha: interactive && _hl ? 0.07 : 0.0),
+                    blurRadius: 22,
+                  ),
+                ],
               ),
+              child: w,
+            ),
+          );
+
+          if (!interactive) return tile;
+
+          return MouseRegion(
+            onEnter: (_) => setState(() => _hover = true),
+            onExit: (_) => setState(() => _hover = false),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (_) => _setPressed(true),
+              onTapUp: (_) => _setPressed(false),
+              onTapCancel: () => _setPressed(false),
+              onTap: widget.onTap,
+              child: tile,
             ),
           );
         },
       ),
     );
+
+    final body = AnimatedBuilder(
+      animation: Listenable.merge([_g, widget.reveal]),
+      child: inner,
+      builder: (context, child) {
+        final p = _revealP();
+        return Opacity(
+          opacity: p.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, _glideY + (1 - p) * 56),
+            child: Transform.scale(
+              scale: 0.94 + 0.06 * p,
+              alignment: alignment,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+
+    return _collapsible ? _sized(body) : body;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Word-by-word fill line. Only two font sizes: primary and secondary.
+// Word-by-word fill line.
 // ---------------------------------------------------------------------------
 
 class _Layout {
@@ -1213,7 +1444,6 @@ class _WordLineState extends State<_WordLine>
   String _layText = '';
   int _layLines = 0;
 
-  /// 1 -> 0 right after a line finishes: the white text eases back to dim.
   late final AnimationController _settle;
 
   @override
@@ -1223,16 +1453,20 @@ class _WordLineState extends State<_WordLine>
         vsync: this, duration: const Duration(milliseconds: 520), value: 0);
   }
 
-  TextStyle _style(double fs, Color c) => TextStyle(
-        fontFamily: _kDisplayFont,
-        fontSize: fs,
-        height: _kLineHeight,
-        leadingDistribution: TextLeadingDistribution.even,
-        fontWeight: FontWeight.w700,
-        letterSpacing: _kTracking * fs,
-        fontStyle: widget.backing ? FontStyle.italic : FontStyle.normal,
-        color: c,
-      );
+  TextStyle _style(double fs, Color c) {
+    final complex = _hasComplexScript(widget.text);
+    return TextStyle(
+      fontFamily: _kDisplayFont,
+      fontFamilyFallback: _kFontFamilyFallback,
+      fontSize: fs,
+      height: complex ? 1.32 : _kLineHeight,
+      leadingDistribution: TextLeadingDistribution.even,
+      fontWeight: FontWeight.w700,
+      letterSpacing: complex ? 0.0 : _kTracking * fs,
+      fontStyle: widget.backing ? FontStyle.italic : FontStyle.normal,
+      color: c,
+    );
+  }
 
   _Layout _layout(double maxW) {
     if (_lay != null &&
@@ -1243,7 +1477,6 @@ class _WordLineState extends State<_WordLine>
     }
     final tokens = widget.text.split(' ').where((t) => t.isNotEmpty).toList();
 
-    // The two sizes.
     final primary = (maxW * 0.09).clamp(26.0, 36.0).toDouble();
     final secondary = (primary * 0.82).roundToDouble();
 
@@ -1279,14 +1512,11 @@ class _WordLineState extends State<_WordLine>
       return n;
     }
 
-    // Bracket lines always use the small size; others use primary if it fits
-    // in maxLines, otherwise the secondary. Nothing in between.
     var fs = widget.backing ? secondary : primary;
     if (!widget.backing && lines(measure(fs), fs) > widget.maxLines) {
       fs = secondary;
     }
 
-    // timing per word
     final n = tokens.length;
     final s = List<double>.filled(n, 0);
     final e = List<double>.filled(n, 0);
@@ -1297,13 +1527,18 @@ class _WordLineState extends State<_WordLine>
         for (var i = 0; i < n; i++) {
           s[i] = ws[i].start.inMicroseconds / 1e6;
           e[i] = math.max(s[i] + 0.05, ws[i].end.inMicroseconds / 1e6);
-          final letters = tokens[i].replaceAll(_nonLetterRe, '').runes.length;
+          // Count GRAPHEMES (what a reader sees as a letter), not code points.
+          final letters = tokens[i]
+              .characters
+              .where((c) => c.replaceAll(_nonLetterRe, '').isNotEmpty)
+              .length;
+          // Every script may be "emphasised"; _Word decides HOW (per-letter
+          // wave for safe scripts, whole-word swell for the rest).
           emph[i] = (e[i] - s[i]) >= _kWaveMinDuration &&
               letters >= _kWaveMinLetters &&
               letters <= _kWaveMaxLetters;
         }
       } else {
-        // Distribute word timings proportionally across tokens.
         final lineStart = ws.first.start.inMicroseconds / 1e6;
         final lineEnd =
             math.max(lineStart + 0.5, ws.last.end.inMicroseconds / 1e6);
@@ -1341,7 +1576,6 @@ class _WordLineState extends State<_WordLine>
         old.backing != widget.backing) {
       _lay = null;
     }
-    // Line just finished: fade white -> dim instead of snapping.
     if (old.current && !widget.current && widget.past && !widget.plain) {
       _settle.value = 1;
       _settle.reverse();
@@ -1361,7 +1595,7 @@ class _WordLineState extends State<_WordLine>
     final reduce = MediaQuery.disableAnimationsOf(context);
     return LayoutBuilder(builder: (context, cons) {
       final lay = _layout(cons.maxWidth);
-      Widget build(double? t, double settle) => Wrap(
+      Widget wrap(double? t, double settle) => Wrap(
             alignment: widget.right ? WrapAlignment.end : WrapAlignment.start,
             spacing: lay.fs * _kWordGap,
             runSpacing: lay.fs * 0.04,
@@ -1375,17 +1609,17 @@ class _WordLineState extends State<_WordLine>
       if (widget.current && !widget.plain) {
         return ValueListenableBuilder<double>(
           valueListenable: widget.clock,
-          builder: (_, t, _) => build(t, 1),
+          builder: (_, t, _) => wrap(t, 1),
         );
       }
       if (widget.past && !widget.plain) {
-        if (_settle.isDismissed) return build(null, 0);
+        if (_settle.isDismissed) return wrap(null, 0);
         return AnimatedBuilder(
           animation: _settle,
-          builder: (context, _) => build(null, _settle.value),
+          builder: (context, _) => wrap(null, _settle.value),
         );
       }
-      return build(null, 1);
+      return wrap(null, 1);
     });
   }
 
@@ -1412,8 +1646,15 @@ class _WordLineState extends State<_WordLine>
 }
 
 /// One word: dim base, soft-edged white fill (left to right) and glow.
-/// Long held words are split into letters and get a staggered wave.
-/// [settle] only matters for a fully filled word: 1 = white, 0 = dim.
+///
+/// Emphasised (long held) words:
+///  * Latin / Greek / Cyrillic  -> per-LETTER wave. Letters are split by
+///    grapheme cluster and the per-letter layout is used for the whole life of
+///    the word (before, during and after), so nothing "pops" when it starts.
+///  * Every other script (Tamil, Hindi, Arabic, Thai, Hebrew, CJK, emoji,
+///    anything with combining marks) -> whole-WORD swell. The word stays ONE
+///    Text, so the font, shaping, matras and conjuncts are exactly the same as
+///    before the animation - only lift / scale / glow are added.
 class _Word extends StatelessWidget {
   const _Word({
     required this.text,
@@ -1427,8 +1668,8 @@ class _Word extends StatelessWidget {
   final String text;
   final double fs;
   final TextStyle Function(double, Color) style;
-  final double p; // 0..1 fill progress
-  final double raw; // unclamped progress (for the wave)
+  final double p;
+  final double raw;
   final bool emph;
   final double settle;
 
@@ -1449,7 +1690,6 @@ class _Word extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // glow
         Opacity(
           opacity: 0.55,
           child: ImageFiltered(
@@ -1477,27 +1717,28 @@ class _Word extends StatelessWidget {
     );
   }
 
+  static double _bump(double u) => (u <= 0 || u >= 1)
+      ? 0.0
+      : math.sin(math.pi * math.pow(u, 0.756).toDouble()); // peak ~40%
+
   Widget _wave() {
-    final letters = text.runes.map(String.fromCharCode).toList();
+    // Grapheme clusters, NOT code points: "é" (e + U+0301), flags, emoji with
+    // ZWJ and similar stay in one piece.
+    final letters = text.characters.toList();
     final n = letters.length;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        for (var i = 0; i < n; i++)
-          _letter(letters[i], i, n),
+        for (var i = 0; i < n; i++) _letter(letters[i], i, n),
       ],
     );
   }
 
   Widget _letter(String ch, int i, int n) {
-    // Each letter owns 1/n of the wipe.
     final pl = (p * n - i).clamp(0.0, 1.0).toDouble();
-    // Staggered bump: starts later for later letters, all done by raw == 1.
     final delay = (i / n) * _kWaveSpread;
     final u = ((raw - delay) / (1 - _kWaveSpread)).clamp(0.0, 1.0).toDouble();
-    final bump = (u <= 0 || u >= 1)
-        ? 0.0
-        : math.sin(math.pi * math.pow(u, 0.756).toDouble()); // peak ~40%
+    final bump = _bump(u);
 
     return Transform.translate(
       offset: Offset(0, -fs * _kWaveLift * bump),
@@ -1522,45 +1763,125 @@ class _Word extends StatelessWidget {
     );
   }
 
+  Widget _swell() {
+    final bump = _bump(raw.clamp(0.0, 1.0).toDouble());
+    final child = _fill(text, fs, style, p, settle);
+    if (bump <= 0) return child;
+    return Transform.translate(
+      offset: Offset(0, -fs * _kWaveLift * 0.8 * bump),
+      child: Transform.scale(
+        scale: 1 + _kWaveScale * 0.8 * bump,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            if (bump > 0.08)
+              Opacity(
+                opacity: (_kWaveGlow * bump).clamp(0.0, 1.0),
+                child: ImageFiltered(
+                  imageFilter: ImageFilter.blur(
+                      sigmaX: 2 + 6 * bump, sigmaY: 2 + 6 * bump),
+                  child: Text(text, style: style(fs, Colors.white)),
+                ),
+              ),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (emph && raw > 0 && raw < 1) return _wave();
-    return _fill(text, fs, style, p, settle);
+    if (!emph) return _fill(text, fs, style, p, settle);
+    return _isWaveSafe(text) ? _wave() : _swell();
   }
 }
 
 // ---------------------------------------------------------------------------
-// Interlude dots: static, the tile pops them in / out.
+// Interlude dots: liquid pop in / out, sequential fill, breathing.
+//
+//  in     each dot springs in with a stagger and a visible overshoot
+//  during dots fill one after another across the gap and gently breathe
+//  end    in the last 0.5s they swell, then spring-shrink away (the tile's
+//         reverse pop plays the same spring backwards: a small anticipation
+//         "squash" before they vanish) and the row collapses smoothly
 // ---------------------------------------------------------------------------
 
 class _Dots extends StatelessWidget {
-  const _Dots();
+  const _Dots({
+    required this.clock,
+    required this.pop,
+    required this.start,
+    required this.end,
+  });
+
+  final ValueListenable<double> clock;
+  final Animation<double> pop;
+  final double start, end;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 10, 0, 10),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < 3; i++)
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: Container(
-                width: 13,
-                height: 13,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        blurRadius: 10)
-                  ],
-                ),
-              ),
-            ),
-        ],
+      child: AnimatedBuilder(
+        animation: Listenable.merge([clock, pop]),
+        builder: (context, _) {
+          final t = clock.value;
+          final span = math.max(0.5, end - start);
+          final prog = ((t - start) / span).clamp(0.0, 1.0);
+          final remain = end - t;
+          final anticip = remain < 0.5
+              ? Curves.easeOut.transform((1 - remain / 0.5).clamp(0.0, 1.0))
+              : 0.0;
+
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < 3; i++)
+                () {
+                  final local =
+                      ((pop.value - i * 0.14) / 0.72).clamp(0.0, 1.0).toDouble();
+                  final pv = _dotSpring.transform(local);
+                  final fill = Curves.easeInOut
+                      .transform((prog * 3 - i).clamp(0.0, 1.0));
+                  final breathe = math.sin(t * 2.4 - i * 0.85);
+                  final scale = math.max(
+                      0.0,
+                      pv *
+                          (0.86 +
+                              0.14 * fill +
+                              0.07 * breathe * fill +
+                              0.22 * anticip));
+                  final opacity =
+                      ((0.32 + 0.68 * fill) * pv.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Transform.scale(
+                      scale: scale,
+                      child: Opacity(
+                        opacity: opacity,
+                        child: Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white
+                                    .withValues(alpha: 0.18 + 0.4 * fill),
+                                blurRadius: 6 + 8 * fill,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }(),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1570,8 +1891,6 @@ class _Dots extends StatelessWidget {
 // Controls: language + sync offset
 // ---------------------------------------------------------------------------
 
-/// Small round-ish button that reacts on touch-down, scales while pressed and
-/// repeats while held. Replaces PressableScale so taps always register.
 class _StepButton extends StatefulWidget {
   const _StepButton({required this.icon, required this.onStep});
   final IconData icon;
@@ -1616,8 +1935,8 @@ class _StepButtonState extends State<_StepButton> {
       onTapCancel: _stop,
       child: AnimatedScale(
         scale: _down ? 0.84 : 1,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
+        duration: Duration(milliseconds: _down ? 120 : 380),
+        curve: _down ? Curves.easeOut : _popSpring,
         child: SizedBox(
           width: 44,
           height: 38,
@@ -1655,6 +1974,10 @@ class _Controls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final values = LyricsLang.values;
+    final n = values.length;
+    final idx = values.indexOf(lang);
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -1670,37 +1993,51 @@ class _Controls extends StatelessWidget {
                     shape: StadiumBorder(),
                     color: Color(0x1FFFFFFF),
                   ),
-                  child: Row(
+                  child: Stack(
                     children: [
-                      for (final l in LyricsLang.values)
-                        Expanded(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => onLang(l),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeOutCubic,
-                              alignment: Alignment.center,
-                              decoration: ShapeDecoration(
-                                shape: const StadiumBorder(),
-                                color: l == lang
-                                    ? Colors.white.withValues(alpha: 0.22)
-                                    : Colors.transparent,
-                              ),
-                              child: Text(
-                                l.label,
-                                style: TextStyle(
-                                  fontFamily: _kTextFont,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: l == lang
-                                      ? Colors.white
-                                      : Colors.white60,
-                                ),
-                              ),
+                      // Liquid thumb: one pill that springs between segments.
+                      AnimatedAlign(
+                        alignment: Alignment(-1 + 2 * idx / (n - 1), 0),
+                        duration: const Duration(milliseconds: 520),
+                        curve: _thumbSpring,
+                        child: FractionallySizedBox(
+                          widthFactor: 1 / n,
+                          heightFactor: 1,
+                          child: DecoratedBox(
+                            decoration: ShapeDecoration(
+                              shape: const StadiumBorder(),
+                              color: Colors.white.withValues(alpha: 0.22),
                             ),
                           ),
                         ),
+                      ),
+                      Row(
+                        children: [
+                          for (final l in values)
+                            Expanded(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => onLang(l),
+                                child: Center(
+                                  child: AnimatedDefaultTextStyle(
+                                    duration: const Duration(milliseconds: 250),
+                                    curve: Curves.easeOutCubic,
+                                    style: TextStyle(
+                                      fontFamily: _kTextFont,
+                                      fontFamilyFallback: _kFontFamilyFallback,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: l == lang
+                                          ? Colors.white
+                                          : Colors.white60,
+                                    ),
+                                    child: Text(l.label),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -1746,22 +2083,6 @@ class _Controls extends StatelessWidget {
                     ),
                     _StepButton(icon: Icons.add_rounded, onStep: onPlus),
                   ],
-                ),
-              ),
-            ],
-            if (onShareLyrics != null) ...[
-              const SizedBox(width: 10),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onShareLyrics,
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const ShapeDecoration(
-                    shape: CircleBorder(),
-                    color: Color(0x1FFFFFFF),
-                  ),
-                  child: const Icon(CupertinoIcons.camera, size: 17, color: Colors.white),
                 ),
               ),
             ],
