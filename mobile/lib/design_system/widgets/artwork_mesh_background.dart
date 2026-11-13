@@ -334,10 +334,15 @@ Future<({ui.Image tile, Color avg})> _makeLayer(ui.Image img, _Crop crop) async 
 }
 
 Future<ui.Image> _buildPaletteSourceImage(List<Color> palette) async {
-  const int size = _sample;
+  const int size = _tile; // 128px high-vibrancy mesh palette
   final colors = palette.isNotEmpty
       ? palette
-      : const [Color(0xFFE11D48), Color(0xFFFFFFFF)];
+      : const [
+          Color(0xFFE11D48),
+          Color(0xFFFF4D79),
+          Color(0xFFFFFFFF),
+          Color(0xFFFFDCE5),
+        ];
   final base = colors.first;
   final recorder = ui.PictureRecorder();
   final rect = Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
@@ -345,21 +350,23 @@ Future<ui.Image> _buildPaletteSourceImage(List<Color> palette) async {
 
   canvas.drawRect(rect, Paint()..color = base);
 
-  // Paint overlapping soft radial color pools so crops sample distinct
-  // multi-directional mixtures (e.g. strawberry rose + white waves).
-  final offsets = <Offset>[
-    const Offset(0.22, 0.25),
-    const Offset(0.78, 0.22),
-    const Offset(0.52, 0.52),
-    const Offset(0.24, 0.78),
-    const Offset(0.80, 0.76),
-    const Offset(0.50, 0.16),
+  // Paint rich overlapping multi-directional radial gradients so crops
+  // sample distinct contrasting waves (e.g. strawberry rose, pink, white).
+  final offsets = <({Offset center, double radius, double stop})>[
+    (center: const Offset(0.20, 0.22), radius: 0.75, stop: 0.85),
+    (center: const Offset(0.82, 0.18), radius: 0.72, stop: 0.90),
+    (center: const Offset(0.50, 0.50), radius: 0.65, stop: 0.80),
+    (center: const Offset(0.18, 0.82), radius: 0.78, stop: 0.88),
+    (center: const Offset(0.84, 0.78), radius: 0.70, stop: 0.85),
+    (center: const Offset(0.48, 0.14), radius: 0.60, stop: 0.75),
+    (center: const Offset(0.52, 0.86), radius: 0.65, stop: 0.80),
   ];
 
   for (var i = 0; i < offsets.length; i++) {
+    final spec = offsets[i];
     final c = colors[i % colors.length];
-    final center = Offset(offsets[i].dx * size, offsets[i].dy * size);
-    final radius = size * 0.68;
+    final center = Offset(spec.center.dx * size, spec.center.dy * size);
+    final radius = size * spec.radius;
     canvas.drawCircle(
       center,
       radius,
@@ -368,7 +375,7 @@ Future<ui.Image> _buildPaletteSourceImage(List<Color> palette) async {
           center,
           radius,
           [c, c.withValues(alpha: 0.0)],
-          const [0.0, 1.0],
+          [0.0, spec.stop],
         ),
     );
   }
@@ -511,11 +518,11 @@ class _MeshEngine extends ChangeNotifier {
   void retarget(int i) {
     final c = _nodes[i], n = nodes[i];
     double sym() => _rand.nextDouble() * 2 - 1;
-    n.tx = c.ax + sym() * c.rx;
-    n.ty = c.ay + sym() * c.ry;
+    n.tx = c.ax + sym() * c.rx * 1.35;
+    n.ty = c.ay + sym() * c.ry * 1.35;
     n.ts = c.size * (1 + sym() * c.osc);
     n.rt = c.spin * (0.55 + _rand.nextDouble() * 0.9);
-    n.next = t + c.h0 + _rand.nextDouble() * (c.h1 - c.h0);
+    n.next = t + (c.h0 + _rand.nextDouble() * (c.h1 - c.h0)) * 0.65;
   }
 
   /// Semi-implicit Euler spring step (sub-stepped by the caller for stability).
@@ -581,11 +588,11 @@ class _MeshPainter extends CustomPainter {
       final alpha = (a * c.alpha).clamp(0.0, 1.0);
       if (alpha < 0.003) continue;
 
-      final sx = math.sin(e.t * c.w1 + c.ph) * 0.035;
-      final sy = math.cos(e.t * c.w2 + c.ph * 1.3) * 0.035;
-      final x = (n.x + sx + e.px * c.depth * 0.05) * w;
-      final y = (n.y + sy + e.py * c.depth * 0.05) * h;
-      final sz = m * n.s * (1 + e.energy * 0.08 * math.sin(e.t * 1.7 + c.ph));
+      final sx = math.sin(e.t * c.w1 * 1.5 + c.ph) * 0.070;
+      final sy = math.cos(e.t * c.w2 * 1.5 + c.ph * 1.3) * 0.070;
+      final x = (n.x + sx + e.px * c.depth * 0.06) * w;
+      final y = (n.y + sy + e.py * c.depth * 0.06) * h;
+      final sz = m * n.s * (1 + (e.energy * 0.12 + 0.04) * math.sin(e.t * 1.7 + c.ph));
 
       _img.color = Color.fromRGBO(255, 255, 255, alpha);
       canvas.save();

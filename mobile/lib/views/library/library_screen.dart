@@ -20,8 +20,7 @@ import '../../design_system/tokens/app_typography.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
-import '../../features/story_sharing/models/story_share_content.dart';
-import '../../features/story_sharing/screens/story_preview_screen.dart';
+import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/innertube_service.dart';
@@ -325,7 +324,7 @@ Future<void> _playlistMenu(BuildContext c, UserPlaylist p, {bool inDetail = fals
         ),
       ZenDropdownItem(
         title: 'Add to Story',
-        icon: CupertinoIcons.camera,
+        icon: CupertinoIcons.sparkles,
         onTap: () {
           final distinctCovers = tracks
               .map((t) => t.coverUrl)

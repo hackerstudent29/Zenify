@@ -24,7 +24,6 @@ import 'studio_fx_sheet.dart';
 import '../details/artist_screen.dart';
 import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
-import '../../features/story_sharing/screens/story_options_sheet.dart';
 import '../../models/track.dart';
 import '../../utils/media_normalizer.dart';
 
@@ -1602,31 +1601,6 @@ class PlayerShellState extends State<PlayerShell>
           ),
           const SizedBox(width: 12),
           PopLikeButton(liked: _isLiked, onToggle: _toggleLike),
-          const SizedBox(width: 8),
-          GlassCircle(
-            onTap: () {
-              if (track == null) return;
-              final t = track is Track
-                  ? track
-                  : Track(
-                      id: track.id?.toString() ?? '',
-                      title: track.title?.toString() ?? '',
-                      artist: track.artist?.toString() ?? '',
-                      album: track.album?.toString() ?? '',
-                      coverUrl: track.coverUrl?.toString() ?? '',
-                      durationSeconds: track.durationSeconds is int ? track.durationSeconds as int : 0,
-                    );
-              StoryOptionsSheet.show(
-                context: context,
-                track: t,
-              );
-            },
-            child: const Icon(
-              CupertinoIcons.camera,
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
           const SizedBox(width: 8),
           GlassCircle(
             onTap: () => _showTrackMenu(track),

@@ -22,6 +22,7 @@ import '../../models/track.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
+import '../../services/user_preferences_service.dart';
 import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
 import '../details/artist_popup.dart';
@@ -184,9 +185,19 @@ class _ExploreScreenState extends State<ExploreScreen>
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final tracks =
+      final trending =
           await _dataService.getTrendingForCountry(_country, forceRefresh: force);
-      if (mounted) setState(() => _trendingTracks = tracks);
+      final personalized =
+          await _dataService.getPersonalizedRecommendations(forceRefresh: force);
+      final combined = <Track>[];
+      final seen = <String>{};
+      for (final t in personalized) {
+        if (seen.add(t.id)) combined.add(t);
+      }
+      for (final t in trending) {
+        if (seen.add(t.id)) combined.add(t);
+      }
+      if (mounted) setState(() => _trendingTracks = combined.isNotEmpty ? combined : trending);
     } catch (_) {
       // keep whatever we had; the empty state offers a retry
     } finally {
@@ -347,9 +358,29 @@ class _ExploreScreenState extends State<ExploreScreen>
     _derivedSrc = src;
     _derivedLen = src.length;
 
-    // Featured: top tracks, one per artist, max 6.
+    // Featured: top tracks, prioritizing user preferences, one per artist, max 6.
+    final prefs = UserPreferencesService.instance.currentPrefs;
     final seenArtists = <String>{};
     final featured = <Track>[];
+
+    // First pick tracks from user's favorite artists
+    if (prefs.favoriteArtists.isNotEmpty) {
+      for (final fa in prefs.favoriteArtists) {
+        final faLower = fa.name.trim().toLowerCase();
+        for (final t in src) {
+          if (t.artist.toLowerCase().contains(faLower)) {
+            final key = t.artist.toLowerCase();
+            if (seenArtists.add(key)) {
+              featured.add(t);
+              break;
+            }
+          }
+        }
+        if (featured.length >= 3) break;
+      }
+    }
+
+    // Fill remaining with trending tracks
     for (final t in src) {
       final key = t.artist.toLowerCase();
       if (key.isEmpty || !seenArtists.add(key)) continue;
@@ -384,9 +415,21 @@ class _ExploreScreenState extends State<ExploreScreen>
     }
     _releases = releases;
 
-    // Artists: first resolved artist of each track.
+    // Artists: prioritize user's onboarded favorite artists first, then resolved track artists.
     final seenNames = <String>{};
     final artists = <_ArtistEntry>[];
+
+    for (final fa in prefs.favoriteArtists) {
+      final lower = fa.name.trim().toLowerCase();
+      if (lower.isNotEmpty && seenNames.add(lower)) {
+        artists.add(_ArtistEntry(
+          fa.name,
+          fa.id.isNotEmpty ? fa.id : null,
+          fa.image,
+        ));
+      }
+    }
+
     for (final t in src) {
       final resolved = t.resolvedArtists;
       final name = resolved.isNotEmpty ? resolved.first.name : t.artist;
@@ -401,7 +444,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           t.coverUrl,
         ),
       );
-      if (artists.length >= 10) break;
+      if (artists.length >= 12) break;
     }
     _artists = artists;
   }
@@ -571,9 +614,10 @@ class _ExploreScreenState extends State<ExploreScreen>
         itemBuilder: (context, i) {
           final t = _featured[i];
           final rank = _trendingTracks.indexOf(t) + 1;
-          final eyebrow = ranked && rank > 0
-              ? 'No. $rank in ${_country.name}'
-              : 'Featured';
+          final isPreferred = UserPreferencesService.instance.currentPrefs.favoriteArtists.any((a) => t.artist.toLowerCase().contains(a.name.toLowerCase()));
+          final eyebrow = isPreferred
+              ? 'Recommended For You'
+              : (ranked && rank > 0 ? 'No. $rank in ${_country.name}' : 'Featured');
 
           return AnimatedBuilder(
             animation: _featuredCtrl,
@@ -1005,7 +1049,11 @@ class _ExploreScreenState extends State<ExploreScreen>
   // ── 6. Browse: ONE compact section (genres + moods merged) ─────────────────
 
   Widget _buildBrowse() {
-    final genres = _dataService.genres;
+    final prefs = UserPreferencesService.instance.currentPrefs;
+    final genres = _dataService.getSortedGenres(
+      preferredGenres: prefs.genres,
+      preferredLanguages: prefs.languages,
+    );
     final moods = _dataService.moods;
     final tiles = <({String title, String query, IconData icon, List<Color> colors})>[];
     for (var i = 0; i < 4; i++) {

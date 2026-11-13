@@ -25,12 +25,15 @@ class Track {
     required this.coverUrl,
     this.streamUrl,
     this.durationSeconds = 210,
-    this.language = '',
+    String language = '',
     this.hasLyrics = true,
     this.source = 'youtube',
     this.artists = const [],
     this.isVideo = false,
-  })  : title = MediaNormalizer.cleanTitle(title),
+  })  : language = (language.trim().isNotEmpty
+            ? language.toLowerCase().trim()
+            : (detectLanguage(title, artist, album) ?? '')),
+        title = MediaNormalizer.cleanTitle(title),
         artist = MediaNormalizer.cleanArtistName(artist),
         album = MediaNormalizer.cleanAlbumTitle(album);
 
@@ -94,15 +97,35 @@ class Track {
   bool get isLocal => source == 'local';
 
   static String? detectLanguage(String title, String artist, [String album = '']) {
-    final lower = '$title $artist $album'.toLowerCase();
+    final raw = '$title $artist $album';
 
-    // 1. Explicit keyword check
-    if (lower.contains('tamil') || lower.contains('kollywood')) return 'tamil';
-    if (lower.contains('telugu') || lower.contains('tollywood')) return 'telugu';
-    if (lower.contains('hindi') || lower.contains('bollywood')) return 'hindi';
-    if (lower.contains('malayalam') || lower.contains('mollywood')) return 'malayalam';
-    if (lower.contains('kannada') || lower.contains('sandalwood')) return 'kannada';
-    if (lower.contains('punjabi') || lower.contains('pollywood')) return 'punjabi';
+    // 0. Native script check (100% authoritative)
+    for (final rune in raw.runes) {
+      if (rune >= 0x0B80 && rune <= 0x0BFF) return 'tamil';
+      if (rune >= 0x0C00 && rune <= 0x0C7F) return 'telugu';
+      if (rune >= 0x0900 && rune <= 0x097F) return 'hindi';
+      if (rune >= 0x0D00 && rune <= 0x0D7F) return 'malayalam';
+      if (rune >= 0x0C80 && rune <= 0x0CF2) return 'kannada';
+      if (rune >= 0x0980 && rune <= 0x09FF) return 'bengali';
+      if (rune >= 0x0A00 && rune <= 0x0A7F) return 'punjabi';
+      if ((rune >= 0x3040 && rune <= 0x30FF) || (rune >= 0x4E00 && rune <= 0x9FFF && raw.contains(RegExp(r'[\u3040-\u30FF]')))) return 'japanese';
+      if ((rune >= 0xAC00 && rune <= 0xD7AF) || (rune >= 0x1100 && rune <= 0x11FF)) return 'korean';
+      if (rune >= 0x0600 && rune <= 0x06FF) return 'arabic';
+    }
+
+    final lower = raw.toLowerCase();
+
+    // 1. Explicit keyword check & bracket/parentheses tags (e.g., "(Telugu)", "[Tamil]", "From Movie - Telugu")
+    if (RegExp(r'\b(tamil|tamizh|kollywood)\b|\b\[ta\]|\(ta\)').hasMatch(lower)) return 'tamil';
+    if (RegExp(r'\b(telugu|tollywood)\b|\b\[te\]|\(te\)').hasMatch(lower)) return 'telugu';
+    if (RegExp(r'\b(hindi|bollywood)\b|\b\[hi\]|\(hi\)').hasMatch(lower)) return 'hindi';
+    if (RegExp(r'\b(malayalam|mollywood)\b|\b\[ml\]|\(ml\)').hasMatch(lower)) return 'malayalam';
+    if (RegExp(r'\b(kannada|sandalwood)\b|\b\[kn\]|\(kn\)').hasMatch(lower)) return 'kannada';
+    if (RegExp(r'\b(punjabi|pollywood)\b').hasMatch(lower)) return 'punjabi';
+    if (RegExp(r'\b(bengali)\b').hasMatch(lower)) return 'bengali';
+    if (RegExp(r'\b(korean|k-pop|kpop)\b').hasMatch(lower)) return 'korean';
+    if (RegExp(r'\b(japanese|j-pop|jpop|anime)\b').hasMatch(lower)) return 'japanese';
+    if (RegExp(r'\b(spanish|español|espanol)\b').hasMatch(lower)) return 'spanish';
 
     final aLower = artist.toLowerCase();
 
@@ -134,7 +157,8 @@ class Track {
         aLower.contains('paal dabba') ||
         aLower.contains('stephen zechariah') ||
         aLower.contains('shakthisree') ||
-        aLower.contains('haricharan')) {
+        aLower.contains('haricharan') ||
+        aLower.contains('anthony daasan')) {
       return 'tamil';
     }
 
@@ -151,7 +175,14 @@ class Track {
         aLower.contains('vivek sagar') ||
         aLower.contains('bheems') ||
         aLower.contains('rahul sipligunj') ||
-        aLower.contains('mangli')) {
+        aLower.contains('mangli') ||
+        aLower.contains('indravathi') ||
+        aLower.contains('geetha madhuri') ||
+        aLower.contains('sri krishna') ||
+        aLower.contains('lipsika') ||
+        aLower.contains('deepu') ||
+        aLower.contains('revanth') ||
+        aLower.contains('sunitha')) {
       return 'telugu';
     }
 
@@ -166,7 +197,9 @@ class Track {
         aLower.contains('dabzee') ||
         aLower.contains('baby jean') ||
         aLower.contains('thirumali') ||
-        aLower.contains('vidyasagar')) {
+        aLower.contains('vidyasagar') ||
+        aLower.contains('harisankar') ||
+        aLower.contains('sithara krishnakumar')) {
       return 'malayalam';
     }
 
@@ -199,7 +232,9 @@ class Track {
         aLower.contains('tanishk bagchi') ||
         aLower.contains('mithoon') ||
         aLower.contains('shankar-ehsaan-loy') ||
-        aLower.contains('jasleen royal')) {
+        aLower.contains('jasleen royal') ||
+        aLower.contains('kanika kapoor') ||
+        aLower.contains('shilpa rao')) {
       return 'hindi';
     }
 
@@ -223,8 +258,10 @@ class Track {
       return 'english';
     }
 
-    // 8. General A.R. Rahman check
+    // 8. General A.R. Rahman check (with multi-language album awareness)
     if (aLower.contains('rahman')) {
+      if (lower.contains('telugu')) return 'telugu';
+      if (lower.contains('hindi')) return 'hindi';
       return 'tamil';
     }
 

@@ -209,37 +209,29 @@ class SearchDataService {
           );
     }
 
-    // 3. Cloud Fallback if InnerTube completely failed or blocked
-    if (rawJson == null) {
-      try {
-        final fallbackTracks = await ApiService.search(q);
-        if (fallbackTracks.isNotEmpty) {
-          final songItems = fallbackTracks.map((t) => _trackToSearchSongItem(t)).toList();
-          final intent = SearchIntentDetector.detectIntent(q, songItems);
-          final result = SearchResult(
-            originalQuery: q,
-            intent: intent,
-            sections: {SearchItemType.song: songItems},
-          );
-          _lruCache.put(cacheKey, result);
-          return result;
-        }
-      } catch (_) {}
+    // 3. Parse Raw JSON or fallback if InnerTube completely failed or blocked
+    final parsed = rawJson != null
+        ? SearchParser.parse(rawJson, query: q)
+        : const ParsedSearchPayload(items: []);
+
+    List<SearchItem> candidateItems = parsed.items;
+    if (candidateItems.isEmpty) {
+      candidateItems = await _fetchFallbackItems(q, filter);
+    }
+
+    if (candidateItems.isEmpty) {
       return SearchResult(
         originalQuery: q,
         intent: SearchIntentDetector.detectIntent(q, const []),
       );
     }
 
-    // 4. Parse Raw JSON with zero-loss fallback chains
-    final parsed = SearchParser.parse(rawJson, query: q);
+    // 4. Detect Intent from query terms and candidate entities
+    final intent = SearchIntentDetector.detectIntent(q, candidateItems);
 
-    // 5. Detect Intent from query terms and parsed candidate entities
-    final intent = SearchIntentDetector.detectIntent(q, parsed.items);
-
-    // 6. Rank, Deduplicate, and Structure Shelves
+    // 5. Rank, Deduplicate, and Structure Shelves
     final rankedResult = SearchRanker.rank(
-      items: parsed.items,
+      items: candidateItems,
       intent: intent,
       countryCode: country,
       initialTopResult: parsed.topResult,
@@ -247,10 +239,10 @@ class SearchDataService {
       continuation: parsed.continuation,
     );
 
-    // 7. Store in LRU Cache
+    // 6. Store in LRU Cache
     _lruCache.put(cacheKey, rankedResult);
 
-    // 8. Prefetch top 5 song thumbnails in background for instant image loading
+    // 7. Prefetch top 5 song thumbnails in background for instant image loading
     _prefetchThumbnails(rankedResult.songs.take(5));
 
     return rankedResult;
@@ -324,5 +316,53 @@ class SearchDataService {
       durationSeconds: t.durationSeconds,
       durationText: t.formattedDuration,
     );
+  }
+
+  SearchVideoItem _trackToSearchVideoItem(Track t) {
+    return SearchVideoItem(
+      id: t.id,
+      title: t.title,
+      subtitle: t.artist,
+      thumbnailUrl: t.coverUrl,
+      thumbnailUrlHiRes: t.coverUrl,
+      videoId: t.id.replaceAll('yt-', ''),
+      channel: t.artist,
+      durationText: t.formattedDuration,
+    );
+  }
+
+  Future<List<SearchItem>> _fetchFallbackItems(String q, SearchFilter filter) async {
+    try {
+      if (filter == SearchFilter.videos) {
+        final videos = await InnerTubeService.instance.searchVideos(q);
+        if (videos.isNotEmpty) {
+          return videos.map(_trackToSearchVideoItem).toList();
+        }
+      } else if (filter == SearchFilter.artists) {
+        final artists = await InnerTubeService.instance.searchArtists(q);
+        if (artists.isNotEmpty) {
+          return artists
+              .map((a) => SearchArtistItem(
+                    id: a.id,
+                    title: a.name,
+                    subtitle: 'Artist',
+                    thumbnailUrl: a.image,
+                    thumbnailUrlHiRes: a.image,
+                    browseId: a.id,
+                  ))
+              .toList();
+        }
+      }
+      List<Track> tracks = await InnerTubeService.instance.search(q);
+      if (tracks.isEmpty) {
+        tracks = await ApiService.search(q);
+      }
+      if (tracks.isNotEmpty) {
+        return tracks.map(_trackToSearchSongItem).toList();
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[SearchDataService] fallback error: $e');
+    }
+    return const [];
   }
 }

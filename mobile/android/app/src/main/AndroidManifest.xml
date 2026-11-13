@@ -109,13 +109,20 @@
     <queries>
         <package android:name="com.instagram.android"/>
         <package android:name="com.facebook.katana"/>
+        <package android:name="com.facebook.lite"/>
         <package android:name="com.whatsapp"/>
+        <package android:name="com.whatsapp.w4b"/>
+        <package android:name="com.snapchat.android"/>
         <intent>
             <action android:name="com.instagram.share.ADD_TO_STORY" />
             <data android:mimeType="image/*" />
         </intent>
         <intent>
             <action android:name="com.facebook.stories.ADD_TO_STORY" />
+            <data android:mimeType="image/*" />
+        </intent>
+        <intent>
+            <action android:name="com.snapchat.add.CONTENT" />
             <data android:mimeType="image/*" />
         </intent>
         <intent>

@@ -897,8 +897,9 @@ class _SearchScreenState extends State<SearchScreen>
     final hasQuery = _submittedQuery.isNotEmpty;
     final category = _activeCategory;
 
-    final editing =
-        _focusNode.hasFocus && text.isNotEmpty && text != _submittedQuery;
+    final editing = (_focusNode.hasFocus || _submittedQuery.isEmpty) &&
+        text.isNotEmpty &&
+        text != _submittedQuery;
 
     final _SearchViewPhase phase;
     if (editing) {
@@ -1567,12 +1568,20 @@ class _SearchScreenState extends State<SearchScreen>
 
   Widget _buildSuggestions({Key? key}) {
     final typed = _textCtrl.text.trim();
-    final list = _liveSuggestions.isEmpty ? [typed] : _liveSuggestions;
+    final List<String> list;
+    if (typed.isEmpty) {
+      list = _liveSuggestions;
+    } else {
+      final norm = typed.toLowerCase();
+      final filtered = _liveSuggestions.where((s) => s.toLowerCase() != norm).toList();
+      list = [typed, ...filtered];
+    }
     return Column(
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(list.length, (i) {
         final s = list[i];
+        final isDirectTyped = typed.isNotEmpty && s.toLowerCase() == typed.toLowerCase();
         return SpringIn(
           delayMs: i * 18,
           rise: 12,
@@ -1594,13 +1603,36 @@ class _SearchScreenState extends State<SearchScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     CupertinoIcons.search,
                     size: 17,
-                    color: AppColors.textTertiary,
+                    color: isDirectTyped ? AppColors.accent : AppColors.textTertiary,
                   ),
                   const SizedBox(width: 14),
-                  Expanded(child: _highlighted(s, typed.toLowerCase())),
+                  Expanded(
+                    child: isDirectTyped
+                        ? RichText(
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            text: TextSpan(
+                              style: _bodyStyle(fontSize: 16, color: AppColors.textPrimary),
+                              children: [
+                                const TextSpan(
+                                  text: 'Search for ',
+                                  style: TextStyle(color: AppColors.textSecondary),
+                                ),
+                                TextSpan(
+                                  text: '"$typed"',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _highlighted(s, typed.toLowerCase()),
+                  ),
                   PressableScale(
                     scale: 0.90,
                     onTap: () {
@@ -1614,19 +1646,19 @@ class _SearchScreenState extends State<SearchScreen>
                       padding: EdgeInsets.all(6),
                       child: Icon(
                         CupertinoIcons.arrow_up_left,
-                        size: 16,
-                        color: AppColors.textTertiary,
-                      ),
+                      size: 16,
+                      color: AppColors.textTertiary,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        );
-      }),
-    );
-  }
+        ),
+      );
+    }),
+  );
+}
 
   Widget _highlighted(String text, String queryLower) {
     final idx = queryLower.isEmpty ? -1 : text.toLowerCase().indexOf(queryLower);

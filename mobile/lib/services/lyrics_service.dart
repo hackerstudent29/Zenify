@@ -213,6 +213,143 @@ class LyricsService {
     return artist.split(RegExp(r'[,&/|]|\bfeat\.?\b|\bft\.?\b', caseSensitive: false)).first.trim();
   }
 
+  // ───────────────────────── Language & Script Detection ─────────────────────
+
+  /// Detects the native script used in the lyrics text.
+  /// Authoritative check for Indic, Asian, and Semitic languages.
+  static String? detectScriptLanguage(String text) {
+    var tamil = 0;
+    var telugu = 0;
+    var hindi = 0;
+    var malayalam = 0;
+    var kannada = 0;
+    var bengali = 0;
+    var punjabi = 0;
+    var korean = 0;
+    var japanese = 0;
+    var arabic = 0;
+
+    for (final rune in text.runes) {
+      if (rune >= 0x0B80 && rune <= 0x0BFF) {
+        tamil++;
+      } else if (rune >= 0x0C00 && rune <= 0x0C7F) {
+        telugu++;
+      } else if (rune >= 0x0900 && rune <= 0x097F) {
+        hindi++;
+      } else if (rune >= 0x0D00 && rune <= 0x0D7F) {
+        malayalam++;
+      } else if (rune >= 0x0C80 && rune <= 0x0CF2) {
+        kannada++;
+      } else if (rune >= 0x0980 && rune <= 0x09FF) {
+        bengali++;
+      } else if (rune >= 0x0A00 && rune <= 0x0A7F) {
+        punjabi++;
+      } else if ((rune >= 0xAC00 && rune <= 0xD7AF) || (rune >= 0x1100 && rune <= 0x11FF)) {
+        korean++;
+      } else if (rune >= 0x3040 && rune <= 0x30FF) {
+        japanese++;
+      } else if (rune >= 0x0600 && rune <= 0x06FF) {
+        arabic++;
+      }
+    }
+
+    final counts = {
+      'tamil': tamil,
+      'telugu': telugu,
+      'hindi': hindi,
+      'malayalam': malayalam,
+      'kannada': kannada,
+      'bengali': bengali,
+      'punjabi': punjabi,
+      'korean': korean,
+      'japanese': japanese,
+      'arabic': arabic,
+    };
+
+    final maxEntry = counts.entries.reduce((a, b) => a.value > b.value ? a : b);
+    if (maxEntry.value >= 5) {
+      return maxEntry.key;
+    }
+    return null;
+  }
+
+  static const _tamilMarkers = {
+    'anbe', 'enadhu', 'kanmani', 'kadhal', 'kaadhal', 'unmai', 'paathu', 'irukku',
+    'enna', 'illai', 'vaadi', 'podaa', 'unodu', 'unakku', 'enaku', 'nenjam',
+    'thangamey', 'azhage', 'uyire', 'pesu', 'paadum', 'naane', 'neeye', 'ippo',
+    'apdi', 'valiyil', 'kangal', 'serndhu', 'unnai', 'ennai', 'kannukkul'
+  };
+
+  static const _teluguMarkers = {
+    'premala', 'prema', 'cheliya', 'neetho', 'nenu', 'naalo', 'unna', 'raave',
+    'choodu', 'evaru', 'ledu', 'undhi', 'chesave', 'manasa', 'kalise', 'gundello',
+    'teliyani', 'chusthe', 'ippudu', 'cheppave', 'ninnu', 'natho', 'kalisi',
+    'nammalenu', 'veedani', 'kallallo', 'velugula', 'chusa', 'naatho'
+  };
+
+  static const _hindiMarkers = {
+    'tere', 'meri', 'mera', 'tum', 'hum', 'dil', 'pyar', 'pyaar', 'zindagi',
+    'kyun', 'nahi', 'kabhi', 'saath', 'hona', 'gaya', 'raha', 'dekh', 'aankhon',
+    'tujhe', 'mujhe', 'karna', 'yeh', 'woh', 'tera', 'ishq', 'deewana', 'jaana', 'raaton'
+  };
+
+  static const _malayalamMarkers = {
+    'njan', 'ente', 'ninne', 'kannukal', 'sneham', 'omaney', 'poove', 'chiri',
+    'ormakal', 'mazha', 'kando', 'vannu', 'oru', 'kaanum'
+  };
+
+  static const _kannadaMarkers = {
+    'nanu', 'nanna', 'preethi', 'hudugi', 'ninna', 'kanasu', 'nodo', 'ellaru',
+    'beku', 'hege', 'idu', 'illi'
+  };
+
+  /// Detects romanized / transliterated lyrics language (Tanglish, Tenglish, Hinglish).
+  static String? detectRomanizedLanguage(String text) {
+    final words = text.toLowerCase().split(RegExp(r'[^a-z]+')).where((w) => w.length >= 3).toSet();
+    if (words.isEmpty) return null;
+
+    final tamilCount = words.intersection(_tamilMarkers).length;
+    final teluguCount = words.intersection(_teluguMarkers).length;
+    final hindiCount = words.intersection(_hindiMarkers).length;
+    final malCount = words.intersection(_malayalamMarkers).length;
+    final kanCount = words.intersection(_kannadaMarkers).length;
+
+    final scores = {
+      'tamil': tamilCount,
+      'telugu': teluguCount,
+      'hindi': hindiCount,
+      'malayalam': malCount,
+      'kannada': kanCount,
+    };
+
+    final maxEntry = scores.entries.reduce((a, b) => a.value > b.value ? a : b);
+    if (maxEntry.value >= 3) {
+      return maxEntry.key;
+    }
+    return null;
+  }
+
+  /// Verifies if candidate lyrics match the expected track language.
+  /// Prevents cross-language collisions (e.g. Tamil lyrics on Telugu song).
+  static bool isLanguageCompatible(String lyricsText, String expectedLanguage) {
+    if (expectedLanguage.isEmpty) return true;
+    final exp = expectedLanguage.toLowerCase().trim();
+
+    // 1. Script check
+    final scriptLang = detectScriptLanguage(lyricsText);
+    if (scriptLang != null) {
+      return scriptLang == exp;
+    }
+
+    // 2. Transliterated / Romanized check
+    final romLang = detectRomanizedLanguage(lyricsText);
+    if (romLang != null && romLang != exp) {
+      return false;
+    }
+
+    return true;
+  }
+
   /// Purges old unsynced (plain) lyrics from SharedPreferences disk cache.
   Future<void> purgeUnsyncedCache() async {
     try {
@@ -237,14 +374,20 @@ class LyricsService {
   /// Fetches lyrics using the strict multi-tier hierarchy:
   /// Tier 1 (WBW) -> Tier 2 (Line-by-Line) -> Tier 3 (Plain Fallback).
   Future<LyricsResult?> fetchLyrics(Track track) async {
+    final lang = track.language.isNotEmpty
+        ? track.language.toLowerCase().trim()
+        : (Track.detectLanguage(track.title, track.artist, track.album) ?? '');
+
     final cacheKey = track.id;
     if (_memCache.containsKey(cacheKey)) {
       final mem = _memCache[cacheKey]!;
-      // Return synced immediately from memory
-      if (mem.synced) return mem;
+      // Return synced immediately from memory if compatible
+      if (mem.synced && (lang.isEmpty || mem.rawLrc == null || isLanguageCompatible(mem.rawLrc!, lang))) {
+        return mem;
+      }
     }
 
-    // Check SharedPreferences offline cache (ONLY accept if synced)
+    // Check SharedPreferences offline cache (ONLY accept if synced & language compatible)
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedStr = prefs.getString('lyrics_cache_$cacheKey');
@@ -252,15 +395,19 @@ class LyricsService {
         final json = jsonDecode(cachedStr) as Map<String, dynamic>;
         final lines = (json['lines'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         final isSynced = json['synced'] == true;
+        final rawLrc = json['rawLrc'] as String?;
         if (lines.isNotEmpty && isSynced) {
-          final result = LyricsResult(
-            lines: lines,
-            synced: true,
-            source: json['source'] ?? 'offline_cache',
-            rawLrc: json['rawLrc'] as String?,
-          );
-          _memCache[cacheKey] = result;
-          return result;
+          final isCompat = lang.isEmpty || rawLrc == null || isLanguageCompatible(rawLrc, lang);
+          if (isCompat) {
+            final result = LyricsResult(
+              lines: lines,
+              synced: true,
+              source: json['source'] ?? 'offline_cache',
+              rawLrc: rawLrc,
+            );
+            _memCache[cacheKey] = result;
+            return result;
+          }
         }
       }
     } catch (_) {}
@@ -275,7 +422,7 @@ class LyricsService {
     // 1a. Query lrc.red for Word-by-Word Enhanced LRC
     LyricsResult? lrcRedLineCandidate;
     try {
-      final lrcRed = await _fetchLrcRed(cleanT, cleanA);
+      final lrcRed = await _fetchLrcRed(cleanT, cleanA, lang);
       if (lrcRed.wbw != null && lrcRed.wbw!.isNotEmpty) {
         return _saveAndReturn(cacheKey, lrcRed.wbw!.lines, true, 'lrc_red_wbw', rawLrc: lrcRed.wbw!.rawLrc);
       }
@@ -290,6 +437,7 @@ class LyricsService {
       backendCandidate = await _fetchBackendLyrics(track, cleanT, cleanA);
       if (backendCandidate != null &&
           backendCandidate.synced &&
+          (lang.isEmpty || backendCandidate.rawLrc == null || isLanguageCompatible(backendCandidate.rawLrc!, lang)) &&
           backendCandidate.lines.any((l) => l['words'] != null && (l['words'] as List).isNotEmpty)) {
         return _saveAndReturn(cacheKey, backendCandidate.lines, true, backendCandidate.source, rawLrc: backendCandidate.rawLrc);
       }
@@ -306,9 +454,9 @@ class LyricsService {
       return _saveAndReturn(cacheKey, lrcRedLineCandidate.lines, true, 'lrc_red_line', rawLrc: lrcRedLineCandidate.rawLrc);
     }
 
-    // 2b. Query LRCLIB STRICTLY for syncedLyrics (reject plain lyrics in this tier)
+    // 2b. Query LRCLIB STRICTLY for syncedLyrics (reject plain lyrics & conflicting languages)
     try {
-      final lrclibSynced = await _fetchLrclibSynced(cleanT, cleanA, track.album, track.durationSeconds);
+      final lrclibSynced = await _fetchLrclibSynced(cleanT, cleanA, track.album, track.durationSeconds, lang);
       if (lrclibSynced != null && lrclibSynced.isNotEmpty && lrclibSynced.synced) {
         return _saveAndReturn(cacheKey, lrclibSynced.lines, true, 'lrclib_synced', rawLrc: lrclibSynced.rawLrc);
       }
@@ -317,7 +465,10 @@ class LyricsService {
     }
 
     // 2c. Use Zenify Backend line-synced lyrics if available
-    if (backendCandidate != null && backendCandidate.isNotEmpty && backendCandidate.synced) {
+    if (backendCandidate != null &&
+        backendCandidate.isNotEmpty &&
+        backendCandidate.synced &&
+        (lang.isEmpty || backendCandidate.rawLrc == null || isLanguageCompatible(backendCandidate.rawLrc!, lang))) {
       return _saveAndReturn(cacheKey, backendCandidate.lines, true, backendCandidate.source, rawLrc: backendCandidate.rawLrc);
     }
 
@@ -325,9 +476,9 @@ class LyricsService {
     // TIER 3 (FALLBACK / LAST RESORT ONLY): PLAIN UNSYNCED LYRICS
     // =========================================================================
 
-    // 3a. LRCLIB plainLyrics
+    // 3a. LRCLIB plainLyrics (validated against language)
     try {
-      final lrclibPlain = await _fetchLrclibPlain(cleanT, cleanA, track.album, track.durationSeconds);
+      final lrclibPlain = await _fetchLrclibPlain(cleanT, cleanA, track.album, track.durationSeconds, lang);
       if (lrclibPlain != null && lrclibPlain.isNotEmpty) {
         return _returnPlainMemoryOnly(cacheKey, lrclibPlain.lines, 'lrclib_plain');
       }
@@ -337,7 +488,7 @@ class LyricsService {
     try {
       final videoId = track.id.startsWith('yt-') ? track.id.substring(3) : track.id;
       final ytLyrics = await InnerTubeService.instance.getLyrics(videoId);
-      if (ytLyrics != null && ytLyrics.trim().isNotEmpty) {
+      if (ytLyrics != null && ytLyrics.trim().isNotEmpty && (lang.isEmpty || isLanguageCompatible(ytLyrics, lang))) {
         final parsed = LrcParser.parse(ytLyrics);
         if (parsed.lines.isNotEmpty) {
           if (parsed.synced) {
@@ -350,7 +501,9 @@ class LyricsService {
     } catch (_) {}
 
     // 3c. Zenify Backend plain lyrics
-    if (backendCandidate != null && backendCandidate.isNotEmpty) {
+    if (backendCandidate != null &&
+        backendCandidate.isNotEmpty &&
+        (lang.isEmpty || backendCandidate.rawLrc == null || isLanguageCompatible(backendCandidate.rawLrc!, lang))) {
       return _returnPlainMemoryOnly(cacheKey, backendCandidate.lines, backendCandidate.source);
     }
 
@@ -359,72 +512,85 @@ class LyricsService {
 
   // ───────────────────────── Tier 1: lrc.red Provider ───────────────────────
 
-  Future<({LyricsResult? wbw, LyricsResult? line})> _fetchLrcRed(String title, String artist) async {
-    try {
-      final q = Uri.encodeComponent('$title $artist'.trim());
-      final searchUri = Uri.parse('https://lrc.red/search.json?q=$q');
-      final searchRes = await _client.get(searchUri, headers: {
-        'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)',
-      }).timeout(const Duration(seconds: 4));
+  Future<({LyricsResult? wbw, LyricsResult? line})> _fetchLrcRed(String title, String artist, String lang) async {
+    final queries = <String>[];
+    if (lang.isNotEmpty) {
+      queries.add('$title $artist $lang'.trim());
+    }
+    queries.add('$title $artist'.trim());
 
-      if (searchRes.statusCode != 200) return (wbw: null, line: null);
-
-      final searchJson = jsonDecode(utf8.decode(searchRes.bodyBytes)) as Map<String, dynamic>;
-      final hits = (searchJson['hits'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      if (hits.isEmpty) return (wbw: null, line: null);
-
-      // Check top 3 hits for matching ISRC
-      for (final hit in hits.take(3)) {
-        final isrc = (hit['isrc'] ?? '').toString().trim();
-        if (isrc.isEmpty) continue;
-
-        final metaUri = Uri.parse('https://lrc.red/s/$isrc.json');
-        final metaRes = await _client.get(metaUri, headers: {
+    for (final query in queries) {
+      try {
+        final q = Uri.encodeComponent(query);
+        final searchUri = Uri.parse('https://lrc.red/search.json?q=$q');
+        final searchRes = await _client.get(searchUri, headers: {
           'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)',
-        }).timeout(const Duration(seconds: 3));
+        }).timeout(const Duration(seconds: 4));
 
-        if (metaRes.statusCode != 200) continue;
-        final metaJson = jsonDecode(utf8.decode(metaRes.bodyBytes)) as Map<String, dynamic>;
-        final syncType = (metaJson['sync'] ?? '').toString().toLowerCase();
-        final lrcUrl = metaJson['files']?['lrc']?.toString();
+        if (searchRes.statusCode != 200) continue;
 
-        if (lrcUrl != null && lrcUrl.isNotEmpty) {
-          final lrcRes = await _client.get(Uri.parse(lrcUrl), headers: {
+        final searchJson = jsonDecode(utf8.decode(searchRes.bodyBytes)) as Map<String, dynamic>;
+        final hits = (searchJson['hits'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        if (hits.isEmpty) continue;
+
+        // Check top 3 hits for matching ISRC
+        for (final hit in hits.take(3)) {
+          final isrc = (hit['isrc'] ?? '').toString().trim();
+          if (isrc.isEmpty) continue;
+
+          final metaUri = Uri.parse('https://lrc.red/s/$isrc.json');
+          final metaRes = await _client.get(metaUri, headers: {
             'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)',
-          }).timeout(const Duration(seconds: 4));
+          }).timeout(const Duration(seconds: 3));
 
-          if (lrcRes.statusCode == 200) {
-            final lrcContent = utf8.decode(lrcRes.bodyBytes);
-            final parsed = LrcParser.parse(lrcContent);
-            if (parsed.lines.isNotEmpty && parsed.synced) {
-              final hasWordTimings = parsed.lines.any((l) => l['words'] != null && (l['words'] as List).isNotEmpty);
-              if (syncType == 'word' || hasWordTimings) {
-                return (
-                  wbw: LyricsResult(
-                    lines: parsed.lines,
-                    synced: true,
-                    source: 'lrc_red_wbw',
-                    rawLrc: lrcContent,
-                  ),
-                  line: null,
-                );
-              } else {
-                return (
-                  wbw: null,
-                  line: LyricsResult(
-                    lines: parsed.lines,
-                    synced: true,
-                    source: 'lrc_red_line',
-                    rawLrc: lrcContent,
-                  ),
-                );
+          if (metaRes.statusCode != 200) continue;
+          final metaJson = jsonDecode(utf8.decode(metaRes.bodyBytes)) as Map<String, dynamic>;
+          final syncType = (metaJson['sync'] ?? '').toString().toLowerCase();
+          final lrcUrl = metaJson['files']?['lrc']?.toString();
+
+          if (lrcUrl != null && lrcUrl.isNotEmpty) {
+            final lrcRes = await _client.get(Uri.parse(lrcUrl), headers: {
+              'User-Agent': 'ZenifyApp/1.0 (https://zenify.app)',
+            }).timeout(const Duration(seconds: 4));
+
+            if (lrcRes.statusCode == 200) {
+              final lrcContent = utf8.decode(lrcRes.bodyBytes);
+              // CRUCIAL: Anti-collision language check
+              if (lang.isNotEmpty && !isLanguageCompatible(lrcContent, lang)) {
+                continue; // Skip hit of different language
+              }
+
+              final parsed = LrcParser.parse(lrcContent);
+              if (parsed.lines.isNotEmpty && parsed.synced) {
+                final hasWordTimings = parsed.lines.any((l) => l['words'] != null && (l['words'] as List).isNotEmpty);
+                if (syncType == 'word' || hasWordTimings) {
+                  return (
+                    wbw: LyricsResult(
+                      lines: parsed.lines,
+                      synced: true,
+                      source: 'lrc_red_wbw',
+                      rawLrc: lrcContent,
+                    ),
+                    line: null,
+                  );
+                } else {
+                  return (
+                    wbw: null,
+                    line: LyricsResult(
+                      lines: parsed.lines,
+                      synced: true,
+                      source: 'lrc_red_line',
+                      rawLrc: lrcContent,
+                    ),
+                  );
+                }
               }
             }
           }
         }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[LyricsService] lrc.red error: $e');
       }
-    } catch (e) {
-      if (kDebugMode) debugPrint('[LyricsService] lrc.red error: $e');
     }
     return (wbw: null, line: null);
   }
@@ -513,7 +679,13 @@ class LyricsService {
 
   // ───────────────────────── Tier 2: LRCLIB Synced Provider ─────────────────
 
-  Future<LyricsResult?> _fetchLrclibSynced(String title, String artist, String album, int durationSeconds) async {
+  Future<LyricsResult?> _fetchLrclibSynced(
+    String title,
+    String artist,
+    String album,
+    int durationSeconds,
+    String lang,
+  ) async {
     // 1. Direct match with GET /api/get
     try {
       final uri = Uri.https('lrclib.net', '/api/get', {
@@ -532,48 +704,114 @@ class LyricsService {
         final syncedLyrics = json['syncedLyrics'] as String?;
 
         if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
-          final parsed = LrcParser.parse(syncedLyrics);
-          if (parsed.lines.isNotEmpty && parsed.synced) {
-            return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_synced', rawLrc: syncedLyrics);
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 2. Search fallback
-    try {
-      final searchUri = Uri.https('lrclib.net', '/api/search', {
-        'q': '$title $artist'.trim(),
-      });
-
-      final searchRes = await _client.get(searchUri, headers: {
-        'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
-      }).timeout(const Duration(seconds: 4));
-
-      if (searchRes.statusCode == 200) {
-        final list = jsonDecode(utf8.decode(searchRes.bodyBytes));
-        if (list is List && list.isNotEmpty) {
-          for (final item in list) {
-            if (item is Map) {
-              final syncedLyrics = item['syncedLyrics'] as String?;
-              if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
-                final parsed = LrcParser.parse(syncedLyrics);
-                if (parsed.lines.isNotEmpty && parsed.synced) {
-                  return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_search_synced', rawLrc: syncedLyrics);
-                }
-              }
+          // Verify language compatibility
+          if (lang.isEmpty || isLanguageCompatible(syncedLyrics, lang)) {
+            final parsed = LrcParser.parse(syncedLyrics);
+            if (parsed.lines.isNotEmpty && parsed.synced) {
+              return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_synced', rawLrc: syncedLyrics);
             }
           }
         }
       }
     } catch (_) {}
 
+    // 2. Multi-query search fallback with candidate language scoring
+    final queries = <String>[];
+    if (lang.isNotEmpty) {
+      queries.add('$title $artist $lang'.trim());
+    }
+    queries.add('$title $artist'.trim());
+
+    for (final q in queries) {
+      try {
+        final searchUri = Uri.https('lrclib.net', '/api/search', {
+          'q': q,
+        });
+
+        final searchRes = await _client.get(searchUri, headers: {
+          'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+        }).timeout(const Duration(seconds: 4));
+
+        if (searchRes.statusCode == 200) {
+          final list = jsonDecode(utf8.decode(searchRes.bodyBytes));
+          if (list is List && list.isNotEmpty) {
+            final scored = <({Map<String, dynamic> item, int score, String lyrics})>[];
+
+            for (final item in list) {
+              if (item is Map) {
+                final map = Map<String, dynamic>.from(item);
+                final syncedLyrics = map['syncedLyrics'] as String?;
+                if (syncedLyrics == null || syncedLyrics.trim().isEmpty) continue;
+
+                // Anti-collision language compatibility check
+                if (lang.isNotEmpty && !isLanguageCompatible(syncedLyrics, lang)) {
+                  continue; // Reject completely if language conflicts!
+                }
+
+                int score = 100;
+                final candTrack = (map['trackName'] ?? '').toString().toLowerCase();
+                final candAlbum = (map['albumName'] ?? '').toString().toLowerCase();
+                final candMeta = '$candTrack $candAlbum';
+
+                if (lang.isNotEmpty) {
+                  if (candMeta.contains(lang)) {
+                    score += 150;
+                  }
+                  // Check competing languages
+                  final otherLangs = ['tamil', 'telugu', 'hindi', 'malayalam', 'kannada', 'punjabi'];
+                  for (final ol in otherLangs) {
+                    if (ol != lang && candMeta.contains(ol)) {
+                      score -= 500; // Penalize wrong language tags
+                    }
+                  }
+                }
+
+                if (durationSeconds > 0 && durationSeconds != 210) {
+                  final candDur = (map['duration'] as num?)?.toInt() ?? 0;
+                  final diff = (candDur - durationSeconds).abs();
+                  if (diff <= 4) {
+                    score += 50;
+                  } else if (diff > 15) {
+                    score -= 50;
+                  }
+                }
+
+                scored.add((item: map, score: score, lyrics: syncedLyrics));
+              }
+            }
+
+            if (scored.isNotEmpty) {
+              scored.sort((a, b) => b.score.compareTo(a.score));
+              final best = scored.first;
+              if (best.score > 0) {
+                final parsed = LrcParser.parse(best.lyrics);
+                if (parsed.lines.isNotEmpty && parsed.synced) {
+                  return LyricsResult(
+                    lines: parsed.lines,
+                    synced: true,
+                    source: 'lrclib_search_synced',
+                    rawLrc: best.lyrics,
+                  );
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     return null;
   }
 
   // ───────────────────────── Tier 3: LRCLIB Plain Provider ──────────────────
 
-  Future<LyricsResult?> _fetchLrclibPlain(String title, String artist, String album, int durationSeconds) async {
+  Future<LyricsResult?> _fetchLrclibPlain(
+    String title,
+    String artist,
+    String album,
+    int durationSeconds,
+    String lang,
+  ) async {
     try {
       final uri = Uri.https('lrclib.net', '/api/get', {
         'track_name': title,
@@ -590,40 +828,52 @@ class LyricsService {
         final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
         final plainLyrics = json['plainLyrics'] as String?;
         if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
-          final parsed = LrcParser.parse(plainLyrics);
-          if (parsed.lines.isNotEmpty) {
-            return LyricsResult(lines: parsed.lines, synced: false, source: 'lrclib_plain');
-          }
-        }
-      }
-    } catch (_) {}
-
-    try {
-      final searchUri = Uri.https('lrclib.net', '/api/search', {
-        'q': '$title $artist'.trim(),
-      });
-
-      final searchRes = await _client.get(searchUri, headers: {
-        'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
-      }).timeout(const Duration(seconds: 4));
-
-      if (searchRes.statusCode == 200) {
-        final list = jsonDecode(utf8.decode(searchRes.bodyBytes));
-        if (list is List && list.isNotEmpty) {
-          for (final item in list) {
-            if (item is Map) {
-              final plainLyrics = item['plainLyrics'] as String?;
-              if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
-                final parsed = LrcParser.parse(plainLyrics);
-                if (parsed.lines.isNotEmpty) {
-                  return LyricsResult(lines: parsed.lines, synced: false, source: 'lrclib_search_plain');
-                }
-              }
+          if (lang.isEmpty || isLanguageCompatible(plainLyrics, lang)) {
+            final parsed = LrcParser.parse(plainLyrics);
+            if (parsed.lines.isNotEmpty) {
+              return LyricsResult(lines: parsed.lines, synced: false, source: 'lrclib_plain');
             }
           }
         }
       }
     } catch (_) {}
+
+    final queries = <String>[];
+    if (lang.isNotEmpty) {
+      queries.add('$title $artist $lang'.trim());
+    }
+    queries.add('$title $artist'.trim());
+
+    for (final q in queries) {
+      try {
+        final searchUri = Uri.https('lrclib.net', '/api/search', {
+          'q': q,
+        });
+
+        final searchRes = await _client.get(searchUri, headers: {
+          'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+        }).timeout(const Duration(seconds: 4));
+
+        if (searchRes.statusCode == 200) {
+          final list = jsonDecode(utf8.decode(searchRes.bodyBytes));
+          if (list is List && list.isNotEmpty) {
+            for (final item in list) {
+              if (item is Map) {
+                final plainLyrics = item['plainLyrics'] as String?;
+                if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
+                  if (lang.isEmpty || isLanguageCompatible(plainLyrics, lang)) {
+                    final parsed = LrcParser.parse(plainLyrics);
+                    if (parsed.lines.isNotEmpty) {
+                      return LyricsResult(lines: parsed.lines, synced: false, source: 'lrclib_search_plain');
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
 
     return null;
   }

@@ -154,6 +154,7 @@ class UserPreferencesService {
       ValueNotifier<OnboardingPrefs?>(null);
 
   OnboardingPrefs? get current => prefsNotifier.value;
+  OnboardingPrefs get currentPrefs => prefsNotifier.value ?? const OnboardingPrefs();
   bool get hasCompleted => prefsNotifier.value?.completed == true;
 
   static const List<String> genderOptions = [

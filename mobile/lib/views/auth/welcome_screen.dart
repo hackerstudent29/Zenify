@@ -279,17 +279,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             },
             child: const ArtworkMeshBackground(
               palette: _roseWhitePalette,
-              speed: 1.25,
-              intensity: 0.35,
+              speed: 1.55,
+              intensity: 0.45,
               interactive: true,
               dither: true,
-              scrimOpacity: 0.28,
+              scrimOpacity: 0.08,
               backgroundColor: Color(0xFF1F0610),
             ),
           ),
 
-          // Soft lower-edge contrast gradient so CTA controls pop effortlessly
-          // while letting strawberry rose & white waves shine above.
+          // Gentle lower-edge contrast gradient so CTA controls pop effortlessly
+          // while letting strawberry rose & white liquid waves shine freely all around.
           const IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -297,12 +297,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Color(0x2414040A),
+                    Color(0x1014040A),
                     Color(0x0014040A),
-                    Color(0x52120409),
-                    Color(0xC20D0307),
+                    Color(0x28120409),
+                    Color(0x920D0307),
                   ],
-                  stops: [0.0, 0.35, 0.72, 1.0],
+                  stops: [0.0, 0.40, 0.76, 1.0],
                 ),
               ),
             ),

@@ -11,8 +11,7 @@ import 'package:provider/provider.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
-import '../../features/story_sharing/models/story_share_content.dart';
-import '../../features/story_sharing/screens/story_preview_screen.dart';
+import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/artist_service.dart';
@@ -20,6 +19,7 @@ import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
+import '../player/player_shell.dart';
 import 'album_screen.dart';
 
 /* ------------------------------------------------------------------ */
@@ -449,6 +449,161 @@ class _Shelf extends StatelessWidget {
           itemExtent: _kExtent,
           itemCount: count,
           itemBuilder: (_, i) => Padding(padding: const EdgeInsets.only(right: _kGap), child: builder(i)),
+        ),
+      );
+}
+
+class _VideoCover extends StatelessWidget {
+  const _VideoCover({required this.track, required this.onTap});
+  final Track track;
+  final VoidCallback onTap;
+
+  String _formatDuration(int sec) {
+    if (sec <= 0) return '';
+    final m = sec ~/ 60;
+    final s = sec % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dur = _formatDuration(track.durationSeconds);
+    return _Press(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: DecoratedBox(
+              decoration: ShapeDecoration(
+                shape: _sq(10),
+                shadows: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _Img(track.coverUrl, radius: 10),
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.65),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.70),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(CupertinoIcons.play_rectangle_fill, size: 10, color: AppColors.accent),
+                          SizedBox(width: 4),
+                          Text(
+                            'VIDEO',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (dur.isNotEmpty)
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          dur,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            MediaNormalizer.cleanCompactTitle(track.title),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.15,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            track.artist.isNotEmpty ? track.artist : 'Music Video',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoShelf extends StatelessWidget {
+  const _VideoShelf({required this.count, required this.builder});
+  final int count;
+  final Widget Function(int) builder;
+
+  static const double _kVideoExtent = 236.0;
+  static const double _kVideoShelfH = 194.0;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        height: _kVideoShelfH,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          physics: const _SnapPhysics(parent: BouncingScrollPhysics(), itemExtent: _kVideoExtent),
+          itemExtent: _kVideoExtent,
+          itemCount: count,
+          itemBuilder: (_, i) => Padding(padding: const EdgeInsets.only(right: 14), child: builder(i)),
         ),
       );
 }
@@ -1066,6 +1221,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
             .toList()
         : releases.where((r) => r.tracks.length < 3).toList();
     final featuredPlaylists = _artistProfile?.featuredPlaylists ?? const [];
+    final musicVideos = _artistProfile?.musicVideos ?? const <Track>[];
 
     // Newest release: pick by year when the profile has years, else first found.
     _Release? latest;
@@ -1436,6 +1592,21 @@ class _ArtistScreenState extends State<ArtistScreen> {
                                   ? '${singles[i].type} · ${singles[i].year}'
                                   : (singles[i].tracks.length == 1 ? 'Single' : 'EP'),
                               onTap: () => _openAlbum(singles[i]),
+                            ),
+                          ),
+                        ],
+
+                        // Music Videos / Video Songs
+                        if (musicVideos.isNotEmpty) ...[
+                          const _SecHeader('Music Videos'),
+                          _VideoShelf(
+                            count: musicVideos.length,
+                            builder: (i) => _VideoCover(
+                              track: musicVideos[i],
+                              onTap: () {
+                                _play(musicVideos, i);
+                                PlayerShell.requestOpen();
+                              },
                             ),
                           ),
                         ],

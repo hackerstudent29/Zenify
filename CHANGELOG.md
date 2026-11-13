@@ -2,6 +2,40 @@
 
 All notable changes to the Zenify platform are documented in this file.
 
+## [1.0.10] - 2026-11-13
+
+### Added
+- **Multi-Language Lyrics Anti-Collision Engine**:
+  - Implemented pre-sanitization language detection in `Track` constructor to extract `(Telugu)`, `[Tamil]`, `(Hindi)`, etc., and album metadata *before* title normalizers strip bracketed tags.
+  - Added native script rune analysis (`LyricsService.detectScriptLanguage`) covering Tamil, Telugu, Devanagari/Hindi, Malayalam, Kannada, Bengali, Gurmukhi, Korean, Japanese, and Arabic.
+  - Added romanized transliteration detector (`LyricsService.detectRomanizedLanguage`) for Tanglish, Tenglish, and Hinglish stopwords.
+  - Added strict language compatibility gate (`LyricsService.isLanguageCompatible`) to reject wrong-language and wrong-script lyrics (e.g. Tamil lyrics on Telugu song audio like *Ale Ale*, *Arabic Kuthu*, *Chaleya/Hayyoda*).
+  - Enhanced multi-query search fallbacks in `_fetchLrclibSynced` and `_fetchLrcRed` with language-scoped queries and candidate scoring.
+- **Transparent Zenify Full Brand Logo Across All Story Templates**:
+  - Configured `ZenifyStoryBrand` to render the authentic transparent brand mark (`assets/images/zenify_logo.png`) across all 16 story sharing templates.
+  - Removed artificial plain text widgets (`Text('Zenify')`), ensuring only the pristine official logo with high-contrast color polarity is rendered on exported stories.
+- **Architecture Streamlining for Story Sharing**:
+  - Consolidated 21 micro-files and 5 subfolders in `mobile/lib/features/story_sharing/` into 5 high-cohesion modules (`story_models.dart`, `story_service.dart`, `story_widgets.dart`, `story_templates.dart`, `story_preview_screen.dart`, and unified barrel `story_sharing.dart`).
+
+### Changed
+- **Removed Camera Buttons App-Wide**: Eliminated standalone camera icons from Now Playing screen, `PlayerShell` meta row, `LyricsSheet` bottom bar, and dropdown action items in favor of the standard three-dot (`...`) context menu.
+- **Consolidated Story Sharing Templates into Single Category Files**: Refactored the 16 micro-files into 5 clean, category-based files under `mobile/lib/features/story_sharing/templates/`:
+  - `song_templates.dart` (`Classic`, `Full Poster`, `Liquid Glass`, `Editorial`)
+  - `lyrics_templates.dart` (`Classic`, `Typography Poster`, `Minimal`)
+  - `artist_templates.dart` (`Profile`, `Editorial`, `Discography`)
+  - `album_templates.dart` (`Stacked Depth`, `Editorial`, `Liquid`)
+  - `playlist_templates.dart` (`Collage`, `Poster`, `Editorial Grid`)
+- **Direct Multi-Platform Social Story Redirection**:
+  - Added native **Snapchat** Story/Snap sharing support (`com.snapchat.android`).
+  - Added automatic fallback to direct `Intent.ACTION_SEND` targeting `com.instagram.android` with explicit URI read permissions if Instagram Story intent is not supported.
+  - Added support for WhatsApp Business (`com.whatsapp.w4b`) alongside standard WhatsApp (`com.whatsapp`).
+  - Added support for Facebook Lite (`com.facebook.lite`) alongside Facebook Katana (`com.facebook.katana`).
+- **Responsive Viewport & Stable Capture Boundary**:
+  - Wrapped `StoryCardViewport` in `FittedBox(fit: BoxFit.contain)` to guarantee story and square cards scale responsively without overflow on any mobile screen dimensions.
+  - Implemented stable per-template `GlobalKey` caching (`_boundaryKeys`) in `StoryPreviewScreen` to eliminate duplicate key collision warnings and guarantee clean 3.0x pixel-ratio rasterization.
+- **Unified Story Options Sheet**:
+  - Integrated Quick Social Destinations bar directly inside `StoryOptionsSheet` (Instagram, WhatsApp, Facebook, Snapchat, Copy Link) alongside category selection tiles.
+
 ## [1.0.9] - 2026-11-12
 
 ### Added
