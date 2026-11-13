@@ -5,6 +5,7 @@ import 'dart:ui' show lerpDouble;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -447,10 +448,10 @@ class PlayerShellState extends State<PlayerShell>
 
   void _bumpIdle({bool force = false}) {
     if (_panel != _Panel.lyrics) return;
-    if (_chromeHidden) {
+    if (_chromeHidden || _chrome.value > 0.01) {
       _chromeHidden = false;
       _lyricsImmersive.value = false;
-      _chrome.springTo(0, spring: kSnappySpring);
+      if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
     } else if (!force) {
       final last = _lastBump;
       if (last != null &&
@@ -1219,7 +1220,14 @@ class PlayerShellState extends State<PlayerShell>
           key: ValueKey('lyrics-$_trackKey'),
           child: NotificationListener<ScrollNotification>(
             onNotification: (n) {
-              if (n is ScrollUpdateNotification) {
+              // Only user-initiated scroll gestures (direct touch drag or active user scroll)
+              // should reset the idle timer or reveal controls. Programmatic auto-scrolls
+              // when lyrics advance to the next line (dragDetails == null) must NEVER
+              // wake or re-show controls.
+              if ((n is ScrollUpdateNotification && n.dragDetails != null) ||
+                  (n is ScrollStartNotification && n.dragDetails != null) ||
+                  (n is UserScrollNotification &&
+                      n.direction != ScrollDirection.idle)) {
                 _bumpIdle();
               }
               return false;

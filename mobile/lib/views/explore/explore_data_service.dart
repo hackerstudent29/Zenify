@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../models/track.dart';
+import '../../services/api_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/user_preferences_service.dart';
 
@@ -352,9 +353,15 @@ class ExploreDataService {
     final tracks = <Track>[];
     final seen = <String>{};
 
-    for (final q in queries.take(4)) {
+    for (final q in queries.take(3)) {
       try {
-        final res = await InnerTubeService.instance.search(q);
+        var res = await InnerTubeService.instance
+            .search(q)
+            .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+        if (res.isEmpty) {
+          res = await ApiService.search(q)
+              .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+        }
         for (final t in res) {
           if (seen.add(t.id)) tracks.add(t);
           if (tracks.length >= 24) break;
@@ -383,7 +390,9 @@ class ExploreDataService {
     try {
       // 1. If India, prefer on-device direct home feed
       if (country.code == 'IN') {
-        final homeFeed = await InnerTubeService.instance.getHomeFeed();
+        final homeFeed = await InnerTubeService.instance
+            .getHomeFeed()
+            .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
         if (homeFeed.isNotEmpty) {
           _countryTrackCache[key] = homeFeed;
           return homeFeed;
@@ -391,14 +400,26 @@ class ExploreDataService {
       }
 
       // 2. Query regional trending via search
-      final regionalTracks = await InnerTubeService.instance.search(country.query);
+      final regionalTracks = await InnerTubeService.instance
+          .search(country.query)
+          .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
       if (regionalTracks.isNotEmpty) {
         _countryTrackCache[key] = regionalTracks;
         return regionalTracks;
       }
     } catch (_) {}
 
-    // 3. Fallback to catalog
+    // 3. Fallback to ApiService or catalog
+    try {
+      final cloud = await ApiService.search(country.query)
+          .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+      if (cloud.isNotEmpty) {
+        _countryTrackCache[key] = cloud;
+        return cloud;
+      }
+    } catch (_) {}
+
+    // 4. Fallback to catalog
     final catalog = CatalogDataSource.allTracks;
     _countryTrackCache[key] = catalog;
     return catalog;

@@ -51,11 +51,11 @@ class InnerTubeTransport {
   static const String _visitorPref = 'zenify_yt_visitor_data';
 
   // ---- Politeness knobs ---------------------------------------------------
-  static const Duration _timeout = Duration(seconds: 12);
-  static const int _maxAttempts = 3;
+  static const Duration _timeout = Duration(seconds: 4);
+  static const int _maxAttempts = 2;
 
   final http.Client _http = http.Client();
-  final _TokenBucket _bucket = _TokenBucket(capacity: 6, refillPerSecond: 2.5);
+  final _TokenBucket _bucket = _TokenBucket(capacity: 12, refillPerSecond: 5.0);
   final _Breaker _breaker = _Breaker();
   final _TtlCache _cache = _TtlCache(maxEntries: 200);
   final Map<String, Future<Map<String, dynamic>>> _inflight = {};
@@ -141,8 +141,7 @@ class InnerTubeTransport {
     if (_breaker.open) {
       final stale = _cache.get(key, allowStale: true);
       if (stale != null) return stale;
-      throw InnerTubeException(
-          429, 'Cooling down for ${_breaker.remaining.inSeconds}s', true);
+      _breaker.success(); // auto-reset so app is never permanently locked out
     }
 
     InnerTubeException? last;

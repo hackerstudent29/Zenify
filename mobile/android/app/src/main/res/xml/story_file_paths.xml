@@ -3,5 +3,7 @@
     <cache-path name="story_cache" path="." />
     <external-cache-path name="story_ext_cache" path="." />
     <files-path name="story_files" path="." />
+    <external-files-path name="story_ext_files" path="." />
+    <external-path name="story_ext" path="." />
 </paths>
 

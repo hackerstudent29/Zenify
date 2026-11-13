@@ -225,26 +225,28 @@ class StoryCardViewport extends StatelessWidget {
       child: Center(
         child: FittedBox(
           fit: BoxFit.contain,
-          child: RepaintBoundary(
-            key: boundaryKey,
-            child: Container(
-              width: aspectRatio.width,
-              height: aspectRatio.height,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(clipRadius),
-                boxShadow: elevation > 0
-                    ? [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          blurRadius: elevation,
-                          offset: const Offset(0, 10),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(clipRadius),
-                child: child,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(clipRadius),
+              boxShadow: elevation > 0
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        blurRadius: elevation,
+                        offset: const Offset(0, 10),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(clipRadius),
+              child: RepaintBoundary(
+                key: boundaryKey,
+                child: SizedBox(
+                  width: aspectRatio.width,
+                  height: aspectRatio.height,
+                  child: child,
+                ),
               ),
             ),
           ),

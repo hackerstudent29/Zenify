@@ -5,9 +5,6 @@ import 'dart:ui' show FontFeature, ImageFilter;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
-import '../../features/story_sharing/story_sharing.dart';
-import '../../services/lyrics_service.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart'
     show RenderAbstractViewport, ScrollDirection;
@@ -16,6 +13,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../features/story_sharing/story_sharing.dart';
+import '../../services/lyrics_service.dart';
 import '../../services/player_state.dart';
 
 // ---------------------------------------------------------------------------
@@ -25,11 +24,12 @@ import '../../services/player_state.dart';
 /// Instrumental gaps shorter than this get NO dots.
 const double _kInterludeMin = 5.0;
 
-/// Long held word => per-letter wave (Latin/Greek/Cyrillic) or whole-word
-/// swell (every other script, so shaping is never broken).
-const double _kWaveMinDuration = 1.0; // seconds
-const int _kWaveMinLetters = 2;
-const int _kWaveMaxLetters = 9;
+/// Wave: ONLY the last word of a line, ONLY its last 3-5 letters (never the
+/// whole word), and only when that word is actually held for a moment.
+///   word <= 5 letters -> last 3, 6-7 letters -> last 4, 8+ letters -> last 5
+/// (always at least one letter stays still).
+const double _kWaveMinDuration = 0.5; // seconds the last word must last
+const int _kWaveMinLetters = 3;
 const double _kWaveLift = 0.10; // x font size
 const double _kWaveScale = 0.08;
 const double _kWaveGlow = 0.7;
@@ -84,14 +84,39 @@ final RegExp _complexScriptRe = RegExp(
 
 bool _hasComplexScript(String s) => _complexScriptRe.hasMatch(s);
 
-/// A word is safe to split into per-letter widgets ONLY when every code point is
-/// a precomposed Latin / Greek / Cyrillic letter, digit or basic punctuation.
-/// Everything else gets the whole-word swell instead (same glyphs, no splitting).
-final RegExp _waveSafeRe = RegExp(
-  r'^[\u0021-\u007E\u00A0-\u024F\u0370-\u03FF\u0400-\u04FF\u2018-\u201D\u2026]+$',
-);
+/// Set to false if Tamil tail letters ever look wrong on a device: Tamil words
+/// then simply fill without any wave.
+const bool _kWaveTamil = true;
+
+/// A word may get the letter wave ONLY when every code point is a precomposed
+/// Latin / Greek / Cyrillic letter, digit or basic punctuation (or Tamil, see
+/// above). The wave splits by grapheme cluster, which keeps Tamil consonant +
+/// vowel sign together. All other scripts (Devanagari, Arabic, Thai...) are
+/// never split: they just fill normally, so their glyphs can never break.
+final RegExp _waveSafeRe = RegExp(_kWaveTamil
+    ? r'^[\u0021-\u007E\u00A0-\u024F\u0370-\u03FF\u0400-\u04FF\u0B80-\u0BFF\u2018-\u201D\u2026]+$'
+    : r'^[\u0021-\u007E\u00A0-\u024F\u0370-\u03FF\u0400-\u04FF\u2018-\u201D\u2026]+$');
 
 bool _isWaveSafe(String s) => _waveSafeRe.hasMatch(s);
+
+/// How a word is cut for the wave.
+class _Tail {
+  const _Tail(this.n, this.letters, this.tail);
+  final int n; // grapheme count of the whole token
+  final int letters; // graphemes before trailing punctuation
+  final int tail; // how many of the last letters wave
+}
+
+_Tail _tailOf(String word) {
+  final g = word.characters.toList();
+  var letters = g.length;
+  while (letters > 0 && g[letters - 1].replaceAll(_nonLetterRe, '').isEmpty) {
+    letters--;
+  }
+  final want = letters <= 5 ? 3 : (letters <= 7 ? 4 : 5);
+  final tail = math.max(0, math.min(want, letters - 1));
+  return _Tail(g.length, letters, tail);
+}
 
 /// Controls auto-hide after this much time without touching the screen.
 const Duration _kIdleHide = Duration(seconds: 3);
@@ -379,7 +404,7 @@ class _SpringCurve extends Curve {
     double stiffness = 170,
     double ratio = 0.82,
     this._settle = 0.85,
-  })  : _sim = SpringSimulation(
+  }) : _sim = SpringSimulation(
           SpringDescription.withDampingRatio(
               mass: 1, stiffness: stiffness, ratio: ratio),
           0,
@@ -1044,10 +1069,8 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   bool _ready = false;
   bool _present = true; // takes layout space
   bool _pressed = false;
-  bool _hl = false; // highlight border visible
-  bool _hover = false;
   double _gFrom = 0; // px offset the glide starts from
-  Timer? _dt, _exit, _glideT, _hlT;
+  Timer? _dt, _exit, _glideT;
 
   @override
   void initState() {
@@ -1118,19 +1141,7 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   }
 
   void _setPressed(bool down) {
-    _hlT?.cancel();
-    if (down) {
-      setState(() {
-        _pressed = true;
-        _hl = true;
-      });
-    } else {
-      if (_pressed) setState(() => _pressed = false);
-      // Keep the border a moment after release, then let it melt away.
-      _hlT = Timer(const Duration(milliseconds: 420), () {
-        if (mounted && _hl) setState(() => _hl = false);
-      });
-    }
+    if (_pressed != down) setState(() => _pressed = down);
   }
 
   @override
@@ -1192,7 +1203,6 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
     _dt?.cancel();
     _exit?.cancel();
     _glideT?.cancel();
-    _hlT?.cancel();
     _d.dispose();
     _popCurve.dispose();
     _pop.dispose();
@@ -1324,52 +1334,28 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
           }
           w = Opacity(opacity: (dp.o * popOpacity).clamp(0.0, 1.0), child: w);
 
-          final fillA = interactive ? (_hl ? 0.10 : (_hover ? 0.06 : 0.0)) : 0.0;
-          final borderA = interactive && _hl ? 0.26 : 0.0;
-
-          Widget tile = AnimatedScale(
-            scale: _pressed ? 0.965 : 1.0,
-            duration: Duration(milliseconds: _pressed ? 110 : 420),
+          // No card / border / fill behind the text: the lyrics sit directly on
+          // the transparent background. Only a subtle spring press-scale.
+          final tile = AnimatedScale(
+            scale: _pressed ? 0.975 : 1.0,
+            duration: Duration(milliseconds: _pressed ? 120 : 460),
             curve: _pressed ? Curves.easeOutCubic : _popSpring,
             alignment: alignment,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 320),
-              curve: Curves.easeOutCubic,
-              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                color: Colors.white.withValues(alpha: fillA),
-                // Always 1.2px so layout never jumps; only the colour fades.
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: borderA),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white
-                        .withValues(alpha: interactive && _hl ? 0.07 : 0.0),
-                    blurRadius: 22,
-                  ),
-                ],
-              ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
               child: w,
             ),
           );
 
           if (!interactive) return tile;
 
-          return MouseRegion(
-            onEnter: (_) => setState(() => _hover = true),
-            onExit: (_) => setState(() => _hover = false),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapDown: (_) => _setPressed(true),
-              onTapUp: (_) => _setPressed(false),
-              onTapCancel: () => _setPressed(false),
-              onTap: widget.onTap,
-              child: tile,
-            ),
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) => _setPressed(true),
+            onTapUp: (_) => _setPressed(false),
+            onTapCancel: () => _setPressed(false),
+            onTap: widget.onTap,
+            child: tile,
           );
         },
       ),
@@ -1527,16 +1513,14 @@ class _WordLineState extends State<_WordLine>
         for (var i = 0; i < n; i++) {
           s[i] = ws[i].start.inMicroseconds / 1e6;
           e[i] = math.max(s[i] + 0.05, ws[i].end.inMicroseconds / 1e6);
-          // Count GRAPHEMES (what a reader sees as a letter), not code points.
-          final letters = tokens[i]
-              .characters
-              .where((c) => c.replaceAll(_nonLetterRe, '').isNotEmpty)
-              .length;
-          // Every script may be "emphasised"; _Word decides HOW (per-letter
-          // wave for safe scripts, whole-word swell for the rest).
-          emph[i] = (e[i] - s[i]) >= _kWaveMinDuration &&
-              letters >= _kWaveMinLetters &&
-              letters <= _kWaveMaxLetters;
+          // Only the LAST word of the line, only when it is really held.
+          if (i == n - 1) {
+            final tl = _tailOf(tokens[i]);
+            emph[i] = _isWaveSafe(tokens[i]) &&
+                (e[i] - s[i]) >= _kWaveMinDuration &&
+                tl.letters >= _kWaveMinLetters &&
+                tl.tail > 0;
+          }
         }
       } else {
         final lineStart = ws.first.start.inMicroseconds / 1e6;
@@ -1633,45 +1617,58 @@ class _WordLineState extends State<_WordLine>
     } else {
       raw = (t - lay.s[i]) / span;
     }
+
+    _Tail? tail;
+    double wave = -1;
+    if (lay.emph[i] && !reduce && !widget.plain) {
+      tail = _tailOf(lay.tokens[i]);
+      if (t == null) {
+        wave = widget.past ? 2 : -1;
+      } else {
+        // The wave starts when the fill reaches the tail letters and rolls on
+        // a little past the end of the word, so it eases out instead of
+        // stopping dead.
+        final ws = lay.s[i] + span * (tail.letters - tail.tail) / tail.n;
+        final we = math.max(lay.e[i] + 0.35, ws + 0.9);
+        wave = (t - ws) / (we - ws);
+      }
+    }
     return _Word(
       text: lay.tokens[i],
       fs: lay.fs,
       style: _style,
       p: raw.clamp(0.0, 1.0).toDouble(),
-      raw: raw,
       settle: settle,
-      emph: lay.emph[i] && !reduce && !widget.plain,
+      tail: tail,
+      wave: wave,
     );
   }
 }
 
 /// One word: dim base, soft-edged white fill (left to right) and glow.
 ///
-/// Emphasised (long held) words:
-///  * Latin / Greek / Cyrillic  -> per-LETTER wave. Letters are split by
-///    grapheme cluster and the per-letter layout is used for the whole life of
-///    the word (before, during and after), so nothing "pops" when it starts.
-///  * Every other script (Tamil, Hindi, Arabic, Thai, Hebrew, CJK, emoji,
-///    anything with combining marks) -> whole-WORD swell. The word stays ONE
-///    Text, so the font, shaping, matras and conjuncts are exactly the same as
-///    before the animation - only lift / scale / glow are added.
+/// Words never "pop" as a whole. The only extra motion is the tail wave: for
+/// the last word of a line, its last 3-5 letters float up one after another
+/// (lift + tiny scale + glow) while the rest of the word stays still. The word
+/// is laid out the same way before, during and after the wave, so nothing
+/// jumps when it starts or ends.
 class _Word extends StatelessWidget {
   const _Word({
     required this.text,
     required this.fs,
     required this.style,
     required this.p,
-    required this.raw,
-    required this.emph,
     this.settle = 1,
+    this.tail,
+    this.wave = -1,
   });
   final String text;
   final double fs;
   final TextStyle Function(double, Color) style;
-  final double p;
-  final double raw;
-  final bool emph;
+  final double p; // 0..1 fill progress of the whole word
   final double settle;
+  final _Tail? tail;
+  final double wave; // 0..1 wave progress (outside = idle)
 
   static const _dim = Color(0x6BFFFFFF); // white 42%
 
@@ -1680,7 +1677,7 @@ class _Word extends StatelessWidget {
     if (p <= 0) return Text(text, style: style(fs, _dim));
     if (p >= 1) {
       return Text(text,
-          style: style(fs, Color.lerp(_dim, Colors.white, settle)!));
+          style: style(fs, Color.lerp(_dim, Colors.white, settle) ?? Colors.white));
     }
 
     const soft = 0.18;
@@ -1717,27 +1714,14 @@ class _Word extends StatelessWidget {
     );
   }
 
+  /// Soft rise (~40%) and a slower settle back down.
   static double _bump(double u) => (u <= 0 || u >= 1)
       ? 0.0
-      : math.sin(math.pi * math.pow(u, 0.756).toDouble()); // peak ~40%
+      : math.sin(math.pi * math.pow(u, 0.756).toDouble());
 
-  Widget _wave() {
-    // Grapheme clusters, NOT code points: "é" (e + U+0301), flags, emoji with
-    // ZWJ and similar stay in one piece.
-    final letters = text.characters.toList();
-    final n = letters.length;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < n; i++) _letter(letters[i], i, n),
-      ],
-    );
-  }
-
-  Widget _letter(String ch, int i, int n) {
-    final pl = (p * n - i).clamp(0.0, 1.0).toDouble();
-    final delay = (i / n) * _kWaveSpread;
-    final u = ((raw - delay) / (1 - _kWaveSpread)).clamp(0.0, 1.0).toDouble();
+  Widget _letter(String ch, int i, int count, double pl) {
+    final delay = (i / count) * _kWaveSpread;
+    final u = ((wave - delay) / (1 - _kWaveSpread)).clamp(0.0, 1.0).toDouble();
     final bump = _bump(u);
 
     return Transform.translate(
@@ -1763,37 +1747,38 @@ class _Word extends StatelessWidget {
     );
   }
 
-  Widget _swell() {
-    final bump = _bump(raw.clamp(0.0, 1.0).toDouble());
-    final child = _fill(text, fs, style, p, settle);
-    if (bump <= 0) return child;
-    return Transform.translate(
-      offset: Offset(0, -fs * _kWaveLift * 0.8 * bump),
-      child: Transform.scale(
-        scale: 1 + _kWaveScale * 0.8 * bump,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            if (bump > 0.08)
-              Opacity(
-                opacity: (_kWaveGlow * bump).clamp(0.0, 1.0),
-                child: ImageFiltered(
-                  imageFilter: ImageFilter.blur(
-                      sigmaX: 2 + 6 * bump, sigmaY: 2 + 6 * bump),
-                  child: Text(text, style: style(fs, Colors.white)),
-                ),
-              ),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (!emph) return _fill(text, fs, style, p, settle);
-    return _isWaveSafe(text) ? _wave() : _swell();
+    final tl = tail;
+    if (tl == null || tl.tail <= 0) return _fill(text, fs, style, p, settle);
+
+    // Grapheme clusters, not code points: accents, Tamil vowel signs etc.
+    // stay attached to their base letter.
+    final g = text.characters.toList();
+    final n = g.length;
+    final preLen = tl.letters - tl.tail;
+    final prefix = g.sublist(0, preLen).join();
+    final suffix = g.sublist(tl.letters).join();
+    final pn = p * n;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Everything before the tail stays one piece of text (real kerning).
+        _fill(prefix, fs, style, (pn / preLen).clamp(0.0, 1.0).toDouble(),
+            settle),
+        for (var i = 0; i < tl.tail; i++)
+          _letter(g[preLen + i], i, tl.tail,
+              (pn - (preLen + i)).clamp(0.0, 1.0).toDouble()),
+        if (suffix.isNotEmpty)
+          _fill(
+              suffix,
+              fs,
+              style,
+              ((pn - tl.letters) / (n - tl.letters)).clamp(0.0, 1.0).toDouble(),
+              settle),
+      ],
+    );
   }
 }
 
@@ -2083,6 +2068,23 @@ class _Controls extends StatelessWidget {
                     ),
                     _StepButton(icon: Icons.add_rounded, onStep: onPlus),
                   ],
+                ),
+              ),
+            ],
+            if (onShareLyrics != null) ...[
+              const SizedBox(width: 10),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onShareLyrics,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const ShapeDecoration(
+                    shape: CircleBorder(),
+                    color: Color(0x1FFFFFFF),
+                  ),
+                  child: const Icon(CupertinoIcons.camera,
+                      size: 17, color: Colors.white),
                 ),
               ),
             ],

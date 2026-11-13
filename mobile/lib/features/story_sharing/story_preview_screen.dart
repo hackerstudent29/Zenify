@@ -582,6 +582,7 @@ class StoryOptionsSheet {
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
+                                      initialShareTarget: StoryShareTarget.instagram,
                                     ),
                                   ),
                                 );
@@ -598,6 +599,7 @@ class StoryOptionsSheet {
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
+                                      initialShareTarget: StoryShareTarget.whatsapp,
                                     ),
                                   ),
                                 );
@@ -614,6 +616,7 @@ class StoryOptionsSheet {
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
+                                      initialShareTarget: StoryShareTarget.facebook,
                                     ),
                                   ),
                                 );
@@ -630,6 +633,24 @@ class StoryOptionsSheet {
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
+                                      initialShareTarget: StoryShareTarget.snapchat,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 10),
+                            _QuickSocialDestination(
+                              label: 'Telegram',
+                              color: const Color(0xFF2AABEE),
+                              child: const Icon(CupertinoIcons.paperplane_fill, color: Colors.white, size: 18),
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                Navigator.of(context).push(
+                                  CupertinoPageRoute(
+                                    builder: (_) => StoryPreviewScreen(
+                                      content: SongStoryContent(track: track),
+                                      initialShareTarget: StoryShareTarget.telegram,
                                     ),
                                   ),
                                 );
@@ -956,10 +977,12 @@ class StoryPreviewScreen extends StatefulWidget {
     super.key,
     required this.content,
     this.initialTemplateId,
+    this.initialShareTarget,
   });
 
   final StoryShareContent content;
   final String? initialTemplateId;
+  final StoryShareTarget? initialShareTarget;
 
   @override
   State<StoryPreviewScreen> createState() => _StoryPreviewScreenState();
@@ -997,6 +1020,38 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
 
     _loadPreferences();
     _extractArtworkPalette();
+
+    if (widget.initialShareTarget != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _triggerInitialShare(widget.initialShareTarget!);
+      });
+    }
+  }
+
+  Future<void> _triggerInitialShare(StoryShareTarget target) async {
+    // Wait for the render boundary to complete layout & image paint
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
+    switch (target) {
+      case StoryShareTarget.instagram:
+        await _shareInstagram();
+        break;
+      case StoryShareTarget.facebook:
+        await _shareFacebook();
+        break;
+      case StoryShareTarget.whatsapp:
+        await _shareWhatsApp();
+        break;
+      case StoryShareTarget.snapchat:
+        await _shareSnapchat();
+        break;
+      case StoryShareTarget.telegram:
+        await _shareTelegram();
+        break;
+      case StoryShareTarget.system:
+        await _shareMore();
+        break;
+    }
   }
 
   @override
@@ -1123,6 +1178,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
       file,
       topColor: _palette.primary,
       bottomColor: _palette.background,
+      asSticker: _aspectRatio == StoryAspectRatio.square,
       fallbackText: widget.content.shareText,
     );
   }
@@ -1151,6 +1207,15 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
     await StorySharingService.shareToSnapchat(
       file,
       fallbackText: widget.content.shareText,
+    );
+  }
+
+  Future<void> _shareTelegram() async {
+    final file = await _captureCurrentCard();
+    if (file == null) return;
+    await StorySharingService.shareToTelegram(
+      file,
+      text: widget.content.shareText,
     );
   }
 

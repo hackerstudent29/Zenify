@@ -170,33 +170,25 @@ class SearchDataService {
     _activeSearchQuery = q;
     final requestId = ++_activeRequestId;
 
-    // 2. Fetch raw search payload from InnerTube with exponential backoff
+    // 2. Fetch raw search payload from InnerTube with fast timeout
     Map<String, dynamic>? rawJson;
-    int retries = 0;
-    while (retries < 2 && rawJson == null) {
-      try {
-        final body = <String, dynamic>{'query': q};
-        if (filter.params != null) {
-          body['params'] = filter.params;
-        }
-
-        rawJson = await InnerTubeService.instance
-            .post(
-              'search',
-              body,
-              countryCode: country,
-              ttl: SearchRankingConfig.kLruCacheTtl,
-              forceRefresh: forceRefresh,
-            )
-            .timeout(const Duration(seconds: 8));
-      } catch (e) {
-        retries++;
-        if (retries >= 2) {
-          if (kDebugMode) debugPrint('[SearchDataService] InnerTube search attempt failed ($retries): $e');
-        } else {
-          await Future.delayed(Duration(milliseconds: (200 * math.pow(2, retries)).toInt()));
-        }
+    try {
+      final body = <String, dynamic>{'query': q};
+      if (filter.params != null) {
+        body['params'] = filter.params;
       }
+
+      rawJson = await InnerTubeService.instance
+          .post(
+            'search',
+            body,
+            countryCode: country,
+            ttl: SearchRankingConfig.kLruCacheTtl,
+            forceRefresh: forceRefresh,
+          )
+          .timeout(const Duration(seconds: 4));
+    } catch (e) {
+      if (kDebugMode) debugPrint('[SearchDataService] InnerTube search attempt failed: $e');
     }
 
     // Guard against out-of-order responses from cancelled/delayed searches
@@ -334,12 +326,16 @@ class SearchDataService {
   Future<List<SearchItem>> _fetchFallbackItems(String q, SearchFilter filter) async {
     try {
       if (filter == SearchFilter.videos) {
-        final videos = await InnerTubeService.instance.searchVideos(q);
+        final videos = await InnerTubeService.instance
+            .searchVideos(q)
+            .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
         if (videos.isNotEmpty) {
           return videos.map(_trackToSearchVideoItem).toList();
         }
       } else if (filter == SearchFilter.artists) {
-        final artists = await InnerTubeService.instance.searchArtists(q);
+        final artists = await InnerTubeService.instance
+            .searchArtists(q)
+            .timeout(const Duration(seconds: 3), onTimeout: () => const []);
         if (artists.isNotEmpty) {
           return artists
               .map((a) => SearchArtistItem(
@@ -353,12 +349,34 @@ class SearchDataService {
               .toList();
         }
       }
-      List<Track> tracks = await InnerTubeService.instance.search(q);
+
+      // Fast native songs attempt
+      List<Track> tracks = await InnerTubeService.instance
+          .searchSongsNative(q)
+          .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+
+      // Resilient cloud fallback via ApiService
       if (tracks.isEmpty) {
-        tracks = await ApiService.search(q);
+        tracks = await ApiService.search(q)
+            .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
       }
+
       if (tracks.isNotEmpty) {
-        return tracks.map(_trackToSearchSongItem).toList();
+        final items = <SearchItem>[];
+        // If query looks like an artist, create an artist item for top result
+        final first = tracks.first;
+        if (first.artist.toLowerCase().contains(q.toLowerCase()) || q.toLowerCase().contains(first.artist.toLowerCase())) {
+          items.add(SearchArtistItem(
+            id: 'artist-${first.artist}',
+            title: first.artist,
+            subtitle: 'Artist',
+            thumbnailUrl: first.coverUrl,
+            thumbnailUrlHiRes: first.coverUrl,
+            browseId: '',
+          ));
+        }
+        items.addAll(tracks.map(_trackToSearchSongItem));
+        return items;
       }
     } catch (e) {
       if (kDebugMode) debugPrint('[SearchDataService] fallback error: $e');
