@@ -8,10 +8,12 @@ import 'package:mobile/services/country_service.dart';
 import 'package:mobile/services/dock_visibility.dart';
 import 'package:mobile/services/player_state.dart';
 import 'package:mobile/services/settings_service.dart';
+import 'package:mobile/services/together_service.dart';
 import 'package:mobile/services/user_preferences_service.dart';
 import 'package:mobile/views/auth/onboarding_sheet.dart';
 import 'package:mobile/views/insights/insights_screen.dart';
 import 'package:mobile/views/profile/profile_screen.dart';
+import 'package:mobile/views/room_together/room_together_screen.dart';
 import 'package:mobile/views/settings/settings_screen.dart';
 
 void main() {
@@ -273,5 +275,40 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Replay'), findsOneWidget);
     expect(find.text('Sign In for Replay'), findsOneWidget);
+  });
+
+  testWidgets(
+      'RoomTogetherScreen lobby populates onboarded username from UserPreferencesService',
+      (tester) async {
+    await UserPreferencesService.instance.save(
+      const OnboardingPrefs(
+        displayName: 'Karthik',
+        completed: true,
+      ),
+      syncRemote: false,
+    );
+
+    final auth = AuthState();
+    final player = PlayerState();
+    final together = TogetherService.instance;
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthState>.value(value: auth),
+          ChangeNotifierProvider<PlayerState>.value(value: player),
+          ChangeNotifierProvider<TogetherService>.value(value: together),
+        ],
+        child: const MaterialApp(home: RoomTogetherScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Room Together'), findsOneWidget);
+    expect(find.text('Karthik'), findsWidgets);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 }

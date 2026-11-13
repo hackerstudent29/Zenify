@@ -5,6 +5,31 @@ All notable changes to the Zenify platform are documented in this file.
 ## [1.0.9] - 2026-11-12
 
 ### Added
+- **Apple Music-Inspired "Add to Story" & Music Sharing Suite**: Complete, production-grade social story and card export feature across Song, Lyrics, Artist, Album, and Playlist categories with 16 distinct hand-crafted templates.
+  - **Song Sharing Templates (4)**: `Classic` (floating Apple-style poster card with squircle album art, bold typography, and transparent Zenify branding in the footer), `Full Poster` (cinematic full-bleed artwork with dark gradient overlay), `Liquid Glass` (blurred cover background, frosted glass card, waveform visualizer bars, and transparent Zenify logo), and `Editorial` (asymmetric artwork layout with oversized display typography and negative space).
+  - **Lyrics Sharing & Dedicated Selection Screen (3 Templates)**:
+    - Full-screen `LyricsSelectionScreen` enforcing 1–3 consecutive line selection, tap-to-deselect, non-consecutive tap reset, `appleToast('Select up to 3 lines')` limit guard, and graceful fallback when lyrics are unavailable.
+    - `Classic Lyrics` (frosted dark container with stacked lyric lines, mini cover, title, artist, and transparent Zenify logo badge).
+    - `Typography Poster` (expressive editorial display typography over warm multi-orb fluid gradient with hairline divider and metadata).
+    - `Minimal Lyrics` (clean presentation with generous negative space, quotation styling, and subtle footer metadata).
+  - **Artist Sharing Templates (3)**: `Profile` (circular portrait, real listener/subscriber count, and top 3 real songs), `Editorial` (cinematic full-canvas portrait poster), and `Discography` (portrait with 3 representative album/song covers).
+  - **Album Sharing Templates (3)**: `Stacked Depth` (main cover with two offset depth layers behind it for 3D depth, release year, and track count), `Editorial` (full-bleed split cover with editorial typography), and `Liquid Album` (floating glass composition).
+  - **Playlist Sharing Templates (3)**: `Collage` (2×2 grid adapting gracefully for 1, 2, 3, or 4 album covers), `Poster` (cinematic gradient background with playlist title and featured tracks), and `Editorial Grid` (asymmetrical collage layout).
+- **Dynamic Artwork Palette & Fluid Art Mesh Engine**:
+  - `ArtworkPaletteService`: Decodes and downsamples artwork pixels to extract 4 complementary vibrant colors with in-memory caching and automatic contrast darkening.
+  - `ArtMeshBackground`: Deterministic 4-orb radial gradient mesh with smooth gaussian blur and vignette overlay, supporting `Art Mesh`, `Blurred Cover`, and `Solid Charcoal Dark` styles without relying on active ticking loops during static image capture.
+  - `ZenifyStoryBrand`: Transparent brand mark (`assets/images/z_logo.png`) paired with SF Pro Display wordmark, adapting to both dark and light card polarities.
+- **Social Stories & Native Android Scoped Storage Pipeline**:
+  - Direct native Kotlin `StorySharePlugin` supporting Instagram Stories (`com.instagram.share.ADD_TO_STORY`), Facebook Stories (`com.facebook.stories.ADD_TO_STORY` / `Intent.ACTION_SEND`), WhatsApp (`com.whatsapp`), and scoped-storage `MediaStore.Images.Media` gallery export to `Pictures/Zenify` album on Android 10–15.
+  - Configured `androidx.core.content.FileProvider` (`story_file_paths.xml`) and Android package visibility queries, with automatic fallback to `share_plus` system share sheet.
+- **Story Preview & Customization Experience (`StoryPreviewScreen`)**:
+  - Full-screen swipeable `PageView` with smooth transitions and bottom frosted pill template selector.
+  - Customization toggles: `9:16` Story (`1080×1920`) vs `1:1` Square (`1080×1080`), `Art Mesh` / `Blurred` / `Solid Dark` background styles, and `Light` / `Dark` text polarity.
+  - Category-aware template preference persistence via `SharedPreferences`.
+  - High-res PNG rasterization via `StoryImageRenderer` (`RepaintBoundary` at `pixelRatio: 3.0`).
+- **Seamless App-Wide Entry Points**:
+  - Story camera buttons added to Now Playing screen (`now_playing_screen.dart`), `PlayerShell` meta row, and `LyricsSheet` controls bar.
+  - "Add to Story" options integrated into `ZenDropdown.showTrackMenu`, Quick Share Stories buttons, Artist menu, Album menu, and Library playlist menu.
 - **YouTube Video Streaming in MiniPlayer & Fullscreen Player (`ExoPlayer` + Flutter `Texture`)**: Native Android video surface binding in `ZenAudioPlugin` paired with `ZenPlayer.videoTextureIdNotifier` and reactive MiniPlayer / Fullscreen Player video surfaces when playing video tracks.
 - **Redesigned Explore, Search, Profile, Settings & Insights Experience**: Refined `ExploreScreen` and `SearchScreen` layouts, card spacing, mood tiles, `InnerTubeService.searchArtists` artist profile lookup, redesigned `ProfileScreen` / `SettingsScreen` / `InsightsScreen`, unified `ProfileEditSheets`, and region-aware `UserPreferencesService` (`sortedLanguagesForCountry`, `sortedGenresForLanguages`, `curatedArtistsForLanguages`, `age`/`gender`) seeding Home & Explore from Day 1.
 - **Rose-White Liquid Aurora Welcome Screen**: Added `palette` & `scrimOpacity` baking to `ArtworkMeshBackground` behind looping transparent `ZenifyAnimatedLogo`, paired with Layer-1 `OnboardingSheet` (`DockVisibility.runModal`) and updated `/api/preferences` validation (`1–8` genres, `1–6` languages, optional `age`, `gender`).

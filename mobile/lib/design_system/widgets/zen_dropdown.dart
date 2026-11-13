@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../features/story_sharing/screens/story_options_sheet.dart';
 import '../../models/track.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/innertube_service.dart';
@@ -546,7 +547,21 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
 
     // Build Action Menu Rows
     final List<ZenDropdownItem> rows = [
-      // 1. Play next
+      // 1. Add to Story
+      ZenDropdownItem(
+        title: 'Add to Story',
+        icon: CupertinoIcons.camera,
+        onTap: () {
+          Navigator.of(context).pop();
+          if (widget.callerContext.mounted) {
+            StoryOptionsSheet.show(
+              context: widget.callerContext,
+              track: effectiveTrack,
+            );
+          }
+        },
+      ),
+      // 2. Play next
       ZenDropdownItem(
         title: 'Play next',
         icon: CupertinoIcons.arrow_turn_right_up,
@@ -817,9 +832,12 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       ),
                       onTap: () {
                         Navigator.of(context).pop();
-                        SharePlus.instance.share(ShareParams(
-                          text: 'Listening to "${widget.title}" by ${widget.artist} on Zenify: $_shareUrl',
-                        ));
+                        if (widget.callerContext.mounted) {
+                          StoryOptionsSheet.show(
+                            context: widget.callerContext,
+                            track: effectiveTrack,
+                          );
+                        }
                       },
                     ),
                     // Facebook Stories
@@ -829,9 +847,12 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       color: const Color(0xFF1877F2),
                       onTap: () {
                         Navigator.of(context).pop();
-                        SharePlus.instance.share(ShareParams(
-                          text: 'Listening to "${widget.title}" by ${widget.artist} on Zenify: $_shareUrl',
-                        ));
+                        if (widget.callerContext.mounted) {
+                          StoryOptionsSheet.show(
+                            context: widget.callerContext,
+                            track: effectiveTrack,
+                          );
+                        }
                       },
                     ),
                   ],

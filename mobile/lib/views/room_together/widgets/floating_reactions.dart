@@ -34,8 +34,14 @@ class FloatingReactionsState extends State<FloatingReactions> with SingleTickerP
   final List<_P> _ps = [];
   final ValueNotifier<int> _repaint = ValueNotifier(0);
   final math.Random _rng = math.Random();
-  late final Ticker _ticker = createTicker(_tick);
+  Ticker? _ticker;
   double _now = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker(_tick);
+  }
 
   void burst(String emoji, {int count = 1}) {
     if (!mounted) return;
@@ -56,7 +62,8 @@ class FloatingReactionsState extends State<FloatingReactions> with SingleTickerP
         rise: style.rise,
       ));
     }
-    if (!_ticker.isActive) _ticker.start();
+    final t = _ticker;
+    if (t != null && !t.isActive) t.start();
   }
 
   ({double life, double amp, double freq, double scale, double rot, double rise}) _styleFor(String e) {
@@ -80,12 +87,12 @@ class FloatingReactionsState extends State<FloatingReactions> with SingleTickerP
     _now = d.inMicroseconds / 1e6;
     _ps.removeWhere((p) => _now - p.t0 > p.life);
     _repaint.value++;
-    if (_ps.isEmpty) _ticker.stop();
+    if (_ps.isEmpty) _ticker?.stop();
   }
 
   @override
   void dispose() {
-    _ticker.dispose();
+    _ticker?.dispose();
     _repaint.dispose();
     super.dispose();
   }

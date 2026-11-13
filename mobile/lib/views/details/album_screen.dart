@@ -13,6 +13,8 @@ import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
+import '../../features/story_sharing/models/story_share_content.dart';
+import '../../features/story_sharing/screens/story_preview_screen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/innertube_service.dart';
@@ -591,6 +593,46 @@ class _AlbumScreenState extends State<AlbumScreen> {
           title: 'Go to Artist',
           icon: CupertinoIcons.person_circle,
           onTap: _openArtist,
+        ),
+        ZenDropdownItem(
+          title: 'Add to Story',
+          icon: CupertinoIcons.camera,
+          onTap: () {
+            Navigator.of(context).push(
+              CupertinoPageRoute(
+                builder: (_) => StoryPreviewScreen(
+                  content: AlbumStoryContent(
+                    albumTitle: _displayAlbumTitle,
+                    artistName: _displayArtistName,
+                    coverUrl: cover,
+                    year: _releaseYear != null ? '$_releaseYear' : null,
+                    trackCount: _tracks.isNotEmpty ? _tracks.length : null,
+                    tracks: _tracks,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        ZenDropdownItem(
+          title: 'Add to Story',
+          icon: CupertinoIcons.camera,
+          onTap: () {
+            Navigator.of(context).push(
+              CupertinoPageRoute(
+                builder: (_) => StoryPreviewScreen(
+                  content: AlbumStoryContent(
+                    albumTitle: _displayAlbumTitle,
+                    artistName: _displayArtistName,
+                    coverUrl: cover,
+                    year: _releaseYear?.toString(),
+                    trackCount: _tracks.isNotEmpty ? _tracks.length : null,
+                    tracks: _tracks,
+                  ),
+                ),
+              ),
+            );
+          },
         ),
         ZenDropdownItem(
           title: 'Copy Album Link',

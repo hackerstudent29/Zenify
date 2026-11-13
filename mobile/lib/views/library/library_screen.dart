@@ -7,6 +7,7 @@ import 'package:flutter/cupertino.dart'
     show
         CupertinoActivityIndicator,
         CupertinoIcons,
+        CupertinoPageRoute,
         CupertinoSearchTextField,
         CupertinoSliverRefreshControl;
 import 'package:flutter/material.dart';
@@ -19,6 +20,8 @@ import '../../design_system/tokens/app_typography.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
+import '../../features/story_sharing/models/story_share_content.dart';
+import '../../features/story_sharing/screens/story_preview_screen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/innertube_service.dart';
@@ -320,6 +323,29 @@ Future<void> _playlistMenu(BuildContext c, UserPlaylist p, {bool inDetail = fals
           icon: CupertinoIcons.plus_circle,
           onTap: () => _push(c, _AddSongsPage(p), modal: true),
         ),
+      ZenDropdownItem(
+        title: 'Add to Story',
+        icon: CupertinoIcons.camera,
+        onTap: () {
+          final distinctCovers = tracks
+              .map((t) => t.coverUrl)
+              .where((u) => u.isNotEmpty)
+              .toSet()
+              .toList();
+          Navigator.of(c).push(
+            CupertinoPageRoute(
+              builder: (_) => StoryPreviewScreen(
+                content: PlaylistStoryContent(
+                  playlistTitle: p.name,
+                  covers: distinctCovers,
+                  owner: 'Your Playlist',
+                  tracks: tracks,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
       ZenDropdownItem(
         title: 'Rename',
         icon: CupertinoIcons.pencil,

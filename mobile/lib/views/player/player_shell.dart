@@ -24,6 +24,7 @@ import 'studio_fx_sheet.dart';
 import '../details/artist_screen.dart';
 import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
+import '../../features/story_sharing/screens/story_options_sheet.dart';
 import '../../models/track.dart';
 import '../../utils/media_normalizer.dart';
 
@@ -32,7 +33,7 @@ const double _kMiniH = 58;
 const double _kMiniArt = 40;
 
 /// Lyrics open + no touch for this long → the bottom controls glide away.
-const Duration _kIdleHide = Duration(seconds: 5);
+const Duration _kIdleHide = Duration(seconds: 3);
 
 /// Cover docking spring (art <-> header). Critically damped (2*sqrt(k) ≈ 45.6):
 /// no bounce, settles in roughly a quarter of a second.
@@ -73,7 +74,7 @@ enum _Panel { art, lyrics, queue }
 ///  • `_dock`   0 = big artwork, 1 = artwork docked top-left in the header.
 ///    Drives the lyrics / queue transitions. Critically damped: no bounce.
 ///  • `_chrome` 0 = bottom controls shown, 1 = hidden. Lyrics open and idle for
-///    5 s → 1. Any touch → 0.
+///    3 s → 1. Any touch → 0.
 ///  • ONE artwork widget lives in an overlay, laid out once at the big size and
 ///    moved/scaled with a matrix between mini → big → header, so there is no
 ///    per-frame relayout.
@@ -122,34 +123,13 @@ class PlayerShellState extends State<PlayerShell>
   void closeSheet() => _close();
   void openSheet({double velocity = 0}) => _openSheet(velocity: velocity);
 
-  late final AnimationController _sheet = AnimationController.unbounded(
-    vsync: this,
-    value: 0,
-  );
-  late final AnimationController _pause = AnimationController.unbounded(
-    vsync: this,
-    value: 1,
-  );
-  late final AnimationController _dock = AnimationController.unbounded(
-    vsync: this,
-    value: 0,
-  );
-  late final AnimationController _chrome = AnimationController.unbounded(
-    vsync: this,
-    value: 0,
-  );
-  late final AnimationController _artX = AnimationController.unbounded(
-    vsync: this,
-    value: 0,
-  );
-  late final AnimationController _miniX = AnimationController.unbounded(
-    vsync: this,
-    value: 0,
-  );
-  late final AnimationController _press = AnimationController.unbounded(
-    vsync: this,
-    value: 1,
-  );
+  late final AnimationController _sheet;
+  late final AnimationController _pause;
+  late final AnimationController _dock;
+  late final AnimationController _chrome;
+  late final AnimationController _artX;
+  late final AnimationController _miniX;
+  late final AnimationController _press;
 
   _Panel _bodyPanel = _Panel.art; // what is actually mounted in the middle
   Timer? _mountTimer;
@@ -172,6 +152,7 @@ class PlayerShellState extends State<PlayerShell>
   // idle-hide of the bottom controls while lyrics are open
   Timer? _idleTimer;
   bool _chromeHidden = false;
+  final ValueNotifier<bool> _lyricsImmersive = ValueNotifier<bool>(false);
   int _activePointers = 0;
   DateTime? _lastBump;
 
@@ -219,6 +200,13 @@ class PlayerShellState extends State<PlayerShell>
   @override
   void initState() {
     super.initState();
+    _sheet = AnimationController.unbounded(vsync: this, value: 0);
+    _pause = AnimationController.unbounded(vsync: this, value: 1);
+    _dock = AnimationController.unbounded(vsync: this, value: 0);
+    _chrome = AnimationController.unbounded(vsync: this, value: 0);
+    _artX = AnimationController.unbounded(vsync: this, value: 0);
+    _miniX = AnimationController.unbounded(vsync: this, value: 0);
+    _press = AnimationController.unbounded(vsync: this, value: 1);
     PlayerShell.openRequestNotifier.addListener(_onOpenRequested);
   }
 
@@ -236,6 +224,7 @@ class PlayerShellState extends State<PlayerShell>
     PlayerShell.openRequestNotifier.removeListener(_onOpenRequested);
     _idleTimer?.cancel();
     _mountTimer?.cancel();
+    _lyricsImmersive.dispose();
     _prevPulse.dispose();
     _nextPulse.dispose();
     for (final c in [_sheet, _pause, _dock, _chrome, _artX, _miniX, _press]) {
@@ -371,6 +360,7 @@ class PlayerShellState extends State<PlayerShell>
       _dock.value = 0;
       _chrome.value = 0;
       _chromeHidden = false;
+      _lyricsImmersive.value = false;
       _activePointers = 0;
       _artX.value = 0;
       setState(() {
@@ -442,10 +432,12 @@ class PlayerShellState extends State<PlayerShell>
         )
         .then((_) => _queueMeasure());
     if (p == _Panel.lyrics) {
+      _activePointers = 0;
       _bumpIdle(force: true);
     } else {
       _idleTimer?.cancel();
       _chromeHidden = false;
+      _lyricsImmersive.value = false;
       if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
     }
   }
@@ -458,6 +450,7 @@ class PlayerShellState extends State<PlayerShell>
     if (_panel != _Panel.lyrics) return;
     if (_chromeHidden) {
       _chromeHidden = false;
+      _lyricsImmersive.value = false;
       _chrome.springTo(0, spring: kSnappySpring);
     } else if (!force) {
       final last = _lastBump;
@@ -479,6 +472,7 @@ class PlayerShellState extends State<PlayerShell>
       return;
     }
     _chromeHidden = true;
+    _lyricsImmersive.value = true;
     _chrome.springTo(1, spring: kSoftSpring);
   }
 
@@ -1142,13 +1136,16 @@ class PlayerShellState extends State<PlayerShell>
                                     : null,
                               ),
                             ),
-                            // soft scrim keeps lyrics / queue text readable
+                            // soft scrim keeps queue / lyrics readable while letting
+                            // the dim lyrics boundary frame stand out smoothly
                             IgnorePointer(
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeOutCubic,
                                 color: Colors.black.withValues(
-                                  alpha: _docked ? 0.26 : 0,
+                                  alpha: _panel == _Panel.lyrics
+                                      ? 0.14
+                                      : (_docked ? 0.26 : 0),
                                 ),
                               ),
                             ),
@@ -1221,9 +1218,51 @@ class PlayerShellState extends State<PlayerShell>
         return KeyedSubtree(
           // new key per track → lyrics cross-fade when the song changes
           key: ValueKey('lyrics-$_trackKey'),
-          child: _dismissOnOverscroll(
-            _edgeFade(
-              widget.lyricsBuilder?.call(context) ?? const LyricsSheet(),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n is ScrollUpdateNotification) {
+                _bumpIdle();
+              }
+              return false;
+            },
+            child: _dismissOnOverscroll(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(26),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.34),
+                        Colors.black.withValues(alpha: 0.22),
+                        Colors.black.withValues(alpha: 0.36),
+                      ],
+                      stops: const [0.0, 0.48, 1.0],
+                    ),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.11),
+                      width: 0.85,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.36),
+                        blurRadius: 24,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(26),
+                    child: _edgeFade(
+                      widget.lyricsBuilder?.call(context) ??
+                          LyricsSheet(immersiveListenable: _lyricsImmersive),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         );
@@ -1254,15 +1293,21 @@ class PlayerShellState extends State<PlayerShell>
         if (anim.status == AnimationStatus.reverse) {
           return Opacity(
             opacity: v.clamp(0.0, 1.0),
-            child: child,
+            child: Transform.scale(
+              scale: 0.98 + 0.02 * v.clamp(0.0, 1.0),
+              child: child,
+            ),
           );
         }
-        final e = Curves.easeOutCubic.transform(v.clamp(0.0, 1.0));
+        final e = const Cubic(0.18, 0.95, 0.32, 1.0).transform(v.clamp(0.0, 1.0));
         return Opacity(
-          opacity: e,
+          opacity: e.clamp(0.0, 1.0),
           child: Transform.translate(
-            offset: Offset(0, (1 - e) * 28),
-            child: child,
+            offset: Offset(0, (1 - e) * 24),
+            child: Transform.scale(
+              scale: 0.97 + 0.03 * e,
+              child: child,
+            ),
           ),
         );
       },
@@ -1323,7 +1368,7 @@ class PlayerShellState extends State<PlayerShell>
     final isLyrics = _panel == _Panel.lyrics;
 
     // Raw pointer listener (never steals gestures): any touch while lyrics are
-    // open wakes the bottom controls and re-arms the 5 s idle timer.
+    // open wakes the bottom controls and re-arms the 3 s idle timer.
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: (_) {
@@ -1383,7 +1428,7 @@ class PlayerShellState extends State<PlayerShell>
             ),
           ),
 
-          // Bottom block: glides away after 5 s idle while lyrics are open.
+          // Bottom block: glides away after 3 s idle while lyrics are open.
           _chromeCollapse(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -1396,7 +1441,7 @@ class PlayerShellState extends State<PlayerShell>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // title / artist / like / more: collapses smoothly when lyrics / queue open
+                    // title / artist / like / more: smoothly moves with artwork into compact header
                     _dockCollapse(inverse: true, child: _metaRow(track)),
 
                     Center(
@@ -1412,59 +1457,30 @@ class PlayerShellState extends State<PlayerShell>
                       ),
                     ),
 
-                    // transport glides away while lyrics are open
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOutCubic,
-                      alignment: Alignment.topCenter,
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 180),
-                        opacity: isLyrics ? 0 : 1,
-                        child: isLyrics
-                            ? const SizedBox(width: double.infinity)
-                            : Center(
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 360,
-                                  ),
-                                  child: Padding(
-                                    // more air between seekbar → transport → tools
-                                    padding: const EdgeInsets.only(
-                                      top: 18,
-                                      bottom: 24,
-                                    ),
-                                    child: _transport(player),
-                                  ),
-                                ),
-                              ),
+                    // Transport remains visible on Lyrics open; only hides after 3s idle
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 360,
+                        ),
+                        child: Padding(
+                          // more air between seekbar → transport → tools
+                          padding: const EdgeInsets.only(
+                            top: 18,
+                            bottom: 24,
+                          ),
+                          child: _transport(player),
+                        ),
                       ),
                     ),
 
-                    AnimatedPadding(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOutCubic,
-                      padding: EdgeInsets.only(top: isLyrics ? 14 : 0),
-                      child: _tools(isLyrics),
-                    ),
+                    _tools(isLyrics),
                   ],
                 ),
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _fade(bool show, Widget child) {
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 180),
-      opacity: show ? 1 : 0,
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 300),
-        curve: const SpringCurve(kSnappySpring, 0.5),
-        scale: show ? 1 : 0.7,
-        child: IgnorePointer(ignoring: !show, child: child),
       ),
     );
   }
@@ -1484,6 +1500,7 @@ class PlayerShellState extends State<PlayerShell>
             const SizedBox(width: 12),
             Expanded(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   MarqueeScroll(
@@ -1585,6 +1602,31 @@ class PlayerShellState extends State<PlayerShell>
           ),
           const SizedBox(width: 12),
           PopLikeButton(liked: _isLiked, onToggle: _toggleLike),
+          const SizedBox(width: 8),
+          GlassCircle(
+            onTap: () {
+              if (track == null) return;
+              final t = track is Track
+                  ? track
+                  : Track(
+                      id: track.id?.toString() ?? '',
+                      title: track.title?.toString() ?? '',
+                      artist: track.artist?.toString() ?? '',
+                      album: track.album?.toString() ?? '',
+                      coverUrl: track.coverUrl?.toString() ?? '',
+                      durationSeconds: track.durationSeconds is int ? track.durationSeconds as int : 0,
+                    );
+              StoryOptionsSheet.show(
+                context: context,
+                track: t,
+              );
+            },
+            child: const Icon(
+              CupertinoIcons.camera,
+              color: Colors.white,
+              size: 16,
+            ),
+          ),
           const SizedBox(width: 8),
           GlassCircle(
             onTap: () => _showTrackMenu(track),
@@ -1702,8 +1744,8 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   /// Studio FX · Lyrics · Queue.
-  /// While lyrics are open the side buttons fade away and the lyrics toggle
-  /// stays pinned to the center, so there's always a way back.
+  /// All three action buttons stay visible when Lyrics opens (moving the cover
+  /// only), and hide smoothly together with the rest of chrome after 3s idle.
   Widget _tools(bool lyricsOpen) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 260),
@@ -1715,31 +1757,25 @@ class PlayerShellState extends State<PlayerShell>
           children: [
             Align(
               alignment: Alignment.centerLeft,
-              child: _fade(
-                !lyricsOpen,
-                PlateButton(
-                  size: 44,
-                  onTap: () => showStudioFxSheet(context),
-                  child: const Icon(
-                    CupertinoIcons.slider_horizontal_3,
-                    size: 22,
-                  ),
+              child: PlateButton(
+                size: 44,
+                onTap: () => showStudioFxSheet(context),
+                child: const Icon(
+                  CupertinoIcons.slider_horizontal_3,
+                  size: 22,
                 ),
               ),
             ),
             Align(
               alignment: Alignment.centerRight,
-              child: _fade(
-                !lyricsOpen,
-                PlateButton(
-                  size: 44,
-                  active: _panel == _Panel.queue,
-                  onTap: () => _togglePanel(_Panel.queue),
-                  child: SpringPop(
-                    trigger: _panel == _Panel.queue,
-                    scale: 0.3,
-                    child: const Icon(CupertinoIcons.list_bullet, size: 24),
-                  ),
+              child: PlateButton(
+                size: 44,
+                active: _panel == _Panel.queue,
+                onTap: () => _togglePanel(_Panel.queue),
+                child: SpringPop(
+                  trigger: _panel == _Panel.queue,
+                  scale: 0.3,
+                  child: const Icon(CupertinoIcons.list_bullet, size: 24),
                 ),
               ),
             ),

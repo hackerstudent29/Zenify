@@ -11,6 +11,8 @@ import 'package:provider/provider.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
+import '../../features/story_sharing/models/story_share_content.dart';
+import '../../features/story_sharing/screens/story_preview_screen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/artist_service.dart';
@@ -972,6 +974,25 @@ class _ArtistScreenState extends State<ArtistScreen> {
           title: following ? 'Unfollow Artist' : 'Follow Artist',
           icon: following ? CupertinoIcons.star_fill : CupertinoIcons.star,
           onTap: () => LibraryStore.instance.toggleFollow(name, img),
+        ),
+        ZenDropdownItem(
+          title: 'Add to Story',
+          icon: CupertinoIcons.camera,
+          onTap: () {
+            Navigator.of(context).push(
+              CupertinoPageRoute(
+                builder: (_) => StoryPreviewScreen(
+                  content: ArtistStoryContent(
+                    artistName: name,
+                    coverUrl: img,
+                    audience: _audienceLine.isNotEmpty ? _audienceLine : null,
+                    topTracks: songs,
+                    albumCovers: _artistProfile?.albums.map((a) => a.coverUrl).where((u) => u.isNotEmpty).toList() ?? const [],
+                  ),
+                ),
+              ),
+            );
+          },
         ),
         ZenDropdownItem(
           title: 'Copy Artist Link',

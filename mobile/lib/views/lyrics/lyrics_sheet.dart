@@ -2,8 +2,12 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature, ImageFilter;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../../features/story_sharing/screens/lyrics_selection_screen.dart';
+import '../../services/lyrics_service.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/rendering.dart'
     show RenderAbstractViewport, ScrollDirection;
@@ -109,12 +113,19 @@ enum LyricsLang {
 // ---------------------------------------------------------------------------
 
 class LyricsSheet extends StatelessWidget {
-  const LyricsSheet({super.key, this.onImmersiveChanged});
+  const LyricsSheet({
+    super.key,
+    this.onImmersiveChanged,
+    this.immersiveListenable,
+  });
 
   /// Called with true when the screen was idle for 3s (controls hidden) and
   /// false when the user touches it again. Use it to hide/show your own
   /// player chrome (header, transport controls...) if you want.
   final ValueChanged<bool>? onImmersiveChanged;
+
+  /// Optional external 3s idle state synchronized with the enclosing player.
+  final ValueListenable<bool>? immersiveListenable;
 
   static Duration _ms(dynamic v) =>
       Duration(milliseconds: (v is num ? v : 0).toInt());
@@ -227,6 +238,26 @@ class LyricsSheet extends StatelessWidget {
       );
     }).toList();
 
+    void openShareLyrics() {
+      final t = player.currentTrack;
+      if (t == null) return;
+      final lyricsRes = player.hasLyrics
+          ? LyricsResult(
+              lines: player.lyricsLines,
+              synced: player.lyricsSynced,
+              source: 'current',
+            )
+          : null;
+      Navigator.of(context).push(
+        CupertinoPageRoute(
+          builder: (_) => LyricsSelectionScreen(
+            track: t,
+            lyrics: lyricsRes,
+          ),
+        ),
+      );
+    }
+
     return LyricsView(
       lines: lines,
       position: player.position,
@@ -234,6 +265,8 @@ class LyricsSheet extends StatelessWidget {
       onSeek: player.seek,
       isSynced: player.lyricsSynced,
       onImmersiveChanged: onImmersiveChanged,
+      immersiveListenable: immersiveListenable,
+      onShareLyrics: openShareLyrics,
     );
   }
 }
@@ -355,6 +388,8 @@ class LyricsView extends StatefulWidget {
     this.initialLang = LyricsLang.original,
     this.isSynced = true,
     this.onImmersiveChanged,
+    this.immersiveListenable,
+    this.onShareLyrics,
   });
 
   final List<LyricLine> lines;
@@ -366,6 +401,8 @@ class LyricsView extends StatefulWidget {
   final LyricsLang initialLang;
   final bool isSynced;
   final ValueChanged<bool>? onImmersiveChanged;
+  final ValueListenable<bool>? immersiveListenable;
+  final VoidCallback? onShareLyrics;
 
   @override
   State<LyricsView> createState() => _LyricsViewState();
@@ -375,6 +412,7 @@ class _LyricsViewState extends State<LyricsView>
     with TickerProviderStateMixin {
   static const _step = 500;
   static const _maxOffset = 15000;
+  static const Curve _liquidCurve = Cubic(0.16, 1.0, 0.30, 1.0);
 
   final _scroll = ScrollController();
   final _clock = ValueNotifier<double>(0); // effective seconds (offset applied)
@@ -392,7 +430,7 @@ class _LyricsViewState extends State<LyricsView>
   Timer? _resume;
 
   // Idle / immersive (controls hidden) state.
-  bool _immersive = false;
+  late bool _immersive = widget.immersiveListenable?.value ?? false;
   Timer? _idle;
   int _pointers = 0;
 
@@ -400,8 +438,6 @@ class _LyricsViewState extends State<LyricsView>
   Duration _anchorAt = Duration.zero;
   Duration _lastElapsed = Duration.zero;
 
-  double _shift = 0;
-  int _shiftToken = 0;
   bool _didFirstFollow = false;
 
   bool get _hasTranslation =>
@@ -416,18 +452,29 @@ class _LyricsViewState extends State<LyricsView>
     super.initState();
     _sig = _signature(widget.lines);
     _rebuildItems();
+    widget.immersiveListenable?.addListener(_onExternalImmersive);
     if (widget.isSynced) {
       widget.position.addListener(_onPosition);
       _publish(_posSeconds());
       _syncTicker();
       WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
     }
-    _armIdle();
+    if (widget.immersiveListenable == null) _armIdle();
   }
 
   @override
   void didUpdateWidget(covariant LyricsView old) {
     super.didUpdateWidget(old);
+    if (old.immersiveListenable != widget.immersiveListenable) {
+      old.immersiveListenable?.removeListener(_onExternalImmersive);
+      widget.immersiveListenable?.addListener(_onExternalImmersive);
+      if (widget.immersiveListenable != null) {
+        _idle?.cancel();
+        _onExternalImmersive();
+      } else {
+        _armIdle();
+      }
+    }
     if (old.position != widget.position) {
       old.position.removeListener(_onPosition);
       if (widget.isSynced) widget.position.addListener(_onPosition);
@@ -447,6 +494,7 @@ class _LyricsViewState extends State<LyricsView>
 
   @override
   void dispose() {
+    widget.immersiveListenable?.removeListener(_onExternalImmersive);
     widget.position.removeListener(_onPosition);
     _ticker.dispose();
     _resume?.cancel();
@@ -456,19 +504,25 @@ class _LyricsViewState extends State<LyricsView>
     super.dispose();
   }
 
+  void _onExternalImmersive() {
+    final v = widget.immersiveListenable?.value ?? false;
+    _setImmersive(v);
+  }
+
   // ----- idle (hide controls after 3s without touch) -----
 
   void _setImmersive(bool v) {
     if (_immersive == v || !mounted) return;
     setState(() => _immersive = v);
     widget.onImmersiveChanged?.call(v);
-    // The lyrics area grows / shrinks; re-centre the active line afterwards.
-    Future.delayed(const Duration(milliseconds: 420), () {
+    // Keep the active line smoothly centered as viewport space breathes.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _follow();
     });
   }
 
   void _armIdle() {
+    if (widget.immersiveListenable != null) return;
     _idle?.cancel();
     _idle = Timer(_kIdleHide, () {
       if (mounted && _pointers == 0) _setImmersive(true);
@@ -478,7 +532,7 @@ class _LyricsViewState extends State<LyricsView>
   void _pointerDown() {
     _pointers++;
     _idle?.cancel();
-    _setImmersive(false);
+    if (widget.immersiveListenable == null) _setImmersive(false);
   }
 
   void _pointerUp() {
@@ -631,9 +685,9 @@ class _LyricsViewState extends State<LyricsView>
     }
   }
 
-  // ----- scrolling: jump, then each line springs into place -----
+  // ----- scrolling: silky liquid glide to the active line -----
 
-  void _follow() {
+  void _follow({bool forceAnimated = false}) {
     if (!widget.isSynced || !mounted || _manual || !_scroll.hasClients) return;
     double target;
     if (_active < 0) {
@@ -641,23 +695,28 @@ class _LyricsViewState extends State<LyricsView>
     } else {
       final ro = _keys[_active].currentContext?.findRenderObject();
       if (ro == null) return;
-      target = RenderAbstractViewport.of(ro).getOffsetToReveal(ro, 0.3).offset;
+      target = RenderAbstractViewport.of(ro).getOffsetToReveal(ro, 0.30).offset;
     }
     final pos = _scroll.position;
     target = target.clamp(pos.minScrollExtent, pos.maxScrollExtent).toDouble();
-    final d = target - pos.pixels;
-    if (d.abs() < 0.5) return;
+    final d = (target - pos.pixels).abs();
+    if (d < 0.5) return;
 
     final reduce = MediaQuery.disableAnimationsOf(context);
-    final vh = pos.viewportDimension;
-    _scroll.jumpTo(target);
-    if (_didFirstFollow && !reduce && d.abs() < vh * 1.5) {
-      setState(() {
-        _shift = d;
-        _shiftToken++;
-      });
+    if ((!_didFirstFollow && !forceAnimated) || reduce) {
+      _scroll.jumpTo(target);
+      _didFirstFollow = true;
+      return;
     }
+
     _didFirstFollow = true;
+    final vh = math.max(1.0, pos.viewportDimension);
+    final ms = (380 + (d / vh).clamp(0.0, 2.5) * 260).round().clamp(380, 680);
+    _scroll.animateTo(
+      target,
+      duration: Duration(milliseconds: ms),
+      curve: _liquidCurve,
+    );
   }
 
   // ----- offset / language -----
@@ -683,8 +742,9 @@ class _LyricsViewState extends State<LyricsView>
     _resume = Timer(const Duration(seconds: 3), () {
       if (!mounted) return;
       setState(() => _manual = false);
-      _didFirstFollow = false; // glide back without a huge cascade
-      _follow();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _follow(forceAnimated: true);
+      });
     });
   }
 
@@ -717,11 +777,14 @@ class _LyricsViewState extends State<LyricsView>
                   Color(0xFF000000),
                   Color(0x00000000),
                 ],
-                stops: [0, 0.05, 0.92, 1],
+                stops: [0, 0.06, 0.92, 1],
               ).createShader(r),
               child: NotificationListener<ScrollNotification>(
                 onNotification: (n) {
-                  if (n is UserScrollNotification &&
+                  if (n is ScrollStartNotification && n.dragDetails != null) {
+                    _resume?.cancel();
+                    if (!_manual) setState(() => _manual = true);
+                  } else if (n is UserScrollNotification &&
                       n.direction != ScrollDirection.idle) {
                     _resume?.cancel();
                     if (!_manual) setState(() => _manual = true);
@@ -732,8 +795,11 @@ class _LyricsViewState extends State<LyricsView>
                 },
                 child: SingleChildScrollView(
                   controller: _scroll,
-                  physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.only(top: 48, bottom: h * 0.45),
+                  physics: const BouncingScrollPhysics(
+                    decelerationRate: ScrollDecelerationRate.fast,
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
+                  padding: EdgeInsets.only(top: 28, bottom: h * 0.36),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -748,8 +814,6 @@ class _LyricsViewState extends State<LyricsView>
                           past: widget.isSynced && i < _active,
                           dist: _distFor(i),
                           manual: _manual,
-                          shift: _shift,
-                          shiftToken: _shiftToken,
                           onCollapsed: () => WidgetsBinding.instance
                               .addPostFrameCallback((_) => _follow()),
                           onTap: () {
@@ -757,11 +821,19 @@ class _LyricsViewState extends State<LyricsView>
                             if (!widget.isSynced || line == null) return;
                             HapticFeedback.selectionClick();
                             _resume?.cancel();
-                            setState(() => _manual = false);
-                            // effective = raw + offset  =>  raw = start - offset
-                            widget.onSeek?.call(Duration(
-                                milliseconds: math.max(0,
-                                    line.start.inMilliseconds - _offsetMs)));
+                            final seekMs = math.max(
+                                0, line.start.inMilliseconds - _offsetMs);
+                            _anchorPos = seekMs / 1000.0;
+                            _anchorAt = _lastElapsed;
+                            _clock.value = line.start.inMicroseconds / 1e6;
+                            setState(() {
+                              _manual = false;
+                              _active = i;
+                            });
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) _follow(forceAnimated: true);
+                            });
+                            widget.onSeek?.call(Duration(milliseconds: seekMs));
                           },
                         ),
                     ],
@@ -775,12 +847,12 @@ class _LyricsViewState extends State<LyricsView>
               child: AnimatedAlign(
                 alignment: Alignment.topCenter,
                 heightFactor: _immersive ? 0.0 : 1.0,
-                duration: const Duration(milliseconds: 380),
-                curve: Curves.easeOutCubic,
+                duration: const Duration(milliseconds: 420),
+                curve: _liquidCurve,
                 child: AnimatedOpacity(
                   opacity: _immersive ? 0.0 : 1.0,
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOut,
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
                   child: IgnorePointer(
                     ignoring: _immersive,
                     child: _Controls(
@@ -792,13 +864,13 @@ class _LyricsViewState extends State<LyricsView>
                       onLang: (l) {
                         HapticFeedback.selectionClick();
                         setState(() => _lang = l);
-                        _didFirstFollow = false;
-                        WidgetsBinding.instance
-                            .addPostFrameCallback((_) => _follow());
+                        WidgetsBinding.instance.addPostFrameCallback(
+                            (_) => _follow(forceAnimated: true));
                       },
                       onMinus: () => _changeOffset(-_step),
                       onPlus: () => _changeOffset(_step),
                       onReset: _resetOffset,
+                      onShareLyrics: widget.onShareLyrics,
                     ),
                   ),
                 ),
@@ -825,8 +897,6 @@ class _LineTile extends StatefulWidget {
     required this.past,
     required this.dist,
     required this.manual,
-    required this.shift,
-    required this.shiftToken,
     required this.onTap,
     required this.onCollapsed,
   });
@@ -836,8 +906,6 @@ class _LineTile extends StatefulWidget {
   final ValueListenable<double> clock;
   final bool synced, current, past, manual;
   final int dist;
-  final double shift;
-  final int shiftToken;
   final VoidCallback onTap;
   final VoidCallback onCollapsed;
 
@@ -847,25 +915,31 @@ class _LineTile extends StatefulWidget {
 
 class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   static final _curve = _SpringCurve();
-  static const _ySpring =
-      SpringDescription(mass: 1, stiffness: 170, damping: 21);
 
-  late final AnimationController _d = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 800));
-  late final AnimationController _y = AnimationController.unbounded(vsync: this);
-
-  // Pop in / pop out (dots + bracket lines).
-  late final AnimationController _pop = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 380),
-      reverseDuration: const Duration(milliseconds: 220));
-  late final CurvedAnimation _popCurve = CurvedAnimation(
-      parent: _pop, curve: Curves.easeOutBack, reverseCurve: Curves.easeInCubic);
+  late final AnimationController _d;
+  late final AnimationController _pop;
+  late final CurvedAnimation _popCurve;
 
   late _Depth _from, _to;
   bool _ready = false;
   bool _present = true; // takes layout space
-  Timer? _dt, _yt, _exit;
+  bool _pressed = false;
+  Timer? _dt, _exit;
+
+  @override
+  void initState() {
+    super.initState();
+    _d = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700));
+    _pop = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 380),
+        reverseDuration: const Duration(milliseconds: 220));
+    _popCurve = CurvedAnimation(
+        parent: _pop,
+        curve: Curves.easeOutBack,
+        reverseCurve: Curves.easeInCubic);
+  }
 
   bool get _collapsible => widget.synced && widget.item.collapsible;
 
@@ -877,9 +951,9 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   _Depth _target() => _depthFor(widget.dist, widget.current, widget.manual,
       !widget.synced, _reduce);
 
-  // Lines below the active one start moving a little later each (cascade).
+  // Subtle waterfall stagger across nearby upcoming lines during playback.
   int get _waterfall => (!widget.current && widget.dist > 0 && !widget.manual)
-      ? math.min(widget.dist, 5) * 36
+      ? math.min(widget.dist, 5) * 32
       : 0;
 
   @override
@@ -921,30 +995,26 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
       _to = nt;
       _d.value = 0;
       _dt?.cancel();
-      _dt = Timer(Duration(milliseconds: _reduce ? 0 : _waterfall), () {
-        if (mounted) _d.forward(from: 0);
-      });
-    }
-    if (old.shiftToken != widget.shiftToken &&
-        widget.shift != 0 &&
-        widget.dist >= -6 &&
-        widget.dist <= 10) {
-      _yt?.cancel();
-      _y.value = _y.value + widget.shift; // looks unmoved...
-      _yt = Timer(Duration(milliseconds: _waterfall), () {
-        if (!mounted) return;
-        _y.animateWith(SpringSimulation(_ySpring, _y.value, 0, 0)); // ...then rises
-      });
+      if (widget.manual) {
+        // Sharpen all lines rapidly on drag start to keep scrolling 120fps.
+        _d.animateTo(
+          1,
+          duration: Duration(milliseconds: _reduce ? 0 : 180),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _dt = Timer(Duration(milliseconds: _reduce ? 0 : _waterfall), () {
+          if (mounted) _d.forward(from: 0);
+        });
+      }
     }
   }
 
   @override
   void dispose() {
     _dt?.cancel();
-    _yt?.cancel();
     _exit?.cancel();
     _d.dispose();
-    _y.dispose();
     _popCurve.dispose();
     _pop.dispose();
     super.dispose();
@@ -1029,40 +1099,70 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
 
     final alignment = right ? Alignment.centerRight : Alignment.centerLeft;
 
-    return AnimatedBuilder(
-      animation: Listenable.merge([_d, _y, _pop]),
-      child: content,
-      builder: (context, child) {
-        final dp = _cur;
-        final pv = _collapsible ? _popCurve.value : 1.0;
-        final popScale = _collapsible ? 0.5 + 0.5 * pv : 1.0;
-        final popOpacity = _collapsible ? pv.clamp(0.0, 1.0) : 1.0;
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_d, _pop]),
+        child: content,
+        builder: (context, child) {
+          final dp = _cur;
+          final pv = _collapsible ? _popCurve.value : 1.0;
+          final popScale = _collapsible ? 0.5 + 0.5 * pv : 1.0;
+          final popOpacity = _collapsible ? pv.clamp(0.0, 1.0) : 1.0;
 
-        Widget w = Transform.scale(
-          scale: dp.s * popScale,
-          alignment: alignment,
-          child: child,
-        );
-        if (dp.b > 0.05) {
-          w = ImageFiltered(
-            imageFilter: ImageFilter.blur(
-                sigmaX: dp.b, sigmaY: dp.b, tileMode: TileMode.decal),
-            child: w,
+          Widget w = Transform.scale(
+            scale: dp.s * popScale,
+            alignment: alignment,
+            child: child,
           );
-        }
-        w = Opacity(opacity: (dp.o * popOpacity).clamp(0.0, 1.0), child: w);
-        return Transform.translate(
-          offset: Offset(0, _y.value),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          if (dp.b > 0.18) {
+            w = ImageFiltered(
+              imageFilter: ImageFilter.blur(
+                  sigmaX: dp.b, sigmaY: dp.b, tileMode: TileMode.decal),
               child: w,
+            );
+          }
+          w = Opacity(opacity: (dp.o * popOpacity).clamp(0.0, 1.0), child: w);
+          final interactive = widget.synced && widget.item.line != null;
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: interactive
+                ? (_) {
+                    if (!_pressed) setState(() => _pressed = true);
+                  }
+                : null,
+            onTapUp: interactive
+                ? (_) {
+                    if (_pressed) setState(() => _pressed = false);
+                  }
+                : null,
+            onTapCancel: interactive
+                ? () {
+                    if (_pressed) setState(() => _pressed = false);
+                  }
+                : null,
+            onTap: widget.onTap,
+            child: AnimatedScale(
+              scale: _pressed ? 0.96 : 1.0,
+              duration: Duration(milliseconds: _pressed ? 100 : 280),
+              curve: _pressed ? Curves.easeOutCubic : Curves.easeOutBack,
+              alignment: alignment,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: _pressed
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : Colors.transparent,
+                ),
+                child: w,
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -1114,8 +1214,14 @@ class _WordLineState extends State<_WordLine>
   int _layLines = 0;
 
   /// 1 -> 0 right after a line finishes: the white text eases back to dim.
-  late final AnimationController _settle = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 520), value: 0);
+  late final AnimationController _settle;
+
+  @override
+  void initState() {
+    super.initState();
+    _settle = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 520), value: 0);
+  }
 
   TextStyle _style(double fs, Color c) => TextStyle(
         fontFamily: _kDisplayFont,
@@ -1400,7 +1506,7 @@ class _Word extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            if (bump > 0.02)
+            if (bump > 0.08)
               Opacity(
                 opacity: (_kWaveGlow * bump).clamp(0.0, 1.0),
                 child: ImageFiltered(
@@ -1533,6 +1639,7 @@ class _Controls extends StatelessWidget {
     required this.onMinus,
     required this.onPlus,
     required this.onReset,
+    this.onShareLyrics,
   });
 
   final LyricsLang lang;
@@ -1544,6 +1651,7 @@ class _Controls extends StatelessWidget {
   final VoidCallback onMinus;
   final VoidCallback onPlus;
   final VoidCallback onReset;
+  final VoidCallback? onShareLyrics;
 
   @override
   Widget build(BuildContext context) {
@@ -1638,6 +1746,22 @@ class _Controls extends StatelessWidget {
                     ),
                     _StepButton(icon: Icons.add_rounded, onStep: onPlus),
                   ],
+                ),
+              ),
+            ],
+            if (onShareLyrics != null) ...[
+              const SizedBox(width: 10),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onShareLyrics,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const ShapeDecoration(
+                    shape: CircleBorder(),
+                    color: Color(0x1FFFFFFF),
+                  ),
+                  child: const Icon(CupertinoIcons.camera, size: 17, color: Colors.white),
                 ),
               ),
             ],

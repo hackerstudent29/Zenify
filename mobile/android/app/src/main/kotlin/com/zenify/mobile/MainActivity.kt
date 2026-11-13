@@ -29,6 +29,9 @@ class MainActivity : AudioServiceActivity() {
         // Register Metrolist InnerTube native client
         flutterEngine.plugins.add(com.zenify.mobile.innertube.ZenInnerTubePlugin())
 
+        // Register Story & Social sharing plugin
+        com.zenify.mobile.story.StorySharePlugin.registerWith(flutterEngine.dartExecutor.binaryMessenger, this)
+
         // App utility channel: Native URL launcher, permissions, and APK update downloader
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
