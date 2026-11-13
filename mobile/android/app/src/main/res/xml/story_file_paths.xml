@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="story_cache" path="." />
+    <external-cache-path name="story_ext_cache" path="." />
+    <files-path name="story_files" path="." />
+</paths>
+

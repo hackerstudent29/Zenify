@@ -21,6 +21,7 @@ import '../../models/track.dart';
 import '../../services/playback_bridge.dart';
 import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
+import '../../features/story_sharing/screens/story_options_sheet.dart';
 import 'now_playing_widgets.dart';
 
 class NowPlayingScreen extends StatefulWidget {
@@ -299,6 +300,26 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             ),
           ),
         ),
+        SpringPress(
+          onTap: () {
+            ZenHaptics.tap();
+            StoryOptionsSheet.show(
+              context: context,
+              track: track,
+            );
+          },
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.18),
+            ),
+            child: const Icon(CupertinoIcons.camera,
+                size: 16, color: Colors.white),
+          ),
+        ),
+        const SizedBox(width: 8),
         SpringPress(
           onTap: widget.onMore,
           child: Container(
