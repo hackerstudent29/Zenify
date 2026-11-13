@@ -8,19 +8,18 @@
   "releaseTime": "06:50 PM IST",
   "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.10/zenify-v1.0.10.apk",
   "features": [
-    "Multi-Language Lyrics Anti-Collision Engine: Intelligently detects song languages (Telugu, Tamil, Hindi, Malayalam, Kannada) and blocks incorrect cross-language lyrics",
-    "Apple Music Story Sharing Suite: 16 handcrafted templates with transparent full Zenify logo branding and native Instagram, WhatsApp & Snapchat sharing",
-    "Streamlined Story Sharing Suite architecture with buttery smooth rasterization"
+    "Accurate Multi-Language Lyrics: Intelligently matches correct language lyrics for songs released in multiple languages (Tamil, Telugu, Hindi, Malayalam, Kannada)",
+    "Authentic Zenify Story Logo: All 16 story templates showcase the official transparent Zenify brand mark when sharing to Instagram, WhatsApp & Snapchat",
+    "Fast & Smooth Story Sharing: Streamlined story export engine for instant previews and crisp exports"
   ],
   "fixes": [
-    "Eliminated cross-language lyrics collision for multi-lingual movie songs (e.g. Ale Ale, Arabic Kuthu, Chaleya/Hayyoda) via Indic script and romanized transliteration validation",
-    "Ensured full authentic transparent Zenify logo is rendered on all shared stories without artificial plain text letters",
-    "Language-scoped multi-query search fallback with candidate score weighting in LRCLIB and lrc.red"
+    "Fixed wrong-language lyrics showing on multi-lingual songs (such as Ale Ale, Arabic Kuthu, Chaleya)",
+    "Fixed story templates to show the authentic transparent Zenify logo without plain text letters"
   ],
   "improvements": [
-    "Freshly built v1.0.10 (Build 14) ultra-compressed ARM64 & Universal APKs",
-    "Optimized lyrics memory and persistent disk caching for instantaneous line-synced display"
+    "Freshly built v1.0.10 (Build 14) ultra-compressed 14.5 MB APK",
+    "Instant lyrics loading and smoother playback performance"
   ],
-  "releaseNotes": "• Multi-language lyrics anti-collision engine (Telugu, Tamil, Hindi, Malayalam, Kannada)\n• Transparent full Zenify logo on all 16 story templates\n• Streamlined architecture & fresh v1.0.10 Build 14 APK",
-  "message": "Update to v1.0.10 (Build 14) for multi-language lyrics anti-collision, authentic transparent story branding, and performance improvements"
+  "releaseNotes": "• Accurate multi-language lyrics (no more language mixups)\n• Authentic transparent Zenify logo on all 16 story templates\n• Fast, smooth story sharing & fresh 14.5 MB APK",
+  "message": "Update to v1.0.10 (Build 14) for accurate multi-language lyrics, official story branding, and faster performance"
 }

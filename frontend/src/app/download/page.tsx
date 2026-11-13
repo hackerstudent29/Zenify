@@ -496,7 +496,7 @@ export default function DownloadPage() {
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">What&apos;s Included in v1.0.10</span>
                 <span className="text-zinc-300 leading-relaxed">
-                  Multi-language lyrics collision engine (script runes &amp; romanized detector preventing cross-lingual lyrics mismatch), transparent full-name Zenify branding across all 16 story templates, story suite architecture consolidation (5 high-performance files), YouTube H.264 video streaming in MiniPlayer &amp; Fullscreen, start-of-track scrubbing stability, and hardware-accelerated Studio FX.
+                  Accurate multi-language lyrics matching (no cross-language mixups for multi-lingual songs), authentic transparent Zenify logo across all 16 story templates, faster story exports, smooth in-app YouTube video streaming, and instant playback stability.
                 </span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
