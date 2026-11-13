@@ -302,6 +302,7 @@ enum StoryShareTarget {
   facebook,
   whatsapp,
   snapchat,
+  telegram,
   system,
 }
 
@@ -333,11 +334,19 @@ class StorySharingService {
     return isAppInstalled('com.whatsapp.w4b');
   }
   static Future<bool> isSnapchatInstalled() => isAppInstalled('com.snapchat.android');
+  static Future<bool> isTelegramInstalled() async {
+    final tg = await isAppInstalled('org.telegram.messenger');
+    if (tg) return true;
+    final tgX = await isAppInstalled('org.thunderdog.challegram');
+    if (tgX) return true;
+    return isAppInstalled('org.telegram.messenger.web');
+  }
 
   static Future<bool> shareToInstagram(
     File imageFile, {
     Color? topColor,
     Color? bottomColor,
+    bool asSticker = false,
     String? fallbackText,
   }) async {
     if (!imageFile.existsSync()) return false;
@@ -357,6 +366,7 @@ class StorySharingService {
           'filePath': imageFile.path,
           'topBackgroundColor': hexTop,
           'bottomBackgroundColor': hexBottom,
+          'asSticker': asSticker,
         });
         if (success == true) return true;
       } catch (e) {
@@ -424,8 +434,40 @@ class StorySharingService {
     return shareToSystem(imageFile, text: fallbackText);
   }
 
-  static Future<bool> shareToSystem(File imageFile, {String? text}) async {
+  static Future<bool> shareToTelegram(File imageFile, {String? text}) async {
     if (!imageFile.existsSync()) return false;
+
+    if (Platform.isAndroid) {
+      try {
+        final bool? success = await _channel.invokeMethod<bool>('shareToTelegram', {
+          'filePath': imageFile.path,
+          'text': text,
+        });
+        if (success == true) return true;
+      } catch (e) {
+        debugPrint('[StorySharingService] Telegram share error: $e');
+      }
+    }
+
+    return shareToSystem(imageFile, text: text);
+  }
+
+  static Future<bool> shareToSystem(File imageFile, {String? text, String? title}) async {
+    if (!imageFile.existsSync()) return false;
+
+    if (Platform.isAndroid) {
+      try {
+        final bool? success = await _channel.invokeMethod<bool>('shareToSystemChooser', {
+          'filePath': imageFile.path,
+          'text': text,
+          'title': title ?? 'Share Story',
+        });
+        if (success == true) return true;
+      } catch (e) {
+        debugPrint('[StorySharingService] Native system chooser error: $e');
+      }
+    }
+
     try {
       await SharePlus.instance.share(
         ShareParams(
@@ -437,6 +479,53 @@ class StorySharingService {
     } catch (e) {
       debugPrint('[StorySharingService] System share error: $e');
       return false;
+    }
+  }
+
+  static Future<bool> shareToTarget(
+    StoryShareTarget target,
+    File imageFile, {
+    Color? topColor,
+    Color? bottomColor,
+    bool asSticker = false,
+    String? text,
+    String? appId,
+  }) async {
+    switch (target) {
+      case StoryShareTarget.instagram:
+        return shareToInstagram(
+          imageFile,
+          topColor: topColor,
+          bottomColor: bottomColor,
+          asSticker: asSticker,
+          fallbackText: text,
+        );
+      case StoryShareTarget.facebook:
+        return shareToFacebook(
+          imageFile,
+          appId: appId,
+          fallbackText: text,
+        );
+      case StoryShareTarget.whatsapp:
+        return shareToWhatsApp(
+          imageFile,
+          text: text,
+        );
+      case StoryShareTarget.snapchat:
+        return shareToSnapchat(
+          imageFile,
+          fallbackText: text,
+        );
+      case StoryShareTarget.telegram:
+        return shareToTelegram(
+          imageFile,
+          text: text,
+        );
+      case StoryShareTarget.system:
+        return shareToSystem(
+          imageFile,
+          text: text,
+        );
     }
   }
 }

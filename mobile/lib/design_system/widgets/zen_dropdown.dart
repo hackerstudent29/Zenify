@@ -837,9 +837,13 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       onTap: () {
                         Navigator.of(context).pop();
                         if (widget.callerContext.mounted) {
-                          StoryOptionsSheet.show(
-                            context: widget.callerContext,
-                            track: effectiveTrack,
+                          Navigator.of(widget.callerContext).push(
+                            CupertinoPageRoute(
+                              builder: (_) => StoryPreviewScreen(
+                                content: SongStoryContent(track: effectiveTrack),
+                                initialShareTarget: StoryShareTarget.whatsapp,
+                              ),
+                            ),
                           );
                         }
                       },
@@ -852,9 +856,13 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       onTap: () {
                         Navigator.of(context).pop();
                         if (widget.callerContext.mounted) {
-                          StoryOptionsSheet.show(
-                            context: widget.callerContext,
-                            track: effectiveTrack,
+                          Navigator.of(widget.callerContext).push(
+                            CupertinoPageRoute(
+                              builder: (_) => StoryPreviewScreen(
+                                content: SongStoryContent(track: effectiveTrack),
+                                initialShareTarget: StoryShareTarget.facebook,
+                              ),
+                            ),
                           );
                         }
                       },

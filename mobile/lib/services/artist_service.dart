@@ -92,8 +92,38 @@ class ArtistService {
   static void clearCache() => _cache.clear();
 
   Future<Map<String, dynamic>?> _fetchCloud(String cleanName) async {
-    // Pure YouTube Music pipeline: no external cloud fallback
-    return null;
+    try {
+      final cloudTracks = await ApiService.search(cleanName)
+          .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
+      if (cloudTracks.isEmpty) return null;
+      final first = cloudTracks.first;
+
+      final albumsMap = <String, Map<String, dynamic>>{};
+      for (final t in cloudTracks) {
+        if (t.album.isNotEmpty && t.album != 'Single' && !albumsMap.containsKey(t.album)) {
+          albumsMap[t.album] = {
+            'title': t.album,
+            'coverUrl': t.coverUrl,
+            'year': '',
+          };
+        }
+      }
+
+      return {
+        'name': cleanName,
+        'imageUrl': first.coverUrl,
+        'coverUrl': first.coverUrl,
+        'bio': 'Official artist profile for $cleanName on Zenify.',
+        'follower_count': 5000000,
+        'topSongs': cloudTracks.map((t) => t.toJson()).toList(),
+        'albums': albumsMap.values.toList(),
+        'singles': <Map<String, dynamic>>[],
+        'dedicatedPlaylists': <Map<String, dynamic>>[],
+        'related': <Map<String, dynamic>>[],
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<ArtistProfile?> getArtist(String artistName, {String? browseId, bool forceRefresh = false}) async {

@@ -90,7 +90,9 @@ class InnerTubeService {
   Future<List<Track>> searchSongsNative(String query) async {
     if (!_useNative) return const [];
     try {
-      final res = await _nativeChannel.invokeMethod<List<dynamic>>('searchSongs', {'query': query});
+      final res = await _nativeChannel
+          .invokeMethod<List<dynamic>>('searchSongs', {'query': query})
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       final tracks = <Track>[];
       final seen = <String>{};
@@ -130,7 +132,9 @@ class InnerTubeService {
   Future<Map<String, dynamic>?> searchSummaryNative(String query) async {
     if (!_useNative) return null;
     try {
-      final res = await _nativeChannel.invokeMethod<List<dynamic>>('searchSummary', {'query': query});
+      final res = await _nativeChannel
+          .invokeMethod<List<dynamic>>('searchSummary', {'query': query})
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
       if (res == null || res.isEmpty) return null;
       return {'summaries': res};
     } catch (e) {
@@ -144,7 +148,9 @@ class InnerTubeService {
       final directSongs = await searchSongsNative(query);
       if (directSongs.isNotEmpty) return directSongs;
 
-      final res = await _nativeChannel.invokeMethod<List<dynamic>>('searchSummary', {'query': query});
+      final res = await _nativeChannel
+          .invokeMethod<List<dynamic>>('searchSummary', {'query': query})
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       final tracks = <Track>[];
       final seen = <String>{};
@@ -446,7 +452,9 @@ class InnerTubeService {
 
     if (_useNative) {
       try {
-        final list = await _nativeChannel.invokeMethod<List<dynamic>>('searchSuggestions', {'query': q});
+        final list = await _nativeChannel
+            .invokeMethod<List<dynamic>>('searchSuggestions', {'query': q})
+            .timeout(const Duration(seconds: 3), onTimeout: () => null);
         if (list != null && list.isNotEmpty) {
           return list.whereType<String>().toList();
         }
@@ -483,7 +491,9 @@ class InnerTubeService {
   Future<List<Track>> getHomeFeed({String? countryCode}) async {
     if (_useNative) {
       try {
-        final res = await _nativeChannel.invokeMethod<List<dynamic>>('getHomeFeed');
+        final res = await _nativeChannel
+            .invokeMethod<List<dynamic>>('getHomeFeed')
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final tracks = <Track>[];
           final seen = <String>{};
@@ -556,7 +566,9 @@ class InnerTubeService {
 
     if (_useNative) {
       try {
-        final res = await _nativeChannel.invokeMethod<List<dynamic>>('getCharts', {'countryCode': countryCode ?? CountryService.instance.currentCode});
+        final res = await _nativeChannel
+            .invokeMethod<List<dynamic>>('getCharts', {'countryCode': countryCode ?? CountryService.instance.currentCode})
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final seen = <String>{};
           for (final sec in res) {
@@ -946,14 +958,16 @@ class InnerTubeService {
   Future<Map<String, dynamic>?> getArtistChannel(String browseId, {String? artistName}) async {
     if (_useNative) {
       try {
-        final res = await _nativeChannel.invokeMethod<Map<dynamic, dynamic>>(
-          'getArtist',
-          {
-            'browseId': browseId,
-            'name': artistName ?? '',
-            'artistName': artistName ?? '',
-          },
-        );
+        final res = await _nativeChannel
+            .invokeMethod<Map<dynamic, dynamic>>(
+              'getArtist',
+              {
+                'browseId': browseId,
+                'name': artistName ?? '',
+                'artistName': artistName ?? '',
+              },
+            )
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final artistMap = Map<String, dynamic>.from(res['artist'] as Map? ?? {});
           final name = MediaNormalizer.cleanTitle(artistMap['title'] as String?);
@@ -1302,16 +1316,18 @@ class InnerTubeService {
   }) async {
     if (_useNative) {
       try {
-        final res = await _nativeChannel.invokeMethod<Map<dynamic, dynamic>>(
-          'getAlbum',
-          {
-            'browseId': browseId,
-            'title': albumTitle ?? '',
-            'albumTitle': albumTitle ?? '',
-            'artist': artistName ?? '',
-            'artistName': artistName ?? '',
-          },
-        );
+        final res = await _nativeChannel
+            .invokeMethod<Map<dynamic, dynamic>>(
+              'getAlbum',
+              {
+                'browseId': browseId,
+                'title': albumTitle ?? '',
+                'albumTitle': albumTitle ?? '',
+                'artist': artistName ?? '',
+                'artistName': artistName ?? '',
+              },
+            )
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final albumMap = Map<String, dynamic>.from(res['album'] as Map? ?? {});
           final resolvedTitle = MediaNormalizer.cleanTitle(albumMap['title'] as String?);
@@ -1439,7 +1455,9 @@ class InnerTubeService {
     final cleanId = playlistId.startsWith('VL') ? playlistId.substring(2) : playlistId;
     if (_useNative) {
       try {
-        final res = await _nativeChannel.invokeMethod<Map<dynamic, dynamic>>('getPlaylist', {'browseId': cleanId});
+        final res = await _nativeChannel
+            .invokeMethod<Map<dynamic, dynamic>>('getPlaylist', {'browseId': cleanId})
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final tracks = <Track>[];
           final rawTracks = res['tracks'] as List? ?? const [];
@@ -1510,10 +1528,12 @@ class InnerTubeService {
 
     if (_useNative) {
       try {
-        final res = await _nativeChannel.invokeMethod<List<dynamic>>('getNext', {
-          'videoId': cleanId,
-          'playlistId': ?playlistId,
-        });
+        final res = await _nativeChannel
+            .invokeMethod<List<dynamic>>('getNext', {
+              'videoId': cleanId,
+              'playlistId': ?playlistId,
+            })
+            .timeout(const Duration(seconds: 4), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final tracks = <Track>[];
           for (final raw in res) {

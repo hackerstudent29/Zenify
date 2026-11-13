@@ -20,6 +20,7 @@ import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/api_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../services/search_nav.dart';
@@ -668,30 +669,46 @@ class _SearchScreenState extends State<SearchScreen>
       _catVideos = const [];
     });
 
-    Future<SearchResult> safe(SearchFilter f) async {
+    SearchResult resAll = _emptyResult();
+    try {
+      resAll = await _dataService
+          .search(query: spec.query, filter: SearchFilter.all)
+          .timeout(const Duration(seconds: 4), onTimeout: () => _emptyResult());
+    } catch (_) {}
+
+    if (resAll.songs.isEmpty) {
       try {
-        return await _dataService.search(query: spec.query, filter: f);
-      } catch (_) {
-        return _emptyResult();
-      }
+        final cloudTracks = await ApiService.search(spec.query)
+            .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+        if (cloudTracks.isNotEmpty && mounted && id == _catRequestId) {
+          final cloudSongs = cloudTracks.map((t) => SearchSongItem(
+            id: t.id,
+            title: t.title,
+            subtitle: t.artist,
+            thumbnailUrl: t.coverUrl,
+            thumbnailUrlHiRes: t.coverUrl,
+            videoId: t.id.replaceAll('yt-', ''),
+            artists: t.artists,
+            albumName: t.album,
+            durationSeconds: t.durationSeconds,
+            durationText: t.formattedDuration,
+          )).toList();
+          setState(() {
+            _catSongs = cloudSongs;
+            _catLoading = false;
+          });
+          return;
+        }
+      } catch (_) {}
     }
 
-    final res = await Future.wait([
-      safe(SearchFilter.all),
-      safe(SearchFilter.songs),
-      safe(SearchFilter.albums),
-      safe(SearchFilter.artists),
-      safe(SearchFilter.featuredPlaylists),
-    ]);
     if (!mounted || id != _catRequestId) return;
     setState(() {
-      _catSongs = res[1].songs.isNotEmpty ? res[1].songs : res[0].songs;
-      _catAlbums = res[2].albums.isNotEmpty ? res[2].albums : res[0].albums;
-      _catArtists =
-          res[3].artists.isNotEmpty ? res[3].artists : res[0].artists;
-      _catPlaylists =
-          res[4].playlists.isNotEmpty ? res[4].playlists : res[0].playlists;
-      _catVideos = res[0].videos;
+      _catSongs = resAll.songs;
+      _catAlbums = resAll.albums;
+      _catArtists = resAll.artists;
+      _catPlaylists = resAll.playlists;
+      _catVideos = resAll.videos;
       _catLoading = false;
     });
   }

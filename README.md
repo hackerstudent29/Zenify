@@ -1,301 +1,160 @@
+<div align="center">  <a href="https://listenzenify.vercel.app">
+    <img src="assets/images/zenify_logo_animation.gif" alt="Zenify — Free Ad-Free Music Streaming App" width="560" />
+  </a>  <h1>Zenify — Free Music. No Ads. Just Press Play.</h1>  <p><strong>A free, ad-free music streaming experience for music lovers around the world.</strong><br>
+  Discover songs, follow the lyrics, shape your sound, and listen together — on the web or Android.</p>  <p>
+    <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/🎧_Listen_on_the_Web-Open_Zenify-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Listen on the web"></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk"><img src="https://img.shields.io/badge/📱_Android_APK-Download-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download Android APK"></a>
+    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/All_Releases-GitHub-blue?style=for-the-badge&logo=github&logoColor=white" alt="All releases"></a>
+  </p>  <p>
+    <a href="#why-people-choose-zenify">Why Zenify?</a> ·
+    <a href="#find-the-features-you-care-about">Explore features</a> ·
+    <a href="#see-zenify-in-action">Screenshots</a> ·
+    <a href="#get-started-on-your-device">Get started</a> ·
+    <a href="#frequently-asked-questions">FAQ</a>
+  </p>  <p>
+    <strong>Free to use</strong> · <strong>No audio ads</strong> · <strong>No account needed to start</strong> · <strong>Web + Android</strong>
+  </p></div>Looking for a music app without ads?
+You probably just want to play your music without interruptions, avoid another monthly subscription, and enjoy the features that make listening better. That's what Zenify is made for.
+
+Zenify is a free, open-source music streaming app and web player with an ad-free listening experience, global and regional music discovery, synchronized lyrics, audio effects, and group listening.
+
+Whether you're searching for a free Spotify alternative, an Apple Music alternative, a YouTube Music alternative, or simply a music player without ads, explore what Zenify offers.
 <div align="center">
-  <br />
-  <a href="https://listenzenify.vercel.app">
-    <img src="assets/images/zenify_logo_animation.gif" alt="Zenify: Free Ad-Free Music Streaming App & Spotify Alternative" width="560" />
+  <a href="https://listenzenify.vercel.app"><strong>▶ Open Zenify and start listening</strong></a>
+</div>Why people choose Zenify
+What listeners are looking for	What Zenify offers
+Music without interruptions	No audio commercials, video pop-ups, or banner ads
+Free music streaming	No paid subscription or paywall to start listening
+Music from around the world	International tracks and regional music discovery
+Lyrics while listening	Synchronized, word-by-word karaoke-style lyrics
+Better control over sound	Equalizer, bass boost, reverb, speed controls, and 8D audio
+Listening with friends	Room Together for shared, synchronized listening
+A player for personal music	Play supported audio files stored on your device
+Easy access	Listen on the web or install the Android app
+No sign-up barrier	Start listening without creating an account
+
+
+Find the features you care about
+<details open>
+<summary><strong>🎧 Ad-free music streaming</strong></summary>Enjoy music without audio advertisements, video interruptions, or banner ads. Explore international tracks, new releases, popular music, and regional collections across languages including English, Spanish, Hindi, Tamil, Telugu, Punjabi, Korean, Japanese, French, and more.
+</details><details>
+<summary><strong>🌍 Music discovery from different regions</strong></summary>
+Explore music beyond your usual playlists. Discover artists, tracks, charts, and regional sounds from different languages and music scenes around the world.
+</details><details>
+<summary><strong>🎤 Synchronized lyrics and karaoke</strong></summary>
+Follow along as lyrics highlight in time with the song. Enjoy word-by-word transitions, instrumental pause indicators, and romanized pronunciation support for selected non-Latin scripts, including Tamil, Hindi, Korean, and Japanese.
+</details><details>
+<summary><strong>🎛️ Equalizer, 8D audio, and sound effects</strong></summary>
+Adjust the way your music sounds with bass, mid, and treble controls. Try 8D spatial audio, room reverb, pitch and tempo changes, and listening styles such as slowed or Nightcore.
+</details><details>
+<summary><strong>👥 Room Together — listen with friends</strong></summary>
+Create a listening room or join one with friends. Enjoy synchronized playback, chat, emoji reactions, shared queues, song requests, and room invitations. You can share an invite link and experience music together even when everyone is in a different place.
+</details><details>
+<summary><strong>📁 Play music stored on your device</strong></summary>
+Use the local music player to play supported files such as MP3, FLAC, WAV, M4A, and AAC from your phone or computer. Your local audio files are played from your device and are not uploaded as part of this feature.
+</details><details>
+<summary><strong>📻 Smart autoplay and language radio</strong></summary>
+Keep the music going with automatic recommendations when a playlist or album ends. Explore continuous listening based on music style and language preferences.
+</details>Choose how you want to listen
+<div align="center">Device	How to use Zenify
+🤖 Android phone or tablet	Download and install the Android APK
+🍎 iPhone or iPad	Open the web app in Safari and add it to your Home Screen
+💻 Windows, Mac, or Linux	Listen in a browser or install the web app where supported
+
+
+</div>Android app
+<a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk">
+  <img src="https://img.shields.io/badge/⬇_Download_Zenify_for_Android_v1.0.9-13.7_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download Zenify Android APK">
+</a>- Download ARM64 APK (13.7 MB)
+- Download Universal APK (30.6 MB)
+- Open the web download page and QR code
+- View all Zenify releases
+Install on Android
+1. Download the APK using one of the links above.
+2. Open the downloaded file from your browser notification or Downloads folder.
+3. If Android asks, allow installation from that source in your device settings.
+4. Tap Install, then open Zenify and start listening.
+<details>
+<summary><strong>Having trouble installing?</strong></summary>Android may show a security warning because the APK is downloaded outside the Play Store. Only install it if you trust the source. If your device blocks the installation, check the Android settings for permission to install apps from your browser or file manager.
+</details>iPhone and iPad
+1. Open listenzenify.vercel.app in Safari.
+2. Tap the Share button.
+3. Choose Add to Home Screen.
+4. Tap Add, then open Zenify from your Home Screen.
+Windows, macOS, and Linux
+1. Open listenzenify.vercel.app in Chrome, Edge, or Brave.
+2. Use the browser's Install option if it is available.
+3. Launch Zenify from your desktop or app launcher.
+See Zenify in action
+Discover music	Your listening experience
+<img src="docs/images/zenify_home_dashboard.png" alt="Zenify home screen showing music discovery and collections" width="100%">	<img src="docs/images/zenify_fullview_player.png" alt="Zenify full-screen music player and audio controls" width="100%">
+Explore music collections, releases, and charts.	Control playback and personalize your sound.
+
+
+Sing along	Explore artists
+<img src="docs/images/zenify_synced_lyrics.png" alt="Zenify synchronized lyrics screen" width="100%">	<img src="docs/images/zenify_artist_page.png" alt="Zenify artist profile and discography screen" width="100%">
+Follow synchronized lyrics as the song plays.	Discover artists, popular tracks, and discographies.
+
+
+Zenify compared with other music apps
+Looking for a Spotify alternative without ads, or comparing free music streaming apps? Here's a quick feature overview.
+Feature	Zenify	Spotify Free	Apple Music	YouTube Music Free
+Free listening option	✓	✓	Subscription	✓
+Ad-free listening	✓	✕	✓	✕
+Start without an account	✓	Account required	Account required	Account required
+Synchronized lyrics	✓	Limited	✓	Basic
+Equalizer and audio effects	✓	Basic	Basic	—
+8D spatial audio feature	✓	—	—	—
+Listen together feature	✓	Limited / Premium features	SharePlay	—
+Play local audio files	✓	Limited	—	Limited
+Android APK download	✓	—	—	—
+Open source	✓	—	—	—
+
+
+Feature availability and app policies can change by country, platform, subscription, and app version. This table is a general overview, not a guarantee that every competing app behaves identically for every user.
+Frequently asked questions
+<details>
+<summary><strong>Is Zenify free?</strong></summary>Yes. Zenify is presented as a free, open-source app under the MIT License. There are no paid subscriptions or paywalls required to start listening.
+</details><details>
+<summary><strong>Does Zenify have ads?</strong></summary>
+Zenify is designed for ad-free listening, without audio commercials, video interruptions, or banner ads.
+</details><details>
+<summary><strong>Do I need to create an account?</strong></summary>
+No. You can start listening without signing up. Creating an account is optional for features such as syncing your saved library across devices.
+</details><details>
+<summary><strong>Can I use Zenify on iPhone?</strong></summary>
+You can access Zenify through its web app in Safari and add it to your iPhone or iPad Home Screen.
+</details><details>
+<summary><strong>Is Zenify available on Windows and Mac?</strong></summary>
+Yes. Open the web app in a supported browser. You may also be able to install it as a web app through your browser.
+</details><details>
+<summary><strong>Can I listen with my friends?</strong></summary>
+Yes. Room Together lets you create or join shared listening rooms with synchronized music, chat, reactions, and shared queue features.
+</details><details>
+<summary><strong>Can I play my own music files?</strong></summary>
+Yes. The local player supports formats including MP3, FLAC, WAV, M4A, and AAC.
+</details><details>
+<summary><strong>Which languages and regions are supported?</strong></summary>
+Zenify includes international and regional music discovery across multiple languages. The available catalog can vary by track and region.
+</details><details>
+<summary><strong>Where can I download the latest version?</strong></summary>
+Visit the GitHub Releases page for available releases and downloads.
+</details>Ready to listen?
+<div align="center">  <h3>Your music. Your mood. No ad interruptions.</h3>
+  <p>Open the web player or get the Android app and explore Zenify.</p>  <a href="https://listenzenify.vercel.app">
+    <img src="https://img.shields.io/badge/▶_LISTEN_NOW-Open_Zenify-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Listen to Zenify now">
   </a>
-  <br />
-  <br />
-  <h1>Zenify — The Ultimate Free, Ad-Free Music Streaming App & Player</h1>
-  <p>
-    <b>The open-source Spotify & Apple Music alternative. Stream millions of songs ad-free in pristine 320kbps lossless audio with real-time synchronized karaoke lyrics, studio equalizer, 8D spatial audio, Room Together collaborative listening, and private offline FLAC/MP3 playback.</b>
-  </p>
-
-  <p>
-    <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/🚀_Live_Web_App-listenzenify.vercel.app-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk"><img src="https://img.shields.io/badge/📱_Download_Android_APK-v1.0.9-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases"><img src="https://img.shields.io/badge/📦_GitHub_Releases-v1.0.9-blue?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="MIT License" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub Stars" /></a>
-    <a href="https://github.com/hackerstudent29/Zenify/fork"><img src="https://img.shields.io/github/forks/hackerstudent29/Zenify?style=for-the-badge&color=blueviolet" alt="GitHub Forks" /></a>
-  </p>
-
-  <p>
-    <a href="#-download-mobile-app-android-apk"><b>Download APK</b></a> •
-    <a href="#-try-it-now">Try Web App</a> •
-    <a href="#-why-zenify-vs-spotify--apple-music">Why Zenify</a> •
-    <a href="#-features">Features</a> •
-    <a href="#-screenshots">Screenshots</a> •
-    <a href="#-how-to-install">Install Guide</a> •
-    <a href="#-architecture--tech-stack">Tech Stack</a> •
-    <a href="#-quickstart--local-development">Development</a> •
-    <a href="#-faq">FAQ</a>
-  </p>
-</div>
-
----
-
-## 🎧 Overview
-
-<div align="center">
-  <img src="docs/images/zenify_fullview_player.png" alt="Zenify Full-View Music Player with Reactive Dynamic Artwork Background, Synced Lyrics, and Studio Equalizer" width="100%" />
-</div>
-
-**Zenify** is a free, open-source online music streaming platform and native mobile application designed with an Apple Music-inspired liquid glass aesthetic. Engineered for audiophiles, music lovers, and privacy-conscious users worldwide, Zenify delivers:
-
-* **100% Ad-Free Music Streaming**: No audio commercials, video popups, or banner ads — ever.
-* **Vast Global & Regional Music Catalog**: Powered by an asynchronous native InnerTube pipeline and Akamai Clean CDN.
-* **Sub-Second Synchronized Karaoke Lyrics**: Real-time syllable and line-by-line animations with instrumental pause markers across 50+ languages.
-* **Hardware-Accelerated Studio Equalizer**: 3-band parametric EQ, bass boost, 8D spatial audio, dynamic room reverb, and DJ pitch/tempo control.
-* **Room Together (Synchronized Live Listening)**: Host or join real-time group listening sessions with friends across the globe with low-drift sync.
-* **Local Offline Player (FLAC / MP3 / WAV / ALAC / AAC)**: Play your personal music library directly from device storage without uploading to the cloud.
-* **No Account Required**: Instant playback on any device without sign-up, email, or credit card requirements.
-
----
-
-## 📱 Download Mobile App (Android APK)
-
-Install the native **Zenify Android application** directly to your smartphone or tablet for seamless background audio playback, lock-screen controls, and offline listening:
-
-<div align="center">
-  <br />
   <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk">
-    <img src="https://img.shields.io/badge/⚡_DOWNLOAD_ZENIFY_APK_(v1.0.9)-13.7_MB-E11D48?style=for-the-badge&logo=android&logoColor=white" alt="Download Zenify APK Package" height="46" />
-  </a>
-  <br />
-  <p><i>Direct download link: <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk">zenify-v1.0.9.apk (ARM64 13.7 MB)</a> • <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk">Universal APK (30.6 MB)</a> • <a href="https://listenzenify.vercel.app/download">Web Direct & QR</a></i></p>
-  <br />
-  <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fgithub.com%2Fhackerstudent29%2FZenify%2Freleases%2Fdownload%2Fv1.0.9%2Fzenify-v1.0.9.apk&format=svg&color=ffffff&bgcolor=121214" alt="Scan QR Code to Download Zenify APK" width="180" />
-  <p><b>Scan with your phone's camera to download directly</b></p>
-</div>
+    <img src="https://img.shields.io/badge/⬇_GET_ANDROID_APP-Download_APK-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Get Zenify Android app">
+  </a>  <p>If Zenify is useful to you, support the project by starring it on GitHub and sharing it with other music lovers.</p>
+  <a href="https://github.com/hackerstudent29/Zenify"><img src="https://img.shields.io/github/stars/hackerstudent29/Zenify?style=for-the-badge&color=gold" alt="GitHub stars"></a>
+  <a href="https://github.com/hackerstudent29/Zenify/fork"><img src="https://img.shields.io/github/forks/hackerstudent29/Zenify?style=for-the-badge&color=blueviolet" alt="GitHub forks"></a></div>Search topics
+Zenify may be relevant to people searching for:
 
-### 📲 How to Install the APK on Your Android Device
-
-1. **Download the APK Package**: Tap the **[Download Zenify APK (v1.0.9)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk)** button or scan the QR code above.
-   > *Note*: If Google Chrome or your browser displays *"File might be harmful"*, tap **Download anyway**. This is standard Android security verification for apps installed outside the Google Play Store.
-2. **Open the File**: When the download completes, tap **Open** from your notification tray, or open your phone's **Files** or **Downloads** folder and tap `zenify.apk`.
-3. **Allow Unknown Apps**: If prompted with *"For your security, your phone is not allowed to install unknown apps from this source"*, tap **Settings** and turn on **Allow from this source**.
-4. **Tap Install**: Tap **Install**. In seconds, installation will finish. Open Zenify to stream high-bitrate ad-free music with synced lyrics and lock-screen controls!
-
-### 📦 Package & Checksum Details (`v1.0.9` / Build `13`)
-| Field | Value |
-|---|---|
-| **Application ID** | `com.zenify.mobile` |
-| **Release Version** | `v1.0.9` (Android `versionCode`: `13`, Min SDK: Android 8.0 / API 26) |
-| **ARM64 Split APK (`zenify-v1.0.9.apk`)** | `13.7 MB` (`14,373,365` bytes) — SHA-256: `1FB85A84F66C301F3ED0121D1158DA647C1EB65420DDE6474B37A394192F0F5D` |
-| **Universal APK (`zenify-v1.0.9-universal.apk`)** | `30.6 MB` (`32,133,871` bytes) — SHA-256: `F0A77CB5712BDB5B89BA9E7CD4110242245A2180D24C5608411A4D674EDC4CE9` |
-| **Included Highlights** | YouTube H.264 video streaming in MiniPlayer & Fullscreen Player, reliable start-of-track playback & scrubbing (`SimpleCache` `itag` keying, cache eviction & backend fallback fix), sheet/page miniplayer & dock isolation (`Profile`, `Room Together`, modal sheets), dead-centered Dynamic Island headers across dock pages, collapsed scroll MiniPlayer & Search dock de-overlap, Explore & Search redesigns, Artist/Album verified badge & round button fixes, and single-song Smart Queue isolation |
-
----
-
-## ⚡ Why Zenify vs. Spotify & Apple Music?
-
-| Feature | Zenify | Spotify Free | Apple Music | YouTube Music Free |
-|---|:---:|:---:|:---:|:---:|
-| **Price** | **100% Free Forever** | Free with ads | Paid ($10.99/mo) | Free with ads |
-| **Audio Ads Between Songs** | **Zero Commercials** | Frequent audio ads | None (Paid) | Frequent video/audio ads |
-| **Account Required to Listen** | **No Account Needed** | Mandatory | Mandatory (Paid) | Mandatory |
-| **Audio Bitrate Quality** | **Pristine 320kbps** | 96 - 160 kbps | 256 kbps AAC (Paid) | 128 kbps OPUS |
-| **Native InnerTube Streaming** | **Yes (Sub-300ms)** | No | No | Official client only |
-| **Real-Time Synced Lyrics** | **Included Free** | Limited / Restricted | Included (Paid) | Basic text only |
-| **Dynamic Island 3-Dock UI** | **Included** | No | iOS only | No |
-| **Studio Equalizer & 8D Audio** | **Included Free** | Basic presets only | Basic presets only | None |
-| **Room Together (Live Listening)** | **Included Free** | Premium only | SharePlay (Apple only) | None |
-| **Plays Local Files Privately** | **Yes (Client-side)** | Complex sync | Desktop only | Cloud upload |
-| **Background Playback on Mobile** | **Included Free** | Included | Included (Paid) | Blocked (Requires Premium) |
-| **Direct Android APK Package** | **Yes (Direct Download)** | Play Store only | Play Store only | Play Store only |
-| **Open Source & Privacy-Friendly** | **Yes (MIT License)** | Closed source | Closed source | Closed source |
-
----
-
-## ✨ Features
-
-### 🎵 Unlimited Ad-Free Music Streaming
-* **Zero Commercial Interruptions**: Listen for hours without annoying banner ads, interstitial video ads, or 30-second sponsored interruptions.
-* **Vast Music Library**: Access millions of international tracks, trending charts, new releases, and deep regional catalogs (English, Spanish, Hindi, Tamil, Telugu, Punjabi, K-Pop, Japanese, French, Latin, and more).
-* **Instant Sub-300ms Playback**: Asynchronous Kotlin coroutine pipeline with PO-token pre-warming and `RefusedRetryDataSource` for lightning-fast playback startup.
-
-### 🎤 Synchronized Word-by-Word Karaoke Lyrics
-* **Sub-Second Timing**: Syllable-accurate timing synchronized with the vocals.
-* **Interactive Karaoke Experience**: Words illuminate with smooth glowing transitions as the artist sings.
-* **Instrumental Pause Markers**: Visual rhythm indicators (`• • •`) signify instrumental interludes so you never miss a beat.
-* **Auto Romanization**: Romanized pronunciation guides for non-Latin scripts (Tamil, Hindi, Korean, Japanese, etc.).
-
-### 🎛️ Audiophile DSP Studio & 8D Spatial Audio
-* **3-Band Parametric Equalizer**: Hardware-accelerated Bass, Mid, and Treble controls with real-time parameter interpolation.
-* **8D Spatial Audio**: Immersive headphone sound with smooth rotational panning.
-* **Audio FX Engine**: Dynamic room reverb, tube warmth simulation, vocal isolation, and customizable pitch/tempo speed shifts (0.5x to 1.5x, Nightcore & Slowed+Reverb modes).
-
-### 🏝️ Liquid Glass Dynamic Island Header
-* **Unified 3-Dock System**: Top header seamlessly adapts on scroll:
-  - **Left Dock**: Liquid glass back button.
-  - **Center Dock**: Dynamic Island pill with marquee title and artist subtitle (tap to spring smoothly back to top).
-  - **Right Dock**: User profile avatar shortcut.
-* **Smooth Spring Physics**: Natural iOS-grade spring transitions and overscroll bounce.
-
-### 👥 Room Together — Synchronized Live Listening
-* **Listen with Friends in Real Time**: Host or join persistent synchronized rooms (`/api/v1/together`, `/ws/together` with `RESUME` sequence replay and automatic 90-second host failover).
-* **Live Chat & Reactions**: Built-in threaded chat messages (reply/edit/delete) and live emoji reactions with reaction timeline.
-* **Synced Room Lyrics, Moments & Fair Queueing**: Real-time karaoke lyrics with translation and romanization toggles, pinned timestamped song moments, RBAC waiting-room approvals, song request queue & DJ permissions, and room taste discovery.
-* **Themes, Deep Links, Insights & PNG Recaps**: Custom Apple-inspired room themes, expiring QR & WhatsApp invite deep links (`zenify://room`, `https://listenzenify.vercel.app/together`, `https://listenzenify.vercel.app/j/<code>`), room achievements, analytics, and shareable high-res PNG room recap cards.
-
-### 📁 Offline Local Music Player
-* **Play Device Audio Files**: Seamlessly play MP3, FLAC, WAV, M4A, and AAC files stored on your phone or computer.
-* **100% Private & Client-Side**: Audio files are decoded locally using device hardware; zero data is ever uploaded to any cloud server.
-
-### 📻 Intelligent Language Radio & Smart Autoplay
-* **Continuous Playback**: When your playlist or album ends, Zenify automatically queues similar high-affinity music matching your vibe.
-* **Indian & International Language Affinity**: Dedicated continuous radio tailored to regional preferences without repetitive loops.
-
----
-
-## 📸 Screenshots
-
-| 🏠 Home Dashboard | 🎛️ Studio Player & Audio Controls |
-| :---: | :---: |
-| <img src="docs/images/zenify_home_dashboard.png" alt="Zenify Home Dashboard with Curated Music Shelves and Charts" width="100%" /> | <img src="docs/images/zenify_fullview_player.png" alt="Zenify Full Screen Player with Studio Controls" width="100%" /> |
-| *Discover trending releases and personalized collections* | *Sculpt your sound with real-time EQ and spatial audio* |
-
-| 🎤 Real-Time Synced Lyrics | 👤 Artist Discography & Profile |
-| :---: | :---: |
-| <img src="docs/images/zenify_synced_lyrics.png" alt="Zenify Sub-Second Synchronized Karaoke Lyrics" width="100%" /> | <img src="docs/images/zenify_artist_page.png" alt="Zenify Artist Profile Page with Discography and Top Tracks" width="100%" /> |
-| *Sub-second karaoke lyrics with instrumental pause indicators* | *Explore full discographies, popular songs, and related artists* |
-
----
-
-## 📲 How to Install Across Devices
-
-### 🤖 Android (Native APK)
-1. Download **[Zenify APK v1.0.9 (13.7 MB ARM64)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk)** (or **[Universal 30.6 MB](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk)**).
-2. Tap the downloaded file in your notification bar or **Downloads** folder.
-3. Enable **Allow from this source** in Settings if prompted.
-4. Tap **Install** and enjoy ad-free music streaming!
-
-### 🍎 iOS & iPadOS (Apple Web App / PWA)
-1. Open **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in **Safari**.
-2. Tap the **Share** button (box with an upward arrow) in the toolbar.
-3. Scroll down and tap **Add to Home Screen**, then tap **Add**.
-4. Open Zenify directly from your iPhone home screen for an immersive full-screen experience with lock-screen controls!
-
-### 💻 Desktop (Windows, macOS, Linux PWA)
-1. Open **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in Google Chrome, Microsoft Edge, or Brave.
-2. Click the **Install** button in the browser address bar (or Menu → *Install Zenify*).
-3. Zenify will launch in a dedicated borderless window with keyboard media key support and taskbar integration.
-
----
-
-## 🚀 Try It Now
-
-Start listening immediately — **no sign-up, credit card, or subscription required**.
-
-* **Live Web Player**: Open **[listenzenify.vercel.app](https://listenzenify.vercel.app)** in any modern web browser.
-* **Download APK**: Direct download **[Zenify APK v1.0.9 (13.7 MB ARM64)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk)** • **[Universal APK (30.6 MB)](https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9-universal.apk)**.
-
----
-
-## 🏛️ Architecture & Project Structure
-
-> Explore the complete monorepo map in **[`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md)** and system data flows in **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**.
-
-```text
-Zenify/
-├── .github/                  # CI/CD workflows (lint, security, test, release) & templates
-├── assets/                   # Shared logos, display fonts & promotional artwork
-├── backend/                  # API Server (Node.js, Fastify 5, Prisma ORM, PostgreSQL, Redis, WebSockets)
-│   ├── src/routes/           # Tracks, search, albums, artists, auth, lyrics & Room Together v1 endpoints
-│   ├── src/services/         # JioSaavn Clean CDN, InnerTube, personalization & modular together/ engine
-│   └── tests/                # Automated test suites
-├── frontend/                 # Web PWA (React 19, Vite 6, React Router, Tailwind CSS v4, Web Audio API)
-│   ├── public/downloads/     # Distributed Android release APK (zenify.apk) & SEO assets (sitemap, robots, llms.txt)
-│   ├── scripts/              # Build-time sitemap generation, route prerendering & SEO audit scripts
-│   └── src/app/              # Route views (Home, Discover, Download, Room Together, Track, Album, Artist)
-├── mobile/                   # Native Client (Flutter, Dart, Android Media3 ExoPlayer & Kotlin DSP)
-│   ├── android/              # Kotlin plugins (ZenInnerTubePlugin, ZenAudioPlugin, ZenFxProcessor, YtEngine)
-│   └── lib/                  # Design system, Room Together views, services & ZenPlayer engine
-├── scripts/                  # Deployment, secret scanning & mobile launch utilities
-├── docs/                     # Documentation hub, architecture specs, deployment guides & screenshots
-│   ├── README.md             # Documentation index
-│   ├── PROJECT_STRUCTURE.md  # Full monorepo folder tree & file locator
-│   ├── ARCHITECTURE.md       # System design, auth & audio pipeline
-│   └── architecture/         # Backend, frontend, schema & parity technical specs
-└── CHANGELOG.md              # Full release history (through v1.0.9)
-```
-
-> **Docs**: [Documentation Hub](docs/README.md) • [Project Structure](docs/PROJECT_STRUCTURE.md) • [Architecture](docs/ARCHITECTURE.md) • [Developer Guide](docs/DEVELOPER.md) • [Troubleshooting](docs/TROUBLESHOOTING.md) • [Changelog](CHANGELOG.md)
-
-- **Frontend**: React 19, Vite, Tailwind CSS v4, Framer Motion, TanStack Query, Zustand, Radix UI.
-- **Mobile**: Flutter 3.44.2, Dart 3.12.2, Android Media3 ExoPlayer, Provider, Cupertino Icons, Bundled SF Pro & SF Pro Display Typography.
-- **Native Android Engine**: Kotlin coroutine dispatchers, PO-token generator, `RefusedRetryDataSource`, and hardware audio session routing.
-- **Backend API**: Node.js, Fastify, TypeScript, Prisma ORM, PostgreSQL, `@fastify/websocket`, JWT.
-- **Audio Delivery Pipeline**: Pristine JioSaavn Akamai 320kbps CDN resolution + yt-dlp / InnerTube stream proxy.
-
----
-
-## 🛠️ Quickstart & Local Development
-
-### 1. Clone the Repository
-```bash
-git clone https://github.com/hackerstudent29/Zenify.git
-cd Zenify
-```
-
-### 2. Run the Backend
-```bash
-cd backend
-npm install
-npx prisma generate
-npm run dev
-```
-
-### 3. Run the Frontend Web App
-```bash
-cd frontend
-npm install
-npm run dev
-# Web player will be accessible at http://localhost:3001
-```
-
-### 4. Run the Mobile Client
-```bash
-cd mobile
-flutter pub get
-flutter run
-# To build release split APKs:
-flutter build apk --split-per-abi
-```
-
----
-
-## ❓ Frequently Asked Questions (FAQ)
-
-### 1. Is Zenify really 100% free with no ads?
-Yes! Zenify is free and open-source software under the MIT license. There are zero paid subscriptions, zero paywalls, and zero audio or video advertisements.
-
-### 2. Is an account required to stream music?
-No. You can open Zenify and immediately stream tracks, albums, artist discographies, and language radios without creating an account or providing personal details. Account creation is completely optional to sync your saved library across devices.
-
-### 3. How does Zenify achieve high-quality 320kbps audio?
-Zenify utilizes pristine Akamai Clean CDN resolution for Indian and international releases, coupled with a native InnerTube pipeline with HTTP 206 range seeking, delivering uncompressed, bit-perfect 320kbps audio without lossy transcoding.
-
-### 4. Can I play my own audio files from phone or PC?
-Yes. The **Local Library** feature allows you to open MP3, FLAC, WAV, M4A, and AAC files directly from your device storage. Playback happens client-side using device hardware decoding without uploading any files to remote servers.
-
-### 5. How do synchronized karaoke lyrics work?
-Zenify parses timestamped syllable and line timings, synchronizing words in real time with the audio timeline. Words highlight smoothly as the artist sings, and visual pause markers (`• • •`) indicate instrumental passages.
-
----
-
-## 🌐 Search Tags & Keywords
-
-`spotify alternative` • `apple music alternative` • `youtube music alternative` • `free music streaming` • `ad free music app` • `free music player` • `lossless audio streaming` • `320kbps music player` • `synced lyrics app` • `karaoke lyrics player` • `music streaming apk` • `flutter music player` • `open source music app` • `offline flac player` • `listen together app` • `room together music` • `equalizer music player` • `8d audio player` • `android music player apk` • `free spotify no ads`
-
----
-
-## 🤝 Community & Support
-
-Zenify is built with ❤️ for music lovers around the world. If you love using Zenify, please **star this repository on GitHub** and share it with your friends!
-
----
-
-## 📜 License
-
-Distributed under the **MIT License**. Created with passion by [Ramanathan S](https://github.com/hackerstudent29).
+free music streaming app · ad-free music app · music streaming without ads · Spotify alternative · free Spotify alternative · Apple Music alternative · YouTube Music alternative · Android music player · Android music streaming APK · free online music player · music player for iPhone · music web player · open-source music app · music app without subscription · 320kbps music player · lossless audio player · music app with synced lyrics · karaoke lyrics app · music equalizer app · 8D audio player · offline local music player · FLAC music player · listen to music with friends · group listening app · Flutter music player app
+Community and license
+Zenify is built for music lovers around the world. If you enjoy using it, consider starring the project, sharing it, or contributing through GitHub.
+- GitHub: https://github.com/hackerstudent29/Zenify
+- Releases: https://github.com/hackerstudent29/Zenify/releases
+- License: MIT License
+- Created by: Ramanathan S
