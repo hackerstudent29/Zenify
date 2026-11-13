@@ -1,30 +1,26 @@
 {
-  "version": 13,
+  "version": 14,
   "streamMode": "device",
   "minAppVersion": "1.0.9",
-  "latestAppVersion": "1.0.9",
-  "isForceUpdate": true,
-  "releaseDate": "November 12, 2026",
-  "releaseTime": "08:15 PM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk",
+  "latestAppVersion": "1.0.10",
+  "isForceUpdate": false,
+  "releaseDate": "November 13, 2026",
+  "releaseTime": "06:50 PM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.10/zenify-v1.0.10.apk",
   "features": [
-    "YouTube H.264 video streaming playback directly inside the MiniPlayer and Fullscreen Player via native ExoPlayer Texture",
-    "Redesigned Explore, Search, Profile, Settings & Insights with region-aware onboarding preferences seeding Day-1 Home feeds",
-    "Unified Layer-1 ZenDropdown action/input sheets, Rose-White liquid aurora Welcome screen, and Dedicated Artist Search"
+    "Multi-Language Lyrics Anti-Collision Engine: Intelligently detects song languages (Telugu, Tamil, Hindi, Malayalam, Kannada) and blocks incorrect cross-language lyrics",
+    "Apple Music Story Sharing Suite: 16 handcrafted templates with transparent full Zenify logo branding and native Instagram, WhatsApp & Snapchat sharing",
+    "Streamlined Story Sharing Suite architecture with buttery smooth rasterization"
   ],
   "fixes": [
-    "Fixed songs starting at the last 50s, failing on start-of-track scrub, or auto-skipping via ExoPlayer DSP offload disable, itag SimpleCache keying/eviction, and /api/utils/stream-youtube fallback",
-    "Fixed YouTube video playback & fullscreen video rendering by selecting H.264/MP4 + AAC streams and falling back cleanly on native video resolution failure",
-    "Fixed MiniPlayer & Bottom Dock overlapping sheets, Profile, Room Together, Settings, Insights & Welcome screens via DockVisibility.runModal and root-navigator dialogs",
-    "Fixed Dynamic Island center alignment across all dock pages, prevented scrolled collapsed MiniPlayer from overlapping an expanded Search bar, and fixed WelcomeScreen compact viewport scroll layout",
-    "Fixed background auto-next playback, real-time notification/lock-screen seekbar & state updates, Dynamic Island alert pill sizing, Artist/Album verified badges, and Smart Queue isolation"
+    "Eliminated cross-language lyrics collision for multi-lingual movie songs (e.g. Ale Ale, Arabic Kuthu, Chaleya/Hayyoda) via Indic script and romanized transliteration validation",
+    "Ensured full authentic transparent Zenify logo is rendered on all shared stories without artificial plain text letters",
+    "Language-scoped multi-query search fallback with candidate score weighting in LRCLIB and lrc.red"
   ],
   "improvements": [
-    "Improved MiniPlayer-to-Fullscreen seamless video surface handoff with smooth aspect-ratio rendering",
-    "Ultra-compressed APK packaging (jniLibs compression, split debug symbols & subsetted SF Pro fonts), cutting ARM64 APK from 33.2 MB to 13.7 MB",
-    "Replaced Room Together voice & action popups cleanly with Layer-1 ZenDropdown sheets without regressing collaborative playback",
-    "Published fresh clean-built v1.0.9 (Build 13) ARM64 (13.7 MB) & Universal (30.6 MB) APKs across web, API, and GitHub Releases"
+    "Freshly built v1.0.10 (Build 14) ultra-compressed ARM64 & Universal APKs",
+    "Optimized lyrics memory and persistent disk caching for instantaneous line-synced display"
   ],
-  "releaseNotes": "• Fixed start-of-track playback, seeking from 0:00 & backend stream fallback\n• Fixed playable H.264 YouTube videos in MiniPlayer & Fullscreen Player\n• Hid MiniPlayer & Bottom Dock behind sheets, Profile & Room Together\n• Dead-centered Dynamic Island headers & de-overlapped scrolled Search/MiniPlayer dock\n• Single-song Smart Queue, reliable auto-next & real-time lock-screen controls (v1.0.9 Build 13)",
-  "message": "Update to v1.0.9 (Build 13) for start-of-track playback/seek fixes, fullscreen YouTube video playback, sheet/subpage dock isolation, centered Dynamic Island headers, and Smart Queue fixes"
+  "releaseNotes": "• Multi-language lyrics anti-collision engine (Telugu, Tamil, Hindi, Malayalam, Kannada)\n• Transparent full Zenify logo on all 16 story templates\n• Streamlined architecture & fresh v1.0.10 Build 14 APK",
+  "message": "Update to v1.0.10 (Build 14) for multi-language lyrics anti-collision, authentic transparent story branding, and performance improvements"
 }
