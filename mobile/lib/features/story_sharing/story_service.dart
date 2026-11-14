@@ -209,7 +209,7 @@ class StoryImageRenderer {
   static Future<RenderResult?> captureToPng(
     GlobalKey boundaryKey, {
     String filePrefix = 'zenify_story',
-    double pixelRatio = 3.0,
+    double pixelRatio = 2.5,
   }) async {
     try {
       final ctx = boundaryKey.currentContext;
@@ -224,11 +224,14 @@ class StoryImageRenderer {
         return null;
       }
 
-      if (boundary.debugNeedsPaint) {
-        await Future<void>.delayed(const Duration(milliseconds: 50));
+      var retries = 0;
+      while (boundary.debugNeedsPaint && retries < 10) {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        retries++;
       }
 
-      final ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
+      final safeRatio = pixelRatio.clamp(1.5, 2.5);
+      final ui.Image image = await boundary.toImage(pixelRatio: safeRatio);
       final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final width = image.width;
       final height = image.height;
@@ -367,7 +370,13 @@ class StorySharingService {
           'topBackgroundColor': hexTop,
           'bottomBackgroundColor': hexBottom,
           'asSticker': asSticker,
-        });
+        }).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('[StorySharingService] Instagram native share timed out');
+            return false;
+          },
+        );
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] Instagram native story share error: $e');
@@ -389,7 +398,13 @@ class StorySharingService {
         final bool? success = await _channel.invokeMethod<bool>('shareToFacebookStory', {
           'filePath': imageFile.path,
           'appId': appId,
-        });
+        }).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('[StorySharingService] Facebook native share timed out');
+            return false;
+          },
+        );
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] Facebook story share error: $e');
@@ -407,7 +422,13 @@ class StorySharingService {
         final bool? success = await _channel.invokeMethod<bool>('shareToWhatsApp', {
           'filePath': imageFile.path,
           'text': text,
-        });
+        }).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('[StorySharingService] WhatsApp share timed out');
+            return false;
+          },
+        );
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] WhatsApp share error: $e');
@@ -424,7 +445,13 @@ class StorySharingService {
       try {
         final bool? success = await _channel.invokeMethod<bool>('shareToSnapchat', {
           'filePath': imageFile.path,
-        });
+        }).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('[StorySharingService] Snapchat share timed out');
+            return false;
+          },
+        );
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] Snapchat share error: $e');
@@ -442,7 +469,13 @@ class StorySharingService {
         final bool? success = await _channel.invokeMethod<bool>('shareToTelegram', {
           'filePath': imageFile.path,
           'text': text,
-        });
+        }).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('[StorySharingService] Telegram share timed out');
+            return false;
+          },
+        );
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] Telegram share error: $e');

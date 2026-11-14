@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 
 import 'motion/zen_page_route.dart';
 import 'tokens/app_colors.dart';
+import 'tokens/app_typography.dart';
 export 'widgets/marquee_text.dart';
 export 'widgets/dynamic_island_header.dart';
 export 'widgets/action_buttons.dart';
@@ -419,10 +420,12 @@ ThemeData zenDarkTheme() {
     onSurface: Zen.label,
   );
 
+  final font = AppTypography.effectiveFontPro;
+
   final base = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
-    fontFamily: 'SF Pro',
+    fontFamily: font,
     colorScheme: scheme,
     scaffoldBackgroundColor: Zen.bg,
     canvasColor: Zen.bg,
@@ -448,12 +451,12 @@ ThemeData zenDarkTheme() {
 
   return base.copyWith(
     textTheme: base.textTheme.apply(
-      fontFamily: 'SF Pro',
+      fontFamily: font,
       bodyColor: Zen.label,
       displayColor: Zen.label,
     ),
     primaryTextTheme: base.primaryTextTheme.apply(
-      fontFamily: 'SF Pro',
+      fontFamily: font,
       bodyColor: Zen.label,
       displayColor: Zen.label,
     ),

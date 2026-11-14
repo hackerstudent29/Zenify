@@ -1154,78 +1154,172 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
   }
 
   Future<File?> _captureCurrentCard() async {
+    if (_isExporting) return null; // Prevent concurrent captures from rapid taps
     setState(() => _isExporting = true);
     try {
       final key = _keyForTemplate(_currentTemplate.id);
       final result = await StoryImageRenderer.captureToPng(
         key,
         filePrefix: 'zenify_${widget.content.contentType}',
-        pixelRatio: 3.0,
+        pixelRatio: 2.5,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          debugPrint('[StoryPreviewScreen] Capture timed out after 10s');
+          return null;
+        },
       );
       if (result == null && mounted) {
-        appleToast(context, 'Preparing story image...');
+        appleToast(context, 'Unable to export story. Please try again.');
       }
       return result?.file;
+    } catch (e, stack) {
+      debugPrint('[StoryPreviewScreen] Capture failed: $e\n$stack');
+      if (mounted) {
+        appleToast(context, 'Export error occurred. Please try again.');
+      }
+      return null;
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
   }
 
   Future<void> _shareInstagram() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToInstagram(
-      file,
-      topColor: _palette.primary,
-      bottomColor: _palette.background,
-      asSticker: _aspectRatio == StoryAspectRatio.square,
-      fallbackText: widget.content.shareText,
-    );
+    if (_isExporting) return;
+    try {
+      final file = await _captureCurrentCard();
+      if (file == null) return;
+      final success = await StorySharingService.shareToInstagram(
+        file,
+        topColor: _palette.primary,
+        bottomColor: _palette.background,
+        asSticker: _aspectRatio == StoryAspectRatio.square,
+        fallbackText: widget.content.shareText,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => false,
+      );
+      if (!success && mounted) {
+        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
+      }
+    } catch (e) {
+      debugPrint('[StoryPreviewScreen] Instagram share error: $e');
+      if (mounted) appleToast(context, 'Share failed. Opening system share...');
+    } finally {
+      if (mounted && _isExporting) setState(() => _isExporting = false);
+    }
   }
 
   Future<void> _shareFacebook() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToFacebook(
-      file,
-      fallbackText: widget.content.shareText,
-    );
+    if (_isExporting) return;
+    try {
+      final file = await _captureCurrentCard();
+      if (file == null) return;
+      final success = await StorySharingService.shareToFacebook(
+        file,
+        fallbackText: widget.content.shareText,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => false,
+      );
+      if (!success && mounted) {
+        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
+      }
+    } catch (e) {
+      debugPrint('[StoryPreviewScreen] Facebook share error: $e');
+      if (mounted) appleToast(context, 'Share failed. Opening system share...');
+    } finally {
+      if (mounted && _isExporting) setState(() => _isExporting = false);
+    }
   }
 
   Future<void> _shareWhatsApp() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToWhatsApp(
-      file,
-      text: widget.content.shareText,
-    );
+    if (_isExporting) return;
+    try {
+      final file = await _captureCurrentCard();
+      if (file == null) return;
+      final success = await StorySharingService.shareToWhatsApp(
+        file,
+        text: widget.content.shareText,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => false,
+      );
+      if (!success && mounted) {
+        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
+      }
+    } catch (e) {
+      debugPrint('[StoryPreviewScreen] WhatsApp share error: $e');
+      if (mounted) appleToast(context, 'Share failed. Opening system share...');
+    } finally {
+      if (mounted && _isExporting) setState(() => _isExporting = false);
+    }
   }
 
   Future<void> _shareSnapchat() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToSnapchat(
-      file,
-      fallbackText: widget.content.shareText,
-    );
+    if (_isExporting) return;
+    try {
+      final file = await _captureCurrentCard();
+      if (file == null) return;
+      final success = await StorySharingService.shareToSnapchat(
+        file,
+        fallbackText: widget.content.shareText,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => false,
+      );
+      if (!success && mounted) {
+        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
+      }
+    } catch (e) {
+      debugPrint('[StoryPreviewScreen] Snapchat share error: $e');
+      if (mounted) appleToast(context, 'Share failed. Opening system share...');
+    } finally {
+      if (mounted && _isExporting) setState(() => _isExporting = false);
+    }
   }
 
   Future<void> _shareTelegram() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToTelegram(
-      file,
-      text: widget.content.shareText,
-    );
+    if (_isExporting) return;
+    try {
+      final file = await _captureCurrentCard();
+      if (file == null) return;
+      final success = await StorySharingService.shareToTelegram(
+        file,
+        text: widget.content.shareText,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => false,
+      );
+      if (!success && mounted) {
+        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
+      }
+    } catch (e) {
+      debugPrint('[StoryPreviewScreen] Telegram share error: $e');
+      if (mounted) appleToast(context, 'Share failed. Opening system share...');
+    } finally {
+      if (mounted && _isExporting) setState(() => _isExporting = false);
+    }
   }
 
   Future<void> _shareMore() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToSystem(
-      file,
-      text: widget.content.shareText,
-    );
+    if (_isExporting) return;
+    try {
+      final file = await _captureCurrentCard();
+      if (file == null) return;
+      await StorySharingService.shareToSystem(
+        file,
+        text: widget.content.shareText,
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => false,
+      );
+    } catch (e) {
+      debugPrint('[StoryPreviewScreen] System share error: $e');
+      if (mounted) appleToast(context, 'Share failed. Please try again.');
+    } finally {
+      if (mounted && _isExporting) setState(() => _isExporting = false);
+    }
   }
 
   Future<void> _saveToGallery() async {

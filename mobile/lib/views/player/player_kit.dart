@@ -359,12 +359,12 @@ class PlateButton extends StatelessWidget {
   const PlateButton({
     super.key,
     required this.child,
-    required this.onTap,
+    this.onTap,
     this.active = false,
     this.size = 42,
   });
   final Widget child;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool active;
   final double size;
 
