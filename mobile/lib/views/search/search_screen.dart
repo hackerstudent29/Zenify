@@ -528,19 +528,36 @@ class _SearchScreenState extends State<SearchScreen>
   Future<void> _executeSearch(String query, SearchFilter filter) async {
     final key = _keyOf(query, filter);
     _wantedKey = key;
+
+    // Safety failsafe: never allow _isLoading to remain true indefinitely
+    Timer(const Duration(seconds: 10), () {
+      if (mounted && _isLoading && _wantedKey == key) {
+        setState(() => _isLoading = false);
+      }
+    });
+
     final future = _inflight[key] ??= _dataService
         .search(query: query, filter: filter)
         .whenComplete(() => _inflight.remove(key));
     try {
-      final results = await future;
-      if (!mounted || _wantedKey != key) return;
-      setState(() {
-        _searchResults = results;
-        _resultsKey = key;
-        _isLoading = false;
-      });
+      final results = await future.timeout(
+        const Duration(seconds: 9),
+        onTimeout: () => _dataService.getFallbackResult(query, filter),
+      );
+      if (!mounted) return;
+      if (_wantedKey == key) {
+        setState(() {
+          _searchResults = results;
+          _resultsKey = key;
+          _isLoading = false;
+        });
+      }
     } catch (_) {
       if (mounted && _wantedKey == key) {
+        setState(() => _isLoading = false);
+      }
+    } finally {
+      if (mounted && _wantedKey == key && _isLoading) {
         setState(() => _isLoading = false);
       }
     }

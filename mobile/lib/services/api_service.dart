@@ -179,11 +179,12 @@ class ApiService {
   // ---------------------------------------------------------------------------
 
   /// Direct on-device YouTube Music search with failover and offline fallback.
+  /// (Strict on-device client-side execution from the user's IP - no backend proxying).
   static Future<List<Track>> search(String query, {String? source}) async {
     final q = query.trim();
     if (q.isEmpty) return featuredTracks;
 
-    // 1. Direct on-device YouTube InnerTube search
+    // 1. Direct on-device YouTube InnerTube search (from user's device IP)
     try {
       final ytTracks = await InnerTubeService.instance.searchOrThrow(q);
       if (ytTracks.isNotEmpty) return ytTracks;
@@ -194,20 +195,8 @@ class ApiService {
       if (kDebugMode) debugPrint('[ApiService] on-device search notice: $e');
     }
 
-    // 2. Cloud fallback
-    final remote = await _memo<List<Track>>(
-      'search:${q.toLowerCase()}',
-      const Duration(minutes: 5),
-      () => _remoteSearch(q),
-      cacheable: (l) => l.isNotEmpty,
-    );
-    if (remote.isNotEmpty) return remote;
+    // 2. Local catalogue fallback
     return _localSearch(q);
-  }
-
-  static Future<List<Track>> _remoteSearch(String q) async {
-    final res = await _getJson('/api/search', query: {'q': q}, timeout: const Duration(seconds: 10));
-    return res == null ? const [] : _parseTracks(res.data, res.base);
   }
 
   static List<Track> _localSearch(String query) {
@@ -218,6 +207,68 @@ class ApiService {
             t.artist.toLowerCase().contains(q) ||
             t.album.toLowerCase().contains(q))
         .toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Per-User Library API (Auth-scoped to user's JWT token)
+  // ---------------------------------------------------------------------------
+
+  /// Fetches the authenticated user's library from backend DB.
+  static Future<Map<String, dynamic>?> fetchUserLibrary() async {
+    final res = await _getJson('/api/me/library', timeout: const Duration(seconds: 8));
+    return res != null && res.data is Map ? Map<String, dynamic>.from(res.data as Map) : null;
+  }
+
+  /// Saves an album to the authenticated user's backend library.
+  static Future<bool> saveUserAlbum(Map<String, dynamic> albumData) async {
+    for (final base in _bases) {
+      try {
+        final uri = Uri.parse('$base/api/me/library/albums');
+        final res = await _client.post(
+          uri,
+          headers: {'Content-Type': 'application/json', ..._headers},
+          body: jsonEncode(albumData),
+        ).timeout(const Duration(seconds: 8));
+        if (res.statusCode >= 200 && res.statusCode < 300) return true;
+      } catch (e) {
+        if (kDebugMode) debugPrint('[ApiService] saveUserAlbum error: $e');
+      }
+    }
+    return false;
+  }
+
+  /// Removes an album from the authenticated user's backend library.
+  static Future<bool> removeUserAlbum(String title, String artist) async {
+    for (final base in _bases) {
+      try {
+        final uri = Uri.parse('$base/api/me/library/albums').replace(
+          queryParameters: {'title': title, 'artist': artist},
+        );
+        final res = await _client.delete(uri, headers: _headers).timeout(const Duration(seconds: 8));
+        if (res.statusCode >= 200 && res.statusCode < 300) return true;
+      } catch (e) {
+        if (kDebugMode) debugPrint('[ApiService] removeUserAlbum error: $e');
+      }
+    }
+    return false;
+  }
+
+  /// Batch synchronizes user's albums and artists with backend DB.
+  static Future<bool> syncUserLibrary(Map<String, dynamic> payload) async {
+    for (final base in _bases) {
+      try {
+        final uri = Uri.parse('$base/api/me/library/sync');
+        final res = await _client.post(
+          uri,
+          headers: {'Content-Type': 'application/json', ..._headers},
+          body: jsonEncode(payload),
+        ).timeout(const Duration(seconds: 8));
+        if (res.statusCode >= 200 && res.statusCode < 300) return true;
+      } catch (e) {
+        if (kDebugMode) debugPrint('[ApiService] syncUserLibrary error: $e');
+      }
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------------------
@@ -349,6 +400,62 @@ class ApiService {
     final extra = results.length < 5 ? await fetchTrending() : <Track>[];
     final seen = <String>{seed.id};
     return [...results, ...extra].where((t) => seen.add(t.id)).take(limit).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Artist & Discography
+  // ---------------------------------------------------------------------------
+
+  /// Fetches rich artist profile, full discography, albums, and listener counts from Zenify backend.
+  static Future<Map<String, dynamic>?> getArtist(String artistName) async {
+    final clean = artistName.trim();
+    if (clean.isEmpty) return null;
+    return _memo('artist_full_$clean', const Duration(hours: 6), () async {
+      final res = await _getJson('/api/artists/${Uri.encodeComponent(clean)}', timeout: const Duration(seconds: 5));
+      final data = res?.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+      return null;
+    });
+  }
+
+  /// Fetches rich artist biography extract and Wikipedia article URL from Wikipedia REST API.
+  static Future<({String extract, String? url, String? imageUrl})?> fetchWikipediaSummary(String artistName) async {
+    final clean = artistName.trim();
+    if (clean.isEmpty) return null;
+    return _memo('wiki_bio_$clean', const Duration(hours: 12), () async {
+      final slug = clean.replaceAll(' ', '_');
+      final candidates = [
+        slug,
+        '${slug}_(musician)',
+        '${slug}_(singer)',
+        '${slug}_(composer)',
+      ];
+      for (final title in candidates) {
+        try {
+          final uri = Uri.parse('https://en.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(title)}');
+          final res = await _client.get(uri, headers: {
+            'User-Agent': 'ZenifyApp/1.0 (contact@zenify.app)',
+            'Accept': 'application/json',
+          }).timeout(const Duration(seconds: 4));
+          if (res.statusCode == 200) {
+            final data = jsonDecode(utf8.decode(res.bodyBytes));
+            if (data is Map) {
+              final extract = (data['extract'] as String?)?.trim() ?? '';
+              final pageUrl = (data['content_urls']?['desktop']?['page'] as String?) ??
+                  (data['content_urls']?['mobile']?['page'] as String?);
+              final imgUrl = (data['thumbnail']?['source'] as String?) ??
+                  (data['originalimage']?['source'] as String?);
+              if (extract.isNotEmpty) {
+                return (extract: extract, url: pageUrl, imageUrl: imgUrl);
+              }
+            }
+          }
+        } catch (_) {}
+      }
+      return null;
+    });
   }
 
   // ---------------------------------------------------------------------------

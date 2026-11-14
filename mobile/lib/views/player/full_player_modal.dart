@@ -195,6 +195,8 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                                         albumTitle: track.album,
                                         artistName: track.artist,
                                         coverUrl: track.coverUrl,
+                                        browseId: track.albumBrowseId,
+                                        initialTracks: [track],
                                       ),
                                     ),
                                   );
@@ -311,13 +313,31 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                     children: [
                       // Synced Lyrics Button
                       PressableScale(
-                        onTap: () => _openLyrics(context),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.textSecondary, size: 20),
-                            const SizedBox(width: 6),
-                            Text('Lyrics', style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
-                          ],
+                        onTap: (player.hasLyrics || player.isLoadingLyrics)
+                            ? () => _openLyrics(context)
+                            : null,
+                        child: Opacity(
+                          opacity: (player.hasLyrics || player.isLoadingLyrics) ? 1.0 : 0.28,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.chat_bubble_outline_rounded,
+                                color: (player.hasLyrics || player.isLoadingLyrics)
+                                    ? AppColors.textSecondary
+                                    : Colors.white24,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Lyrics',
+                                style: AppTypography.caption.copyWith(
+                                  color: (player.hasLyrics || player.isLoadingLyrics)
+                                      ? AppColors.textSecondary
+                                      : Colors.white24,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
 

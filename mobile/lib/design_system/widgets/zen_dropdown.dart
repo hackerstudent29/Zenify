@@ -589,7 +589,12 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                 showArtistPopup(widget.callerContext, artists: resolved);
               } else if (resolved.isNotEmpty) {
                 widget.callerNav.push(
-                  ZenPageRoute(builder: (_) => ArtistScreen(artistName: resolved.first.name)),
+                  ZenPageRoute(
+                    builder: (_) => ArtistScreen(
+                      artistName: resolved.first.name,
+                      browseId: resolved.first.id.isNotEmpty ? resolved.first.id : null,
+                    ),
+                  ),
                 );
               } else {
                 widget.callerNav.push(
@@ -611,6 +616,8 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       albumTitle: widget.album,
                       artistName: widget.artist,
                       coverUrl: widget.coverUrl,
+                      browseId: widget.track?.albumBrowseId,
+                      initialTracks: widget.track != null ? [widget.track!] : [effectiveTrack],
                     ),
                   ),
                 );

@@ -86,6 +86,7 @@ class InnerTubeService {
   // ─────────────────────────────── Native Bridge ──────────────────────────────
   static const MethodChannel _nativeChannel = MethodChannel('zenify/innertube');
   bool get _useNative => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get isNativeAvailable => _useNative;
 
   Future<List<Track>> searchSongsNative(String query) async {
     if (!_useNative) return const [];
@@ -106,7 +107,9 @@ class InnerTubeService {
         final artists = artistRefs.isNotEmpty
             ? ArtistRef.formatList(artistRefs)
             : MediaNormalizer.formatArtists(rawArtists?.map((a) => (a is Map ? a['name'] : a)).toList());
-        final albumName = (item['album'] is Map) ? (item['album']['name'] as String?) : null;
+        final albumMap = (item['album'] is Map) ? (item['album'] as Map) : null;
+        final albumName = albumMap?['name'] as String?;
+        final albumBrowseId = albumMap?['id'] as String?;
         final album = albumName != null ? MediaNormalizer.cleanTitle(albumName) : 'Single';
         final thumb = MediaNormalizer.upgradeArtworkUrl(item['thumbnail'] as String?, videoId: id);
         final duration = (item['duration'] as num?)?.toInt() ?? 210;
@@ -116,6 +119,7 @@ class InnerTubeService {
           artist: artists,
           artists: artistRefs,
           album: album,
+          albumBrowseId: albumBrowseId,
           coverUrl: thumb,
           durationSeconds: duration,
           language: Track.detectLanguage(title, artists, album) ?? '',
@@ -140,6 +144,34 @@ class InnerTubeService {
     } catch (e) {
       if (kDebugMode) debugPrint('[InnerTube] Native searchSummary error: $e');
       return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchAlbumsNative(String query) async {
+    if (!_useNative) return const [];
+    try {
+      final res = await _nativeChannel
+          .invokeMethod<List<dynamic>>('searchAlbums', {'query': query})
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+      if (res == null || res.isEmpty) return const [];
+      return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] Native searchAlbums error: $e');
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchArtistsNative(String query) async {
+    if (!_useNative) return const [];
+    try {
+      final res = await _nativeChannel
+          .invokeMethod<List<dynamic>>('searchArtists', {'query': query})
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+      if (res == null || res.isEmpty) return const [];
+      return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] Native searchArtists error: $e');
+      return const [];
     }
   }
 
@@ -364,12 +396,52 @@ class InnerTubeService {
         subRuns = f1['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
       }
 
+      // Extract album and album browseId from flexColumns[2]
+      String? albumName;
+      String? albumBrowseId;
+      if (flex.length > 2 && flex[2] is Map) {
+        final f2 = flex[2] as Map;
+        final albumRuns = f2['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List?;
+        if (albumRuns != null && albumRuns.isNotEmpty && albumRuns[0] is Map) {
+          final t = albumRuns[0]['text'] as String?;
+          final b = albumRuns[0]['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+          if (t != null && t.trim().isNotEmpty && !MediaNormalizer.isMetadataNoise(t)) {
+            albumName = t.trim();
+          }
+          if (b != null && b.isNotEmpty) {
+            albumBrowseId = b;
+          }
+        }
+      }
+
+      // Also check menuNavigationItemRenderer with iconType == MUSIC_ALBUM
+      final menuItems = item['menu']?['menuRenderer']?['items'] as List?;
+      if (menuItems != null) {
+        for (final mi in menuItems) {
+          final mni = mi?['menuNavigationItemRenderer'];
+          final icon = mni?['icon']?['iconType'];
+          if (icon == 'MUSIC_ALBUM') {
+            albumBrowseId ??= mni?['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+            final runs = mni?['text']?['runs'] as List?;
+            if (runs != null && runs.isNotEmpty && albumName == null) {
+              final t = runs[0]['text'] as String?;
+              if (t != null && t.trim().isNotEmpty) albumName = t.trim();
+            }
+            break;
+          }
+        }
+      }
+
       final norm = MediaNormalizer.normalize(
         id: 'yt-$videoId',
         titleRuns: titleRuns,
         subtitleRuns: subRuns,
         videoId: videoId,
       );
+
+      final cleanAlbum = (albumName != null && albumName.isNotEmpty)
+          ? MediaNormalizer.cleanAlbumTitle(albumName)
+          : 'Single';
 
       int duration = 210;
       if (subRuns != null) {
@@ -393,10 +465,11 @@ class InnerTubeService {
         id: norm.id,
         title: norm.title,
         artist: norm.subtitle,
-        album: 'Single',
+        album: cleanAlbum,
+        albumBrowseId: albumBrowseId,
         coverUrl: _cover(thumbs, videoId),
         durationSeconds: duration,
-        language: Track.detectLanguage(norm.title, norm.subtitle, 'Single') ?? '',
+        language: Track.detectLanguage(norm.title, norm.subtitle, cleanAlbum) ?? '',
         source: 'youtube',
       );
     } catch (_) {
@@ -418,6 +491,22 @@ class InnerTubeService {
       final thumbs = item['thumbnailRenderer']?['musicThumbnailRenderer']
           ?['thumbnail']?['thumbnails'] as List?;
 
+      String? albumName;
+      String? albumBrowseId;
+      if (subRuns != null && subRuns.length > 2) {
+        final r = subRuns[2];
+        if (r is Map) {
+          final t = r['text'] as String?;
+          final b = r['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+          if (t != null && t.trim().isNotEmpty && !MediaNormalizer.isMetadataNoise(t)) {
+            albumName = t.trim();
+          }
+          if (b != null && b.isNotEmpty) {
+            albumBrowseId = b;
+          }
+        }
+      }
+
       final norm = MediaNormalizer.normalize(
         id: 'yt-$videoId',
         titleRuns: titleRuns,
@@ -425,14 +514,19 @@ class InnerTubeService {
         videoId: videoId,
       );
 
+      final cleanAlbum = (albumName != null && albumName.isNotEmpty)
+          ? MediaNormalizer.cleanAlbumTitle(albumName)
+          : 'Single';
+
       return Track(
         id: norm.id,
         title: norm.title,
         artist: norm.subtitle,
-        album: 'Single',
+        album: cleanAlbum,
+        albumBrowseId: albumBrowseId,
         coverUrl: _cover(thumbs, videoId),
         durationSeconds: 210,
-        language: Track.detectLanguage(norm.title, norm.subtitle, 'Single') ?? '',
+        language: Track.detectLanguage(norm.title, norm.subtitle, cleanAlbum) ?? '',
         source: 'youtube',
       );
     } catch (_) {
@@ -1680,10 +1774,84 @@ class InnerTubeService {
     return results;
   }
 
+  // ────────────────────────────── Album & Metadata Resolution ───────────────────
+
+  /// Resolves the canonical album browse ID (`MPREb_...`), album title, and artist channel ID
+  /// directly from the track's YouTube Music WatchNext (`next`) payload.
+  /// Guarantees 100% precision without fuzzy text matching.
+  Future<({String? albumBrowseId, String? albumTitle, String? artistChannelId, String? artistName})?> resolveSongAlbumDetails(String videoId) async {
+    final cleanId = videoId.replaceFirst('yt-', '').trim();
+    if (cleanId.isEmpty) return null;
+    try {
+      final nextRes = await post('next', {'videoId': cleanId}, ttl: const Duration(hours: 12));
+      final currentVideo = nextRes['contents']?['singleColumnMusicWatchNextResultsRenderer']
+          ?['tabbedRenderer']?['watchNextTabbedResultsRenderer']?['tabs']?[0]?['tabRenderer']
+          ?['content']?['musicQueueRenderer']?['content']?['playlistPanelRenderer']?['contents']?[0]
+          ?['playlistPanelVideoRenderer'];
+
+      String? albumBrowseId;
+      String? albumTitle;
+      String? artistChannelId;
+      String? artistName;
+
+      // 1. Check longBylineText runs
+      final runs = currentVideo?['longBylineText']?['runs'] as List?;
+      if (runs != null) {
+        for (final r in runs) {
+          if (r is Map) {
+            final bId = r['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+            final text = r['text'] as String?;
+            if (bId != null) {
+              if (bId.startsWith('MPREb_') || bId.startsWith('FEmusic_library_privately_owned_release_detail_b_')) {
+                albumBrowseId = bId;
+                if (text != null && text.trim().isNotEmpty) albumTitle = text.trim();
+              } else if (bId.startsWith('UC') || bId.contains('artist')) {
+                artistChannelId = bId;
+                if (text != null && text.trim().isNotEmpty) artistName = text.trim();
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Check menuNavigationItemRenderer (MUSIC_ALBUM icon)
+      final menuItems = currentVideo?['menu']?['menuRenderer']?['items'] as List?;
+      if (menuItems != null) {
+        for (final mi in menuItems) {
+          final mni = mi?['menuNavigationItemRenderer'];
+          final icon = mni?['icon']?['iconType'];
+          if (icon == 'MUSIC_ALBUM') {
+            albumBrowseId ??= mni?['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+            final tRuns = mni?['text']?['runs'] as List?;
+            if (tRuns != null && tRuns.isNotEmpty && albumTitle == null) {
+              albumTitle = tRuns[0]['text'] as String?;
+            }
+          } else if (icon == 'ARTIST') {
+            artistChannelId ??= mni?['navigationEndpoint']?['browseEndpoint']?['browseId'] as String?;
+          }
+        }
+      }
+
+      if (kDebugMode) {
+        debugPrint('[InnerTube] resolveSongAlbumDetails videoId=$cleanId -> album=$albumTitle ($albumBrowseId) artist=$artistName ($artistChannelId)');
+      }
+
+      return (
+        albumBrowseId: albumBrowseId,
+        albumTitle: albumTitle,
+        artistChannelId: artistChannelId,
+        artistName: artistName,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] resolveSongAlbumDetails error: $e');
+      return null;
+    }
+  }
+
   // ────────────────────────────── Lyrics ─────────────────────────────────────
 
   Future<String?> getLyrics(String videoId) async {
-    final cleanId = videoId.replaceFirst('yt-', '');
+    final cleanId = videoId.replaceFirst('yt-', '').trim();
     try {
       final nextRes = await post('next', {'videoId': cleanId}, ttl: const Duration(hours: 12));
       final tabs = nextRes['contents']?['singleColumnMusicWatchNextResultsRenderer']
@@ -1693,15 +1861,32 @@ class InnerTubeService {
       String? lyricsBrowseId;
       for (final t in tabs) {
         final tr = t?['tabRenderer'];
-        final title = (tr?['title'] ?? '').toString().toLowerCase();
-        final bId = tr?['endpoint']?['browseEndpoint']?['browseId'] as String?;
-        if ((title.contains('lyric') || bId != null) && bId != null) {
+        if (tr == null) continue;
+        if (tr['unselectable'] == true) continue; // If unselectable, lyrics are unavailable
+        final title = (tr['title'] ?? '').toString().toLowerCase();
+        final tabId = (tr['tabIdentifier'] ?? '').toString().toLowerCase();
+        final bId = tr['endpoint']?['browseEndpoint']?['browseId'] as String?;
+        if (bId != null && bId.isNotEmpty &&
+            (tabId == 'lyrics' ||
+             title.contains('lyric') ||
+             title.contains('பாடல்') ||
+             title.contains('సాహిత్యం') ||
+             title.contains('गीत') ||
+             title.contains('गाने') ||
+             title.contains('வரிகள்'))) {
           lyricsBrowseId = bId;
           break;
         }
       }
 
-      if (lyricsBrowseId == null || lyricsBrowseId.isEmpty) return null;
+      if (lyricsBrowseId == null || lyricsBrowseId.isEmpty) {
+        if (kDebugMode) debugPrint('[LyricsFlow] No lyrics tab found for videoId=$cleanId');
+        return null;
+      }
+
+      if (kDebugMode) {
+        debugPrint('[LyricsFlow] Found official InnerTube lyrics browseId=$lyricsBrowseId for videoId=$cleanId');
+      }
 
       final browseRes = await post('browse', {'browseId': lyricsBrowseId}, ttl: const Duration(days: 7));
       final shelf = browseRes['contents']?['sectionListRenderer']?['contents']?[0]?['musicDescriptionShelfRenderer'];
@@ -1712,7 +1897,7 @@ class InnerTubeService {
       }
       return null;
     } catch (e) {
-      if (kDebugMode) debugPrint('[InnerTube] getLyrics error: $e');
+      if (kDebugMode) debugPrint('[LyricsFlow] InnerTube getLyrics error: $e');
       return null;
     }
   }

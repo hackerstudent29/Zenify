@@ -93,6 +93,35 @@ class ArtistService {
 
   Future<Map<String, dynamic>?> _fetchCloud(String cleanName) async {
     try {
+      // 1. Fetch full artist catalog from backend (JioSaavn + Deezer + local DB)
+      final backendArtist = await ApiService.getArtist(cleanName).timeout(
+        const Duration(seconds: 4),
+        onTimeout: () => null,
+      );
+
+      // 2. Concurrently fetch Wikipedia summary extract & link
+      final wiki = await ApiService.fetchWikipediaSummary(cleanName).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => null,
+      );
+
+      if (backendArtist != null && (backendArtist['topSongs'] is List || backendArtist['albums'] is List)) {
+        var bio = (backendArtist['bio'] as String?)?.trim() ?? '';
+        if (wiki != null && wiki.extract.isNotEmpty) {
+          bio = '${wiki.extract}\n\nFrom Wikipedia (${wiki.url ?? 'https://en.wikipedia.org/wiki/${Uri.encodeComponent(cleanName)}'})';
+        } else if (bio.isEmpty) {
+          bio = 'Official verified artist profile for $cleanName on Zenify. Stream all top popular songs, latest releases, and complete discography.';
+        }
+
+        return {
+          ...backendArtist,
+          'bio': bio,
+          'wikiUrl': wiki?.url,
+          'wikiImage': wiki?.imageUrl,
+        };
+      }
+
+      // If backend fails, fallback to search tracks
       final cloudTracks = await ApiService.search(cleanName)
           .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
       if (cloudTracks.isEmpty) return null;
@@ -109,17 +138,22 @@ class ArtistService {
         }
       }
 
+      var bio = 'Official verified artist profile for $cleanName on Zenify.';
+      if (wiki != null && wiki.extract.isNotEmpty) {
+        bio = '${wiki.extract}\n\nFrom Wikipedia (${wiki.url ?? 'https://en.wikipedia.org/wiki/${Uri.encodeComponent(cleanName)}'})';
+      }
+
       return {
         'name': cleanName,
-        'imageUrl': first.coverUrl,
+        'imageUrl': wiki?.imageUrl ?? first.coverUrl,
         'coverUrl': first.coverUrl,
-        'bio': 'Official artist profile for $cleanName on Zenify.',
+        'bio': bio,
         'follower_count': 5000000,
         'topSongs': cloudTracks.map((t) => t.toJson()).toList(),
         'albums': albumsMap.values.toList(),
         'singles': <Map<String, dynamic>>[],
         'dedicatedPlaylists': <Map<String, dynamic>>[],
-        'related': <Map<String, dynamic>>[],
+        'relatedArtists': <Map<String, dynamic>>[],
       };
     } catch (_) {
       return null;
@@ -179,9 +213,18 @@ class ArtistService {
             ? MediaNormalizer.upgradeBannerUrl(channelBanner)
             : (imageUrl.isNotEmpty ? MediaNormalizer.upgradeBannerUrl(rawImage) : '');
 
-        final bio = (ytChannel['bio'] as String?)?.isNotEmpty == true
-            ? ytChannel['bio'] as String
-            : 'Official artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, and singles.';
+        var bio = (ytChannel['bio'] as String?)?.trim() ?? '';
+        if (bio.isEmpty || bio.startsWith('Official artist profile')) {
+          final wiki = await ApiService.fetchWikipediaSummary(name).timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => null,
+          );
+          if (wiki != null && wiki.extract.isNotEmpty) {
+            bio = '${wiki.extract}\n\nFrom Wikipedia (${wiki.url ?? 'https://en.wikipedia.org/wiki/${Uri.encodeComponent(name)}'})';
+          } else if (bio.isEmpty) {
+            bio = 'Official verified artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, and singles.';
+          }
+        }
 
         final subscriberCount = (ytChannel['subscriberCount'] as String?) ??
             ytCard?.audience ??
@@ -423,10 +466,19 @@ class ArtistService {
   }
 
   static String _formatNumber(dynamic n) {
-    if (n is! num) return n.toString();
-    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
-    return n.toString();
+    if (n is! num) {
+      final parsed = int.tryParse(n?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '');
+      if (parsed != null) {
+        n = parsed;
+      } else {
+        return n?.toString() ?? '';
+      }
+    }
+    final num numVal = n;
+    if (numVal >= 10000000) return '${(numVal / 10000000).toStringAsFixed(1)} Cr';
+    if (numVal >= 1000000) return '${(numVal / 1000000).toStringAsFixed(1)}M';
+    if (numVal >= 1000) return '${(numVal / 1000).toStringAsFixed(1)}K';
+    return numVal.toString();
   }
 }
 

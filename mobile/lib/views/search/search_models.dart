@@ -160,6 +160,7 @@ class SearchSongItem extends SearchItem {
       artist: subtitle,
       artists: artists,
       album: albumName ?? 'Single',
+      albumBrowseId: albumBrowseId,
       coverUrl: thumbnailUrlHiRes.isNotEmpty ? thumbnailUrlHiRes : thumbnailUrl,
       durationSeconds: durationSeconds,
       language: Track.detectLanguage(title, subtitle, albumName ?? '') ?? '',

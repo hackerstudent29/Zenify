@@ -560,4 +560,72 @@ void main() {
       }
     });
   });
+
+  group('8. Native Summary Parsing & Failsafe Tests', () {
+    test('parses Android native summary list correctly into Top Result and categorized items', () {
+      final nativeFixture = [
+        {
+          'title': 'Top result',
+          'items': [
+            {
+              'type': 'artist',
+              'id': 'UC_anirudh',
+              'channelId': 'UC_anirudh',
+              'title': 'Anirudh Ravichander',
+              'thumbnail': 'https://lh3.googleusercontent.com/avatar=s544',
+            }
+          ],
+        },
+        {
+          'title': 'Songs',
+          'items': [
+            {
+              'type': 'song',
+              'id': 'video12345',
+              'title': 'Hukum',
+              'artists': [
+                {'id': 'a1', 'name': 'Anirudh Ravichander'}
+              ],
+              'album': {'id': 'alb1', 'name': 'Jailer'},
+              'duration': 207,
+              'thumbnail': 'https://lh3.googleusercontent.com/cover=s544',
+              'explicit': false,
+            }
+          ],
+        },
+        {
+          'title': 'Albums',
+          'items': [
+            {
+              'type': 'album',
+              'id': 'alb1',
+              'browseId': 'MPREb_123',
+              'playlistId': 'OLAK5uy_123',
+              'title': 'Jailer',
+              'artists': [
+                {'id': 'a1', 'name': 'Anirudh Ravichander'}
+              ],
+              'year': 2023,
+              'thumbnail': 'https://lh3.googleusercontent.com/cover=s544',
+            }
+          ],
+        }
+      ];
+
+      final payload = SearchParser.parseNativeSummaries(nativeFixture, query: 'anirudh');
+      expect(payload.topResult, isNotNull);
+      expect(payload.topResult!.title, equals('Anirudh Ravichander'));
+      expect(payload.topResult!.type, equals(SearchItemType.artist));
+      expect(payload.items.length, equals(3));
+
+      final song = payload.items.whereType<SearchSongItem>().first;
+      expect(song.title, equals('Hukum'));
+      expect(song.albumName, equals('Jailer'));
+      expect(song.durationText, equals('3:27'));
+
+      final album = payload.items.whereType<SearchAlbumItem>().first;
+      expect(album.title, equals('Jailer'));
+      expect(album.year, equals(2023));
+    });
+  });
 }

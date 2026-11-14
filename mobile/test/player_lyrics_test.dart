@@ -30,6 +30,9 @@ class _TestPlayerState extends PlayerState {
 
   @override
   bool get isCurrentVideo => false;
+
+  @override
+  bool get hasLyrics => true;
 }
 
 void main() {
