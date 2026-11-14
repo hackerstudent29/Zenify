@@ -22,18 +22,19 @@ import '../../services/player_state.dart';
 // ---------------------------------------------------------------------------
 
 /// Instrumental gaps shorter than this get NO dots.
-const double _kInterludeMin = 5.0;
+const double kInterludeMinSeconds = 4.0;
+const double _kInterludeMin = kInterludeMinSeconds;
 
-/// Wave: ONLY the last word of a line, ONLY its last 3-5 letters (never the
-/// whole word), and only when that word is actually held for a moment.
-///   word <= 5 letters -> last 3, 6-7 letters -> last 4, 8+ letters -> last 5
-/// (always at least one letter stays still).
-const double _kWaveMinDuration = 0.5; // seconds the last word must last
-const int _kWaveMinLetters = 3;
-const double _kWaveLift = 0.10; // x font size
-const double _kWaveScale = 0.08;
-const double _kWaveGlow = 0.7;
-const double _kWaveSpread = 0.4; // portion of word time used for the stagger
+/// Karaoke glyph-fill subtle scale peak (1.0 to ~1.03-1.05 max).
+/// Transform-only around glyph center, ease in, then ease back to 1.0 after fill passes.
+const double kKaraokeGlyphScalePeak = 1.04;
+
+/// Three-dot interlude animation tunables.
+const double kDotPopInOvershoot = 1.25;
+const double kDotPulseScaleMin = 1.0;
+const double kDotPulseScaleMax = 1.4;
+const double kDotClosingDuration = 0.55; // seconds before next line to complete fade/shrink
+const int kDotStaggerMs = 120;
 
 /// Apple-style "waterfall": every line below the active one starts its glide a
 /// little later than the one above it.
@@ -43,11 +44,8 @@ const int _kGlideMaxLines = 9;
 /// Typography (Apple Music / SF Pro style).
 const double _kWordGap = 0.27; // space between words, x font size
 const double _kLineHeight = 1.2;
-const double _kTracking = 0.008; // letter spacing, x font size
 
 /// Universal fallback fonts for Indic, Asian, Arabic, Hebrew and Emoji scripts.
-/// For 100% consistent glyphs on Android, bundle Noto Sans families in
-/// pubspec.yaml (see notes) - system fallback differs per device/OEM.
 const List<String> _kFontFamilyFallback = [
   'Noto Sans Tamil',
   'Noto Sans Devanagari',
@@ -73,10 +71,7 @@ const List<String> _kFontFamilyFallback = [
   'sans-serif',
 ];
 
-/// Scripts / sequences where splitting into separate widgets or adding
-/// letter-spacing breaks shaping: Arabic, Indic, Thai, Lao, Tibetan, Myanmar,
-/// Khmer, Hebrew, combining marks, ZWJ/ZWNJ, variation selectors, Hangul Jamo
-/// and emoji.
+/// Scripts / sequences where tall line-height is needed for diacritics / combining marks.
 final RegExp _complexScriptRe = RegExp(
   r'[\u0300-\u036F\u0590-\u06FF\u0750-\u077F\u08A0-\u08FF\u0900-\u0DFF\u0E00-\u0E7F\u0E80-\u0EFF\u0F00-\u0FFF\u1000-\u109F\u1100-\u11FF\u1780-\u17FF\u200C\u200D\uFE00-\uFE0F\u{1F000}-\u{1FAFF}]',
   unicode: true,
@@ -84,38 +79,16 @@ final RegExp _complexScriptRe = RegExp(
 
 bool _hasComplexScript(String s) => _complexScriptRe.hasMatch(s);
 
-/// Set to false if Tamil tail letters ever look wrong on a device: Tamil words
-/// then simply fill without any wave.
-const bool _kWaveTamil = true;
+/// Regular expression to match instrumental line tags, dots, or solo markers.
+final RegExp _instrumentalOrDotsRe = RegExp(
+  r'^(\.{2,}|•\s*•\s*•|\[(instrumental|solo|music|guitar solo|intro|outro|bridge|interlude)\]|\((instrumental|solo|music|guitar solo|intro|outro|bridge|interlude)\)|instrumental|solo|music|bridge)$',
+  caseSensitive: false,
+);
 
-/// A word may get the letter wave ONLY when every code point is a precomposed
-/// Latin / Greek / Cyrillic letter, digit or basic punctuation (or Tamil, see
-/// above). The wave splits by grapheme cluster, which keeps Tamil consonant +
-/// vowel sign together. All other scripts (Devanagari, Arabic, Thai...) are
-/// never split: they just fill normally, so their glyphs can never break.
-final RegExp _waveSafeRe = RegExp(_kWaveTamil
-    ? r'^[\u0021-\u007E\u00A0-\u024F\u0370-\u03FF\u0400-\u04FF\u0B80-\u0BFF\u2018-\u201D\u2026]+$'
-    : r'^[\u0021-\u007E\u00A0-\u024F\u0370-\u03FF\u0400-\u04FF\u2018-\u201D\u2026]+$');
-
-bool _isWaveSafe(String s) => _waveSafeRe.hasMatch(s);
-
-/// How a word is cut for the wave.
-class _Tail {
-  const _Tail(this.n, this.letters, this.tail);
-  final int n; // grapheme count of the whole token
-  final int letters; // graphemes before trailing punctuation
-  final int tail; // how many of the last letters wave
-}
-
-_Tail _tailOf(String word) {
-  final g = word.characters.toList();
-  var letters = g.length;
-  while (letters > 0 && g[letters - 1].replaceAll(_nonLetterRe, '').isEmpty) {
-    letters--;
-  }
-  final want = letters <= 5 ? 3 : (letters <= 7 ? 4 : 5);
-  final tail = math.max(0, math.min(want, letters - 1));
-  return _Tail(g.length, letters, tail);
+bool _isInstrumentalOrDots(String text) {
+  final clean = text.trim();
+  if (clean.isEmpty) return true;
+  return _instrumentalOrDotsRe.hasMatch(clean);
 }
 
 /// Controls auto-hide after this much time without touching the screen.
@@ -130,7 +103,6 @@ final String _kTextFont = _isApple ? '.SF Pro Text' : 'SF Pro Text';
 const _kGroupSingers = {'both', 'all', 'group', 'together', 'duet', 'v1000', 'chorus'};
 
 final _tagRe = RegExp(r'<[^>]+>');
-final _nonLetterRe = RegExp(r'[^\p{L}\p{N}]', unicode: true);
 
 bool _isBackingText(String t) {
   final s = t.replaceAll(_tagRe, ' ').trim();
@@ -423,7 +395,6 @@ final Curve _glideSpring = _SpringCurve(stiffness: 120, ratio: 0.8, settle: 0.7)
 final Curve _revealSpring =
     _SpringCurve(stiffness: 150, ratio: 0.74, settle: 0.7);
 final Curve _popSpring = _SpringCurve(stiffness: 240, ratio: 0.58, settle: 0.5);
-final Curve _dotSpring = _SpringCurve(stiffness: 230, ratio: 0.52, settle: 0.5);
 final Curve _thumbSpring = _SpringCurve(stiffness: 220, ratio: 0.7, settle: 0.6);
 const Curve _liquidCurve = Cubic(0.16, 1.0, 0.30, 1.0);
 
@@ -692,6 +663,12 @@ class _LyricsViewState extends State<LyricsView>
       final nextStart = hasNext ? s(L[i + 1].start) : start + 4;
       final known = knownEnd(L[i]);
       final end = known ?? math.min(nextStart, start + 7).toDouble();
+
+      // Convert explicit instrumental placeholder lines or dot markers into three-dot interlude gaps
+      if (_isInstrumentalOrDots(L[i].text)) {
+        _items.add(_Item.gap(start, hasNext ? nextStart : math.max(start + 4.0, end)));
+        continue;
+      }
 
       final backing = _isBackingText(L[i].text);
       final sg = _normSinger(L[i].singer);
@@ -1389,12 +1366,11 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
 // ---------------------------------------------------------------------------
 
 class _Layout {
-  _Layout(this.fs, this.tokens, this.s, this.e, this.emph);
+  _Layout(this.fs, this.tokens, this.s, this.e);
   final double fs;
   final List<String> tokens;
   final List<double> s;
   final List<double> e;
-  final List<bool> emph;
 }
 
 class _WordLine extends StatefulWidget {
@@ -1424,7 +1400,7 @@ class _WordLine extends StatefulWidget {
 }
 
 class _WordLineState extends State<_WordLine>
-    with SingleTickerProviderStateMixin {
+  with SingleTickerProviderStateMixin {
   _Layout? _lay;
   double _layW = -1;
   String _layText = '';
@@ -1440,15 +1416,14 @@ class _WordLineState extends State<_WordLine>
   }
 
   TextStyle _style(double fs, Color c) {
-    final complex = _hasComplexScript(widget.text);
     return TextStyle(
       fontFamily: _kDisplayFont,
       fontFamilyFallback: _kFontFamilyFallback,
       fontSize: fs,
-      height: complex ? 1.32 : _kLineHeight,
+      height: _kLineHeight,
       leadingDistribution: TextLeadingDistribution.even,
       fontWeight: FontWeight.w700,
-      letterSpacing: complex ? 0.0 : _kTracking * fs,
+      letterSpacing: 0.0,
       fontStyle: widget.backing ? FontStyle.italic : FontStyle.normal,
       color: c,
     );
@@ -1506,49 +1481,44 @@ class _WordLineState extends State<_WordLine>
     final n = tokens.length;
     final s = List<double>.filled(n, 0);
     final e = List<double>.filled(n, 0);
-    final emph = List<bool>.filled(n, false);
     final ws = widget.words;
     if (ws != null && ws.isNotEmpty && n > 0) {
       if (ws.length == n) {
         for (var i = 0; i < n; i++) {
           s[i] = ws[i].start.inMicroseconds / 1e6;
           e[i] = math.max(s[i] + 0.05, ws[i].end.inMicroseconds / 1e6);
-          // Only the LAST word of the line, only when it is really held.
-          if (i == n - 1) {
-            final tl = _tailOf(tokens[i]);
-            emph[i] = _isWaveSafe(tokens[i]) &&
-                (e[i] - s[i]) >= _kWaveMinDuration &&
-                tl.letters >= _kWaveMinLetters &&
-                tl.tail > 0;
-          }
         }
       } else {
         final lineStart = ws.first.start.inMicroseconds / 1e6;
         final lineEnd =
             math.max(lineStart + 0.5, ws.last.end.inMicroseconds / 1e6);
-        final total = tokens.fold<int>(0, (a, t) => a + t.length);
+        // Measure by grapheme cluster counts rather than code units
+        final totalClusters = tokens.fold<int>(0, (a, t) => a + t.characters.length);
         var acc = 0;
         for (var i = 0; i < n; i++) {
-          s[i] = lineStart + (acc / math.max(1, total)) * (lineEnd - lineStart);
-          acc += tokens[i].length;
-          e[i] = lineStart + (acc / math.max(1, total)) * (lineEnd - lineStart);
+          final clCount = tokens[i].characters.length;
+          s[i] = lineStart + (acc / math.max(1, totalClusters)) * (lineEnd - lineStart);
+          acc += clCount;
+          e[i] = lineStart + (acc / math.max(1, totalClusters)) * (lineEnd - lineStart);
         }
       }
     } else {
       final dur = math.max(0.5, widget.end - widget.start);
-      final total = tokens.fold<int>(0, (a, t) => a + t.length);
+      // Measure by grapheme cluster counts rather than code units
+      final totalClusters = tokens.fold<int>(0, (a, t) => a + t.characters.length);
       var acc = 0;
       for (var i = 0; i < n; i++) {
-        s[i] = widget.start + acc / math.max(1, total) * dur;
-        acc += tokens[i].length;
-        e[i] = widget.start + acc / math.max(1, total) * dur;
+        final clCount = tokens[i].characters.length;
+        s[i] = widget.start + (acc / math.max(1, totalClusters)) * dur;
+        acc += clCount;
+        e[i] = widget.start + (acc / math.max(1, totalClusters)) * dur;
       }
     }
 
     _layW = maxW;
     _layText = widget.text;
     _layLines = widget.maxLines;
-    return _lay = _Layout(fs, tokens, s, e, emph);
+    return _lay = _Layout(fs, tokens, s, e);
   }
 
   @override
@@ -1618,40 +1588,17 @@ class _WordLineState extends State<_WordLine>
       raw = (t - lay.s[i]) / span;
     }
 
-    _Tail? tail;
-    double wave = -1;
-    if (lay.emph[i] && !reduce && !widget.plain) {
-      tail = _tailOf(lay.tokens[i]);
-      if (t == null) {
-        wave = widget.past ? 2 : -1;
-      } else {
-        // The wave starts when the fill reaches the tail letters and rolls on
-        // a little past the end of the word, so it eases out instead of
-        // stopping dead.
-        final ws = lay.s[i] + span * (tail.letters - tail.tail) / tail.n;
-        final we = math.max(lay.e[i] + 0.35, ws + 0.9);
-        wave = (t - ws) / (we - ws);
-      }
-    }
     return _Word(
       text: lay.tokens[i],
       fs: lay.fs,
       style: _style,
       p: raw.clamp(0.0, 1.0).toDouble(),
       settle: settle,
-      tail: tail,
-      wave: wave,
     );
   }
 }
 
-/// One word: dim base, soft-edged white fill (left to right) and glow.
-///
-/// Words never "pop" as a whole. The only extra motion is the tail wave: for
-/// the last word of a line, its last 3-5 letters float up one after another
-/// (lift + tiny scale + glow) while the rest of the word stays still. The word
-/// is laid out the same way before, during and after the wave, so nothing
-/// jumps when it starts or ends.
+/// One word: dim base, shaped grapheme-accurate karaoke fill, and subtle glyph zoom.
 class _Word extends StatelessWidget {
   const _Word({
     required this.text,
@@ -1659,137 +1606,198 @@ class _Word extends StatelessWidget {
     required this.style,
     required this.p,
     this.settle = 1,
-    this.tail,
-    this.wave = -1,
   });
+
   final String text;
   final double fs;
   final TextStyle Function(double, Color) style;
-  final double p; // 0..1 fill progress of the whole word
+  final double p; // 0..1 fill progress of this word
   final double settle;
-  final _Tail? tail;
-  final double wave; // 0..1 wave progress (outside = idle)
 
   static const _dim = Color(0x6BFFFFFF); // white 42%
 
-  static Widget _fill(String text, double fs,
-      TextStyle Function(double, Color) style, double p, double settle) {
-    if (p <= 0) return Text(text, style: style(fs, _dim));
-    if (p >= 1) {
-      return Text(text,
-          style: style(fs, Color.lerp(_dim, Colors.white, settle) ?? Colors.white));
-    }
-
-    const soft = 0.18;
-    final a = (p * (1 + soft) - soft).clamp(0.0, 1.0).toDouble();
-    final b = (p * (1 + soft)).clamp(0.0, 1.0).toDouble();
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Opacity(
-          opacity: 0.55,
-          child: ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-            child: ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (r) => LinearGradient(
-                colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
-                stops: [0, a, b],
-              ).createShader(r),
-              child: Text(text, style: style(fs, Colors.white)),
-            ),
-          ),
-        ),
-        Text(text, style: style(fs, _dim)),
-        ShaderMask(
-          blendMode: BlendMode.dstIn,
-          shaderCallback: (r) => LinearGradient(
-            colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
-            stops: [0, a, b],
-          ).createShader(r),
-          child: Text(text, style: style(fs, Colors.white)),
-        ),
-      ],
-    );
-  }
-
-  /// Soft rise (~40%) and a slower settle back down.
-  static double _bump(double u) => (u <= 0 || u >= 1)
-      ? 0.0
-      : math.sin(math.pi * math.pow(u, 0.756).toDouble());
-
-  Widget _letter(String ch, int i, int count, double pl) {
-    final delay = (i / count) * _kWaveSpread;
-    final u = ((wave - delay) / (1 - _kWaveSpread)).clamp(0.0, 1.0).toDouble();
-    final bump = _bump(u);
-
-    return Transform.translate(
-      offset: Offset(0, -fs * _kWaveLift * bump),
-      child: Transform.scale(
-        scale: 1 + _kWaveScale * bump,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            if (bump > 0.08)
-              Opacity(
-                opacity: (_kWaveGlow * bump).clamp(0.0, 1.0),
-                child: ImageFiltered(
-                  imageFilter: ImageFilter.blur(
-                      sigmaX: 2 + 6 * bump, sigmaY: 2 + 6 * bump),
-                  child: Text(ch, style: style(fs, Colors.white)),
-                ),
-              ),
-            _fill(ch, fs, style, pl, settle),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final tl = tail;
-    if (tl == null || tl.tail <= 0) return _fill(text, fs, style, p, settle);
+    // Idle / unreached word
+    if (p <= 0.0) {
+      return Text(text, style: style(fs, _dim));
+    }
 
-    // Grapheme clusters, not code points: accents, Tamil vowel signs etc.
-    // stay attached to their base letter.
-    final g = text.characters.toList();
-    final n = g.length;
-    final preLen = tl.letters - tl.tail;
-    final prefix = g.sublist(0, preLen).join();
-    final suffix = g.sublist(tl.letters).join();
-    final pn = p * n;
+    // Fully passed word
+    if (p >= 1.0) {
+      final filledColor = Color.lerp(_dim, Colors.white, settle) ?? Colors.white;
+      return Text(text, style: style(fs, filledColor));
+    }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Everything before the tail stays one piece of text (real kerning).
-        _fill(prefix, fs, style, (pn / preLen).clamp(0.0, 1.0).toDouble(),
-            settle),
-        for (var i = 0; i < tl.tail; i++)
-          _letter(g[preLen + i], i, tl.tail,
-              (pn - (preLen + i)).clamp(0.0, 1.0).toDouble()),
-        if (suffix.isNotEmpty)
-          _fill(
-              suffix,
-              fs,
-              style,
-              ((pn - tl.letters) / (n - tl.letters)).clamp(0.0, 1.0).toDouble(),
-              settle),
-      ],
+    // Actively filling word: render base dim and shaped karaoke fill with cluster-accurate clipping and zoom
+    final dimStyle = style(fs, _dim);
+    final fillStyle = style(fs, Colors.white);
+
+    return _WordKaraokeWidget(
+      text: text,
+      fs: fs,
+      dimStyle: dimStyle,
+      fillStyle: fillStyle,
+      p: p,
+      settle: settle,
     );
   }
 }
 
+class _WordKaraokeWidget extends StatelessWidget {
+  const _WordKaraokeWidget({
+    required this.text,
+    required this.fs,
+    required this.dimStyle,
+    required this.fillStyle,
+    required this.p,
+    required this.settle,
+  });
+
+  final String text;
+  final double fs;
+  final TextStyle dimStyle;
+  final TextStyle fillStyle;
+  final double p;
+  final double settle;
+
+  @override
+  Widget build(BuildContext context) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: dimStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final size = tp.size;
+
+    return CustomPaint(
+      size: size,
+      painter: _WordKaraokePainter(
+        text: text,
+        dimStyle: dimStyle,
+        fillStyle: fillStyle,
+        p: p,
+        settle: settle,
+        textPainter: tp,
+      ),
+    );
+  }
+}
+
+class _WordKaraokePainter extends CustomPainter {
+  _WordKaraokePainter({
+    required this.text,
+    required this.dimStyle,
+    required this.fillStyle,
+    required this.p,
+    required this.settle,
+    required this.textPainter,
+  });
+
+  final String text;
+  final TextStyle dimStyle;
+  final TextStyle fillStyle;
+  final double p;
+  final double settle;
+  final TextPainter textPainter;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final clusters = text.characters.toList();
+    if (clusters.isEmpty) return;
+
+    final tpWhite = TextPainter(
+      text: TextSpan(text: text, style: fillStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final totalWidth = textPainter.width;
+    final height = textPainter.height;
+
+    // Paint the dim base text for the word
+    textPainter.paint(canvas, Offset.zero);
+
+    var offset = 0;
+    var currentLeft = 0.0;
+    final fillX = (p * totalWidth);
+
+    for (var i = 0; i < clusters.length; i++) {
+      final cl = clusters[i];
+      final start = offset;
+      final end = offset + cl.length;
+      offset = end;
+
+      final boxes = textPainter.getBoxesForSelection(
+        TextSelection(baseOffset: start, extentOffset: end),
+      );
+
+      double left, right;
+      if (boxes.isNotEmpty) {
+        left = boxes.first.left;
+        right = boxes.last.right;
+        if (right < left) {
+          final tmp = left;
+          left = right;
+          right = tmp;
+        }
+      } else {
+        left = currentLeft;
+        right = currentLeft + (totalWidth / clusters.length);
+      }
+      currentLeft = right;
+
+      final clusterWidth = math.max(0.001, right - left);
+      final double cp;
+      if (fillX <= left) {
+        cp = 0.0;
+      } else if (fillX >= right) {
+        cp = 1.0;
+      } else {
+        cp = ((fillX - left) / clusterWidth).clamp(0.0, 1.0);
+      }
+
+      if (cp <= 0.0) continue;
+
+      final cx = (left + right) / 2.0;
+      final cy = height / 2.0;
+
+      if (cp >= 1.0) {
+        // Fully filled cluster: flat 1.0 scale, clipped strictly to cluster bounds
+        canvas.save();
+        canvas.clipRect(Rect.fromLTRB(left, -2, right, height + 4));
+        tpWhite.paint(canvas, Offset.zero);
+        canvas.restore();
+      } else {
+        // Actively filling cluster: subtle zoom ease-in / ease-out (1.0 -> 1.04 -> 1.0)
+        final scale = 1.0 + (kKaraokeGlyphScalePeak - 1.0) * math.sin(math.pi * cp);
+        final clusterFillX = left + cp * clusterWidth;
+
+        // Clip strictly at clusterFillX so NO pixel beyond progress is filled
+        canvas.save();
+        canvas.clipRect(Rect.fromLTRB(left, -2, clusterFillX, height + 4));
+        canvas.translate(cx, cy);
+        canvas.scale(scale);
+        canvas.translate(-cx, -cy);
+        tpWhite.paint(canvas, Offset.zero);
+        canvas.restore();
+      }
+    }
+
+    tpWhite.dispose();
+  }
+
+  @override
+  bool shouldRepaint(covariant _WordKaraokePainter oldDelegate) {
+    return oldDelegate.text != text ||
+        oldDelegate.p != p ||
+        oldDelegate.settle != settle ||
+        oldDelegate.dimStyle != dimStyle ||
+        oldDelegate.fillStyle != fillStyle;
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Interlude dots: liquid pop in / out, sequential fill, breathing.
-//
-//  in     each dot springs in with a stagger and a visible overshoot
-//  during dots fill one after another across the gap and gently breathe
-//  end    in the last 0.5s they swell, then spring-shrink away (the tile's
-//         reverse pop plays the same spring backwards: a small anticipation
-//         "squash" before they vanish) and the row collapses smoothly
+// Interlude dots: Pop-in overshoot, active breathing pulse, smooth closing.
 // ---------------------------------------------------------------------------
 
 class _Dots extends StatelessWidget {
@@ -1812,33 +1820,56 @@ class _Dots extends StatelessWidget {
         animation: Listenable.merge([clock, pop]),
         builder: (context, _) {
           final t = clock.value;
-          final span = math.max(0.5, end - start);
-          final prog = ((t - start) / span).clamp(0.0, 1.0);
-          final remain = end - t;
-          final anticip = remain < 0.5
-              ? Curves.easeOut.transform((1 - remain / 0.5).clamp(0.0, 1.0))
-              : 0.0;
+          final span = math.max(0.6, end - start);
+
+          // If outside bounds or pop is zero, render empty space
+          if (t < start - 0.1 || t >= end || pop.value <= 0.001) {
+            return const SizedBox(height: 18);
+          }
+
+          final closingWindow = kDotClosingDuration;
+          final isClosing = t >= (end - closingWindow);
+          final closingFactor = isClosing
+              ? ((end - t) / closingWindow).clamp(0.0, 1.0)
+              : 1.0;
+          final closingEase = Curves.easeInOutCubic.transform(closingFactor);
 
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               for (var i = 0; i < 3; i++)
                 () {
-                  final local =
-                      ((pop.value - i * 0.14) / 0.72).clamp(0.0, 1.0).toDouble();
-                  final pv = _dotSpring.transform(local);
-                  final fill = Curves.easeInOut
-                      .transform((prog * 3 - i).clamp(0.0, 1.0));
-                  final breathe = math.sin(t * 2.4 - i * 0.85);
-                  final scale = math.max(
-                      0.0,
-                      pv *
-                          (0.86 +
-                              0.14 * fill +
-                              0.07 * breathe * fill +
-                              0.22 * anticip));
-                  final opacity =
-                      ((0.32 + 0.68 * fill) * pv.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+                  final dotDelay = i * (kDotStaggerMs / 1000.0);
+                  final dotTime = t - start - dotDelay;
+                  if (dotTime < 0.0) {
+                    return const SizedBox(width: 23, height: 18);
+                  }
+
+                  // 1. Pop-in phase: 0 -> kDotPopInOvershoot (1.25) -> 1.0
+                  const popInDuration = 0.40;
+                  final popInRaw = (dotTime / popInDuration).clamp(0.0, 1.0);
+                  final double popInScale;
+                  if (popInRaw < 1.0) {
+                    popInScale = Curves.easeOutBack.transform(popInRaw) * (kDotPopInOvershoot / 1.15);
+                  } else {
+                    popInScale = 1.0;
+                  }
+
+                  // 2. Active breathing pulse: 1.0 to 1.4, staggered like a wave of pops
+                  final wave = (math.sin((t - start) * 3.6 - i * 0.95) + 1.0) / 2.0;
+                  final activePulse = kDotPulseScaleMin + (kDotPulseScaleMax - kDotPulseScaleMin) * wave;
+
+                  final baseScale = popInRaw < 1.0
+                      ? popInScale
+                      : activePulse;
+
+                  // 3. Closing phase: shrink to 0 + fade smoothly before next line
+                  final scale = (baseScale * closingEase * pop.value).clamp(0.0, 2.0);
+                  final opacity = (popInRaw * closingEase * pop.value).clamp(0.0, 1.0);
+
+                  final fillProg = ((t - start) / span);
+                  final fill = ((fillProg * 3.0) - i).clamp(0.0, 1.0);
+
                   return Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: Transform.scale(
@@ -1849,13 +1880,12 @@ class _Dots extends StatelessWidget {
                           width: 13,
                           height: 13,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Color.lerp(const Color(0x66FFFFFF), Colors.white, fill),
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.white
-                                    .withValues(alpha: 0.18 + 0.4 * fill),
-                                blurRadius: 6 + 8 * fill,
+                                color: Colors.white.withValues(alpha: 0.15 + 0.45 * fill),
+                                blurRadius: 4 + 8 * fill,
                               ),
                             ],
                           ),

@@ -176,7 +176,7 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
     ) {
         val file = File(filePath)
         if (!file.exists()) {
-            result.error("FILE_NOT_FOUND", "Story image file does not exist", null)
+            result.success(false)
             return
         }
 
@@ -224,17 +224,24 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
             }
 
             // Fallback: Direct Instagram Image Send Intent
-            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
-                setPackage(igPkg)
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+            if (isPackageInstalled(igPkg)) {
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    setPackage(igPkg)
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                grantPermissionsAndAttachClipData(sendIntent, contentUri)
+                if (sendIntent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(sendIntent)
+                    result.success(true)
+                    return
+                }
             }
-            grantPermissionsAndAttachClipData(sendIntent, contentUri)
-            context.startActivity(sendIntent)
-            result.success(true)
-        } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message ?: "Instagram share failed", null)
+
+            result.success(false)
+        } catch (_: Exception) {
+            result.success(false)
         }
     }
 
@@ -245,7 +252,7 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
     ) {
         val file = File(filePath)
         if (!file.exists()) {
-            result.error("FILE_NOT_FOUND", "Story image file does not exist", null)
+            result.success(false)
             return
         }
 
@@ -275,17 +282,24 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
             }
 
             // Fallback: Direct image send intent targeting Facebook
-            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
-                setPackage(fbPkg)
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+            if (isPackageInstalled(fbPkg)) {
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    setPackage(fbPkg)
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                grantPermissionsAndAttachClipData(sendIntent, contentUri)
+                if (sendIntent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(sendIntent)
+                    result.success(true)
+                    return
+                }
             }
-            grantPermissionsAndAttachClipData(sendIntent, contentUri)
-            context.startActivity(sendIntent)
-            result.success(true)
-        } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message ?: "Facebook share failed", null)
+
+            result.success(false)
+        } catch (_: Exception) {
+            result.success(false)
         }
     }
 
@@ -296,7 +310,7 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
     ) {
         val file = File(filePath)
         if (!file.exists()) {
-            result.error("FILE_NOT_FOUND", "Story image file does not exist", null)
+            result.success(false)
             return
         }
 
@@ -308,20 +322,27 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
 
         try {
             val contentUri = getFileUri(file)
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
-                setPackage(waPkg)
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-                if (!text.isNullOrBlank()) {
-                    putExtra(Intent.EXTRA_TEXT, text)
+            if (isPackageInstalled(waPkg)) {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    setPackage(waPkg)
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    if (!text.isNullOrBlank()) {
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                 }
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                grantPermissionsAndAttachClipData(intent, contentUri)
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    result.success(true)
+                    return
+                }
             }
-            grantPermissionsAndAttachClipData(intent, contentUri)
-            context.startActivity(intent)
-            result.success(true)
-        } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message ?: "WhatsApp share failed", null)
+
+            result.success(false)
+        } catch (_: Exception) {
+            result.success(false)
         }
     }
 
@@ -331,7 +352,7 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
     ) {
         val file = File(filePath)
         if (!file.exists()) {
-            result.error("FILE_NOT_FOUND", "Story image file does not exist", null)
+            result.success(false)
             return
         }
 
@@ -339,33 +360,40 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
         try {
             val contentUri = getFileUri(file)
 
-            // Try Snapchat Creative Kit content intent
-            val snapIntent = Intent("com.snapchat.add.CONTENT").apply {
-                setDataAndType(contentUri, "image/png")
-                setPackage(snapPkg)
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-            }
-            grantPermissionsAndAttachClipData(snapIntent, contentUri)
+            if (isPackageInstalled(snapPkg)) {
+                // Try Snapchat Creative Kit content intent
+                val snapIntent = Intent("com.snapchat.add.CONTENT").apply {
+                    setDataAndType(contentUri, "image/png")
+                    setPackage(snapPkg)
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                }
+                grantPermissionsAndAttachClipData(snapIntent, contentUri)
 
-            if (snapIntent.resolveActivity(context.packageManager) != null) {
-                context.startActivity(snapIntent)
-                result.success(true)
-                return
+                if (snapIntent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(snapIntent)
+                    result.success(true)
+                    return
+                }
+
+                // Fallback: Direct image send intent targeting Snapchat
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    setPackage(snapPkg)
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                grantPermissionsAndAttachClipData(sendIntent, contentUri)
+                if (sendIntent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(sendIntent)
+                    result.success(true)
+                    return
+                }
             }
 
-            // Fallback: Direct image send intent targeting Snapchat
-            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
-                setPackage(snapPkg)
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-            }
-            grantPermissionsAndAttachClipData(sendIntent, contentUri)
-            context.startActivity(sendIntent)
-            result.success(true)
-        } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message ?: "Snapchat share failed", null)
+            result.success(false)
+        } catch (_: Exception) {
+            result.success(false)
         }
     }
 
@@ -376,7 +404,7 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
     ) {
         val file = File(filePath)
         if (!file.exists()) {
-            result.error("FILE_NOT_FOUND", "Story image file does not exist", null)
+            result.success(false)
             return
         }
 
@@ -389,20 +417,27 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
 
         try {
             val contentUri = getFileUri(file)
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
-                setPackage(tgPkg)
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-                if (!text.isNullOrBlank()) {
-                    putExtra(Intent.EXTRA_TEXT, text)
+            if (isPackageInstalled(tgPkg)) {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    setPackage(tgPkg)
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    if (!text.isNullOrBlank()) {
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                 }
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                grantPermissionsAndAttachClipData(intent, contentUri)
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                    result.success(true)
+                    return
+                }
             }
-            grantPermissionsAndAttachClipData(intent, contentUri)
-            context.startActivity(intent)
-            result.success(true)
-        } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message ?: "Telegram share failed", null)
+
+            result.success(false)
+        } catch (_: Exception) {
+            result.success(false)
         }
     }
 
@@ -414,7 +449,7 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
     ) {
         val file = File(filePath)
         if (!file.exists()) {
-            result.error("FILE_NOT_FOUND", "Story image file does not exist", null)
+            result.success(false)
             return
         }
 
@@ -436,8 +471,8 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
             }
             context.startActivity(chooser)
             result.success(true)
-        } catch (e: Exception) {
-            result.error("SHARE_FAILED", e.message ?: "System share chooser failed", null)
+        } catch (_: Exception) {
+            result.success(false)
         }
     }
 
