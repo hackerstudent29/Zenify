@@ -1,100 +1,237 @@
 <div align="center">
 
+  <br />
+
   <a href="https://listenzenify.vercel.app">
-    <img src="assets/images/zenify_logo_animation.gif" alt="Zenify Logo" width="460" />
+    <img src="assets/images/zenify_logo_animation.gif" alt="Zenify Logo" width="440" />
   </a>
 
+  <br />
+
   # Zenify
-  **Pure Music. Zero Ads. Infinite Sound.**
-
-  A fast, open-source music streaming app and web player crafted with an Apple-inspired editorial design, real-time synchronized karaoke lyrics, spatial audio, and synchronized group rooms.
+  ### Pure Music. Zero Ads. Infinite Sound.
 
   <p align="center">
-    <a href="https://listenzenify.vercel.app"><img src="https://img.shields.io/badge/Web_Player-Launch_Zenify-E11D48?style=for-the-badge&logo=vercel&logoColor=white" alt="Open Web Player"></a>
-    <a href="https://listenzenify.vercel.app/downloads/zenify.apk"><img src="https://img.shields.io/badge/Android_APK-v1.0.10_Direct-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK"></a>
-    <a href="https://github.com/hackerstudent29/Zenify/releases/latest"><img src="https://img.shields.io/badge/GitHub-Releases-blue?style=for-the-badge&logo=github&logoColor=white" alt="GitHub Releases"></a>
+    A high-fidelity, open-source music streaming application and web player crafted with an Apple-inspired editorial aesthetic, synchronized karaoke lyrics, spatial audio, and real-time collaborative rooms.
   </p>
 
+  <br />
+
+  <!-- Apple-Style Primary Action Buttons -->
   <p align="center">
-    <img src="https://img.shields.io/badge/Version-1.0.10-E11D48?style=flat-square" alt="Version 1.0.10">
-    <img src="https://img.shields.io/badge/Ads-Strictly_Zero-black?style=flat-square" alt="Zero Ads">
-    <img src="https://img.shields.io/badge/Audio-Up_to_320kbps-E11D48?style=flat-square" alt="High Fidelity">
-    <img src="https://img.shields.io/badge/License-MIT-gray?style=flat-square" alt="License MIT">
+    <a href="https://listenzenify.vercel.app" target="_blank">
+      <img src="assets/buttons/button_web_player.svg" alt="Launch Web Player" height="50" />
+    </a>
+    &nbsp;&nbsp;
+    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.10/zenify-v1.0.10.apk">
+      <img src="assets/buttons/button_android_apk.svg" alt="Download Android APK" height="50" />
+    </a>
+    &nbsp;&nbsp;
+    <a href="https://github.com/hackerstudent29/Zenify/releases">
+      <img src="assets/buttons/button_github_releases.svg" alt="GitHub Releases" height="50" />
+    </a>
   </p>
+
+  <br />
+
+  <!-- Apple-Style Spec Capsule Badges -->
+  <p align="center">
+    <img src="assets/buttons/badge_ad_free.svg" alt="Strictly Zero Ads" height="26" />
+    &nbsp;
+    <img src="assets/buttons/badge_audio.svg" alt="320kbps Master Audio" height="26" />
+    &nbsp;
+    <img src="assets/buttons/badge_lyrics.svg" alt="Synced Karaoke Lyrics" height="26" />
+    &nbsp;
+    <img src="assets/buttons/badge_room.svg" alt="Room Together" height="26" />
+    &nbsp;
+    <img src="assets/buttons/badge_mit.svg" alt="Open Source MIT" height="26" />
+  </p>
+
+  <br />
 
 </div>
 
 ---
 
-### ✨ Highlights
+<div align="center">
+  <h2>✦ The Zenify Experience ✦</h2>
+  <p>Engineered for listeners who appreciate refined design, acoustic precision, and uncompromising privacy.</p>
+</div>
 
-- **🚫 100% Ad-Free**: No commercial audio ads, no video interruptions, no subscription paywalls.
-- **🎤 Synchronized Karaoke Lyrics**: Real-time line-by-line and word-level progress, romanized Indic scripts, and interactive interlude transitions.
-- **⚡ Studio Fidelity**: Direct 320kbps streams with instant seeking and zero 30-second preview limitations.
-- **👥 Room Together**: Shared real-time listening rooms with friends, live synchronized queues, and reaction chat.
-- **🎛️ StudioFX & 8D Spatial Audio**: Multi-band equalizer, bass booster, room reverb, and dynamic spatial panning.
-- **📱 True Cross-Platform**: Native Android app with Dynamic Island notifications and high-performance Web / PWA.
+<br />
+
+<!-- Apple Bento Feature Grid -->
+<table width="100%">
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🎙️ Synchronized Karaoke Lyrics</h3>
+      <p>Real-time vocal tracking with cluster-level progress, romanized pronunciation for Indic scripts (Tamil, Telugu, Hindi, Malayalam, Kannada), and breathing 3-dot interlude transitions.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>⚡ Pristine 320kbps Streams</h3>
+      <p>Direct lossless Akamai CDN audio resolution with instant seeking, background lock-screen playback, and a strict ban on 30-second preview clips.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🎨 Apple-Inspired "Add to Story"</h3>
+      <p>16 handcrafted editorial templates for sharing songs, synced lyrics, artists, albums, and playlists directly to Instagram, WhatsApp, Snapchat, and Facebook.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>👥 Room Together Live Sessions</h3>
+      <p>Listen synchronously with friends across devices. Features sub-millisecond clock alignment, shared democratic queues, live emoji reactions, and voice chat.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🏝️ Dynamic Island & SF Pro Design</h3>
+      <p>Persistent floating Dynamic Island header, Apple San Francisco typography, squircle corner curvature, and buttery interruptible spring physics.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🎛️ StudioFX & 8D Spatial Audio</h3>
+      <p>Fine-tune your soundstage with a multi-band equalizer, dynamic spatial panning, acoustic room reverb, and studio peak limiting.</p>
+    </td>
+  </tr>
+</table>
+
+<br />
 
 ---
-
-### 📲 Download & Install
-
-| Platform | Recommended Method | Link |
-| :--- | :--- | :--- |
-| **Android (ARM64)** | Direct Split APK *(Lightweight ~15 MB)* | [⬇️ Download `zenify.apk`](https://listenzenify.vercel.app/downloads/zenify.apk) |
-| **Android (Universal)** | All architectures (`arm64`, `armv7`, `x86_64`) | [⬇️ Download `zenify-universal.apk`](https://listenzenify.vercel.app/downloads/zenify-universal.apk) |
-| **Web & iOS (PWA)** | Instant Browser Playback + Add to Home Screen | [🎧 Launch Web App](https://listenzenify.vercel.app) |
-| **All Releases** | GitHub Release Assets & Source Code | [📦 GitHub Releases](https://github.com/hackerstudent29/Zenify/releases) |
-
-#### Quick Android Setup:
-1. Tap [Download `zenify.apk`](https://listenzenify.vercel.app/downloads/zenify.apk).
-2. Open the downloaded file from your browser notification or file manager.
-3. When prompted, allow installation from your browser, then tap **Install**.
-
----
-
-### 📸 Preview
 
 <div align="center">
+  <h2>📲 Get Zenify</h2>
+  <p>Available on Android and instantly playable on all modern desktop and mobile web browsers.</p>
+</div>
+
+<br />
+
+<!-- Apple-Style Download Cards -->
+<table width="100%">
+  <thead>
+    <tr>
+      <th align="left">Platform</th>
+      <th align="left">Edition</th>
+      <th align="center">Size</th>
+      <th align="right">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>🤖 Android (Modern)</b></td>
+      <td>ARM64 Split APK · <i>Recommended for Pixel, Galaxy, OnePlus, Xiaomi, Nothing</i></td>
+      <td align="center"><code>14.5 MB</code></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.10/zenify-v1.0.10.apk"><b>⬇️ Download APK</b></a></td>
+    </tr>
+    <tr>
+      <td><b>🌐 Android (Universal)</b></td>
+      <td>All Architectures (`arm64-v8a`, `armeabi-v7a`, `x86_64`)</td>
+      <td align="center"><code>34.7 MB</code></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.10/zenify-v1.0.10-universal.apk"><b>⬇️ Download Universal</b></a></td>
+    </tr>
+    <tr>
+      <td><b>🍎 Web & iOS (PWA)</b></td>
+      <td>Instant In-Browser Player · <i>Tap "Add to Home Screen" on iOS Safari</i></td>
+      <td align="center"><code>Zero Install</code></td>
+      <td align="right"><a href="https://listenzenify.vercel.app"><b>🎧 Launch Player</b></a></td>
+    </tr>
+    <tr>
+      <td><b>📦 GitHub Releases</b></td>
+      <td>All Release Packages, Release Notes & SHA-256 Checksums</td>
+      <td align="center"><code>Build 14</code></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases"><b>View Releases</b></a></td>
+    </tr>
+  </tbody>
+</table>
+
+<br />
+
+<details>
+  <summary><b>📋 Quick 3-Step Android Installation Guide</b></summary>
+  <br />
+  <ol>
+    <li>Tap <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.10/zenify-v1.0.10.apk"><b>Download APK</b></a> on your Android device.</li>
+    <li>When the download completes, tap the notification or open the APK in your device's <b>Files</b> app.</li>
+    <li>Allow <i>"Install unknown apps"</i> from your browser if prompted, tap <b>Install</b>, and start listening!</li>
+  </ol>
+</details>
+
+<br />
+
+---
+
+<div align="center">
+  <h2>📸 Visual Showcase</h2>
+  <p>Editorial layouts designed with clarity, deep neutral dark canvases, and fluid transitions.</p>
+  <br />
+
   <table>
     <tr>
-      <td width="50%">
+      <td width="50%" align="center">
         <img src="docs/images/zenify_home_dashboard.png" alt="Home Dashboard" width="100%" />
-        <p align="center"><em>Discovery & Curated Collections</em></p>
+        <br />
+        <sub><b>DISCOVERY & CURATED FEEDS</b></sub>
       </td>
-      <td width="50%">
+      <td width="50%" align="center">
         <img src="docs/images/zenify_fullview_player.png" alt="Player Shell" width="100%" />
-        <p align="center"><em>Editorial Player Shell & Sound Stage</em></p>
+        <br />
+        <sub><b>EDITORIAL PLAYER SHELL & SOUNDSTAGE</b></sub>
       </td>
     </tr>
     <tr>
-      <td width="50%">
+      <td width="50%" align="center">
         <img src="docs/images/zenify_synced_lyrics.png" alt="Synchronized Lyrics" width="100%" />
-        <p align="center"><em>Synced Karaoke Lyrics & Pronunciations</em></p>
+        <br />
+        <sub><b>REAL-TIME KARAOKE & REGIONAL LYRICS</b></sub>
       </td>
-      <td width="50%">
+      <td width="50%" align="center">
         <img src="docs/images/zenify_artist_page.png" alt="Artist Profile" width="100%" />
-        <p align="center"><em>Artist Profiles, Discography & Top Tracks</em></p>
+        <br />
+        <sub><b>ARTIST PROFILES & COMPLETE DISCOGRAPHY</b></sub>
       </td>
     </tr>
   </table>
 </div>
 
----
-
-### 🛠️ Architecture & Tech Stack
-
-- **Mobile Client**: Flutter 3 (Android native channels, custom Spring physics, dynamic blur backdrops)
-- **Web Frontend**: React 18, Vite, Tailwind CSS, Lucide icons, Framer Motion
-- **Backend**: Node.js, Fastify, TypeScript, Prisma ORM, PostgreSQL (AWS RDS)
-- **Audio Pipeline**: JioSaavn Akamai CDN, YouTube InnerTube on-device engine, Web Audio API / JustAudio
+<br />
 
 ---
-
-### 📄 License
-
-Zenify is open-source software licensed under the [MIT License](LICENSE).
 
 <div align="center">
-  <sub>Crafted for listeners who simply want their music back.</sub>
+  <h2>⚙️ Tech Specs & Architecture</h2>
+</div>
+
+<br />
+
+<table width="100%">
+  <tr>
+    <td width="25%"><b>📱 Mobile Client</b></td>
+    <td>Flutter 3 · Custom Spring Physics · Native Audio Channels · Lock-Screen Service · Hardware DSP Offloading</td>
+  </tr>
+  <tr>
+    <td width="25%"><b>🌐 Web Player</b></td>
+    <td>React 18 · Vite · Tailwind CSS · Framer Motion · Web Audio API · Lucide Icons</td>
+  </tr>
+  <tr>
+    <td width="25%"><b>⚡ Backend & API</b></td>
+    <td>Node.js · Fastify · TypeScript · Prisma ORM · PostgreSQL (AWS RDS) · WebSocket Cluster</td>
+  </tr>
+  <tr>
+    <td width="25%"><b>🎶 Audio Engines</b></td>
+    <td>JioSaavn Pristine 320kbps Akamai CDN · YouTube InnerTube On-Device Engine · Cloudflare R2 Audio Ingest</td>
+  </tr>
+  <tr>
+    <td width="25%"><b>Typography</b></td>
+    <td>Apple SF Pro Display / Text · Universal Indic Fallbacks (Noto Sans Tamil, Telugu, Devanagari, Malayalam)</td>
+  </tr>
+</table>
+
+<br />
+
+---
+
+<div align="center">
+  <h3>📄 License</h3>
+  <p>Zenify is open-source software released under the <a href="LICENSE">MIT License</a>.</p>
+  <br />
+  <sub>Designed with care for everyone who loves music in its purest form.</sub>
 </div>

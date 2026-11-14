@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="168" height="28" viewBox="0 0 168 28" fill="none">
+  <rect x="0.5" y="0.5" width="167" height="27" rx="13.5" fill="#18181B" stroke="rgba(255,255,255,0.12)"/>
+  <g transform="translate(10, 6)">
+    <path d="M8 10C9.65 10 11 8.65 11 7V3C11 1.35 9.65 0 8 0C6.35 0 5 1.35 5 3V7C5 8.65 6.35 10 8 10Z" fill="#E11D48"/><path d="M2.5 6.5C2.5 9.5 5 12 8 12C11 12 13.5 9.5 13.5 6.5M8 12V15M5.5 15H10.5" stroke="#E11D48" stroke-width="1.4" stroke-linecap="round"/>
+  </g>
+  <text x="32" y="18" fill="#F4F4F5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" letter-spacing="-0.01em">Synced Karaoke Lyrics</text>
+</svg>

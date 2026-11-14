@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="165" height="28" viewBox="0 0 165 28" fill="none">
+  <rect x="0.5" y="0.5" width="164" height="27" rx="13.5" fill="#18181B" stroke="rgba(255,255,255,0.12)"/>
+  <g transform="translate(10, 6)">
+    <path d="M1 8V8.1M4 5V11M7 2V14M10 5V11M13 7V9" stroke="#E11D48" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <text x="32" y="18" fill="#F4F4F5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" letter-spacing="-0.01em">320kbps Master Audio</text>
+</svg>
