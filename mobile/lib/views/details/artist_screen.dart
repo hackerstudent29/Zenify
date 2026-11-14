@@ -1181,7 +1181,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
     final player = context.watch<PlayerState>();
     final top = MediaQuery.paddingOf(context).top;
     final width = MediaQuery.sizeOf(context).width;
-    final heroH = math.min(width * 1.12, 470.0);
+    final heroH = math.min(width * 0.88, 380.0);
 
     final rawCleaned = MediaNormalizer.stripIdNoise(MediaNormalizer.formatArtists(widget.artistName));
     final name = (rawCleaned.isNotEmpty && !rawCleaned.startsWith('UC'))
@@ -1351,7 +1351,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
                           animation: _sc,
                           builder: (_, child) {
                             final o = _sc.hasClients ? _sc.offset : 0.0;
-                            final fade = (1 - (o - (heroH - 230)) / 90).clamp(0.0, 1.0).toDouble();
+                            final fade = (1 - (o - (heroH - 200)) / 80).clamp(0.0, 1.0).toDouble();
                             return Opacity(opacity: fade, child: child);
                           },
                           child: _Reveal(
