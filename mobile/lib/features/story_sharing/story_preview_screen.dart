@@ -199,6 +199,8 @@ class _LyricsSelectionScreenState extends State<LyricsSelectionScreen> {
                       ],
                     ),
                   ),
+                  const ZenifyStoryBrand(iconSize: 13),
+                  const SizedBox(width: 12),
                   if (_lyricLines.isNotEmpty)
                     Text(
                       '${_selectedIndices.length}/3',
@@ -241,7 +243,7 @@ class _LyricsSelectionScreenState extends State<LyricsSelectionScreen> {
                                 color: isSelected
                                     ? Colors.white.withValues(alpha: 0.16)
                                     : const Color(0x0AFFFFFF),
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(22),
                                 border: Border.all(
                                   color: isSelected
                                       ? const Color(0xFFE11D48)
@@ -312,14 +314,14 @@ class _LyricsSelectionScreenState extends State<LyricsSelectionScreen> {
                 ),
                 child: SizedBox(
                   width: double.infinity,
-                  height: 50,
+                  height: 54,
                   child: ElevatedButton(
                     onPressed: hasSelection ? _proceedToPreview : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFE11D48),
                       disabledBackgroundColor: const Color(0x33E11D48),
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                      shape: const StadiumBorder(),
                     ),
                     child: Text(
                       hasSelection
@@ -448,14 +450,14 @@ class StoryOptionsSheet {
               !track.artist.startsWith('UC');
 
           return BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+            filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
             child: Container(
               constraints: BoxConstraints(
                 maxHeight: MediaQuery.sizeOf(ctx).height * 0.85,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xF21C1C1E), // Frosted #1C1C1E
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                color: const Color(0xC71C1C1E), // Frosted liquid charcoal
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
                 border: Border(
                   top: BorderSide(
                     color: Colors.white.withValues(alpha: 0.12),
@@ -538,6 +540,8 @@ class StoryOptionsSheet {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 10),
+                          const ZenifyStoryBrand(iconSize: 14),
                         ],
                       ),
 
@@ -582,7 +586,6 @@ class StoryOptionsSheet {
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
-                                      initialShareTarget: StoryShareTarget.instagram,
                                     ),
                                   ),
                                 );
@@ -599,7 +602,6 @@ class StoryOptionsSheet {
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
-                                      initialShareTarget: StoryShareTarget.whatsapp,
                                     ),
                                   ),
                                 );
@@ -616,7 +618,6 @@ class StoryOptionsSheet {
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
-                                      initialShareTarget: StoryShareTarget.facebook,
                                     ),
                                   ),
                                 );
@@ -633,24 +634,6 @@ class StoryOptionsSheet {
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
-                                      initialShareTarget: StoryShareTarget.snapchat,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(width: 10),
-                            _QuickSocialDestination(
-                              label: 'Telegram',
-                              color: const Color(0xFF2AABEE),
-                              child: const Icon(CupertinoIcons.paperplane_fill, color: Colors.white, size: 18),
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                Navigator.of(context).push(
-                                  CupertinoPageRoute(
-                                    builder: (_) => StoryPreviewScreen(
-                                      content: SongStoryContent(track: track),
-                                      initialShareTarget: StoryShareTarget.telegram,
                                     ),
                                   ),
                                 );
@@ -1028,32 +1011,6 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
     }
   }
 
-  Future<void> _triggerInitialShare(StoryShareTarget target) async {
-    // Wait for the render boundary to complete layout & image paint
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (!mounted) return;
-    switch (target) {
-      case StoryShareTarget.instagram:
-        await _shareInstagram();
-        break;
-      case StoryShareTarget.facebook:
-        await _shareFacebook();
-        break;
-      case StoryShareTarget.whatsapp:
-        await _shareWhatsApp();
-        break;
-      case StoryShareTarget.snapchat:
-        await _shareSnapchat();
-        break;
-      case StoryShareTarget.telegram:
-        await _shareTelegram();
-        break;
-      case StoryShareTarget.system:
-        await _shareMore();
-        break;
-    }
-  }
-
   @override
   void dispose() {
     _pageController.dispose();
@@ -1154,172 +1111,102 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
   }
 
   Future<File?> _captureCurrentCard() async {
-    if (_isExporting) return null; // Prevent concurrent captures from rapid taps
     setState(() => _isExporting = true);
     try {
       final key = _keyForTemplate(_currentTemplate.id);
       final result = await StoryImageRenderer.captureToPng(
         key,
         filePrefix: 'zenify_${widget.content.contentType}',
-        pixelRatio: 2.5,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          debugPrint('[StoryPreviewScreen] Capture timed out after 10s');
-          return null;
-        },
+        targetWidth: _aspectRatio.exportWidth,
       );
       if (result == null && mounted) {
-        appleToast(context, 'Unable to export story. Please try again.');
+        appleToast(context, 'Preparing story image...');
       }
       return result?.file;
-    } catch (e, stack) {
-      debugPrint('[StoryPreviewScreen] Capture failed: $e\n$stack');
-      if (mounted) {
-        appleToast(context, 'Export error occurred. Please try again.');
-      }
-      return null;
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
   }
 
   Future<void> _shareInstagram() async {
-    if (_isExporting) return;
-    try {
-      final file = await _captureCurrentCard();
-      if (file == null) return;
-      final success = await StorySharingService.shareToInstagram(
-        file,
-        topColor: _palette.primary,
-        bottomColor: _palette.background,
-        asSticker: _aspectRatio == StoryAspectRatio.square,
-        fallbackText: widget.content.shareText,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => false,
-      );
-      if (!success && mounted) {
-        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
-      }
-    } catch (e) {
-      debugPrint('[StoryPreviewScreen] Instagram share error: $e');
-      if (mounted) appleToast(context, 'Share failed. Opening system share...');
-    } finally {
-      if (mounted && _isExporting) setState(() => _isExporting = false);
-    }
+    final file = await _captureCurrentCard();
+    if (file == null) return;
+    await StorySharingService.shareToInstagram(
+      file,
+      topColor: _palette.primary,
+      bottomColor: _palette.background,
+      fallbackText: widget.content.shareText,
+    );
   }
 
   Future<void> _shareFacebook() async {
-    if (_isExporting) return;
-    try {
-      final file = await _captureCurrentCard();
-      if (file == null) return;
-      final success = await StorySharingService.shareToFacebook(
-        file,
-        fallbackText: widget.content.shareText,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => false,
-      );
-      if (!success && mounted) {
-        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
-      }
-    } catch (e) {
-      debugPrint('[StoryPreviewScreen] Facebook share error: $e');
-      if (mounted) appleToast(context, 'Share failed. Opening system share...');
-    } finally {
-      if (mounted && _isExporting) setState(() => _isExporting = false);
-    }
+    final file = await _captureCurrentCard();
+    if (file == null) return;
+    await StorySharingService.shareToFacebook(
+      file,
+      fallbackText: widget.content.shareText,
+    );
   }
 
   Future<void> _shareWhatsApp() async {
-    if (_isExporting) return;
-    try {
-      final file = await _captureCurrentCard();
-      if (file == null) return;
-      final success = await StorySharingService.shareToWhatsApp(
-        file,
-        text: widget.content.shareText,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => false,
-      );
-      if (!success && mounted) {
-        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
-      }
-    } catch (e) {
-      debugPrint('[StoryPreviewScreen] WhatsApp share error: $e');
-      if (mounted) appleToast(context, 'Share failed. Opening system share...');
-    } finally {
-      if (mounted && _isExporting) setState(() => _isExporting = false);
-    }
+    final file = await _captureCurrentCard();
+    if (file == null) return;
+    await StorySharingService.shareToWhatsApp(
+      file,
+      text: widget.content.shareText,
+    );
   }
 
   Future<void> _shareSnapchat() async {
-    if (_isExporting) return;
-    try {
-      final file = await _captureCurrentCard();
-      if (file == null) return;
-      final success = await StorySharingService.shareToSnapchat(
-        file,
-        fallbackText: widget.content.shareText,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => false,
-      );
-      if (!success && mounted) {
-        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
-      }
-    } catch (e) {
-      debugPrint('[StoryPreviewScreen] Snapchat share error: $e');
-      if (mounted) appleToast(context, 'Share failed. Opening system share...');
-    } finally {
-      if (mounted && _isExporting) setState(() => _isExporting = false);
-    }
+    final file = await _captureCurrentCard();
+    if (file == null) return;
+    await StorySharingService.shareToSnapchat(
+      file,
+      fallbackText: widget.content.shareText,
+    );
   }
 
   Future<void> _shareTelegram() async {
-    if (_isExporting) return;
-    try {
-      final file = await _captureCurrentCard();
-      if (file == null) return;
-      final success = await StorySharingService.shareToTelegram(
-        file,
-        text: widget.content.shareText,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => false,
-      );
-      if (!success && mounted) {
-        await StorySharingService.shareToSystem(file, text: widget.content.shareText);
-      }
-    } catch (e) {
-      debugPrint('[StoryPreviewScreen] Telegram share error: $e');
-      if (mounted) appleToast(context, 'Share failed. Opening system share...');
-    } finally {
-      if (mounted && _isExporting) setState(() => _isExporting = false);
+    final file = await _captureCurrentCard();
+    if (file == null) return;
+    await StorySharingService.shareToTelegram(
+      file,
+      text: widget.content.shareText,
+    );
+  }
+
+  Future<void> _triggerInitialShare(StoryShareTarget target) async {
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
+    switch (target) {
+      case StoryShareTarget.instagram:
+        await _shareInstagram();
+        break;
+      case StoryShareTarget.facebook:
+        await _shareFacebook();
+        break;
+      case StoryShareTarget.whatsapp:
+        await _shareWhatsApp();
+        break;
+      case StoryShareTarget.snapchat:
+        await _shareSnapchat();
+        break;
+      case StoryShareTarget.telegram:
+        await _shareTelegram();
+        break;
+      case StoryShareTarget.system:
+        await _shareMore();
+        break;
     }
   }
 
   Future<void> _shareMore() async {
-    if (_isExporting) return;
-    try {
-      final file = await _captureCurrentCard();
-      if (file == null) return;
-      await StorySharingService.shareToSystem(
-        file,
-        text: widget.content.shareText,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => false,
-      );
-    } catch (e) {
-      debugPrint('[StoryPreviewScreen] System share error: $e');
-      if (mounted) appleToast(context, 'Share failed. Please try again.');
-    } finally {
-      if (mounted && _isExporting) setState(() => _isExporting = false);
-    }
+    final file = await _captureCurrentCard();
+    if (file == null) return;
+    await StorySharingService.shareToSystem(
+      file,
+      text: widget.content.shareText,
+    );
   }
 
   Future<void> _saveToGallery() async {
@@ -1360,140 +1247,195 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
     );
   }
 
+  double _pageValue() {
+    if (_pageController.hasClients && _pageController.position.haveDimensions) {
+      return _pageController.page ?? _pageController.initialPage.toDouble();
+    }
+    return _pageController.initialPage.toDouble();
+  }
+
+  Widget _topBar(double safeTop) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, safeTop + 8, 16, 6),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            behavior: HitTestBehavior.opaque,
+            child: const LiquidGlass(
+              radius: 19,
+              width: 38,
+              height: 38,
+              shadow: false,
+              child: Center(child: Icon(CupertinoIcons.xmark, size: 16, color: Colors.white)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Add to Story',
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Display',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  widget.content.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'SF Pro Text',
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withValues(alpha: 0.62),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_isExporting) ...[
+            const CupertinoActivityIndicator(color: Colors.white, radius: 9),
+            const SizedBox(width: 10),
+          ],
+          const ZenifyStoryBrand(iconSize: 15),
+        ],
+      ),
+    );
+  }
+
+  Widget _dots() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (final t in _availableTemplates)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(horizontal: 2.5),
+            width: t.id == _currentTemplate.id ? 16 : 5,
+            height: 5,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(3),
+              color: Colors.white.withValues(alpha: t.id == _currentTemplate.id ? 0.95 : 0.30),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121214), // Universal dark neutral
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: Column(
-          children: [
-            // ── Top Bar ──
-            Padding(
-              padding: EdgeInsets.fromLTRB(16, safeTop + 8, 16, 8),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: const ShapeDecoration(
-                        shape: CircleBorder(),
-                        color: Color(0x1FFFFFFF),
-                      ),
-                      child: const Icon(CupertinoIcons.xmark, size: 18, color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Add to Story',
-                          style: const TextStyle(
-                            fontFamily: 'SF Pro Display',
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          widget.content.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontFamily: 'SF Pro',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withValues(alpha: 0.60),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_isExporting)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE11D48)),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+      backgroundColor: const Color(0xFF0B0B0D),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Living liquid backdrop tinted by the artwork — gives the glass
+          // controls real colour to refract.
+          ArtMeshBackground(
+            coverUrl: widget.content.coverUrl,
+            palette: _palette,
+            style: StoryBackgroundStyle.artMesh,
+            animate: true,
+          ),
+          ColoredBox(color: Colors.black.withValues(alpha: 0.38)),
 
-            // ── Central Story Preview PageView ──
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: PageView.builder(
-                    controller: _pageController,
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: _availableTemplates.length,
-                    onPageChanged: _onPageChanged,
-                    itemBuilder: (context, index) {
-                      final template = _availableTemplates[index];
-                      return Center(
-                        child: StoryCardPreview(
-                          boundaryKey: _keyForTemplate(template.id),
-                          content: widget.content,
-                          template: template,
-                          palette: _palette,
-                          backgroundStyle: _backgroundStyle,
-                          textPolarity: _textPolarity,
-                          aspectRatio: _aspectRatio,
+          Column(
+            children: [
+              _topBar(safeTop),
+
+              // ── Story preview pager with depth ──
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _availableTemplates.length,
+                  onPageChanged: _onPageChanged,
+                  itemBuilder: (context, index) {
+                    final template = _availableTemplates[index];
+                    return AnimatedBuilder(
+                      animation: _pageController,
+                      builder: (context, child) {
+                        final d = (index - _pageValue()).clamp(-1.0, 1.0);
+                        return Opacity(
+                          opacity: 1 - 0.45 * d.abs(),
+                          child: Transform(
+                            alignment: Alignment.center,
+                            transform: Matrix4.identity()
+                              ..setEntry(3, 2, 0.0012)
+                              ..rotateY(-d * 0.38),
+                            child: Transform.scale(
+                              scale: 1 - d.abs() * 0.1,
+                              child: child,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+                        child: Center(
+                          child: Bob(
+                            dy: 3,
+                            seconds: 8,
+                            child: StoryCardPreview(
+                              boundaryKey: _keyForTemplate(template.id),
+                              content: widget.content,
+                              template: template,
+                              palette: _palette,
+                              backgroundStyle: _backgroundStyle,
+                              textPolarity: _textPolarity,
+                              aspectRatio: _aspectRatio,
+                            ),
+                          ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
 
-            const SizedBox(height: 8),
+              _dots(),
+              const SizedBox(height: 12),
 
-            // ── Horizontal Template Selector Bar ──
-            StoryTemplateSelector(
-              templates: _availableTemplates,
-              selectedTemplate: _currentTemplate,
-              onSelectTemplate: _onTemplateSelected,
-            ),
-
-            const SizedBox(height: 12),
-
-            // ── Customization Toggles & Share Actions Bar ──
-            Padding(
-              padding: EdgeInsets.only(bottom: math.max(12, safeBottom + 6)),
-              child: StoryShareControls(
-                aspectRatio: _aspectRatio,
-                backgroundStyle: _backgroundStyle,
-                textPolarity: _textPolarity,
-                onToggleAspectRatio: _toggleAspectRatio,
-                onToggleBackgroundStyle: _toggleBackgroundStyle,
-                onToggleTextPolarity: _toggleTextPolarity,
-                onShareInstagram: _shareInstagram,
-                onShareFacebook: _shareFacebook,
-                onShareWhatsApp: _shareWhatsApp,
-                onShareSnapchat: _shareSnapchat,
-                onShareMore: _shareMore,
-                onSaveGallery: _saveToGallery,
-                onCopyLink: _copyLink,
-                isExporting: _isExporting,
+              StoryTemplateSelector(
+                templates: _availableTemplates,
+                selectedTemplate: _currentTemplate,
+                onSelectTemplate: _onTemplateSelected,
               ),
-            ),
-          ],
-        ),
+
+              const SizedBox(height: 14),
+
+              Padding(
+                padding: EdgeInsets.only(bottom: math.max(14, safeBottom + 8)),
+                child: StoryShareControls(
+                  aspectRatio: _aspectRatio,
+                  backgroundStyle: _backgroundStyle,
+                  textPolarity: _textPolarity,
+                  onToggleAspectRatio: _toggleAspectRatio,
+                  onToggleBackgroundStyle: _toggleBackgroundStyle,
+                  onToggleTextPolarity: _toggleTextPolarity,
+                  onShareInstagram: _shareInstagram,
+                  onShareFacebook: _shareFacebook,
+                  onShareWhatsApp: _shareWhatsApp,
+                  onShareSnapchat: _shareSnapchat,
+                  onShareMore: _shareMore,
+                  onSaveGallery: _saveToGallery,
+                  onCopyLink: _copyLink,
+                  isExporting: _isExporting,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
