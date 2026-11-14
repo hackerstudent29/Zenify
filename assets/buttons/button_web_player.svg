@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="52" viewBox="0 0 220 52" fill="none">
+  <defs>
+    <linearGradient id="bg_grad" x1="0" y1="0" x2="0" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1F1F23"/>
+      <stop offset="100%" stop-color="#121214"/>
+    </linearGradient>
+    <linearGradient id="glow_grad" x1="0" y1="0" x2="220" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E11D48" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#E11D48" stop-opacity="0.0"/>
+    </linearGradient>
+  </defs>
+  <rect x="0.5" y="0.5" width="219" height="51" rx="14" fill="url(#bg_grad)" stroke="rgba(255,255,255,0.14)"/>
+  <rect x="0.5" y="0.5" width="219" height="51" rx="14" fill="url(#glow_grad)"/>
+  
+  <!-- Play Icon with Crimson Glow -->
+  <circle cx="28" cy="26" r="14" fill="#E11D48"/>
+  <path d="M25 20L34 26L25 32V20Z" fill="white"/>
+
+  <!-- Apple Typography -->
+  <text x="52" y="20" fill="#A1A1AA" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif" font-size="8.5" font-weight="700" letter-spacing="0.1em">STREAM INSTANTLY</text>
+  <text x="52" y="37" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14.5" font-weight="700" letter-spacing="-0.02em">Launch Web Player</text>
+</svg>
