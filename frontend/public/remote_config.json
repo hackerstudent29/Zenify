@@ -1,25 +1,27 @@
 {
-  "version": 14,
+  "version": 15,
   "streamMode": "device",
-  "minAppVersion": "1.0.9",
-  "latestAppVersion": "1.0.10",
+  "minAppVersion": "1.0.10",
+  "latestAppVersion": "1.1.11",
   "isForceUpdate": false,
-  "releaseDate": "November 13, 2026",
-  "releaseTime": "06:50 PM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.10/zenify-v1.0.10.apk",
+  "releaseDate": "November 14, 2026",
+  "releaseTime": "02:40 PM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.11/zenify-v1.1.11.apk",
   "features": [
-    "Accurate Multi-Language Lyrics: Intelligently matches correct language lyrics for songs released in multiple languages (Tamil, Telugu, Hindi, Malayalam, Kannada)",
-    "Authentic Zenify Story Logo: All 16 story templates showcase the official transparent Zenify brand mark when sharing to Instagram, WhatsApp & Snapchat",
-    "Fast & Smooth Story Sharing: Streamlined story export engine for instant previews and crisp exports"
+    "Refined Hero Presentation: Restored clean original aspect ratio for album covers and artist hero banners without artificial zoom or image cropping",
+    "Zero Background Bleed: Solid black transitions beneath album and artist heroes, eliminating transparent or blurred ghosting behind Latest Release and Top Songs",
+    "Pristine Scrim & Backdrop Termination: Smooth ambient color glow strictly confined above play controls, fading cleanly to pure black",
+    "High-Performance Audio: Responsive track seeking with self-healing stream resolution and zero preview limits"
   ],
   "fixes": [
-    "Fixed wrong-language lyrics showing on multi-lingual songs (such as Ale Ale, Arabic Kuthu, Chaleya)",
-    "Fixed story templates to show the authentic transparent Zenify logo without plain text letters"
+    "Fixed transparent/blurred hero artwork ghosting between Latest Release and Top Songs",
+    "Fixed over-zoomed album and artist hero banners to fit screen in original proportions",
+    "Fixed ambient backdrop tint bleeding down into tracklists and shelves"
   ],
   "improvements": [
-    "Freshly built v1.0.10 (Build 14) ultra-compressed 14.5 MB APK",
-    "Instant lyrics loading and smoother playback performance"
+    "Freshly built v1.1.11 (Build 15) optimized release APK",
+    "Instant lyrics sync and silky-smooth detail page scroll performance"
   ],
-  "releaseNotes": "• Accurate multi-language lyrics (no more language mixups)\n• Authentic transparent Zenify logo on all 16 story templates\n• Fast, smooth story sharing & fresh 14.5 MB APK",
-  "message": "Update to v1.0.10 (Build 14) for accurate multi-language lyrics, official story branding, and faster performance"
+  "releaseNotes": "• Refined hero art presentation in original aspect ratio without zoom\n• Zero background bleed or transparent ghosting on artist & album pages\n• Fast, responsive playback with self-healing stream resolution",
+  "message": "Update to v1.1.11 (Build 15) for refined hero presentation, zero transparent background bleed, and faster performance"
 }

@@ -2,6 +2,14 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.1.11] - 2026-11-14
+
+### What's New
+- **Refined Hero Presentation**: Restored original square aspect ratio and subtle drop shadow for album artwork, and natural viewport fitting for artist hero banners without artificial zoom or image cropping.
+- **Zero Background Bleed**: Pure solid black transitions beneath album and artist heroes, completely eliminating transparent or blurred ghosting behind Latest Release, Top Songs, and upcoming tracks.
+- **Clean Scrim & Gradient Termination**: Smooth ambient color wash strictly confined above player action buttons, fading to deep neutral dark across all detail pages.
+- **Enhanced Playback & Seeking**: Instant responsive track loading with self-healing stream resolution and zero preview limits.
+
 ## [1.0.10] - 2026-11-13
 
 ### What's New
