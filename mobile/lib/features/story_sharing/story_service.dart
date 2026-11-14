@@ -77,20 +77,23 @@ class ArtworkPaletteService {
 
     listener = ImageStreamListener(
       (frame, _) {
-        completer.complete(frame.image);
-        stream.removeListener(listener);
+        if (!completer.isCompleted) completer.complete(frame.image);
       },
       onError: (err, _) {
-        completer.completeError(err);
-        stream.removeListener(listener);
+        if (!completer.isCompleted) completer.completeError(err);
       },
     );
 
     stream.addListener(listener);
-    final image = await completer.future.timeout(const Duration(milliseconds: 900));
+    final ui.Image image;
+    try {
+      image = await completer.future.timeout(const Duration(milliseconds: 1200));
+    } finally {
+      stream.removeListener(listener);
+    }
 
-    // Downscale to 16x16 thumbnail for instant sampling
-    const sampleSize = 16.0;
+    // Downscale to a tiny thumbnail for instant sampling
+    const sampleSize = 24.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.drawImageRect(
@@ -106,54 +109,101 @@ class ArtworkPaletteService {
     if (byteData == null) return ArtworkPalette.defaultPalette;
 
     final bytes = byteData.buffer.asUint8List();
-    double rSum = 0, gSum = 0, bSum = 0;
-    int pixelCount = (sampleSize * sampleSize).toInt();
 
-    // Track vibrant extremes
-    int maxSatR = 225, maxSatG = 29, maxSatB = 72;
-    double maxSat = -1;
+    // Hue-bucketed sampling: finds the artwork's two most distinct, vivid hues
+    // instead of a single saturated outlier pixel.
+    const buckets = 12;
+    final weight = List<double>.filled(buckets, 0);
+    final rs = List<double>.filled(buckets, 0);
+    final gs = List<double>.filled(buckets, 0);
+    final bs = List<double>.filled(buckets, 0);
+    double rSum = 0, gSum = 0, bSum = 0;
+    final pixelCount = bytes.length ~/ 4;
 
     for (int i = 0; i < bytes.length; i += 4) {
-      final r = bytes[i];
-      final g = bytes[i + 1];
-      final b = bytes[i + 2];
+      final r = bytes[i], g = bytes[i + 1], b = bytes[i + 2];
       rSum += r;
       gSum += g;
       bSum += b;
-
-      final maxC = math.max(r, math.max(g, b));
-      final minC = math.min(r, math.min(g, b));
-      final sat = maxC == 0 ? 0.0 : (maxC - minC) / maxC;
-
-      if (sat > maxSat && maxC > 50 && maxC < 240) {
-        maxSat = sat;
-        maxSatR = r;
-        maxSatG = g;
-        maxSatB = b;
-      }
+      final hsv = HSVColor.fromColor(Color.fromARGB(255, r, g, b));
+      // Ignore near-black / near-white / grey pixels for the accent hues.
+      final w = hsv.saturation * hsv.value * (hsv.value > 0.18 && hsv.value < 0.98 ? 1.0 : 0.0);
+      if (w <= 0.02) continue;
+      final bi = (hsv.hue / (360 / buckets)).floor() % buckets;
+      weight[bi] += w;
+      rs[bi] += r * w;
+      gs[bi] += g * w;
+      bs[bi] += b * w;
     }
 
     final avgR = (rSum / pixelCount).round();
     final avgG = (gSum / pixelCount).round();
     final avgB = (bSum / pixelCount).round();
 
-    final primary = Color.fromRGBO(maxSatR, maxSatG, maxSatB, 1.0);
-    final secondary = Color.fromRGBO(
-      (maxSatR * 0.75 + avgR * 0.25).round().clamp(0, 255),
-      (maxSatG * 0.75 + avgG * 0.25).round().clamp(0, 255),
-      (maxSatB * 0.75 + avgB * 0.25).round().clamp(0, 255),
-      1.0,
-    );
-    final accent = Color.fromRGBO(
-      (maxSatB * 0.8 + 50).round().clamp(0, 255),
-      (maxSatR * 0.3 + 30).round().clamp(0, 255),
-      (maxSatG * 0.9 + 70).round().clamp(0, 255),
-      1.0,
-    );
+    Color bucketColor(int i) => Color.fromRGBO(
+          (rs[i] / weight[i]).round().clamp(0, 255),
+          (gs[i] / weight[i]).round().clamp(0, 255),
+          (bs[i] / weight[i]).round().clamp(0, 255),
+          1.0,
+        );
+
+    int first = -1;
+    for (int i = 0; i < buckets; i++) {
+      if (weight[i] > 0 && (first < 0 || weight[i] > weight[first])) first = i;
+    }
+
+    // Greyscale / monochrome art: fall back to a refined neutral-crimson palette.
+    if (first < 0) {
+      final base = Color.fromRGBO(avgR, avgG, avgB, 1.0);
+      final hsv = HSVColor.fromColor(base);
+      return ArtworkPalette(
+        primary: hsv.withSaturation(0.10).withValue((hsv.value + 0.25).clamp(0.45, 0.85)).toColor(),
+        secondary: hsv.withSaturation(0.08).withValue((hsv.value * 0.6).clamp(0.18, 0.5)).toColor(),
+        accent: ArtworkPalette.defaultPalette.primary,
+        background: Color.fromRGBO(
+          (avgR * 0.16).round().clamp(10, 30),
+          (avgG * 0.16).round().clamp(10, 30),
+          (avgB * 0.16).round().clamp(12, 32),
+          1.0,
+        ),
+      );
+    }
+
+    // Second hue: heaviest bucket at least 2 hue-steps away from the first.
+    int second = -1;
+    for (int i = 0; i < buckets; i++) {
+      final d = math.min((i - first).abs(), buckets - (i - first).abs());
+      if (d >= 2 && weight[i] > 0 && (second < 0 || weight[i] > weight[second])) second = i;
+    }
+
+    // Boost vibrancy (Apple Music-like saturated glow) without clipping.
+    Color vivid(Color c, {double sat = 1.18, double minVal = 0.55, double maxVal = 0.95}) {
+      final h = HSVColor.fromColor(c);
+      return h
+          .withSaturation((h.saturation * sat).clamp(0.45, 1.0))
+          .withValue(h.value.clamp(minVal, maxVal))
+          .toColor();
+    }
+
+    final primary = vivid(bucketColor(first));
+    final secondary = second >= 0
+        ? vivid(bucketColor(second), sat: 1.05, minVal: 0.42, maxVal: 0.85)
+        : () {
+            final h = HSVColor.fromColor(primary);
+            return h.withHue((h.hue + 26) % 360).withValue((h.value * 0.72).clamp(0.3, 0.8)).toColor();
+          }();
+    final accent = () {
+      final h = HSVColor.fromColor(primary);
+      return h
+          .withHue((h.hue + 150) % 360)
+          .withSaturation(0.62)
+          .withValue(0.95)
+          .toColor();
+    }();
     final background = Color.fromRGBO(
-      (avgR * 0.18).round().clamp(10, 30),
-      (avgG * 0.18).round().clamp(10, 30),
-      (avgB * 0.18).round().clamp(12, 32),
+      (avgR * 0.16).round().clamp(10, 30),
+      (avgG * 0.16).round().clamp(10, 30),
+      (avgB * 0.16).round().clamp(12, 32),
       1.0,
     );
 
@@ -209,7 +259,11 @@ class StoryImageRenderer {
   static Future<RenderResult?> captureToPng(
     GlobalKey boundaryKey, {
     String filePrefix = 'zenify_story',
-    double pixelRatio = 2.5,
+    double pixelRatio = 3.0,
+
+    /// When set, pixelRatio is derived so the PNG is exactly this wide
+    /// (1080 for Instagram / WhatsApp / Snapchat stories).
+    double? targetWidth,
   }) async {
     try {
       final ctx = boundaryKey.currentContext;
@@ -224,14 +278,14 @@ class StoryImageRenderer {
         return null;
       }
 
-      var retries = 0;
-      while (boundary.debugNeedsPaint && retries < 10) {
-        await Future<void>.delayed(const Duration(milliseconds: 30));
-        retries++;
+      if (boundary.debugNeedsPaint) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
       }
 
-      final safeRatio = pixelRatio.clamp(1.5, 2.5);
-      final ui.Image image = await boundary.toImage(pixelRatio: safeRatio);
+      final effectiveRatio = (targetWidth != null && boundary.size.width > 0)
+          ? targetWidth / boundary.size.width
+          : pixelRatio;
+      final ui.Image image = await boundary.toImage(pixelRatio: effectiveRatio);
       final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final width = image.width;
       final height = image.height;
@@ -345,11 +399,28 @@ class StorySharingService {
     return isAppInstalled('org.telegram.messenger.web');
   }
 
+  static Future<bool> shareToTelegram(File imageFile, {String? text}) async {
+    if (!imageFile.existsSync()) return false;
+
+    if (Platform.isAndroid) {
+      try {
+        final bool? success = await _channel.invokeMethod<bool>('shareToTelegram', {
+          'filePath': imageFile.path,
+          'text': text,
+        });
+        if (success == true) return true;
+      } catch (e) {
+        debugPrint('[StorySharingService] Telegram share error: $e');
+      }
+    }
+
+    return shareToSystem(imageFile, text: text);
+  }
+
   static Future<bool> shareToInstagram(
     File imageFile, {
     Color? topColor,
     Color? bottomColor,
-    bool asSticker = false,
     String? fallbackText,
   }) async {
     if (!imageFile.existsSync()) return false;
@@ -369,14 +440,7 @@ class StorySharingService {
           'filePath': imageFile.path,
           'topBackgroundColor': hexTop,
           'bottomBackgroundColor': hexBottom,
-          'asSticker': asSticker,
-        }).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('[StorySharingService] Instagram native share timed out');
-            return false;
-          },
-        );
+        });
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] Instagram native story share error: $e');
@@ -398,13 +462,7 @@ class StorySharingService {
         final bool? success = await _channel.invokeMethod<bool>('shareToFacebookStory', {
           'filePath': imageFile.path,
           'appId': appId,
-        }).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('[StorySharingService] Facebook native share timed out');
-            return false;
-          },
-        );
+        });
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] Facebook story share error: $e');
@@ -422,13 +480,7 @@ class StorySharingService {
         final bool? success = await _channel.invokeMethod<bool>('shareToWhatsApp', {
           'filePath': imageFile.path,
           'text': text,
-        }).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('[StorySharingService] WhatsApp share timed out');
-            return false;
-          },
-        );
+        });
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] WhatsApp share error: $e');
@@ -445,13 +497,7 @@ class StorySharingService {
       try {
         final bool? success = await _channel.invokeMethod<bool>('shareToSnapchat', {
           'filePath': imageFile.path,
-        }).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('[StorySharingService] Snapchat share timed out');
-            return false;
-          },
-        );
+        });
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] Snapchat share error: $e');
@@ -461,46 +507,8 @@ class StorySharingService {
     return shareToSystem(imageFile, text: fallbackText);
   }
 
-  static Future<bool> shareToTelegram(File imageFile, {String? text}) async {
+  static Future<bool> shareToSystem(File imageFile, {String? text}) async {
     if (!imageFile.existsSync()) return false;
-
-    if (Platform.isAndroid) {
-      try {
-        final bool? success = await _channel.invokeMethod<bool>('shareToTelegram', {
-          'filePath': imageFile.path,
-          'text': text,
-        }).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('[StorySharingService] Telegram share timed out');
-            return false;
-          },
-        );
-        if (success == true) return true;
-      } catch (e) {
-        debugPrint('[StorySharingService] Telegram share error: $e');
-      }
-    }
-
-    return shareToSystem(imageFile, text: text);
-  }
-
-  static Future<bool> shareToSystem(File imageFile, {String? text, String? title}) async {
-    if (!imageFile.existsSync()) return false;
-
-    if (Platform.isAndroid) {
-      try {
-        final bool? success = await _channel.invokeMethod<bool>('shareToSystemChooser', {
-          'filePath': imageFile.path,
-          'text': text,
-          'title': title ?? 'Share Story',
-        });
-        if (success == true) return true;
-      } catch (e) {
-        debugPrint('[StorySharingService] Native system chooser error: $e');
-      }
-    }
-
     try {
       await SharePlus.instance.share(
         ShareParams(
@@ -512,53 +520,6 @@ class StorySharingService {
     } catch (e) {
       debugPrint('[StorySharingService] System share error: $e');
       return false;
-    }
-  }
-
-  static Future<bool> shareToTarget(
-    StoryShareTarget target,
-    File imageFile, {
-    Color? topColor,
-    Color? bottomColor,
-    bool asSticker = false,
-    String? text,
-    String? appId,
-  }) async {
-    switch (target) {
-      case StoryShareTarget.instagram:
-        return shareToInstagram(
-          imageFile,
-          topColor: topColor,
-          bottomColor: bottomColor,
-          asSticker: asSticker,
-          fallbackText: text,
-        );
-      case StoryShareTarget.facebook:
-        return shareToFacebook(
-          imageFile,
-          appId: appId,
-          fallbackText: text,
-        );
-      case StoryShareTarget.whatsapp:
-        return shareToWhatsApp(
-          imageFile,
-          text: text,
-        );
-      case StoryShareTarget.snapchat:
-        return shareToSnapchat(
-          imageFile,
-          fallbackText: text,
-        );
-      case StoryShareTarget.telegram:
-        return shareToTelegram(
-          imageFile,
-          text: text,
-        );
-      case StoryShareTarget.system:
-        return shareToSystem(
-          imageFile,
-          text: text,
-        );
     }
   }
 }
