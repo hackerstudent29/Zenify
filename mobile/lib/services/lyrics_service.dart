@@ -329,6 +329,8 @@ class LyricsService {
     return null;
   }
 
+  static const String _kCachePrefix = 'lyrics_cache_v3_';
+
   /// Verifies if candidate lyrics match the expected track language.
   /// Prevents cross-language collisions (e.g. Tamil lyrics on Telugu song).
   static bool isLanguageCompatible(String lyricsText, String expectedLanguage) {
@@ -338,33 +340,74 @@ class LyricsService {
     // 1. Script check
     final scriptLang = detectScriptLanguage(lyricsText);
     if (scriptLang != null) {
-      return scriptLang == exp;
+      final compat = scriptLang == exp;
+      if (!compat && kDebugMode) {
+        debugPrint('[LyricsFlow] Rejected lyrics: detected script=$scriptLang vs expected=$exp');
+      }
+      return compat;
     }
 
     // 2. Transliterated / Romanized check
     final romLang = detectRomanizedLanguage(lyricsText);
     if (romLang != null && romLang != exp) {
+      if (kDebugMode) {
+        debugPrint('[LyricsFlow] Rejected lyrics: detected romanized=$romLang vs expected=$exp');
+      }
       return false;
+    }
+
+    // 3. Strict cross-language marker collision prevention
+    final words = lyricsText.toLowerCase().split(RegExp(r'[^a-z]+')).where((w) => w.length >= 3).toSet();
+    if (exp == 'telugu') {
+      if (words.intersection(_tamilMarkers).length >= 2) {
+        if (kDebugMode) debugPrint('[LyricsFlow] Rejected: Tamil markers found in Telugu song lyrics');
+        return false;
+      }
+      if (words.intersection(_hindiMarkers).length >= 2) {
+        if (kDebugMode) debugPrint('[LyricsFlow] Rejected: Hindi markers found in Telugu song lyrics');
+        return false;
+      }
+    } else if (exp == 'tamil') {
+      if (words.intersection(_teluguMarkers).length >= 2) {
+        if (kDebugMode) debugPrint('[LyricsFlow] Rejected: Telugu markers found in Tamil song lyrics');
+        return false;
+      }
+      if (words.intersection(_hindiMarkers).length >= 2) {
+        if (kDebugMode) debugPrint('[LyricsFlow] Rejected: Hindi markers found in Tamil song lyrics');
+        return false;
+      }
+    } else if (exp == 'hindi') {
+      if (words.intersection(_tamilMarkers).length >= 2) return false;
+      if (words.intersection(_teluguMarkers).length >= 2) return false;
+    } else if (exp == 'malayalam') {
+      if (words.intersection(_tamilMarkers).length >= 2) return false;
+    } else if (exp == 'kannada') {
+      if (words.intersection(_teluguMarkers).length >= 2) return false;
     }
 
     return true;
   }
 
-  /// Purges old unsynced (plain) lyrics from SharedPreferences disk cache.
+  /// Purges old unsynced and poisoned (v1/v2) lyrics from SharedPreferences disk cache.
   Future<void> purgeUnsyncedCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final keys = prefs.getKeys().where((k) => k.startsWith('lyrics_cache_')).toList();
-      for (final k in keys) {
-        final raw = prefs.getString(k);
-        if (raw != null) {
-          try {
-            final json = jsonDecode(raw);
-            if (json is Map && json['synced'] != true) {
+      final allKeys = prefs.getKeys().toList();
+      for (final k in allKeys) {
+        if (k.startsWith('lyrics_cache_') && !k.startsWith(_kCachePrefix)) {
+          // Eradicate poisoned v1 and v2 caches
+          await prefs.remove(k);
+        } else if (k.startsWith(_kCachePrefix)) {
+          final raw = prefs.getString(k);
+          if (raw != null) {
+            try {
+              final json = jsonDecode(raw);
+              if (json is Map && json['synced'] != true) {
+                await prefs.remove(k);
+              }
+            } catch (_) {
               await prefs.remove(k);
             }
-          } catch (_) {
-            await prefs.remove(k);
           }
         }
       }
@@ -379,10 +422,15 @@ class LyricsService {
         : (Track.detectLanguage(track.title, track.artist, track.album) ?? '');
 
     final cacheKey = track.id;
+    if (kDebugMode) {
+      debugPrint('[LyricsFlow] START fetchLyrics trackId=${track.id} title="${track.title}" artist="${track.artist}" lang="$lang"');
+    }
+
     if (_memCache.containsKey(cacheKey)) {
       final mem = _memCache[cacheKey]!;
       // Return synced immediately from memory if compatible
       if (mem.synced && (lang.isEmpty || mem.rawLrc == null || isLanguageCompatible(mem.rawLrc!, lang))) {
+        if (kDebugMode) debugPrint('[LyricsFlow] MEM_CACHE_HIT key=$cacheKey source=${mem.source}');
         return mem;
       }
     }
@@ -390,7 +438,7 @@ class LyricsService {
     // Check SharedPreferences offline cache (ONLY accept if synced & language compatible)
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cachedStr = prefs.getString('lyrics_cache_$cacheKey');
+      final cachedStr = prefs.getString('$_kCachePrefix$cacheKey');
       if (cachedStr != null) {
         final json = jsonDecode(cachedStr) as Map<String, dynamic>;
         final lines = (json['lines'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -406,6 +454,7 @@ class LyricsService {
               rawLrc: rawLrc,
             );
             _memCache[cacheKey] = result;
+            if (kDebugMode) debugPrint('[LyricsFlow] DISK_CACHE_HIT key=$cacheKey source=${result.source}');
             return result;
           }
         }
@@ -894,7 +943,7 @@ class LyricsService {
     if (synced) {
       SharedPreferences.getInstance().then((prefs) {
         prefs.setString(
-          'lyrics_cache_$cacheKey',
+          '$_kCachePrefix$cacheKey',
           jsonEncode({
             'lines': lines,
             'synced': true,

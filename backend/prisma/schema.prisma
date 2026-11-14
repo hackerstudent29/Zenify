@@ -60,6 +60,7 @@ model User {
   userArtistStats UserArtistStat[]
   userHourlyStats UserHourlyStat[]
   userAchievements UserAchievement[]
+  savedAlbums     SavedAlbum[]
 }
 
 model Subscription {
@@ -372,6 +373,22 @@ model Like {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId])
+}
+
+model SavedAlbum {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String
+  artist    String
+  coverUrl  String?  @map("cover_url")
+  browseId  String?  @map("browse_id")
+  year      Int?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, title, artist])
+  @@index([userId])
+  @@map("saved_albums")
 }
 
 model Rating {

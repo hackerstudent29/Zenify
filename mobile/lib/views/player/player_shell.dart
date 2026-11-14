@@ -5,7 +5,6 @@ import 'dart:ui' show lerpDouble;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -284,9 +283,18 @@ class PlayerShellState extends State<PlayerShell>
     if (widget.onGoToArtist != null) {
       widget.onGoToArtist!(artistName);
     } else {
+      final t = context.read<PlayerState>().currentTrack;
+      final browseId = (t != null && t.artists.isNotEmpty && t.artists.first.id.isNotEmpty)
+          ? t.artists.first.id
+          : null;
       Navigator.push(
         context,
-        ZenPageRoute(builder: (_) => ArtistScreen(artistName: artistName)),
+        ZenPageRoute(
+          builder: (_) => ArtistScreen(
+            artistName: artistName,
+            browseId: browseId,
+          ),
+        ),
       );
     }
   }
@@ -296,17 +304,20 @@ class PlayerShellState extends State<PlayerShell>
     if (widget.onGoToAlbum != null) {
       widget.onGoToAlbum!(track);
     } else {
+      final t = track is Track ? track : null;
       Navigator.push(
         context,
         ZenPageRoute(
           builder: (_) => AlbumScreen(
             albumTitle: (track?.album as String?)?.isNotEmpty == true
-                ? (track is Track ? track.album : MediaNormalizer.cleanAlbumTitle(track?.album?.toString()))
-                : (track is Track ? track.title : MediaNormalizer.cleanTitle(track?.title?.toString())),
-            artistName: track is Track
-                ? track.artist
+                ? (t != null ? t.album : MediaNormalizer.cleanAlbumTitle(track?.album?.toString()))
+                : (t != null ? t.title : MediaNormalizer.cleanTitle(track?.title?.toString())),
+            artistName: t != null
+                ? t.artist
                 : MediaNormalizer.formatArtists(track?.artist?.toString()),
-            coverUrl: track.coverUrl as String?,
+            coverUrl: track?.coverUrl as String?,
+            browseId: t?.albumBrowseId,
+            initialTracks: t != null ? [t] : null,
           ),
         ),
       );
@@ -1220,14 +1231,11 @@ class PlayerShellState extends State<PlayerShell>
           key: ValueKey('lyrics-$_trackKey'),
           child: NotificationListener<ScrollNotification>(
             onNotification: (n) {
-              // Only user-initiated scroll gestures (direct touch drag or active user scroll)
+              // Only user-initiated touch drag gestures (with non-null dragDetails and active pointer touch)
               // should reset the idle timer or reveal controls. Programmatic auto-scrolls
-              // when lyrics advance to the next line (dragDetails == null) must NEVER
-              // wake or re-show controls.
-              if ((n is ScrollUpdateNotification && n.dragDetails != null) ||
-                  (n is ScrollStartNotification && n.dragDetails != null) ||
-                  (n is UserScrollNotification &&
-                      n.direction != ScrollDirection.idle)) {
+              // when lyrics advance to the next line must NEVER wake or re-show controls.
+              if ((n is ScrollUpdateNotification && n.dragDetails != null && _activePointers > 0) ||
+                  (n is ScrollStartNotification && n.dragDetails != null && _activePointers > 0)) {
                 _bumpIdle();
               }
               return false;
@@ -1481,7 +1489,7 @@ class PlayerShellState extends State<PlayerShell>
                       ),
                     ),
 
-                    _tools(isLyrics),
+                    _tools(isLyrics, hasLyrics: player.hasLyrics || player.isLoadingLyrics),
                   ],
                 ),
               ),
@@ -1728,7 +1736,7 @@ class PlayerShellState extends State<PlayerShell>
   /// Studio FX · Lyrics · Queue.
   /// All three action buttons stay visible when Lyrics opens (moving the cover
   /// only), and hide smoothly together with the rest of chrome after 3s idle.
-  Widget _tools(bool lyricsOpen) {
+  Widget _tools(bool lyricsOpen, {bool hasLyrics = true}) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 260),
       child: SizedBox(
@@ -1764,15 +1772,18 @@ class PlayerShellState extends State<PlayerShell>
             PlateButton(
               size: 44,
               active: lyricsOpen,
-              onTap: () => _togglePanel(_Panel.lyrics),
-              child: SpringPop(
-                trigger: lyricsOpen,
-                scale: 0.3,
-                child: Icon(
-                  lyricsOpen
-                      ? CupertinoIcons.quote_bubble_fill
-                      : CupertinoIcons.quote_bubble,
-                  size: 22,
+              onTap: hasLyrics ? () => _togglePanel(_Panel.lyrics) : null,
+              child: Opacity(
+                opacity: hasLyrics ? 1.0 : 0.28,
+                child: SpringPop(
+                  trigger: lyricsOpen,
+                  scale: 0.3,
+                  child: Icon(
+                    lyricsOpen
+                        ? CupertinoIcons.quote_bubble_fill
+                        : CupertinoIcons.quote_bubble,
+                    size: 22,
+                  ),
                 ),
               ),
             ),

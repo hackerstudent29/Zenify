@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../design_system/widgets/dynamic_island_header.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
+import 'library_store.dart';
 import 'secure_storage_service.dart';
 
 class UserProfile {
@@ -147,6 +148,7 @@ class AuthState extends ChangeNotifier {
       if (raw != null) {
         _user = UserProfile.fromJson(jsonDecode(raw) as Map<String, dynamic>);
       }
+      unawaited(LibraryStore.instance.switchUser(_user?.id));
       notifyListeners();
     } catch (e) {
       if (kDebugMode) debugPrint('[AuthState] storage load error: $e');
@@ -411,6 +413,7 @@ class AuthState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kUserKey);
     await prefs.remove(_kGuestDismissedAtKey);
+    LibraryStore.instance.clearForSignOut();
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'auth_signout_${DateTime.now().millisecondsSinceEpoch}',
@@ -431,5 +434,6 @@ class AuthState extends ChangeNotifier {
     if (_user == null) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kUserKey, jsonEncode(_user!.toJson()));
+    unawaited(LibraryStore.instance.switchUser(_user?.id));
   }
 }

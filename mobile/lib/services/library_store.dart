@@ -10,6 +10,7 @@ import '../data/datasources/catalog_datasource.dart';
 import '../design_system/widgets/dynamic_island_header.dart';
 import '../models/track.dart';
 import '../utils/media_normalizer.dart';
+import 'api_service.dart';
 
 /* ------------------------------------------------------------------ */
 /*  Storage                                                             */
@@ -29,8 +30,13 @@ class MemoryLibraryStorage implements LibraryStorage {
 }
 
 class PrefsLibraryStorage implements LibraryStorage {
-  static const _keyPrimary = 'library_v1';
-  static const _keyBackup = 'library_v1_backup';
+  PrefsLibraryStorage({this.userId});
+  final String? userId;
+
+  String get _keyPrimary => (userId != null && userId!.trim().isNotEmpty)
+      ? 'library_user_${userId!.trim()}'
+      : 'library_v1';
+  String get _keyBackup => '${_keyPrimary}_backup';
 
   @override
   Future<String?> read() async {
@@ -41,6 +47,18 @@ class PrefsLibraryStorage implements LibraryStorage {
       if (val != null && val.trim().isNotEmpty && val.trim().length > 10) return val;
       final backup = p.getString(_keyBackup);
       if (backup != null && backup.trim().isNotEmpty && backup.trim().length > 10) return backup;
+
+      // Safe migration: if this is an authenticated user with no data yet,
+      // but legacy shared library exists, migrate it safely to user's storage
+      // while keeping legacy backup untouched!
+      if (userId != null && userId!.trim().isNotEmpty) {
+        final legacy = p.getString('library_v1');
+        if (legacy != null && legacy.trim().isNotEmpty && legacy.trim().length > 10) {
+          await p.setString('library_legacy_backup', legacy);
+          await p.setString(_keyPrimary, legacy);
+          return legacy;
+        }
+      }
       return null;
     } catch (_) {
       return null;
@@ -141,6 +159,9 @@ class LibraryStore extends ChangeNotifier {
   static final LibraryStore instance = LibraryStore._();
   static LibraryStorage storage = PrefsLibraryStorage();
 
+  String? _activeUserId;
+  String? get activeUserId => _activeUserId;
+
   final Map<String, Track> _seen = {};
   final List<String> _liked = [];
   final List<FollowedArtist> _artists = [];
@@ -150,6 +171,105 @@ class LibraryStore extends ChangeNotifier {
   bool _isLoaded = false;
 
   bool get isLoaded => _isLoaded;
+
+  /// Switches the active library user cleanly (handles login, logout, account switching).
+  Future<void> switchUser(String? userId) async {
+    final cleanId = userId?.trim();
+    if (_activeUserId == cleanId && _isLoaded) return;
+    _activeUserId = cleanId;
+    if (storage is PrefsLibraryStorage) {
+      storage = PrefsLibraryStorage(userId: cleanId);
+    }
+
+    // Reset in-memory state cleanly
+    _seen.clear();
+    _liked.clear();
+    _artists.clear();
+    _albums.clear();
+    _playlists.clear();
+    _isLoaded = false;
+    _loading = null;
+
+    await ensureLoaded();
+
+    // If authenticated user, fetch and merge backend data
+    if (cleanId != null && cleanId.isNotEmpty) {
+      try {
+        final remote = await ApiService.fetchUserLibrary();
+        if (remote != null) {
+          bool changed = false;
+          // 1. Saved albums
+          final remoteAlbums = remote['albums'] as List?;
+          if (remoteAlbums != null) {
+            for (final item in remoteAlbums) {
+              if (item is Map) {
+                final title = (item['title'] as String? ?? '').trim();
+                final artist = (item['artist'] as String? ?? '').trim();
+                final cover = MediaNormalizer.upgradeArtworkUrl((item['coverUrl'] as String? ?? '').trim());
+                if (title.isNotEmpty && !isAlbumSaved(title, artist)) {
+                  _albums.add(SavedAlbum(title, artist, cover));
+                  changed = true;
+                }
+              }
+            }
+          }
+          // 2. Liked songs
+          final remoteLiked = remote['liked'] as List?;
+          if (remoteLiked != null) {
+            for (final item in remoteLiked) {
+              if (item is Map) {
+                final id = (item['id'] as String? ?? '').trim();
+                if (id.isNotEmpty && !_liked.contains(id)) {
+                  _liked.add(id);
+                  try {
+                    _seen[id] = Track.fromJson(Map<String, dynamic>.from(item));
+                  } catch (_) {}
+                  changed = true;
+                }
+              }
+            }
+          }
+          // 3. Followed artists
+          final remoteArtists = remote['artists'] as List?;
+          if (remoteArtists != null) {
+            for (final item in remoteArtists) {
+              if (item is Map) {
+                final name = (item['name'] as String? ?? '').trim();
+                final cover = MediaNormalizer.upgradeArtworkUrl(
+                  (item['coverUrl'] as String? ?? '').trim(),
+                  isArtistAvatar: true,
+                );
+                if (name.isNotEmpty && !isFollowing(name)) {
+                  _artists.add(FollowedArtist(name, cover));
+                  changed = true;
+                }
+              }
+            }
+          }
+          if (changed) _save();
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[LibraryStore] Failed to sync remote library: $e');
+      }
+    }
+
+    notifyListeners();
+  }
+
+  /// Clears in-memory state on sign-out so another account starts fresh.
+  void clearForSignOut() {
+    _activeUserId = null;
+    if (storage is PrefsLibraryStorage) {
+      storage = PrefsLibraryStorage(userId: null);
+    }
+    _seen.clear();
+    _liked.clear();
+    _artists.clear();
+    _albums.clear();
+    _playlists.clear();
+    _isLoaded = true;
+    notifyListeners();
+  }
 
   Future<void> ensureLoaded() async {
     if (_isLoaded) return;
@@ -398,6 +518,9 @@ class LibraryStore extends ChangeNotifier {
     );
     if (i >= 0) {
       _albums.removeAt(i);
+      if (_activeUserId != null && _activeUserId!.isNotEmpty) {
+        unawaited(ApiService.removeUserAlbum(cTitle, cArtist));
+      }
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'album_rm_${cTitle}_${DateTime.now().millisecondsSinceEpoch}',
@@ -408,6 +531,13 @@ class LibraryStore extends ChangeNotifier {
       );
     } else {
       _albums.insert(0, SavedAlbum(cTitle, cArtist, cover));
+      if (_activeUserId != null && _activeUserId!.isNotEmpty) {
+        unawaited(ApiService.saveUserAlbum({
+          'title': cTitle,
+          'artist': cArtist,
+          'coverUrl': cover,
+        }));
+      }
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'album_add_${cTitle}_${DateTime.now().millisecondsSinceEpoch}',

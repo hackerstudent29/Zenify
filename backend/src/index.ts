@@ -289,6 +289,8 @@ import { blendRoutes } from './routes/blend.routes';
 server.register(blendRoutes, { prefix: '/api/me' });
 import { meRoutes } from './routes/me.routes';
 server.register(meRoutes, { prefix: '/api/me' });
+import { libraryRoutes } from './routes/library.routes';
+server.register(libraryRoutes, { prefix: '/api/me/library' });
 import { discoveryRoutes } from './routes/discovery.routes';
 server.register(discoveryRoutes, { prefix: '/api/discover' });
 import { databaseAdminRoutes } from './routes/database-admin.routes';

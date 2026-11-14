@@ -16,6 +16,7 @@ class Track {
   final String source; // 'youtube', 'local'
   final List<ArtistRef> artists;
   final bool isVideo;
+  final String? albumBrowseId;
 
   Track({
     required this.id,
@@ -30,6 +31,7 @@ class Track {
     this.source = 'youtube',
     this.artists = const [],
     this.isVideo = false,
+    this.albumBrowseId,
   })  : language = (language.trim().isNotEmpty
             ? language.toLowerCase().trim()
             : (detectLanguage(title, artist, album) ?? '')),
@@ -129,116 +131,7 @@ class Track {
 
     final aLower = artist.toLowerCase();
 
-    // 2. Tamil composer / artist recognition
-    if (aLower.contains('anirudh') ||
-        aLower.contains('yuvan') ||
-        aLower.contains('harris jayaraj') ||
-        aLower.contains('santhosh narayanan') ||
-        aLower.contains('sean roldan') ||
-        aLower.contains('ilaiyaraaja') ||
-        aLower.contains('ilayaraja') ||
-        aLower.contains('govind vasantha') ||
-        aLower.contains('sai abhyankkar') ||
-        aLower.contains('d. imman') ||
-        aLower.contains('imman') ||
-        aLower.contains('g.v. prakash') ||
-        aLower.contains('g. v. prakash') ||
-        aLower.contains('hiphop tamizha') ||
-        aLower.contains('pradeep kumar') ||
-        aLower.contains('vijay antony') ||
-        aLower.contains('silambarasan') ||
-        aLower.contains('dhibu ninan') ||
-        aLower.contains('sam c.s') ||
-        aLower.contains('sam c. s') ||
-        aLower.contains('ghibran') ||
-        aLower.contains('leon james') ||
-        aLower.contains('vivek-mervin') ||
-        aLower.contains('asal kolaar') ||
-        aLower.contains('paal dabba') ||
-        aLower.contains('stephen zechariah') ||
-        aLower.contains('shakthisree') ||
-        aLower.contains('haricharan') ||
-        aLower.contains('anthony daasan')) {
-      return 'tamil';
-    }
-
-    // 3. Telugu composer / artist recognition
-    if (aLower.contains('thaman') ||
-        aLower.contains('devi sri prasad') ||
-        aLower.contains('dsp') ||
-        aLower.contains('mickey j meyer') ||
-        aLower.contains('ram miriyala') ||
-        aLower.contains('anurag kulkarni') ||
-        aLower.contains('keeravani') ||
-        aLower.contains('keeravaani') ||
-        aLower.contains('chaitan bharadwaj') ||
-        aLower.contains('vivek sagar') ||
-        aLower.contains('bheems') ||
-        aLower.contains('rahul sipligunj') ||
-        aLower.contains('mangli') ||
-        aLower.contains('indravathi') ||
-        aLower.contains('geetha madhuri') ||
-        aLower.contains('sri krishna') ||
-        aLower.contains('lipsika') ||
-        aLower.contains('deepu') ||
-        aLower.contains('revanth') ||
-        aLower.contains('sunitha')) {
-      return 'telugu';
-    }
-
-    // 4. Malayalam composer / artist recognition
-    if (aLower.contains('sushin shyam') ||
-        aLower.contains('hesham abdul wahab') ||
-        aLower.contains('jakes bejoy') ||
-        aLower.contains('shaan rahman') ||
-        aLower.contains('deepak dev') ||
-        aLower.contains('rex vijayan') ||
-        aLower.contains('gopi sundar') ||
-        aLower.contains('dabzee') ||
-        aLower.contains('baby jean') ||
-        aLower.contains('thirumali') ||
-        aLower.contains('vidyasagar') ||
-        aLower.contains('harisankar') ||
-        aLower.contains('sithara krishnakumar')) {
-      return 'malayalam';
-    }
-
-    // 5. Punjabi artist recognition
-    if (aLower.contains('karan aujla') ||
-        aLower.contains('diljit') ||
-        aLower.contains('sidhu moose') ||
-        aLower.contains('ap dhillon') ||
-        aLower.contains('shubh') ||
-        aLower.contains('guru randhawa') ||
-        aLower.contains('ammy virk') ||
-        aLower.contains('b praak') ||
-        aLower.contains('jaani') ||
-        aLower.contains('harrdy sandhu')) {
-      return 'punjabi';
-    }
-
-    // 6. Hindi / Bollywood artist recognition
-    if (aLower.contains('arijit singh') ||
-        aLower.contains('pritam') ||
-        aLower.contains('sachin-jigar') ||
-        aLower.contains('vishal-shekhar') ||
-        aLower.contains('amit trivedi') ||
-        aLower.contains('badshah') ||
-        aLower.contains('neha kakkar') ||
-        aLower.contains('atif aslam') ||
-        aLower.contains('sonu nigam') ||
-        aLower.contains('jubin nautiyal') ||
-        aLower.contains('darshan raval') ||
-        aLower.contains('tanishk bagchi') ||
-        aLower.contains('mithoon') ||
-        aLower.contains('shankar-ehsaan-loy') ||
-        aLower.contains('jasleen royal') ||
-        aLower.contains('kanika kapoor') ||
-        aLower.contains('shilpa rao')) {
-      return 'hindi';
-    }
-
-    // 7. English / Western artist recognition
+    // 2. English / Western artist recognition (only for clear global English acts)
     if (aLower.contains('taylor swift') ||
         aLower.contains('the weeknd') ||
         aLower.contains('drake') ||
@@ -296,16 +189,18 @@ class Track {
     Map<String, dynamic> json, {
     String baseUrl = defaultBaseUrl,
   }) {
+    // 0. Language from raw fields before descriptor stripping
+    final rawTitle = _clean(json['title']) ?? _clean(json['name']) ?? _clean(json['trackName']) ?? '';
+    final rawAlbumField = json['album'] is Map ? _clean(json['album']['name'] ?? json['album']['title']) : _clean(json['album']);
+    final rawArtist = json['artist'];
+    final rawExplicitLang = _clean(json['language']) ??
+        detectLanguage(rawTitle, rawArtist is String ? rawArtist : '', rawAlbumField ?? '');
+
     // 1. Title
-    final title = MediaNormalizer.cleanTitle(
-        _clean(json['title']) ??
-        _clean(json['name']) ??
-        _clean(json['trackName']) ??
-        'Unknown Title');
+    final title = MediaNormalizer.cleanTitle(rawTitle.isNotEmpty ? rawTitle : 'Unknown Title');
 
     // 2. Artist (handles String, Map, List, ArtistRef and common alternate keys)
     String? artistName;
-    final rawArtist = json['artist'];
     if (rawArtist is String) {
       artistName = MediaNormalizer.cleanArtistName(rawArtist);
     } else if (rawArtist is Map) {
@@ -397,6 +292,9 @@ class Track {
       parsedArtists.addAll(ArtistRef.splitFromName(artistName));
     }
 
+    final albumBrowseId = _clean(json['albumBrowseId']) ??
+        (json['album'] is Map ? _clean(json['album']['id'] ?? json['album']['browseId']) : null);
+
     return Track(
       id: id,
       title: title,
@@ -405,13 +303,14 @@ class Track {
       coverUrl: cover,
       streamUrl: resolvedStream,
       durationSeconds: _parseDuration(json),
-      language: _clean(json['language']) ?? detectLanguage(title, artistName, albumName) ?? '',
+      language: rawExplicitLang ?? detectLanguage(title, artistName, albumName) ?? '',
       hasLyrics: json['hasLyrics'] == true ||
           json['synced_lyrics'] != null ||
           json['lyrics'] != null,
       source: source,
       artists: parsedArtists,
       isVideo: json['isVideo'] == true,
+      albumBrowseId: albumBrowseId,
     );
   }
 
@@ -429,6 +328,7 @@ class Track {
       'source': source,
       'artists': artists.map((a) => a.toJson()).toList(),
       if (isVideo) 'isVideo': true,
+      if (albumBrowseId != null) 'albumBrowseId': albumBrowseId,
     };
   }
 
@@ -445,6 +345,7 @@ class Track {
     String? source,
     List<ArtistRef>? artists,
     bool? isVideo,
+    String? albumBrowseId,
   }) {
     return Track(
       id: id ?? this.id,
@@ -459,6 +360,7 @@ class Track {
       source: source ?? this.source,
       artists: artists ?? this.artists,
       isVideo: isVideo ?? this.isVideo,
+      albumBrowseId: albumBrowseId ?? this.albumBrowseId,
     );
   }
 

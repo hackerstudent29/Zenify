@@ -169,6 +169,161 @@ class SearchParser {
     );
   }
 
+  /// Parses Metrolist Android native summary payload into [ParsedSearchPayload].
+  static ParsedSearchPayload parseNativeSummaries(
+    List<dynamic> summaries, {
+    required String query,
+  }) {
+    SearchTopResult? topResult;
+    final items = <SearchItem>[];
+    int rawRankCounter = 0;
+
+    try {
+      for (final rawSummary in summaries) {
+        if (rawSummary is! Map) continue;
+        final summaryTitle = (rawSummary['title'] as String? ?? '').trim();
+        final rawItems = rawSummary['items'] as List?;
+        if (rawItems == null || rawItems.isEmpty) continue;
+
+        final isTopSection = summaryTitle.toLowerCase().contains('top result');
+
+        for (final rawItem in rawItems) {
+          if (rawItem is! Map) continue;
+          final itemMap = Map<String, dynamic>.from(rawItem);
+          final parsedItem = parseNativeItem(itemMap, rawRank: rawRankCounter++);
+          if (parsedItem == null) continue;
+
+          if (isTopSection && topResult == null) {
+            topResult = SearchTopResult(
+              item: parsedItem,
+              playVideoId: parsedItem.videoId ?? (parsedItem is SearchSongItem ? parsedItem.id : null),
+              radioPlaylistId: parsedItem.radioPlaylistId,
+            );
+          }
+          items.add(parsedItem);
+        }
+      }
+    } catch (e, stack) {
+      if (kDebugMode) debugPrint('[SearchParser] Error parsing native summaries: $e\n$stack');
+    }
+
+    return ParsedSearchPayload(
+      topResult: topResult,
+      items: items,
+    );
+  }
+
+  /// Parses a single item map returned from Android native InnerTube channel.
+  static SearchItem? parseNativeItem(Map<String, dynamic> m, {required int rawRank}) {
+    final type = (m['type'] as String? ?? '').toLowerCase();
+    final id = (m['id'] as String? ?? '').trim();
+    final title = MediaNormalizer.cleanTitle(m['title'] as String? ?? '');
+    if (title.isEmpty) return null;
+
+    final thumb = MediaNormalizer.upgradeArtworkUrl(m['thumbnail'] as String?, videoId: id);
+    final rawArtists = m['artists'] as List?;
+    final artistRefs = InnerTubeService.parseArtistRefs(rawArtists);
+    final artistsString = artistRefs.isNotEmpty
+        ? ArtistRef.formatList(artistRefs)
+        : MediaNormalizer.formatArtists(rawArtists?.map((a) => a is Map ? a['name'] : a).toList());
+
+    final isExplicit = m['explicit'] == true;
+
+    if (type == 'song') {
+      final albumMap = (m['album'] is Map) ? m['album'] as Map : null;
+      final albumName = albumMap?['name'] as String?;
+      final album = albumName != null ? MediaNormalizer.cleanTitle(albumName) : null;
+      final albumBrowseId = albumMap?['id'] as String? ?? albumMap?['browseId'] as String?;
+      final durSec = (m['duration'] as num?)?.toInt() ?? 210;
+      final mins = durSec ~/ 60;
+      final secs = (durSec % 60).toString().padLeft(2, '0');
+      return SearchSongItem(
+        id: id,
+        title: title,
+        subtitle: artistsString.isNotEmpty ? artistsString : 'Song',
+        thumbnailUrl: thumb,
+        thumbnailUrlHiRes: thumb,
+        videoId: id,
+        artists: artistRefs,
+        albumName: album,
+        albumBrowseId: albumBrowseId,
+        durationSeconds: durSec,
+        durationText: '$mins:$secs',
+        isExplicit: isExplicit,
+        rawRank: rawRank,
+      );
+    } else if (type == 'album') {
+      final browseId = m['browseId'] as String? ?? id;
+      final playlistId = m['playlistId'] as String?;
+      final year = (m['year'] as num?)?.toInt();
+      return SearchAlbumItem(
+        id: id.isNotEmpty ? id : (browseId.isNotEmpty ? browseId : 'album-$title'),
+        title: title,
+        subtitle: artistsString.isNotEmpty ? (year != null ? '$artistsString • $year' : artistsString) : 'Album',
+        thumbnailUrl: thumb,
+        thumbnailUrlHiRes: thumb,
+        browseId: browseId,
+        playlistId: playlistId,
+        year: year,
+        artists: artistRefs,
+        isExplicit: isExplicit,
+        rawRank: rawRank,
+      );
+    } else if (type == 'artist') {
+      final channelId = m['channelId'] as String? ?? id;
+      return SearchArtistItem(
+        id: id.isNotEmpty ? id : (channelId.isNotEmpty ? channelId : 'artist-$title'),
+        title: title,
+        subtitle: 'Artist',
+        thumbnailUrl: thumb,
+        thumbnailUrlHiRes: thumb,
+        browseId: channelId,
+        isVerified: true,
+        rawRank: rawRank,
+      );
+    } else if (type == 'playlist') {
+      final author = (m['author'] is Map) ? (m['author']['name'] as String?) : null;
+      return SearchPlaylistItem(
+        id: id,
+        title: title,
+        subtitle: author != null ? 'Playlist • $author' : 'Playlist',
+        thumbnailUrl: thumb,
+        thumbnailUrlHiRes: thumb,
+        browseId: id,
+        playlistId: id,
+        author: author,
+        rawRank: rawRank,
+      );
+    } else if (type == 'video') {
+      final channel = artistsString.isNotEmpty ? artistsString : (m['channel'] as String?);
+      return SearchVideoItem(
+        id: id,
+        title: title,
+        subtitle: channel ?? 'Video',
+        thumbnailUrl: thumb,
+        thumbnailUrlHiRes: thumb,
+        videoId: id,
+        channel: channel,
+        rawRank: rawRank,
+      );
+    } else {
+      // Fallback: guess by presence of fields
+      if (m.containsKey('duration') || id.length == 11) {
+        return SearchSongItem(
+          id: id,
+          title: title,
+          subtitle: artistsString.isNotEmpty ? artistsString : 'Song',
+          thumbnailUrl: thumb,
+          thumbnailUrlHiRes: thumb,
+          videoId: id,
+          artists: artistRefs,
+          rawRank: rawRank,
+        );
+      }
+    }
+    return null;
+  }
+
   // ─────────────────────────── Top Result Parser ─────────────────────────────
 
   static SearchTopResult? _parseMusicCardShelf(Map<String, dynamic> card, {required int rawRank}) {

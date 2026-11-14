@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../data/datasources/catalog_datasource.dart';import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/track.dart';
 import '../../services/api_service.dart';
@@ -170,25 +171,103 @@ class SearchDataService {
     _activeSearchQuery = q;
     final requestId = ++_activeRequestId;
 
-    // 2. Fetch raw search payload from InnerTube with fast timeout
-    Map<String, dynamic>? rawJson;
-    try {
-      final body = <String, dynamic>{'query': q};
-      if (filter.params != null) {
-        body['params'] = filter.params;
+    List<SearchItem> candidateItems = [];
+    SearchTopResult? topResult;
+    String? didYouMean;
+    String? continuation;
+
+    // 2. PRIMARY STRATEGY:
+    // If native InnerTube is available (Android), try it first with high priority!
+    if (InnerTubeService.instance.isNativeAvailable) {
+      try {
+        if (filter == SearchFilter.all) {
+          final nativeData = await InnerTubeService.instance
+              .searchSummaryNative(q)
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+          if (nativeData != null && nativeData['summaries'] is List) {
+            final parsed = SearchParser.parseNativeSummaries(
+              nativeData['summaries'] as List,
+              query: q,
+            );
+            if (parsed.items.isNotEmpty) {
+              candidateItems = parsed.items;
+              topResult = parsed.topResult;
+              didYouMean = parsed.didYouMean;
+              continuation = parsed.continuation;
+            }
+          }
+          if (candidateItems.isEmpty) {
+            final nativeSongs = await InnerTubeService.instance
+                .searchSongsNative(q)
+                .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
+            if (nativeSongs.isNotEmpty) {
+              candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
+            }
+          }
+        } else if (filter == SearchFilter.songs) {
+          final nativeSongs = await InnerTubeService.instance
+              .searchSongsNative(q)
+              .timeout(const Duration(seconds: 5), onTimeout: () => <Track>[]);
+          if (nativeSongs.isNotEmpty) {
+            candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
+          }
+        } else if (filter == SearchFilter.albums) {
+          final nativeAlbums = await InnerTubeService.instance
+              .searchAlbumsNative(q)
+              .timeout(const Duration(seconds: 5), onTimeout: () => const []);
+          if (nativeAlbums.isNotEmpty) {
+            candidateItems = nativeAlbums
+                .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
+                .whereType<SearchItem>()
+                .toList();
+          }
+        } else if (filter == SearchFilter.artists) {
+          final nativeArtists = await InnerTubeService.instance
+              .searchArtistsNative(q)
+              .timeout(const Duration(seconds: 5), onTimeout: () => const []);
+          if (nativeArtists.isNotEmpty) {
+            candidateItems = nativeArtists
+                .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
+                .whereType<SearchItem>()
+                .toList();
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[SearchDataService] Native search attempt error: $e');
+      }
+    }
+
+    // 3. SECONDARY STRATEGY (Web / Desktop / HTTP fallback):
+    if (candidateItems.isEmpty) {
+      Map<String, dynamic>? rawJson;
+      try {
+        final body = <String, dynamic>{'query': q};
+        if (filter.params != null) {
+          body['params'] = filter.params;
+        }
+
+        rawJson = await InnerTubeService.instance
+            .post(
+              'search',
+              body,
+              countryCode: country,
+              ttl: SearchRankingConfig.kLruCacheTtl,
+              forceRefresh: forceRefresh,
+            )
+            .timeout(const Duration(seconds: 6));
+      } catch (e) {
+        if (kDebugMode) debugPrint('[SearchDataService] InnerTube HTTP search attempt failed: $e');
       }
 
-      rawJson = await InnerTubeService.instance
-          .post(
-            'search',
-            body,
-            countryCode: country,
-            ttl: SearchRankingConfig.kLruCacheTtl,
-            forceRefresh: forceRefresh,
-          )
-          .timeout(const Duration(seconds: 4));
-    } catch (e) {
-      if (kDebugMode) debugPrint('[SearchDataService] InnerTube search attempt failed: $e');
+      if (rawJson != null) {
+        final parsed = SearchParser.parse(rawJson, query: q);
+        if (parsed.items.isNotEmpty) {
+          candidateItems = parsed.items;
+          topResult = parsed.topResult;
+          didYouMean = parsed.didYouMean;
+          continuation = parsed.continuation;
+        }
+      }
     }
 
     // Guard against out-of-order responses from cancelled/delayed searches
@@ -201,40 +280,37 @@ class SearchDataService {
           );
     }
 
-    // 3. Parse Raw JSON or fallback if InnerTube completely failed or blocked
-    final parsed = rawJson != null
-        ? SearchParser.parse(rawJson, query: q)
-        : const ParsedSearchPayload(items: []);
-
-    List<SearchItem> candidateItems = parsed.items;
+    // 4. TERTIARY STRATEGY (Local Catalog / Featured Tracks / Cloud Fallback):
     if (candidateItems.isEmpty) {
       candidateItems = await _fetchFallbackItems(q, filter);
     }
 
     if (candidateItems.isEmpty) {
-      return SearchResult(
+      final emptyResult = SearchResult(
         originalQuery: q,
         intent: SearchIntentDetector.detectIntent(q, const []),
       );
+      _lruCache.put(cacheKey, emptyResult);
+      return emptyResult;
     }
 
-    // 4. Detect Intent from query terms and candidate entities
+    // 5. Detect Intent from query terms and candidate entities
     final intent = SearchIntentDetector.detectIntent(q, candidateItems);
 
-    // 5. Rank, Deduplicate, and Structure Shelves
+    // 6. Rank, Deduplicate, and Structure Shelves
     final rankedResult = SearchRanker.rank(
       items: candidateItems,
       intent: intent,
       countryCode: country,
-      initialTopResult: parsed.topResult,
-      didYouMean: parsed.didYouMean,
-      continuation: parsed.continuation,
+      initialTopResult: topResult,
+      didYouMean: didYouMean,
+      continuation: continuation,
     );
 
-    // 6. Store in LRU Cache
+    // 7. Store in LRU Cache
     _lruCache.put(cacheKey, rankedResult);
 
-    // 7. Prefetch top 5 song thumbnails in background for instant image loading
+    // 8. Prefetch top 5 song thumbnails in background for instant image loading
     _prefetchThumbnails(rankedResult.songs.take(5));
 
     return rankedResult;
@@ -325,6 +401,56 @@ class SearchDataService {
 
   Future<List<SearchItem>> _fetchFallbackItems(String q, SearchFilter filter) async {
     try {
+      final qLower = q.toLowerCase();
+
+      // 1. Check in-memory CatalogDataSource
+      final catalogMatches = CatalogDataSource.allTracks.where((t) =>
+        t.title.toLowerCase().contains(qLower) ||
+        t.artist.toLowerCase().contains(qLower) ||
+        t.album.toLowerCase().contains(qLower)
+      ).toList();
+
+      if (catalogMatches.isNotEmpty) {
+        final items = <SearchItem>[];
+        final first = catalogMatches.first;
+        if (first.artist.toLowerCase().contains(qLower) || qLower.contains(first.artist.toLowerCase())) {
+          items.add(SearchArtistItem(
+            id: 'artist-${first.artist}',
+            title: first.artist,
+            subtitle: 'Artist',
+            thumbnailUrl: first.coverUrl,
+            thumbnailUrlHiRes: first.coverUrl,
+            browseId: '',
+          ));
+        }
+        items.addAll(catalogMatches.map(_trackToSearchSongItem));
+        return items;
+      }
+
+      // 2. Check ApiService.featuredTracks
+      final featuredMatches = ApiService.featuredTracks.where((t) =>
+        t.title.toLowerCase().contains(qLower) ||
+        t.artist.toLowerCase().contains(qLower) ||
+        t.album.toLowerCase().contains(qLower)
+      ).toList();
+
+      if (featuredMatches.isNotEmpty) {
+        final items = <SearchItem>[];
+        final first = featuredMatches.first;
+        if (first.artist.toLowerCase().contains(qLower) || qLower.contains(first.artist.toLowerCase())) {
+          items.add(SearchArtistItem(
+            id: 'artist-${first.artist}',
+            title: first.artist,
+            subtitle: 'Artist',
+            thumbnailUrl: first.coverUrl,
+            thumbnailUrlHiRes: first.coverUrl,
+            browseId: '',
+          ));
+        }
+        items.addAll(featuredMatches.map(_trackToSearchSongItem));
+        return items;
+      }
+
       if (filter == SearchFilter.videos) {
         final videos = await InnerTubeService.instance
             .searchVideos(q)
@@ -351,21 +477,36 @@ class SearchDataService {
       }
 
       // Fast native songs attempt
-      List<Track> tracks = await InnerTubeService.instance
-          .searchSongsNative(q)
-          .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+      if (InnerTubeService.instance.isNativeAvailable) {
+        final tracks = await InnerTubeService.instance
+            .searchSongsNative(q)
+            .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+        if (tracks.isNotEmpty) {
+          final items = <SearchItem>[];
+          final first = tracks.first;
+          if (first.artist.toLowerCase().contains(qLower) || qLower.contains(first.artist.toLowerCase())) {
+            items.add(SearchArtistItem(
+              id: 'artist-${first.artist}',
+              title: first.artist,
+              subtitle: 'Artist',
+              thumbnailUrl: first.coverUrl,
+              thumbnailUrlHiRes: first.coverUrl,
+              browseId: '',
+            ));
+          }
+          items.addAll(tracks.map(_trackToSearchSongItem));
+          return items;
+        }
+      }
 
       // Resilient cloud fallback via ApiService
-      if (tracks.isEmpty) {
-        tracks = await ApiService.search(q)
-            .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
-      }
+      final tracks = await ApiService.search(q)
+          .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
 
       if (tracks.isNotEmpty) {
         final items = <SearchItem>[];
-        // If query looks like an artist, create an artist item for top result
         final first = tracks.first;
-        if (first.artist.toLowerCase().contains(q.toLowerCase()) || q.toLowerCase().contains(first.artist.toLowerCase())) {
+        if (first.artist.toLowerCase().contains(qLower) || qLower.contains(first.artist.toLowerCase())) {
           items.add(SearchArtistItem(
             id: 'artist-${first.artist}',
             title: first.artist,
@@ -382,5 +523,37 @@ class SearchDataService {
       if (kDebugMode) debugPrint('[SearchDataService] fallback error: $e');
     }
     return const [];
+  }
+
+  /// Instant local fallback result for timeouts or network failures.
+  SearchResult getFallbackResult(String query, SearchFilter filter) {
+    final q = query.trim();
+    final qLower = q.toLowerCase();
+    final tracks = CatalogDataSource.allTracks
+        .where((t) =>
+            t.title.toLowerCase().contains(qLower) ||
+            t.artist.toLowerCase().contains(qLower) ||
+            t.album.toLowerCase().contains(qLower))
+        .take(12)
+        .map(_trackToSearchSongItem)
+        .toList();
+
+    if (tracks.isEmpty) {
+      tracks.addAll(
+        ApiService.featuredTracks
+            .where((t) =>
+                t.title.toLowerCase().contains(qLower) ||
+                t.artist.toLowerCase().contains(qLower))
+            .take(8)
+            .map(_trackToSearchSongItem),
+      );
+    }
+
+    final intent = SearchIntentDetector.detectIntent(q, tracks);
+    return SearchRanker.rank(
+      items: tracks,
+      intent: intent,
+      countryCode: CountryService.instance.currentCode,
+    );
   }
 }
