@@ -828,34 +828,44 @@ class _AlbumScreenState extends State<AlbumScreen> {
       body: Stack(
         children: [
           // Tinted hero backdrop; follows the scroll so overscroll never shows a gap.
-          Positioned.fill(
+          Positioned(
+            top: -600,
+            left: 0,
+            right: 0,
+            height: top + 600 + 540,
             child: AnimatedBuilder(
               animation: _sc,
               builder: (_, child) {
                 final o = _sc.hasClients ? _sc.offset : 0.0;
                 return Transform.translate(offset: Offset(0, -o), child: child);
               },
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: TweenAnimationBuilder<Color?>(
-                  tween: ColorTween(end: _tint),
-                  duration: const Duration(milliseconds: 900),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, c, _) {
-                    final t = c ?? _tint;
-                    return Container(
-                      height: top + 640 + 800, // extends up for bounce overscroll
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [t, t.withValues(alpha: 0.55), AppColors.bg],
-                          stops: const [0.0, 0.4, 0.62],
-                        ),
+              child: TweenAnimationBuilder<Color?>(
+                tween: ColorTween(end: _tint),
+                duration: const Duration(milliseconds: 900),
+                curve: Curves.easeOutCubic,
+                builder: (context, c, _) {
+                  final t = c ?? _tint;
+                  return Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          t.withValues(alpha: 0.7),
+                          t.withValues(alpha: 0.7),
+                          t.withValues(alpha: 0.25),
+                          AppColors.bg,
+                        ],
+                        stops: [
+                          0.0,
+                          600.0 / (top + 1140),
+                          (600.0 + top + 320) / (top + 1140),
+                          1.0,
+                        ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
