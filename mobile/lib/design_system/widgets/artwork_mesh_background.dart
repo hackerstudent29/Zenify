@@ -993,22 +993,20 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
                       c.hasBoundedHeight ? c.maxHeight : screen.height,
                     );
                     final cs = _canvasFor(box, mobile);
-                    return ClipRect(
-                      child: Align(
-                        alignment: Alignment.topLeft,
-                        child: Transform.translate(
-                          offset: const Offset(-4.0, -4.0),
-                          child: Transform.scale(
-                            alignment: Alignment.topLeft,
-                            scaleX: (box.width + 8.0) / cs.width,
-                            scaleY: (box.height + 8.0) / cs.height,
-                            filterQuality: FilterQuality.low,
-                            child: SizedBox.fromSize(
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Transform.translate(
+                        offset: const Offset(-20.0, -20.0),
+                        child: Transform.scale(
+                          alignment: Alignment.topLeft,
+                          scaleX: (box.width + 40.0) / cs.width,
+                          scaleY: (box.height + 40.0) / cs.height,
+                          filterQuality: FilterQuality.low,
+                          child: SizedBox.fromSize(
+                            size: cs,
+                            child: CustomPaint(
                               size: cs,
-                              child: CustomPaint(
-                                size: cs,
-                                painter: _MeshPainter(_engine, bg),
-                              ),
+                              painter: _MeshPainter(_engine, bg),
                             ),
                           ),
                         ),

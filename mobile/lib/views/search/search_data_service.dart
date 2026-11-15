@@ -185,7 +185,7 @@ class SearchDataService {
 
     // Concurrently fire live backend cloud search (JioSaavn + iTunes + Database)
     final cloudFuture = ApiService.searchCloud(q).timeout(
-      const Duration(seconds: 8),
+      const Duration(seconds: 6),
       onTimeout: () => null,
     );
 
@@ -196,14 +196,12 @@ class SearchDataService {
         if (filter == SearchFilter.all) {
           final nativeData = await InnerTubeService.instance
               .searchSummaryNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => null);
-          print('[SearchDataService] nativeData summaries count=${(nativeData?['summaries'] as List?)?.length}');
+              .timeout(const Duration(seconds: 4), onTimeout: () => null);
           if (nativeData != null && nativeData['summaries'] is List) {
             final parsed = SearchParser.parseNativeSummaries(
               nativeData['summaries'] as List,
               query: q,
             );
-            print('[SearchDataService] parsed from native summaries: items=${parsed.items.length}, topResult=${parsed.topResult?.item.title}');
             if (parsed.items.isNotEmpty) {
               candidateItems = parsed.items;
               topResult = parsed.topResult;
@@ -212,12 +210,22 @@ class SearchDataService {
             }
           }
           if (candidateItems.isEmpty || !candidateItems.any((i) => i is SearchSongItem)) {
-            final nativeSongs = await InnerTubeService.instance
-                .searchSongsNative(q)
-                .timeout(
-                  const Duration(seconds: 8),
-                  onTimeout: () => <Track>[],
-                );
+            final parallelResults = await Future.wait([
+              InnerTubeService.instance
+                  .searchSongsNative(q)
+                  .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]),
+              InnerTubeService.instance
+                  .searchAlbumsNative(q)
+                  .timeout(const Duration(seconds: 3), onTimeout: () => const []),
+              InnerTubeService.instance
+                  .searchArtistsNative(q)
+                  .timeout(const Duration(seconds: 3), onTimeout: () => const []),
+            ]);
+
+            final nativeSongs = parallelResults[0] as List<Track>;
+            final nativeAlbums = parallelResults[1] as List<Map<String, dynamic>>;
+            final nativeArtists = parallelResults[2] as List<Map<String, dynamic>>;
+
             if (nativeSongs.isNotEmpty) {
               final songItems = nativeSongs.map(_trackToSearchSongItem).toList();
               if (candidateItems.isEmpty) {
@@ -227,12 +235,7 @@ class SearchDataService {
                 candidateItems.addAll(songItems.where((s) => seenIds.add(s.id)));
               }
             }
-          }
-          if (!candidateItems.any((i) => i is SearchAlbumItem)) {
-            final nativeAlbums = await InnerTubeService.instance
-                .searchAlbumsNative(q)
-                .timeout(const Duration(seconds: 4), onTimeout: () => const []);
-            if (nativeAlbums.isNotEmpty) {
+            if (nativeAlbums.isNotEmpty && !candidateItems.any((i) => i is SearchAlbumItem)) {
               final albumItems = nativeAlbums
                   .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
                   .whereType<SearchAlbumItem>()
@@ -240,12 +243,7 @@ class SearchDataService {
               final seenIds = candidateItems.map((i) => i.id).toSet();
               candidateItems.addAll(albumItems.where((a) => seenIds.add(a.id)));
             }
-          }
-          if (!candidateItems.any((i) => i is SearchArtistItem)) {
-            final nativeArtists = await InnerTubeService.instance
-                .searchArtistsNative(q)
-                .timeout(const Duration(seconds: 4), onTimeout: () => const []);
-            if (nativeArtists.isNotEmpty) {
+            if (nativeArtists.isNotEmpty && !candidateItems.any((i) => i is SearchArtistItem)) {
               final artistItems = nativeArtists
                   .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
                   .whereType<SearchArtistItem>()
@@ -257,14 +255,14 @@ class SearchDataService {
         } else if (filter == SearchFilter.songs) {
           final nativeSongs = await InnerTubeService.instance
               .searchSongsNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => <Track>[]);
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
           if (nativeSongs.isNotEmpty) {
             candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
           }
         } else if (filter == SearchFilter.albums) {
           final nativeAlbums = await InnerTubeService.instance
               .searchAlbumsNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
           if (nativeAlbums.isNotEmpty) {
             candidateItems = nativeAlbums
                 .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
@@ -274,7 +272,7 @@ class SearchDataService {
         } else if (filter == SearchFilter.artists) {
           final nativeArtists = await InnerTubeService.instance
               .searchArtistsNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
           if (nativeArtists.isNotEmpty) {
             candidateItems = nativeArtists
                 .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
@@ -289,20 +287,34 @@ class SearchDataService {
       }
     }
 
-    // 2.5 CLOUD ACCELERATION:
-    // If native didn't find items, leverage the parallel cloud search
-    if (candidateItems.isEmpty) {
-      try {
-        final cloud = await cloudFuture;
-        if (cloud != null) {
-          final parsedCloud = _parseCloudSearch(cloud, q);
-          if (parsedCloud.items.isNotEmpty) {
+    // 2.5 CLOUD ACCELERATION & UNION:
+    // Concurrently merge results from cloud (JioSaavn 320k, iTunes metadata, PostgreSQL)
+    try {
+      final cloud = await cloudFuture;
+      if (cloud != null) {
+        final parsedCloud = _parseCloudSearch(cloud, q);
+        if (parsedCloud.items.isNotEmpty) {
+          if (candidateItems.isEmpty) {
             candidateItems = parsedCloud.items;
             if (parsedCloud.topResult != null) topResult = parsedCloud.topResult;
+          } else {
+            final seenIds = candidateItems.map((i) => i.id).toSet();
+            final seenTitles = candidateItems
+                .map((i) => '${i.title.toLowerCase()}::${i.subtitle.toLowerCase()}')
+                .toSet();
+            for (final ci in parsedCloud.items) {
+              final titleKey = '${ci.title.toLowerCase()}::${ci.subtitle.toLowerCase()}';
+              if (seenIds.add(ci.id) && seenTitles.add(titleKey)) {
+                candidateItems.add(ci);
+              }
+            }
+            if (topResult == null && parsedCloud.topResult != null) {
+              topResult = parsedCloud.topResult;
+            }
           }
         }
-      } catch (_) {}
-    }
+      }
+    } catch (_) {}
 
     // 3. SECONDARY STRATEGY (Web / Desktop / HTTP fallback):
     if (candidateItems.isEmpty) {
@@ -360,10 +372,11 @@ class SearchDataService {
       candidateItems = await _fetchFallbackItems(q, filter);
     }
 
-    print('[SearchDataService] candidateItems count=${candidateItems.length}');
     if (candidateItems.isEmpty) {
       // DO NOT cache empty results into _lruCache so subsequent retries aren't blocked!
-      print('[SearchDataService] returning EMPTY SearchResult for "$q"');
+      if (kDebugMode) {
+        debugPrint('[SearchDataService] returning EMPTY SearchResult for "$q"');
+      }
       return SearchResult(
         originalQuery: q,
         intent: SearchIntentDetector.detectIntent(q, const []),
@@ -382,7 +395,9 @@ class SearchDataService {
       didYouMean: didYouMean,
       continuation: continuation,
     );
-    print('[SearchDataService] rankedResult isEmpty=${rankedResult.isEmpty}, songs=${rankedResult.songs.length}, artists=${rankedResult.artists.length}, albums=${rankedResult.albums.length}');
+    if (kDebugMode) {
+      debugPrint('[SearchDataService] rankedResult isEmpty=${rankedResult.isEmpty}, songs=${rankedResult.songs.length}, artists=${rankedResult.artists.length}, albums=${rankedResult.albums.length}');
+    }
 
     // 7. Store in LRU Cache
     _lruCache.put(cacheKey, rankedResult);

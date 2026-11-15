@@ -858,7 +858,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       onTap: () {
                         Navigator.of(context).pop();
                         if (widget.callerContext.mounted) {
-                          Navigator.of(widget.callerContext).push(
+                          Navigator.of(widget.callerContext, rootNavigator: true).push(
                             CupertinoPageRoute(
                               builder: (_) => StoryPreviewScreen(
                                 content: SongStoryContent(track: effectiveTrack),
@@ -877,7 +877,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       onTap: () {
                         Navigator.of(context).pop();
                         if (widget.callerContext.mounted) {
-                          Navigator.of(widget.callerContext).push(
+                          Navigator.of(widget.callerContext, rootNavigator: true).push(
                             CupertinoPageRoute(
                               builder: (_) => StoryPreviewScreen(
                                 content: SongStoryContent(track: effectiveTrack),

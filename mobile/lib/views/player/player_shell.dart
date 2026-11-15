@@ -1029,8 +1029,8 @@ class PlayerShellState extends State<PlayerShell>
     );
 
     return Positioned(
-      left: -8.0,
-      right: -8.0,
+      left: 0.0,
+      right: 0.0,
       top: 0.0,
       bottom: 0.0,
       child: AnimatedBuilder(
@@ -1136,10 +1136,10 @@ class PlayerShellState extends State<PlayerShell>
     final column = RepaintBoundary(child: _sheetColumn(player, track, safe));
 
     return Positioned(
-      left: -8.0,
-      right: -8.0,
-      top: 0.0,
-      bottom: 0.0,
+      left: -24.0,
+      right: -24.0,
+      top: -24.0,
+      bottom: -60.0,
       child: AnimatedBuilder(
         animation: _sheet,
         child: column,
@@ -1187,6 +1187,7 @@ class PlayerShellState extends State<PlayerShell>
                                 backgroundColor: _palette.isNotEmpty
                                     ? _palette.first
                                     : null,
+                                scrimOpacity: 0.0,
                               ),
                             ),
                             // Scrim: NONE for lyrics (they sit directly on the
@@ -1214,7 +1215,7 @@ class PlayerShellState extends State<PlayerShell>
                           behavior: HitTestBehavior.opaque,
                           onTap: () {},
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 60.0),
                             child: child,
                           ),
                         ),

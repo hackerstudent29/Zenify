@@ -331,7 +331,7 @@ Future<void> _playlistMenu(BuildContext c, UserPlaylist p, {bool inDetail = fals
               .where((u) => u.isNotEmpty)
               .toSet()
               .toList();
-          Navigator.of(c).push(
+          Navigator.of(c, rootNavigator: true).push(
             CupertinoPageRoute(
               builder: (_) => StoryPreviewScreen(
                 content: PlaylistStoryContent(
