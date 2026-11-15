@@ -557,7 +557,9 @@ class _SearchScreenState extends State<SearchScreen>
         });
       }
     } catch (e, st) {
-      print('[SearchScreen] ERROR in _executeSearch for "$query": $e\n$st');
+      if (kDebugMode) {
+        debugPrint('[SearchScreen] ERROR in _executeSearch for "$query": $e\n$st');
+      }
       if (mounted && _wantedKey == key) {
         setState(() => _isLoading = false);
       }

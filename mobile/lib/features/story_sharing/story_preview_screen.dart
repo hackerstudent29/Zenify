@@ -38,11 +38,21 @@ class LyricsSelectionScreen extends StatefulWidget {
 class _LyricsSelectionScreenState extends State<LyricsSelectionScreen> {
   final Set<int> _selectedIndices = {};
   late final List<String> _lyricLines;
+  int? _dockToken;
 
   @override
   void initState() {
     super.initState();
+    _dockToken = DockVisibility.acquire(hideNav: true, hideMini: true);
     _lyricLines = _extractLines(widget.lyrics);
+  }
+
+  @override
+  void dispose() {
+    if (_dockToken != null) {
+      DockVisibility.release(_dockToken!);
+    }
+    super.dispose();
   }
 
   List<String> _extractLines(LyricsResult? result) {
@@ -122,7 +132,7 @@ class _LyricsSelectionScreenState extends State<LyricsSelectionScreen> {
       selectedLines: selectedTexts,
     );
 
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context, rootNavigator: true).pushReplacement(
       CupertinoPageRoute(
         builder: (_) => StoryPreviewScreen(content: content),
       ),
@@ -130,7 +140,7 @@ class _LyricsSelectionScreenState extends State<LyricsSelectionScreen> {
   }
 
   void _shareSongInstead() {
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context, rootNavigator: true).pushReplacement(
       CupertinoPageRoute(
         builder: (_) => StoryPreviewScreen(
           content: SongStoryContent(track: widget.track),
@@ -581,7 +591,7 @@ class StoryOptionsSheet {
                                 ),
                               ),
                               onTap: () {
-                                final nav = Navigator.of(context);
+                                final nav = Navigator.of(context, rootNavigator: true);
                                 Navigator.pop(ctx);
                                 nav.push(
                                   CupertinoPageRoute(
@@ -599,7 +609,7 @@ class StoryOptionsSheet {
                               color: const Color(0xFF25D366),
                               child: const Icon(CupertinoIcons.chat_bubble_fill, color: Colors.white, size: 20),
                               onTap: () {
-                                final nav = Navigator.of(context);
+                                final nav = Navigator.of(context, rootNavigator: true);
                                 Navigator.pop(ctx);
                                 nav.push(
                                   CupertinoPageRoute(
@@ -617,7 +627,7 @@ class StoryOptionsSheet {
                               color: const Color(0xFF1877F2),
                               child: const Icon(CupertinoIcons.share, color: Colors.white, size: 20),
                               onTap: () {
-                                final nav = Navigator.of(context);
+                                final nav = Navigator.of(context, rootNavigator: true);
                                 Navigator.pop(ctx);
                                 nav.push(
                                   CupertinoPageRoute(
@@ -635,7 +645,7 @@ class StoryOptionsSheet {
                               color: const Color(0xFFFFFC00),
                               child: const Icon(CupertinoIcons.paperplane_fill, color: Colors.black, size: 18),
                               onTap: () {
-                                final nav = Navigator.of(context);
+                                final nav = Navigator.of(context, rootNavigator: true);
                                 Navigator.pop(ctx);
                                 nav.push(
                                   CupertinoPageRoute(
@@ -681,7 +691,7 @@ class StoryOptionsSheet {
                         subtitle: 'Poster, liquid glass, and editorial song cards',
                         onTap: () {
                           Navigator.pop(ctx);
-                          Navigator.of(context).push(
+                          Navigator.of(context, rootNavigator: true).push(
                             CupertinoPageRoute(
                               builder: (_) => StoryPreviewScreen(
                                 content: SongStoryContent(track: track),
@@ -701,7 +711,7 @@ class StoryOptionsSheet {
                           subtitle: 'Select up to 3 lines with dynamic artwork typography',
                           onTap: () {
                             Navigator.pop(ctx);
-                            Navigator.of(context).push(
+                            Navigator.of(context, rootNavigator: true).push(
                               CupertinoPageRoute(
                                 builder: (_) => LyricsSelectionScreen(
                                   track: track,
@@ -722,7 +732,7 @@ class StoryOptionsSheet {
                           subtitle: track.artist,
                           onTap: () {
                             Navigator.pop(ctx);
-                            Navigator.of(context).push(
+                            Navigator.of(context, rootNavigator: true).push(
                               CupertinoPageRoute(
                                 builder: (_) => StoryPreviewScreen(
                                   content: ArtistStoryContent(
@@ -750,7 +760,7 @@ class StoryOptionsSheet {
                           subtitle: track.album,
                           onTap: () {
                             Navigator.pop(ctx);
-                            Navigator.of(context).push(
+                            Navigator.of(context, rootNavigator: true).push(
                               CupertinoPageRoute(
                                 builder: (_) => StoryPreviewScreen(
                                   content: AlbumStoryContent(
@@ -777,7 +787,7 @@ class StoryOptionsSheet {
                           subtitle: playlistContent.playlistTitle,
                           onTap: () {
                             Navigator.pop(ctx);
-                            Navigator.of(context).push(
+                            Navigator.of(context, rootNavigator: true).push(
                               CupertinoPageRoute(
                                 builder: (_) => StoryPreviewScreen(
                                   content: playlistContent,
@@ -997,6 +1007,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
 
   ArtworkPalette _palette = ArtworkPalette.defaultPalette;
   bool _isExporting = false;
+  int? _dockToken;
 
   List<StoryTemplate> get _visible =>
       _skinFilter == null ? _allTemplates : _allTemplates.where((t) => t.skin == _skinFilter).toList();
@@ -1009,6 +1020,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
   @override
   void initState() {
     super.initState();
+    _dockToken = DockVisibility.acquire(hideNav: true, hideMini: true);
     _allTemplates = _resolveTemplatesForContent(widget.content);
     _currentTemplate = _allTemplates.firstWhere(
       (t) => t.id == widget.initialTemplateId,
@@ -1026,6 +1038,9 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
 
   @override
   void dispose() {
+    if (_dockToken != null) {
+      DockVisibility.release(_dockToken!);
+    }
     _pageController.dispose();
     super.dispose();
   }

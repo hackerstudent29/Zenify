@@ -776,7 +776,7 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
           title: 'Add to Story',
           icon: CupertinoIcons.paperplane_fill,
           onTap: () {
-            Navigator.of(context).push(
+            Navigator.of(context, rootNavigator: true).push(
               CupertinoPageRoute(
                 builder: (_) => StoryPreviewScreen(
                   content: AlbumStoryContent(
