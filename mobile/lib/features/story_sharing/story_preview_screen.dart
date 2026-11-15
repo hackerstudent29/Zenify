@@ -38,7 +38,7 @@ class LyricsSelectionScreen extends StatefulWidget {
 class _LyricsSelectionScreenState extends State<LyricsSelectionScreen> {
   final Set<int> _selectedIndices = {};
   late final List<String> _lyricLines;
-  int? _dockToken;
+  Object? _dockToken;
 
   @override
   void initState() {
@@ -1007,7 +1007,7 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
 
   ArtworkPalette _palette = ArtworkPalette.defaultPalette;
   bool _isExporting = false;
-  int? _dockToken;
+  Object? _dockToken;
 
   List<StoryTemplate> get _visible =>
       _skinFilter == null ? _allTemplates : _allTemplates.where((t) => t.skin == _skinFilter).toList();
