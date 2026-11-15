@@ -53,6 +53,8 @@ google-services.json
 *.opus
 *.webm
 *.mp4
+# Temporary screenshots & screen recordings
+phone_now2.png
 *.part
 backend/public/music/*
 !backend/public/music/.gitkeep

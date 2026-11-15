@@ -14,7 +14,6 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.url
@@ -184,12 +183,6 @@ class InnerTube(
                 requestTimeoutMillis = 60_000
                 connectTimeoutMillis = 30_000
                 socketTimeoutMillis = 60_000
-            }
-
-            defaultRequest {
-                url("https://music.youtube.com/youtubei/v1/")
-                header("Accept", "application/json")
-                header("Cache-Control", "no-cache")
             }
         }
 

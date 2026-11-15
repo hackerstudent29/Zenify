@@ -381,18 +381,46 @@ class DynamicIslandHeader extends StatefulWidget {
 class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerProviderStateMixin {
   static const _spring = SpringDescription(mass: 1, stiffness: 300, damping: 21);
 
-  late final AnimationController _c =
-      AnimationController.unbounded(vsync: this, value: widget.scrollController == null ? 1 : 0);
+  // Subpages / detail pages start at 0.0 (strictly hidden at rest).
+  // Only root dock pages with no controller (Home, Explore) start at 1.0.
+  late final AnimationController _c = AnimationController.unbounded(
+    vsync: this,
+    value: (widget.isDockPage == true && widget.scrollController == null) ? 1.0 : 0.0,
+  );
   late final AnimationController _n =
       AnimationController.unbounded(vsync: this, value: IslandNotifier.instance.current == null ? 0.0 : 1.0);
   bool _shown = false;
+  ScrollController? _activeSc;
+
+  bool get _isSubpage {
+    if (widget.isDockPage == true) return false;
+    if (widget.isDockPage == false) return true;
+    if (widget.showBack != null) return widget.showBack!;
+    return mounted && Navigator.canPop(context);
+  }
 
   void _listener() => _check(false);
 
+  ScrollController? _findController() {
+    if (widget.scrollController != null) return widget.scrollController;
+    if (mounted) {
+      return PrimaryScrollController.maybeOf(context);
+    }
+    return null;
+  }
+
   void _check(bool jump) {
-    final sc = widget.scrollController;
-    if (sc == null || !mounted || !sc.hasClients) return;
-    final show = sc.offset > widget.revealOffset;
+    final sc = _findController();
+    final isSub = _isSubpage;
+
+    if (sc == null || !mounted || !sc.hasClients) {
+      // If this is a subpage with in-page title and no active scroll offset, keep island hidden
+      if (isSub && _c.value > 0.0 && !_shown) {
+        _c.value = 0.0;
+      }
+      return;
+    }
+    final show = isSub ? (sc.offset > widget.revealOffset) : true;
     if (show == _shown) return;
     _shown = show;
     final to = show ? 1.0 : 0.0;
@@ -429,6 +457,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
   void initState() {
     super.initState();
     widget.scrollController?.addListener(_listener);
+    _activeSc = widget.scrollController;
     IslandNotifier.instance.addListener(_onNotifChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _check(true);
@@ -439,12 +468,32 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isSubpage && !_shown) {
+      _c.value = 0.0;
+    }
+    final newSc = _findController();
+    if (newSc != _activeSc) {
+      _activeSc?.removeListener(_listener);
+      _activeSc = newSc;
+      _activeSc?.addListener(_listener);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _check(true));
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant DynamicIslandHeader old) {
     super.didUpdateWidget(old);
     if (old.scrollController != widget.scrollController) {
-      old.scrollController?.removeListener(_listener);
-      widget.scrollController?.addListener(_listener);
-      if (widget.scrollController == null) {
+      _activeSc?.removeListener(_listener);
+      _activeSc = widget.scrollController ?? PrimaryScrollController.maybeOf(context);
+      _activeSc?.addListener(_listener);
+      if (_isSubpage) {
+        _shown = false;
+        _c.value = 0;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _check(true));
+      } else if (widget.scrollController == null) {
         _c.value = 1;
       } else {
         _shown = false;
@@ -458,6 +507,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 
   @override
   void dispose() {
+    _activeSc?.removeListener(_listener);
     widget.scrollController?.removeListener(_listener);
     IslandNotifier.instance.removeListener(_onNotifChanged);
     _c.dispose();

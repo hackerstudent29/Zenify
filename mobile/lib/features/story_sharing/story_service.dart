@@ -2,13 +2,16 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 1. ARTWORK PALETTE SERVICE
@@ -315,64 +318,89 @@ class StoryImageRenderer {
   }
 }
 
+
 // ═════════════════════════════════════════════════════════════════════════════
-// 3. GALLERY SAVE SERVICE
+// 3. DOWNLOAD / GALLERY SAVE SERVICE (Android + iOS)
 // ═════════════════════════════════════════════════════════════════════════════
 
 class GallerySaveService {
   GallerySaveService._();
   static const MethodChannel _channel = MethodChannel('com.zenify.mobile/story_share');
 
+  /// Saves the PNG into the phone gallery (album "Zenify"). Uses `gal`, which
+  /// handles Android 10+ scoped storage and iOS photo-library permission.
   static Future<bool> saveImageToGallery(File imageFile, {String title = 'Zenify_Story'}) async {
     if (!imageFile.existsSync()) {
       debugPrint('[GallerySaveService] Image file does not exist: ${imageFile.path}');
       return false;
     }
-
-    if (!Platform.isAndroid) {
-      debugPrint('[GallerySaveService] saveToGallery not supported on ${Platform.operatingSystem}');
-      return false;
-    }
-
     try {
-      final bool? result = await _channel.invokeMethod<bool>('saveToGallery', {
-        'filePath': imageFile.path,
-        'title': title,
-      });
-      return result ?? false;
-    } on PlatformException catch (e) {
-      debugPrint('[GallerySaveService] Platform exception: ${e.message}');
-      return false;
+      var ok = await Gal.hasPermission(toAlbum: true);
+      if (!ok) ok = await Gal.requestPermission(toAlbum: true);
+      if (!ok) return false;
+      await Gal.putImage(imageFile.path, album: 'Zenify');
+      return true;
     } catch (e) {
-      debugPrint('[GallerySaveService] Error: $e');
-      return false;
+      debugPrint('[GallerySaveService] gal error: $e');
     }
+    // Fallback: your existing Android MediaStore channel.
+    if (Platform.isAndroid) {
+      try {
+        final bool? result = await _channel.invokeMethod<bool>('saveToGallery', {
+          'filePath': imageFile.path,
+          'title': title,
+        });
+        return result ?? false;
+      } catch (e) {
+        debugPrint('[GallerySaveService] channel error: $e');
+      }
+    }
+    return false;
   }
+
+  /// "Save to Files": opens the system sheet so the PNG can go to Files,
+  /// Drive, AirDrop, Nearby Share, etc.
+  static Future<bool> saveToFiles(File imageFile) => StorySharingService.shareToSystem(imageFile);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 4. NATIVE STORY & SYSTEM SHARING SERVICE
+// 4. REAL-TIME SHARING — native app hand-off + link intents
 // ═════════════════════════════════════════════════════════════════════════════
 
+/// Targets that receive the rendered IMAGE (+ caption / link).
+/// Old names (instagram, facebook, …) are kept so existing callers compile.
 enum StoryShareTarget {
-  instagram,
-  facebook,
-  whatsapp,
-  snapchat,
+  instagram, // Instagram Story (sticker over background colours)
+  instagramPost, // Instagram share sheet: Feed / Reels / Direct
+  facebook, // Facebook Story
+  whatsapp, // WhatsApp / Business (chat or Status)
+  twitter, // X (Twitter) post composer with the image attached
+  snapchat, // Snapchat camera with the image
   telegram,
+  messenger,
+  threads,
   system,
 }
+
+/// Targets that receive the LINK (+ text) through universal links, so they
+/// work even where image hand-off is not possible (e.g. iOS, web fallbacks).
+enum StoryLinkTarget { x, whatsapp, telegram, facebook, linkedin, reddit, pinterest, sms, email }
 
 class StorySharingService {
   StorySharingService._();
   static const MethodChannel _channel = MethodChannel('com.zenify.mobile/story_share');
 
+  static const Map<StoryShareTarget, List<String>> _packages = {
+    StoryShareTarget.instagramPost: ['com.instagram.android'],
+    StoryShareTarget.twitter: ['com.twitter.android', 'com.twitter.android.lite'],
+    StoryShareTarget.messenger: ['com.facebook.orca', 'com.facebook.mlite'],
+    StoryShareTarget.threads: ['com.instagram.barcelona'],
+  };
+
   static Future<bool> isAppInstalled(String packageName) async {
     if (!Platform.isAndroid) return false;
     try {
-      final bool? result = await _channel.invokeMethod<bool>('isAppInstalled', {
-        'packageName': packageName,
-      });
+      final bool? result = await _channel.invokeMethod<bool>('isAppInstalled', {'packageName': packageName});
       return result ?? false;
     } catch (_) {
       return false;
@@ -380,28 +408,68 @@ class StorySharingService {
   }
 
   static Future<bool> isInstagramInstalled() => isAppInstalled('com.instagram.android');
-  static Future<bool> isFacebookInstalled() async {
-    final fb = await isAppInstalled('com.facebook.katana');
-    if (fb) return true;
-    return isAppInstalled('com.facebook.lite');
-  }
-  static Future<bool> isWhatsAppInstalled() async {
-    final wa = await isAppInstalled('com.whatsapp');
-    if (wa) return true;
-    return isAppInstalled('com.whatsapp.w4b');
-  }
+  static Future<bool> isFacebookInstalled() async =>
+      await isAppInstalled('com.facebook.katana') || await isAppInstalled('com.facebook.lite');
+  static Future<bool> isWhatsAppInstalled() async =>
+      await isAppInstalled('com.whatsapp') || await isAppInstalled('com.whatsapp.w4b');
   static Future<bool> isSnapchatInstalled() => isAppInstalled('com.snapchat.android');
-  static Future<bool> isTelegramInstalled() async {
-    final tg = await isAppInstalled('org.telegram.messenger');
-    if (tg) return true;
-    final tgX = await isAppInstalled('org.thunderdog.challegram');
-    if (tgX) return true;
-    return isAppInstalled('org.telegram.messenger.web');
+  static Future<bool> isTelegramInstalled() async =>
+      await isAppInstalled('org.telegram.messenger') ||
+      await isAppInstalled('org.thunderdog.challegram') ||
+      await isAppInstalled('org.telegram.messenger.web');
+
+  /// One entry point used by the preview screen.
+  static Future<bool> shareImage(
+    StoryShareTarget target,
+    File file, {
+    String? text,
+    Color? topColor,
+    Color? bottomColor,
+  }) {
+    switch (target) {
+      case StoryShareTarget.instagram:
+        return shareToInstagram(file, topColor: topColor, bottomColor: bottomColor, fallbackText: text);
+      case StoryShareTarget.facebook:
+        return shareToFacebook(file, fallbackText: text);
+      case StoryShareTarget.whatsapp:
+        return shareToWhatsApp(file, text: text);
+      case StoryShareTarget.snapchat:
+        return shareToSnapchat(file, fallbackText: text);
+      case StoryShareTarget.telegram:
+        return shareToTelegram(file, text: text);
+      case StoryShareTarget.instagramPost:
+      case StoryShareTarget.twitter:
+      case StoryShareTarget.messenger:
+      case StoryShareTarget.threads:
+        return _shareToPackages(file, _packages[target]!, text: text);
+      case StoryShareTarget.system:
+        return shareToSystem(file, text: text);
+    }
+  }
+
+  /// Generic Android hand-off: opens the target app's composer directly with
+  /// the PNG attached. Falls back to the system sheet (always on iOS).
+  static Future<bool> _shareToPackages(File file, List<String> packages, {String? text}) async {
+    if (!file.existsSync()) return false;
+    if (Platform.isAndroid) {
+      for (final pkg in packages) {
+        try {
+          final bool? ok = await _channel.invokeMethod<bool>('shareToPackage', {
+            'filePath': file.path,
+            'packageName': pkg,
+            'text': text,
+          });
+          if (ok == true) return true;
+        } catch (e) {
+          debugPrint('[StorySharingService] shareToPackage($pkg) error: $e');
+        }
+      }
+    }
+    return shareToSystem(file, text: text);
   }
 
   static Future<bool> shareToTelegram(File imageFile, {String? text}) async {
     if (!imageFile.existsSync()) return false;
-
     if (Platform.isAndroid) {
       try {
         final bool? success = await _channel.invokeMethod<bool>('shareToTelegram', {
@@ -413,7 +481,6 @@ class StorySharingService {
         debugPrint('[StorySharingService] Telegram share error: $e');
       }
     }
-
     return shareToSystem(imageFile, text: text);
   }
 
@@ -424,39 +491,24 @@ class StorySharingService {
     String? fallbackText,
   }) async {
     if (!imageFile.existsSync()) return false;
-
     if (Platform.isAndroid) {
       try {
-        String? hexTop;
-        String? hexBottom;
-        if (topColor != null) {
-          hexTop = '#${topColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
-        }
-        if (bottomColor != null) {
-          hexBottom = '#${bottomColor.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
-        }
-
+        String? hex(Color? c) => c == null ? null : '#${c.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
         final bool? success = await _channel.invokeMethod<bool>('shareToInstagramStory', {
           'filePath': imageFile.path,
-          'topBackgroundColor': hexTop,
-          'bottomBackgroundColor': hexBottom,
+          'topBackgroundColor': hex(topColor),
+          'bottomBackgroundColor': hex(bottomColor),
         });
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] Instagram native story share error: $e');
       }
     }
-
     return shareToSystem(imageFile, text: fallbackText);
   }
 
-  static Future<bool> shareToFacebook(
-    File imageFile, {
-    String? appId,
-    String? fallbackText,
-  }) async {
+  static Future<bool> shareToFacebook(File imageFile, {String? appId, String? fallbackText}) async {
     if (!imageFile.existsSync()) return false;
-
     if (Platform.isAndroid) {
       try {
         final bool? success = await _channel.invokeMethod<bool>('shareToFacebookStory', {
@@ -468,13 +520,11 @@ class StorySharingService {
         debugPrint('[StorySharingService] Facebook story share error: $e');
       }
     }
-
     return shareToSystem(imageFile, text: fallbackText);
   }
 
   static Future<bool> shareToWhatsApp(File imageFile, {String? text}) async {
     if (!imageFile.existsSync()) return false;
-
     if (Platform.isAndroid) {
       try {
         final bool? success = await _channel.invokeMethod<bool>('shareToWhatsApp', {
@@ -486,51 +536,71 @@ class StorySharingService {
         debugPrint('[StorySharingService] WhatsApp share error: $e');
       }
     }
-
     return shareToSystem(imageFile, text: text);
   }
 
   static Future<bool> shareToSnapchat(File imageFile, {String? fallbackText}) async {
     if (!imageFile.existsSync()) return false;
-
     if (Platform.isAndroid) {
       try {
-        final bool? success = await _channel.invokeMethod<bool>('shareToSnapchat', {
-          'filePath': imageFile.path,
-        });
+        final bool? success = await _channel.invokeMethod<bool>('shareToSnapchat', {'filePath': imageFile.path});
         if (success == true) return true;
       } catch (e) {
         debugPrint('[StorySharingService] Snapchat share error: $e');
       }
     }
-
     return shareToSystem(imageFile, text: fallbackText);
   }
 
-  static Future<bool> shareToSystem(File imageFile, {String? text}) async {
+  /// System sheet: every installed app + AirDrop / Nearby Share / Files / print.
+  static Future<bool> shareToSystem(File imageFile, {String? text, Rect? origin}) async {
     if (!imageFile.existsSync()) return false;
-    if (Platform.isAndroid) {
-      try {
-        final bool? success = await _channel.invokeMethod<bool>('shareToSystemChooser', {
-          'filePath': imageFile.path,
-          'text': text,
-          'title': 'Share Story',
-        });
-        if (success == true) return true;
-      } catch (e) {
-        debugPrint('[StorySharingService] Native system chooser error: $e');
-      }
-    }
     try {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(imageFile.path, mimeType: 'image/png')],
           text: text,
+          sharePositionOrigin: origin,
         ),
       );
       return true;
     } catch (e) {
       debugPrint('[StorySharingService] System share error: $e');
+      return false;
+    }
+  }
+
+  // ── Link intents (live link, opens the app/site composer) ──
+
+  static Uri linkUri(StoryLinkTarget t, {required String text, required String url}) {
+    final q = Uri.encodeQueryComponent;
+    switch (t) {
+      case StoryLinkTarget.x:
+        return Uri.parse('https://x.com/intent/post?text=${q(text)}&url=${q(url)}');
+      case StoryLinkTarget.whatsapp:
+        return Uri.parse('https://wa.me/?text=${q('$text $url')}');
+      case StoryLinkTarget.telegram:
+        return Uri.parse('https://t.me/share/url?url=${q(url)}&text=${q(text)}');
+      case StoryLinkTarget.facebook:
+        return Uri.parse('https://www.facebook.com/sharer/sharer.php?u=${q(url)}&quote=${q(text)}');
+      case StoryLinkTarget.linkedin:
+        return Uri.parse('https://www.linkedin.com/sharing/share-offsite/?url=${q(url)}');
+      case StoryLinkTarget.reddit:
+        return Uri.parse('https://www.reddit.com/submit?url=${q(url)}&title=${q(text)}');
+      case StoryLinkTarget.pinterest:
+        return Uri.parse('https://pinterest.com/pin/create/button/?url=${q(url)}&description=${q(text)}');
+      case StoryLinkTarget.sms:
+        return Uri.parse('sms:?body=${q('$text $url')}');
+      case StoryLinkTarget.email:
+        return Uri.parse('mailto:?subject=${q(text)}&body=${q('$text\n$url')}');
+    }
+  }
+
+  static Future<bool> shareLink(StoryLinkTarget t, {required String text, required String url}) async {
+    try {
+      return await launchUrl(linkUri(t, text: text, url: url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('[StorySharingService] link share error: $e');
       return false;
     }
   }

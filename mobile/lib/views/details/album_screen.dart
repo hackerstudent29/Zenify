@@ -5,7 +5,6 @@ import 'dart:ui' as ui;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -20,7 +19,6 @@ import '../../design_system/zen.dart';
 import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
-import '../../services/api_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
@@ -248,7 +246,6 @@ class _SecHeader extends StatelessWidget {
       );
 }
 
-/// Frosted-glass container (back button, share/more pill).
 
 /// Round translucent button used in the action row (shuffle / add).
 class _ActionCircle extends StatelessWidget {
@@ -283,14 +280,13 @@ class _Release {
   int count = 0;
 }
 
-List<_Release> _group(Iterable<Track> tracks, {String? skip, String? fallbackCover}) {
+List<_Release> _group(Iterable<Track> tracks, {String? skip}) {
   final map = <String, _Release>{};
   for (final t in tracks) {
     final a = t.album;
     final key = a.isEmpty ? t.title : a;
     if (skip != null && key.toLowerCase() == skip.toLowerCase()) continue;
-    final cover = t.coverUrl.isNotEmpty ? t.coverUrl : (fallbackCover ?? '');
-    final r = map.putIfAbsent(key, () => _Release(key, t.artist, cover));
+    final r = map.putIfAbsent(key, () => _Release(key, t.artist, t.coverUrl));
     r.count++;
   }
   return map.values.toList();
@@ -352,7 +348,6 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
   // to be shown full-bleed (otherwise it is shown as an inset square).
   Color _tint = const Color(0xFF3A3A3C);
   String? _coverKey;
-  bool _fullBleed = true;
 
   // ---- Living cover ----
   /// Flip to -1 if the tilt parallax feels inverted on your device.
@@ -381,11 +376,13 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
     final init = widget.initialTracks;
     if (init != null && init.isNotEmpty) {
       _tracks = init;
-      _loading = false;
       _inspectTracksMetadata();
+      // If only 1 placeholder song was passed, keep loading spinner active while fetching full album
+      _loading = init.length <= 1;
     } else {
-      _loadAlbum();
+      _loading = true;
     }
+    _loadAlbum();
     _loadMore();
     LibraryStore.instance.ensureLoaded();
     LibraryStore.instance.addListener(_onLibrary);
@@ -511,61 +508,15 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
   /* ---------------------------- data ---------------------------- */
   Future<void> _loadAlbum() async {
     try {
-      final bId = widget.browseId ?? '';
-      final title = MediaNormalizer.stripIdNoise(MediaNormalizer.cleanTitle(widget.albumTitle)).trim();
-      final artist = MediaNormalizer.stripIdNoise(MediaNormalizer.formatArtists(widget.artistName)).trim();
-
-      // 1. Primary: Rich cloud album lookup via ApiService (JioSaavn + iTunes + Database)
-      try {
-        final cloudLookupTarget = bId.isNotEmpty ? bId : title;
-        if (cloudLookupTarget.isNotEmpty) {
-          final cloudAlbum = await ApiService.getAlbum(
-            cloudLookupTarget,
-            artistName: artist.isNotEmpty ? artist : null,
-          ).timeout(const Duration(seconds: 5), onTimeout: () => null);
-
-          if (cloudAlbum != null && cloudAlbum['tracks'] is List) {
-            final trackList = (cloudAlbum['tracks'] as List)
-                .whereType<Map>()
-                .map((m) => Track.fromJson(Map<String, dynamic>.from(m), baseUrl: ApiService.liveCloudUrl))
-                .where((t) => t.title.isNotEmpty)
-                .toList();
-
-            if (trackList.isNotEmpty) {
-              if (mounted) {
-                final albTitle = (cloudAlbum['title'] ?? cloudAlbum['name'] ?? '')?.toString();
-                final albCover = (cloudAlbum['coverUrl'] ?? cloudAlbum['imageUrl'] ?? '')?.toString();
-                final albArtist = cloudAlbum['artist'] is Map
-                    ? (cloudAlbum['artist']['name']?.toString() ?? '')
-                    : (cloudAlbum['artist'] ?? cloudAlbum['artistName'] ?? '')?.toString();
-                final albYear = int.tryParse((cloudAlbum['year'] ?? '').toString());
-                final albLabel = cloudAlbum['label']?.toString();
-                final albDesc = cloudAlbum['description']?.toString();
-
-                setState(() {
-                  _tracks = trackList;
-                  if (albCover != null && albCover.isNotEmpty) _resolvedCover = albCover;
-                  if (albTitle != null && albTitle.isNotEmpty) _resolvedAlbumTitle = MediaNormalizer.cleanAlbumTitle(albTitle);
-                  if (albArtist != null && albArtist.isNotEmpty) _resolvedArtistName = MediaNormalizer.formatArtists(albArtist);
-                  if (albYear != null && albYear > 0) _releaseYear = albYear;
-                  if (albLabel != null && albLabel.isNotEmpty) _recordLabel = albLabel;
-                  if (albDesc != null && albDesc.isNotEmpty) _description = albDesc;
-                  _loading = false;
-                });
-                _inspectTracksMetadata();
-                return;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        if (kDebugMode) debugPrint('[AlbumScreen] cloud album lookup notice: $e');
+      var bId = widget.browseId ?? '';
+      final firstTrack = widget.initialTracks?.isNotEmpty == true ? widget.initialTracks!.first : null;
+      if (bId.isEmpty && firstTrack?.albumBrowseId != null && firstTrack!.albumBrowseId!.isNotEmpty) {
+        bId = firstTrack.albumBrowseId!;
       }
 
-      // 2. InnerTube playlist / album lookup (for YouTube playlists like VLPL...)
       if (bId.isNotEmpty) {
-        if (bId.startsWith('VLPL') || bId.startsWith('PL') || bId.startsWith('RD') || bId.startsWith('VL')) {
-          final pRes = await InnerTubeService.instance.getPlaylist(bId).timeout(const Duration(seconds: 5), onTimeout: () => null);
+        if (bId.startsWith('VLPL') || bId.startsWith('PL') || bId.startsWith('RD') || bId.startsWith('OLAK5uy_')) {
+          final pRes = await InnerTubeService.instance.getPlaylist(bId);
           if (pRes != null && pRes.tracks.isNotEmpty) {
             if (mounted) {
               setState(() {
@@ -582,13 +533,13 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
         }
       }
 
-      // 3. InnerTube album endpoint
       final res = await InnerTubeService.instance.getAlbum(
         bId,
-        albumTitle: title,
-        artistName: artist,
-      ).timeout(const Duration(seconds: 6), onTimeout: () => null);
-
+        albumTitle: MediaNormalizer.stripIdNoise(MediaNormalizer.cleanTitle(widget.albumTitle)),
+        artistName: MediaNormalizer.stripIdNoise(MediaNormalizer.formatArtists(widget.artistName)),
+        videoId: firstTrack?.id,
+        songTitle: firstTrack?.title,
+      );
       if (res != null && res.tracks.isNotEmpty) {
         if (mounted) {
           setState(() {
@@ -619,18 +570,12 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
         return;
       }
 
-      // 4. Fallback search for tracks
-      final q = artist.isNotEmpty && title.isNotEmpty ? '$title $artist' : (title.isNotEmpty ? title : artist);
-      final r = await InnerTubeService.instance.search(q).timeout(const Duration(seconds: 5), onTimeout: () => const []);
+      final r = await InnerTubeService.instance.search(
+          '${MediaNormalizer.stripIdNoise(widget.albumTitle)} ${MediaNormalizer.stripIdNoise(widget.artistName)}');
       final exact = r.where((t) => t.album.toLowerCase() == widget.albumTitle.toLowerCase()).toList();
-      var candidate = exact.isNotEmpty ? exact : r;
-      if (candidate.isEmpty && _artistPool.isNotEmpty) {
-        candidate = _artistPool;
-      }
-
       if (mounted) {
         setState(() {
-          _tracks = candidate;
+          _tracks = exact.isNotEmpty ? exact : (r.isNotEmpty ? r : (widget.initialTracks ?? []));
           _loading = false;
         });
         _inspectTracksMetadata();
@@ -670,16 +615,8 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
 
   Future<void> _loadMore() async {
     try {
-      final r = await InnerTubeService.instance.search(widget.artistName).timeout(const Duration(seconds: 5), onTimeout: () => const []);
-      if (mounted) {
-        setState(() {
-          _artistPool = r;
-          if (_tracks.isEmpty && _loading && r.isNotEmpty) {
-            _tracks = r;
-            _loading = false;
-          }
-        });
-      }
+      final r = await InnerTubeService.instance.search(widget.artistName);
+      if (mounted) setState(() => _artistPool = r);
     } catch (_) {/* optional sections just stay hidden */}
   }
 
@@ -709,20 +646,17 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
   ///  * full-bleed vs inset (real pixel width)
   ///  * whether it is already animated (GIF / animated WebP)
   Future<void> _analyzeCover(String url) async {
-    var w = 0;
     var animated = false;
     try {
       final file = await DefaultCacheManager().getSingleFile(_hq(url));
       final codec = await ui.instantiateImageCodec(await file.readAsBytes());
       animated = codec.frameCount > 1;
       final frame = await codec.getNextFrame();
-      w = frame.image.width;
       frame.image.dispose();
       codec.dispose();
     } catch (_) {}
     if (!mounted || _coverKey != url) return;
     setState(() {
-      _fullBleed = w >= 480;
       _animatedCover = animated;
     });
   }
@@ -840,7 +774,7 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
         ),
         ZenDropdownItem(
           title: 'Add to Story',
-          icon: CupertinoIcons.camera,
+          icon: CupertinoIcons.paperplane_fill,
           onTap: () {
             Navigator.of(context).push(
               CupertinoPageRoute(
@@ -946,9 +880,9 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
     final player = context.watch<PlayerState>();
     final top = MediaQuery.paddingOf(context).top;
     final width = MediaQuery.sizeOf(context).width;
-    final heroH = width * 1.12;
+    final insetSize = math.min(width * 0.68, 260.0);
+    final heroH = top + 56 + insetSize + 28;
     _heroH = heroH;
-    final insetSize = math.min(width * 0.72, 300.0);
     final saved = LibraryStore.instance.isAlbumSaved(widget.albumTitle, widget.artistName);
     final cover = _resolvedCover ??
         widget.coverUrl ??
@@ -973,14 +907,14 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
     final lower = widget.artistName.toLowerCase();
     final mine = _artistPool.where((t) => t.artist.toLowerCase().contains(lower));
     final theirs = _artistPool.where((t) => !t.artist.toLowerCase().contains(lower));
-    final moreBy = _group(mine, skip: widget.albumTitle, fallbackCover: cover);
-    final similar = _group(theirs, fallbackCover: cover);
+    final moreBy = _group(mine, skip: widget.albumTitle);
+    final similar = _group(theirs);
 
     final title = _displayAlbumTitle;
     final artists = _albumArtists.isNotEmpty
         ? _albumArtists
         : MediaNormalizer.splitArtistNames(_displayArtistName);
-    final heroSpace = _fullBleed ? heroH - 120 : top + 56 + insetSize + 24;
+    final heroSpace = top + 56 + insetSize + 18;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -1008,7 +942,7 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
                           tween: Tween(end: heroSpace),
                           duration: const Duration(milliseconds: 650),
                           curve: Curves.easeOutCubic,
-                          builder: (_, v, _) => SizedBox(height: v),
+                          builder: (context, v, child) => SizedBox(height: v),
                         ),
                         _Reveal(
                           delay: const Duration(milliseconds: 120),
@@ -1165,36 +1099,14 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
                             ),
                           ),
                         const SizedBox(height: 14),
-                        // ───────── Apple-Style Blurred Bleed Transition (Melts cleanly into solid AppColors.bg) ─────────
-                        ClipRect(
-                          child: BackdropFilter(
-                            filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                            child: Container(
-                              height: 56,
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Color(0xD9000000), // 85% dark
-                                    AppColors.bg,
-                                  ],
-                                  stops: [0.0, 0.45, 1.0],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
 
-                  // ---------------- Tracklist + footer + shelves on Solid AppColors.bg ----------------
+                  // ---------------- Tracklist + footer + shelves ----------------
                   SliverToBoxAdapter(
-                    child: Container(
-                      width: double.infinity,
-                      color: AppColors.bg,
+                    child: ColoredBox(
+                      color: Colors.black,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1212,7 +1124,7 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
                         else ...[
                           for (var i = 0; i < _tracks.length; i++)
                             _Reveal(
-                              delay: Duration(milliseconds: (30 * math.min(i, 8)).toInt()),
+                              delay: Duration(milliseconds: 30 * math.min(i, 8)),
                               rise: 14,
                               child: _TrackRow(
                                 index: i,
@@ -1251,32 +1163,31 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
                 ),
                 ],
               )),
-              // ---------------- Floating Dynamic Island Header (Three Docks) ----------------
               Positioned(
                 top: 0,
                 left: 0,
                 right: 0,
                 child: DynamicIslandHeader(
-                  title: _displayAlbumTitle,
-                  subtitle: _displayArtistName,
+                  title: title,
                   showBack: true,
+                  scrollController: _sc,
+                  revealOffset: heroSpace - 40,
                   onBack: () => Navigator.pop(context),
-                  showProfile: false,
-                  trailing: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
+                  trailing: _Press(
+                    scale: 0.88,
                     onTap: () => _showMore(saved, cover),
                     child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: ShapeDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        shape: const CircleBorder(),
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 0.8),
                       ),
+                      alignment: Alignment.center,
                       child: const Icon(CupertinoIcons.ellipsis, color: Colors.white, size: 18),
                     ),
                   ),
-                  scrollController: _sc,
-                  revealOffset: 240,
                 ),
               ),
             ],
@@ -1292,8 +1203,8 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
   /// bounce-overscroll never shows a gap) and slowly breathes.
   Widget _backdrop(Color base, double heroH) {
     const extra = 1200.0;
-    final h = extra + heroH + 800;
-    final stops = [0.0, (extra + heroH * 0.9) / h, (extra + heroH + 280) / h, 1.0];
+    final h = extra + heroH + 600;
+    final stops = [0.0, (extra + heroH * 0.4) / h, (extra + heroH * 0.75) / h, 1.0];
     return Positioned(
       top: -extra,
       left: 0,
@@ -1301,7 +1212,7 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
       height: h,
       child: AnimatedBuilder(
         animation: Listenable.merge([_sc, _glow]),
-        builder: (_, _) {
+        builder: (context, child) {
           final b = _breathe(base);
           return Transform.translate(
             offset: Offset(0, -_offset),
@@ -1310,7 +1221,7 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [b, b, Color.lerp(b, AppColors.bg, 0.65)!, AppColors.bg],
+                  colors: [b, b.withValues(alpha: 0.6), Colors.black, Colors.black],
                   stops: stops,
                 ),
               ),
@@ -1352,83 +1263,6 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
     );
   }
 
-  /// Full-bleed: slow Ken-Burns drift + tilt parallax on the image, and a
-  /// liquid edge (moving blob + wavering gradient) where it melts into the tint.
-  Widget _fullArt(Color base, double heroH, String url) {
-    return SizedBox(
-      key: const ValueKey('full'),
-      height: heroH,
-      width: double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          AnimatedBuilder(
-            animation: Listenable.merge([_live, _tilt]),
-            child: _cover(url, 0),
-            builder: (_, child) {
-              final a = _live.value * math.pi;
-              final t = _tilt.value;
-              final d = _driftOn;
-              // cos(a) and cos(2a) have zero slope at both ends of the
-              // back-and-forth, so the path never has a visible "turn".
-              final dx = (d ? math.cos(a) * 9 : 0.0) - t.dx * 12;
-              final dy = (d ? math.cos(2 * a) * 6 : 0.0) + t.dy * 8;
-              // Natural original size - do not zoom or over-scale
-              return Transform.translate(
-                offset: Offset(dx, dy),
-                child: child,
-              );
-            },
-          ),
-          // status-bar scrim
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.black.withValues(alpha: 0.30), Colors.transparent],
-                stops: const [0.0, 0.2],
-              ),
-            ),
-          ),
-          // liquid edge
-          AnimatedBuilder(
-            animation: Listenable.merge([_live, _glow]),
-            builder: (_, _) {
-              final a = _live.value * math.pi;
-              final c = math.cos(a), c2 = math.cos(2 * a);
-              final b = _breathe(base);
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: Alignment(0.8 * c, 0.95 + 0.06 * c2),
-                        radius: 0.8,
-                        colors: [b.withValues(alpha: 0.55), b.withValues(alpha: 0)],
-                      ),
-                    ),
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment(-0.15 * c, -1),
-                        end: Alignment(0.15 * c, 1),
-                        colors: [Colors.transparent, b.withValues(alpha: 0.55), b],
-                        stops: [0.50 + 0.04 * c, 0.78 + 0.03 * c2, 1.0],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Inset square: 3D tilt (follows the phone), floating drift inside the
   /// frame and a glow behind it that breathes.
   Widget _insetArt(double top, double heroH, double size, String url) {
@@ -1443,7 +1277,7 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
           padding: EdgeInsets.only(top: top + 56),
           child: AnimatedBuilder(
             animation: Listenable.merge([_tilt, _glow]),
-            builder: (_, _) {
+            builder: (context, child) {
               final t = _tilt.value;
               final b = Curves.easeInOut.transform(_glow.value);
               return Transform(
@@ -1474,10 +1308,9 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
                       builder: (_, child) {
                         final a = _live.value * math.pi;
                         final d = _driftOn;
-                        final s = 1.04 + (d ? 0.02 * (0.5 - 0.5 * math.cos(a)) : 0.0);
                         return Transform.translate(
-                          offset: Offset(d ? math.cos(a) * 5 : 0.0, d ? math.cos(2 * a) * 4 : 0.0),
-                          child: Transform.scale(scale: s, child: child),
+                          offset: Offset(d ? math.cos(a) * 3 : 0.0, d ? math.cos(2 * a) * 2 : 0.0),
+                          child: child,
                         );
                       },
                     ),
@@ -1498,7 +1331,7 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
     final Widget art = AnimatedSwitcher(
       duration: const Duration(milliseconds: 600),
       switchInCurve: Curves.easeOutCubic,
-      child: _fullBleed ? _fullArt(base, heroH, url) : _insetArt(top, heroH, insetSize, url),
+      child: _insetArt(top, heroH, insetSize, url),
     );
 
     return Positioned(
@@ -1506,35 +1339,51 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
       left: 0,
       right: 0,
       height: heroH,
-      child: AnimatedBuilder(
-        animation: _sc,
-        child: RepaintBoundary(child: art),
-        builder: (_, child) {
-          final o = _offset;
-          final p = (o / (heroH * 0.7)).clamp(0.0, 1.0).toDouble();
-          final e = Curves.easeInOut.transform(p);
-          final sigma = e * 28;
-          final over = o < 0 ? -o : 0.0;
-          final scale = 1.0 + (over > 0 ? over / (heroH * 1.5) : 0.0);
-          final fade = 1 - Curves.easeIn.transform(((p - 0.5) / 0.5).clamp(0.0, 1.0).toDouble());
+      child: ClipRect(
+        child: ColoredBox(
+          color: Colors.black,
+          child: AnimatedBuilder(
+          animation: _sc,
+          child: RepaintBoundary(child: art),
+          builder: (_, child) {
+            final o = _offset;
+            final p = (o / (heroH * 0.7)).clamp(0.0, 1.0).toDouble();
+            final e = Curves.easeInOut.transform(p);
+            final sigma = e * 28;
+            final over = o < 0 ? -o : 0.0;
+            final scale = 1.0 + (over > 0 ? over / (heroH * 1.5) : 0.0);
 
-          Widget w = child!;
-          if (sigma > 0.4) {
-            w = ImageFiltered(
-              imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.clamp),
-              child: w,
-            );
-          }
-          w = Transform.scale(scale: scale, alignment: Alignment.topCenter, child: w);
-          w = Transform.translate(offset: Offset(0, o > 0 ? -o * 0.45 : 0), child: w);
-          return fade < 1 ? Opacity(opacity: fade, child: w) : w;
-        },
+            Widget w = child!;
+            if (sigma > 0.4) {
+              w = ImageFiltered(
+                imageFilter: ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.clamp),
+                child: w,
+              );
+            }
+            w = Transform.scale(scale: scale, alignment: Alignment.topCenter, child: w);
+            w = Transform.translate(offset: Offset(0, o > 0 ? -o * 0.45 : 0), child: w);
+
+            // Smoothly cover with solid black on scroll-up so image never shows transparently behind content
+            final blackCover = (o / 150.0).clamp(0.0, 1.0).toDouble();
+            if (blackCover > 0.0) {
+              w = Stack(
+                fit: StackFit.expand,
+                children: [
+                  w,
+                  ColoredBox(
+                    color: Colors.black.withValues(alpha: blackCover),
+                  ),
+                ],
+              );
+            }
+            return w;
+          },
+        ),
       ),
-    );
-  }
-
+    ),
+  );
 }
-
+}
 
 /* ------------------------------------------------------------------ */
 /*  Track Row (compact, Apple Music style)                              */
@@ -1739,3 +1588,4 @@ class _ReleaseShelf extends StatelessWidget {
         ),
       );
 }
+

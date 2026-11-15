@@ -190,18 +190,20 @@ class SearchDataService {
     );
 
     // 2. PRIMARY STRATEGY:
-    // If native InnerTube is available (Android), try it with snappy timeout!
+    // If native InnerTube is available (Android), query native InnerTubeX
     if (InnerTubeService.instance.isNativeAvailable) {
       try {
         if (filter == SearchFilter.all) {
           final nativeData = await InnerTubeService.instance
               .searchSummaryNative(q)
-              .timeout(const Duration(milliseconds: 3500), onTimeout: () => null);
+              .timeout(const Duration(seconds: 8), onTimeout: () => null);
+          print('[SearchDataService] nativeData summaries count=${(nativeData?['summaries'] as List?)?.length}');
           if (nativeData != null && nativeData['summaries'] is List) {
             final parsed = SearchParser.parseNativeSummaries(
               nativeData['summaries'] as List,
               query: q,
             );
+            print('[SearchDataService] parsed from native summaries: items=${parsed.items.length}, topResult=${parsed.topResult?.item.title}');
             if (parsed.items.isNotEmpty) {
               candidateItems = parsed.items;
               topResult = parsed.topResult;
@@ -209,28 +211,60 @@ class SearchDataService {
               continuation = parsed.continuation;
             }
           }
-          if (candidateItems.isEmpty) {
+          if (candidateItems.isEmpty || !candidateItems.any((i) => i is SearchSongItem)) {
             final nativeSongs = await InnerTubeService.instance
                 .searchSongsNative(q)
                 .timeout(
-                  const Duration(milliseconds: 2500),
+                  const Duration(seconds: 8),
                   onTimeout: () => <Track>[],
                 );
             if (nativeSongs.isNotEmpty) {
-              candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
+              final songItems = nativeSongs.map(_trackToSearchSongItem).toList();
+              if (candidateItems.isEmpty) {
+                candidateItems = songItems;
+              } else {
+                final seenIds = candidateItems.map((i) => i.id).toSet();
+                candidateItems.addAll(songItems.where((s) => seenIds.add(s.id)));
+              }
+            }
+          }
+          if (!candidateItems.any((i) => i is SearchAlbumItem)) {
+            final nativeAlbums = await InnerTubeService.instance
+                .searchAlbumsNative(q)
+                .timeout(const Duration(seconds: 4), onTimeout: () => const []);
+            if (nativeAlbums.isNotEmpty) {
+              final albumItems = nativeAlbums
+                  .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
+                  .whereType<SearchAlbumItem>()
+                  .take(8);
+              final seenIds = candidateItems.map((i) => i.id).toSet();
+              candidateItems.addAll(albumItems.where((a) => seenIds.add(a.id)));
+            }
+          }
+          if (!candidateItems.any((i) => i is SearchArtistItem)) {
+            final nativeArtists = await InnerTubeService.instance
+                .searchArtistsNative(q)
+                .timeout(const Duration(seconds: 4), onTimeout: () => const []);
+            if (nativeArtists.isNotEmpty) {
+              final artistItems = nativeArtists
+                  .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
+                  .whereType<SearchArtistItem>()
+                  .take(6);
+              final seenIds = candidateItems.map((i) => i.id).toSet();
+              candidateItems.addAll(artistItems.where((a) => seenIds.add(a.id)));
             }
           }
         } else if (filter == SearchFilter.songs) {
           final nativeSongs = await InnerTubeService.instance
               .searchSongsNative(q)
-              .timeout(const Duration(milliseconds: 3500), onTimeout: () => <Track>[]);
+              .timeout(const Duration(seconds: 8), onTimeout: () => <Track>[]);
           if (nativeSongs.isNotEmpty) {
             candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
           }
         } else if (filter == SearchFilter.albums) {
           final nativeAlbums = await InnerTubeService.instance
               .searchAlbumsNative(q)
-              .timeout(const Duration(milliseconds: 3500), onTimeout: () => const []);
+              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
           if (nativeAlbums.isNotEmpty) {
             candidateItems = nativeAlbums
                 .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
@@ -240,7 +274,7 @@ class SearchDataService {
         } else if (filter == SearchFilter.artists) {
           final nativeArtists = await InnerTubeService.instance
               .searchArtistsNative(q)
-              .timeout(const Duration(milliseconds: 3500), onTimeout: () => const []);
+              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
           if (nativeArtists.isNotEmpty) {
             candidateItems = nativeArtists
                 .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
@@ -287,7 +321,7 @@ class SearchDataService {
               ttl: SearchRankingConfig.kLruCacheTtl,
               forceRefresh: forceRefresh,
             )
-            .timeout(const Duration(milliseconds: 3500));
+            .timeout(const Duration(seconds: 8));
       } catch (e) {
         if (kDebugMode) {
           debugPrint(
@@ -326,8 +360,10 @@ class SearchDataService {
       candidateItems = await _fetchFallbackItems(q, filter);
     }
 
+    print('[SearchDataService] candidateItems count=${candidateItems.length}');
     if (candidateItems.isEmpty) {
       // DO NOT cache empty results into _lruCache so subsequent retries aren't blocked!
+      print('[SearchDataService] returning EMPTY SearchResult for "$q"');
       return SearchResult(
         originalQuery: q,
         intent: SearchIntentDetector.detectIntent(q, const []),
@@ -346,6 +382,7 @@ class SearchDataService {
       didYouMean: didYouMean,
       continuation: continuation,
     );
+    print('[SearchDataService] rankedResult isEmpty=${rankedResult.isEmpty}, songs=${rankedResult.songs.length}, artists=${rankedResult.artists.length}, albums=${rankedResult.albums.length}');
 
     // 7. Store in LRU Cache
     _lruCache.put(cacheKey, rankedResult);

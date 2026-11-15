@@ -7,7 +7,6 @@ import '../../design_system/apple/apple_kit.dart';
 import '../../design_system/apple/apple_tokens.dart';
 import '../../services/auth_state.dart';
 import '../../services/country_service.dart';
-import '../../services/dock_visibility.dart';
 import '../../services/user_preferences_service.dart';
 import '../auth/onboarding_sheet.dart';
 import '../auth/welcome_screen.dart';
@@ -24,10 +23,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
-  @override
-  bool get hideMiniPlayerWhileActive => true;
-
+class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();

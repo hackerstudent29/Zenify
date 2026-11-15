@@ -119,6 +119,73 @@ export class LyricEnrichmentService {
     } | null {
         if (!lrcText || !lrcText.trim()) return null;
 
+        // 1. Support structured LyricsDoc JSON (from Better Lyrics / Unison)
+        if (lrcText.trim().startsWith('{')) {
+            try {
+                const doc = JSON.parse(lrcText);
+                if (doc && Array.isArray(doc.lines) && doc.lines.length > 0) {
+                    const tokens: SyncedLyricLine[] = doc.lines.map((l: any) => ({
+                        time: Math.round((l.startMs || 0) / 10) / 100,
+                        endTime: Math.round((l.endMs || ((l.startMs || 0) + 3000)) / 10) / 100,
+                        text: this.formatLyricLine(l.text || ''),
+                        words: Array.isArray(l.words) ? l.words.map((w: any) => ({
+                            word: this.formatLyricLine(w.text || w.word || ''),
+                            time: Math.round((w.startMs || 0) / 10) / 100,
+                            endTime: Math.round((w.endMs || ((w.startMs || 0) + 300)) / 10) / 100
+                        })) : undefined
+                    }));
+
+                    const plainLines = doc.lines.map((l: any) => this.formatLyricLine(l.text || ''));
+                    const rawLrc = doc.lines.map((l: any) => {
+                        const min = Math.floor((l.startMs || 0) / 60000).toString().padStart(2, '0');
+                        const sec = (((l.startMs || 0) % 60000) / 1000).toFixed(2).padStart(5, '0');
+                        return `[${min}:${sec}] ${l.text}`;
+                    }).join('\n');
+
+                    return {
+                        syncedTokens: this.insertInstrumentalGaps(tokens, trackDuration),
+                        plainLyrics: plainLines.join('\n'),
+                        rawLrc
+                    };
+                }
+            } catch {}
+        }
+
+        // 2. Support raw TTML XML
+        if (lrcText.trim().includes('<tt')) {
+            try {
+                const { TtmlParser } = require('../lyrics/parsers/ttml.parser');
+                const doc = TtmlParser.parse(lrcText, 'better-lyrics');
+                if (doc && Array.isArray(doc.lines) && doc.lines.length > 0) {
+                    const tokens: SyncedLyricLine[] = doc.lines.map((l: any) => ({
+                        time: Math.round((l.startMs || 0) / 10) / 100,
+                        endTime: Math.round((l.endMs || ((l.startMs || 0) + 3000)) / 10) / 100,
+                        text: this.formatLyricLine(l.text || ''),
+                        words: Array.isArray(l.words) ? l.words.map((w: any) => ({
+                            word: this.formatLyricLine(w.text || w.word || ''),
+                            time: Math.round((w.startMs || 0) / 10) / 100,
+                            endTime: Math.round((w.endMs || ((w.startMs || 0) + 300)) / 10) / 100
+                        })) : undefined
+                    }));
+
+                    const plainLines = doc.lines.map((l: any) => this.formatLyricLine(l.text || ''));
+                    const rawLrc = doc.lines.map((l: any) => {
+                        const min = Math.floor((l.startMs || 0) / 60000).toString().padStart(2, '0');
+                        const sec = (((l.startMs || 0) % 60000) / 1000).toFixed(2).padStart(5, '0');
+                        return `[${min}:${sec}] ${l.text}`;
+                    }).join('\n');
+
+                    return {
+                        syncedTokens: this.insertInstrumentalGaps(tokens, trackDuration),
+                        plainLyrics: plainLines.join('\n'),
+                        rawLrc
+                    };
+                }
+            } catch {}
+        }
+
+        // 3. Support standard & enhanced LRC text lines
+
         const lines = lrcText.split('\n');
         const tokens: SyncedLyricLine[] = [];
         const plainLines: string[] = [];
@@ -504,8 +571,8 @@ export class LyricEnrichmentService {
 
             let plainLyricsToAlign: string | null = (track.lyrics && track.lyrics.trim().length > 0) ? track.lyrics.trim() : null;
 
-            // 5. Step 1: Word-by-word synced lyrics search first (lrc.red Apple Music / Musixmatch)
-            console.log(`[LyricEnrichment] Step 1: Searching word-by-word synced lyrics (lrc.red) for "${track.title}"...`);
+            // 5. Step 1: Word-by-word synced lyrics search first (lrc.red, Better Lyrics, Unison)
+            console.log(`[LyricEnrichment] Step 1: Searching word-by-word synced lyrics for "${track.title}"...`);
             let lrcCandidate: any = null;
             try {
                 const wordCandidate = await LyricsEnhancementService.fetchLrcRed(track.title, artistName);
@@ -514,7 +581,42 @@ export class LyricEnrichmentService {
                     console.log(`[LyricEnrichment] Word-by-word synced lyrics found via ${wordCandidate.source}!`);
                 }
             } catch (wErr: any) {
-                console.warn(`[LyricEnrichment] Word-by-word check skipped: ${wErr.message}`);
+                console.warn(`[LyricEnrichment] Word-by-word check (lrc.red) skipped: ${wErr.message}`);
+            }
+
+            if (!lrcCandidate) {
+                try {
+                    const blCandidate = await LyricsEnhancementService.fetchBetterLyrics(
+                        track.title,
+                        artistName,
+                        track.duration,
+                        (track as any).album?.title,
+                        track.isrc
+                    );
+                    if (blCandidate && blCandidate.lyrics) {
+                        lrcCandidate = blCandidate;
+                        console.log(`[LyricEnrichment] Word-by-word synced lyrics found via ${blCandidate.source}!`);
+                    }
+                } catch (bErr: any) {
+                    console.warn(`[LyricEnrichment] Better Lyrics check skipped: ${bErr.message}`);
+                }
+            }
+
+            if (!lrcCandidate) {
+                try {
+                    const unisonCandidate = await LyricsEnhancementService.fetchUnison(
+                        track.title,
+                        artistName,
+                        track.duration,
+                        track.isrc
+                    );
+                    if (unisonCandidate && unisonCandidate.lyrics) {
+                        lrcCandidate = unisonCandidate;
+                        console.log(`[LyricEnrichment] Synced lyrics found via ${unisonCandidate.source}!`);
+                    }
+                } catch (uErr: any) {
+                    console.warn(`[LyricEnrichment] Unison check skipped: ${uErr.message}`);
+                }
             }
 
             if (!lrcCandidate) {
@@ -534,11 +636,18 @@ export class LyricEnrichmentService {
                 if (lrcCandidate.isSynced) {
                     const parsed = this.parseLrcToSyncedTokens(lrcCandidate.lyrics, track.duration);
                     if (parsed && parsed.syncedTokens.length > 2) {
-                        console.log(`[LyricEnrichment] Sourced ${parsed.syncedTokens.length} synced lyric lines from LRCLib for "${track.title}". Verifying audio onset with Deepgram...`);
+                        console.log(`[LyricEnrichment] Sourced ${parsed.syncedTokens.length} synced lyric lines from ${lrcCandidate.source || 'upstream'} for "${track.title}". Verifying audio onset with Deepgram...`);
 
                         let finalTokens = parsed.syncedTokens;
                         let finalRawLrc = parsed.rawLrc;
                         let finalSource = 'LRCLIB_SYNCED';
+                        if (lrcCandidate.source?.includes('Better Lyrics')) {
+                            finalSource = 'BETTER_LYRICS_WORD';
+                        } else if (lrcCandidate.source?.includes('Unison')) {
+                            finalSource = 'UNISON_SYNCED';
+                        } else if (lrcCandidate.source?.includes('lrc.red')) {
+                            finalSource = 'LRCRED_WORD';
+                        }
 
                         if (track.audioUrl && DeepgramLyricsService.isAvailable()) {
                             try {

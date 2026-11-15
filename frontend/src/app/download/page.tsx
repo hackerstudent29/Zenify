@@ -31,9 +31,9 @@ export default function DownloadPage() {
 
   // Fallback download URLs
   const apkDownloadUrl = "/downloads/zenify.apk";
-  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.1.11";
-  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.11/zenify-v1.1.11.apk";
-  const universalApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.11/zenify-v1.1.11-universal.apk";
+  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.0.12";
+  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.12/zenify-v1.0.12.apk";
+  const universalApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.12/zenify-v1.0.12-universal.apk";
   const absoluteDownloadUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/downloads/zenify.apk`
     : "https://listenzenify.vercel.app/downloads/zenify.apk";
@@ -54,8 +54,8 @@ export default function DownloadPage() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen w-full bg-[#030303] pt-24 sm:pt-28 md:pt-32 pb-40 font-sans text-[#F2F2F3] selection:bg-white/15">
         <SEO
-          title="Download Zenify APK (v1.1.11) – Ad-Free Music for Android, iOS & Desktop"
-          description="Download the Zenify v1.1.11 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, YouTube video streaming, Room Together, synchronized lyrics, and Studio FX."
+          title="Download Zenify APK (v1.0.12) – Ad-Free Music for Android, iOS & Desktop"
+          description="Download the Zenify v1.0.12 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, YouTube video streaming, Room Together, synchronized lyrics, and Studio FX."
           keywords={[
             "download zenify apk",
             "zenify android app",
@@ -69,7 +69,7 @@ export default function DownloadPage() {
             "@type": "MobileApplication",
             name: "Zenify Music Player",
             operatingSystem: "Android 8.0+",
-            softwareVersion: "1.1.11",
+            softwareVersion: "1.0.12",
             applicationCategory: "MultimediaApplication",
             applicationSubCategory: "Music & Audio",
             downloadUrl: "https://listenzenify.vercel.app/downloads/zenify.apk",
@@ -91,7 +91,7 @@ export default function DownloadPage() {
           <motion.div variants={rise} className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/20 text-brand text-[11px] font-bold uppercase tracking-wider">
               <Sparkles size={13} className="text-brand" />
-              <span>Mobile Release v1.1.11 Available</span>
+              <span>Mobile Release v1.0.12 Available</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-sans uppercase tracking-tight text-white leading-tight">
@@ -162,7 +162,7 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-zinc-400">
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Version</span>
-                    <span className="text-white font-medium">v1.1.11 (Build 15)</span>
+                    <span className="text-white font-medium">v1.0.12 (Build 16)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Package Size</span>
@@ -467,7 +467,7 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Release Version</span>
-                <span className="text-white">v1.1.11 (Build 15) — November 14, 2026</span>
+                <span className="text-white">v1.0.12 (Build 16) — November 15, 2026</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Package Format</span>
@@ -479,11 +479,11 @@ export default function DownloadPage() {
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">ARM64 SHA-256</span>
-                <span className="text-white font-mono text-[11px] break-all">Release Build 15 Verified</span>
+                <span className="text-white font-mono text-[11px] break-all">Release Build 16 Verified</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Universal SHA-256</span>
-                <span className="text-white font-mono text-[11px] break-all">Release Build 15 Verified</span>
+                <span className="text-white font-mono text-[11px] break-all">Release Build 16 Verified</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
                 <span className="text-zinc-500 font-medium">Minimum Operating System</span>
@@ -494,9 +494,9 @@ export default function DownloadPage() {
                 <span className="text-white">Flutter 3.44.2 • Dart 3.12.2 • Kotlin • Android Media3 ExoPlayer</span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
-                <span className="text-zinc-500 font-medium">What&apos;s Included in v1.1.11</span>
+                <span className="text-zinc-500 font-medium">What&apos;s Included in v1.0.12</span>
                 <span className="text-zinc-300 leading-relaxed">
-                  Refined hero artwork in original aspect ratio without zoom or distortion, zero background bleed or transparent ghosting beneath artist Latest Release and Top Songs, smooth ambient backdrop termination, and instant stream resolution.
+                  Scroll-linked Dynamic Island header that opens smoothly when scrolling past hero, expansive artist portrait hero section with balanced layout, edge-to-edge fullview player with zero display gaps, high-precision lyric matching, and clean audience metrics.
                 </span>
               </div>
               <div className="grid py-3 sm:grid-cols-[13rem_1fr] sm:gap-8">
@@ -524,7 +524,7 @@ export default function DownloadPage() {
                 className="h-11 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 <Download size={16} className="text-brand" />
-                <span>Download Zenify APK (v1.1.11 • 15.2 MB)</span>
+                <span>Download Zenify APK (v1.0.12 • 15.2 MB)</span>
               </a>
             </div>
           </motion.div>

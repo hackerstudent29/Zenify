@@ -996,16 +996,19 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
                     return ClipRect(
                       child: Align(
                         alignment: Alignment.topLeft,
-                        child: Transform.scale(
-                          alignment: Alignment.topLeft,
-                          scaleX: box.width / cs.width,
-                          scaleY: box.height / cs.height,
-                          filterQuality: FilterQuality.low,
-                          child: SizedBox.fromSize(
-                            size: cs,
-                            child: CustomPaint(
+                        child: Transform.translate(
+                          offset: const Offset(-4.0, -4.0),
+                          child: Transform.scale(
+                            alignment: Alignment.topLeft,
+                            scaleX: (box.width + 8.0) / cs.width,
+                            scaleY: (box.height + 8.0) / cs.height,
+                            filterQuality: FilterQuality.low,
+                            child: SizedBox.fromSize(
                               size: cs,
-                              painter: _MeshPainter(_engine, bg),
+                              child: CustomPaint(
+                                size: cs,
+                                painter: _MeshPainter(_engine, bg),
+                              ),
                             ),
                           ),
                         ),

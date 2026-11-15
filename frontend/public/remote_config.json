@@ -1,27 +1,30 @@
 {
-  "version": 15,
+  "version": 16,
   "streamMode": "device",
-  "minAppVersion": "1.0.10",
-  "latestAppVersion": "1.1.11",
+  "minAppVersion": "1.0.11",
+  "latestAppVersion": "1.0.12",
   "isForceUpdate": false,
-  "releaseDate": "November 14, 2026",
-  "releaseTime": "02:40 PM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.11/zenify-v1.1.11.apk",
+  "releaseDate": "November 15, 2026",
+  "releaseTime": "07:15 PM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.12/zenify-v1.0.12.apk",
   "features": [
-    "Refined Hero Presentation: Restored clean original aspect ratio for album covers and artist hero banners without artificial zoom or image cropping",
-    "Zero Background Bleed: Solid black transitions beneath album and artist heroes, eliminating transparent or blurred ghosting behind Latest Release and Top Songs",
-    "Pristine Scrim & Backdrop Termination: Smooth ambient color glow strictly confined above play controls, fading cleanly to pure black",
-    "High-Performance Audio: Responsive track seeking with self-healing stream resolution and zero preview limits"
+    "Expansive Artist Hero & Balanced Layout: Restored full-height portrait photography (480px) with ~250px of breathing room so portraits are never obstructed",
+    "Scroll-Linked Dynamic Island: Header capsule stays collapsed at rest and only springs open to reveal the title when scrolling past the hero",
+    "Edge-to-Edge Fullview Player: Expanded bounds eliminate right-side subpixel gaps across all display sizes",
+    "Strict Multi-Field Lyric Matching: Zero mismatched lyrics with multi-word overlap validation and YouTube official lyrics fallback",
+    "Pristine Audience Formatting: Monthly listeners formatted cleanly without duplicate phrases (e.g. 40.8 crore monthly listeners)"
   ],
   "fixes": [
-    "Fixed transparent/blurred hero artwork ghosting between Latest Release and Top Songs",
-    "Fixed over-zoomed album and artist hero banners to fit screen in original proportions",
-    "Fixed ambient backdrop tint bleeding down into tracklists and shelves"
+    "Fixed Dynamic Island showing title before scrolling past artist and album headers",
+    "Fixed display gap on right side of full-view player screen",
+    "Fixed duplicate 'monthly audience monthly listeners' metric text on artist profiles",
+    "Fixed inaccurate lyric match across multi-language releases"
   ],
   "improvements": [
-    "Freshly built v1.1.11 (Build 15) optimized release APK",
-    "Instant lyrics sync and silky-smooth detail page scroll performance"
+    "Freshly built v1.0.12 (Build 16) release APK with optimized asset footprint",
+    "Silky-smooth spring physics on Dynamic Island transitions",
+    "Enhanced stream proxying and zero preview audio limits"
   ],
-  "releaseNotes": "• Refined hero art presentation in original aspect ratio without zoom\n• Zero background bleed or transparent ghosting on artist & album pages\n• Fast, responsive playback with self-healing stream resolution",
-  "message": "Update to v1.1.11 (Build 15) for refined hero presentation, zero transparent background bleed, and faster performance"
+  "releaseNotes": "• Scroll-linked Dynamic Island header that opens smoothly when scrolling past hero\n• Expansive artist portrait hero section with balanced layout\n• Edge-to-edge fullview player with zero display gaps\n• High-precision lyric matching and accurate audience metrics",
+  "message": "Update to v1.0.12 (Build 16) for scroll-linked Dynamic Island, edge-to-edge player, and precision lyrics"
 }

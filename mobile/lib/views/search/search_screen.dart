@@ -556,7 +556,8 @@ class _SearchScreenState extends State<SearchScreen>
           _isLoading = false;
         });
       }
-    } catch (_) {
+    } catch (e, st) {
+      print('[SearchScreen] ERROR in _executeSearch for "$query": $e\n$st');
       if (mounted && _wantedKey == key) {
         setState(() => _isLoading = false);
       }
@@ -1048,6 +1049,8 @@ class _SearchScreenState extends State<SearchScreen>
                     : 'Search',
                 showBack: showBack,
                 isDockPage: !showBack,
+                scrollController: (showBack && category != null) ? _scrollCtrl : null,
+                revealOffset: 120.0,
                 showProfile: true,
                 topPadding: topPad + 4,
                 centerWidget: (typing || hasQuery) ? _topField() : null,
@@ -2103,13 +2106,22 @@ class _SearchScreenState extends State<SearchScreen>
 
     final sorted = cands.values.toList()
       ..sort((a, b) => b.score.compareTo(a.score));
-    if (sorted.isEmpty || sorted.first.score < 0.6) return const [];
+    if (sorted.isEmpty) {
+      if (serviceTop != null) return [_TopCand(serviceTop, 1.0)];
+      return const [];
+    }
 
-    final best = sorted.first.score;
+    if (serviceTop != null) {
+      sorted.removeWhere((c) => keyOf(c.item) == serviceKey);
+      sorted.insert(0, _TopCand(serviceTop, 1.0));
+    } else if (sorted.first.score < 0.35) {
+      return const [];
+    }
+
     final out = <_TopCand>[sorted.first];
     for (final c in sorted.skip(1)) {
-      if (out.length >= 5) break;
-      if (c.score >= 0.7 && c.score >= best - 0.15) out.add(c);
+      if (out.length >= 4) break;
+      if (c.score >= 0.45) out.add(c);
     }
     return out;
   }

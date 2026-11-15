@@ -422,44 +422,88 @@ Widget _page({
   VoidCallback? onOpenProfile,
   required List<Widget> slivers,
 }) =>
-    AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Builder(
-          builder: (context) {
-            final top = MediaQuery.paddingOf(context).top;
-            return Stack(
-              children: [
-                CustomScrollView(
-                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                  slivers: [
-                    SliverToBoxAdapter(child: SizedBox(height: top + 56)),
-                    ...slivers,
-                    const SliverToBoxAdapter(child: SizedBox(height: 120)),
-                  ],
-                ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: DynamicIslandHeader(
-                    title: title,
-                    showBack: !root,
-                    isDockPage: root,
-                    onBack: () => Navigator.maybePop(context),
-                    showProfile: root,
-                    onProfileTap: onOpenProfile,
-                    trailing: trailing,
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+    _LibraryPageShell(
+      title: title,
+      previous: previous,
+      trailing: trailing,
+      root: root,
+      onOpenProfile: onOpenProfile,
+      slivers: slivers,
     );
+
+class _LibraryPageShell extends StatefulWidget {
+  const _LibraryPageShell({
+    required this.title,
+    this.previous,
+    this.trailing,
+    this.root = false,
+    this.onOpenProfile,
+    required this.slivers,
+  });
+
+  final String title;
+  final String? previous;
+  final Widget? trailing;
+  final bool root;
+  final VoidCallback? onOpenProfile;
+  final List<Widget> slivers;
+
+  @override
+  State<_LibraryPageShell> createState() => _LibraryPageShellState();
+}
+
+class _LibraryPageShellState extends State<_LibraryPageShell> {
+  late final ScrollController _sc = ScrollController();
+
+  @override
+  void dispose() {
+    _sc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light,
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Builder(
+            builder: (context) {
+              final top = MediaQuery.paddingOf(context).top;
+              return Stack(
+                children: [
+                  CustomScrollView(
+                    controller: _sc,
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                    slivers: [
+                      SliverToBoxAdapter(child: SizedBox(height: top + 56)),
+                      ...widget.slivers,
+                      const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                    ],
+                  ),
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: DynamicIslandHeader(
+                      title: widget.title,
+                      showBack: !widget.root,
+                      isDockPage: widget.root,
+                      scrollController: widget.root ? null : _sc,
+                      revealOffset: 50.0,
+                      onBack: () => Navigator.maybePop(context),
+                      showProfile: widget.root,
+                      onProfileTap: widget.onOpenProfile,
+                      trailing: widget.trailing,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      );
+}
 
 /* ═══════════════════════════════════════════════════════════════════
  *  LIBRARY (root)

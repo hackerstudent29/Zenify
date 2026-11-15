@@ -403,7 +403,51 @@ export async function trackRoutes(server: FastifyInstance) {
         let chosenSource = provider;
 
         try {
-            if (provider === 'deepgram') {
+            if (provider === 'better-lyrics') {
+                const bl = await LyricsEnhancementService.fetchBetterLyrics(track.title, artistName, track.duration, (track as any).album?.title, track.isrc, targetLanguage);
+                if (bl?.doc) {
+                    const doc = bl.doc;
+                    syncedTokens = doc.lines.map((l: any) => ({
+                        time: Math.round((l.startMs || 0) / 10) / 100,
+                        endTime: Math.round((l.endMs || ((l.startMs || 0) + 3000)) / 10) / 100,
+                        text: l.text,
+                        words: Array.isArray(l.words) ? l.words.map((w: any) => ({
+                            word: w.text,
+                            time: Math.round((w.startMs || 0) / 10) / 100,
+                            endTime: Math.round((w.endMs || ((w.startMs || 0) + 300)) / 10) / 100
+                        })) : undefined
+                    }));
+                    plainLyrics = doc.lines.map((l: any) => l.text).join('\n');
+                    rawLrc = doc.lines.map((l: any) => {
+                        const min = Math.floor((l.startMs || 0) / 60000).toString().padStart(2, '0');
+                        const sec = (((l.startMs || 0) % 60000) / 1000).toFixed(2).padStart(5, '0');
+                        return `[${min}:${sec}] ${l.text}`;
+                    }).join('\n');
+                    chosenSource = 'BETTER_LYRICS_WORD';
+                }
+            } else if (provider === 'unison') {
+                const un = await LyricsEnhancementService.fetchUnison(track.title, artistName, track.duration, track.isrc, (track as any).sourceId || track.id, targetLanguage);
+                if (un?.doc) {
+                    const doc = un.doc;
+                    syncedTokens = doc.lines.map((l: any) => ({
+                        time: Math.round((l.startMs || 0) / 10) / 100,
+                        endTime: Math.round((l.endMs || ((l.startMs || 0) + 3000)) / 10) / 100,
+                        text: l.text,
+                        words: Array.isArray(l.words) ? l.words.map((w: any) => ({
+                            word: w.text,
+                            time: Math.round((w.startMs || 0) / 10) / 100,
+                            endTime: Math.round((w.endMs || ((w.startMs || 0) + 300)) / 10) / 100
+                        })) : undefined
+                    }));
+                    plainLyrics = doc.lines.map((l: any) => l.text).join('\n');
+                    rawLrc = doc.lines.map((l: any) => {
+                        const min = Math.floor((l.startMs || 0) / 60000).toString().padStart(2, '0');
+                        const sec = (((l.startMs || 0) % 60000) / 1000).toFixed(2).padStart(5, '0');
+                        return `[${min}:${sec}] ${l.text}`;
+                    }).join('\n');
+                    chosenSource = 'UNISON_SYNCED';
+                }
+            } else if (provider === 'deepgram') {
                 const dg = await DeepgramLyricsService.syncTrackLyrics(track.id, { force: true, tryVocals: true });
                 if (dg?.syncedTokens?.length) {
                     syncedTokens = dg.syncedTokens;
@@ -479,11 +523,61 @@ export async function trackRoutes(server: FastifyInstance) {
                 }
             } else {
                 // Auto / Best Available Pipeline:
-                // 0. Primary JioSaavn authentic official lyrics
-                const saavn = await LyricsEnhancementService.fetchJioSaavnLyrics(track.title, artistName, (track as any).sourceId || track.id).catch(() => null);
-                if (saavn?.lyrics) {
-                    plainLyrics = saavn.lyrics;
-                    chosenSource = 'JIOSAAVN';
+                // 0a. Better Lyrics pristine Apple Music word-by-word TTML
+                const bl = await LyricsEnhancementService.fetchBetterLyrics(track.title, artistName, track.duration, (track as any).album?.title, track.isrc, targetLanguage).catch(() => null);
+                if (bl?.doc) {
+                    const doc = bl.doc;
+                    syncedTokens = doc.lines.map((l: any) => ({
+                        time: Math.round((l.startMs || 0) / 10) / 100,
+                        endTime: Math.round((l.endMs || ((l.startMs || 0) + 3000)) / 10) / 100,
+                        text: l.text,
+                        words: Array.isArray(l.words) ? l.words.map((w: any) => ({
+                            word: w.text,
+                            time: Math.round((w.startMs || 0) / 10) / 100,
+                            endTime: Math.round((w.endMs || ((w.startMs || 0) + 300)) / 10) / 100
+                        })) : undefined
+                    }));
+                    plainLyrics = doc.lines.map((l: any) => l.text).join('\n');
+                    rawLrc = doc.lines.map((l: any) => {
+                        const min = Math.floor((l.startMs || 0) / 60000).toString().padStart(2, '0');
+                        const sec = (((l.startMs || 0) % 60000) / 1000).toFixed(2).padStart(5, '0');
+                        return `[${min}:${sec}] ${l.text}`;
+                    }).join('\n');
+                    chosenSource = 'BETTER_LYRICS_WORD';
+                }
+
+                // 0b. Unison crowdsourced synced lyrics
+                if (!syncedTokens.length) {
+                    const un = await LyricsEnhancementService.fetchUnison(track.title, artistName, track.duration, track.isrc, (track as any).sourceId || track.id, targetLanguage).catch(() => null);
+                    if (un?.doc) {
+                        const doc = un.doc;
+                        syncedTokens = doc.lines.map((l: any) => ({
+                            time: Math.round((l.startMs || 0) / 10) / 100,
+                            endTime: Math.round((l.endMs || ((l.startMs || 0) + 3000)) / 10) / 100,
+                            text: l.text,
+                            words: Array.isArray(l.words) ? l.words.map((w: any) => ({
+                                word: w.text,
+                                time: Math.round((w.startMs || 0) / 10) / 100,
+                                endTime: Math.round((w.endMs || ((w.startMs || 0) + 300)) / 10) / 100
+                            })) : undefined
+                        }));
+                        plainLyrics = doc.lines.map((l: any) => l.text).join('\n');
+                        rawLrc = doc.lines.map((l: any) => {
+                            const min = Math.floor((l.startMs || 0) / 60000).toString().padStart(2, '0');
+                            const sec = (((l.startMs || 0) % 60000) / 1000).toFixed(2).padStart(5, '0');
+                            return `[${min}:${sec}] ${l.text}`;
+                        }).join('\n');
+                        chosenSource = 'UNISON_SYNCED';
+                    }
+                }
+
+                // 0c. Primary JioSaavn authentic official lyrics (regional)
+                if (!syncedTokens.length) {
+                    const saavn = await LyricsEnhancementService.fetchJioSaavnLyrics(track.title, artistName, (track as any).sourceId || track.id).catch(() => null);
+                    if (saavn?.lyrics) {
+                        plainLyrics = saavn.lyrics;
+                        chosenSource = 'JIOSAAVN';
+                    }
                 }
                 // 1. LRCLIB with language verification
                 const lrc = await LyricsEnhancementService.fetchLRCLib(track.title, artistName, track.duration, targetLanguage).catch(() => null);

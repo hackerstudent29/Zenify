@@ -108,14 +108,18 @@
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
         <package android:name="com.instagram.android"/>
+        <package android:name="com.instagram.barcelona"/>
         <package android:name="com.facebook.katana"/>
         <package android:name="com.facebook.lite"/>
+        <package android:name="com.facebook.orca"/>
         <package android:name="com.whatsapp"/>
         <package android:name="com.whatsapp.w4b"/>
         <package android:name="com.snapchat.android"/>
         <package android:name="org.telegram.messenger"/>
         <package android:name="org.thunderdog.challegram"/>
         <package android:name="org.telegram.messenger.web"/>
+        <package android:name="com.twitter.android"/>
+        <package android:name="com.zhiliaoapp.musically"/>
         <intent>
             <action android:name="com.instagram.share.ADD_TO_STORY" />
             <data android:mimeType="image/*" />

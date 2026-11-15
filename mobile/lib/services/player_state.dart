@@ -662,6 +662,14 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
         },
       ],
     );
+
+    // Synchronously reset lyrics so old song lyrics never linger
+    _lyricsLines = [];
+    _lyricTimes = [];
+    _lyricsSynced = false;
+    _isLoadingLyrics = true;
+    lyricIndexNotifier.value = -1;
+
     notifyListeners();
 
     unawaited(_loadLyricsForTrack(track, token));
@@ -1060,10 +1068,27 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       final nextSource =
           reason == AdvanceReason.trackCompleted ? 'auto' : 'manual';
       final nextEntry = q.advance(reason: reason);
-      if (nextEntry != null) {
-        final track = nextEntry.track;
-        final cleanMediaId =
-            autoTransitionMediaId?.replaceFirst('yt-', '').trim() ?? '';
+      Track? track = nextEntry?.track;
+
+      // If QueueState was exhausted or did not have the next item, check our internal queue
+      if (track == null && _currentIndex < _queue.length - 1) {
+        _currentIndex++;
+        track = _queue[_currentIndex];
+      }
+
+      final cleanMediaId =
+          autoTransitionMediaId?.replaceFirst('yt-', '').trim() ?? '';
+      if (cleanMediaId.isNotEmpty) {
+        final matchedIdx = _queue.indexWhere(
+          (t) => t.id.replaceFirst('yt-', '').trim() == cleanMediaId,
+        );
+        if (matchedIdx >= 0) {
+          _currentIndex = matchedIdx;
+          track = _queue[matchedIdx];
+        }
+      }
+
+      if (track != null) {
         final cleanTrackId = track.id.replaceFirst('yt-', '').trim();
 
         if (cleanMediaId.isNotEmpty && cleanMediaId == cleanTrackId) {
@@ -1071,6 +1096,9 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
           _currentTrack = track;
           final token = ++_playToken;
           LibraryStore.instance.registerTrack(track);
+          final idx = _queue.indexWhere((t) => t.id == track!.id);
+          if (idx >= 0) _currentIndex = idx;
+          q.syncCurrent(track);
           _isTransitioning = false;
           _pausing = false;
           _isBuffering = false;
@@ -1089,6 +1117,14 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
           _duration = Duration(seconds: track.durationSeconds);
           _setPosition(Duration.zero);
           _pushHistory(track);
+
+          // Synchronously reset lyrics so old song lyrics never linger on the new track
+          _lyricsLines = [];
+          _lyricTimes = [];
+          _lyricsSynced = false;
+          _isLoadingLyrics = true;
+          lyricIndexNotifier.value = -1;
+
           ListeningTrackerService.instance.startTrack(
             trackId: track.id,
             trackTitle: track.title,

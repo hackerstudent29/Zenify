@@ -34,9 +34,9 @@ export class LyricsOrchestrator {
   static initialize() {
     this.providers.clear();
     this.registerProvider(new LrcRedProvider());
+    this.registerProvider(new BetterLyricsProvider());
     this.registerProvider(new UnisonProvider());
     this.registerProvider(new LrcLibWordProvider());
-    this.registerProvider(new BetterLyricsProvider());
 
     this.registerProvider(new LrcLibLineProvider());
     this.registerProvider(new SimpMusicProvider());

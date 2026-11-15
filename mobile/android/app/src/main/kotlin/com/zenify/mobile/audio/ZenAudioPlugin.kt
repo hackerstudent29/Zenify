@@ -81,7 +81,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     private val ticker = object : Runnable {
         override fun run() {
             val p = player
-            val active = p != null && (
+            val isSuppressed = p?.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
+            val active = p != null && !isSuppressed && (
                 p.isPlaying ||
                     (p.playWhenReady &&
                         p.playbackState != Player.STATE_ENDED &&
@@ -123,7 +124,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
 
     private fun updateTickerState() {
         val p = player
-        val active = p != null && (
+        val isSuppressed = p?.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
+        val active = p != null && !isSuppressed && (
             p.isPlaying ||
                 (p.playWhenReady &&
                     p.playbackState != Player.STATE_ENDED &&
@@ -237,13 +239,17 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
 
     private fun emitState() {
         val p = player ?: return
+        val isSuppressed = p.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
         val s = when {
             p.playbackState == Player.STATE_ENDED -> "completed"
             p.playbackState == Player.STATE_IDLE -> "stopped"
-            p.playWhenReady -> "playing" // buffering still counts as playing, so UI does not flicker
+            isSuppressed -> "paused"
+            p.isPlaying -> "playing"
+            p.playWhenReady && p.playbackState == Player.STATE_BUFFERING -> "playing"
+            p.playWhenReady && p.playbackState == Player.STATE_READY -> "playing"
             else -> "paused"
         }
-        val isBuffering = p.playbackState == Player.STATE_BUFFERING
+        val isBuffering = p.playbackState == Player.STATE_BUFFERING && !isSuppressed
         emit(mapOf("type" to "state", "value" to s, "buffering" to isBuffering))
     }
 
@@ -328,6 +334,11 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 updateTickerState()
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                emitState()
+                emitProgressSnapshot(p)
+                updateTickerState()
+            }
+            override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
                 emitState()
                 emitProgressSnapshot(p)
                 updateTickerState()

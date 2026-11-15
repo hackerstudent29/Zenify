@@ -2,6 +2,7 @@ package com.metrolist.innertube.models.response
 
 import com.metrolist.innertube.models.Continuation
 import com.metrolist.innertube.models.MusicResponsiveListItemRenderer
+import com.metrolist.innertube.models.SectionListRenderer
 import com.metrolist.innertube.models.Tabs
 import kotlinx.serialization.Serializable
 
@@ -12,7 +13,8 @@ data class SearchResponse(
 ) {
     @Serializable
     data class Contents(
-        val tabbedSearchResultsRenderer: Tabs?,
+        val tabbedSearchResultsRenderer: Tabs? = null,
+        val sectionListRenderer: SectionListRenderer? = null,
     )
 
     @Serializable

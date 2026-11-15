@@ -33,9 +33,8 @@ const double _kSameStartEps = 0.35;
 /// Transform-only around glyph center, ease in, then ease back to 1.0 after fill passes.
 const double kKaraokeGlyphScalePeak = 1.04;
 
-/// Apple Music lyric typography (SF Pro Display, heavy-bold, tight tracking).
+/// Apple Music lyric typography (SF Pro Display).
 const FontWeight _kLyricWeight = FontWeight.w800;
-const double _kLyricTracking = -0.45; // SF Display tightens at large sizes
 
 /// Three-dot interlude animation tunables.
 const double kDotPopInOvershoot = 1.25;
@@ -817,7 +816,9 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
       final backing = _isBackingText(L[i].text);
       final sg = _normSinger(L[i].singer);
       bool right;
-      if (!duet) {
+      if (backing) {
+        right = true; // Backing vocals always align right like Apple Music
+      } else if (!duet) {
         right = false;
       } else if (sg == null) {
         right = lastRight;
@@ -1441,19 +1442,22 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
     }
     main = main.replaceAll(_tagRe, ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
 
+    final isCenter = it.interlude || _isInstrumentalOrDots(main);
     Widget content;
     if (it.interlude) {
-      content = _Dots(
-        clock: widget.clock,
-        pop: _pop,
-        start: it.start,
-        end: it.end,
+      content = Center(
+        child: _Dots(
+          clock: widget.clock,
+          pop: _pop,
+          start: it.start,
+          end: it.end,
+        ),
       );
     } else {
       content = Column(
-        crossAxisAlignment: right
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
+        crossAxisAlignment: isCenter
+            ? CrossAxisAlignment.center
+            : (right ? CrossAxisAlignment.end : CrossAxisAlignment.start),
         children: [
           _WordLine(
             text: main,
@@ -1467,12 +1471,15 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
             maxLines: sub != null ? 1 : 2,
             backing: backing,
             right: right,
+            center: isCenter,
           ),
           if (sub != null) ...[
             const SizedBox(height: 5),
             FittedBox(
               fit: BoxFit.scaleDown,
-              alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+              alignment: isCenter
+                  ? Alignment.center
+                  : (right ? Alignment.centerRight : Alignment.centerLeft),
               child: Text(
                 sub,
                 maxLines: 1,
@@ -1482,8 +1489,8 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
                   fontFamilyFallback: _kFontFamilyFallback,
                   fontSize: 18,
                   height: _hasComplexScript(sub) ? 1.32 : 1.2,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: _hasComplexScript(sub) ? 0.0 : -0.2,
+                  fontWeight: _hasComplexScript(sub) ? FontWeight.w700 : FontWeight.w600,
+                  letterSpacing: _hasComplexScript(sub) ? 0.0 : 0.35,
                   color: Colors.white.withValues(
                     alpha: widget.current ? 0.85 : 0.6,
                   ),
@@ -1495,7 +1502,9 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
       );
     }
 
-    final alignment = right ? Alignment.centerRight : Alignment.centerLeft;
+    final alignment = isCenter
+        ? Alignment.center
+        : (right ? Alignment.centerRight : Alignment.centerLeft);
     final interactive = widget.synced && widget.item.line != null;
 
     // Inner: depth + press highlight. Lives inside a RepaintBoundary so the
@@ -1607,13 +1616,14 @@ class _WordLine extends StatefulWidget {
     required this.maxLines,
     required this.backing,
     required this.right,
+    this.center = false,
   });
 
   final String text;
   final List<LyricWord>? words;
   final double start, end;
   final ValueListenable<double> clock;
-  final bool current, past, plain, backing, right;
+  final bool current, past, plain, backing, right, center;
   final int maxLines;
 
   @override
@@ -1647,9 +1657,12 @@ class _WordLineState extends State<_WordLine>
       fontSize: fs,
       height: _kLineHeight,
       leadingDistribution: TextLeadingDistribution.even,
-      // Backing vocals are lighter + smaller (not italic) like Apple Music.
-      fontWeight: widget.backing ? FontWeight.w700 : _kLyricWeight,
-      letterSpacing: complex ? 0.0 : _kLyricTracking,
+      // Slightly reduced boldness for English lyrics (w600/w500); full heavy weight for Indic/Asian scripts.
+      fontWeight: complex
+          ? (widget.backing ? FontWeight.w700 : _kLyricWeight)
+          : (widget.backing ? FontWeight.w500 : FontWeight.w600),
+      // Visible letter gaps for SF Pro English lyrics; neutral for complex glyphs.
+      letterSpacing: complex ? 0.0 : 0.55,
       color: c,
     );
   }
@@ -1788,7 +1801,9 @@ class _WordLineState extends State<_WordLine>
       builder: (context, cons) {
         final lay = _layout(cons.maxWidth);
         Widget wrap(double? t, double settle) => Wrap(
-          alignment: widget.right ? WrapAlignment.end : WrapAlignment.start,
+          alignment: widget.center
+              ? WrapAlignment.center
+              : (widget.right ? WrapAlignment.end : WrapAlignment.start),
           spacing: lay.fs * _kWordGap,
           runSpacing: lay.fs * 0.04,
           crossAxisAlignment: WrapCrossAlignment.end,
@@ -2222,26 +2237,6 @@ class _Controls extends StatelessWidget {
                     ),
                     _StepButton(icon: Icons.add_rounded, onStep: onPlus),
                   ],
-                ),
-              ),
-            ],
-            if (onShareLyrics != null) ...[
-              const SizedBox(width: 10),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onShareLyrics,
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const ShapeDecoration(
-                    shape: CircleBorder(),
-                    color: Color(0x1FFFFFFF),
-                  ),
-                  child: const Icon(
-                    CupertinoIcons.camera,
-                    size: 17,
-                    color: Colors.white,
-                  ),
                 ),
               ),
             ],

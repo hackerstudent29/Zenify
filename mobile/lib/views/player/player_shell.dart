@@ -142,6 +142,7 @@ class PlayerShellState extends State<PlayerShell>
   final ValueNotifier<int> _prevPulse = ValueNotifier<int>(0);
   final ValueNotifier<int> _nextPulse = ValueNotifier<int>(0);
 
+  static _Panel _preferredMode = _Panel.art;
   bool _open = false;
   _Panel _panel = _Panel.art;
   bool _dragging = false;
@@ -244,6 +245,12 @@ class PlayerShellState extends State<PlayerShell>
     // render the new cover on frame 1 without a blank flash
     if (url.isNotEmpty && _shownCover != url) {
       _shownCover = url;
+    }
+    // Follow the user's active player mode (e.g. lyrics mode) for the next song too
+    if (_open && _preferredMode == _Panel.lyrics && _panel != _Panel.lyrics) {
+      _panel = _Panel.lyrics;
+      _bodyPanel = _Panel.lyrics;
+      _dock.value = 1.0;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -364,7 +371,17 @@ class PlayerShellState extends State<PlayerShell>
   void _openSheet({double velocity = 0}) {
     HapticFeedback.lightImpact();
     PlayerShell.isPlayerOpenNotifier.value = true;
-    if (!_open) setState(() => _open = true);
+    final restoreLyrics = _preferredMode == _Panel.lyrics;
+    if (!_open) {
+      setState(() {
+        _open = true;
+        if (restoreLyrics) {
+          _panel = _Panel.lyrics;
+          _bodyPanel = _Panel.lyrics;
+          _dock.value = 1.0;
+        }
+      });
+    }
     _sheet.springTo(1, spring: kSnappySpring, velocity: velocity);
   }
 
@@ -426,6 +443,9 @@ class PlayerShellState extends State<PlayerShell>
   /* ───────────────────────── panels (art / lyrics / queue) ───────────────────────── */
 
   void _setPanel(_Panel p) {
+    if (p == _Panel.lyrics || p == _Panel.art) {
+      _preferredMode = p;
+    }
     if (_panel == p) return;
     HapticFeedback.selectionClick();
     _mountTimer?.cancel();
@@ -1008,7 +1028,11 @@ class PlayerShellState extends State<PlayerShell>
       ),
     );
 
-    return Positioned.fill(
+    return Positioned(
+      left: -8.0,
+      right: -8.0,
+      top: 0.0,
+      bottom: 0.0,
       child: AnimatedBuilder(
         animation: Listenable.merge([_sheet, _dock, _pause, _artX, _press]),
         child: cover,
@@ -1111,7 +1135,11 @@ class PlayerShellState extends State<PlayerShell>
     // AnimatedBuilder as `child`, so it is NOT rebuilt on every animation frame.
     final column = RepaintBoundary(child: _sheetColumn(player, track, safe));
 
-    return Positioned.fill(
+    return Positioned(
+      left: -8.0,
+      right: -8.0,
+      top: 0.0,
+      bottom: 0.0,
       child: AnimatedBuilder(
         animation: _sheet,
         child: column,
@@ -1141,7 +1169,7 @@ class PlayerShellState extends State<PlayerShell>
                 child: Stack(
                   key: _sheetKey,
                   children: [
-                    // ── BACKGROUND CARD (fades out as the sheet is dragged down) ──
+                    // ── BACKGROUND CARD: spans completely edge to edge with zero gaps ──
                     Positioned.fill(
                       child: Opacity(
                         opacity: bgOpacity,
@@ -1185,7 +1213,10 @@ class PlayerShellState extends State<PlayerShell>
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () {},
-                          child: child,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: child,
+                          ),
                         ),
                       ),
                     ),
@@ -1264,7 +1295,7 @@ class PlayerShellState extends State<PlayerShell>
             // top/bottom edge fade remains.
             child: _dismissOnOverscroll(
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
+                padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
                 child: _edgeFade(
                   widget.lyricsBuilder?.call(context) ??
                       LyricsSheet(immersiveListenable: _lyricsImmersive),
