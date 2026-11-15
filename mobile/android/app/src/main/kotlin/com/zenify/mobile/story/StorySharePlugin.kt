@@ -144,6 +144,31 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
         intent.clipData = ClipData.newRawUri("Zenify Story Media", uri)
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
+        // Unconditionally grant permission directly to the target package if set
+        intent.`package`?.let { pkg ->
+            try {
+                context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
+        }
+
+        // Also pre-grant to common social targets so the receiving app can read the media
+        val targets = listOf(
+            "com.instagram.android",
+            "com.facebook.katana",
+            "com.facebook.lite",
+            "com.whatsapp",
+            "com.whatsapp.w4b",
+            "com.snapchat.android",
+            "org.telegram.messenger",
+            "org.thunderdog.challegram",
+            "org.telegram.messenger.web"
+        )
+        for (pkg in targets) {
+            try {
+                context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
+        }
+
         try {
             val resInfoList = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 context.packageManager.queryIntentActivities(
@@ -158,13 +183,7 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                 val packageName = resolveInfo.activityInfo.packageName
                 context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-        } catch (_: Exception) {
-            intent.`package`?.let { pkg ->
-                try {
-                    context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                } catch (_: Exception) {}
-            }
-        }
+        } catch (_: Exception) {}
     }
 
     private fun handleInstagramStory(
@@ -194,10 +213,12 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                 }
                 grantPermissionsAndAttachClipData(storyIntent, contentUri)
 
-                if (storyIntent.resolveActivity(context.packageManager) != null) {
+                try {
                     context.startActivity(storyIntent)
                     result.success(true)
                     return
+                } catch (e: Exception) {
+                    android.util.Log.w("StorySharePlugin", "Instagram story intent direct launch failed: ${e.message}")
                 }
             } else {
                 // Sticker Asset Mode (Square or sticker with top/bottom background colors)
@@ -216,15 +237,17 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                 }
                 grantPermissionsAndAttachClipData(stickerIntent, contentUri)
 
-                if (stickerIntent.resolveActivity(context.packageManager) != null) {
+                try {
                     context.startActivity(stickerIntent)
                     result.success(true)
                     return
+                } catch (e: Exception) {
+                    android.util.Log.w("StorySharePlugin", "Instagram sticker intent direct launch failed: ${e.message}")
                 }
             }
 
-            // Fallback: Direct Instagram Image Send Intent
-            if (isPackageInstalled(igPkg)) {
+            // Fallback 1: Direct Instagram Image Send Intent
+            try {
                 val sendIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
                     setPackage(igPkg)
@@ -232,16 +255,17 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                     flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 grantPermissionsAndAttachClipData(sendIntent, contentUri)
-                if (sendIntent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(sendIntent)
-                    result.success(true)
-                    return
-                }
+                context.startActivity(sendIntent)
+                result.success(true)
+                return
+            } catch (e: Exception) {
+                android.util.Log.w("StorySharePlugin", "Instagram ACTION_SEND launch failed: ${e.message}")
             }
 
-            result.success(false)
+            // Fallback 2: System chooser
+            handleSystemChooser(filePath, null, "Share to Instagram", result)
         } catch (_: Exception) {
-            result.success(false)
+            handleSystemChooser(filePath, null, "Share Story", result)
         }
     }
 
@@ -274,15 +298,17 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                     putExtra("com.facebook.platform.extra.APPLICATION_ID", appId)
                 }
                 grantPermissionsAndAttachClipData(storyIntent, contentUri)
-                if (storyIntent.resolveActivity(context.packageManager) != null) {
+                try {
                     context.startActivity(storyIntent)
                     result.success(true)
                     return
+                } catch (e: Exception) {
+                    android.util.Log.w("StorySharePlugin", "Facebook story intent failed: ${e.message}")
                 }
             }
 
-            // Fallback: Direct image send intent targeting Facebook
-            if (isPackageInstalled(fbPkg)) {
+            // Fallback 1: Direct image send intent targeting Facebook
+            try {
                 val sendIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
                     setPackage(fbPkg)
@@ -290,16 +316,17 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                     flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 grantPermissionsAndAttachClipData(sendIntent, contentUri)
-                if (sendIntent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(sendIntent)
-                    result.success(true)
-                    return
-                }
+                context.startActivity(sendIntent)
+                result.success(true)
+                return
+            } catch (e: Exception) {
+                android.util.Log.w("StorySharePlugin", "Facebook ACTION_SEND launch failed: ${e.message}")
             }
 
-            result.success(false)
+            // Fallback 2: System chooser
+            handleSystemChooser(filePath, null, "Share to Facebook", result)
         } catch (_: Exception) {
-            result.success(false)
+            handleSystemChooser(filePath, null, "Share Story", result)
         }
     }
 
@@ -314,35 +341,32 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
             return
         }
 
-        val waPkg = when {
-            isPackageInstalled("com.whatsapp") -> "com.whatsapp"
-            isPackageInstalled("com.whatsapp.w4b") -> "com.whatsapp.w4b"
-            else -> "com.whatsapp"
-        }
-
+        val pkgs = listOf("com.whatsapp", "com.whatsapp.w4b")
         try {
             val contentUri = getFileUri(file)
-            if (isPackageInstalled(waPkg)) {
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "image/png"
-                    setPackage(waPkg)
-                    putExtra(Intent.EXTRA_STREAM, contentUri)
-                    if (!text.isNullOrBlank()) {
-                        putExtra(Intent.EXTRA_TEXT, text)
+
+            for (pkg in pkgs) {
+                try {
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "image/png"
+                        setPackage(pkg)
+                        putExtra(Intent.EXTRA_STREAM, contentUri)
+                        if (!text.isNullOrBlank()) {
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        }
+                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                     }
-                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                grantPermissionsAndAttachClipData(intent, contentUri)
-                if (intent.resolveActivity(context.packageManager) != null) {
+                    grantPermissionsAndAttachClipData(intent, contentUri)
                     context.startActivity(intent)
                     result.success(true)
                     return
-                }
+                } catch (_: Exception) {}
             }
 
-            result.success(false)
+            // Fallback: System chooser
+            handleSystemChooser(filePath, text, "Share to WhatsApp", result)
         } catch (_: Exception) {
-            result.success(false)
+            handleSystemChooser(filePath, text, "Share Story", result)
         }
     }
 
@@ -360,8 +384,8 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
         try {
             val contentUri = getFileUri(file)
 
-            if (isPackageInstalled(snapPkg)) {
-                // Try Snapchat Creative Kit content intent
+            // Try Snapchat Creative Kit content intent
+            try {
                 val snapIntent = Intent("com.snapchat.add.CONTENT").apply {
                     setDataAndType(contentUri, "image/png")
                     setPackage(snapPkg)
@@ -369,14 +393,13 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                     putExtra(Intent.EXTRA_STREAM, contentUri)
                 }
                 grantPermissionsAndAttachClipData(snapIntent, contentUri)
+                context.startActivity(snapIntent)
+                result.success(true)
+                return
+            } catch (_: Exception) {}
 
-                if (snapIntent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(snapIntent)
-                    result.success(true)
-                    return
-                }
-
-                // Fallback: Direct image send intent targeting Snapchat
+            // Fallback 1: Direct image send intent targeting Snapchat
+            try {
                 val sendIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "image/png"
                     setPackage(snapPkg)
@@ -384,16 +407,15 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                     flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 grantPermissionsAndAttachClipData(sendIntent, contentUri)
-                if (sendIntent.resolveActivity(context.packageManager) != null) {
-                    context.startActivity(sendIntent)
-                    result.success(true)
-                    return
-                }
-            }
+                context.startActivity(sendIntent)
+                result.success(true)
+                return
+            } catch (_: Exception) {}
 
-            result.success(false)
+            // Fallback 2: System chooser
+            handleSystemChooser(filePath, null, "Share to Snapchat", result)
         } catch (_: Exception) {
-            result.success(false)
+            handleSystemChooser(filePath, null, "Share Story", result)
         }
     }
 
@@ -408,36 +430,36 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
             return
         }
 
-        val tgPkg = when {
-            isPackageInstalled("org.telegram.messenger") -> "org.telegram.messenger"
-            isPackageInstalled("org.thunderdog.challegram") -> "org.thunderdog.challegram"
-            isPackageInstalled("org.telegram.messenger.web") -> "org.telegram.messenger.web"
-            else -> "org.telegram.messenger"
-        }
-
+        val pkgs = listOf(
+            "org.telegram.messenger",
+            "org.thunderdog.challegram",
+            "org.telegram.messenger.web"
+        )
         try {
             val contentUri = getFileUri(file)
-            if (isPackageInstalled(tgPkg)) {
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "image/png"
-                    setPackage(tgPkg)
-                    putExtra(Intent.EXTRA_STREAM, contentUri)
-                    if (!text.isNullOrBlank()) {
-                        putExtra(Intent.EXTRA_TEXT, text)
+
+            for (pkg in pkgs) {
+                try {
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "image/png"
+                        setPackage(pkg)
+                        putExtra(Intent.EXTRA_STREAM, contentUri)
+                        if (!text.isNullOrBlank()) {
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        }
+                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                     }
-                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-                grantPermissionsAndAttachClipData(intent, contentUri)
-                if (intent.resolveActivity(context.packageManager) != null) {
+                    grantPermissionsAndAttachClipData(intent, contentUri)
                     context.startActivity(intent)
                     result.success(true)
                     return
-                }
+                } catch (_: Exception) {}
             }
 
-            result.success(false)
+            // Fallback: System chooser
+            handleSystemChooser(filePath, text, "Share to Telegram", result)
         } catch (_: Exception) {
-            result.success(false)
+            handleSystemChooser(filePath, text, "Share Story", result)
         }
     }
 

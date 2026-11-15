@@ -25,15 +25,24 @@ import '../../services/player_state.dart';
 const double kInterludeMinSeconds = 4.0;
 const double _kInterludeMin = kInterludeMinSeconds;
 
+/// Lines whose start times are within this many seconds of each other are
+/// treated as "same timing" and get played one after another.
+const double _kSameStartEps = 0.35;
+
 /// Karaoke glyph-fill subtle scale peak (1.0 to ~1.03-1.05 max).
 /// Transform-only around glyph center, ease in, then ease back to 1.0 after fill passes.
 const double kKaraokeGlyphScalePeak = 1.04;
+
+/// Apple Music lyric typography (SF Pro Display, heavy-bold, tight tracking).
+const FontWeight _kLyricWeight = FontWeight.w800;
+const double _kLyricTracking = -0.45; // SF Display tightens at large sizes
 
 /// Three-dot interlude animation tunables.
 const double kDotPopInOvershoot = 1.25;
 const double kDotPulseScaleMin = 1.0;
 const double kDotPulseScaleMax = 1.4;
-const double kDotClosingDuration = 0.55; // seconds before next line to complete fade/shrink
+const double kDotClosingDuration =
+    0.55; // seconds before next line to complete fade/shrink
 const int kDotStaggerMs = 120;
 
 /// Apple-style "waterfall": every line below the active one starts its glide a
@@ -94,13 +103,19 @@ bool _isInstrumentalOrDots(String text) {
 /// Controls auto-hide after this much time without touching the screen.
 const Duration _kIdleHide = Duration(seconds: 3);
 
-final bool _isApple = defaultTargetPlatform == TargetPlatform.iOS ||
-    defaultTargetPlatform == TargetPlatform.macOS;
-final String _kDisplayFont = _isApple ? '.SF Pro Display' : 'SF Pro Display';
-final String _kTextFont = _isApple ? '.SF Pro Text' : 'SF Pro Text';
+const String _kDisplayFont = 'SF Pro Display';
+const String _kTextFont = 'SF Pro';
 
 /// Singers that mean "everyone" (stay on the left side).
-const _kGroupSingers = {'both', 'all', 'group', 'together', 'duet', 'v1000', 'chorus'};
+const _kGroupSingers = {
+  'both',
+  'all',
+  'group',
+  'together',
+  'duet',
+  'v1000',
+  'chorus',
+};
 
 final _tagRe = RegExp(r'<[^>]+>');
 
@@ -152,6 +167,93 @@ enum LyricsLang {
 }
 
 // ---------------------------------------------------------------------------
+// Same-timing lines
+// ---------------------------------------------------------------------------
+
+/// Lines with (almost) the same start time would let the 2nd line steal focus
+/// instantly, so the 1st never fills. Give each line in such a group its own
+/// consecutive slice of time so they play one after another, each fully filled.
+List<LyricLine> _spreadSimultaneous(List<LyricLine> src) {
+  if (src.length < 2) return src;
+  double sec(Duration d) => d.inMicroseconds / 1e6;
+  Duration dur(double v) => Duration(microseconds: (v * 1e6).round());
+
+  double? knownEnd(LyricLine l) {
+    if (l.end != null) return sec(l.end!);
+    final w = l.words;
+    if (w != null && w.isNotEmpty) return sec(w.last.end);
+    return null;
+  }
+
+  LyricLine retime(LyricLine l, double ns, double ne) {
+    final w = l.words;
+    List<LyricWord>? nw;
+    if (w != null && w.isNotEmpty) {
+      final ws = sec(w.first.start);
+      final we = math.max(ws + 0.05, sec(w.last.end));
+      final k = (ne - ns) / (we - ws);
+      nw = [
+        for (final x in w)
+          LyricWord(
+            text: x.text,
+            start: dur(ns + (sec(x.start) - ws) * k),
+            end: dur(ns + (sec(x.end) - ws) * k),
+          ),
+      ];
+    }
+    return LyricLine(
+      start: dur(ns),
+      end: dur(ne),
+      text: l.text,
+      translation: l.translation,
+      words: nw,
+      singer: l.singer,
+    );
+  }
+
+  final out = <LyricLine>[];
+  var i = 0;
+  while (i < src.length) {
+    var j = i + 1;
+    while (j < src.length &&
+        sec(src[j].start) - sec(src[i].start) < _kSameStartEps) {
+      j++;
+    }
+    if (j - i == 1) {
+      out.add(src[i]);
+      i = j;
+      continue;
+    }
+
+    final group = src.sublist(i, j);
+    final gs = sec(group.first.start);
+    final nextStart = j < src.length ? sec(src[j].start) : null;
+
+    // Each line's own length: from its timing if known, else from its text.
+    final durs = <double>[
+      for (final l in group)
+        () {
+          final ke = knownEnd(l);
+          final d = ke != null ? ke - sec(l.start) : 0.0;
+          return d > 0.3 ? d : math.max(1.2, l.text.characters.length * 0.075);
+        }(),
+    ];
+    final sum = durs.fold<double>(0, (a, b) => a + b);
+    final avail = nextStart != null ? nextStart - gs : sum;
+    final scale = (sum > avail && avail > 0) ? avail / sum : 1.0;
+
+    var cursor = gs;
+    for (var k = 0; k < group.length; k++) {
+      final d = durs[k] * scale;
+      out.add(retime(group[k], cursor, cursor + d));
+      cursor += d;
+    }
+    i = j;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Connected sheet
 // ---------------------------------------------------------------------------
 
@@ -198,14 +300,17 @@ class LyricsSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            Text('Loading lyrics...',
-                style: TextStyle(
-                    fontFamily: _kTextFont,
-                    fontFamilyFallback: _kFontFamilyFallback,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.65),
-                    letterSpacing: 0)),
+            Text(
+              'Loading lyrics...',
+              style: TextStyle(
+                fontFamily: _kTextFont,
+                fontFamilyFallback: _kFontFamilyFallback,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: 0.65),
+                letterSpacing: 0,
+              ),
+            ),
           ],
         ),
       );
@@ -218,18 +323,24 @@ class LyricsSheet extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.lyrics_outlined,
-                  size: 52, color: Colors.white.withValues(alpha: 0.28)),
+              Icon(
+                Icons.lyrics_outlined,
+                size: 52,
+                color: Colors.white.withValues(alpha: 0.28),
+              ),
               const SizedBox(height: 16),
-              Text('Lyrics Not Available',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontFamily: _kDisplayFont,
-                      fontFamilyFallback: _kFontFamilyFallback,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 0.2)),
+              Text(
+                'Lyrics Not Available',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: _kDisplayFont,
+                  fontFamilyFallback: _kFontFamilyFallback,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.2,
+                ),
+              ),
               const SizedBox(height: 8),
               Text(
                 track != null
@@ -237,12 +348,13 @@ class LyricsSheet extends StatelessWidget {
                     : 'No lyrics available for this track.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                    fontFamily: _kTextFont,
-                    fontFamilyFallback: _kFontFamilyFallback,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.55),
-                    height: 1.35),
+                  fontFamily: _kTextFont,
+                  fontFamilyFallback: _kFontFamilyFallback,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.55),
+                  height: 1.35,
+                ),
               ),
             ],
           ),
@@ -302,10 +414,7 @@ class LyricsSheet extends StatelessWidget {
           : null;
       Navigator.of(context).push(
         CupertinoPageRoute(
-          builder: (_) => LyricsSelectionScreen(
-            track: t,
-            lyrics: lyricsRes,
-          ),
+          builder: (_) => LyricsSelectionScreen(track: t, lyrics: lyricsRes),
         ),
       );
     }
@@ -334,10 +443,10 @@ class _Depth {
   final double o, b, s;
 
   static _Depth lerp(_Depth a, _Depth b, double t) => _Depth(
-        a.o + (b.o - a.o) * t,
-        a.b + (b.b - a.b) * t,
-        a.s + (b.s - a.s) * t,
-      );
+    a.o + (b.o - a.o) * t,
+    a.b + (b.b - a.b) * t,
+    a.s + (b.s - a.s) * t,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -358,8 +467,13 @@ const _before = [
   _Depth(0.42, 3.8, 0.90),
 ];
 
-_Depth _depthFor(int dist, bool current, bool manual, bool unsynced,
-    bool reduce) {
+_Depth _depthFor(
+  int dist,
+  bool current,
+  bool manual,
+  bool unsynced,
+  bool reduce,
+) {
   if (current || unsynced) return const _Depth(1, 0, 1);
   if (manual) return const _Depth(0.86, 0, 0.97);
   final d = dist > 0
@@ -377,12 +491,15 @@ class _SpringCurve extends Curve {
     double ratio = 0.82,
     this._settle = 0.85,
   }) : _sim = SpringSimulation(
-          SpringDescription.withDampingRatio(
-              mass: 1, stiffness: stiffness, ratio: ratio),
-          0,
-          1,
-          0,
-        );
+         SpringDescription.withDampingRatio(
+           mass: 1,
+           stiffness: stiffness,
+           ratio: ratio,
+         ),
+         0,
+         1,
+         0,
+       );
   final SpringSimulation _sim;
   final double _settle;
   @override
@@ -391,11 +508,22 @@ class _SpringCurve extends Curve {
 
 /// Springs used across the file.
 final Curve _depthSpring = _SpringCurve();
-final Curve _glideSpring = _SpringCurve(stiffness: 120, ratio: 0.8, settle: 0.7);
-final Curve _revealSpring =
-    _SpringCurve(stiffness: 150, ratio: 0.74, settle: 0.7);
+final Curve _glideSpring = _SpringCurve(
+  stiffness: 120,
+  ratio: 0.8,
+  settle: 0.7,
+);
+final Curve _revealSpring = _SpringCurve(
+  stiffness: 150,
+  ratio: 0.74,
+  settle: 0.7,
+);
 final Curve _popSpring = _SpringCurve(stiffness: 240, ratio: 0.58, settle: 0.5);
-final Curve _thumbSpring = _SpringCurve(stiffness: 220, ratio: 0.7, settle: 0.6);
+final Curve _thumbSpring = _SpringCurve(
+  stiffness: 220,
+  ratio: 0.7,
+  settle: 0.6,
+);
 const Curve _liquidCurve = Cubic(0.16, 1.0, 0.30, 1.0);
 
 /// One "scroll happened" event. Every tile turns it into its own spring.
@@ -411,14 +539,18 @@ class _Glide {
 // ---------------------------------------------------------------------------
 
 class _Item {
-  const _Item.line(this.start, this.end, this.line,
-      {this.right = false, this.backing = false})
-      : interlude = false;
+  const _Item.line(
+    this.start,
+    this.end,
+    this.line, {
+    this.right = false,
+    this.backing = false,
+  }) : interlude = false;
   const _Item.gap(this.start, this.end)
-      : interlude = true,
-        line = null,
-        right = false,
-        backing = false;
+    : interlude = true,
+      line = null,
+      right = false,
+      backing = false;
   final bool interlude;
   final double start; // seconds
   final double end; // seconds
@@ -469,8 +601,7 @@ class LyricsView extends StatefulWidget {
   State<LyricsView> createState() => _LyricsViewState();
 }
 
-class _LyricsViewState extends State<LyricsView>
-    with TickerProviderStateMixin {
+class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
   static const _step = 500;
   static const _maxOffset = 15000;
 
@@ -509,6 +640,12 @@ class _LyricsViewState extends State<LyricsView>
   Duration _lastElapsed = Duration.zero;
 
   bool _didFirstFollow = false;
+
+  /// True while a long animateTo is running (pinning must not fight it).
+  bool _animating = false;
+
+  /// Bumped on every move; stale pin loops stop themselves.
+  int _pinToken = 0;
 
   bool get _hasTranslation =>
       widget.lines.any((l) => (l.translation ?? '').trim().isNotEmpty);
@@ -575,6 +712,7 @@ class _LyricsViewState extends State<LyricsView>
 
   @override
   void dispose() {
+    _pinToken++;
     widget.immersiveListenable?.removeListener(_onExternalImmersive);
     widget.position.removeListener(_onPosition);
     _ticker.dispose();
@@ -625,7 +763,11 @@ class _LyricsViewState extends State<LyricsView>
   // ----- items -----
 
   void _rebuildItems() {
-    final L = widget.lines;
+    // Lines that share (almost) the same start time are spread out so each
+    // one gets its own full fill animation instead of being skipped.
+    final L = widget.isSynced
+        ? _spreadSimultaneous(widget.lines)
+        : widget.lines;
     _keys = [];
     _items = [];
     if (!widget.isSynced) {
@@ -666,7 +808,9 @@ class _LyricsViewState extends State<LyricsView>
 
       // Convert explicit instrumental placeholder lines or dot markers into three-dot interlude gaps
       if (_isInstrumentalOrDots(L[i].text)) {
-        _items.add(_Item.gap(start, hasNext ? nextStart : math.max(start + 4.0, end)));
+        _items.add(
+          _Item.gap(start, hasNext ? nextStart : math.max(start + 4.0, end)),
+        );
         continue;
       }
 
@@ -772,9 +916,15 @@ class _LyricsViewState extends State<LyricsView>
   // new one, with a small extra delay for each line further down. That is the
   // "liquid waterfall". We do exactly that (small moves) and fall back to a
   // smooth expo-out scroll for long jumps (e.g. after manual scrolling).
+  //
+  // Bracket lines and interlude dots collapse their height AFTER they finish,
+  // which shifts everything below them. To stop the focused line from
+  // drifting up and then back down, _startPin() keeps it locked to its target
+  // spot, frame by frame, for a short window after every move.
 
   void _follow({bool forceAnimated = false}) {
     if (!widget.isSynced || !mounted || _manual || !_scroll.hasClients) return;
+    _startPin();
     double target;
     if (_active < 0) {
       target = 0;
@@ -790,6 +940,7 @@ class _LyricsViewState extends State<LyricsView>
 
     final reduce = MediaQuery.disableAnimationsOf(context);
     if ((!_didFirstFollow && !forceAnimated) || reduce) {
+      _animating = false;
       _scroll.jumpTo(target);
       _didFirstFollow = true;
       return;
@@ -798,17 +949,61 @@ class _LyricsViewState extends State<LyricsView>
 
     final vh = math.max(1.0, pos.viewportDimension);
     if (delta.abs() <= vh * 0.9) {
+      _animating = false;
       _scroll.jumpTo(target);
       _glide.value = _Glide(++_glideId, delta, _active);
     } else {
-      final ms =
-          (420 + (delta.abs() / vh).clamp(0.0, 2.5) * 260).round().clamp(420, 760);
-      _scroll.animateTo(
-        target,
-        duration: Duration(milliseconds: ms),
-        curve: _liquidCurve,
+      final ms = (420 + (delta.abs() / vh).clamp(0.0, 2.5) * 260).round().clamp(
+        420,
+        760,
       );
+      _animating = true;
+      _scroll
+          .animateTo(
+            target,
+            duration: Duration(milliseconds: ms),
+            curve: _liquidCurve,
+          )
+          .whenComplete(() => _animating = false);
     }
+  }
+
+  /// While bracket lines / dots open and close, the layout above the focused
+  /// line changes size. For a short window after every move, keep the focused
+  /// line pinned at its target spot so it never drifts.
+  void _startPin([int ms = 1100]) {
+    final token = ++_pinToken;
+    final until = DateTime.now().add(Duration(milliseconds: ms));
+    void tick(Duration _) {
+      if (!mounted || token != _pinToken) return;
+      _pin();
+      if (DateTime.now().isBefore(until)) {
+        WidgetsBinding.instance.addPostFrameCallback(tick);
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback(tick);
+  }
+
+  void _pin() {
+    if (!widget.isSynced ||
+        _manual ||
+        _animating ||
+        _pointers > 0 ||
+        _active < 0 ||
+        !_scroll.hasClients) {
+      return;
+    }
+    final ro = _keys[_active].currentContext?.findRenderObject();
+    if (ro == null) return;
+    final pos = _scroll.position;
+    final target = RenderAbstractViewport.of(ro)
+        .getOffsetToReveal(ro, 0.30)
+        .offset
+        .clamp(pos.minScrollExtent, pos.maxScrollExtent)
+        .toDouble();
+    if ((target - pos.pixels).abs() < 0.5) return;
+    _scroll.jumpTo(target); // layout compensation only, no glide
   }
 
   // ----- offset / language -----
@@ -923,7 +1118,9 @@ class _LyricsViewState extends State<LyricsView>
                               HapticFeedback.selectionClick();
                               _resume?.cancel();
                               final seekMs = math.max(
-                                  0, line.start.inMilliseconds - _offsetMs);
+                                0,
+                                line.start.inMilliseconds - _offsetMs,
+                              );
                               _anchorPos = seekMs / 1000.0;
                               _anchorAt = _lastElapsed;
                               _clock.value = line.start.inMicroseconds / 1e6;
@@ -934,8 +1131,9 @@ class _LyricsViewState extends State<LyricsView>
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 if (mounted) _follow(forceAnimated: true);
                               });
-                              widget.onSeek
-                                  ?.call(Duration(milliseconds: seekMs));
+                              widget.onSeek?.call(
+                                Duration(milliseconds: seekMs),
+                              );
                             },
                           ),
                       ],
@@ -948,12 +1146,15 @@ class _LyricsViewState extends State<LyricsView>
               AnimatedBuilder(
                 animation: _reveal,
                 builder: (context, child) {
-                  final v =
-                      Curves.easeOut.transform(_reveal.value.clamp(0.0, 1.0));
+                  final v = Curves.easeOut.transform(
+                    _reveal.value.clamp(0.0, 1.0),
+                  );
                   return Opacity(
                     opacity: v,
                     child: Transform.translate(
-                        offset: Offset(0, (1 - v) * 18), child: child),
+                      offset: Offset(0, (1 - v) * 18),
+                      child: child,
+                    ),
                   );
                 },
                 child: ClipRect(
@@ -978,7 +1179,8 @@ class _LyricsViewState extends State<LyricsView>
                             HapticFeedback.selectionClick();
                             setState(() => _lang = l);
                             WidgetsBinding.instance.addPostFrameCallback(
-                                (_) => _follow(forceAnimated: true));
+                              (_) => _follow(forceAnimated: true),
+                            );
                           },
                           onMinus: () => _changeOffset(-_step),
                           onPlus: () => _changeOffset(_step),
@@ -1053,15 +1255,24 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _d = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 700));
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
     _pop = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 420),
-        reverseDuration: const Duration(milliseconds: 240));
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+      reverseDuration: const Duration(milliseconds: 240),
+    );
     _popCurve = CurvedAnimation(
-        parent: _pop, curve: _popSpring, reverseCurve: Curves.easeInCubic);
+      parent: _pop,
+      curve: _popSpring,
+      reverseCurve: Curves.easeInCubic,
+    );
     _g = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 760), value: 1);
+      vsync: this,
+      duration: const Duration(milliseconds: 760),
+      value: 1,
+    );
     widget.glide.addListener(_onGlide);
   }
 
@@ -1072,8 +1283,13 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
 
   bool get _reduce => MediaQuery.disableAnimationsOf(context);
 
-  _Depth _target() => _depthFor(widget.dist, widget.current, widget.manual,
-      !widget.synced, _reduce);
+  _Depth _target() => _depthFor(
+    widget.dist,
+    widget.current,
+    widget.manual,
+    !widget.synced,
+    _reduce,
+  );
 
   int get _waterfall => (!widget.current && widget.dist > 0 && !widget.manual)
       ? math.min(widget.dist, 5) * 32
@@ -1188,13 +1404,13 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   }
 
   Widget _sized(Widget child) => AnimatedSize(
-        duration: const Duration(milliseconds: 560),
-        curve: _liquidCurve,
-        alignment: Alignment.topCenter,
-        clipBehavior: Clip.none,
-        onEnd: widget.onCollapsed,
-        child: child,
-      );
+    duration: const Duration(milliseconds: 560),
+    curve: _liquidCurve,
+    alignment: Alignment.topCenter,
+    clipBehavior: Clip.none,
+    onEnd: widget.onCollapsed,
+    child: child,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -1223,10 +1439,7 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
           sub = tr.isNotEmpty ? tr : null;
       }
     }
-    main = main
-        .replaceAll(_tagRe, ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
+    main = main.replaceAll(_tagRe, ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
 
     Widget content;
     if (it.interlude) {
@@ -1238,8 +1451,9 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
       );
     } else {
       content = Column(
-        crossAxisAlignment:
-            right ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: right
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           _WordLine(
             text: main,
@@ -1268,10 +1482,11 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
                   fontFamilyFallback: _kFontFamilyFallback,
                   fontSize: 18,
                   height: _hasComplexScript(sub) ? 1.32 : 1.2,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: _hasComplexScript(sub) ? 0.0 : 0.1,
-                  color: Colors.white
-                      .withValues(alpha: widget.current ? 0.85 : 0.6),
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: _hasComplexScript(sub) ? 0.0 : -0.2,
+                  color: Colors.white.withValues(
+                    alpha: widget.current ? 0.85 : 0.6,
+                  ),
                 ),
               ),
             ),
@@ -1293,9 +1508,12 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
           final dp = _cur;
           // Interlude dots animate themselves; bracket lines use a tile pop.
           final pv = (_collapsible && !it.interlude) ? _popCurve.value : 1.0;
-          final popScale = (_collapsible && !it.interlude) ? 0.5 + 0.5 * pv : 1.0;
-          final popOpacity =
-              (_collapsible && !it.interlude) ? pv.clamp(0.0, 1.0) : 1.0;
+          final popScale = (_collapsible && !it.interlude)
+              ? 0.5 + 0.5 * pv
+              : 1.0;
+          final popOpacity = (_collapsible && !it.interlude)
+              ? pv.clamp(0.0, 1.0)
+              : 1.0;
 
           Widget w = Transform.scale(
             scale: dp.s * popScale,
@@ -1305,7 +1523,10 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
           if (dp.b > 0.18) {
             w = ImageFiltered(
               imageFilter: ImageFilter.blur(
-                  sigmaX: dp.b, sigmaY: dp.b, tileMode: TileMode.decal),
+                sigmaX: dp.b,
+                sigmaY: dp.b,
+                tileMode: TileMode.decal,
+              ),
               child: w,
             );
           }
@@ -1400,7 +1621,7 @@ class _WordLine extends StatefulWidget {
 }
 
 class _WordLineState extends State<_WordLine>
-  with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   _Layout? _lay;
   double _layW = -1;
   String _layText = '';
@@ -1412,19 +1633,23 @@ class _WordLineState extends State<_WordLine>
   void initState() {
     super.initState();
     _settle = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 520), value: 0);
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+      value: 0,
+    );
   }
 
   TextStyle _style(double fs, Color c) {
+    final complex = _hasComplexScript(widget.text);
     return TextStyle(
       fontFamily: _kDisplayFont,
       fontFamilyFallback: _kFontFamilyFallback,
       fontSize: fs,
       height: _kLineHeight,
       leadingDistribution: TextLeadingDistribution.even,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.0,
-      fontStyle: widget.backing ? FontStyle.italic : FontStyle.normal,
+      // Backing vocals are lighter + smaller (not italic) like Apple Music.
+      fontWeight: widget.backing ? FontWeight.w700 : _kLyricWeight,
+      letterSpacing: complex ? 0.0 : _kLyricTracking,
       color: c,
     );
   }
@@ -1438,7 +1663,7 @@ class _WordLineState extends State<_WordLine>
     }
     final tokens = widget.text.split(' ').where((t) => t.isNotEmpty).toList();
 
-    final primary = (maxW * 0.09).clamp(26.0, 36.0).toDouble();
+    final primary = (maxW * 0.10).clamp(28.0, 40.0).toDouble();
     final secondary = (primary * 0.82).roundToDouble();
 
     List<double> measure(double fs) {
@@ -1490,22 +1715,34 @@ class _WordLineState extends State<_WordLine>
         }
       } else {
         final lineStart = ws.first.start.inMicroseconds / 1e6;
-        final lineEnd =
-            math.max(lineStart + 0.5, ws.last.end.inMicroseconds / 1e6);
+        final lineEnd = math.max(
+          lineStart + 0.5,
+          ws.last.end.inMicroseconds / 1e6,
+        );
         // Measure by grapheme cluster counts rather than code units
-        final totalClusters = tokens.fold<int>(0, (a, t) => a + t.characters.length);
+        final totalClusters = tokens.fold<int>(
+          0,
+          (a, t) => a + t.characters.length,
+        );
         var acc = 0;
         for (var i = 0; i < n; i++) {
           final clCount = tokens[i].characters.length;
-          s[i] = lineStart + (acc / math.max(1, totalClusters)) * (lineEnd - lineStart);
+          s[i] =
+              lineStart +
+              (acc / math.max(1, totalClusters)) * (lineEnd - lineStart);
           acc += clCount;
-          e[i] = lineStart + (acc / math.max(1, totalClusters)) * (lineEnd - lineStart);
+          e[i] =
+              lineStart +
+              (acc / math.max(1, totalClusters)) * (lineEnd - lineStart);
         }
       }
     } else {
       final dur = math.max(0.5, widget.end - widget.start);
       // Measure by grapheme cluster counts rather than code units
-      final totalClusters = tokens.fold<int>(0, (a, t) => a + t.characters.length);
+      final totalClusters = tokens.fold<int>(
+        0,
+        (a, t) => a + t.characters.length,
+      );
       var acc = 0;
       for (var i = 0; i < n; i++) {
         final clCount = tokens[i].characters.length;
@@ -1547,34 +1784,36 @@ class _WordLineState extends State<_WordLine>
   @override
   Widget build(BuildContext context) {
     final reduce = MediaQuery.disableAnimationsOf(context);
-    return LayoutBuilder(builder: (context, cons) {
-      final lay = _layout(cons.maxWidth);
-      Widget wrap(double? t, double settle) => Wrap(
-            alignment: widget.right ? WrapAlignment.end : WrapAlignment.start,
-            spacing: lay.fs * _kWordGap,
-            runSpacing: lay.fs * 0.04,
-            crossAxisAlignment: WrapCrossAlignment.end,
-            children: [
-              for (var i = 0; i < lay.tokens.length; i++)
-                _buildWord(lay, i, t, reduce, settle),
-            ],
-          );
+    return LayoutBuilder(
+      builder: (context, cons) {
+        final lay = _layout(cons.maxWidth);
+        Widget wrap(double? t, double settle) => Wrap(
+          alignment: widget.right ? WrapAlignment.end : WrapAlignment.start,
+          spacing: lay.fs * _kWordGap,
+          runSpacing: lay.fs * 0.04,
+          crossAxisAlignment: WrapCrossAlignment.end,
+          children: [
+            for (var i = 0; i < lay.tokens.length; i++)
+              _buildWord(lay, i, t, reduce, settle),
+          ],
+        );
 
-      if (widget.current && !widget.plain) {
-        return ValueListenableBuilder<double>(
-          valueListenable: widget.clock,
-          builder: (_, t, _) => wrap(t, 1),
-        );
-      }
-      if (widget.past && !widget.plain) {
-        if (_settle.isDismissed) return wrap(null, 0);
-        return AnimatedBuilder(
-          animation: _settle,
-          builder: (context, _) => wrap(null, _settle.value),
-        );
-      }
-      return wrap(null, 1);
-    });
+        if (widget.current && !widget.plain) {
+          return ValueListenableBuilder<double>(
+            valueListenable: widget.clock,
+            builder: (_, t, _) => wrap(t, 1),
+          );
+        }
+        if (widget.past && !widget.plain) {
+          if (_settle.isDismissed) return wrap(null, 0);
+          return AnimatedBuilder(
+            animation: _settle,
+            builder: (context, _) => wrap(null, _settle.value),
+          );
+        }
+        return wrap(null, 1);
+      },
+    );
   }
 
   Widget _buildWord(_Layout lay, int i, double? t, bool reduce, double settle) {
@@ -1594,11 +1833,16 @@ class _WordLineState extends State<_WordLine>
       style: _style,
       p: raw.clamp(0.0, 1.0).toDouble(),
       settle: settle,
+      // settle is 1 on the current line and eases 1 -> 0 once it is sung, so
+      // the glow fades out with a smooth curve as the line moves on.
+      glow: widget.plain
+          ? 0.0
+          : Curves.easeOut.transform(settle.clamp(0.0, 1.0)),
     );
   }
 }
 
-/// One word: dim base, shaped grapheme-accurate karaoke fill, and subtle glyph zoom.
+/// One word: dim base, soft-edged white fill (left to right) and pure white glow (Apple Music v1.0.2 style).
 class _Word extends StatelessWidget {
   const _Word({
     required this.text,
@@ -1606,193 +1850,56 @@ class _Word extends StatelessWidget {
     required this.style,
     required this.p,
     this.settle = 1,
+    this.glow = 0,
   });
 
   final String text;
   final double fs;
   final TextStyle Function(double, Color) style;
-  final double p; // 0..1 fill progress of this word
+  final double p;
   final double settle;
+  final double glow;
 
   static const _dim = Color(0x6BFFFFFF); // white 42%
 
   @override
   Widget build(BuildContext context) {
-    // Idle / unreached word
-    if (p <= 0.0) {
-      return Text(text, style: style(fs, _dim));
-    }
+    if (p <= 0.0) return Text(text, style: style(fs, _dim));
+    if (p >= 1.0) return Text(text, style: style(fs, Colors.white));
 
-    // Fully passed word
-    if (p >= 1.0) {
-      final filledColor = Color.lerp(_dim, Colors.white, settle) ?? Colors.white;
-      return Text(text, style: style(fs, filledColor));
-    }
+    const soft = 0.18;
+    final a = (p * (1 + soft) - soft).clamp(0.0, 1.0).toDouble();
+    final b = (p * (1 + soft)).clamp(0.0, 1.0).toDouble();
 
-    // Actively filling word: render base dim and shaped karaoke fill with cluster-accurate clipping and zoom
-    final dimStyle = style(fs, _dim);
-    final fillStyle = style(fs, Colors.white);
-
-    return _WordKaraokeWidget(
-      text: text,
-      fs: fs,
-      dimStyle: dimStyle,
-      fillStyle: fillStyle,
-      p: p,
-      settle: settle,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Apple Music soft white glow behind active word
+        Opacity(
+          opacity: 0.55,
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (r) => LinearGradient(
+                colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
+                stops: [0, a, b],
+              ).createShader(r),
+              child: Text(text, style: style(fs, Colors.white)),
+            ),
+          ),
+        ),
+        Text(text, style: style(fs, _dim)),
+        ShaderMask(
+          blendMode: BlendMode.dstIn,
+          shaderCallback: (r) => LinearGradient(
+            colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
+            stops: [0, a, b],
+          ).createShader(r),
+          child: Text(text, style: style(fs, Colors.white)),
+        ),
+      ],
     );
-  }
-}
-
-class _WordKaraokeWidget extends StatelessWidget {
-  const _WordKaraokeWidget({
-    required this.text,
-    required this.fs,
-    required this.dimStyle,
-    required this.fillStyle,
-    required this.p,
-    required this.settle,
-  });
-
-  final String text;
-  final double fs;
-  final TextStyle dimStyle;
-  final TextStyle fillStyle;
-  final double p;
-  final double settle;
-
-  @override
-  Widget build(BuildContext context) {
-    final tp = TextPainter(
-      text: TextSpan(text: text, style: dimStyle),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final size = tp.size;
-
-    return CustomPaint(
-      size: size,
-      painter: _WordKaraokePainter(
-        text: text,
-        dimStyle: dimStyle,
-        fillStyle: fillStyle,
-        p: p,
-        settle: settle,
-        textPainter: tp,
-      ),
-    );
-  }
-}
-
-class _WordKaraokePainter extends CustomPainter {
-  _WordKaraokePainter({
-    required this.text,
-    required this.dimStyle,
-    required this.fillStyle,
-    required this.p,
-    required this.settle,
-    required this.textPainter,
-  });
-
-  final String text;
-  final TextStyle dimStyle;
-  final TextStyle fillStyle;
-  final double p;
-  final double settle;
-  final TextPainter textPainter;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final clusters = text.characters.toList();
-    if (clusters.isEmpty) return;
-
-    final tpWhite = TextPainter(
-      text: TextSpan(text: text, style: fillStyle),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    final totalWidth = textPainter.width;
-    final height = textPainter.height;
-
-    // Paint the dim base text for the word
-    textPainter.paint(canvas, Offset.zero);
-
-    var offset = 0;
-    var currentLeft = 0.0;
-    final fillX = (p * totalWidth);
-
-    for (var i = 0; i < clusters.length; i++) {
-      final cl = clusters[i];
-      final start = offset;
-      final end = offset + cl.length;
-      offset = end;
-
-      final boxes = textPainter.getBoxesForSelection(
-        TextSelection(baseOffset: start, extentOffset: end),
-      );
-
-      double left, right;
-      if (boxes.isNotEmpty) {
-        left = boxes.first.left;
-        right = boxes.last.right;
-        if (right < left) {
-          final tmp = left;
-          left = right;
-          right = tmp;
-        }
-      } else {
-        left = currentLeft;
-        right = currentLeft + (totalWidth / clusters.length);
-      }
-      currentLeft = right;
-
-      final clusterWidth = math.max(0.001, right - left);
-      final double cp;
-      if (fillX <= left) {
-        cp = 0.0;
-      } else if (fillX >= right) {
-        cp = 1.0;
-      } else {
-        cp = ((fillX - left) / clusterWidth).clamp(0.0, 1.0);
-      }
-
-      if (cp <= 0.0) continue;
-
-      final cx = (left + right) / 2.0;
-      final cy = height / 2.0;
-
-      if (cp >= 1.0) {
-        // Fully filled cluster: flat 1.0 scale, clipped strictly to cluster bounds
-        canvas.save();
-        canvas.clipRect(Rect.fromLTRB(left, -2, right, height + 4));
-        tpWhite.paint(canvas, Offset.zero);
-        canvas.restore();
-      } else {
-        // Actively filling cluster: subtle zoom ease-in / ease-out (1.0 -> 1.04 -> 1.0)
-        final scale = 1.0 + (kKaraokeGlyphScalePeak - 1.0) * math.sin(math.pi * cp);
-        final clusterFillX = left + cp * clusterWidth;
-
-        // Clip strictly at clusterFillX so NO pixel beyond progress is filled
-        canvas.save();
-        canvas.clipRect(Rect.fromLTRB(left, -2, clusterFillX, height + 4));
-        canvas.translate(cx, cy);
-        canvas.scale(scale);
-        canvas.translate(-cx, -cy);
-        tpWhite.paint(canvas, Offset.zero);
-        canvas.restore();
-      }
-    }
-
-    tpWhite.dispose();
-  }
-
-  @override
-  bool shouldRepaint(covariant _WordKaraokePainter oldDelegate) {
-    return oldDelegate.text != text ||
-        oldDelegate.p != p ||
-        oldDelegate.settle != settle ||
-        oldDelegate.dimStyle != dimStyle ||
-        oldDelegate.fillStyle != fillStyle;
   }
 }
 
@@ -1850,22 +1957,31 @@ class _Dots extends StatelessWidget {
                   final popInRaw = (dotTime / popInDuration).clamp(0.0, 1.0);
                   final double popInScale;
                   if (popInRaw < 1.0) {
-                    popInScale = Curves.easeOutBack.transform(popInRaw) * (kDotPopInOvershoot / 1.15);
+                    popInScale =
+                        Curves.easeOutBack.transform(popInRaw) *
+                        (kDotPopInOvershoot / 1.15);
                   } else {
                     popInScale = 1.0;
                   }
 
                   // 2. Active breathing pulse: 1.0 to 1.4, staggered like a wave of pops
-                  final wave = (math.sin((t - start) * 3.6 - i * 0.95) + 1.0) / 2.0;
-                  final activePulse = kDotPulseScaleMin + (kDotPulseScaleMax - kDotPulseScaleMin) * wave;
+                  final wave =
+                      (math.sin((t - start) * 3.6 - i * 0.95) + 1.0) / 2.0;
+                  final activePulse =
+                      kDotPulseScaleMin +
+                      (kDotPulseScaleMax - kDotPulseScaleMin) * wave;
 
-                  final baseScale = popInRaw < 1.0
-                      ? popInScale
-                      : activePulse;
+                  final baseScale = popInRaw < 1.0 ? popInScale : activePulse;
 
                   // 3. Closing phase: shrink to 0 + fade smoothly before next line
-                  final scale = (baseScale * closingEase * pop.value).clamp(0.0, 2.0);
-                  final opacity = (popInRaw * closingEase * pop.value).clamp(0.0, 1.0);
+                  final scale = (baseScale * closingEase * pop.value).clamp(
+                    0.0,
+                    2.0,
+                  );
+                  final opacity = (popInRaw * closingEase * pop.value).clamp(
+                    0.0,
+                    1.0,
+                  );
 
                   final fillProg = ((t - start) / span);
                   final fill = ((fillProg * 3.0) - i).clamp(0.0, 1.0);
@@ -1880,11 +1996,17 @@ class _Dots extends StatelessWidget {
                           width: 13,
                           height: 13,
                           decoration: BoxDecoration(
-                            color: Color.lerp(const Color(0x66FFFFFF), Colors.white, fill),
+                            color: Color.lerp(
+                              const Color(0x66FFFFFF),
+                              Colors.white,
+                              fill,
+                            ),
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.white.withValues(alpha: 0.15 + 0.45 * fill),
+                                color: Colors.white.withValues(
+                                  alpha: 0.15 + 0.45 * fill,
+                                ),
                                 blurRadius: 4 + 8 * fill,
                               ),
                             ],
@@ -1925,7 +2047,9 @@ class _StepButtonState extends State<_StepButton> {
     _rep?.cancel();
     _rep = Timer(const Duration(milliseconds: 450), () {
       _rep = Timer.periodic(
-          const Duration(milliseconds: 140), (_) => widget.onStep());
+        const Duration(milliseconds: 140),
+        (_) => widget.onStep(),
+      );
     });
   }
 
@@ -2086,7 +2210,7 @@ class _Controls extends StatelessWidget {
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               fontFeatures: const [
-                                FontFeature.tabularFigures()
+                                FontFeature.tabularFigures(),
                               ],
                               color: offsetIsZero
                                   ? Colors.white60
@@ -2113,8 +2237,11 @@ class _Controls extends StatelessWidget {
                     shape: CircleBorder(),
                     color: Color(0x1FFFFFFF),
                   ),
-                  child: const Icon(CupertinoIcons.camera,
-                      size: 17, color: Colors.white),
+                  child: const Icon(
+                    CupertinoIcons.camera,
+                    size: 17,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],

@@ -69,13 +69,13 @@ TextStyle _bodyStyle({
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 SearchResult _emptyResult() => SearchResult(
-      originalQuery: '',
-      intent: const SearchIntent(
-        originalQuery: '',
-        normalizedQuery: '',
-        entityText: '',
-      ),
-    );
+  originalQuery: '',
+  intent: const SearchIntent(
+    originalQuery: '',
+    normalizedQuery: '',
+    entityText: '',
+  ),
+);
 
 /// Removes filler such as "Unknown artist", "Artist", "Song", "Single".
 String _cleanSub(String? s) {
@@ -149,9 +149,11 @@ double _matchScore(String q, String title, String secondary) {
   final qTokens = q.split(' ');
   final hay = '$t ${_norm(secondary)}'.split(' ').toSet();
   final hit = qTokens
-      .where((w) =>
-          hay.contains(w) ||
-          (w.length >= 3 && hay.any((h) => h.startsWith(w))))
+      .where(
+        (w) =>
+            hay.contains(w) ||
+            (w.length >= 3 && hay.any((h) => h.startsWith(w))),
+      )
       .length;
   final cov = hit / qTokens.length;
   final tTokens = t.split(' ');
@@ -509,7 +511,9 @@ class _SearchScreenState extends State<SearchScreen>
       return;
     }
 
-    setState(() => _liveSuggestions = _dataService.getInstantLocalSuggestions(q));
+    setState(
+      () => _liveSuggestions = _dataService.getInstantLocalSuggestions(q),
+    );
 
     _suggestTimer = Timer(const Duration(milliseconds: 120), () async {
       try {
@@ -530,7 +534,7 @@ class _SearchScreenState extends State<SearchScreen>
     _wantedKey = key;
 
     // Safety failsafe: never allow _isLoading to remain true indefinitely
-    Timer(const Duration(seconds: 10), () {
+    Timer(const Duration(seconds: 18), () {
       if (mounted && _isLoading && _wantedKey == key) {
         setState(() => _isLoading = false);
       }
@@ -541,7 +545,7 @@ class _SearchScreenState extends State<SearchScreen>
         .whenComplete(() => _inflight.remove(key));
     try {
       final results = await future.timeout(
-        const Duration(seconds: 9),
+        const Duration(seconds: 16),
         onTimeout: () => _dataService.getFallbackResult(query, filter),
       );
       if (!mounted) return;
@@ -605,8 +609,7 @@ class _SearchScreenState extends State<SearchScreen>
       SearchFilter.artists => _searchResults.artists.length >= 6,
       SearchFilter.albums => _searchResults.albums.length >= 6,
       SearchFilter.featuredPlaylists ||
-      SearchFilter.communityPlaylists =>
-        _searchResults.playlists.length >= 6,
+      SearchFilter.communityPlaylists => _searchResults.playlists.length >= 6,
       SearchFilter.videos => _searchResults.videos.length >= 6,
     };
     setState(() {
@@ -695,21 +698,26 @@ class _SearchScreenState extends State<SearchScreen>
 
     if (resAll.songs.isEmpty) {
       try {
-        final cloudTracks = await ApiService.search(spec.query)
-            .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+        final cloudTracks = await ApiService.search(
+          spec.query,
+        ).timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
         if (cloudTracks.isNotEmpty && mounted && id == _catRequestId) {
-          final cloudSongs = cloudTracks.map((t) => SearchSongItem(
-            id: t.id,
-            title: t.title,
-            subtitle: t.artist,
-            thumbnailUrl: t.coverUrl,
-            thumbnailUrlHiRes: t.coverUrl,
-            videoId: t.id.replaceAll('yt-', ''),
-            artists: t.artists,
-            albumName: t.album,
-            durationSeconds: t.durationSeconds,
-            durationText: t.formattedDuration,
-          )).toList();
+          final cloudSongs = cloudTracks
+              .map(
+                (t) => SearchSongItem(
+                  id: t.id,
+                  title: t.title,
+                  subtitle: t.artist,
+                  thumbnailUrl: t.coverUrl,
+                  thumbnailUrlHiRes: t.coverUrl,
+                  videoId: t.id.replaceAll('yt-', ''),
+                  artists: t.artists,
+                  albumName: t.album,
+                  durationSeconds: t.durationSeconds,
+                  durationText: t.formattedDuration,
+                ),
+              )
+              .toList();
           setState(() {
             _catSongs = cloudSongs;
             _catLoading = false;
@@ -743,8 +751,8 @@ class _SearchScreenState extends State<SearchScreen>
   void _playSong(List<Track> list, int index, {String? title}) {
     if (list.isEmpty) return;
     final startIdx = index.clamp(0, list.length - 1);
-    final label = title ??
-        (_submittedQuery.isNotEmpty ? _submittedQuery : 'search');
+    final label =
+        title ?? (_submittedQuery.isNotEmpty ? _submittedQuery : 'search');
     final ctx = PlaybackContext(
       type: PlaybackContextType.search,
       id: label,
@@ -753,10 +761,10 @@ class _SearchScreenState extends State<SearchScreen>
       title: label,
     );
     context.read<PlayerState>().setQueue(
-          list,
-          startIndex: startIdx,
-          context: ctx,
-        );
+      list,
+      startIndex: startIdx,
+      context: ctx,
+    );
   }
 
   List<Track> _tracksForAlbum(SearchAlbumItem a) => _searchResults.songs
@@ -912,7 +920,8 @@ class _SearchScreenState extends State<SearchScreen>
       coverUrl: img,
       isCircularCover: item is SearchArtistItem,
       shareText: sub.isNotEmpty ? '${item.title} – $sub' : item.title,
-      shareUrl: 'https://zenify.app/$shareKind/${Uri.encodeComponent(item.title)}',
+      shareUrl:
+          'https://zenify.app/$shareKind/${Uri.encodeComponent(item.title)}',
       items: items,
     );
   }
@@ -931,7 +940,8 @@ class _SearchScreenState extends State<SearchScreen>
     final hasQuery = _submittedQuery.isNotEmpty;
     final category = _activeCategory;
 
-    final editing = (_focusNode.hasFocus || _submittedQuery.isEmpty) &&
+    final editing =
+        (_focusNode.hasFocus || _submittedQuery.isEmpty) &&
         text.isNotEmpty &&
         text != _submittedQuery;
 
@@ -969,7 +979,9 @@ class _SearchScreenState extends State<SearchScreen>
               slivers: [
                 SliverToBoxAdapter(
                   child: SizedBox(
-                    height: phase == _SearchViewPhase.category ? 0 : topPad + 60,
+                    height: phase == _SearchViewPhase.category
+                        ? 0
+                        : topPad + 60,
                   ),
                 ),
                 SliverToBoxAdapter(
@@ -995,22 +1007,22 @@ class _SearchScreenState extends State<SearchScreen>
                     },
                     child: switch (phase) {
                       _SearchViewPhase.landing => _buildLanding(
-                          key: const ValueKey('phase_landing'),
-                        ),
+                        key: const ValueKey('phase_landing'),
+                      ),
                       _SearchViewPhase.suggestions => _buildSuggestions(
-                          key: const ValueKey('phase_suggestions'),
-                        ),
+                        key: const ValueKey('phase_suggestions'),
+                      ),
                       _SearchViewPhase.loading => const _SearchShimmerView(
-                          key: ValueKey('phase_loading'),
-                        ),
+                        key: ValueKey('phase_loading'),
+                      ),
                       _SearchViewPhase.results => _buildResults(
-                          key: ValueKey('phase_results_$_submittedQuery'),
-                        ),
+                        key: ValueKey('phase_results_$_submittedQuery'),
+                      ),
                       _SearchViewPhase.category => _buildCategoryPage(
-                          category!,
-                          topPad,
-                          key: ValueKey('phase_category_${category.title}'),
-                        ),
+                        category!,
+                        topPad,
+                        key: ValueKey('phase_category_${category.title}'),
+                      ),
                     },
                   ),
                 ),
@@ -1075,10 +1087,7 @@ class _SearchScreenState extends State<SearchScreen>
             textCapitalization: TextCapitalization.none,
             autocorrect: false,
             cursorColor: AppColors.accent,
-            style: _bodyStyle(
-              fontSize: 15,
-              color: AppColors.textPrimary,
-            ),
+            style: _bodyStyle(fontSize: 15, color: AppColors.textPrimary),
             decoration: InputDecoration(
               isDense: true,
               border: InputBorder.none,
@@ -1153,11 +1162,11 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _divider(double indent) => Divider(
-        height: 1,
-        indent: indent,
-        endIndent: _kEdge,
-        color: Colors.white.withValues(alpha: 0.06),
-      );
+    height: 1,
+    indent: indent,
+    endIndent: _kEdge,
+    color: Colors.white.withValues(alpha: 0.06),
+  );
 
   Widget _carousel({
     required String title,
@@ -1183,11 +1192,8 @@ class _SearchScreenState extends State<SearchScreen>
             padding: const EdgeInsets.symmetric(horizontal: _kEdge),
             itemCount: count,
             separatorBuilder: (_, _) => const SizedBox(width: _kGap),
-            itemBuilder: (context, i) => SpringIn(
-              delayMs: (i % 5) * 32,
-              rise: 18,
-              child: item(i),
-            ),
+            itemBuilder: (context, i) =>
+                SpringIn(delayMs: (i % 5) * 32, rise: 18, child: item(i)),
           ),
         ),
         const SizedBox(height: 14),
@@ -1583,7 +1589,9 @@ class _SearchScreenState extends State<SearchScreen>
                     spec: cat,
                     index: i,
                     covers: _catalogCovers(
-                      catalog.isNotEmpty ? catalog : CatalogDataSource.allTracks,
+                      catalog.isNotEmpty
+                          ? catalog
+                          : CatalogDataSource.allTracks,
                     ),
                     onTap: () => _openCategory(cat),
                   ),
@@ -1607,7 +1615,9 @@ class _SearchScreenState extends State<SearchScreen>
       list = _liveSuggestions;
     } else {
       final norm = typed.toLowerCase();
-      final filtered = _liveSuggestions.where((s) => s.toLowerCase() != norm).toList();
+      final filtered = _liveSuggestions
+          .where((s) => s.toLowerCase() != norm)
+          .toList();
       list = [typed, ...filtered];
     }
     return Column(
@@ -1615,7 +1625,8 @@ class _SearchScreenState extends State<SearchScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(list.length, (i) {
         final s = list[i];
-        final isDirectTyped = typed.isNotEmpty && s.toLowerCase() == typed.toLowerCase();
+        final isDirectTyped =
+            typed.isNotEmpty && s.toLowerCase() == typed.toLowerCase();
         return SpringIn(
           delayMs: i * 18,
           rise: 12,
@@ -1640,7 +1651,9 @@ class _SearchScreenState extends State<SearchScreen>
                   Icon(
                     CupertinoIcons.search,
                     size: 17,
-                    color: isDirectTyped ? AppColors.accent : AppColors.textTertiary,
+                    color: isDirectTyped
+                        ? AppColors.accent
+                        : AppColors.textTertiary,
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -1649,11 +1662,16 @@ class _SearchScreenState extends State<SearchScreen>
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             text: TextSpan(
-                              style: _bodyStyle(fontSize: 16, color: AppColors.textPrimary),
+                              style: _bodyStyle(
+                                fontSize: 16,
+                                color: AppColors.textPrimary,
+                              ),
                               children: [
                                 const TextSpan(
                                   text: 'Search for ',
-                                  style: TextStyle(color: AppColors.textSecondary),
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                                 TextSpan(
                                   text: '"$typed"',
@@ -1680,22 +1698,24 @@ class _SearchScreenState extends State<SearchScreen>
                       padding: EdgeInsets.all(6),
                       child: Icon(
                         CupertinoIcons.arrow_up_left,
-                      size: 16,
-                      color: AppColors.textTertiary,
+                        size: 16,
+                        color: AppColors.textTertiary,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      );
-    }),
-  );
-}
+        );
+      }),
+    );
+  }
 
   Widget _highlighted(String text, String queryLower) {
-    final idx = queryLower.isEmpty ? -1 : text.toLowerCase().indexOf(queryLower);
+    final idx = queryLower.isEmpty
+        ? -1
+        : text.toLowerCase().indexOf(queryLower);
     if (idx < 0) {
       return Text(
         text,
@@ -1749,7 +1769,8 @@ class _SearchScreenState extends State<SearchScreen>
     final covers = loaded.isNotEmpty
         ? loaded
         : _catalogCovers(CatalogDataSource.allTracks);
-    final nothing = !_catLoading &&
+    final nothing =
+        !_catLoading &&
         songs.isEmpty &&
         _catAlbums.isEmpty &&
         _catArtists.isEmpty &&
@@ -1768,8 +1789,11 @@ class _SearchScreenState extends State<SearchScreen>
           onPlay: () {
             if (songs.isEmpty) return;
             HapticFeedback.mediumImpact();
-            _playSong(songs.map((s) => s.toTrack()).toList(), 0,
-                title: spec.title);
+            _playSong(
+              songs.map((s) => s.toTrack()).toList(),
+              0,
+              title: spec.title,
+            );
           },
           onShuffle: () {
             if (songs.isEmpty) return;
@@ -1861,8 +1885,9 @@ class _SearchScreenState extends State<SearchScreen>
                 SearchFilter.artists => _buildFilteredArtists(r.artists),
                 SearchFilter.albums => _buildFilteredAlbums(r.albums),
                 SearchFilter.featuredPlaylists ||
-                SearchFilter.communityPlaylists =>
-                  _buildFilteredPlaylists(r.playlists),
+                SearchFilter.communityPlaylists => _buildFilteredPlaylists(
+                  r.playlists,
+                ),
                 SearchFilter.videos => _buildFilteredVideos(r.videos),
               },
             ),
@@ -1999,22 +2024,31 @@ class _SearchScreenState extends State<SearchScreen>
 
     final ordered = switch (r.intent.layoutMode) {
       SearchLayoutMode.exactArtist || SearchLayoutMode.artistType => [
-          songsSec, albumsSec, artistsSec, playlistsSec, videosSec,
-        ],
+        songsSec,
+        albumsSec,
+        artistsSec,
+        playlistsSec,
+        videosSec,
+      ],
       SearchLayoutMode.albumOrPlaylist => [
-          albumsSec, playlistsSec, songsSec, artistsSec, videosSec,
-        ],
+        albumsSec,
+        playlistsSec,
+        songsSec,
+        artistsSec,
+        videosSec,
+      ],
       SearchLayoutMode.songTitle || SearchLayoutMode.generic => [
-          songsSec, albumsSec, artistsSec, playlistsSec, videosSec,
-        ],
+        songsSec,
+        albumsSec,
+        artistsSec,
+        playlistsSec,
+        videosSec,
+      ],
     };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ?topSec,
-        for (final w in ordered) ?w,
-      ],
+      children: [?topSec, for (final w in ordered) ?w],
     );
   }
 
@@ -2030,9 +2064,8 @@ class _SearchScreenState extends State<SearchScreen>
     }
     final w = switch (item) {
       SearchArtistItem _ => artistMode ? 1.05 : 1.0,
-      SearchSongItem _ => m == SearchLayoutMode.songTitle
-          ? 1.04
-          : (artistMode ? 0.9 : 1.0),
+      SearchSongItem _ =>
+        m == SearchLayoutMode.songTitle ? 1.04 : (artistMode ? 0.9 : 1.0),
       SearchAlbumItem _ => m == SearchLayoutMode.albumOrPlaylist ? 1.04 : 0.97,
       SearchPlaylistItem _ =>
         m == SearchLayoutMode.albumOrPlaylist ? 0.98 : 0.85,
@@ -2234,12 +2267,7 @@ class _SearchScreenState extends State<SearchScreen>
   Widget _artistHero(SearchArtistItem a) {
     final store = LibraryStore.instance;
     return _heroLayout(
-      art: _Artwork(
-        url: _hiResUrl(a),
-        title: a.title,
-        size: 108,
-        circle: true,
-      ),
+      art: _Artwork(url: _hiResUrl(a), title: a.title, size: 108, circle: true),
       title: a.title,
       verified: a.isVerified,
       onTap: () => _handleItemTap(a),
@@ -2479,8 +2507,12 @@ class _SearchScreenState extends State<SearchScreen>
         return Column(
           children: [
             _ListRow(
-              leading:
-                  _Artwork(url: _hiResUrl(a), title: a.title, size: 56, radius: 8),
+              leading: _Artwork(
+                url: _hiResUrl(a),
+                title: a.title,
+                size: 56,
+                radius: 8,
+              ),
               title: a.title,
               subtitle: _albumSub(a),
               onTap: () => _handleItemTap(a),
@@ -2492,8 +2524,12 @@ class _SearchScreenState extends State<SearchScreen>
         return Column(
           children: [
             _ListRow(
-              leading:
-                  _Artwork(url: _hiResUrl(p), title: p.title, size: 56, radius: 8),
+              leading: _Artwork(
+                url: _hiResUrl(p),
+                title: p.title,
+                size: 56,
+                radius: 8,
+              ),
               title: p.title,
               subtitle: _playlistSub(p),
               onTap: () => _handleItemTap(p),
@@ -3103,17 +3139,21 @@ class _MeshPainter extends CustomPainter {
       final ph = seed * 1.7 + i * 1.57;
       final c = Offset(
         size.width * (0.5 + 0.55 * math.sin(2 * math.pi * t * fx[i] + ph)),
-        size.height * (0.5 + 0.55 * math.cos(2 * math.pi * t * fy[i] + ph * 1.3)),
+        size.height *
+            (0.5 + 0.55 * math.cos(2 * math.pi * t * fy[i] + ph * 1.3)),
       );
       canvas.drawRect(
         rect,
         Paint()
-          ..shader = RadialGradient(
-            colors: [
-              pal[i + 1].withValues(alpha: 0.95),
-              pal[i + 1].withValues(alpha: 0.0),
-            ],
-          ).createShader(Rect.fromCircle(center: c, radius: r * (0.7 + 0.1 * i))),
+          ..shader =
+              RadialGradient(
+                colors: [
+                  pal[i + 1].withValues(alpha: 0.95),
+                  pal[i + 1].withValues(alpha: 0.0),
+                ],
+              ).createShader(
+                Rect.fromCircle(center: c, radius: r * (0.7 + 0.1 * i)),
+              ),
       );
     }
     // Legibility shade (bottom-left) for the title.
@@ -3249,13 +3289,20 @@ class _CategoryArtState extends State<_CategoryArt>
     super.initState();
     final a = widget.spec.colors[0];
     final b = widget.spec.colors[1];
-    _pal = [b, a, _hue(a, 40, l: 0.04), _hue(a, -35, l: 0.08), _hue(b, 28, l: 0.10)];
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: Duration(seconds: 10 + (widget.index % 3) * 3),
-    )
-      ..value = (widget.index * 0.17) % 1.0
-      ..repeat();
+    _pal = [
+      b,
+      a,
+      _hue(a, 40, l: 0.04),
+      _hue(a, -35, l: 0.08),
+      _hue(b, 28, l: 0.10),
+    ];
+    _ctrl =
+        AnimationController(
+            vsync: this,
+            duration: Duration(seconds: 10 + (widget.index % 3) * 3),
+          )
+          ..value = (widget.index * 0.17) % 1.0
+          ..repeat();
   }
 
   @override
@@ -3312,8 +3359,15 @@ class _CategoryArtState extends State<_CategoryArt>
       case 2: // vinyl
         return [
           card(1, aw * 0.54, top + ah * 0.30, cs * 0.6, -0.2, ph: 1),
-          card(0, aw * 0.80, top + ah * 0.60, cs * 1.3, 0,
-              circle: true, spin: 2 * math.pi * t),
+          card(
+            0,
+            aw * 0.80,
+            top + ah * 0.60,
+            cs * 1.3,
+            0,
+            circle: true,
+            spin: 2 * math.pi * t,
+          ),
         ];
       default: // trio
         return [
@@ -3502,18 +3556,19 @@ class _BrowseCategoryTile extends StatelessWidget {
               bottom: 12,
               child: Text(
                 spec.title,
-                style: _displayStyle(
-                  fontSize: 17,
-                  color: Colors.white,
-                  height: 1.1,
-                ).copyWith(
-                  shadows: [
-                    Shadow(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      blurRadius: 8,
+                style:
+                    _displayStyle(
+                      fontSize: 17,
+                      color: Colors.white,
+                      height: 1.1,
+                    ).copyWith(
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          blurRadius: 8,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -3586,8 +3641,9 @@ class _SearchFilterBarState extends State<_SearchFilterBar>
   }
 
   int get _selectedIndex {
-    final idx =
-        _kResultFilters.indexWhere((f) => f.filter == widget.selectedFilter);
+    final idx = _kResultFilters.indexWhere(
+      (f) => f.filter == widget.selectedFilter,
+    );
     return idx < 0 ? 0 : idx;
   }
 
@@ -3604,8 +3660,9 @@ class _SearchFilterBarState extends State<_SearchFilterBar>
 
   void _measureAndAnimate({required bool snap}) {
     final rowBox = _rowKey.currentContext?.findRenderObject() as RenderBox?;
-    final pillBox = _pillKeys[_selectedIndex].currentContext?.findRenderObject()
-        as RenderBox?;
+    final pillBox =
+        _pillKeys[_selectedIndex].currentContext?.findRenderObject()
+            as RenderBox?;
     if (rowBox == null ||
         pillBox == null ||
         !rowBox.hasSize ||
@@ -3678,8 +3735,8 @@ class _SearchFilterBarState extends State<_SearchFilterBar>
                         color: showFallbackBg
                             ? Colors.white
                             : selected
-                                ? Colors.transparent
-                                : Colors.white.withValues(alpha: 0.07),
+                            ? Colors.transparent
+                            : Colors.white.withValues(alpha: 0.07),
                         borderRadius: BorderRadius.circular(26),
                       ),
                       child: AnimatedDefaultTextStyle(
@@ -3687,8 +3744,9 @@ class _SearchFilterBarState extends State<_SearchFilterBar>
                         style: _bodyStyle(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w600,
-                          color:
-                              selected ? Colors.black : AppColors.textSecondary,
+                          color: selected
+                              ? Colors.black
+                              : AppColors.textSecondary,
                         ),
                         child: Text(entry.label),
                       ),
@@ -3734,7 +3792,13 @@ class _SearchShimmerViewState extends State<_SearchShimmerView>
     super.dispose();
   }
 
-  Widget _bone(Color c, double w, double h, {double r = 6, bool circle = false}) {
+  Widget _bone(
+    Color c,
+    double w,
+    double h, {
+    double r = 6,
+    bool circle = false,
+  }) {
     return Container(
       width: w,
       height: h,
@@ -3759,10 +3823,12 @@ class _SearchShimmerViewState extends State<_SearchShimmerView>
               padding: const EdgeInsets.fromLTRB(20, 6, 20, 18),
               child: Row(
                 children: [62.0, 74.0, 74.0, 78.0, 86.0]
-                    .map((w) => Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _bone(bone, w, 34, r: 26),
-                        ))
+                    .map(
+                      (w) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: _bone(bone, w, 34, r: 26),
+                      ),
+                    )
                     .toList(),
               ),
             ),
@@ -3810,8 +3876,10 @@ class _SearchShimmerViewState extends State<_SearchShimmerView>
             ...List.generate(
               4,
               (_) => Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     _bone(bone, 54, 54, r: 8),

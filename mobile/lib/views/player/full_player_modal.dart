@@ -39,13 +39,30 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
   }
 
   void _openLyrics(BuildContext context) {
+    // Grab the cover now so the sheet can paint the same colour wash behind
+    // the lyrics (no black card, no black barrier).
+    final coverUrl = context.read<PlayerState>().currentTrack?.coverUrl;
+
     DockVisibility.runModal(
       () => showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => const LyricsSheet(),
+        barrierColor: Colors.transparent, // no black dim behind the sheet
+        elevation: 0, // no shadow layer
+        builder: (_) => SizedBox(
+          height: MediaQuery.sizeOf(context).height,
+          child: Stack(
+            children: [
+              // Same liquid artwork wash as the player: lyrics sit directly on it.
+              Positioned.fill(
+                child: ArtworkMeshBackground(coverUrl: coverUrl, paused: false),
+              ),
+              const SafeArea(child: LyricsSheet()),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -90,7 +107,11 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                           width: 40,
                           height: 40,
                           alignment: Alignment.center,
-                          child: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 32),
+                          child: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Colors.white,
+                            size: 32,
+                          ),
                         ),
                       ),
                       Expanded(
@@ -98,7 +119,9 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                           children: [
                             Text(
                               'PLAYING FROM ALBUM',
-                              style: AppTypography.caption.copyWith(letterSpacing: 1.0),
+                              style: AppTypography.caption.copyWith(
+                                letterSpacing: 1.0,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -114,9 +137,15 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
+                        icon: const Icon(
+                          Icons.more_horiz_rounded,
+                          color: Colors.white,
+                        ),
                         onPressed: () {
-                          ZenDropdown.showTrackMenu(context: context, track: track);
+                          ZenDropdown.showTrackMenu(
+                            context: context,
+                            track: track,
+                          );
                         },
                       ),
                     ],
@@ -129,7 +158,9 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                       width: artSize,
                       height: artSize,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(AppSpacing.rArtPlayer),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.rArtPlayer,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.65),
@@ -139,15 +170,23 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                         ],
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(AppSpacing.rArtPlayer),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.rArtPlayer,
+                        ),
                         child: CachedNetworkImage(
                           imageUrl: track.coverUrl,
                           fit: BoxFit.cover,
-                          placeholder: (context, _) => Container(color: AppColors.surface2),
-                          errorWidget: (context, error, stackTrace) => Container(
-                            color: AppColors.surface2,
-                            child: const Icon(Icons.music_note, color: AppColors.textTertiary, size: 64),
-                          ),
+                          placeholder: (context, _) =>
+                              Container(color: AppColors.surface2),
+                          errorWidget: (context, error, stackTrace) =>
+                              Container(
+                                color: AppColors.surface2,
+                                child: const Icon(
+                                  Icons.music_note,
+                                  color: AppColors.textTertiary,
+                                  size: 64,
+                                ),
+                              ),
                         ),
                       ),
                     ),
@@ -184,7 +223,8 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                               ),
                               maxLines: 1,
                             ),
-                            if (track.album.isNotEmpty && track.album != 'Single') ...[
+                            if (track.album.isNotEmpty &&
+                                track.album != 'Single') ...[
                               const SizedBox(height: 2),
                               GestureDetector(
                                 behavior: HitTestBehavior.opaque,
@@ -227,7 +267,9 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                           height: 44,
                           alignment: Alignment.center,
                           child: Icon(
-                            _isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            _isLiked
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
                             color: _isLiked ? AppColors.accent : Colors.white,
                             size: 26,
                           ),
@@ -254,7 +296,9 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                         onTap: () => player.toggleShuffle(),
                         child: Icon(
                           Icons.shuffle_rounded,
-                          color: player.isShuffle ? AppColors.accent : AppColors.textSecondary,
+                          color: player.isShuffle
+                              ? AppColors.accent
+                              : AppColors.textSecondary,
                           size: 24,
                         ),
                       ),
@@ -262,7 +306,11 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                       // Previous
                       PressableScale(
                         onTap: () => player.previous(),
-                        child: const Icon(Icons.skip_previous_rounded, color: Colors.white, size: 40),
+                        child: const Icon(
+                          Icons.skip_previous_rounded,
+                          color: Colors.white,
+                          size: 40,
+                        ),
                       ),
 
                       // Center Play / Pause Button with Accent Spring
@@ -277,7 +325,9 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            player.isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
                             color: AppColors.canvas,
                             size: 40,
                           ),
@@ -287,7 +337,11 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                       // Next
                       PressableScale(
                         onTap: () => player.next(),
-                        child: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 40),
+                        child: const Icon(
+                          Icons.skip_next_rounded,
+                          color: Colors.white,
+                          size: 40,
+                        ),
                       ),
 
                       // Repeat
@@ -317,12 +371,15 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                             ? () => _openLyrics(context)
                             : null,
                         child: Opacity(
-                          opacity: (player.hasLyrics || player.isLoadingLyrics) ? 1.0 : 0.28,
+                          opacity: (player.hasLyrics || player.isLoadingLyrics)
+                              ? 1.0
+                              : 0.28,
                           child: Row(
                             children: [
                               Icon(
                                 Icons.chat_bubble_outline_rounded,
-                                color: (player.hasLyrics || player.isLoadingLyrics)
+                                color:
+                                    (player.hasLyrics || player.isLoadingLyrics)
                                     ? AppColors.textSecondary
                                     : Colors.white24,
                                 size: 20,
@@ -331,7 +388,9 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                               Text(
                                 'Lyrics',
                                 style: AppTypography.caption.copyWith(
-                                  color: (player.hasLyrics || player.isLoadingLyrics)
+                                  color:
+                                      (player.hasLyrics ||
+                                          player.isLoadingLyrics)
                                       ? AppColors.textSecondary
                                       : Colors.white24,
                                 ),
@@ -346,9 +405,19 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                         onTap: () => _openStudioFx(context),
                         child: Row(
                           children: [
-                            const Icon(Icons.equalizer_rounded, color: AppColors.accent, size: 20),
+                            const Icon(
+                              Icons.equalizer_rounded,
+                              color: AppColors.accent,
+                              size: 20,
+                            ),
                             const SizedBox(width: 6),
-                            Text('Studio FX', style: AppTypography.caption.copyWith(color: AppColors.accent, fontWeight: FontWeight.w700)),
+                            Text(
+                              'Studio FX',
+                              style: AppTypography.caption.copyWith(
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -356,7 +425,11 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                       // AirPlay / Cast Picker
                       PressableScale(
                         onTap: () {},
-                        child: const Icon(Icons.speaker_group_outlined, color: AppColors.textSecondary, size: 20),
+                        child: const Icon(
+                          Icons.speaker_group_outlined,
+                          color: AppColors.textSecondary,
+                          size: 20,
+                        ),
                       ),
                     ],
                   ),

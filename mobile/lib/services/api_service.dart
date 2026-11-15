@@ -190,13 +190,44 @@ class ApiService {
       if (ytTracks.isNotEmpty) return ytTracks;
     } on InnerTubeException catch (e) {
       if (kDebugMode) debugPrint('[ApiService] on-device search notice: $e');
-      if (e.rateLimited) return _localSearch(q);
     } catch (e) {
       if (kDebugMode) debugPrint('[ApiService] on-device search notice: $e');
     }
 
-    // 2. Local catalogue fallback
+    // 2. Cloud backend catalog fallback (JioSaavn + iTunes + Database)
+    try {
+      final cloudData = await searchCloud(q);
+      if (cloudData != null && cloudData['tracks'] is List) {
+        final cloudList = (cloudData['tracks'] as List)
+            .whereType<Map>()
+            .map((m) => Track.fromJson(Map<String, dynamic>.from(m), baseUrl: liveCloudUrl))
+            .where((t) => t.title.isNotEmpty)
+            .toList();
+        if (cloudList.isNotEmpty) return cloudList;
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ApiService] cloud search fallback error: $e');
+    }
+
+    // 3. Local catalogue fallback
     return _localSearch(q);
+  }
+
+  /// Global search on backend database & cloud catalog (JioSaavn + iTunes + Postgres).
+  static Future<Map<String, dynamic>?> searchCloud(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return null;
+    return _memo('search_cloud_$q', const Duration(minutes: 5), () async {
+      final res = await _getJson(
+        '/api/search',
+        query: {'q': q},
+        timeout: const Duration(seconds: 8),
+      );
+      if (res != null && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      return null;
+    });
   }
 
   static List<Track> _localSearch(String query) {
@@ -412,6 +443,28 @@ class ApiService {
     if (clean.isEmpty) return null;
     return _memo('artist_full_$clean', const Duration(hours: 6), () async {
       final res = await _getJson('/api/artists/${Uri.encodeComponent(clean)}', timeout: const Duration(seconds: 5));
+      final data = res?.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data);
+      }
+      return null;
+    });
+  }
+
+  /// Fetches full album tracklist, high-res artwork, and release metadata from Zenify backend.
+  static Future<Map<String, dynamic>?> getAlbum(String albumIdOrTitle, {String? artistName}) async {
+    final clean = albumIdOrTitle.trim();
+    if (clean.isEmpty) return null;
+    final query = <String, String>{};
+    if (artistName != null && artistName.trim().isNotEmpty) {
+      query['artist'] = artistName.trim();
+    }
+    return _memo('album_full_${clean}_${artistName ?? ''}', const Duration(hours: 6), () async {
+      final res = await _getJson(
+        '/api/albums/${Uri.encodeComponent(clean)}',
+        query: query.isNotEmpty ? query : null,
+        timeout: const Duration(seconds: 6),
+      );
       final data = res?.data;
       if (data is Map) {
         return Map<String, dynamic>.from(data);

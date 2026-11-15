@@ -93,7 +93,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchSongs', {'query': query})
-          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+          .timeout(const Duration(seconds: 10), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       final tracks = <Track>[];
       final seen = <String>{};
@@ -138,7 +138,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchSummary', {'query': query})
-          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+          .timeout(const Duration(seconds: 10), onTimeout: () => null);
       if (res == null || res.isEmpty) return null;
       return {'summaries': res};
     } catch (e) {
@@ -152,7 +152,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchAlbums', {'query': query})
-          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+          .timeout(const Duration(seconds: 10), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
     } catch (e) {
@@ -166,7 +166,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchArtists', {'query': query})
-          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+          .timeout(const Duration(seconds: 10), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
     } catch (e) {
@@ -1061,7 +1061,7 @@ class InnerTubeService {
                 'artistName': artistName ?? '',
               },
             )
-            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+            .timeout(const Duration(seconds: 12), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final artistMap = Map<String, dynamic>.from(res['artist'] as Map? ?? {});
           final name = MediaNormalizer.cleanTitle(artistMap['title'] as String?);
@@ -1421,7 +1421,7 @@ class InnerTubeService {
                 'artistName': artistName ?? '',
               },
             )
-            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+            .timeout(const Duration(seconds: 10), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final albumMap = Map<String, dynamic>.from(res['album'] as Map? ?? {});
           final resolvedTitle = MediaNormalizer.cleanTitle(albumMap['title'] as String?);
@@ -1470,8 +1470,9 @@ class InnerTubeService {
       }
     }
 
-    try {
-      final res = await post('browse', {'browseId': browseId}, ttl: const Duration(hours: 12));
+    if (browseId.isNotEmpty) {
+      try {
+        final res = await post('browse', {'browseId': browseId}, ttl: const Duration(hours: 12));
       final header = res['header']?['musicDetailHeaderRenderer'] ??
           res['header']?['musicResponsiveHeaderRenderer'] ??
           res['contents']?['twoColumnBrowseResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents']?[0]?['musicResponsiveHeaderRenderer'];
@@ -1543,6 +1544,8 @@ class InnerTubeService {
       return null;
     }
   }
+  return null;
+  }
 
   /// Fetches playlist tracklist and metadata from YouTube Music playlistId / browseId.
   Future<({List<Track> tracks, String coverUrl, String title, String author})?> getPlaylist(String playlistId) async {
@@ -1551,7 +1554,7 @@ class InnerTubeService {
       try {
         final res = await _nativeChannel
             .invokeMethod<Map<dynamic, dynamic>>('getPlaylist', {'browseId': cleanId})
-            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+            .timeout(const Duration(seconds: 10), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final tracks = <Track>[];
           final rawTracks = res['tracks'] as List? ?? const [];
@@ -1627,7 +1630,7 @@ class InnerTubeService {
               'videoId': cleanId,
               'playlistId': ?playlistId,
             })
-            .timeout(const Duration(seconds: 4), onTimeout: () => null);
+            .timeout(const Duration(seconds: 10), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final tracks = <Track>[];
           for (final raw in res) {
