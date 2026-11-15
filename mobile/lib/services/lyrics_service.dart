@@ -329,13 +329,64 @@ class LyricsService {
     return null;
   }
 
-  static const String _kCachePrefix = 'lyrics_cache_v3_';
+  static const String _kCachePrefix = 'lyrics_cache_v4_';
+
+  /// Removes accented characters and diacritics for resilient international matching
+  /// (e.g. "São Paulo" -> "Sao Paulo", "Señorita" -> "Senorita").
+  static String normalizeDiacritics(String text) {
+    return text
+        .replaceAll(RegExp(r'[àáâãäåā]'), 'a')
+        .replaceAll(RegExp(r'[ÀÁÂÃÄÅĀ]'), 'A')
+        .replaceAll(RegExp(r'[èéêëē]'), 'e')
+        .replaceAll(RegExp(r'[ÈÉÊËĒ]'), 'E')
+        .replaceAll(RegExp(r'[ìíîïī]'), 'i')
+        .replaceAll(RegExp(r'[ÌÍÎÏĪ]'), 'I')
+        .replaceAll(RegExp(r'[òóôõöøō]'), 'o')
+        .replaceAll(RegExp(r'[ÒÓÔÕÖØŌ]'), 'O')
+        .replaceAll(RegExp(r'[ùúûüū]'), 'u')
+        .replaceAll(RegExp(r'[ÙÚÛÜŪ]'), 'U')
+        .replaceAll(RegExp(r'[ñ]'), 'n')
+        .replaceAll(RegExp(r'[Ñ]'), 'N')
+        .replaceAll(RegExp(r'[ç]'), 'c')
+        .replaceAll(RegExp(r'[Ç]'), 'C')
+        .replaceAll(RegExp(r'[ýÿ]'), 'y')
+        .replaceAll(RegExp(r'[ÝŸ]'), 'Y')
+        .trim();
+  }
 
   /// Verifies if candidate lyrics match the expected track language.
   /// Prevents cross-language collisions (e.g. Tamil lyrics on Telugu song).
   static bool isLanguageCompatible(String lyricsText, String expectedLanguage) {
     if (expectedLanguage.isEmpty) return true;
     final exp = expectedLanguage.toLowerCase().trim();
+
+    // 0. Strict native Unicode rune check (Hard guarantee: never show Telugu for Tamil or vice-versa)
+    for (final rune in lyricsText.runes) {
+      if (exp == 'tamil') {
+        if (rune >= 0x0C00 && rune <= 0x0C7F) {
+          if (kDebugMode) debugPrint('[LyricsFlow] REJECTED: Telugu script runes found in Tamil song lyrics');
+          return false;
+        }
+        if (rune >= 0x0900 && rune <= 0x097F) {
+          if (kDebugMode) debugPrint('[LyricsFlow] REJECTED: Devanagari script runes found in Tamil song lyrics');
+          return false;
+        }
+      } else if (exp == 'telugu') {
+        if (rune >= 0x0B80 && rune <= 0x0BFF) {
+          if (kDebugMode) debugPrint('[LyricsFlow] REJECTED: Tamil script runes found in Telugu song lyrics');
+          return false;
+        }
+        if (rune >= 0x0900 && rune <= 0x097F) {
+          if (kDebugMode) debugPrint('[LyricsFlow] REJECTED: Devanagari script runes found in Telugu song lyrics');
+          return false;
+        }
+      } else if (exp == 'hindi') {
+        if ((rune >= 0x0B80 && rune <= 0x0BFF) || (rune >= 0x0C00 && rune <= 0x0C7F)) {
+          if (kDebugMode) debugPrint('[LyricsFlow] REJECTED: South Indian runes found in Hindi song lyrics');
+          return false;
+        }
+      }
+    }
 
     // 1. Script check
     final scriptLang = detectScriptLanguage(lyricsText);
@@ -562,11 +613,36 @@ class LyricsService {
   // ───────────────────────── Tier 1: lrc.red Provider ───────────────────────
 
   Future<({LyricsResult? wbw, LyricsResult? line})> _fetchLrcRed(String title, String artist, String lang) async {
+    final normTitle = normalizeDiacritics(title);
+    final normArtist = normalizeDiacritics(artist);
+    final aLower = artist.toLowerCase();
+
     final queries = <String>[];
     if (lang.isNotEmpty) {
       queries.add('$title $artist $lang'.trim());
+      if (normTitle != title || normArtist != artist) {
+        queries.add('$normTitle $normArtist $lang'.trim());
+      }
     }
     queries.add('$title $artist'.trim());
+    if (normTitle != title || normArtist != artist) {
+      queries.add('$normTitle $normArtist'.trim());
+    }
+
+    // Artist alias queries (e.g. The Weeknd -> Abel Tesfaye, Vivek - Mervin -> Vivek Mervin)
+    if (aLower.contains('weeknd')) {
+      queries.add('$title Abel Tesfaye');
+      queries.add('$normTitle Abel Tesfaye');
+    } else if (aLower.contains('vivek') && aLower.contains('mervin')) {
+      queries.add('$title Vivek Mervin');
+      queries.add('$normTitle Vivek Mervin');
+    }
+
+    // Title-only query fallback on lrc.red
+    if (title.length >= 4) {
+      queries.add(title);
+      if (normTitle != title) queries.add(normTitle);
+    }
 
     for (final query in queries) {
       try {
@@ -735,41 +811,62 @@ class LyricsService {
     int durationSeconds,
     String lang,
   ) async {
-    // 1. Direct match with GET /api/get
-    try {
-      final uri = Uri.https('lrclib.net', '/api/get', {
-        'track_name': title,
-        'artist_name': artist,
-        if (album.isNotEmpty && album != 'Single') 'album_name': album,
-        if (durationSeconds > 0 && durationSeconds != 210) 'duration': durationSeconds.toString(),
-      });
+    final normTitle = normalizeDiacritics(title);
+    final normArtist = normalizeDiacritics(artist);
+    final aLower = artist.toLowerCase();
 
-      final res = await _client.get(uri, headers: {
-        'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
-      }).timeout(const Duration(seconds: 4));
+    // 1. Direct match with GET /api/get (try exact and normalized title/artist)
+    final directPairs = [
+      (t: title, a: artist),
+      if (normTitle != title || normArtist != artist) (t: normTitle, a: normArtist),
+    ];
 
-      if (res.statusCode == 200) {
-        final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-        final syncedLyrics = json['syncedLyrics'] as String?;
+    for (final pair in directPairs) {
+      try {
+        final uri = Uri.https('lrclib.net', '/api/get', {
+          'track_name': pair.t,
+          'artist_name': pair.a,
+          if (album.isNotEmpty && album != 'Single') 'album_name': album,
+          if (durationSeconds > 0 && durationSeconds != 210) 'duration': durationSeconds.toString(),
+        });
 
-        if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
-          // Verify language compatibility
-          if (lang.isEmpty || isLanguageCompatible(syncedLyrics, lang)) {
-            final parsed = LrcParser.parse(syncedLyrics);
-            if (parsed.lines.isNotEmpty && parsed.synced) {
-              return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_synced', rawLrc: syncedLyrics);
+        final res = await _client.get(uri, headers: {
+          'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+        }).timeout(const Duration(seconds: 4));
+
+        if (res.statusCode == 200) {
+          final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+          final syncedLyrics = json['syncedLyrics'] as String?;
+
+          if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
+            // Verify language compatibility
+            if (lang.isEmpty || isLanguageCompatible(syncedLyrics, lang)) {
+              final parsed = LrcParser.parse(syncedLyrics);
+              if (parsed.lines.isNotEmpty && parsed.synced) {
+                return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_synced', rawLrc: syncedLyrics);
+              }
             }
           }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     // 2. Multi-query search fallback with candidate language scoring
     final queries = <String>[];
     if (lang.isNotEmpty) {
       queries.add('$title $artist $lang'.trim());
+      if (normTitle != title) queries.add('$normTitle $artist $lang'.trim());
     }
     queries.add('$title $artist'.trim());
+    if (normTitle != title || normArtist != artist) {
+      queries.add('$normTitle $normArtist'.trim());
+    }
+    if (aLower.contains('weeknd')) {
+      queries.add('$normTitle The Weeknd');
+    }
+    if (title.length >= 4) {
+      queries.add(normTitle);
+    }
 
     for (final q in queries) {
       try {

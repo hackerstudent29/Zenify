@@ -716,34 +716,60 @@ export async function albumRoutes(server: FastifyInstance) {
                 const { default: axios } = await import('axios');
                 const movieMatch = decodedId.match(/[\(\[]\s*From\s+["'“]?([^"'”\)\]]+)["'”]?\s*[\)\]]/i);
                 const cleanQuery = movieMatch ? movieMatch[1].trim() : (decodedId.replace(/[\(\[].*?[\)\]]/g, '').trim() || decodedId);
+                const artistParam = (req.query as any)?.artist ? decodeURIComponent((req.query as any).artist).trim() : '';
+                const saavnQuery = artistParam ? `${cleanQuery} ${artistParam}` : cleanQuery;
 
                 // 1. Primary: JioSaavn Album Search
                 const saavnSearch = await axios.get('https://www.jiosaavn.com/api.php', {
                     params: {
                         __call: 'search.getAlbumResults',
-                        q: cleanQuery,
+                        q: saavnQuery,
                         _format: 'json',
                         _marker: '0',
                         api_version: '4',
                         ctx: 'web6dot0',
                         p: 1,
-                        n: 8
+                        n: 12
                     },
                     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
                     timeout: 4500
                 }).catch(() => null);
 
-                const saavnCandidates = saavnSearch?.data?.results || [];
-                // Sort candidates: prefer albums with more songs and title similarity
+                let saavnCandidates = saavnSearch?.data?.results || [];
+                if (saavnCandidates.length === 0 && artistParam) {
+                    // Try without artist
+                    const fallbackSearch = await axios.get('https://www.jiosaavn.com/api.php', {
+                        params: {
+                            __call: 'search.getAlbumResults',
+                            q: cleanQuery,
+                            _format: 'json',
+                            _marker: '0',
+                            api_version: '4',
+                            ctx: 'web6dot0',
+                            p: 1,
+                            n: 8
+                        },
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                        timeout: 3500
+                    }).catch(() => null);
+                    saavnCandidates = fallbackSearch?.data?.results || [];
+                }
+
+                // Sort candidates: prefer albums with more songs, artist match, and title similarity
+                const normArtist = artistParam.toLowerCase().replace(/[^a-z0-9]/g, '');
                 const sortedSaavn = [...saavnCandidates].sort((a: any, b: any) => {
                     const countA = parseInt(a.more_info?.song_count || a.song_count || '1', 10);
                     const countB = parseInt(b.more_info?.song_count || b.song_count || '1', 10);
                     const titleA = (a.title || a.name || '').toLowerCase();
                     const titleB = (b.title || b.name || '').toLowerCase();
+                    const artA = (a.primary_artists || a.more_info?.primary_artists || a.subtitle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const artB = (b.primary_artists || b.more_info?.primary_artists || b.subtitle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                     const target = cleanQuery.toLowerCase();
                     const exactA = titleA === target || titleA.startsWith(target) ? 100 : 0;
                     const exactB = titleB === target || titleB.startsWith(target) ? 100 : 0;
-                    return (countB + exactB) - (countA + exactA);
+                    const matchArtA = normArtist && artA.includes(normArtist) ? 150 : 0;
+                    const matchArtB = normArtist && artB.includes(normArtist) ? 150 : 0;
+                    return (countB + exactB + matchArtB) - (countA + exactA + matchArtA);
                 });
 
                 const bestSaavnAlbum = sortedSaavn[0];

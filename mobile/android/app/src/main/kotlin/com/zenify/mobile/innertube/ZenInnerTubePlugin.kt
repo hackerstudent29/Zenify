@@ -178,26 +178,7 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                     artistData["title"] = artistName
                                 }
                                 val bannerUrl = (artistData["thumbnail"] as? String).orEmpty()
-                                var avatarUrl = bannerUrl
-                                val lookupName = (artistData["title"] as? String)?.takeIf { it.isNotBlank() } ?: artistName
-                                val whMatch = Regex("=w(\\d+)-h(\\d+)").find(bannerUrl)
-                                val isWideBanner = whMatch != null &&
-                                    (whMatch.groupValues[1].toIntOrNull() ?: 0) >
-                                    (whMatch.groupValues[2].toIntOrNull() ?: 0)
-                                if (lookupName.isNotBlank() && (isWideBanner || bannerUrl.isBlank())) {
-                                    val matchedAvatar = runCatching {
-                                        YouTube.search(lookupName, YouTube.SearchFilter.FILTER_ARTIST)
-                                            .getOrNull()?.items
-                                            ?.filterIsInstance<ArtistItem>()
-                                            ?.firstOrNull()?.thumbnail
-                                    }.getOrNull()
-                                    if (!matchedAvatar.isNullOrBlank()) {
-                                        avatarUrl = matchedAvatar
-                                    }
-                                }
-                                if (avatarUrl.isNotBlank()) {
-                                    artistData["thumbnail"] = avatarUrl
-                                }
+                                val avatarUrl = bannerUrl
                                 if (bannerUrl.isNotBlank()) {
                                     artistData["banner"] = bannerUrl
                                 }
@@ -219,31 +200,8 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             }
                         }
 
-                        // Robust fallback: if channel browseId fails or is missing, search songs directly
-                        val fallbackName = if (artistName.isNotBlank()) artistName else "Unknown Artist"
-                        val songsOutcome = YouTube.search(fallbackName, YouTube.SearchFilter.FILTER_SONG)
-                        val songs = songsOutcome.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
-                        val thumb = songs.firstOrNull()?.thumbnail ?: ""
-                        val fallbackArtist = mapOf(
-                            "id" to browseId,
-                            "title" to fallbackName,
-                            "thumbnail" to thumb,
-                            "channelId" to null,
-                            "shareLink" to null
-                        )
-                        val fallbackMap = mapOf(
-                            "artist" to fallbackArtist,
-                            "description" to "Official artist profile for $fallbackName on Zenify.",
-                            "subscriberCountText" to "Top Artist",
-                            "monthlyListenerCount" to null,
-                            "sections" to listOf(
-                                mapOf(
-                                    "title" to "Top Songs",
-                                    "items" to songs.map { songItemToMap(it) + ("type" to "song") }
-                                )
-                            )
-                        )
-                        replySuccess(result, fallbackMap)
+                        // If channel browseId fails or is missing, return error so Dart falls back to backend cloud catalog
+                        replyError(result, "ARTIST_NOT_FOUND", "No YouTube Music channel found for $artistName", null)
                     }
 
                     "getAlbum" -> {
@@ -267,6 +225,29 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         }
 
                         if (browseId.isNotBlank()) {
+                            if (browseId.startsWith("VL") || browseId.startsWith("PL") || browseId.startsWith("RD")) {
+                                val outcome = YouTube.playlist(browseId)
+                                if (outcome.isSuccess) {
+                                    val page = outcome.getOrThrow()
+                                    val p = page.playlist
+                                    val albumMap = mapOf(
+                                        "album" to mapOf(
+                                            "id" to p.id,
+                                            "browseId" to p.id,
+                                            "playlistId" to p.id,
+                                            "title" to (p.title ?: albumTitle),
+                                            "artists" to listOf(mapOf("id" to null, "name" to (p.author?.name ?: artistName))),
+                                            "thumbnail" to (p.thumbnail ?: ""),
+                                            "year" to 2026,
+                                            "explicit" to false
+                                        ),
+                                        "songs" to page.songs.map { songItemToMap(it) },
+                                        "otherVersions" to emptyList<Map<String, Any?>>()
+                                    )
+                                    replySuccess(result, albumMap)
+                                    return@launch
+                                }
+                            }
                             val outcome = YouTube.album(browseId)
                             if (outcome.isSuccess) {
                                 val page = outcome.getOrThrow()
@@ -280,11 +261,15 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             }
                         }
 
-                        // Fallback: search songs for album title
+                        // Fallback: search songs for album title, then artist if needed
                         val fallbackTitle = if (albumTitle.isNotBlank()) albumTitle else "Album"
                         val query = if (artistName.isNotBlank()) "$fallbackTitle $artistName" else fallbackTitle
                         val searchSongs = YouTube.search(query, YouTube.SearchFilter.FILTER_SONG)
-                        val songs = searchSongs.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
+                        var songs = searchSongs.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
+                        if (songs.isEmpty() && artistName.isNotBlank()) {
+                            val artistSongs = YouTube.search(artistName, YouTube.SearchFilter.FILTER_SONG)
+                            songs = artistSongs.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
+                        }
                         val thumb = songs.firstOrNull()?.thumbnail ?: ""
                         val fallbackAlbum = mapOf(
                             "id" to browseId,

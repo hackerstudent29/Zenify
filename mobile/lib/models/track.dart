@@ -147,8 +147,92 @@ class Track {
         aLower.contains('rihanna') ||
         aLower.contains('ariana grande') ||
         aLower.contains('charlie puth') ||
-        aLower.contains('maroon 5')) {
+        aLower.contains('maroon 5') ||
+        aLower.contains('anitta')) {
       return 'english';
+    }
+
+    // 3. Renowned Tamil Music Directors & Artists
+    if (aLower.contains('vivek - mervin') ||
+        aLower.contains('vivek-mervin') ||
+        aLower.contains('vivek mervin') ||
+        aLower.contains('anirudh') ||
+        aLower.contains('yuvan') ||
+        aLower.contains('harris jayaraj') ||
+        aLower.contains('santhosh narayanan') ||
+        aLower.contains('g.v. prakash') ||
+        aLower.contains('gv prakash') ||
+        aLower.contains('hiphop tamizha') ||
+        aLower.contains('imman') ||
+        aLower.contains('sean roldan') ||
+        aLower.contains('sam c.s') ||
+        aLower.contains('sam cs') ||
+        aLower.contains('deva') ||
+        aLower.contains('ilayaraaja') ||
+        aLower.contains('ilayaraja') ||
+        aLower.contains('vidyasagar') ||
+        aLower.contains('sai abhyankkar') ||
+        aLower.contains('dhibu ninan thomas') ||
+        aLower.contains('vijay antony') ||
+        aLower.contains('bharathwaj') ||
+        aLower.contains('maragathamani')) {
+      if (lower.contains('telugu') || lower.contains('[te]') || lower.contains('(te)')) return 'telugu';
+      if (lower.contains('hindi') || lower.contains('[hi]') || lower.contains('(hi)')) return 'hindi';
+      if (lower.contains('kannada') || lower.contains('[kn]')) return 'kannada';
+      if (lower.contains('malayalam') || lower.contains('[ml]')) return 'malayalam';
+      return 'tamil';
+    }
+
+    // 4. Renowned Telugu Music Directors & Artists
+    if (aLower.contains('devi sri prasad') ||
+        aLower.contains('dsp') ||
+        aLower.contains('thaman') ||
+        aLower.contains('keeravaani') ||
+        aLower.contains('mickey j meyer') ||
+        aLower.contains('vivek sagar') ||
+        aLower.contains('radhan') ||
+        aLower.contains('chaitan bharadwaj') ||
+        aLower.contains('bheems cecirolio') ||
+        aLower.contains('mahati swara sagar')) {
+      if (lower.contains('tamil') || lower.contains('[ta]')) return 'tamil';
+      if (lower.contains('hindi') || lower.contains('[hi]')) return 'hindi';
+      return 'telugu';
+    }
+
+    // 5. Renowned Malayalam Music Directors & Artists
+    if (aLower.contains('sushin shyam') ||
+        aLower.contains('shaan rahman') ||
+        aLower.contains('gopi sundar') ||
+        aLower.contains('deepak dev') ||
+        aLower.contains('jakes bejoy') ||
+        aLower.contains('hesham abdul wahab') ||
+        aLower.contains('bijibal')) {
+      if (lower.contains('tamil') || lower.contains('[ta]')) return 'tamil';
+      if (lower.contains('telugu') || lower.contains('[te]')) return 'telugu';
+      return 'malayalam';
+    }
+
+    // 6. Renowned Kannada Music Directors & Artists
+    if (aLower.contains('ajaneesh') ||
+        aLower.contains('charan raj') ||
+        aLower.contains('ravi basrur') ||
+        aLower.contains('arjun janya')) {
+      if (lower.contains('tamil') || lower.contains('[ta]')) return 'tamil';
+      if (lower.contains('telugu') || lower.contains('[te]')) return 'telugu';
+      return 'kannada';
+    }
+
+    // 7. Renowned Hindi Music Directors & Artists
+    if (aLower.contains('pritam') ||
+        aLower.contains('arijit singh') ||
+        aLower.contains('vishal-shekhar') ||
+        aLower.contains('sachin-jigar') ||
+        aLower.contains('amit trivedi') ||
+        aLower.contains('mithoon') ||
+        aLower.contains('tanishk bagchi') ||
+        aLower.contains('shankar-ehsaan-loy') ||
+        aLower.contains('amaal mallik')) {
+      return 'hindi';
     }
 
     // 8. General A.R. Rahman check (with multi-language album awareness)

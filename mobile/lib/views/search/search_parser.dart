@@ -363,6 +363,18 @@ class SearchParser {
             playVideoId ??= nav?['watchEndpoint']?['videoId'] as String?;
             radioPlaylistId ??= nav?['watchPlaylistEndpoint']?['playlistId'] as String?;
           }
+          final btnRenderer = btn['buttonRenderer'];
+          if (btnRenderer is Map) {
+            final cmd = btnRenderer['command'];
+            final icon = btnRenderer['icon']?['iconType'];
+            if (icon == 'MUSIC_SHUFFLE') {
+              shufflePlaylistId ??= cmd?['watchPlaylistEndpoint']?['playlistId'] as String?;
+            } else if (icon == 'MIX') {
+              radioPlaylistId ??= cmd?['watchPlaylistEndpoint']?['playlistId'] as String?;
+            }
+            playVideoId ??= cmd?['watchEndpoint']?['videoId'] as String?;
+            radioPlaylistId ??= cmd?['watchPlaylistEndpoint']?['playlistId'] as String?;
+          }
           final navRenderer = btn['menuRenderer']?['items'] as List?;
           if (navRenderer != null) {
             for (final mItem in navRenderer) {

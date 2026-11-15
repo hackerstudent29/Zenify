@@ -51,7 +51,7 @@ class InnerTubeTransport {
   static const String _visitorPref = 'zenify_yt_visitor_data';
 
   // ---- Politeness knobs ---------------------------------------------------
-  static const Duration _timeout = Duration(seconds: 4);
+  static const Duration _timeout = Duration(seconds: 8);
   static const int _maxAttempts = 2;
 
   final http.Client _http = http.Client();
@@ -80,7 +80,7 @@ class InnerTubeTransport {
         } catch (_) {}
       }();
 
-  static const String _clientVersion = '1.20241101.01.00';
+  static const String _clientVersion = '1.20250101.01.00';
 
   Map<String, dynamic> _payload(Map<String, dynamic> body, String gl) => {
         'context': {

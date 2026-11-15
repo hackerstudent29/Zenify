@@ -78,7 +78,9 @@ enum _Panel { art, lyrics, queue }
 ///    moved/scaled with a matrix between mini → big → header, so there is no
 ///    per-frame relayout.
 class PlayerShell extends StatefulWidget {
-  static final ValueNotifier<bool> isPlayerOpenNotifier = ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> isPlayerOpenNotifier = ValueNotifier<bool>(
+    false,
+  );
   static final ValueNotifier<int> openRequestNotifier = ValueNotifier<int>(0);
 
   /// Requests any mounted [PlayerShell] to expand smoothly to the full-screen
@@ -284,16 +286,15 @@ class PlayerShellState extends State<PlayerShell>
       widget.onGoToArtist!(artistName);
     } else {
       final t = context.read<PlayerState>().currentTrack;
-      final browseId = (t != null && t.artists.isNotEmpty && t.artists.first.id.isNotEmpty)
+      final browseId =
+          (t != null && t.artists.isNotEmpty && t.artists.first.id.isNotEmpty)
           ? t.artists.first.id
           : null;
       Navigator.push(
         context,
         ZenPageRoute(
-          builder: (_) => ArtistScreen(
-            artistName: artistName,
-            browseId: browseId,
-          ),
+          builder: (_) =>
+              ArtistScreen(artistName: artistName, browseId: browseId),
         ),
       );
     }
@@ -310,8 +311,14 @@ class PlayerShellState extends State<PlayerShell>
         ZenPageRoute(
           builder: (_) => AlbumScreen(
             albumTitle: (track?.album as String?)?.isNotEmpty == true
-                ? (t != null ? t.album : MediaNormalizer.cleanAlbumTitle(track?.album?.toString()))
-                : (t != null ? t.title : MediaNormalizer.cleanTitle(track?.title?.toString())),
+                ? (t != null
+                      ? t.album
+                      : MediaNormalizer.cleanAlbumTitle(
+                          track?.album?.toString(),
+                        ))
+                : (t != null
+                      ? t.title
+                      : MediaNormalizer.cleanTitle(track?.title?.toString())),
             artistName: t != null
                 ? t.artist
                 : MediaNormalizer.formatArtists(track?.artist?.toString()),
@@ -324,8 +331,9 @@ class PlayerShellState extends State<PlayerShell>
     }
   }
 
-  dynamic _artistsOf(dynamic track) =>
-      track is Track ? track.resolvedArtists : (track?.artist?.toString() ?? '');
+  dynamic _artistsOf(dynamic track) => track is Track
+      ? track.resolvedArtists
+      : (track?.artist?.toString() ?? '');
 
   /* ───────────────────────── transport (queue aware) ───────────────────────── */
 
@@ -555,7 +563,9 @@ class PlayerShellState extends State<PlayerShell>
       if (_miniAxis == _Axis.y) {
         _dragStart();
         if (!_open) setState(() => _open = true);
-        _dragUpdate(-_miniAcc.dy.abs() * (_miniAcc.dy < 0 ? -1 : 1) * 0 + _miniAcc.dy);
+        _dragUpdate(
+          -_miniAcc.dy.abs() * (_miniAcc.dy < 0 ? -1 : 1) * 0 + _miniAcc.dy,
+        );
         return;
       }
     }
@@ -645,7 +655,9 @@ class PlayerShellState extends State<PlayerShell>
             artist: track.artist?.toString() ?? '',
             album: track.album?.toString() ?? '',
             coverUrl: track.coverUrl?.toString() ?? '',
-            durationSeconds: track.durationSeconds is int ? track.durationSeconds as int : 0,
+            durationSeconds: track.durationSeconds is int
+                ? track.durationSeconds as int
+                : 0,
           );
     ZenDropdown.showTrackMenu(
       context: context,
@@ -927,12 +939,12 @@ class PlayerShellState extends State<PlayerShell>
     Size size,
     EdgeInsets safe,
   ) {
-    final url = ((_shownCover?.isNotEmpty == true
+    final url =
+        ((_shownCover?.isNotEmpty == true
             ? _shownCover
             : (track?.coverUrl as String?))) ??
         '';
-    final currentKey =
-        ValueKey<String>('cover-$url-${_isVideo ? 'v' : 'a'}');
+    final currentKey = ValueKey<String>('cover-$url-${_isVideo ? 'v' : 'a'}');
 
     final dp = widget.dockProgress.clamp(0.0, 1.0);
     final currentMiniH = lerpDouble(52.0, _kMiniH, dp)!;
@@ -949,9 +961,14 @@ class PlayerShellState extends State<PlayerShell>
       currentMiniArt,
     );
     final fallbackSide = math.min(size.width - 56, 380.0);
-    final big = _bigRect ??
-        Rect.fromLTWH((size.width - fallbackSide) / 2, safe.top + 70,
-            fallbackSide, fallbackSide);
+    final big =
+        _bigRect ??
+        Rect.fromLTWH(
+          (size.width - fallbackSide) / 2,
+          safe.top + 70,
+          fallbackSide,
+          fallbackSide,
+        );
     final docked = Rect.fromLTWH(24, safe.top + 29, 56, 56);
     final side = big.width; // laid out ONCE at this size
 
@@ -1022,11 +1039,7 @@ class PlayerShellState extends State<PlayerShell>
           final w = rw * pauseScale;
           final scale = w / side;
           final m = Matrix4.diagonal3Values(scale, scale, 1)
-            ..setTranslationRaw(
-              cx + dx - w / 2,
-              cy - w / 2,
-              0,
-            );
+            ..setTranslationRaw(cx + dx - w / 2, cy - w / 2, 0);
           final r = radius / scale; // keep visual radius constant
           final shadowA = lerpDouble(0.28, 0.45, t)! * (1 - 0.5 * d);
 
@@ -1055,8 +1068,9 @@ class PlayerShellState extends State<PlayerShell>
                       onPanStart: _docked ? null : _artStart,
                       onPanUpdate: _docked ? null : _artUpdate,
                       onPanEnd: _docked ? null : _artEnd,
-                      onPanCancel:
-                          _docked ? null : () => _artEnd(DragEndDetails()),
+                      onPanCancel: _docked
+                          ? null
+                          : () => _artEnd(DragEndDetails()),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: const Color(0xFF27272A),
@@ -1147,15 +1161,16 @@ class PlayerShellState extends State<PlayerShell>
                                     : null,
                               ),
                             ),
-                            // soft scrim keeps queue / lyrics readable while letting
-                            // the dim lyrics boundary frame stand out smoothly
+                            // Scrim: NONE for lyrics (they sit directly on the
+                            // colour wash). Queue keeps a soft scrim so the
+                            // list stays readable.
                             IgnorePointer(
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeOutCubic,
                                 color: Colors.black.withValues(
                                   alpha: _panel == _Panel.lyrics
-                                      ? 0.14
+                                      ? 0.0
                                       : (_docked ? 0.26 : 0),
                                 ),
                               ),
@@ -1234,48 +1249,25 @@ class PlayerShellState extends State<PlayerShell>
               // Only user-initiated touch drag gestures (with non-null dragDetails and active pointer touch)
               // should reset the idle timer or reveal controls. Programmatic auto-scrolls
               // when lyrics advance to the next line must NEVER wake or re-show controls.
-              if ((n is ScrollUpdateNotification && n.dragDetails != null && _activePointers > 0) ||
-                  (n is ScrollStartNotification && n.dragDetails != null && _activePointers > 0)) {
+              if ((n is ScrollUpdateNotification &&
+                      n.dragDetails != null &&
+                      _activePointers > 0) ||
+                  (n is ScrollStartNotification &&
+                      n.dragDetails != null &&
+                      _activePointers > 0)) {
                 _bumpIdle();
               }
               return false;
             },
+            // No card, gradient, border or shadow behind the lyrics: they are
+            // drawn straight onto the artwork colour wash. Only the soft
+            // top/bottom edge fade remains.
             child: _dismissOnOverscroll(
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 2, 12, 6),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(26),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.34),
-                        Colors.black.withValues(alpha: 0.22),
-                        Colors.black.withValues(alpha: 0.36),
-                      ],
-                      stops: const [0.0, 0.48, 1.0],
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.11),
-                      width: 0.85,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.36),
-                        blurRadius: 24,
-                        spreadRadius: 1,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(26),
-                    child: _edgeFade(
-                      widget.lyricsBuilder?.call(context) ??
-                          LyricsSheet(immersiveListenable: _lyricsImmersive),
-                    ),
-                  ),
+                child: _edgeFade(
+                  widget.lyricsBuilder?.call(context) ??
+                      LyricsSheet(immersiveListenable: _lyricsImmersive),
                 ),
               ),
             ),
@@ -1314,15 +1306,17 @@ class PlayerShellState extends State<PlayerShell>
             ),
           );
         }
-        final e = const Cubic(0.18, 0.95, 0.32, 1.0).transform(v.clamp(0.0, 1.0));
+        final e = const Cubic(
+          0.18,
+          0.95,
+          0.32,
+          1.0,
+        ).transform(v.clamp(0.0, 1.0));
         return Opacity(
           opacity: e.clamp(0.0, 1.0),
           child: Transform.translate(
             offset: Offset(0, (1 - e) * 24),
-            child: Transform.scale(
-              scale: 0.97 + 0.03 * e,
-              child: child,
-            ),
+            child: Transform.scale(scale: 0.97 + 0.03 * e, child: child),
           ),
         );
       },
@@ -1475,21 +1469,19 @@ class PlayerShellState extends State<PlayerShell>
                     // Transport remains visible on Lyrics open; only hides after 3s idle
                     Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: 360,
-                        ),
+                        constraints: const BoxConstraints(maxWidth: 360),
                         child: Padding(
                           // more air between seekbar → transport → tools
-                          padding: const EdgeInsets.only(
-                            top: 18,
-                            bottom: 24,
-                          ),
+                          padding: const EdgeInsets.only(top: 18, bottom: 24),
                           child: _transport(player),
                         ),
                       ),
                     ),
 
-                    _tools(isLyrics, hasLyrics: player.hasLyrics || player.isLoadingLyrics),
+                    _tools(
+                      isLyrics,
+                      hasLyrics: player.hasLyrics || player.isLoadingLyrics,
+                    ),
                   ],
                 ),
               ),
@@ -1523,7 +1515,9 @@ class PlayerShellState extends State<PlayerShell>
                     child: SwapText(
                       track is Track
                           ? track.compactTitle
-                          : MediaNormalizer.cleanCompactTitle(track?.title?.toString()),
+                          : MediaNormalizer.cleanCompactTitle(
+                              track?.title?.toString(),
+                            ),
                       dir: _dir,
                       style: const TextStyle(
                         fontFamily: 'SF Pro',
@@ -1585,7 +1579,9 @@ class PlayerShellState extends State<PlayerShell>
                     child: SwapText(
                       track is Track
                           ? track.title
-                          : MediaNormalizer.cleanTitle(track?.title?.toString()),
+                          : MediaNormalizer.cleanTitle(
+                              track?.title?.toString(),
+                            ),
                       dir: _dir,
                       style: const TextStyle(
                         fontFamily: 'SF Pro Display',
@@ -1750,10 +1746,7 @@ class PlayerShellState extends State<PlayerShell>
               child: PlateButton(
                 size: 44,
                 onTap: () => showStudioFxSheet(context),
-                child: const Icon(
-                  CupertinoIcons.slider_horizontal_3,
-                  size: 22,
-                ),
+                child: const Icon(CupertinoIcons.slider_horizontal_3, size: 22),
               ),
             ),
             Align(

@@ -509,6 +509,18 @@ class StorySharingService {
 
   static Future<bool> shareToSystem(File imageFile, {String? text}) async {
     if (!imageFile.existsSync()) return false;
+    if (Platform.isAndroid) {
+      try {
+        final bool? success = await _channel.invokeMethod<bool>('shareToSystemChooser', {
+          'filePath': imageFile.path,
+          'text': text,
+          'title': 'Share Story',
+        });
+        if (success == true) return true;
+      } catch (e) {
+        debugPrint('[StorySharingService] Native system chooser error: $e');
+      }
+    }
     try {
       await SharePlus.instance.share(
         ShareParams(
