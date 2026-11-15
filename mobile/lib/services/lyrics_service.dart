@@ -392,7 +392,7 @@ class LyricsService {
     return null;
   }
 
-  static const String _kCachePrefix = 'lyrics_cache_v9_';
+  static const String _kCachePrefix = 'lyrics_cache_v10_';
 
   /// Removes accented characters and diacritics for resilient international matching
   /// (e.g. "São Paulo" -> "Sao Paulo", "Señorita" -> "Senorita").
@@ -500,6 +500,21 @@ class LyricsService {
     }
 
     return true;
+  }
+
+  /// Completely clears all in-memory and on-disk cached lyrics so tracks re-resolve
+  /// fresh word-level / syllable synced lyrics from Better Lyrics & Unison.
+  Future<void> clearAllLyricsCache() async {
+    _memCache.clear();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final allKeys = prefs.getKeys().toList();
+      for (final k in allKeys) {
+        if (k.startsWith('lyrics_cache_')) {
+          await prefs.remove(k);
+        }
+      }
+    } catch (_) {}
   }
 
   /// Purges old unsynced and poisoned (v1/v2) lyrics from SharedPreferences disk cache.

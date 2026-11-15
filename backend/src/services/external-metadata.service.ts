@@ -2613,16 +2613,21 @@ export class ExternalMetadataService {
             });
 
             const data = res.data;
-            const contents = data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.musicShelfRenderer?.contents || [];
+            const sections = data?.contents?.tabbedSearchResultsRenderer?.tabs?.[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
             
             const results: any[] = [];
-            for (const item of contents) {
-                const m = item.musicResponsiveListItemRenderer;
-                if (!m) continue;
+            const seenVideoIds = new Set<string>();
 
+            const parseRenderer = (m: any) => {
+                if (!m) return;
                 const flexCols = m.flexColumns || [];
                 const title = flexCols[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
-                const videoId = m.playlistItemData?.videoId || flexCols[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
+                const videoId = m.playlistItemData?.videoId || 
+                                flexCols[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId ||
+                                m.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.videoId;
+
+                if (!title || !videoId || seenVideoIds.has(videoId)) return;
+                seenVideoIds.add(videoId);
 
                 const secondColRuns = flexCols[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
                 let artist = secondColRuns[0]?.text || 'Unknown Artist';
@@ -2656,18 +2661,62 @@ export class ExternalMetadataService {
                 const rawThumb = thumbs[thumbs.length - 1]?.url || '';
                 const highResThumb = upgradeInnerTubeArtwork(rawThumb, { videoId, kind: 'song' });
 
-                if (title && videoId) {
-                    results.push({
-                        id: videoId,
-                        videoId: videoId,
-                        title: title.trim(),
-                        artist: artist.trim(),
-                        uploader: artist.trim(),
-                        album: album.trim(),
-                        duration: durationSeconds,
-                        thumbnail: highResThumb || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
-                        isYtMusic: true
-                    });
+                results.push({
+                    id: videoId,
+                    videoId: videoId,
+                    title: title.trim(),
+                    artist: artist.trim(),
+                    uploader: artist.trim(),
+                    album: album.trim(),
+                    duration: durationSeconds,
+                    thumbnail: highResThumb || `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+                    isYtMusic: true
+                });
+            };
+
+            for (const section of sections) {
+                // Top Result Card (Echo-Music pattern)
+                if (section.musicCardShelfRenderer) {
+                    const card = section.musicCardShelfRenderer;
+                    const cardTitle = card.title?.runs?.[0]?.text;
+                    const cardVideoId = card.onTap?.watchEndpoint?.videoId;
+                    if (cardTitle && cardVideoId && !seenVideoIds.has(cardVideoId)) {
+                        seenVideoIds.add(cardVideoId);
+                        const subRuns = card.subtitle?.runs || [];
+                        const cardArtist = subRuns[0]?.text || 'Unknown Artist';
+                        const thumbs = card.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+                        const rawThumb = thumbs[thumbs.length - 1]?.url || '';
+                        results.push({
+                            id: cardVideoId,
+                            videoId: cardVideoId,
+                            title: cardTitle.trim(),
+                            artist: cardArtist.trim(),
+                            uploader: cardArtist.trim(),
+                            album: 'Top Result',
+                            duration: 210,
+                            thumbnail: upgradeInnerTubeArtwork(rawThumb, { videoId: cardVideoId, kind: 'song' }) || `https://i.ytimg.com/vi/${cardVideoId}/maxresdefault.jpg`,
+                            isYtMusic: true
+                        });
+                    }
+
+                    // Nested items in the top card
+                    for (const item of (card.contents || [])) {
+                        parseRenderer(item.musicResponsiveListItemRenderer);
+                    }
+                }
+
+                // Shelves: Songs, Albums, Videos
+                if (section.musicShelfRenderer) {
+                    for (const item of (section.musicShelfRenderer.contents || [])) {
+                        parseRenderer(item.musicResponsiveListItemRenderer);
+                    }
+                }
+
+                // Fallback item sections
+                if (section.itemSectionRenderer) {
+                    for (const item of (section.itemSectionRenderer.contents || [])) {
+                        parseRenderer(item.musicResponsiveListItemRenderer);
+                    }
                 }
             }
 

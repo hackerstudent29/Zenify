@@ -26,6 +26,11 @@ import 'views/splash/zenify_splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Cap in-memory image cache to 35MB & 80 images for ultra-lean memory & storage footprint
+  PaintingBinding.instance.imageCache.maximumSize = 80;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 35 * 1024 * 1024;
+
   await runCacheMigration();
   await CountryService.instance.init();
   await UserPreferencesService.instance.init();

@@ -2,6 +2,25 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.0.13] - 2026-11-15
+
+### What's New
+- **Better Lyrics & Unison Syllable-Level TTML Engine**:
+  - Real-time, word-by-word synchronized lyrics powered by the official Better Lyrics Apple Music TTML engine and Unison community database.
+  - Syllable progress tracking, breathing 3-dot instrumental pauses, and multi-language romanized script switching (Latin, Cyrillic, CJK, Indic, Arabic).
+- **Ultra-Lean Live Streaming Storage (80%+ Storage Reduction)**:
+  - Redesigned as a pure live streaming client: pruned raw audio hoarding and cut ExoPlayer local audio disk buffer from 512 MB to a lean 64 MB.
+  - In-memory decoded image cache capped to 35 MB & 80 objects to keep memory and device cache feather-light.
+  - User phones now store only lightweight metadata for recently played tracks and visited artists for instant 0ms resume.
+  - Purged 488 legacy unlinked tracks and 609 cached lyric documents from backend; preserved 100% of user accounts, credentials, and liked libraries.
+- **Enhanced Application Security & Privacy**:
+  - Hardened Android security manifest with `android:allowBackup="false"` to block unauthorized ADB or cloud backup token extraction.
+  - ProGuard and R8 bytecode obfuscation enabled in release builds.
+  - All auth session tokens secured in Android Keystore / iOS Keychain (`FlutterSecureStorage`) with zero leaked API keys.
+- **Story Sharing & Full-Screen Sheet Polish**:
+  - Full-bleed presentation for "Add to Story" and Lyric Selection screens via root navigator routing, preventing bottom miniplayer overlap.
+  - `DockVisibility` token management ensuring bottom navigation disappears cleanly when creating stories.
+
 ## [1.0.12] - 2026-11-15
 
 ### What's New

@@ -319,6 +319,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
+        extendBody: true,
         backgroundColor: Zen.bg,
         body: ValueListenableBuilder<bool>(
           valueListenable: DockVisibility.hideNavDockNotifier,

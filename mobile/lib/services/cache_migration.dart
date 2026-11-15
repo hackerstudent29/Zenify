@@ -10,10 +10,11 @@ import 'artist_service.dart';
 import 'innertube_service.dart';
 import 'innertube_transport.dart';
 import 'lyrics_service.dart';
+import 'stream_resolver_service.dart';
 import '../data/datasources/catalog_datasource.dart';
 import '../views/explore/explore_data_service.dart';
 
-const kCacheSchema = 3;
+const kCacheSchema = 4;
 
 /// One-time cache wipe that runs at app start before any network call.
 /// Idempotent: stores `cache_schema` in SharedPreferences.
@@ -32,6 +33,7 @@ Future<void> runCacheMigration() async {
     ApiService.clearCache();
     ExploreDataService.instance.clearCache();
     CatalogDataSource.clear();
+    StreamResolverService.instance.clearCache();
     await p.remove('zenify_yt_visitor_data');
     await p.remove('innertube_visitor_data');
 
@@ -70,9 +72,9 @@ Future<void> runCacheMigration() async {
       await const MethodChannel('zenify/audio').invokeMethod('clearAllCaches');
     } catch (_) {}
 
-    // 4) Purge stale plain (unsynced) lyrics so they can resolve to WBW/synced
+    // 4) Purge ALL old cached lyrics (both in-memory and SharedPreferences) so songs re-bind to fresh Better Lyrics & Unison word-level synced lyrics
     try {
-      await LyricsService.instance.purgeUnsyncedCache();
+      await LyricsService.instance.clearAllLyricsCache();
     } catch (_) {}
 
     await p.setInt('cache_schema', kCacheSchema);

@@ -606,23 +606,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onChanged: settings.setDownloadWifiOnly,
                       ),
                       _SliderRow(
-                        title: 'Maximum Disk Cache',
-                        valueLabel: '${settings.maxCacheGb.toStringAsFixed(1)} GB',
-                        value: settings.maxCacheGb,
-                        min: 0.5,
-                        max: 10.0,
+                        title: 'Live Streaming Cache Cap',
+                        valueLabel: '${(settings.maxCacheGb * 1000).toInt()} MB',
+                        value: settings.maxCacheGb.clamp(0.05, 1.0),
+                        min: 0.05,
+                        max: 1.0,
                         divisions: 19,
                         onChanged: settings.setMaxCacheGb,
                       ),
                       AppleRow(
                         leading: const IconTile(CupertinoIcons.trash, color: AT.amber),
-                        title: 'Clear Media & Artwork Cache',
-                        subtitle: 'Purge cached streams and covers',
+                        title: 'Clear Media, Lyrics & Artwork Cache',
+                        subtitle: 'Purge cached lyrics, streams & covers (accounts preserved)',
                         trailing: const _Chevron(),
                         onTap: () async {
                           await CacheService.clearAllMediaAndArtworkCache();
                           if (!context.mounted) return;
-                          appleToast(context, 'Media & artwork cache cleared');
+                          appleToast(context, 'Media, lyrics & artwork cache cleared');
                         },
                       ),
                     ],

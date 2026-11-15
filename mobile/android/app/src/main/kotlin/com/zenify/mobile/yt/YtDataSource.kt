@@ -18,7 +18,7 @@ import java.io.File
 @OptIn(UnstableApi::class)
 object YtDataSource {
     private const val TAG = "YtDataSource"
-    private const val CACHE_SIZE_BYTES = 512L * 1024L * 1024L // 512 MB
+    private const val CACHE_SIZE_BYTES = 64L * 1024L * 1024L // 64 MB lean live streaming cache
 
     @Volatile
     private var simpleCache: SimpleCache? = null

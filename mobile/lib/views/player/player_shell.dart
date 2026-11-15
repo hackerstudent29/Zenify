@@ -553,13 +553,13 @@ class PlayerShellState extends State<PlayerShell>
     if (!r.attached || !s.attached || !r.hasSize || !s.hasSize) return;
     final tl = r.localToGlobal(Offset.zero, ancestor: s);
     final side = math
-        .min(r.size.width - 56, r.size.height - 24)
+        .min(mq.size.width - 56, r.size.height - 24)
         .clamp(100.0, 380.0)
         .toDouble();
     _bigRectKey = key;
     setState(() {
       _bigRect = Rect.fromLTWH(
-        tl.dx + (r.size.width - side) / 2,
+        (mq.size.width - side) / 2, // Always 100% mathematically centered on screen
         tl.dy + (r.size.height - side) * 0.2, // near the top, like Apple Music
         side,
         side,
@@ -1136,10 +1136,10 @@ class PlayerShellState extends State<PlayerShell>
     final column = RepaintBoundary(child: _sheetColumn(player, track, safe));
 
     return Positioned(
-      left: -24.0,
-      right: -24.0,
-      top: -24.0,
-      bottom: -60.0,
+      left: 0.0,
+      right: 0.0,
+      top: 0.0,
+      bottom: 0.0,
       child: AnimatedBuilder(
         animation: _sheet,
         child: column,
@@ -1163,14 +1163,19 @@ class PlayerShellState extends State<PlayerShell>
               offset: Offset(0, (1 - t) * size.height),
               child: ClipRRect(
                 borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(radius),
+                  top: Radius.circular(t >= 0.98 ? 0.0 : radius),
                 ),
-                clipBehavior: radius > 0.1 ? Clip.antiAlias : Clip.none,
+                clipBehavior: t < 0.98 && radius > 0.1 ? Clip.antiAlias : Clip.none,
                 child: Stack(
                   key: _sheetKey,
+                  clipBehavior: Clip.none,
                   children: [
                     // ── BACKGROUND CARD: spans completely edge to edge with zero gaps ──
-                    Positioned.fill(
+                    Positioned(
+                      left: -40.0,
+                      right: -40.0,
+                      top: -60.0,
+                      bottom: -80.0,
                       child: Opacity(
                         opacity: bgOpacity,
                         child: Stack(
@@ -1214,10 +1219,7 @@ class PlayerShellState extends State<PlayerShell>
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () {},
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 60.0),
-                            child: child,
-                          ),
+                          child: child,
                         ),
                       ),
                     ),
