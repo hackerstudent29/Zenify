@@ -149,6 +149,98 @@ export class LyricsEnhancementService {
     }
 
     /**
+     * Fetch from Better Lyrics (Apple Music Word-by-word TTML & Synced Lyrics)
+     * Upstream: https://github.com/better-lyrics/better-lyrics
+     */
+    static async fetchBetterLyrics(
+        title: string,
+        artist: string,
+        durationSeconds?: number,
+        albumName?: string,
+        isrc?: string,
+        targetLanguage?: string
+    ): Promise<{ lyrics: string; isSynced: boolean; quality: number; source: string; doc?: any } | null> {
+        try {
+            const { BetterLyricsProvider } = await import('../lyrics/providers/better-lyrics.provider.js');
+            const provider = new BetterLyricsProvider();
+            const doc = await provider.fetch({
+                title,
+                artist,
+                album: albumName,
+                duration: durationSeconds,
+                isrc
+            });
+
+            if (doc && Array.isArray(doc.lines) && doc.lines.length > 0) {
+                const sampleText = doc.lines.map(l => l.text).join(' ');
+                if (targetLanguage && this.isLyricsLanguageMismatch(sampleText, targetLanguage)) {
+                    console.log(`[BetterLyrics] Candidate rejected due to language mismatch with "${targetLanguage}".`);
+                    return null;
+                }
+
+                const isWord = doc.syncLevel === 'word' || doc.syncLevel === 'ai-word';
+                console.log(`[BetterLyrics] Sourced ${doc.lines.length} lines (${doc.syncLevel}) for "${title}" by ${artist}`);
+                return {
+                    lyrics: JSON.stringify(doc),
+                    isSynced: true,
+                    quality: isWord ? 6 : 5,
+                    source: isWord ? 'Better Lyrics (Word-by-word)' : 'Better Lyrics (Line-synced)',
+                    doc
+                };
+            }
+        } catch (err: any) {
+            console.warn('[BetterLyrics] fetch error:', err.message);
+        }
+        return null;
+    }
+
+    /**
+     * Fetch from Unison (Community crowdsourced & composer synced lyrics)
+     * Upstream: https://unison.betterlyrics.org
+     */
+    static async fetchUnison(
+        title: string,
+        artist: string,
+        durationSeconds?: number,
+        isrc?: string,
+        videoId?: string,
+        targetLanguage?: string
+    ): Promise<{ lyrics: string; isSynced: boolean; quality: number; source: string; doc?: any } | null> {
+        try {
+            const { UnisonProvider } = await import('../lyrics/providers/unison.provider.js');
+            const provider = new UnisonProvider();
+            const doc = await provider.fetch({
+                title,
+                artist,
+                duration: durationSeconds,
+                isrc,
+                trackId: videoId
+            });
+
+            if (doc && Array.isArray(doc.lines) && doc.lines.length > 0) {
+                const sampleText = doc.lines.map(l => l.text).join(' ');
+                if (targetLanguage && this.isLyricsLanguageMismatch(sampleText, targetLanguage)) {
+                    console.log(`[Unison] Candidate rejected due to language mismatch with "${targetLanguage}".`);
+                    return null;
+                }
+
+                const isWord = doc.syncLevel === 'word' || doc.syncLevel === 'ai-word';
+                console.log(`[Unison] Sourced ${doc.lines.length} lines (${doc.syncLevel}) for "${title}" by ${artist}`);
+                return {
+                    lyrics: JSON.stringify(doc),
+                    isSynced: true,
+                    quality: isWord ? 6 : 5,
+                    source: isWord ? 'Unison (Word-by-word)' : 'Unison (Line-synced)',
+                    doc
+                };
+            }
+        } catch (err: any) {
+            console.warn('[Unison] fetch error:', err.message);
+        }
+        return null;
+    }
+
+    /**
      * Checks if a candidate lyrics snippet conflicts with the expected song language.
      * Prevents cross-language dubs (e.g. Telugu lyrics for Tamil songs or vice versa),
      * supporting both native scripts and Romanized (Latin transliterated) text.
@@ -893,7 +985,29 @@ export class LyricsEnhancementService {
             return { ...lrcRedResult, source: 'lrc.red (Word-by-word)' };
         }
 
-        // 2. Try LRCLib (Line synced with instrumental separations)
+        // 2. Try Better Lyrics (Apple Music pristine TTML word-level timings)
+        const betterLyricsResult = await this.fetchBetterLyrics(title, artist, durationSeconds, undefined, isrc);
+        if (betterLyricsResult && betterLyricsResult.isSynced) {
+            this.lyricsCache.set(cacheKey, {
+                ...betterLyricsResult,
+                source: betterLyricsResult.source,
+                expires: Date.now() + this.CACHE_TTL
+            });
+            return { ...betterLyricsResult };
+        }
+
+        // 3. Try Unison (Crowdsourced / composer synchronized lyrics)
+        const unisonResult = await this.fetchUnison(title, artist, durationSeconds, isrc);
+        if (unisonResult && unisonResult.isSynced) {
+            this.lyricsCache.set(cacheKey, {
+                ...unisonResult,
+                source: unisonResult.source,
+                expires: Date.now() + this.CACHE_TTL
+            });
+            return { ...unisonResult };
+        }
+
+        // 4. Try LRCLib (Line synced with instrumental separations)
         const lrcResult = await this.fetchLRCLib(title, artist, durationSeconds);
         if (lrcResult && lrcResult.isSynced) {
             this.lyricsCache.set(cacheKey, {
@@ -906,6 +1020,8 @@ export class LyricsEnhancementService {
 
         // Try multiple sources in parallel
         const fetchPromises = [
+            this.fetchBetterLyrics(title, artist, durationSeconds, undefined, isrc),
+            this.fetchUnison(title, artist, durationSeconds, isrc),
             this.fetchSpotifyRapidApiLyrics(title, artist).then(r => r ? { ...r, source: 'Spotify RapidAPI' } : null),
             this.fetchGeniusRapidApiLyrics(title, artist).then(r => r ? { ...r, source: 'Genius RapidAPI 1' } : null),
             this.fetchGeniusRapidApi5Lyrics(title, artist).then(r => r ? { ...r, source: 'Genius RapidAPI 5' } : null),

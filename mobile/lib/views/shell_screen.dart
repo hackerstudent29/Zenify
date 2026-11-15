@@ -146,6 +146,9 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
   void _onTabDepthChanged(int tabIndex, int depth) {
     _tabDepths[tabIndex] = depth;
     // Keep bottom navigation dock persistent across all pages and tabs.
+    if (depth == 0) {
+      DockVisibility.reset();
+    }
     if (_dockController.value != 1.0) {
       _dockController.value = 1.0;
     }
@@ -178,12 +181,17 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
       if (_navKeys[index].currentState?.canPop() ?? false) {
         _navKeys[index].currentState?.popUntil((r) => r.isFirst);
       }
+      DockVisibility.reset();
+      if (_dockController.value != 1.0) {
+        _dockController.value = 1.0;
+      }
       return;
     }
     FocusManager.instance.primaryFocus?.unfocus();
     _tabHistory.remove(_currentIndex);
     _tabHistory.add(_currentIndex);
     setState(() => _currentIndex = index);
+    DockVisibility.reset();
     if (_dockController.value != 1.0) {
       _dockController.value = 1.0;
     }
@@ -252,29 +260,38 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
   }
 
   void _goToArtist(dynamic trackOrArtist) {
-    final String raw = trackOrArtist is Track
-        ? (trackOrArtist.artistNames.isNotEmpty ? trackOrArtist.artistNames.first : trackOrArtist.artist)
+    final Track? t = trackOrArtist is Track ? trackOrArtist : null;
+    final String raw = t != null
+        ? (t.artistNames.isNotEmpty ? t.artistNames.first : t.artist)
         : (trackOrArtist is String ? trackOrArtist : trackOrArtist?.artist?.toString() ?? '');
     final clean = MediaNormalizer.cleanArtistName(raw);
     final split = MediaNormalizer.splitArtistNames(clean);
     final artist = split.isNotEmpty ? split.first : clean;
+    final String? browseId = (t != null && t.artists.isNotEmpty && t.artists.first.id.isNotEmpty)
+        ? t.artists.first.id
+        : null;
     if (artist.isNotEmpty && artist != 'Unknown Artist') {
-      _openInActiveTab(ArtistScreen(artistName: artist));
+      _openInActiveTab(ArtistScreen(
+        artistName: artist,
+        browseId: browseId,
+        imageUrl: t?.coverUrl,
+      ));
     }
   }
 
   void _goToAlbum(dynamic track) {
+    final Track? t = track is Track ? track : null;
     final String rawTitle;
     final dynamic rawArtist;
     final String? cover;
-    if (track is Track) {
-      rawTitle = (track.album.isNotEmpty && track.album != 'Single') ? track.album : track.title;
-      rawArtist = track.artist;
-      cover = track.coverUrl;
+    if (t != null) {
+      rawTitle = (t.album.isNotEmpty && t.album != 'Single') ? t.album : t.title;
+      rawArtist = t.artist;
+      cover = t.coverUrl;
     } else {
       final a = track?.album?.toString();
-      final t = track?.title?.toString() ?? 'Album';
-      rawTitle = (a != null && a.isNotEmpty && a != 'Single') ? a : t;
+      final trTitle = track?.title?.toString() ?? 'Album';
+      rawTitle = (a != null && a.isNotEmpty && a != 'Single') ? a : trTitle;
       rawArtist = track?.artist;
       cover = track?.coverUrl?.toString();
     }
@@ -284,6 +301,8 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
       albumTitle: title,
       artistName: artist,
       coverUrl: cover,
+      browseId: t?.albumBrowseId,
+      initialTracks: t != null ? [t] : null,
     ));
   }
 

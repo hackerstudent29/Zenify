@@ -2,7 +2,16 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
-## [1.1.11] - 2026-11-14
+## [1.0.12] - 2026-11-15
+
+### What's New
+- **Expansive Artist Hero & Balanced Layout**: Restored full-height portrait photography (`480px`) with ~250px of clean breathing room for artist imagery so portraits and expressions are never covered by titles or action controls.
+- **Scroll-Linked Dynamic Island**: The center island capsule now stays collapsed and hidden at rest across all artist, album, playlist, and category pages, springing open gracefully to reveal the title only when the user scrolls past the on-screen header.
+- **Edge-to-Edge Fullview Player**: Expanded player sheet bounds with seamless full-bleed backdrop coverage, completely eliminating right-side display subpixel gaps on all Android screens.
+- **Strict Lyrics & Search Matching**: Enforced multi-word overlap validation and artist verification, eliminating fuzzy lyric mismatches and guaranteeing 100% accurate lyrics with native YouTube official lyrics fallback.
+- **Audience & Metric Formatting**: Cleaned artist monthly listeners to format cleanly without duplicate words (e.g. "40.8 crore monthly listeners").
+
+## [1.0.11] - 2026-11-14
 
 ### What's New
 - **Refined Hero Presentation**: Restored original square aspect ratio and subtle drop shadow for album artwork, and natural viewport fitting for artist hero banners without artificial zoom or image cropping.

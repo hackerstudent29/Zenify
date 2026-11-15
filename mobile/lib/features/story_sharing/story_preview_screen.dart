@@ -581,11 +581,13 @@ class StoryOptionsSheet {
                                 ),
                               ),
                               onTap: () {
+                                final nav = Navigator.of(context);
                                 Navigator.pop(ctx);
-                                Navigator.of(context).push(
+                                nav.push(
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
+                                      initialShareTarget: StoryShareTarget.instagram,
                                     ),
                                   ),
                                 );
@@ -597,11 +599,13 @@ class StoryOptionsSheet {
                               color: const Color(0xFF25D366),
                               child: const Icon(CupertinoIcons.chat_bubble_fill, color: Colors.white, size: 20),
                               onTap: () {
+                                final nav = Navigator.of(context);
                                 Navigator.pop(ctx);
-                                Navigator.of(context).push(
+                                nav.push(
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
+                                      initialShareTarget: StoryShareTarget.whatsapp,
                                     ),
                                   ),
                                 );
@@ -613,11 +617,13 @@ class StoryOptionsSheet {
                               color: const Color(0xFF1877F2),
                               child: const Icon(CupertinoIcons.share, color: Colors.white, size: 20),
                               onTap: () {
+                                final nav = Navigator.of(context);
                                 Navigator.pop(ctx);
-                                Navigator.of(context).push(
+                                nav.push(
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
+                                      initialShareTarget: StoryShareTarget.facebook,
                                     ),
                                   ),
                                 );
@@ -629,11 +635,13 @@ class StoryOptionsSheet {
                               color: const Color(0xFFFFFC00),
                               child: const Icon(CupertinoIcons.paperplane_fill, color: Colors.black, size: 18),
                               onTap: () {
+                                final nav = Navigator.of(context);
                                 Navigator.pop(ctx);
-                                Navigator.of(context).push(
+                                nav.push(
                                   CupertinoPageRoute(
                                     builder: (_) => StoryPreviewScreen(
                                       content: SongStoryContent(track: track),
+                                      initialShareTarget: StoryShareTarget.snapchat,
                                     ),
                                   ),
                                 );
@@ -955,6 +963,10 @@ class _QuickSocialDestination extends StatelessWidget {
 
 
 /// Full-screen Story Preview & Template Selection Screen.
+/// • swipe through up to 30 designs per category, each at its own ratio
+/// • filter by skin (Glass / Minimal / Retro / Modern / Clay / Neon / …)
+/// • share the rendered image straight into Instagram, WhatsApp, X, Snapchat…
+/// • share a live link, copy it, or download the PNG to the phone
 class StoryPreviewScreen extends StatefulWidget {
   const StoryPreviewScreen({
     super.key,
@@ -974,40 +986,41 @@ class StoryPreviewScreen extends StatefulWidget {
 class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
   final Map<String, GlobalKey> _boundaryKeys = {};
   GlobalKey _keyForTemplate(String id) => _boundaryKeys.putIfAbsent(id, () => GlobalKey());
-  late final PageController _pageController;
 
-  late final List<StoryTemplate> _availableTemplates;
+  late PageController _pageController;
+  late final List<StoryTemplate> _allTemplates;
   late StoryTemplate _currentTemplate;
+  StorySkin? _skinFilter;
 
-  StoryAspectRatio _aspectRatio = StoryAspectRatio.story;
-  StoryBackgroundStyle _backgroundStyle = StoryBackgroundStyle.artMesh;
+  StoryBackgroundStyle _backgroundStyle = StoryBackgroundStyle.auto;
   StoryTextPolarity _textPolarity = StoryTextPolarity.light;
 
   ArtworkPalette _palette = ArtworkPalette.defaultPalette;
   bool _isExporting = false;
 
+  List<StoryTemplate> get _visible =>
+      _skinFilter == null ? _allTemplates : _allTemplates.where((t) => t.skin == _skinFilter).toList();
+
+  List<StorySkin> get _skinsPresent => [
+        for (final s in StorySkin.values)
+          if (_allTemplates.any((t) => t.skin == s)) s,
+      ];
+
   @override
   void initState() {
     super.initState();
-    _availableTemplates = _resolveTemplatesForContent(widget.content);
-
-    // Initial template matching requested or fallback to first
-    final initId = widget.initialTemplateId;
-    _currentTemplate = _availableTemplates.firstWhere(
-      (t) => t.id == initId,
-      orElse: () => _availableTemplates.first,
+    _allTemplates = _resolveTemplatesForContent(widget.content);
+    _currentTemplate = _allTemplates.firstWhere(
+      (t) => t.id == widget.initialTemplateId,
+      orElse: () => _allTemplates.first,
     );
-
-    final initialIndex = _availableTemplates.indexOf(_currentTemplate);
-    _pageController = PageController(initialPage: initialIndex >= 0 ? initialIndex : 0);
+    _pageController = PageController(initialPage: math.max(0, _visible.indexOf(_currentTemplate)));
 
     _loadPreferences();
     _extractArtworkPalette();
 
     if (widget.initialShareTarget != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _triggerInitialShare(widget.initialShareTarget!);
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _triggerInitialShare(widget.initialShareTarget!));
     }
   }
 
@@ -1029,30 +1042,22 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
   Future<void> _loadPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final savedTemplateId = prefs.getString('zenify_story_last_template_${widget.content.contentType}');
-      if (savedTemplateId != null && mounted) {
-        final match = _availableTemplates.firstWhere(
-          (t) => t.id == savedTemplateId,
-          orElse: () => _currentTemplate,
-        );
+      final saved = prefs.getString('zenify_story_last_template_${widget.content.contentType}');
+      if (saved != null && widget.initialTemplateId == null && mounted) {
+        final match = _allTemplates.firstWhere((t) => t.id == saved, orElse: () => _currentTemplate);
         if (match.id != _currentTemplate.id) {
-          final idx = _availableTemplates.indexOf(match);
-          if (idx >= 0 && _pageController.hasClients) {
-            _pageController.jumpToPage(idx);
-          }
+          final idx = _visible.indexOf(match);
+          if (idx >= 0 && _pageController.hasClients) _pageController.jumpToPage(idx);
           setState(() => _currentTemplate = match);
         }
       }
     } catch (_) {}
   }
 
-  Future<void> _savePreference(String templateId) async {
+  Future<void> _savePreference(String id) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        'zenify_story_last_template_${widget.content.contentType}',
-        templateId,
-      );
+      await prefs.setString('zenify_story_last_template_${widget.content.contentType}', id);
     } catch (_) {}
   }
 
@@ -1061,177 +1066,111 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
       widget.content.coverUrl,
       cacheKey: '${widget.content.contentType}_${widget.content.title}',
     );
-    if (mounted) {
-      setState(() => _palette = pal);
-    }
+    if (mounted) setState(() => _palette = pal);
   }
 
-  void _onTemplateSelected(StoryTemplate template) {
-    final index = _availableTemplates.indexOf(template);
+  void _onTemplateSelected(StoryTemplate t) {
+    final index = _visible.indexOf(t);
     if (index >= 0 && _pageController.hasClients) {
-      _pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-      );
+      _pageController.animateToPage(index, duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
     }
-    setState(() => _currentTemplate = template);
-    _savePreference(template.id);
+    setState(() => _currentTemplate = t);
+    _savePreference(t.id);
   }
 
   void _onPageChanged(int index) {
-    if (index >= 0 && index < _availableTemplates.length) {
-      setState(() => _currentTemplate = _availableTemplates[index]);
-      _savePreference(_availableTemplates[index].id);
+    final v = _visible;
+    if (index >= 0 && index < v.length) {
+      setState(() => _currentTemplate = v[index]);
+      _savePreference(v[index].id);
     }
   }
 
-  void _toggleAspectRatio() {
+  void _onSkinFilter(StorySkin? skin) {
+    final old = _pageController;
     setState(() {
-      _aspectRatio = _aspectRatio == StoryAspectRatio.story
-          ? StoryAspectRatio.square
-          : StoryAspectRatio.story;
+      _skinFilter = skin;
+      final v = _visible;
+      if (!v.contains(_currentTemplate) && v.isNotEmpty) _currentTemplate = v.first;
+      _pageController = PageController(initialPage: math.max(0, v.indexOf(_currentTemplate)));
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
   }
 
   void _toggleBackgroundStyle() {
     setState(() {
       const styles = StoryBackgroundStyle.values;
-      final nextIdx = (styles.indexOf(_backgroundStyle) + 1) % styles.length;
-      _backgroundStyle = styles[nextIdx];
+      _backgroundStyle = styles[(styles.indexOf(_backgroundStyle) + 1) % styles.length];
     });
   }
 
   void _toggleTextPolarity() {
     setState(() {
-      _textPolarity = _textPolarity == StoryTextPolarity.light
-          ? StoryTextPolarity.dark
-          : StoryTextPolarity.light;
+      _textPolarity = _textPolarity == StoryTextPolarity.light ? StoryTextPolarity.dark : StoryTextPolarity.light;
     });
   }
+
+  // ── capture / share / download ───────────────────────────────────────────
 
   Future<File?> _captureCurrentCard() async {
     setState(() => _isExporting = true);
     try {
-      final key = _keyForTemplate(_currentTemplate.id);
-      final result = await StoryImageRenderer.captureToPng(
-        key,
-        filePrefix: 'zenify_${widget.content.contentType}',
-        targetWidth: _aspectRatio.exportWidth,
-      );
-      if (result == null && mounted) {
-        appleToast(context, 'Preparing story image...');
+      for (var attempt = 0; attempt < 4; attempt++) {
+        final result = await StoryImageRenderer.captureToPng(
+          _keyForTemplate(_currentTemplate.id),
+          filePrefix: 'zenify_${widget.content.contentType}',
+          targetWidth: _currentTemplate.ratio.exportWidth,
+        );
+        if (result?.file != null) return result!.file;
+        await Future<void>.delayed(const Duration(milliseconds: 200));
       }
-      return result?.file;
+      if (mounted) appleToast(context, 'Preparing image...');
+      return null;
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }
   }
 
-  Future<void> _shareInstagram() async {
+  Future<void> _share(StoryShareTarget target) async {
     final file = await _captureCurrentCard();
     if (file == null) return;
-    await StorySharingService.shareToInstagram(
+    await StorySharingService.shareImage(
+      target,
       file,
+      text: widget.content.shareText,
       topColor: _palette.primary,
       bottomColor: _palette.background,
-      fallbackText: widget.content.shareText,
-    );
-  }
-
-  Future<void> _shareFacebook() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToFacebook(
-      file,
-      fallbackText: widget.content.shareText,
-    );
-  }
-
-  Future<void> _shareWhatsApp() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToWhatsApp(
-      file,
-      text: widget.content.shareText,
-    );
-  }
-
-  Future<void> _shareSnapchat() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToSnapchat(
-      file,
-      fallbackText: widget.content.shareText,
-    );
-  }
-
-  Future<void> _shareTelegram() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToTelegram(
-      file,
-      text: widget.content.shareText,
     );
   }
 
   Future<void> _triggerInitialShare(StoryShareTarget target) async {
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (!mounted) return;
-    switch (target) {
-      case StoryShareTarget.instagram:
-        await _shareInstagram();
-        break;
-      case StoryShareTarget.facebook:
-        await _shareFacebook();
-        break;
-      case StoryShareTarget.whatsapp:
-        await _shareWhatsApp();
-        break;
-      case StoryShareTarget.snapchat:
-        await _shareSnapchat();
-        break;
-      case StoryShareTarget.telegram:
-        await _shareTelegram();
-        break;
-      case StoryShareTarget.system:
-        await _shareMore();
-        break;
-    }
-  }
-
-  Future<void> _shareMore() async {
-    final file = await _captureCurrentCard();
-    if (file == null) return;
-    await StorySharingService.shareToSystem(
-      file,
-      text: widget.content.shareText,
-    );
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    if (mounted) await _share(target);
   }
 
   Future<void> _saveToGallery() async {
     final file = await _captureCurrentCard();
     if (file == null) return;
-
-    final success = await GallerySaveService.saveImageToGallery(
-      file,
-      title: 'Zenify_${widget.content.contentType}',
-    );
-
-    if (mounted) {
-      if (success) {
-        IslandNotifier.instance.show(
-          IslandNotification(
-            id: 'save_story_${DateTime.now().millisecondsSinceEpoch}',
-            title: 'Saved to Gallery',
-            body: 'Pictures/Zenify album',
-            leading: const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFFE11D48), size: 18),
-          ),
-        );
-      } else {
-        appleToast(context, 'Could not save to gallery');
-      }
+    final ok = await GallerySaveService.saveImageToGallery(file, title: 'Zenify_${widget.content.contentType}');
+    if (!mounted) return;
+    if (ok) {
+      IslandNotifier.instance.show(
+        IslandNotification(
+          id: 'save_story_${DateTime.now().millisecondsSinceEpoch}',
+          title: 'Saved to Photos',
+          body: '${_currentTemplate.ratio.exportWidth.toInt()}×${_currentTemplate.ratio.exportHeight.toInt()} · Zenify album',
+          leading: const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFFE11D48), size: 18),
+        ),
+      );
+    } else {
+      appleToast(context, 'Could not save. Check photo permission.');
     }
+  }
+
+  Future<void> _saveToFiles() async {
+    final file = await _captureCurrentCard();
+    if (file == null) return;
+    await GallerySaveService.saveToFiles(file);
   }
 
   void _copyLink() {
@@ -1246,6 +1185,98 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
       ),
     );
   }
+
+  Future<void> _openLinkSheet() async {
+    HapticFeedback.mediumImpact();
+    final items = <(String, IconData, StoryLinkTarget)>[
+      ('Post on X', CupertinoIcons.chat_bubble_text_fill, StoryLinkTarget.x),
+      ('WhatsApp', CupertinoIcons.chat_bubble_fill, StoryLinkTarget.whatsapp),
+      ('Telegram', CupertinoIcons.paperplane_fill, StoryLinkTarget.telegram),
+      ('Facebook', CupertinoIcons.share, StoryLinkTarget.facebook),
+      ('LinkedIn', CupertinoIcons.briefcase_fill, StoryLinkTarget.linkedin),
+      ('Reddit', CupertinoIcons.news_solid, StoryLinkTarget.reddit),
+      ('Pinterest', CupertinoIcons.pin_fill, StoryLinkTarget.pinterest),
+      ('Messages', CupertinoIcons.text_bubble_fill, StoryLinkTarget.sms),
+      ('Email', CupertinoIcons.mail_solid, StoryLinkTarget.email),
+    ];
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (ctx) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xD91C1C1E),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.12), width: 0.6)),
+          ),
+          padding: EdgeInsets.fromLTRB(16, 14, 16, math.max(16, MediaQuery.paddingOf(ctx).bottom + 8)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 36, height: 4.5, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(3)))),
+              const SizedBox(height: 14),
+              const Text('Share link', style: TextStyle(fontFamily: 'SF Pro Display', fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white)),
+              const SizedBox(height: 2),
+              Text(widget.content.shareUrl, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'SF Pro', fontSize: 12.5, color: Colors.white.withValues(alpha: 0.55))),
+              const SizedBox(height: 12),
+              Flexible(
+                child: GridView.count(
+                  shrinkWrap: true,
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 1.45,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    for (final it in items)
+                      GestureDetector(
+                        onTap: () async {
+                          HapticFeedback.lightImpact();
+                          Navigator.pop(ctx);
+                          final ok = await StorySharingService.shareLink(it.$3, text: widget.content.shareText, url: widget.content.shareUrl);
+                          if (!ok && mounted) appleToast(context, 'Could not open ${it.$1}');
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(16)),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(it.$2, color: Colors.white, size: 22),
+                              const SizedBox(height: 6),
+                              Text(it.$1, style: const TextStyle(fontFamily: 'SF Pro', fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<ShareDestination> _destinations() => [
+        ShareDestination(label: 'Story', icon: Icons.camera_alt_rounded, colors: const [Color(0xFF833AB4), Color(0xFFFD1D1D), Color(0xFFFCB045)], onTap: () => _share(StoryShareTarget.instagram)),
+        ShareDestination(label: 'Instagram', icon: Icons.photo_camera_back_rounded, colors: const [Color(0xFFF58529), Color(0xFFDD2A7B)], onTap: () => _share(StoryShareTarget.instagramPost)),
+        ShareDestination(label: 'WhatsApp', icon: Icons.chat_rounded, colors: const [Color(0xFF2EE66F), Color(0xFF128C7E)], onTap: () => _share(StoryShareTarget.whatsapp)),
+        ShareDestination(label: 'X', icon: Icons.close_rounded, textGlyph: 'X', colors: const [Color(0xFF2B2B2E), Color(0xFF000000)], onTap: () => _share(StoryShareTarget.twitter)),
+        ShareDestination(label: 'Snapchat', icon: Icons.emoji_emotions_rounded, colors: const [Color(0xFFFFFC00), Color(0xFFFFD60A)], glyph: Colors.black, onTap: () => _share(StoryShareTarget.snapchat)),
+        ShareDestination(label: 'Facebook', icon: Icons.facebook_rounded, colors: const [Color(0xFF2B8CFF), Color(0xFF1877F2)], onTap: () => _share(StoryShareTarget.facebook)),
+        ShareDestination(label: 'Telegram', icon: Icons.send_rounded, colors: const [Color(0xFF37AEE2), Color(0xFF1E96C8)], onTap: () => _share(StoryShareTarget.telegram)),
+        ShareDestination(label: 'Messenger', icon: Icons.bolt_rounded, colors: const [Color(0xFF00B2FF), Color(0xFF006AFF)], onTap: () => _share(StoryShareTarget.messenger)),
+        ShareDestination(label: 'Threads', icon: Icons.alternate_email_rounded, colors: const [Color(0xFF3A3A3C), Color(0xFF111111)], onTap: () => _share(StoryShareTarget.threads)),
+        ShareDestination(label: 'Share link', icon: CupertinoIcons.link_circle_fill, colors: const [Color(0xFF5E5CE6), Color(0xFF3634A3)], onTap: _openLinkSheet),
+        ShareDestination(label: 'Save', icon: CupertinoIcons.arrow_down_to_line, colors: const [Color(0xFF4A4A4F), Color(0xFF2C2C2E)], onTap: _saveToGallery),
+        ShareDestination(label: 'Files', icon: CupertinoIcons.folder_fill, colors: const [Color(0xFF4A4A4F), Color(0xFF2C2C2E)], onTap: _saveToFiles),
+        ShareDestination(label: 'Copy link', icon: CupertinoIcons.link, colors: const [Color(0xFF4A4A4F), Color(0xFF2C2C2E)], onTap: _copyLink),
+        ShareDestination(label: 'More', icon: CupertinoIcons.share, colors: const [Color(0xFFFF4D6D), Color(0xFFE11D48)], onTap: () => _share(StoryShareTarget.system)),
+      ];
 
   double _pageValue() {
     if (_pageController.hasClients && _pageController.position.haveDimensions) {
@@ -1275,56 +1306,27 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Add to Story',
-                  style: TextStyle(
-                    fontFamily: 'SF Pro Display',
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                    color: Colors.white,
-                  ),
-                ),
-                Text(
-                  widget.content.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'SF Pro Text',
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.62),
-                  ),
-                ),
+                const Text('Share', style: TextStyle(fontFamily: 'SF Pro Display', fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: Colors.white)),
+                Text(widget.content.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontFamily: 'SF Pro Text', fontSize: 12.5, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.62))),
               ],
             ),
           ),
-          if (_isExporting) ...[
-            const CupertinoActivityIndicator(color: Colors.white, radius: 9),
-            const SizedBox(width: 10),
-          ],
+          if (_isExporting) ...[const CupertinoActivityIndicator(color: Colors.white, radius: 9), const SizedBox(width: 10)],
           const ZenifyStoryBrand(iconSize: 15),
         ],
       ),
     );
   }
 
-  Widget _dots() {
+  Widget _info() {
+    final v = _visible;
+    final i = math.max(0, v.indexOf(_currentTemplate));
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        for (final t in _availableTemplates)
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            margin: const EdgeInsets.symmetric(horizontal: 2.5),
-            width: t.id == _currentTemplate.id ? 16 : 5,
-            height: 5,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(3),
-              color: Colors.white.withValues(alpha: t.id == _currentTemplate.id ? 0.95 : 0.30),
-            ),
-          ),
+        Text(_currentTemplate.name, style: ZenType.text(13.5, Colors.white, weight: FontWeight.w700)),
+        const SizedBox(width: 8),
+        Text('${_currentTemplate.caption}  ·  ${i + 1}/${v.length}', style: ZenType.text(12, Colors.white.withValues(alpha: 0.55), weight: FontWeight.w600)),
       ],
     );
   }
@@ -1333,35 +1335,27 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.paddingOf(context).top;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final visible = _visible;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0B0D),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Living liquid backdrop tinted by the artwork — gives the glass
-          // controls real colour to refract.
-          ArtMeshBackground(
-            coverUrl: widget.content.coverUrl,
-            palette: _palette,
-            style: StoryBackgroundStyle.artMesh,
-            animate: true,
-          ),
+          ArtMeshBackground(coverUrl: widget.content.coverUrl, palette: _palette, style: StoryBackgroundStyle.liquid, animate: true),
           ColoredBox(color: Colors.black.withValues(alpha: 0.38)),
-
           Column(
             children: [
               _topBar(safeTop),
-
-              // ── Story preview pager with depth ──
               Expanded(
                 child: PageView.builder(
+                  key: ValueKey(_skinFilter),
                   controller: _pageController,
                   physics: const BouncingScrollPhysics(),
-                  itemCount: _availableTemplates.length,
+                  itemCount: visible.length,
                   onPageChanged: _onPageChanged,
                   itemBuilder: (context, index) {
-                    final template = _availableTemplates[index];
+                    final template = visible[index];
                     return AnimatedBuilder(
                       animation: _pageController,
                       builder: (context, child) {
@@ -1373,28 +1367,20 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
                             transform: Matrix4.identity()
                               ..setEntry(3, 2, 0.0012)
                               ..rotateY(-d * 0.38),
-                            child: Transform.scale(
-                              scale: 1 - d.abs() * 0.1,
-                              child: child,
-                            ),
+                            child: Transform.scale(scale: 1 - d.abs() * 0.1, child: child),
                           ),
                         );
                       },
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
                         child: Center(
-                          child: Bob(
-                            dy: 3,
-                            seconds: 8,
-                            child: StoryCardPreview(
-                              boundaryKey: _keyForTemplate(template.id),
-                              content: widget.content,
-                              template: template,
-                              palette: _palette,
-                              backgroundStyle: _backgroundStyle,
-                              textPolarity: _textPolarity,
-                              aspectRatio: _aspectRatio,
-                            ),
+                          child: StoryCardPreview(
+                            boundaryKey: _keyForTemplate(template.id),
+                            content: widget.content,
+                            template: template,
+                            palette: _palette,
+                            backgroundStyle: _backgroundStyle,
+                            textPolarity: _textPolarity,
                           ),
                         ),
                       ),
@@ -1402,34 +1388,21 @@ class _StoryPreviewScreenState extends State<StoryPreviewScreen> {
                   },
                 ),
               ),
-
-              _dots(),
+              _info(),
+              const SizedBox(height: 10),
+              StorySkinFilter(skins: _skinsPresent, selected: _skinFilter, onSelected: _onSkinFilter),
+              const SizedBox(height: 10),
+              StoryTemplateSelector(templates: visible, selectedTemplate: _currentTemplate, onSelectTemplate: _onTemplateSelected),
               const SizedBox(height: 12),
-
-              StoryTemplateSelector(
-                templates: _availableTemplates,
-                selectedTemplate: _currentTemplate,
-                onSelectTemplate: _onTemplateSelected,
-              ),
-
-              const SizedBox(height: 14),
-
               Padding(
-                padding: EdgeInsets.only(bottom: math.max(14, safeBottom + 8)),
+                padding: EdgeInsets.only(bottom: math.max(12, safeBottom + 6)),
                 child: StoryShareControls(
-                  aspectRatio: _aspectRatio,
                   backgroundStyle: _backgroundStyle,
                   textPolarity: _textPolarity,
-                  onToggleAspectRatio: _toggleAspectRatio,
+                  lockPolarity: _currentTemplate.skin.locksPolarity,
                   onToggleBackgroundStyle: _toggleBackgroundStyle,
                   onToggleTextPolarity: _toggleTextPolarity,
-                  onShareInstagram: _shareInstagram,
-                  onShareFacebook: _shareFacebook,
-                  onShareWhatsApp: _shareWhatsApp,
-                  onShareSnapchat: _shareSnapchat,
-                  onShareMore: _shareMore,
-                  onSaveGallery: _saveToGallery,
-                  onCopyLink: _copyLink,
+                  destinations: _destinations(),
                   isExporting: _isExporting,
                 ),
               ),

@@ -13,6 +13,7 @@ import '../../models/track.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
+import '../../services/lyrics_service.dart';
 import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
 import '../../views/details/album_screen.dart';
@@ -547,20 +548,33 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
 
     // Build Action Menu Rows
     final List<ZenDropdownItem> rows = [
-      // 1. Add to Story
-      ZenDropdownItem(
-        title: 'Add to Story',
-        icon: CupertinoIcons.sparkles,
-        onTap: () {
-          Navigator.of(context).pop();
-          if (widget.callerContext.mounted) {
-            StoryOptionsSheet.show(
-              context: widget.callerContext,
-              track: effectiveTrack,
-            );
-          }
-        },
-      ),
+      // 1. Share Lyrics (when lyrics are available for the song)
+      if (player != null && (player.hasLyrics || player.currentTrack?.id == effectiveTrack.id))
+        ZenDropdownItem(
+          title: 'Share Lyrics',
+          icon: CupertinoIcons.paperplane_fill,
+          onTap: () {
+            Navigator.of(context).pop();
+            final p = player;
+            final lyricsRes = (p != null && p.hasLyrics)
+                ? LyricsResult(
+                    lines: p.lyricsLines,
+                    synced: p.lyricsSynced,
+                    source: 'current',
+                  )
+                : null;
+            if (widget.callerContext.mounted) {
+              Navigator.of(widget.callerContext).push(
+                CupertinoPageRoute(
+                  builder: (_) => LyricsSelectionScreen(
+                    track: effectiveTrack,
+                    lyrics: lyricsRes,
+                  ),
+                ),
+              );
+            }
+          },
+        ),
       // 2. Play next
       ZenDropdownItem(
         title: 'Play next',
@@ -819,7 +833,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                     ),
                     // Stories (Instagram / Social Story)
                     _QuickShareBtn(
-                      icon: CupertinoIcons.sparkles,
+                      icon: CupertinoIcons.paperplane_fill,
                       label: 'Stories',
                       gradient: const LinearGradient(
                         begin: Alignment.bottomLeft,
@@ -857,7 +871,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                     ),
                     // Facebook Stories
                     _QuickShareBtn(
-                      icon: CupertinoIcons.share,
+                      icon: CupertinoIcons.paperplane_fill,
                       label: 'Facebook',
                       color: const Color(0xFF1877F2),
                       onTap: () {
@@ -1220,7 +1234,7 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                           },
                         ),
                         _QuickShareBtn(
-                          icon: CupertinoIcons.sparkles,
+                          icon: CupertinoIcons.paperplane_fill,
                           label: 'Stories',
                           gradient: const LinearGradient(
                             begin: Alignment.bottomLeft,
@@ -1233,7 +1247,7 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                           },
                         ),
                         _QuickShareBtn(
-                          icon: CupertinoIcons.share,
+                          icon: CupertinoIcons.paperplane_fill,
                           label: 'Share',
                           color: const Color(0xFF1877F2),
                           onTap: () {

@@ -204,6 +204,7 @@ class SearchParser {
         }
       }
     } catch (e, stack) {
+      print('[SearchParser] Error parsing native summaries: $e\n$stack');
       if (kDebugMode) debugPrint('[SearchParser] Error parsing native summaries: $e\n$stack');
     }
 

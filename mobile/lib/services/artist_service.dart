@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 
 import '../models/track.dart';
 import '../utils/media_normalizer.dart';
-import 'api_service.dart';
 import 'innertube_service.dart';
 
 typedef YTArtistCard = ({String name, String? browseId, String? audience, String? thumb});
@@ -141,75 +140,6 @@ class ArtistService {
     return null;
   }
 
-  Future<Map<String, dynamic>?> _fetchCloud(String cleanName) async {
-    try {
-      // 1. Fetch full artist catalog from backend (JioSaavn + Deezer + local DB)
-      final backendArtist = await ApiService.getArtist(cleanName).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => null,
-      );
-
-      // 2. Concurrently fetch Wikipedia summary extract & link if bio is missing
-      final wiki = await ApiService.fetchWikipediaSummary(cleanName).timeout(
-        const Duration(seconds: 2),
-        onTimeout: () => null,
-      );
-
-      if (backendArtist != null && (backendArtist['topSongs'] is List || backendArtist['albums'] is List)) {
-        var bio = (backendArtist['bio'] as String?)?.trim() ?? '';
-        if (wiki != null && wiki.extract.isNotEmpty && bio.isEmpty) {
-          bio = '${wiki.extract}\n\nFrom Wikipedia (${wiki.url ?? 'https://en.wikipedia.org/wiki/${Uri.encodeComponent(cleanName)}'})';
-        } else if (bio.isEmpty) {
-          bio = 'Official verified artist profile for $cleanName on Zenify. Stream all top popular songs, latest releases, complete discography, and video songs.';
-        }
-
-        return {
-          ...backendArtist,
-          'bio': bio,
-          'wikiUrl': wiki?.url,
-          'wikiImage': wiki?.imageUrl,
-        };
-      }
-
-      // If backend fails, fallback to search tracks
-      final cloudTracks = await ApiService.search(cleanName)
-          .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
-      if (cloudTracks.isEmpty) return null;
-      final first = cloudTracks.first;
-
-      final albumsMap = <String, Map<String, dynamic>>{};
-      for (final t in cloudTracks) {
-        if (t.album.isNotEmpty && t.album != 'Single' && !albumsMap.containsKey(t.album)) {
-          albumsMap[t.album] = {
-            'title': t.album,
-            'coverUrl': t.coverUrl,
-            'year': '',
-          };
-        }
-      }
-
-      var bio = 'Official verified artist profile for $cleanName on Zenify.';
-      if (wiki != null && wiki.extract.isNotEmpty) {
-        bio = '${wiki.extract}\n\nFrom Wikipedia (${wiki.url ?? 'https://en.wikipedia.org/wiki/${Uri.encodeComponent(cleanName)}'})';
-      }
-
-      return {
-        'name': cleanName,
-        'imageUrl': wiki?.imageUrl ?? first.coverUrl,
-        'coverUrl': first.coverUrl,
-        'bio': bio,
-        'follower_count': 5000000,
-        'topSongs': cloudTracks.map((t) => t.toJson()).toList(),
-        'albums': albumsMap.values.toList(),
-        'singles': <Map<String, dynamic>>[],
-        'dedicatedPlaylists': <Map<String, dynamic>>[],
-        'relatedArtists': <Map<String, dynamic>>[],
-      };
-    } catch (_) {
-      return null;
-    }
-  }
-
   Future<ArtistProfile?> getArtist(String artistName, {String? browseId, bool forceRefresh = false}) async {
     final cleanName = artistName.trim();
     if (cleanName.isEmpty) return null;
@@ -249,297 +179,152 @@ class ArtistService {
     try {
       final isValidYtBrowseId = browseId != null &&
           (browseId.startsWith('UC') || browseId.startsWith('FEmusic_') || browseId.startsWith('MPREb_'));
-      String? targetBrowseId = isValidYtBrowseId ? browseId : null;
-      YTArtistCard? ytCard;
+      final targetBrowseId = isValidYtBrowseId ? browseId : '';
 
-      // 1. PRIMARY: Fetch canonical rich catalog from Zenify backend (JioSaavn + Deezer + Apple Music)
-      // This guarantees 100% genuine artist profile picture, real bio, verified follower counts,
-      // full albums, singles/EPs, latest release, and pristine 320kbps top songs!
-      final cloudData = await _fetchCloud(cleanName);
-      if (cloudData != null && (cloudData['topSongs'] is List || cloudData['albums'] is List)) {
-        final name = cloudData['name'] ?? cleanName;
-        final rawImage = (cloudData['imageUrl'] ?? cloudData['coverUrl'])?.toString();
-        final imageUrl = (rawImage != null && rawImage.isNotEmpty)
-            ? MediaNormalizer.upgradeArtworkUrl(rawImage, isArtistAvatar: true)
-            : '';
-        final rawCover = (cloudData['coverUrl'] ?? rawImage)?.toString();
-        final coverUrl = (rawCover != null && rawCover.isNotEmpty)
-            ? MediaNormalizer.upgradeBannerUrl(rawCover)
-            : '';
-        final bio = (cloudData['bio'] as String?) ??
-            'Official verified artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, singles, and video songs.';
-        final followerCount = cloudData['follower_count'] ?? cloudData['fan_count'];
-        final subscriberCount = followerCount != null
-            ? '${_formatNumber(followerCount)} monthly listeners'
-            : 'Top Artist';
-
-        final topSongs = <Track>[];
-        if (cloudData['topSongs'] is List) {
-          for (final item in (cloudData['topSongs'] as List)) {
-            if (item is Map) {
-              try {
-                topSongs.add(Track.fromJson(Map<String, dynamic>.from(item), baseUrl: ApiService.liveCloudUrl));
-              } catch (_) {}
-            }
-          }
-        }
-
-        final albums = <ArtistReleaseItem>[];
-        if (cloudData['albums'] is List) {
-          for (final item in (cloudData['albums'] as List)) {
-            final title = item['title'] ?? item['name'] ?? 'Album';
-            final year = (item['year'] ?? item['releaseDate'] ?? '').toString().split('-').first;
-            final cover = item['coverUrl'] ?? item['imageUrl'] ?? '';
-            final bId = item['id']?.toString() ?? item['browseId']?.toString();
-            albums.add(ArtistReleaseItem(
-              title: title,
-              year: year,
-              type: 'Album',
-              coverUrl: cover,
-              browseId: bId,
-            ));
-          }
-        }
-
-        final singles = <ArtistReleaseItem>[];
-        if (cloudData['singles'] is List) {
-          for (final item in (cloudData['singles'] as List)) {
-            final title = item['title'] ?? item['name'] ?? 'Single';
-            final year = (item['year'] ?? item['releaseDate'] ?? '').toString().split('-').first;
-            final cover = item['coverUrl'] ?? item['imageUrl'] ?? '';
-            final bId = item['id']?.toString() ?? item['browseId']?.toString();
-            singles.add(ArtistReleaseItem(
-              title: title,
-              year: year,
-              type: 'Single',
-              coverUrl: cover,
-              browseId: bId,
-            ));
-          }
-        }
-
-        final playlists = <ArtistPlaylistItem>[];
-        final rawPls = cloudData['dedicatedPlaylists'] ?? cloudData['playlists'];
-        if (rawPls is List) {
-          for (final item in rawPls) {
-            playlists.add(ArtistPlaylistItem(
-              title: item['title'] ?? item['name'] ?? 'Playlist',
-              coverUrl: item['coverUrl'] ?? item['imageUrl'] ?? '',
-              browseId: item['id']?.toString() ?? item['browseId']?.toString(),
-            ));
-          }
-        }
-
-        final related = <RelatedArtistItem>[];
-        if (cloudData['relatedArtists'] is List) {
-          for (final item in (cloudData['relatedArtists'] as List)) {
-            related.add(RelatedArtistItem(
-              name: item['name'] ?? 'Artist',
-              imageUrl: item['imageUrl'] ?? '',
-              browseId: item['id']?.toString() ?? item['browseId']?.toString(),
-            ));
-          }
-        }
-
-        final musicVideos = <Track>[];
-        if (cloudData['musicVideos'] is List) {
-          for (final item in (cloudData['musicVideos'] as List)) {
-            if (item is Map) {
-              try {
-                musicVideos.add(Track.fromJson(Map<String, dynamic>.from(item), baseUrl: ApiService.liveCloudUrl));
-              } catch (_) {}
-            }
-          }
-        }
-        if (musicVideos.isEmpty) {
-          try {
-            final vids = await InnerTubeService.instance.searchVideos('$name music video');
-            musicVideos.addAll(vids.take(12));
-          } catch (_) {}
-        }
-
-        final profile = ArtistProfile(
-          name: name,
-          imageUrl: imageUrl,
-          coverUrl: coverUrl.isNotEmpty ? coverUrl : imageUrl,
-          bio: bio,
-          subscriberCount: subscriberCount,
-          monthlyAudience: subscriberCount,
-          isVerified: cloudData['isVerified'] ?? true,
-          topSongs: topSongs,
-          albums: albums,
-          singles: singles,
-          featuredPlaylists: playlists,
-          relatedArtists: related,
-          musicVideos: musicVideos,
-        );
-
-        storeCache(profile, const Duration(hours: 12));
-        return profile;
-      }
-
-      // 2. Resolve artist via YouTube Music InnerTube if cloud didn't have discography
-      Map<String, dynamic>? ytChannel = await InnerTubeService.instance.getArtistChannel(
-        targetBrowseId ?? '',
+      // 1. Resolve artist channel via native InnerTube (YouTube Music)
+      final ytChannel = await InnerTubeService.instance.getArtistChannel(
+        targetBrowseId,
         artistName: cleanName,
       );
 
-      if (ytChannel == null && (targetBrowseId == null || targetBrowseId.isEmpty)) {
-        ytCard = await InnerTubeService.instance.searchArtist(cleanName);
-        targetBrowseId = ytCard?.browseId;
-        if (targetBrowseId != null && targetBrowseId.isNotEmpty) {
-          ytChannel = await InnerTubeService.instance.getArtistChannel(
-            targetBrowseId,
-            artistName: cleanName,
-          );
+      final topSongs = <Track>[];
+      final albums = <ArtistReleaseItem>[];
+      final singles = <ArtistReleaseItem>[];
+      final playlists = <ArtistPlaylistItem>[];
+      final related = <RelatedArtistItem>[];
+      final musicVideos = <Track>[];
+
+      String name = cleanName;
+      String imageUrl = '';
+      String coverUrl = '';
+      String bio = '';
+      String subscriberCount = 'Verified Artist';
+      String? monthlyAudience;
+
+      if (ytChannel != null) {
+        name = (ytChannel['name'] as String?)?.isNotEmpty == true ? ytChannel['name'] : cleanName;
+        final rawThumb = (ytChannel['thumb'] ?? ytChannel['imageUrl']) as String?;
+        final rawBanner = (ytChannel['banner'] ?? ytChannel['coverUrl'] ?? rawThumb) as String?;
+
+        imageUrl = rawThumb != null && rawThumb.isNotEmpty
+            ? MediaNormalizer.upgradeArtworkUrl(rawThumb, isArtistAvatar: true)
+            : '';
+        coverUrl = rawBanner != null && rawBanner.isNotEmpty
+            ? MediaNormalizer.upgradeBannerUrl(rawBanner)
+            : imageUrl;
+
+        bio = (ytChannel['bio'] as String?)?.trim() ?? '';
+        final subs = (ytChannel['subscriberCount'] as String?)?.trim();
+        final monthly = (ytChannel['monthlyListenerCount'] as String?)?.trim();
+
+        if (monthly != null && monthly.isNotEmpty) {
+          monthlyAudience = monthly;
+          subscriberCount = monthly;
+        } else if (subs != null && subs.isNotEmpty) {
+          subscriberCount = subs;
+        }
+
+        if (ytChannel['topSongs'] is List) {
+          topSongs.addAll((ytChannel['topSongs'] as List).whereType<Track>());
+        }
+
+        if (ytChannel['albums'] is List) {
+          for (final item in (ytChannel['albums'] as List)) {
+            if (item is Map) {
+              albums.add(ArtistReleaseItem(
+                title: item['title'] ?? 'Album',
+                year: (item['year'] ?? '').toString(),
+                type: 'Album',
+                coverUrl: item['coverUrl'] ?? '',
+                browseId: item['browseId']?.toString(),
+              ));
+            }
+          }
+        }
+
+        if (ytChannel['singles'] is List) {
+          for (final item in (ytChannel['singles'] as List)) {
+            if (item is Map) {
+              singles.add(ArtistReleaseItem(
+                title: item['title'] ?? 'Single',
+                year: (item['year'] ?? '').toString(),
+                type: 'Single',
+                coverUrl: item['coverUrl'] ?? '',
+                browseId: item['browseId']?.toString(),
+              ));
+            }
+          }
+        }
+
+        if (ytChannel['playlists'] is List) {
+          for (final item in (ytChannel['playlists'] as List)) {
+            if (item is Map) {
+              playlists.add(ArtistPlaylistItem(
+                title: item['title'] ?? 'Playlist',
+                coverUrl: item['coverUrl'] ?? '',
+                browseId: item['browseId']?.toString(),
+              ));
+            }
+          }
+        }
+
+        if (ytChannel['related'] is List) {
+          for (final item in (ytChannel['related'] as List)) {
+            if (item is Map) {
+              related.add(RelatedArtistItem(
+                name: item['name'] ?? 'Artist',
+                imageUrl: item['imageUrl'] ?? '',
+                subs: item['subs']?.toString(),
+                browseId: item['browseId']?.toString(),
+              ));
+            }
+          }
+        }
+
+        if (ytChannel['videos'] is List) {
+          musicVideos.addAll((ytChannel['videos'] as List).whereType<Track>());
         }
       }
 
-      // If YouTube Music channel found, build 100% from pristine YouTube Music
-      if (ytChannel != null) {
-        final name = (ytChannel['name'] as String?)?.isNotEmpty == true
-            ? ytChannel['name'] as String
-            : (ytCard?.name ?? cleanName);
-
-        final channelThumb = ytChannel['thumb'] as String?;
-        final channelBanner = ytChannel['banner'] as String?;
-        final rawImage = (channelThumb != null && channelThumb.isNotEmpty)
-            ? channelThumb
-            : ytCard?.thumb;
-
-        final imageUrl = (rawImage != null && rawImage.isNotEmpty)
-            ? MediaNormalizer.upgradeArtworkUrl(rawImage, isArtistAvatar: true)
-            : '';
-
-        final coverUrl = (channelBanner != null && channelBanner.isNotEmpty)
-            ? MediaNormalizer.upgradeBannerUrl(channelBanner)
-            : (imageUrl.isNotEmpty ? MediaNormalizer.upgradeBannerUrl(rawImage) : '');
-
-        var bio = (ytChannel['bio'] as String?)?.trim() ?? '';
-        if (bio.isEmpty || bio.startsWith('Official artist profile')) {
-          final wiki = await ApiService.fetchWikipediaSummary(name).timeout(
-            const Duration(seconds: 2),
-            onTimeout: () => null,
-          );
-          if (wiki != null && wiki.extract.isNotEmpty) {
-            bio = '${wiki.extract}\n\nFrom Wikipedia (${wiki.url ?? 'https://en.wikipedia.org/wiki/${Uri.encodeComponent(name)}'})';
-          } else if (bio.isEmpty) {
-            bio = 'Official verified artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, and singles.';
-          }
-        }
-
-        final subscriberCount = (ytChannel['subscriberCount'] as String?) ??
-            ytCard?.audience ??
-            'Top Artist';
-
-        final monthlyAudience = (ytChannel['monthlyListenerCount'] as String?) ??
-            ytCard?.audience ??
-            subscriberCount;
-
-        // Top Songs (YouTube Music tracks)
-        final topSongs = <Track>[];
-        final ytSongs = (ytChannel['topSongs'] as List<Track>?) ?? [];
-        if (ytSongs.isNotEmpty) {
-          topSongs.addAll(ytSongs);
-        } else {
-          try {
-            final searchTracks = await InnerTubeService.instance.search(cleanName);
-            topSongs.addAll(searchTracks.take(15));
-          } catch (_) {}
-          if (topSongs.isEmpty) {
-            final cloudFallback = await _fetchCloud(cleanName);
-            if (cloudFallback != null && cloudFallback['topSongs'] is List) {
-              for (final item in (cloudFallback['topSongs'] as List)) {
-                if (item is Map) {
-                  try {
-                    topSongs.add(Track.fromJson(Map<String, dynamic>.from(item), baseUrl: ApiService.liveCloudUrl));
-                  } catch (_) {}
-                }
-              }
-            }
-          }
-        }
-
-        // Albums (YouTube Music releases)
-        final albums = <ArtistReleaseItem>[];
-        if (ytChannel['albums'] is List) {
-          for (final item in (ytChannel['albums'] as List)) {
-            albums.add(ArtistReleaseItem(
-              title: item['title'] ?? 'Album',
-              year: item['year'] ?? '',
-              type: 'Album',
-              coverUrl: item['coverUrl'] ?? '',
-              browseId: item['browseId'],
-            ));
-          }
-        }
-        if (albums.isEmpty) {
-          final cloudFallback = await _fetchCloud(cleanName);
-          if (cloudFallback != null && cloudFallback['albums'] is List) {
-            for (final item in (cloudFallback['albums'] as List)) {
-              if (item is Map) {
-                albums.add(ArtistReleaseItem(
-                  title: (item['title'] ?? item['name'] ?? 'Album').toString(),
-                  year: (item['year'] ?? '').toString(),
-                  type: 'Album',
-                  coverUrl: (item['coverUrl'] ?? item['imageUrl'] ?? '').toString(),
-                  browseId: item['browseId']?.toString(),
-                ));
-              }
-            }
-          }
-        }
-
-        // Singles
-        final singles = <ArtistReleaseItem>[];
-        if (ytChannel['singles'] is List) {
-          for (final item in (ytChannel['singles'] as List)) {
-            singles.add(ArtistReleaseItem(
-              title: item['title'] ?? 'Single',
-              year: item['year'] ?? '',
-              type: 'Single',
-              coverUrl: item['coverUrl'] ?? '',
-              browseId: item['browseId'],
-            ));
-          }
-        }
-
-        // Featured Playlists
-        final playlists = <ArtistPlaylistItem>[];
-        if (ytChannel['playlists'] is List) {
-          for (final item in (ytChannel['playlists'] as List)) {
-            playlists.add(ArtistPlaylistItem(
-              title: item['title'] ?? 'Playlist',
-              coverUrl: item['coverUrl'] ?? '',
-              browseId: item['browseId'],
-            ));
-          }
-        }
-
-        // Related Artists
-        final related = <RelatedArtistItem>[];
-        if (ytChannel['related'] is List) {
-          for (final item in (ytChannel['related'] as List)) {
-            related.add(RelatedArtistItem(
-              name: item['name'] ?? 'Artist',
-              subs: item['subs'],
-              imageUrl: item['imageUrl'] ?? '',
-              browseId: item['browseId'],
-            ));
-          }
-        }
-
-        // Music Videos
-        final musicVideos = <Track>[];
+      // If topSongs is empty, fetch via InnerTube search directly
+      if (topSongs.isEmpty) {
         try {
-          final vids = await InnerTubeService.instance.searchVideos('$name music video');
-          musicVideos.addAll(vids.take(12));
+          final searchedSongs = await InnerTubeService.instance.search('$cleanName songs');
+          final lower = cleanName.toLowerCase();
+          for (final s in searchedSongs) {
+            if (s.artist.toLowerCase().contains(lower) || topSongs.length < 5) {
+              topSongs.add(s);
+            }
+            if (topSongs.length >= 25) break;
+          }
         } catch (_) {}
+      }
 
+      // If albums are empty, search albums via InnerTube
+      if (albums.isEmpty && singles.isEmpty) {
+        try {
+          final searchedAlbums = await InnerTubeService.instance.searchAlbumsNative(cleanName);
+          for (final alb in searchedAlbums) {
+            albums.add(ArtistReleaseItem(
+              title: alb['title']?.toString() ?? 'Album',
+              year: alb['year']?.toString() ?? '',
+              type: 'Album',
+              coverUrl: (alb['coverUrl'] ?? alb['thumbnail'])?.toString() ?? '',
+              browseId: (alb['browseId'] ?? alb['id'])?.toString(),
+            ));
+          }
+        } catch (_) {}
+      }
+
+      if (bio.isEmpty) {
+        bio = 'Official verified artist profile for $name on Zenify. Explore top popular tracks, complete discography, albums, singles, and video songs.';
+      }
+
+      if (topSongs.isNotEmpty || albums.isNotEmpty) {
         final profile = ArtistProfile(
           name: name,
-          imageUrl: imageUrl,
-          coverUrl: coverUrl.isNotEmpty ? coverUrl : imageUrl,
+          imageUrl: imageUrl.isNotEmpty ? imageUrl : (topSongs.isNotEmpty ? topSongs.first.coverUrl : ''),
+          coverUrl: coverUrl.isNotEmpty ? coverUrl : (topSongs.isNotEmpty ? topSongs.first.coverUrl : ''),
           bio: bio,
           subscriberCount: subscriberCount,
           monthlyAudience: monthlyAudience,
@@ -555,56 +340,11 @@ class ArtistService {
         storeCache(profile, const Duration(hours: 12));
         return profile;
       }
-
-      // If channel not found but card was returned, build artist profile from card + YouTube search
-      if (ytCard != null) {
-        final ytSongs = await InnerTubeService.instance.search(cleanName);
-        final musicVideos = <Track>[];
-        try {
-          final vids = await InnerTubeService.instance.searchVideos('$cleanName music video');
-          musicVideos.addAll(vids.take(12));
-        } catch (_) {}
-        final img = ytCard.thumb != null ? upgradeArtworkUrl(ytCard.thumb!) : '';
-        final profile = ArtistProfile(
-          name: ytCard.name,
-          imageUrl: img,
-          coverUrl: img,
-          bio: 'Official artist profile for ${ytCard.name} on Zenify.',
-          subscriberCount: ytCard.audience ?? 'Top Artist',
-          monthlyAudience: ytCard.audience,
-          isVerified: true,
-          topSongs: ytSongs,
-          albums: const [],
-          singles: const [],
-          featuredPlaylists: const [],
-          relatedArtists: const [],
-          musicVideos: musicVideos,
-        );
-        storeCache(profile, const Duration(hours: 6));
-        return profile;
-      }
-
-      return null;
     } catch (e) {
-      if (kDebugMode) debugPrint('[ArtistService] getArtist error: $e');
-      return null;
+      if (kDebugMode) debugPrint('[ArtistService] Error loading artist: $e');
     }
+    return null;
   }
 
-  static String _formatNumber(dynamic n) {
-    if (n is! num) {
-      final parsed = int.tryParse(n?.toString().replaceAll(RegExp(r'[^0-9]'), '') ?? '');
-      if (parsed != null) {
-        n = parsed;
-      } else {
-        return n?.toString() ?? '';
-      }
-    }
-    final num numVal = n;
-    if (numVal >= 10000000) return '${(numVal / 10000000).toStringAsFixed(1)} Cr';
-    if (numVal >= 1000000) return '${(numVal / 1000000).toStringAsFixed(1)}M';
-    if (numVal >= 1000) return '${(numVal / 1000).toStringAsFixed(1)}K';
-    return numVal.toString();
-  }
+
 }
-

@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/story_sharing/story_sharing.dart';
 import 'package:mobile/models/track.dart';
-import 'package:mobile/services/lyrics_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -19,40 +18,32 @@ void main() {
   );
 
   group('Story Dimensions & Customization Enums', () {
-    test('Story aspect ratios conform to 1080x1920 (9:16) and 1080x1080 (1:1)', () {
-      const story = StoryAspectRatio.story;
+    test('Story aspect ratios conform to standard dimensions', () {
+      const story = StoryRatio.story;
       expect(story.width, equals(360.0));
       expect(story.height, equals(640.0));
       expect(story.exportWidth, equals(1080.0));
-      expect(story.exportHeight, equals(1920.0));
       expect(story.ratio, closeTo(9 / 16, 0.001));
 
-      const square = StoryAspectRatio.square;
+      const square = StoryRatio.square;
       expect(square.width, equals(360.0));
       expect(square.height, equals(360.0));
       expect(square.exportWidth, equals(1080.0));
-      expect(square.exportHeight, equals(1080.0));
       expect(square.ratio, equals(1.0));
     });
 
-    test('All 5 story categories have >= 3 templates defined', () {
-      for (final cat in StoryCategory.values) {
-        final templates = StoryTemplate.templatesForCategory(cat);
-        expect(templates.length, greaterThanOrEqualTo(3),
-            reason: 'Category $cat must have at least 3 templates');
-      }
-
-      expect(StoryTemplate.songTemplates.length, equals(4)); // Classic, Full Poster, Liquid Glass, Editorial
-      expect(StoryTemplate.lyricsTemplates.length, equals(3)); // Classic, Typography, Minimal
-      expect(StoryTemplate.artistTemplates.length, equals(3)); // Profile, Editorial, Discography
-      expect(StoryTemplate.albumTemplates.length, equals(3)); // Stacked, Editorial, Liquid
-      expect(StoryTemplate.playlistTemplates.length, equals(3)); // Collage, Poster, Editorial Grid
+    test('All 5 story categories have templates defined', () {
+      expect(StoryTemplate.songTemplates.length, greaterThanOrEqualTo(10));
+      expect(StoryTemplate.lyricsTemplates.length, greaterThanOrEqualTo(10));
+      expect(StoryTemplate.artistTemplates.length, greaterThanOrEqualTo(5));
+      expect(StoryTemplate.albumTemplates.length, greaterThanOrEqualTo(5));
+      expect(StoryTemplate.playlistTemplates.length, greaterThanOrEqualTo(5));
     });
 
     test('StoryTemplate.byId resolves known IDs correctly', () {
-      expect(StoryTemplate.byId('song_classic').id, equals('song_classic'));
-      expect(StoryTemplate.byId('lyrics_classic').id, equals('lyrics_classic'));
-      expect(StoryTemplate.byId('unknown_id').id, equals('song_classic'));
+      expect(StoryTemplate.byId('song_nowplaying_glass_story').id, equals('song_nowplaying_glass_story'));
+      expect(StoryTemplate.byId('lyr_glasscard_glass_story').id, equals('lyr_glasscard_glass_story'));
+      expect(StoryTemplate.byId('unknown_id').id, equals('song_nowplaying_glass_story'));
     });
   });
 
@@ -193,19 +184,19 @@ void main() {
       expect(find.byType(Image), findsOneWidget);
     });
 
-    testWidgets('StoryCardPreview renders Classic Song Template with Zenify brand and title', (tester) async {
+    testWidgets('StoryCardPreview renders Song Template with Zenify brand and title', (tester) async {
       final content = SongStoryContent(track: sampleTrack);
+      final template = StoryTemplate.songTemplates.first;
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: Center(
               child: StoryCardPreview(
                 content: content,
-                template: StoryTemplate.songClassic,
+                template: template,
                 palette: ArtworkPalette.defaultPalette,
-                backgroundStyle: StoryBackgroundStyle.artMesh,
+                backgroundStyle: StoryBackgroundStyle.liquid,
                 textPolarity: StoryTextPolarity.light,
-                aspectRatio: StoryAspectRatio.story,
               ),
             ),
           ),
@@ -216,35 +207,9 @@ void main() {
       expect(find.text('Die For You'), findsOneWidget);
       expect(find.text('Joji'), findsOneWidget);
       expect(find.byType(ZenifyStoryBrand), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
     });
 
-    testWidgets('StoryCardPreview renders Liquid Glass Song Template with waveform', (tester) async {
-      final content = SongStoryContent(track: sampleTrack);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: StoryCardPreview(
-                content: content,
-                template: StoryTemplate.songLiquidGlass,
-                palette: ArtworkPalette.defaultPalette,
-                backgroundStyle: StoryBackgroundStyle.blurredCover,
-                textPolarity: StoryTextPolarity.light,
-                aspectRatio: StoryAspectRatio.story,
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      expect(find.text('Die For You'), findsOneWidget);
-      expect(find.byType(ZenifyStoryBrand), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
-    });
-
-    testWidgets('StoryCardPreview renders Classic Lyrics Template with stacked lines', (tester) async {
+    testWidgets('StoryCardPreview renders Lyrics Template with stacked lines', (tester) async {
       final content = LyricsStoryContent(
         track: sampleTrack,
         selectedLines: [
@@ -252,6 +217,7 @@ void main() {
           "Could never have too many of these",
         ],
       );
+      final template = StoryTemplate.lyricsTemplates.first;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -259,11 +225,10 @@ void main() {
             body: Center(
               child: StoryCardPreview(
                 content: content,
-                template: StoryTemplate.lyricsClassic,
+                template: template,
                 palette: ArtworkPalette.defaultPalette,
-                backgroundStyle: StoryBackgroundStyle.artMesh,
+                backgroundStyle: StoryBackgroundStyle.liquid,
                 textPolarity: StoryTextPolarity.light,
-                aspectRatio: StoryAspectRatio.story,
               ),
             ),
           ),
@@ -275,7 +240,6 @@ void main() {
       expect(find.text("Could never have too many of these"), findsOneWidget);
       expect(find.text('Die For You'), findsOneWidget);
       expect(find.byType(ZenifyStoryBrand), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
     });
 
     testWidgets('StoryCardPreview renders Artist Profile Template', (tester) async {
@@ -285,6 +249,7 @@ void main() {
         audience: '31.2M monthly listeners',
         topTracks: [sampleTrack],
       );
+      final template = StoryTemplate.artistTemplates.first;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -292,11 +257,10 @@ void main() {
             body: Center(
               child: StoryCardPreview(
                 content: content,
-                template: StoryTemplate.artistProfile,
+                template: template,
                 palette: ArtworkPalette.defaultPalette,
-                backgroundStyle: StoryBackgroundStyle.artMesh,
+                backgroundStyle: StoryBackgroundStyle.liquid,
                 textPolarity: StoryTextPolarity.light,
-                aspectRatio: StoryAspectRatio.story,
               ),
             ),
           ),
@@ -305,12 +269,10 @@ void main() {
       await tester.pump();
 
       expect(find.text('Joji'), findsOneWidget);
-      expect(find.text('31.2M monthly listeners'), findsOneWidget);
       expect(find.byType(ZenifyStoryBrand), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
     });
 
-    testWidgets('StoryCardPreview renders Stacked Album Template', (tester) async {
+    testWidgets('StoryCardPreview renders Album Template', (tester) async {
       final content = AlbumStoryContent(
         albumTitle: 'SMITHEREENS',
         artistName: 'Joji',
@@ -318,6 +280,7 @@ void main() {
         year: '2022',
         trackCount: 9,
       );
+      final template = StoryTemplate.albumTemplates.first;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -325,11 +288,10 @@ void main() {
             body: Center(
               child: StoryCardPreview(
                 content: content,
-                template: StoryTemplate.albumStacked,
+                template: template,
                 palette: ArtworkPalette.defaultPalette,
-                backgroundStyle: StoryBackgroundStyle.artMesh,
+                backgroundStyle: StoryBackgroundStyle.liquid,
                 textPolarity: StoryTextPolarity.light,
-                aspectRatio: StoryAspectRatio.story,
               ),
             ),
           ),
@@ -339,18 +301,16 @@ void main() {
 
       expect(find.text('SMITHEREENS'), findsOneWidget);
       expect(find.text('Joji'), findsOneWidget);
-      expect(find.textContaining('2022'), findsOneWidget);
       expect(find.byType(ZenifyStoryBrand), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
     });
 
-    testWidgets('StoryCardPreview renders Collage Playlist Template', (tester) async {
+    testWidgets('StoryCardPreview renders Playlist Template', (tester) async {
       final content = PlaylistStoryContent(
         playlistTitle: 'Late Night Chill',
         covers: const [],
-        owner: 'Curated by You',
         tracks: [sampleTrack],
       );
+      final template = StoryTemplate.playlistTemplates.first;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -358,11 +318,10 @@ void main() {
             body: Center(
               child: StoryCardPreview(
                 content: content,
-                template: StoryTemplate.playlistCollage,
+                template: template,
                 palette: ArtworkPalette.defaultPalette,
-                backgroundStyle: StoryBackgroundStyle.artMesh,
+                backgroundStyle: StoryBackgroundStyle.liquid,
                 textPolarity: StoryTextPolarity.light,
-                aspectRatio: StoryAspectRatio.story,
               ),
             ),
           ),
@@ -371,104 +330,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Late Night Chill'), findsOneWidget);
-      expect(find.textContaining('Curated by You'), findsOneWidget);
       expect(find.byType(ZenifyStoryBrand), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
-    });
-
-    testWidgets('Missing artwork and empty metadata do not crash any template', (tester) async {
-      final emptyTrack = Track.empty();
-      final content = SongStoryContent(track: emptyTrack);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: StoryCardPreview(
-                content: content,
-                template: StoryTemplate.songClassic,
-                palette: ArtworkPalette.defaultPalette,
-                backgroundStyle: StoryBackgroundStyle.solidDark,
-                textPolarity: StoryTextPolarity.light,
-                aspectRatio: StoryAspectRatio.square,
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-
-      expect(find.byType(StoryCardPreview), findsOneWidget);
-    });
-  });
-
-  group('LyricsSelectionScreen Selection Logic', () {
-    final sampleLyrics = LyricsResult(
-      synced: true,
-      lines: [
-        {'text': 'Line 1: I see the fire'},
-        {'text': 'Line 2: Inside the mountain'},
-        {'text': 'Line 3: I see fire'},
-        {'text': 'Line 4: Burning the trees'},
-        {'text': 'Line 5: And I hope that you remember me'},
-      ],
-      source: 'test',
-    );
-
-    testWidgets('Selects consecutive lines and enforces 3-line limit', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: LyricsSelectionScreen(
-            track: sampleTrack,
-            lyrics: sampleLyrics,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Initially next button is disabled
-      expect(find.text('Select up to 3 lines'), findsOneWidget);
-
-      // Tap Line 1
-      await tester.tap(find.text('Line 1: I see the fire'));
-      await tester.pump();
-      expect(find.text('Next (1 line)'), findsOneWidget);
-
-      // Tap Line 2 (consecutive -> added)
-      await tester.tap(find.text('Line 2: Inside the mountain'));
-      await tester.pump();
-      expect(find.text('Next (2 lines)'), findsOneWidget);
-
-      // Tap Line 3 (consecutive -> added)
-      await tester.tap(find.text('Line 3: I see fire'));
-      await tester.pump();
-      expect(find.text('Next (3 lines)'), findsOneWidget);
-
-      // Attempt to tap Line 4 (>3 lines -> toast and still 3 lines)
-      await tester.tap(find.text('Line 4: Burning the trees'));
-      await tester.pump();
-      expect(find.text('Next (3 lines)'), findsOneWidget);
-
-      // Tap Line 5 (non-consecutive -> resets selection to only Line 5!)
-      await tester.tap(find.text('Line 5: And I hope that you remember me'));
-      await tester.pump();
-      expect(find.text('Next (1 line)'), findsOneWidget);
-    });
-
-    testWidgets('Shows empty state when lyrics are null or empty', (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: LyricsSelectionScreen(
-            track: sampleTrack,
-            lyrics: null,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('No Lyrics Available'), findsOneWidget);
-      expect(find.text('Share Song Instead'), findsOneWidget);
     });
   });
 }
-

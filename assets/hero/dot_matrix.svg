@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="60" viewBox="0 0 800 60" fill="none">
+  <defs>
+    <pattern id="dot_grid" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#FFFFFF" fill-opacity="0.12"/>
+    </pattern>
+    <linearGradient id="fade" x1="0" y1="0" x2="800" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="25%" stop-color="#000000" stop-opacity="1"/>
+      <stop offset="75%" stop-color="#000000" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="fade_mask">
+      <rect width="800" height="60" fill="url(#fade)"/>
+    </mask>
+  </defs>
+  <rect width="800" height="60" fill="url(#dot_grid)" mask="url(#fade_mask)"/>
+  <!-- Crosshairs -->
+  <path d="M 240 10 L 244 10 M 242 8 L 242 12" stroke="#FF375F" stroke-width="1" stroke-opacity="0.5"/>
+  <path d="M 560 10 L 564 10 M 562 8 L 562 12" stroke="#FF375F" stroke-width="1" stroke-opacity="0.5"/>
+  <path d="M 320 48 L 324 48 M 322 46 L 322 50" stroke="#FF375F" stroke-width="1" stroke-opacity="0.5"/>
+  <path d="M 480 48 L 484 48 M 482 46 L 482 50" stroke="#FF375F" stroke-width="1" stroke-opacity="0.5"/>
+</svg>

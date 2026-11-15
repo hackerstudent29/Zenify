@@ -171,7 +171,7 @@ object YouTube {
             val response = innerTube.search(WEB_REMIX, query, setLogin = recordSearchHistory).body<SearchResponse>()
             val allSummaries = mutableListOf<SearchSummary>()
 
-            response.contents
+            val sections = response.contents
                 ?.tabbedSearchResultsRenderer
                 ?.tabs
                 ?.firstOrNull()
@@ -179,7 +179,11 @@ object YouTube {
                 ?.content
                 ?.sectionListRenderer
                 ?.contents
-                ?.forEach { section ->
+                ?: response.contents
+                    ?.sectionListRenderer
+                    ?.contents
+
+            sections?.forEach { section ->
                     if (section.musicCardShelfRenderer != null) {
                         // Top result card - keep as single section
                         val cardRenderer = section.musicCardShelfRenderer
@@ -323,7 +327,7 @@ object YouTube {
             val searchItems = mutableListOf<YTItem>()
             var searchContinuation: String? = null
 
-            response.contents
+            val sections = response.contents
                 ?.tabbedSearchResultsRenderer
                 ?.tabs
                 ?.firstOrNull()
@@ -331,7 +335,11 @@ object YouTube {
                 ?.content
                 ?.sectionListRenderer
                 ?.contents
-                ?.forEach { section ->
+                ?: response.contents
+                    ?.sectionListRenderer
+                    ?.contents
+
+            sections?.forEach { section ->
                     if (section.musicShelfRenderer != null) {
                         val shelf = section.musicShelfRenderer
                         val items = shelf.contents?.getItems()?.mapNotNull { SearchPage.toYTItem(it) } ?: emptyList()
@@ -831,7 +839,7 @@ object YouTube {
                                 ?.watchEndpoint,
                     ),
                 sections =
-                    response.contents
+                    (response.contents
                         ?.singleColumnBrowseResultsRenderer
                         ?.tabs
                         ?.firstOrNull()
@@ -839,7 +847,16 @@ object YouTube {
                         ?.content
                         ?.sectionListRenderer
                         ?.contents
-                        ?.mapNotNull(ArtistPage::fromSectionListRendererContent)!!,
+                        ?: response.contents
+                            ?.twoColumnBrowseResultsRenderer
+                            ?.tabs
+                            ?.firstOrNull()
+                            ?.tabRenderer
+                            ?.content
+                            ?.sectionListRenderer
+                            ?.contents)
+                        ?.mapNotNull(ArtistPage::fromSectionListRendererContent)
+                        ?: emptyList(),
                 description = descriptionRuns?.joinToString(separator = "") { it.text },
                 subscriberCountText =
                     response.header

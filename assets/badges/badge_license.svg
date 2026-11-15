@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="136" height="26" viewBox="0 0 136 26" fill="none">
+  <rect width="136" height="26" rx="13" fill="#18181B" stroke="rgba(255,255,255,0.12)"/>
+  <rect x="58" y="2" width="76" height="22" rx="11" fill="#FF375F"/>
+  <text x="14" y="17" fill="#A1A1AA" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif" font-size="10.5" font-weight="600">license</text>
+  <text x="69" y="17" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif" font-size="10.5" font-weight="800">MIT Open</text>
+</svg>

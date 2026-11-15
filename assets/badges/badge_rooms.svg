@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="168" height="26" viewBox="0 0 168 26" fill="none">
+  <rect width="168" height="26" rx="13" fill="#18181B" stroke="rgba(255,255,255,0.12)"/>
+  <rect x="74" y="2" width="92" height="22" rx="11" fill="#FF375F"/>
+  <text x="14" y="17" fill="#A1A1AA" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif" font-size="10.5" font-weight="600">together</text>
+  <text x="84" y="17" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif" font-size="10.5" font-weight="800">live sync</text>
+</svg>

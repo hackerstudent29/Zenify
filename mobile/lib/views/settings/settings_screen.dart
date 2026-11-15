@@ -14,7 +14,6 @@ import '../../services/auth_service.dart';
 import '../../services/auth_state.dart';
 import '../../services/cache_service.dart';
 import '../../services/country_service.dart';
-import '../../services/dock_visibility.dart';
 import '../../services/settings_service.dart';
 import '../../services/update_service.dart';
 import '../../services/user_preferences_service.dart';
@@ -31,10 +30,7 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
-  @override
-  bool get hideMiniPlayerWhileActive => true;
-
+class _SettingsScreenState extends State<SettingsScreen> {
   int _versionTapCount = 0;
   String _appVersion = 'v1.0.9 (Build 13)';
 

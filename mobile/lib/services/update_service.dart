@@ -67,8 +67,12 @@ class UpdateService {
   /// Returns true if [latest] is strictly newer than [current].
   static bool isNewerVersion(String latest, String current) {
     try {
-      final lClean = latest.trim().toLowerCase().replaceAll(RegExp(r'^v'), '').split('+')[0];
-      final cClean = current.trim().toLowerCase().replaceAll(RegExp(r'^v'), '').split('+')[0];
+      var lClean = latest.trim().toLowerCase().replaceAll(RegExp(r'^v'), '').split('+')[0];
+      var cClean = current.trim().toLowerCase().replaceAll(RegExp(r'^v'), '').split('+')[0];
+
+      // Correct legacy typo where 1.0.11 was mistakenly tagged as 1.1.11
+      if (lClean == '1.1.11') lClean = '1.0.11';
+      if (cClean == '1.1.11') cClean = '1.0.11';
 
       // If current is 1.0.x and remote returned legacy 2.x from previous repo, ignore
       if (cClean.startsWith('1.') && lClean.startsWith('2.')) {
@@ -128,7 +132,10 @@ class UpdateService {
         return null;
       }
 
-      final latestAppVersion = (configData['latestAppVersion'] ?? configData['version'] ?? currentVersion).toString();
+      var latestAppVersion = (configData['latestAppVersion'] ?? configData['version'] ?? currentVersion).toString();
+      if (latestAppVersion.trim().toLowerCase().replaceAll(RegExp(r'^v'), '').startsWith('1.1.11')) {
+        latestAppVersion = '1.0.11';
+      }
       final minAppVersion = (configData['minAppVersion'] ?? '1.0.0').toString();
       final updateUrl = (configData['updateUrl'] ?? 'https://listenzenify.com/downloads/zenify.apk').toString();
       final releaseDate = (configData['releaseDate'] ?? 'November 12, 2026').toString();

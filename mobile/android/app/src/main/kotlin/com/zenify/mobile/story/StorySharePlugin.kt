@@ -105,6 +105,32 @@ class StorySharePlugin(private val context: Context) : MethodChannel.MethodCallH
                 }
                 handleSaveToGallery(path, title, result)
             }
+            "shareToPackage" -> {
+                val path = call.argument<String>("filePath")
+                val pkg = call.argument<String>("packageName")
+                val text = call.argument<String>("text")
+                if (path.isNullOrBlank() || pkg.isNullOrBlank()) {
+                    result.error("BAD_ARGS", "filePath or packageName is missing", null)
+                    return
+                }
+                try {
+                    val file = File(path)
+                    val uri = getFileUri(file)
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "image/png"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        if (!text.isNullOrEmpty()) putExtra(Intent.EXTRA_TEXT, text)
+                        setPackage(pkg)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    grantPermissionsAndAttachClipData(intent, uri)
+                    context.startActivity(intent)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
             else -> result.notImplemented()
         }
     }
