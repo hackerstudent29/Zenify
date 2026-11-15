@@ -143,7 +143,7 @@ class SettingsState extends ChangeNotifier {
   bool _downloadWifiOnly = true;
   bool get downloadWifiOnly => _downloadWifiOnly;
 
-  double _maxCacheGb = 3.0; // 0.5 to 10 GB
+  double _maxCacheGb = 0.25; // 0.1 to 1.0 GB live streaming cache cap
   double get maxCacheGb => _maxCacheGb;
 
   // ==================== CONTENT & REGION ====================
@@ -209,7 +209,7 @@ class SettingsState extends ChangeNotifier {
     _shareAnonymousErrors = _prefs.getBool('zen_share_errors') ?? true;
 
     _downloadWifiOnly = _prefs.getBool('zen_download_wifi_only') ?? true;
-    _maxCacheGb = _prefs.getDouble('zen_max_cache_gb') ?? 3.0;
+    _maxCacheGb = _prefs.getDouble('zen_max_cache_gb') ?? 0.25;
 
     _musicCountry = _prefs.getString('zen_music_country') ?? 'IN';
     _preferredLanguages = _prefs.getStringList('zen_preferred_langs') ?? ['ta', 'en', 'hi'];

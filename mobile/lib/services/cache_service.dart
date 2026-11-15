@@ -9,12 +9,14 @@ import 'api_service.dart';
 import 'artist_service.dart';
 import 'innertube_service.dart';
 import 'listening_history_service.dart';
+import 'lyrics_service.dart';
+import 'stream_resolver_service.dart';
 
 class CacheService {
   CacheService._();
 
-  /// Completely clears all in-memory, disk image, recommendation, and metadata
-  /// caches so songs, videos, and artist profiles reload freshly at HD from YouTube Music.
+  /// Completely clears all in-memory, disk image, lyrics, recommendation, and metadata
+  /// caches while strictly preserving user accounts, tokens, and saved libraries.
   static Future<void> clearAllMediaAndArtworkCache() async {
     // 1. Clear in-memory service caches
     ArtistService.clearCache();
@@ -22,33 +24,43 @@ class CacheService {
     InnerTubeService.instance.clearCache();
     ExploreDataService.instance.clearCache();
     CatalogDataSource.clear();
+    StreamResolverService.instance.clearCache();
 
-    // 2. Clear disk image caches (cached_network_image / flutter_cache_manager)
+    // 2. Clear all cached lyrics (both in-memory and SharedPreferences)
+    try {
+      await LyricsService.instance.clearAllLyricsCache();
+    } catch (_) {}
+
+    // 3. Clear disk image caches (cached_network_image / flutter_cache_manager)
     try {
       await DefaultCacheManager().emptyCache();
     } catch (_) {}
 
-    // 3. Clear Flutter in-memory decoded image cache
+    // 4. Clear Flutter in-memory decoded image cache
     try {
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
     } catch (_) {}
 
-    // 4. Clear search recents & listening/recommendation history caches
+    // 5. Clear search recents & listening/recommendation/stream history caches
     try {
       await SearchDataService.instance.clearRecents();
       await ListeningHistoryService.instance.clearHistory();
       final prefs = await SharedPreferences.getInstance();
       final staleKeys = prefs.getKeys().where((k) =>
           k.startsWith('zenify_search_') ||
+          k.startsWith('lyrics_cache_') ||
+          k.startsWith('stream_cache_') ||
           k.contains('recommend') ||
-          k.contains('explore_cache'));
+          k.contains('explore_cache') ||
+          k.contains('home_feed') ||
+          k.contains('resolved_stream'));
       for (final k in staleKeys.toList()) {
         await prefs.remove(k);
       }
     } catch (_) {}
 
-    // 5. Re-initialize fresh HD catalog from YouTube Music InnerTube
+    // 6. Re-initialize fresh HD catalog from YouTube Music InnerTube
     try {
       await CatalogDataSource.initialize();
     } catch (_) {}
