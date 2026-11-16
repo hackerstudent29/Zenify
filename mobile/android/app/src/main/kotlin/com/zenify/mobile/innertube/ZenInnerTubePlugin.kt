@@ -48,6 +48,28 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             try {
                 Log.d("ZenInnerTube", "onMethodCall: ${call.method}")
                 when (call.method) {
+                    "getStreamUrl" -> {
+                        val videoId = call.argument<String>("videoId")
+                        if (videoId.isNullOrBlank()) {
+                            replyError(result, "INVALID_ARG", "videoId is required", null)
+                            return@launch
+                        }
+                        try {
+                            val resolved = com.zenify.mobile.yt.YtEngine.resolve(videoId, wantVideo = false)
+                            val map = mapOf(
+                                "url" to resolved.url,
+                                "headers" to resolved.headers,
+                                "client" to resolved.client,
+                                "itag" to resolved.itag,
+                                "contentLength" to resolved.contentLength,
+                                "expiresInSec" to resolved.expiresInSec
+                            )
+                            replySuccess(result, map)
+                        } catch (e: Exception) {
+                            Log.w("ZenInnerTube", "getStreamUrl failed for $videoId: ${e.message}")
+                            replyError(result, "RESOLVE_FAILED", e.message, null)
+                        }
+                    }
                     "searchSummary" -> {
                         val query = call.argument<String>("query") ?: ""
                         if (query.isBlank()) {
@@ -659,7 +681,8 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             replyError(result, "BAD_ARGS", "playlistId cannot be blank", null)
                             return@launch
                         }
-                        val outcome = YouTube.playlist(playlistId)
+                        val cleanPlaylistId = playlistId.removePrefix("VL")
+                        val outcome = YouTube.playlist(cleanPlaylistId)
                         outcome.fold(
                             onSuccess = { page ->
                                 val map = mapOf(

@@ -13,6 +13,7 @@ import '../data/datasources/catalog_datasource.dart';
 import '../design_system/widgets/dynamic_island_header.dart';
 import '../models/track.dart';
 import 'api_service.dart';
+import 'download_service.dart';
 import 'innertube_service.dart';
 import 'studio_fx_state.dart';
 import 'playback_bridge.dart';
@@ -741,6 +742,25 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
 
     Object? error;
 
+    // 0. TOP PRIORITY: Offline Local Storage (100% offline playback, 0 network, instant)
+    final localAudio = DownloadService.instance.getLocalAudioPath(track.id);
+    if (localAudio != null) {
+      try {
+        if (token != _playToken) return;
+        await _audioPlayer.playMedia(
+          mediaId: localAudio,
+          title: track.title,
+          artist: track.artist,
+          artworkUrl: track.coverUrl,
+          startMs: startMs,
+          isVideo: false,
+        );
+        return;
+      } catch (e) {
+        if (kDebugMode) debugPrint('[PlayerState] offline local audio play error: $e');
+      }
+    }
+
     // 1. TOP PRIORITY: Native ExoPlayer Pipeline with InnerTubeX + PO Token
     // Instant ~200-300ms playback directly on device.
     final videoId = track.id.replaceFirst('yt-', '').trim();
@@ -899,9 +919,10 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
         unawaited(_ensureVideoTexturePrepared());
       }
       // Gapless next track setup & native engine prefetch with metadata
+      final nextLocal = DownloadService.instance.getLocalAudioPath(nextTrack.id);
       unawaited(
         _audioPlayer.setNext(
-          nextTrack.id,
+          nextLocal ?? nextTrack.id,
           title: nextTrack.title,
           artist: nextTrack.artist,
           artworkUrl: nextTrack.coverUrl,
@@ -1432,6 +1453,18 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     _lyricsSynced = false;
     lyricIndexNotifier.value = -1;
     notifyListeners();
+
+    // Check offline downloaded lyrics first (instant, 100% offline)
+    final offlineLyrics = DownloadService.instance.getLocalLyrics(track.id);
+    if (offlineLyrics != null && offlineLyrics.isNotEmpty) {
+      if (token != _playToken) return;
+      _lyricsLines = offlineLyrics.lines;
+      _lyricTimes = offlineLyrics.lines.map((l) => ((l['timeMs'] ?? l['startMs']) as num?)?.toInt() ?? 0).toList();
+      _lyricsSynced = offlineLyrics.synced;
+      _isLoadingLyrics = false;
+      notifyListeners();
+      return;
+    }
 
     var lines = <Map<String, dynamic>>[];
     LyricsResult? lyricsRes;

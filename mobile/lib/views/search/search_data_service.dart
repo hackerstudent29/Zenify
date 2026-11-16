@@ -222,8 +222,9 @@ class SearchDataService {
             }
           }
         } catch (e) {
-          if (kDebugMode)
+          if (kDebugMode) {
             debugPrint('[SearchDataService] native searchSummary error: $e');
+          }
         }
       }
 
@@ -248,8 +249,9 @@ class SearchDataService {
             continuation = parsed.continuation;
           }
         } catch (e) {
-          if (kDebugMode)
+          if (kDebugMode) {
             debugPrint('[SearchDataService] HTTP search attempt failed: $e');
+          }
         }
       }
     } else if (filter == SearchFilter.songs) {

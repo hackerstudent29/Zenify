@@ -669,6 +669,31 @@ class LibraryStore extends ChangeNotifier {
     return true;
   }
 
+  /// Adds a list of tracks to an existing playlist, avoiding duplicates.
+  int addTracksToPlaylist(String id, List<Track> tracks) {
+    final p = playlistById(id);
+    if (p == null || tracks.isEmpty) return 0;
+    int added = 0;
+    for (final t in tracks) {
+      final k = _key(t);
+      _seen[k] = t;
+      if (!p.trackIds.contains(k)) {
+        p.trackIds.add(k);
+        added++;
+      }
+    }
+    _save();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'playlist_add_batch_${p.id}_${DateTime.now().millisecondsSinceEpoch}',
+        title: 'Added to ${p.name}',
+        body: '$added ${added == 1 ? "song" : "songs"} added',
+        leading: const Icon(CupertinoIcons.checkmark_circle, color: Color(0xFFE11D48), size: 18),
+      ),
+    );
+    return added;
+  }
+
   void removeFromPlaylist(String id, Track t) {
     final p = playlistById(id);
     p?.trackIds.remove(_key(t));

@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../features/story_sharing/story_sharing.dart';
 import '../../models/track.dart';
 import '../../services/dock_visibility.dart';
+import '../../services/download_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/lyrics_service.dart';
@@ -491,6 +492,17 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
     } else {
       _liked = false;
     }
+    DownloadService.instance.addListener(_onDownloadChanged);
+  }
+
+  @override
+  void dispose() {
+    DownloadService.instance.removeListener(_onDownloadChanged);
+    super.dispose();
+  }
+
+  void _onDownloadChanged() {
+    if (mounted) setState(() {});
   }
 
   String _formatDuration(int seconds) {
@@ -546,6 +558,11 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
           durationSeconds: widget.durationSeconds,
         );
 
+    final dl = DownloadService.instance;
+    final isDownloaded = dl.isDownloaded(effectiveTrack.id);
+    final isDownloading = dl.isDownloading(effectiveTrack.id);
+    final downloadedItem = dl.getDownloaded(effectiveTrack.id);
+
     // Build Action Menu Rows
     final List<ZenDropdownItem> rows = [
       // 1. Share Lyrics (when lyrics are available for the song)
@@ -581,7 +598,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
         icon: CupertinoIcons.arrow_turn_right_up,
         onTap: widget.onPlayNext ?? () => player?.playNext(effectiveTrack),
       ),
-      // 2. Add to playlist
+      // 3. Add to playlist
       ZenDropdownItem(
         title: 'Add to playlist',
         icon: CupertinoIcons.text_badge_plus,
@@ -592,6 +609,77 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
               }
             },
       ),
+      // 4. Download / Remove Offline
+      if (isDownloaded)
+        ZenDropdownItem(
+          title: 'Remove from Downloads',
+          subtitle: downloadedItem != null
+              ? '${downloadedItem.formattedSize} · Stored Offline'
+              : 'Stored Offline',
+          icon: CupertinoIcons.arrow_down_circle_fill,
+          isDestructive: true,
+          onTap: () async {
+            Navigator.of(context).pop();
+            await dl.deleteDownload(effectiveTrack.id);
+            HapticFeedback.lightImpact();
+            IslandNotifier.instance.show(
+              IslandNotification(
+                id: 'del_dl_${effectiveTrack.id}',
+                title: 'Removed from Downloads',
+                body: effectiveTrack.title,
+                leading: const Icon(CupertinoIcons.trash, color: Colors.white70, size: 18),
+              ),
+            );
+          },
+        )
+      else if (isDownloading)
+        ZenDropdownItem(
+          title: 'Downloading...',
+          subtitle: '${(dl.getDownloadProgress(effectiveTrack.id) * 100).toInt()}% • Saving Audio & Lyrics',
+          icon: CupertinoIcons.arrow_down_circle,
+          iconColor: const Color(0xFFE11D48),
+          onTap: () {},
+        )
+      else
+        ZenDropdownItem(
+          title: 'Download Song',
+          subtitle: 'Audio · Lyrics · Artwork (< 5 MB)',
+          icon: CupertinoIcons.arrow_down_circle,
+          iconColor: const Color(0xFFE11D48),
+          onTap: () async {
+            Navigator.of(context).pop();
+            HapticFeedback.lightImpact();
+            IslandNotifier.instance.show(
+              IslandNotification(
+                id: 'start_dl_${effectiveTrack.id}',
+                title: 'Downloading',
+                body: effectiveTrack.title,
+                leading: const Icon(CupertinoIcons.arrow_down_circle, color: Color(0xFFE11D48), size: 18),
+              ),
+            );
+            final ok = await dl.downloadTrack(effectiveTrack);
+            if (ok) {
+              final sz = dl.getDownloaded(effectiveTrack.id)?.formattedSize ?? '3.5 MB';
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'done_dl_${effectiveTrack.id}',
+                  title: 'Downloaded Offline',
+                  body: '${effectiveTrack.title} · $sz',
+                  leading: const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFFE11D48), size: 18),
+                ),
+              );
+            } else {
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'fail_dl_${effectiveTrack.id}',
+                  title: 'Download Failed',
+                  body: effectiveTrack.title,
+                  leading: const Icon(CupertinoIcons.exclamationmark_circle, color: Colors.white70, size: 18),
+                ),
+              );
+            }
+          },
+        ),
       // 3. Go to artist
       ZenDropdownItem(
         title: 'Go to artist',

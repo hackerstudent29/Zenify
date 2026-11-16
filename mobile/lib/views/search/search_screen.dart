@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
@@ -375,6 +374,7 @@ class _SearchScreenState extends State<SearchScreen>
 
   // Suggestions
   Timer? _suggestTimer;
+  Timer? _debounceTimer;
   int _suggestId = 0;
   int _searchRequestId = 0;
   String _lastTyped = '';
@@ -384,7 +384,6 @@ class _SearchScreenState extends State<SearchScreen>
   String _submittedQuery = '';
   String _wantedKey = '';
   String _resultsKey = '';
-  final Map<String, Future<SearchResult>> _inflight = {};
   bool _isLoading = false;
   bool _isLoadingMore = false;
   SearchResult _searchResults = _emptyResult();
@@ -417,6 +416,7 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   void dispose() {
     _suggestTimer?.cancel();
+    _debounceTimer?.cancel();
     _textCtrl.removeListener(_onTextChanged);
     _focusNode.removeListener(_onFocusChanged);
     _scrollCtrl.removeListener(_onScroll);
@@ -630,7 +630,8 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   void _onFilterSelected(SearchFilter filter) {
-    if (_selectedFilter == filter || _submittedQuery.isEmpty) return;
+    final currentQ = _submittedQuery.isNotEmpty ? _submittedQuery : _textCtrl.text.trim();
+    if (_selectedFilter == filter || currentQ.isEmpty) return;
     HapticFeedback.selectionClick();
     final hasCachedForFilter = switch (filter) {
       SearchFilter.all => !_searchResults.isEmpty,
@@ -968,27 +969,17 @@ class _SearchScreenState extends State<SearchScreen>
     final topPad = MediaQuery.paddingOf(context).top;
     final typing = _isTyping;
     final text = _textCtrl.text.trim();
-    final hasQuery = _submittedQuery.isNotEmpty;
+    final effectiveQuery = text.isNotEmpty ? text : _submittedQuery;
+    final hasQuery = effectiveQuery.isNotEmpty;
     final category = _activeCategory;
 
     final showSuggestions =
         typing && _liveSuggestions.isNotEmpty && _searchResults.isEmpty;
 
-    final editing =
-        (_focusNode.hasFocus || _submittedQuery.isEmpty) &&
-        text.isNotEmpty &&
-        text != _submittedQuery;
-
     final _SearchViewPhase phase;
-    if (editing) {
-      phase = _SearchViewPhase.suggestions;
-    } else if (hasQuery) {
-      phase = (_isLoading && _searchResults.isEmpty)
-          ? _SearchViewPhase.loading
-          : _SearchViewPhase.results;
-    } else if (category != null) {
+    if (category != null) {
       phase = _SearchViewPhase.category;
-    } else {
+    } else if (!hasQuery) {
       phase = _SearchViewPhase.landing;
     } else if (showSuggestions) {
       phase = _SearchViewPhase.suggestions;
