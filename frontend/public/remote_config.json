@@ -1,30 +1,28 @@
 {
-  "version": 16,
+  "version": 2026,
   "streamMode": "device",
-  "minAppVersion": "1.0.11",
-  "latestAppVersion": "1.0.12",
+  "minAppVersion": "1.0.12",
+  "latestAppVersion": "1.1.13",
   "isForceUpdate": false,
-  "releaseDate": "November 15, 2026",
-  "releaseTime": "07:15 PM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.12/zenify-v1.0.12.apk",
+  "releaseDate": "November 16, 2026",
+  "releaseTime": "07:45 PM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.13/zenify-v1.1.13.apk",
   "features": [
-    "Expansive Artist Hero & Balanced Layout: Restored full-height portrait photography (480px) with ~250px of breathing room so portraits are never obstructed",
-    "Scroll-Linked Dynamic Island: Header capsule stays collapsed at rest and only springs open to reveal the title when scrolling past the hero",
-    "Edge-to-Edge Fullview Player: Expanded bounds eliminate right-side subpixel gaps across all display sizes",
-    "Strict Multi-Field Lyric Matching: Zero mismatched lyrics with multi-word overlap validation and YouTube official lyrics fallback",
-    "Pristine Audience Formatting: Monthly listeners formatted cleanly without duplicate phrases (e.g. 40.8 crore monthly listeners)"
+    "Pure YouTube Music Search: Entire search catalog migrated directly to YouTube Music with zero JioSaavn dependencies",
+    "Debounced Live Search: Restored early version debounced search flow so typing directly streams and ranks results in real time",
+    "Fluid Album Artmesh: Restored live song cover artwork morphing and color grading in fullview player",
+    "Ultra-Compressed Release: Split-per-ABI ARM64 release package under 15.3MB"
   ],
   "fixes": [
-    "Fixed Dynamic Island showing title before scrolling past artist and album headers",
-    "Fixed display gap on right side of full-view player screen",
-    "Fixed duplicate 'monthly audience monthly listeners' metric text on artist profiles",
-    "Fixed inaccurate lyric match across multi-language releases"
+    "Fixed search queries failing and empty results state",
+    "Fixed missing album artmesh background on fullview player",
+    "Fixed invalid package installation errors on Android 14"
   ],
   "improvements": [
-    "Freshly built v1.0.12 (Build 16) release APK with optimized asset footprint",
-    "Silky-smooth spring physics on Dynamic Island transitions",
-    "Enhanced stream proxying and zero preview audio limits"
+    "Native YouTube Music InnerTube speed optimizations",
+    "Ultra-compact APK download size (15.28 MB)",
+    "Instant search suggestions and multi-shelf Apple Music layout"
   ],
-  "releaseNotes": "• Scroll-linked Dynamic Island header that opens smoothly when scrolling past hero\n• Expansive artist portrait hero section with balanced layout\n• Edge-to-edge fullview player with zero display gaps\n• High-precision lyric matching and accurate audience metrics",
-  "message": "Update to v1.0.12 (Build 16) for scroll-linked Dynamic Island, edge-to-edge player, and precision lyrics"
+  "releaseNotes": "• Pure YouTube Music search with live debounced suggestions\n• Restored fluid album artmesh background on fullview player\n• Ultra-compressed 15.28MB release APK with instant install",
+  "message": "Update to v1.1.13 for pure YouTube Music live search and fluid album artmesh"
 }

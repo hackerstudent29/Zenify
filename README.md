@@ -29,7 +29,7 @@
   <p align="center">
     <span style="color: rgba(255,255,255,0.25); font-family: monospace; font-size: 16px;">+</span>
     &nbsp;&nbsp;
-    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.12/zenify-v1.1.12.apk">
+    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.13/zenify-v1.1.13.apk">
       <img src="assets/buttons/btn_download_android.svg" alt="Download for Android" height="46" />
     </a>
     &nbsp;&nbsp;
@@ -52,7 +52,7 @@
 
   <!-- Signature Rose Spec Capsules -->
   <p align="center">
-    <img src="assets/badges/badge_release.svg" alt="Release v1.1.12" height="26" />
+    <img src="assets/badges/badge_release.svg" alt="Release v1.1.13" height="26" />
     &nbsp;
     <img src="assets/badges/badge_audio.svg" alt="320kbps Audio" height="26" />
     &nbsp;
@@ -350,14 +350,14 @@
     <tr>
       <td><b>🤖 Android (Modern)</b></td>
       <td>ARM64 Split APK · <i>Recommended for Pixel, Galaxy, OnePlus, Xiaomi, Nothing, Sony</i></td>
-      <td align="center"><code>15.2 MB</code></td>
-      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.12/zenify-v1.1.12.apk"><b>⬇️ Download APK</b></a></td>
+      <td align="center"><code>15.3 MB</code></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.13/zenify-v1.1.13.apk"><b>⬇️ Download APK</b></a></td>
     </tr>
     <tr>
       <td><b>🌐 Android (Universal)</b></td>
       <td>All Architectures (`arm64-v8a`, `armeabi-v7a`, `x86_64`) · <i>Works on every Android device</i></td>
       <td align="center"><code>34.6 MB</code></td>
-      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.12/zenify.apk"><b>⬇️ Download Universal</b></a></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.13/zenify.apk"><b>⬇️ Download Universal</b></a></td>
     </tr>
     <tr>
       <td><b>🍎 Web & iOS (PWA)</b></td>
@@ -368,7 +368,7 @@
     <tr>
       <td><b>📦 GitHub Releases</b></td>
       <td>All Release Packages, Release Notes & SHA-256 Checksums</td>
-      <td align="center"><code>Build 16</code></td>
+      <td align="center"><code>Build 2026</code></td>
       <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases"><b>View Releases</b></a></td>
     </tr>
   </tbody>
@@ -384,8 +384,8 @@
   <summary><b>📱 Step-by-Step Android Installation Guide</b></summary>
   <br />
   <ol>
-    <li>Tap <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.12/zenify-v1.1.12.apk"><b>Download APK</b></a> on your Android device (or choose the Universal APK if using an older 32-bit device or emulator).</li>
-    <li>When the download completes, tap the notification or locate <code>zenify-v1.1.12.apk</code> in your device's <b>Files</b> or <b>Downloads</b> app.</li>
+    <li>Tap <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.13/zenify-v1.1.13.apk"><b>Download APK</b></a> on your Android device (or choose the Universal APK if using an older 32-bit device or emulator).</li>
+    <li>When the download completes, tap the notification or locate <code>zenify-v1.1.13.apk</code> in your device's <b>Files</b> or <b>Downloads</b> app.</li>
     <li>If prompted, toggle <i>"Allow from this source"</i> in your browser or file manager settings.</li>
     <li>Tap <b>Install</b>, open Zenify, and experience high-fidelity ad-free music instantly!</li>
   </ol>
