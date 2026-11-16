@@ -768,17 +768,19 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
   String get _fallbackKey => 'asset:${widget.fallbackAsset}';
 
   String _sourceKey(ArtworkMeshBackground w) {
+    final raw = (w.coverUrl != null && w.coverUrl!.isNotEmpty)
+        ? w.coverUrl!
+        : (w.covers != null && w.covers!.isNotEmpty ? w.covers!.first : '');
+    if (raw.isNotEmpty) {
+      return w.mediaUrlResolver?.call(raw) ?? raw;
+    }
     if (w.palette != null && w.palette!.isNotEmpty) {
       final sig = w.palette!
           .map((c) => c.toARGB32().toRadixString(16).padLeft(8, '0'))
           .join('_');
       return 'palette:$sig';
     }
-    final raw = (w.coverUrl != null && w.coverUrl!.isNotEmpty)
-        ? w.coverUrl!
-        : (w.covers != null && w.covers!.isNotEmpty ? w.covers!.first : '');
-    if (raw.isEmpty) return 'asset:${w.fallbackAsset}';
-    return w.mediaUrlResolver?.call(raw) ?? raw;
+    return 'asset:${w.fallbackAsset}';
   }
 
   ImageProvider _providerFor(String key) {

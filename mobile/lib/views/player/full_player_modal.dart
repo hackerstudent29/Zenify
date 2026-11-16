@@ -10,6 +10,7 @@ import '../../design_system/widgets/scrubber_slider.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/player_state.dart';
+import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../lyrics/lyrics_sheet.dart';
@@ -57,7 +58,12 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
             children: [
               // Same liquid artwork wash as the player: lyrics sit directly on it.
               Positioned.fill(
-                child: ArtworkMeshBackground(coverUrl: coverUrl, paused: false),
+                child: ArtworkMeshBackground(
+                  coverUrl: MediaNormalizer.upgradeArtworkUrl(coverUrl ?? ''),
+                  imageProviderBuilder: (url) =>
+                      CachedNetworkImageProvider(MediaNormalizer.upgradeArtworkUrl(url)),
+                  paused: false,
+                ),
               ),
               const SafeArea(child: LyricsSheet()),
             ],
@@ -86,8 +92,10 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
           // Liquid Artwork Mesh Background
           Positioned.fill(
             child: ArtworkMeshBackground(
-              coverUrl: track.coverUrl,
-              paused: !player.isPlaying,
+              coverUrl: MediaNormalizer.upgradeArtworkUrl(track.coverUrl),
+              imageProviderBuilder: (url) =>
+                  CachedNetworkImageProvider(MediaNormalizer.upgradeArtworkUrl(url)),
+              paused: false,
             ),
           ),
 

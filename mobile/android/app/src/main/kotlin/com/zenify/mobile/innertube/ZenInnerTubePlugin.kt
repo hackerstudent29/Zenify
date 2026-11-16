@@ -6,7 +6,9 @@ import android.util.Log
 import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.AlbumItem
 import com.metrolist.innertube.models.ArtistItem
+import com.metrolist.innertube.models.EpisodeItem
 import com.metrolist.innertube.models.PlaylistItem
+import com.metrolist.innertube.models.PodcastItem
 import com.metrolist.innertube.models.SongItem
 import com.metrolist.innertube.models.WatchEndpoint
 import com.metrolist.innertube.models.YTItem
@@ -55,9 +57,17 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         try {
                             val outcome = YouTube.searchSummary(query)
                             val summaryList = outcome.getOrNull()?.summaries?.map { summary ->
+                                val isVideoSection = summary.title.contains("video", ignoreCase = true)
                                 mapOf(
                                     "title" to summary.title,
-                                    "items" to summary.items.mapNotNull { ytItemToMap(it) }
+                                    "items" to summary.items.mapNotNull { item ->
+                                        val mapped = ytItemToMap(item)
+                                        if (mapped != null && isVideoSection) {
+                                            mapped + ("type" to "video")
+                                        } else {
+                                            mapped
+                                        }
+                                    }
                                 )
                             }?.filter { (it["items"] as? List<*>)?.isNotEmpty() == true } ?: emptyList()
 
@@ -157,6 +167,47 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             replySuccess(result, artists)
                         } catch (e: Exception) {
                             Log.e("ZenInnerTube", "searchArtists FAILED for $query: ${e.message}", e)
+                            replySuccess(result, emptyList<Map<String, Any?>>())
+                        }
+                    }
+
+                    "searchPlaylists" -> {
+                        val query = call.argument<String>("query") ?: ""
+                        if (query.isBlank()) {
+                            replySuccess(result, emptyList<Map<String, Any?>>())
+                            return@launch
+                        }
+                        try {
+                            val outcome = YouTube.search(query, YouTube.SearchFilter.FILTER_FEATURED_PLAYLIST)
+                            val playlists = outcome.getOrNull()?.items?.filterIsInstance<PlaylistItem>()?.map {
+                                playlistItemToMap(it) + ("type" to "playlist")
+                            } ?: emptyList()
+                            Log.i("ZenInnerTube", "searchPlaylists SUCCESS: ${playlists.size} playlists for $query")
+                            replySuccess(result, playlists)
+                        } catch (e: Exception) {
+                            Log.e("ZenInnerTube", "searchPlaylists FAILED for $query: ${e.message}", e)
+                            replySuccess(result, emptyList<Map<String, Any?>>())
+                        }
+                    }
+
+                    "searchVideos" -> {
+                        val query = call.argument<String>("query") ?: ""
+                        if (query.isBlank()) {
+                            replySuccess(result, emptyList<Map<String, Any?>>())
+                            return@launch
+                        }
+                        try {
+                            val outcome = YouTube.search(query, YouTube.SearchFilter.FILTER_VIDEO)
+                            val videos = outcome.getOrNull()?.items?.mapNotNull { item ->
+                                when (item) {
+                                    is SongItem -> songItemToMap(item) + ("type" to "video")
+                                    else -> ytItemToMap(item)?.let { it + ("type" to "video") }
+                                }
+                            } ?: emptyList()
+                            Log.i("ZenInnerTube", "searchVideos SUCCESS: ${videos.size} videos for $query")
+                            replySuccess(result, videos)
+                        } catch (e: Exception) {
+                            Log.e("ZenInnerTube", "searchVideos FAILED for $query: ${e.message}", e)
                             replySuccess(result, emptyList<Map<String, Any?>>())
                         }
                     }
@@ -772,10 +823,18 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
     private fun ytItemToMap(item: YTItem): Map<String, Any?>? {
         return when (item) {
-            is SongItem -> songItemToMap(item) + ("type" to "song")
+            is SongItem -> songItemToMap(item) + ("type" to if (item.isVideoSong) "video" else "song")
             is AlbumItem -> albumItemToMap(item) + ("type" to "album")
             is ArtistItem -> artistItemToMap(item) + ("type" to "artist")
             is PlaylistItem -> playlistItemToMap(item) + ("type" to "playlist")
+            is PodcastItem -> mapOf(
+                "id" to item.id,
+                "title" to item.title,
+                "thumbnail" to item.thumbnail,
+                "channelId" to item.channelId,
+                "type" to "podcast"
+            )
+            is EpisodeItem -> songItemToMap(item.asSongItem()) + ("type" to "episode")
             else -> mapOf(
                 "id" to item.id,
                 "title" to item.title,
