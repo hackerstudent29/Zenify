@@ -62,6 +62,7 @@ const DISCOVER_GENRES = [
 const DEFAULT_LANGUAGES = ["Tamil", "Hindi", "English", "Telugu", "Malayalam", "Punjabi", "Kannada", "Bengali"];
 
 type FilterTab = "all" | "tracks" | "artists" | "albums" | "playlists";
+type SearchSource = "all" | "youtube" | "jiosaavn";
 type RegionalCategory = "all" | "popular" | "new_releases" | "recommended";
 
 const fmtDuration = (d?: number) => {
@@ -83,7 +84,7 @@ function Segmented<T extends string>({
   id: string;
   value: T;
   onChange: (v: T) => void;
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; icon?: React.ReactNode }[];
 }) {
   return (
     <div className="inline-flex p-[3px] rounded-[9px] bg-white/[0.08] border border-white/[0.06] backdrop-blur-xl shrink-0">
@@ -94,7 +95,7 @@ function Segmented<T extends string>({
             key={o.value}
             onClick={() => onChange(o.value)}
             className={cn(
-              "relative px-3.5 py-1 text-[13px] font-medium rounded-[7px] outline-none cursor-pointer transition-colors duration-200 whitespace-nowrap",
+              "relative flex items-center gap-1.5 px-3.5 py-1 text-[13px] font-medium rounded-[7px] outline-none cursor-pointer transition-colors duration-200 whitespace-nowrap",
               active ? "text-white" : "text-white/60 hover:text-white/90"
             )}
           >
@@ -105,7 +106,10 @@ function Segmented<T extends string>({
                 className="absolute inset-0 rounded-[7px] bg-white/[0.18] shadow-[0_1px_3px_rgba(0,0,0,0.35),inset_0_0.5px_0_rgba(255,255,255,0.2)]"
               />
             )}
-            <span className="relative">{o.label}</span>
+            <span className="relative flex items-center gap-1.5">
+              {o.icon}
+              {o.label}
+            </span>
           </button>
         );
       })}
@@ -355,6 +359,21 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
   const [isSmartSearching, setIsSmartSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
+  // Multi-Source Search State (All · Universal | YouTube Music | Jio Music)
+  const [searchSource, setSearchSource] = useState<SearchSource>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("zenify_search_source") as SearchSource) || "all";
+    }
+    return "all";
+  });
+
+  const handleSourceChange = (src: SearchSource) => {
+    setSearchSource(src);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("zenify_search_source", src);
+    }
+  };
+
   const user = useAuthStore((s) => s.user);
   const preferredCountry = user?.country?.trim() || "";
   const preferredLang = user?.preferences?.languages?.[0]?.trim() || "";
@@ -533,17 +552,35 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
       });
   };
 
-  // Live query results
+  // Live query results (Multi-Source with InnerTube YouTube Music support)
   const { data: results, isLoading: isSearchLoading } = useQuery({
-    queryKey: ["discover-search", debouncedQuery],
+    queryKey: ["discover-search", debouncedQuery, searchSource],
     queryFn: async ({ signal }) => {
       if (!debouncedQuery) return null;
       saveRecentSearch(debouncedQuery);
-      const res = await api.get("search", { params: { q: debouncedQuery, limit: 24 }, signal });
+      if (searchSource === "youtube") {
+        const res = await api.get("search/youtube", { params: { q: debouncedQuery }, signal });
+        return res.data;
+      }
+      const res = await api.get("search", {
+        params: { q: debouncedQuery, limit: 24, source: searchSource },
+        signal,
+      });
       return res.data;
     },
     enabled: !!debouncedQuery,
     staleTime: 15000,
+  });
+
+  // YouTube Music Trending Feed
+  const { data: ytTrendingData, isLoading: isYtTrendingLoading } = useQuery({
+    queryKey: ["youtube-trending-feed"],
+    queryFn: async () => {
+      const res = await api.get("search/youtube/trending");
+      return res.data?.tracks || [];
+    },
+    enabled: !debouncedQuery && searchSource === "youtube",
+    staleTime: 1000 * 60 * 10,
   });
 
   // Live provider search rich autocomplete (Artists, Tracks, Albums & Hints)
@@ -684,6 +721,12 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
       {open ? "Show Less" : `${label} (${count})`}
     </button>
   );
+
+  const sourceOptions: { value: SearchSource; label: string; icon?: React.ReactNode }[] = [
+    { value: "all", label: "All · Universal", icon: <Sparkles size={12} className="text-amber-400 shrink-0" /> },
+    { value: "youtube", label: "YouTube Music", icon: <Play size={11} className="text-[#FF0000] fill-current shrink-0" /> },
+    { value: "jiosaavn", label: "Jio Music", icon: <Music size={12} className="text-[#00D2FF] shrink-0" /> },
+  ];
 
   const filterOptions: { value: FilterTab; label: string }[] = [
     { value: "all", label: "Top Results" },
@@ -1044,6 +1087,26 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
               )}
             </div>
 
+            {/* Source Capsule & Filter Controls */}
+            <div className="flex items-center justify-between gap-3 overflow-x-auto no-scrollbar pt-0.5">
+              <Segmented
+                id="source"
+                value={searchSource}
+                onChange={(v) => handleSourceChange(v as SearchSource)}
+                options={sourceOptions}
+              />
+              {debouncedQuery && (
+                <div className="hidden sm:block">
+                  <Segmented
+                    id="filter-desktop"
+                    value={selectedFilter}
+                    onChange={(v) => setSelectedFilter(v as FilterTab)}
+                    options={filterOptions}
+                  />
+                </div>
+              )}
+            </div>
+
             <AnimatePresence initial={false}>
               {debouncedQuery && (
                 <motion.div
@@ -1051,10 +1114,10 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={SPRING_SOFT}
-                  className="overflow-hidden"
+                  className="sm:hidden overflow-hidden"
                 >
                   <div className="overflow-x-auto no-scrollbar">
-                    <Segmented id="filter" value={selectedFilter} onChange={(v) => setSelectedFilter(v as FilterTab)} options={filterOptions} />
+                    <Segmented id="filter-mobile" value={selectedFilter} onChange={(v) => setSelectedFilter(v as FilterTab)} options={filterOptions} />
                   </div>
                 </motion.div>
               )}
@@ -1064,7 +1127,7 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
           {/* ===== Content ===== */}
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
-              key={debouncedQuery ? "results" : "discover"}
+              key={debouncedQuery ? `results-${searchSource}` : `discover-${searchSource}`}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
@@ -1073,6 +1136,42 @@ export default function DiscoverPage({ isSearchRoute = false }: { isSearchRoute?
               {!debouncedQuery ? (
                 /* ================= DISCOVER ================= */
                 <div className="space-y-11 pt-7">
+                  {/* YouTube Music Trending shelf when YouTube Music is active */}
+                  {searchSource === "youtube" && (
+                    <section>
+                      <SectionHeader
+                        title="YouTube Music Trending Hits"
+                        subtitle="Real-time trending releases across YouTube Music with instant high-bitrate streaming."
+                      />
+                      {isYtTrendingLoading ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                          {Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i}>
+                              <div className="aspect-square rounded-xl bg-white/[0.06] animate-pulse" />
+                              <div className="h-3 w-3/4 rounded bg-white/[0.06] animate-pulse mt-2.5" />
+                              <div className="h-3 w-1/2 rounded bg-white/[0.04] animate-pulse mt-1.5" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : ytTrendingData && ytTrendingData.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                          {ytTrendingData.slice(0, 12).map((track: any) => (
+                            <ArtCard
+                              key={track.id}
+                              cover={getMediaUrl(track.coverUrl) || "/logo.png"}
+                              alt={track.title || "YouTube Music track"}
+                              title={formatDisplayTitle(track.title)}
+                              subtitle={formatArtists(track) || "YouTube Artist"}
+                              caption="YouTube Music · Trending"
+                              playable
+                              isPlayingNow={currentTrack?.id === track.id && isPlaying}
+                              onClick={() => playTrack(track, false)}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </section>
+                  )}
                   {/* Regional shelf */}
                   <section>
                     <SectionHeader
