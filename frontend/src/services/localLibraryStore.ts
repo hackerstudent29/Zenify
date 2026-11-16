@@ -41,9 +41,15 @@ export async function runParallelWorkerPool<T, R>(
         const currentIndex = nextIndex++;
         activeWorkers++;
         try {
-          results[currentIndex] = await taskFn(items[currentIndex], currentIndex);
+          const timeoutPromise = new Promise<R>((_, reject) =>
+            setTimeout(() => reject(new Error(`Worker task timed out at index ${currentIndex}`)), 5000)
+          );
+          results[currentIndex] = await Promise.race([
+            taskFn(items[currentIndex], currentIndex),
+            timeoutPromise,
+          ]);
         } catch (err) {
-          console.warn(`Worker task failed at index ${currentIndex}:`, err);
+          console.warn(`Worker task failed or timed out at index ${currentIndex}:`, err);
         } finally {
           activeWorkers--;
           completedCount++;
@@ -358,6 +364,42 @@ export async function saveTrackToCloudDB(track: LocalAudioMetadata): Promise<Loc
 export async function saveLocalLibrary(tracks: LocalAudioMetadata[], userId?: string): Promise<void> {
   const { tracksKey, foldersKey } = getStorageKeys(userId);
 
+  // 1. Derive & persist Folder Groups FIRST so folders are NEVER lost
+  const folderMap = new Map<string, LocalFolderGroup>();
+
+  tracks.forEach(t => {
+    const existing = folderMap.get(t.folderPath) || {
+      path: t.folderPath,
+      name: t.folderName,
+      trackCount: 0,
+      totalDuration: 0,
+      coverUrl: t.matchedCoverUrl || t.coverUrl,
+      artists: []
+    };
+
+    existing.trackCount += 1;
+    existing.totalDuration += (t.duration || 0);
+    if (!existing.coverUrl && (t.matchedCoverUrl || t.coverUrl)) {
+      existing.coverUrl = t.matchedCoverUrl || t.coverUrl;
+    }
+    const artistName = t.matchedArtistName || t.artist;
+    if (artistName && !existing.artists.includes(artistName)) {
+      existing.artists.push(artistName);
+    }
+
+    folderMap.set(t.folderPath, existing);
+  });
+
+  const folderList = Array.from(folderMap.values());
+  try {
+    await set(foldersKey, folderList);
+    // Also mirror to guest key if not signed in or as redundancy
+    await set("zenify_local_library_folders_guest", folderList);
+  } catch (err) {
+    console.warn("[LocalLibraryStore] Failed to write foldersKey:", err);
+  }
+
+  // 2. Prepare serializable tracks metadata
   const serializableTracks = tracks.map(t => ({
     id: t.id,
     cloudTrackId: t.cloudTrackId,
@@ -385,38 +427,22 @@ export async function saveLocalLibrary(tracks: LocalAudioMetadata[], userId?: st
     matchedGenre: t.matchedGenre,
     matchedPreviewUrl: t.matchedPreviewUrl,
     isMatched: t.isMatched,
-    file: t.file // Persist local File handle in IDB for instant playback
+    file: t.file // Persist local File handle if supported by browser IDB
   }));
 
-  await set(tracksKey, serializableTracks);
-
-  // Derive Folder Groups
-  const folderMap = new Map<string, LocalFolderGroup>();
-
-  tracks.forEach(t => {
-    const existing = folderMap.get(t.folderPath) || {
-      path: t.folderPath,
-      name: t.folderName,
-      trackCount: 0,
-      totalDuration: 0,
-      coverUrl: t.matchedCoverUrl || t.coverUrl,
-      artists: []
-    };
-
-    existing.trackCount += 1;
-    existing.totalDuration += t.duration;
-    if (!existing.coverUrl && (t.matchedCoverUrl || t.coverUrl)) {
-      existing.coverUrl = t.matchedCoverUrl || t.coverUrl;
+  try {
+    await set(tracksKey, serializableTracks);
+  } catch (err) {
+    // If storing raw File objects triggers QuotaExceededError or DataCloneError on large FLAC/ALAC files,
+    // strip the heavy file reference and safely store full metadata
+    console.warn("[LocalLibraryStore] Direct file persistence in IDB threw error. Retrying with lightweight metadata:", err);
+    try {
+      const lightweightTracks = serializableTracks.map(({ file, ...rest }) => rest);
+      await set(tracksKey, lightweightTracks);
+    } catch (retryErr) {
+      console.error("[LocalLibraryStore] Failed to save track metadata into IDB:", retryErr);
     }
-    const artistName = t.matchedArtistName || t.artist;
-    if (artistName && !existing.artists.includes(artistName)) {
-      existing.artists.push(artistName);
-    }
-
-    folderMap.set(t.folderPath, existing);
-  });
-
-  await set(foldersKey, Array.from(folderMap.values()));
+  }
 }
 
 export async function getSavedLocalTracks(userId?: string): Promise<any[]> {
@@ -425,7 +451,18 @@ export async function getSavedLocalTracks(userId?: string): Promise<any[]> {
 
   let tracks = await get(tracksKey);
 
-  // Backward compatibility migration: If the user-scoped key is empty, check legacy store
+  // 1. Fallback: If empty and user is logged in, check guest key
+  if ((!tracks || tracks.length === 0) && currentUserId) {
+    try {
+      const guestTracks = await get("zenify_local_library_tracks_guest");
+      if (Array.isArray(guestTracks) && guestTracks.length > 0) {
+        tracks = guestTracks;
+        await set(tracksKey, guestTracks);
+      }
+    } catch (_) {}
+  }
+
+  // 2. Backward compatibility migration: If still empty, check legacy store
   if ((!tracks || tracks.length === 0) && currentUserId) {
     try {
       const legacyTracks = await get(legacyTracksKey);
@@ -452,6 +489,18 @@ export async function getSavedLocalFolders(userId?: string): Promise<LocalFolder
 
   let folders = await get(foldersKey);
 
+  // 1. Fallback: If empty and user is logged in, check guest key
+  if ((!folders || folders.length === 0) && currentUserId) {
+    try {
+      const guestFolders = await get("zenify_local_library_folders_guest");
+      if (Array.isArray(guestFolders) && guestFolders.length > 0) {
+        folders = guestFolders;
+        await set(foldersKey, guestFolders);
+      }
+    } catch (_) {}
+  }
+
+  // 2. Fallback: check legacy
   if ((!folders || folders.length === 0) && currentUserId) {
     try {
       const legacyFolders = await get(legacyFoldersKey);

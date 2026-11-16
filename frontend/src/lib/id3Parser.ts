@@ -74,7 +74,7 @@ export function cleanSongTitle(rawText: string): string {
   let text = rawText.trim();
 
   // 1. Remove file extensions
-  text = text.replace(/\.(mp3|m4a|flac|wav|ogg|aac)$/i, "");
+  text = text.replace(/\.(mp3|m4a|flac|alac|wav|ogg|aac|opus|aif|aiff|caf)$/i, "");
 
   // 2. Remove leading track index numbers (e.g. "01. ", "01 - ", "01_ ", "Track 01 - ", "128kbps_01")
   text = text.replace(/^(?:\d{1,3}[\.\-\_\s]+)+/, "");
@@ -446,14 +446,35 @@ function parsePICFrame(buffer: ArrayBuffer, offset: number, size: number): Blob 
 
 function getAudioDuration(url: string): Promise<number> {
   return new Promise((resolve) => {
+    let settled = false;
     const audio = new Audio();
+
+    const cleanupAndResolve = (dur: number) => {
+      if (settled) return;
+      settled = true;
+      audio.onloadedmetadata = null;
+      audio.onerror = null;
+      audio.src = "";
+      resolve(dur);
+    };
+
+    // Strict 2-second timeout to prevent stalling on complex FLAC/ALAC or un-demuxable codecs
+    const timer = setTimeout(() => {
+      cleanupAndResolve(180);
+    }, 2000);
+
     audio.preload = "metadata";
     audio.src = url;
+
     audio.onloadedmetadata = () => {
-      resolve(Number.isFinite(audio.duration) ? audio.duration : 180);
+      clearTimeout(timer);
+      const val = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 180;
+      cleanupAndResolve(val);
     };
+
     audio.onerror = () => {
-      resolve(180);
+      clearTimeout(timer);
+      cleanupAndResolve(180);
     };
   });
 }
