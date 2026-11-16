@@ -1,0 +1,25 @@
+name: Mirror to Zenify-Core
+
+on:
+  workflow_dispatch:
+    inputs:
+      core_token:
+        description: 'GitHub Personal Access Token'
+        required: true
+        default: ''
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Zenify
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Zenify-Core
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add core https://x-access-token:${{ github.event.inputs.core_token }}@github.com/hackerstudent29/Zenify-Core.git
+          git push core main:main --force --tags
