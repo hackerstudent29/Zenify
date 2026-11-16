@@ -29,7 +29,7 @@
   <p align="center">
     <span style="color: rgba(255,255,255,0.25); font-family: monospace; font-size: 16px;">+</span>
     &nbsp;&nbsp;
-    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.13/zenify-v1.0.13.apk">
+    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.14/zenify-v1.0.14.apk">
       <img src="assets/buttons/btn_download_android.svg" alt="Download for Android" height="46" />
     </a>
     &nbsp;&nbsp;
@@ -52,7 +52,7 @@
 
   <!-- Signature Rose Spec Capsules -->
   <p align="center">
-    <img src="assets/badges/badge_release.svg" alt="Release v1.0.13" height="26" />
+    <img src="assets/badges/badge_release.svg" alt="Release v1.0.14" height="26" />
     &nbsp;
     <img src="assets/badges/badge_audio.svg" alt="320kbps Audio" height="26" />
     &nbsp;
@@ -260,6 +260,30 @@
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <h3>🔎 Instant Multi-Source Search & Fast-Path Switcher</h3>
+      <p>Apple-styled source switcher capsule (<b>All · Universal | YouTube Music | Jio Music</b>). Instant ~250ms JioSaavn Akamai CDN queries, 4s parallel fallback, eliminating search stalls.</p>
+      <sub><code>Source Capsule</code> &nbsp;•&nbsp; <code>Fast-Path CDN</code> &nbsp;•&nbsp; <code>Zero-Hang Fallback</code></sub>
+    </td>
+    <td width="50%" valign="top">
+      <h3>📥 One-Click Playlist Import (YouTube & Spotify)</h3>
+      <p>Instantly import your existing playlists from YouTube Music, YouTube, and Spotify share URLs with automatic high-fidelity track resolution and personal library syncing.</p>
+      <sub><code>Headless Metadata</code> &nbsp;•&nbsp; <code>yt-dlp Engine</code> &nbsp;•&nbsp; <code>Spotify URL Resolver</code></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>📁 Resilient Local Music Player</h3>
+      <p>Multi-tier IndexedDB storage supporting FLAC, ALAC, Opus, CAF, and AIFF files with duration watchdog timers and automatic 320kbps CDN stream recovery for unsupported browser codecs.</p>
+      <sub><code>Lossless ALAC/FLAC</code> &nbsp;•&nbsp; <code>IndexedDB Tier</code> &nbsp;•&nbsp; <code>Auto Stream Healing</code></sub>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🍃 Ultra-Lean Live Streaming Storage (80%+ Reduction)</h3>
+      <p>Pure live streaming architecture: ExoPlayer disk cache cut to 64MB and in-memory decoded image cache capped at 35MB. User devices stay lightning fast with 0ms resume.</p>
+      <sub><code>Feather-Light Cache</code> &nbsp;•&nbsp; <code>64MB ExoPlayer Buffer</code> &nbsp;•&nbsp; <code>Zero Audio Hoarding</code></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
       <h3>🏝️ Scroll-Linked Dynamic Island</h3>
       <p>Apple-inspired 3-dock floating header. Collapses gracefully at the top of detail pages and springs open to reveal artist, album, and category titles as content crosses underneath.</p>
       <sub><code>Spring Physics</code> &nbsp;•&nbsp; <code>Adaptive Docking</code> &nbsp;•&nbsp; <code>Backdrop Blur Filter</code></sub>
@@ -284,14 +308,14 @@
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3>🔎 Instant Global Search & InnerTube Engine</h3>
-      <p>High-speed search across 100M+ tracks with instant fuzzy suggestions, artist profiles, curated editorial albums, and official music videos.</p>
-      <sub><code>Fuzzy Indexing</code> &nbsp;•&nbsp; <code>InnerTube Engine</code> &nbsp;•&nbsp; <code>Music Video Switching</code></sub>
-    </td>
-    <td width="50%" valign="top">
       <h3>🛡️ Strictly Zero Ads & Privacy-First</h3>
       <p>No audio advertisements, no visual popups, no telemetry trackers, and no targeted data profiling. Completely open source and auditable under the MIT license.</p>
       <sub><code>100% Ad-Free</code> &nbsp;•&nbsp; <code>Zero Tracking</code> &nbsp;•&nbsp; <code>MIT Open Source</code></sub>
+    </td>
+    <td width="50%" valign="top">
+      <h3>🔒 Hardened Android Security & Keystore Encryption</h3>
+      <p>Backup extraction blocked via <code>android:allowBackup="false"</code>, R8/ProGuard bytecode obfuscation enabled, and all auth tokens encrypted in hardware Keystore / Keychain.</p>
+      <sub><code>Hardware Keystore</code> &nbsp;•&nbsp; <code>R8 Obfuscation</code> &nbsp;•&nbsp; <code>Zero Token Leaks</code></sub>
     </td>
   </tr>
 </table>
@@ -327,13 +351,13 @@
       <td><b>🤖 Android (Modern)</b></td>
       <td>ARM64 Split APK · <i>Recommended for Pixel, Galaxy, OnePlus, Xiaomi, Nothing, Sony</i></td>
       <td align="center"><code>15.2 MB</code></td>
-      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.13/zenify-v1.0.13.apk"><b>⬇️ Download APK</b></a></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.14/zenify-v1.0.14.apk"><b>⬇️ Download APK</b></a></td>
     </tr>
     <tr>
       <td><b>🌐 Android (Universal)</b></td>
       <td>All Architectures (`arm64-v8a`, `armeabi-v7a`, `x86_64`) · <i>Works on every Android device</i></td>
       <td align="center"><code>34.6 MB</code></td>
-      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.13/zenify-v1.0.13-universal.apk"><b>⬇️ Download Universal</b></a></td>
+      <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.14/zenify-v1.0.14.apk"><b>⬇️ Download Universal</b></a></td>
     </tr>
     <tr>
       <td><b>🍎 Web & iOS (PWA)</b></td>
@@ -344,7 +368,7 @@
     <tr>
       <td><b>📦 GitHub Releases</b></td>
       <td>All Release Packages, Release Notes & SHA-256 Checksums</td>
-      <td align="center"><code>Build 17</code></td>
+      <td align="center"><code>Build 16</code></td>
       <td align="right"><a href="https://github.com/hackerstudent29/Zenify/releases"><b>View Releases</b></a></td>
     </tr>
   </tbody>
@@ -360,8 +384,8 @@
   <summary><b>📱 Step-by-Step Android Installation Guide</b></summary>
   <br />
   <ol>
-    <li>Tap <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.13/zenify-v1.0.13.apk"><b>Download APK</b></a> on your Android device (or choose the Universal APK if using an older 32-bit device or emulator).</li>
-    <li>When the download completes, tap the notification or locate <code>zenify-v1.0.13.apk</code> in your device's <b>Files</b> or <b>Downloads</b> app.</li>
+    <li>Tap <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.0.14/zenify-v1.0.14.apk"><b>Download APK</b></a> on your Android device (or choose the Universal APK if using an older 32-bit device or emulator).</li>
+    <li>When the download completes, tap the notification or locate <code>zenify-v1.0.14.apk</code> in your device's <b>Files</b> or <b>Downloads</b> app.</li>
     <li>If prompted, toggle <i>"Allow from this source"</i> in your browser or file manager settings.</li>
     <li>Tap <b>Install</b>, open Zenify, and experience high-fidelity ad-free music instantly!</li>
   </ol>
