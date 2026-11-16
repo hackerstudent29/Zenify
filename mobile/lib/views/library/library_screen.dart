@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
@@ -9,8 +10,8 @@ import 'package:flutter/cupertino.dart'
         CupertinoIcons,
         CupertinoPageRoute,
         CupertinoSearchTextField,
-        CupertinoSliverRefreshControl;
-import 'package:flutter/foundation.dart';
+        CupertinoSliverRefreshControl,
+        CupertinoTextField;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -18,16 +19,19 @@ import 'package:provider/provider.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_typography.dart';
+import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
-import '../../services/api_service.dart';
+import '../../services/dock_visibility.dart';
+import '../../services/download_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
+import '../../services/youtube_link_importer.dart';
 import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
 import '../details/artist_screen.dart';
@@ -67,7 +71,8 @@ enum _Cat {
   artists('Artists', Icons.mic_external_on_rounded),
   albums('Albums', Icons.album_rounded),
   songs('Songs', Icons.music_note_rounded),
-  liked('Liked Songs', Icons.favorite_rounded);
+  liked('Liked Songs', Icons.favorite_rounded),
+  downloaded('Downloaded', CupertinoIcons.arrow_down_circle_fill);
 
   const _Cat(this.label, this.icon);
   final String label;
@@ -289,51 +294,587 @@ Future<UserPlaylist?> _createPlaylist(BuildContext c, {Track? first}) async {
   return p;
 }
 
-Future<void> _importPlaylist(BuildContext c) async {
-  final url = await _promptName(c, title: 'Import Playlist', confirm: 'Import');
-  if (url == null || url.trim().isEmpty || !c.mounted) return;
-
-  IslandNotifier.instance.show(
-    IslandNotification(
-      id: 'import_fetching',
-      title: 'Importing…',
-      body: 'Fetching playlist from link',
-      leading: const Icon(CupertinoIcons.arrow_down_circle, color: Color(0xFFE11D48), size: 18),
+Future<void> _importPlaylist(BuildContext c, {UserPlaylist? targetPlaylist}) async {
+  HapticFeedback.lightImpact();
+  await DockVisibility.runModal(
+    () => showModalBottomSheet<void>(
+      context: c,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      isScrollControlled: true,
+      enableDrag: true,
+      builder: (ctx) => _ImportLinkBottomSheetContent(targetPlaylist: targetPlaylist),
     ),
   );
+}
 
-  try {
-    final res = await ApiService.importPlaylist(url.trim());
-    if (res != null && c.mounted) {
-      final name = (res['name'] ?? res['title'] ?? 'Imported Playlist').toString();
-      final rawTracks = res['tracks'];
-      final List<Track> tracks = [];
-      if (rawTracks is List) {
-        for (final pt in rawTracks) {
-          final dynamic rawItem = (pt is Map && pt['track'] != null) ? pt['track'] : pt;
-          if (rawItem is Map) {
-            final map = Map<String, dynamic>.from(rawItem);
-            tracks.add(Track.fromJson(map));
-          }
-        }
+class _ImportLinkBottomSheetContent extends StatefulWidget {
+  const _ImportLinkBottomSheetContent({this.targetPlaylist});
+  final UserPlaylist? targetPlaylist;
+
+  @override
+  State<_ImportLinkBottomSheetContent> createState() =>
+      _ImportLinkBottomSheetContentState();
+}
+
+class _ImportLinkBottomSheetContentState
+    extends State<_ImportLinkBottomSheetContent> {
+  final TextEditingController _ctrl = TextEditingController();
+  bool _loading = false;
+  String? _statusText;
+  String? _error;
+  String? _clipboardCandidate;
+  String _targetMode = 'new';
+  String? _selectedExistingId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.targetPlaylist != null) {
+      _targetMode = 'existing';
+      _selectedExistingId = widget.targetPlaylist!.id;
+    } else {
+      final playlists = LibraryStore.instance.playlists;
+      if (playlists.isNotEmpty) {
+        _selectedExistingId = playlists.first.id;
       }
-      final store = LibraryStore.instance;
-      final p = store.importPlaylist(name, tracks);
-      HapticFeedback.mediumImpact();
-      _push(c, _PlaylistPage(p));
-      return;
     }
-  } catch (e) {
-    if (kDebugMode) debugPrint('[LibraryScreen] importPlaylist error: $e');
+    _checkClipboard();
   }
 
-  if (c.mounted) {
-    IslandNotifier.instance.show(
-      IslandNotification(
-        id: 'import_fail',
-        title: 'Import Failed',
-        body: 'Check the URL and try again',
-        leading: const Icon(CupertinoIcons.exclamationmark_circle, color: Color(0xFFE11D48), size: 18),
+  Future<void> _checkClipboard() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim() ?? '';
+      if (text.contains('youtube.com') ||
+          text.contains('youtu.be') ||
+          text.contains('spotify.com') ||
+          text.startsWith('PL') ||
+          text.startsWith('OLAK') ||
+          text.startsWith('MPREb_')) {
+        if (mounted) {
+          setState(() => _clipboardCandidate = text);
+        }
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final text = _ctrl.text.trim();
+    if (text.isEmpty) {
+      setState(() => _error = 'Please paste a valid YouTube or YouTube Music link.');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _statusText = 'Connecting to InnerTube…';
+      _error = null;
+    });
+
+    try {
+      final result = await YouTubeLinkImporter.instance.resolve(text);
+      if (!mounted) return;
+
+      if (result == null || result.tracks.isEmpty) {
+        setState(() {
+          _loading = false;
+          _statusText = null;
+          _error = 'Could not fetch tracks. Ensure the link is public or unlisted.';
+        });
+        return;
+      }
+
+      final store = LibraryStore.instance;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      if (_targetMode == 'existing' && _selectedExistingId != null) {
+        store.addTracksToPlaylist(_selectedExistingId!, result.tracks);
+        final targetP = store.playlistById(_selectedExistingId!);
+        if (targetP != null && widget.targetPlaylist == null) {
+          _push(context, _PlaylistPage(targetP));
+        }
+      } else {
+        final p = store.importPlaylist(result.title, result.tracks);
+        _push(context, _PlaylistPage(p));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _statusText = null;
+          _error = 'Error resolving link: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = LibraryStore.instance;
+    final playlists = store.playlists;
+    final mq = MediaQuery.of(context);
+    final isTargetLocked = widget.targetPlaylist != null;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+      child: AppleGlass(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        blur: 32,
+        tint: const Color(0xF0121214),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              10,
+              20,
+              math.max(18, mq.padding.bottom + 10),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4.5,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(2.5),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: _rose.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(CupertinoIcons.link, color: _rose, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            isTargetLocked
+                                ? 'Add Link to ${widget.targetPlaylist!.name}'
+                                : 'Paste YouTube Link',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'SF Pro Display',
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Playlist, album, or song link via InnerTube',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'SF Pro',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFFA1A1A6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PressableScale(
+                      onTap: () =>
+                          Navigator.of(context, rootNavigator: true).pop(),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const ShapeDecoration(
+                          shape: CircleBorder(),
+                          color: Color(0x1FFFFFFF),
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_clipboardCandidate != null && _ctrl.text.isEmpty) ...[
+                  const SizedBox(height: 12),
+                  PressableScale(
+                    scale: 0.98,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() {
+                        _ctrl.text = _clipboardCandidate!;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _rose.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _rose.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            CupertinoIcons.doc_on_clipboard,
+                            color: _rose,
+                            size: 15,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Paste from clipboard: ${_clipboardCandidate!}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: _rose,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                CupertinoTextField(
+                  controller: _ctrl,
+                  autofocus: true,
+                  placeholder: 'https://music.youtube.com/playlist?list=…',
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _submit(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                  style: const TextStyle(
+                    fontFamily: 'SF Pro',
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  placeholderStyle: TextStyle(
+                    fontFamily: 'SF Pro',
+                    color: Colors.white.withValues(alpha: 0.35),
+                    fontSize: 14,
+                  ),
+                  cursorColor: _rose,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E22),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.10),
+                    ),
+                  ),
+                  suffix: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _ctrl,
+                    builder: (_, val, _) {
+                      if (val.text.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: PressableScale(
+                            onTap: () async {
+                              final d = await Clipboard.getData(
+                                Clipboard.kTextPlain,
+                              );
+                              if (d?.text != null &&
+                                  d!.text!.trim().isNotEmpty) {
+                                setState(() => _ctrl.text = d.text!.trim());
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Paste',
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.clear_rounded,
+                            size: 18,
+                            color: Colors.white54,
+                          ),
+                          onPressed: () => setState(() => _ctrl.clear()),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                if (!isTargetLocked && playlists.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PressableScale(
+                          onTap: () => setState(() => _targetMode = 'new'),
+                          child: Container(
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: _targetMode == 'new'
+                                  ? _rose.withValues(alpha: 0.22)
+                                  : const Color(0xFF1E1E22),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _targetMode == 'new'
+                                    ? _rose.withValues(alpha: 0.6)
+                                    : Colors.white.withValues(alpha: 0.08),
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'New Playlist',
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _targetMode == 'new'
+                                    ? _rose
+                                    : Colors.white70,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: PressableScale(
+                          onTap: () => setState(() => _targetMode = 'existing'),
+                          child: Container(
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: _targetMode == 'existing'
+                                  ? _rose.withValues(alpha: 0.22)
+                                  : const Color(0xFF1E1E22),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _targetMode == 'existing'
+                                    ? _rose.withValues(alpha: 0.6)
+                                    : Colors.white.withValues(alpha: 0.08),
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'Existing Playlist',
+                              style: TextStyle(
+                                fontFamily: 'SF Pro',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _targetMode == 'existing'
+                                    ? _rose
+                                    : Colors.white70,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_targetMode == 'existing') ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E1E22),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.10),
+                        ),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedExistingId,
+                          isExpanded: true,
+                          dropdownColor: const Color(0xFF1E1E22),
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro',
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          items: playlists
+                              .map(
+                                (p) => DropdownMenuItem<String>(
+                                  value: p.id,
+                                  child: Text(
+                                    '${p.name} (${store.playlistTracks(p).length} songs)',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (id) {
+                            if (id != null) {
+                              setState(() => _selectedExistingId = id);
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: const TextStyle(
+                      fontFamily: 'SF Pro',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFFF453A),
+                    ),
+                  ),
+                ],
+                if (_statusText != null) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const CupertinoActivityIndicator(radius: 7, color: _rose),
+                      const SizedBox(width: 8),
+                      Text(
+                        _statusText!,
+                        style: const TextStyle(
+                          fontFamily: 'SF Pro',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: _rose,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: PressableScale(
+                        onTap: () =>
+                            Navigator.of(context, rootNavigator: true).pop(),
+                        child: Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E1E22),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontFamily: 'SF Pro',
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _ctrl,
+                        builder: (_, val, _) {
+                          final canSubmit =
+                              val.text.trim().isNotEmpty && !_loading;
+                          return PressableScale(
+                            scale: 0.96,
+                            onTap: canSubmit ? _submit : null,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 160),
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF18181B),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: canSubmit
+                                      ? _rose.withValues(alpha: 0.5)
+                                      : Colors.white.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_loading) ...[
+                                    const CupertinoActivityIndicator(
+                                      color: _rose,
+                                      radius: 8,
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  Text(
+                                    _loading ? 'IMPORTING…' : 'FETCH & IMPORT',
+                                    style: TextStyle(
+                                      fontFamily: 'SF Pro',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.2,
+                                      color: canSubmit ? _rose : Colors.white38,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -368,6 +909,71 @@ Future<void> _playlistMenu(BuildContext c, UserPlaylist p, {bool inDetail = fals
           icon: CupertinoIcons.shuffle,
           onTap: () => _shuffle(c, tracks),
         ),
+      if (tracks.isNotEmpty) ...[
+        () {
+          final dl = DownloadService.instance;
+          final allDl = tracks.every((t) => dl.isDownloaded(t.id));
+          final someDownloading = tracks.any((t) => dl.isDownloading(t.id));
+          if (allDl) {
+            return ZenDropdownItem(
+              title: 'Remove Playlist from Downloads',
+              subtitle: '${tracks.length} songs stored offline',
+              icon: CupertinoIcons.arrow_down_circle_fill,
+              isDestructive: true,
+              onTap: () async {
+                for (final t in tracks) {
+                  await dl.deleteDownload(t.id);
+                }
+                HapticFeedback.lightImpact();
+                IslandNotifier.instance.show(
+                  IslandNotification(
+                    id: 'del_playlist_dl_${DateTime.now().millisecondsSinceEpoch}',
+                    title: 'Downloads Removed',
+                    body: '${p.name} removed from offline storage',
+                    leading: const Icon(CupertinoIcons.trash, color: Colors.white70, size: 18),
+                  ),
+                );
+              },
+            );
+          } else if (someDownloading) {
+            return ZenDropdownItem(
+              title: 'Downloading Playlist…',
+              subtitle: 'Saving tracks for offline playback',
+              icon: CupertinoIcons.arrow_down_circle,
+              iconColor: const Color(0xFFE11D48),
+              onTap: () {},
+            );
+          } else {
+            return ZenDropdownItem(
+              title: 'Download Playlist',
+              subtitle: '${tracks.length} songs · Under ~${(tracks.length * 3.8).toStringAsFixed(0)} MB',
+              icon: CupertinoIcons.arrow_down_circle,
+              iconColor: const Color(0xFFE11D48),
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                IslandNotifier.instance.show(
+                  IslandNotification(
+                    id: 'dl_playlist_${DateTime.now().millisecondsSinceEpoch}',
+                    title: 'Downloading Playlist',
+                    body: 'Downloading ${tracks.length} songs for offline listening',
+                    leading: const Icon(CupertinoIcons.arrow_down_circle, color: Color(0xFFE11D48), size: 18),
+                  ),
+                );
+                dl.downloadBulk(tracks).then((count) {
+                  IslandNotifier.instance.show(
+                    IslandNotification(
+                      id: 'dl_playlist_done_${DateTime.now().millisecondsSinceEpoch}',
+                      title: 'Playlist Downloaded',
+                      body: '$count songs from ${p.name} saved offline',
+                      leading: const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFFE11D48), size: 18),
+                    ),
+                  );
+                });
+              },
+            );
+          }
+        }(),
+      ],
       if (inDetail)
         ZenDropdownItem(
           title: 'Add Songs…',
@@ -600,6 +1206,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
         _push(context, const _SongsPage());
       case _Cat.liked:
         _push(context, const _LikedPage());
+      case _Cat.downloaded:
+        _push(context, const _DownloadedPage());
     }
   }
 
@@ -1792,6 +2400,332 @@ class _LikedPageState extends State<_LikedPage> {
       );
 }
 
+class _DownloadedPage extends StatefulWidget {
+  const _DownloadedPage();
+
+  @override
+  State<_DownloadedPage> createState() => _DownloadedPageState();
+}
+
+class _DownloadedPageState extends State<_DownloadedPage> {
+  final _q = TextEditingController();
+  _Sort _sort = _Sort.recent;
+
+  @override
+  void dispose() {
+    _q.dispose();
+    super.dispose();
+  }
+
+  void _showDownloadedOptions(BuildContext ctx) {
+    HapticFeedback.selectionClick();
+    final dl = DownloadService.instance;
+    ZenDropdown.show<void>(
+      context: ctx,
+      title: 'Downloaded Music',
+      subtitle: '${dl.downloadedCount} songs · ${dl.formattedTotalSize} total',
+      items: [
+        if (dl.downloadedCount > 0)
+          ZenDropdownItem(
+            title: 'Delete All Downloads',
+            subtitle: 'Free up ${dl.formattedTotalSize} of storage',
+            icon: CupertinoIcons.trash,
+            isDestructive: true,
+            onTap: () async {
+              final ok = await _confirm(
+                ctx,
+                title: 'Delete All Downloads?',
+                message: 'This will remove all ${dl.downloadedCount} downloaded songs from offline storage.',
+                action: 'Delete All',
+              );
+              if (ok) {
+                await dl.deleteAllDownloads();
+                HapticFeedback.mediumImpact();
+                IslandNotifier.instance.show(
+                  IslandNotification(
+                    id: 'delete_all_dl_${DateTime.now().millisecondsSinceEpoch}',
+                    title: 'All Downloads Removed',
+                    body: 'Storage freed up',
+                    leading: const Icon(CupertinoIcons.trash, color: Colors.white70, size: 18),
+                  ),
+                );
+              }
+            },
+          ),
+      ],
+    );
+  }
+
+  List<DownloadedSong> _filterAndSort(List<DownloadedSong> items, String query, _Sort sort) {
+    var list = items;
+    final q = query.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list
+          .where((s) =>
+              s.title.toLowerCase().contains(q) ||
+              s.artist.toLowerCase().contains(q) ||
+              s.album.toLowerCase().contains(q))
+          .toList();
+    }
+    switch (sort) {
+      case _Sort.recent:
+        list.sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
+      case _Sort.title:
+        list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      case _Sort.artist:
+        list.sort((a, b) => a.artist.toLowerCase().compareTo(b.artist.toLowerCase()));
+    }
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: DownloadService.instance,
+        builder: (ctx, _) {
+          final dl = DownloadService.instance;
+          final empty = dl.downloadedCount == 0;
+          final downloadedSongs = _filterAndSort(dl.downloadedSongs, _q.text, _sort);
+          final tracks = downloadedSongs.map((s) => s.toTrack()).toList();
+
+          return _page(
+            title: 'Downloaded',
+            previous: 'Library',
+            trailing: _CircleBtn(Icons.more_horiz_rounded, () => _showDownloadedOptions(ctx)),
+            slivers: [
+              if (!empty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _fill,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _hair),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: _rose.withValues(alpha: 0.18),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(CupertinoIcons.arrow_down_circle_fill, color: _rose, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${dl.downloadedCount} Songs Available Offline', style: _t(15, w: FontWeight.w600)),
+                                Text('Total Storage: ${dl.formattedTotalSize} · Strict < 5 MB per song', style: _t(12, c: _sub)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _Search(controller: _q, hint: 'Find in Downloads', onChanged: (_) => setState(() {})),
+                ),
+              ],
+              ..._downloadedSongSlivers(
+                ctx,
+                downloadedSongs,
+                tracks,
+                sort: _sort,
+                onSort: () => _sortSheet(ctx, _sort, (v) => setState(() => _sort = v)),
+                empty: _Empty(
+                  icon: empty ? CupertinoIcons.arrow_down_circle : Icons.search_off_rounded,
+                  title: empty ? 'No Downloaded Songs' : 'No Results',
+                  message: empty
+                      ? 'Tap the three dots on any song, album, or playlist and choose “Download” for 100% offline playback.'
+                      : 'Nothing in Downloads matches “${_q.text.trim()}”.',
+                ),
+              ),
+            ],
+          );
+        },
+      );
+}
+
+List<Widget> _downloadedSongSlivers(
+  BuildContext c,
+  List<DownloadedSong> downloadedSongs,
+  List<Track> songs, {
+  required _Sort sort,
+  required VoidCallback onSort,
+  required Widget empty,
+}) {
+  if (downloadedSongs.isEmpty) return [SliverToBoxAdapter(child: empty)];
+  return [
+    SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 6),
+        child: Column(
+          children: [
+            _PlayShuffle(onPlay: () => _play(c, songs, 0), onShuffle: () => _shuffle(c, songs)),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: PressableScale(
+                onTap: onSort,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(sort.label, style: _t(15, w: FontWeight.w600, c: _rose)),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.unfold_more_rounded, size: 18, color: _rose),
+                  ]),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+    SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (ctx, i) {
+          final s = downloadedSongs[i];
+          final t = songs[i];
+          return Dismissible(
+            key: ValueKey('dl_${s.id}'),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 24),
+              color: Colors.red.withValues(alpha: 0.8),
+              child: const Icon(CupertinoIcons.trash, color: Colors.white, size: 22),
+            ),
+            onDismissed: (_) async {
+              HapticFeedback.mediumImpact();
+              await DownloadService.instance.deleteDownload(s.id);
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'dismiss_dl_${s.id}',
+                  title: 'Removed from Downloads',
+                  body: t.title,
+                  leading: const Icon(CupertinoIcons.trash, color: Colors.white70, size: 18),
+                ),
+              );
+            },
+            child: _DownloadedSongRow(
+              downloadedSong: s,
+              track: t,
+              onTap: () => _play(ctx, songs, i),
+              onLong: () => _trackActions(ctx, t),
+              trailing: _MoreBtn(() => _trackActions(ctx, t)),
+            ),
+          );
+        },
+        childCount: downloadedSongs.length,
+      ),
+    ),
+  ];
+}
+
+class _DownloadedSongRow extends StatelessWidget {
+  const _DownloadedSongRow({
+    required this.downloadedSong,
+    required this.track,
+    required this.onTap,
+    required this.onLong,
+    required this.trailing,
+  });
+
+  final DownloadedSong downloadedSong;
+  final Track track;
+  final VoidCallback onTap, onLong;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) => Selector<PlayerState, ({Object? id, bool playing})>(
+        selector: (_, p) => (id: p.currentTrack?.id, playing: p.isPlaying),
+        builder: (context, s, child) {
+          final active = s.id == track.id;
+          return PressableScale(
+            scale: 0.985,
+            onTap: onTap,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onLongPress: onLong,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 20, right: 8),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _Frame(radius: 6, child: _Cover(track.coverUrl, radius: 0)),
+                          if (active)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                color: Colors.black.withValues(alpha: 0.45),
+                                child: _EqBars(playing: s.playing),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        height: 62,
+                        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _hair, width: 0.5))),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    MediaNormalizer.cleanCompactTitle(track.title),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: _t(16, c: active ? _rose : Colors.white),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      const Icon(CupertinoIcons.arrow_down_circle_fill, color: _rose, size: 12),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          '${track.artist} • ${downloadedSong.formattedSize}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: _t(13, c: _sub),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            trailing,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+}
+
 /* ═══════════════════════════════════════════════════════════════════
  *  Rows & small widgets
  * ═══════════════════════════════════════════════════════════════════ */
@@ -2099,19 +3033,37 @@ class _Cover extends StatelessWidget {
       color: Colors.white.withValues(alpha: 0.06), child: const Icon(Icons.music_note_rounded, color: Colors.white24));
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: url.isEmpty
-            ? _ph
-            : CachedNetworkImage(
-                imageUrl: url,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                fadeInDuration: const Duration(milliseconds: 180),
-                errorWidget: (context, u, e) => _ph,
-              ),
+  Widget build(BuildContext context) {
+    Widget content;
+    final isLocal = url.startsWith('file://') || url.startsWith('/');
+    if (url.isEmpty) {
+      content = _ph;
+    } else if (isLocal) {
+      final f = File(url.replaceFirst('file://', ''));
+      content = f.existsSync()
+          ? Image.file(
+              f,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (_, _, _) => _ph,
+            )
+          : _ph;
+    } else {
+      content = CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        fadeInDuration: const Duration(milliseconds: 180),
+        errorWidget: (context, u, e) => _ph,
       );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: content,
+    );
+  }
 }
 
 class _Avatar extends StatelessWidget {

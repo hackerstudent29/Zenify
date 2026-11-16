@@ -19,6 +19,7 @@ import '../../design_system/zen.dart';
 import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/download_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
@@ -749,6 +750,10 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
 
   void _showMore(bool saved, String cover) {
     HapticFeedback.selectionClick();
+    final dl = DownloadService.instance;
+    final allDownloaded = _tracks.isNotEmpty && _tracks.every((t) => dl.isDownloaded(t.id));
+    final someDownloading = _tracks.any((t) => dl.isDownloading(t.id));
+
     ZenDropdown.show<void>(
       context: context,
       title: _displayAlbumTitle,
@@ -762,6 +767,64 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
           icon: saved ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.plus_circle,
           onTap: () => _toggleSaved(cover),
         ),
+        if (allDownloaded)
+          ZenDropdownItem(
+            title: 'Remove Album from Downloads',
+            subtitle: '${_tracks.length} songs stored offline',
+            icon: CupertinoIcons.arrow_down_circle_fill,
+            isDestructive: true,
+            onTap: () async {
+              for (final t in _tracks) {
+                await dl.deleteDownload(t.id);
+              }
+              HapticFeedback.lightImpact();
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'del_album_dl_${DateTime.now().millisecondsSinceEpoch}',
+                  title: 'Downloads Removed',
+                  body: '$_displayAlbumTitle removed from offline storage',
+                  leading: const Icon(CupertinoIcons.trash, color: Colors.white70, size: 18),
+                ),
+              );
+              if (mounted) setState(() {});
+            },
+          )
+        else if (someDownloading)
+          ZenDropdownItem(
+            title: 'Downloading Album…',
+            subtitle: 'Saving tracks for offline playback',
+            icon: CupertinoIcons.arrow_down_circle,
+            iconColor: const Color(0xFFE11D48),
+            onTap: () {},
+          )
+        else if (_tracks.isNotEmpty)
+          ZenDropdownItem(
+            title: 'Download Album',
+            subtitle: '${_tracks.length} songs · Under ~${(_tracks.length * 3.8).toStringAsFixed(0)} MB',
+            icon: CupertinoIcons.arrow_down_circle,
+            iconColor: const Color(0xFFE11D48),
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'dl_album_${DateTime.now().millisecondsSinceEpoch}',
+                  title: 'Downloading Album',
+                  body: 'Downloading ${_tracks.length} songs for offline listening',
+                  leading: const Icon(CupertinoIcons.arrow_down_circle, color: Color(0xFFE11D48), size: 18),
+                ),
+              );
+              dl.downloadBulk(_tracks).then((count) {
+                IslandNotifier.instance.show(
+                  IslandNotification(
+                    id: 'dl_album_done_${DateTime.now().millisecondsSinceEpoch}',
+                    title: 'Album Downloaded',
+                    body: '$count songs from $_displayAlbumTitle saved offline',
+                    leading: const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFFE11D48), size: 18),
+                  ),
+                );
+              });
+            },
+          ),
         ZenDropdownItem(
           title: 'Shuffle Album',
           icon: CupertinoIcons.shuffle,

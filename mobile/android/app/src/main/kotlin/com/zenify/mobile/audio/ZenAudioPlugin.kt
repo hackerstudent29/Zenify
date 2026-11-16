@@ -254,6 +254,14 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         emit(mapOf("type" to "state", "value" to s, "buffering" to isBuffering))
     }
 
+    private fun resolveMediaUri(mediaId: String, isVideo: Boolean = false): Uri {
+        return if (mediaId.startsWith("/") || mediaId.startsWith("file://")) {
+            Uri.parse(if (mediaId.startsWith("file://")) mediaId else "file://$mediaId")
+        } else {
+            Uri.parse(if (isVideo) "zenify://video/$mediaId" else "zenify://media/$mediaId")
+        }
+    }
+
     private fun ensurePlayer(): ExoPlayer {
         player?.let { return it }
         val renderersFactory = object : DefaultRenderersFactory(ctx) {
@@ -419,7 +427,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         if (!isVideo) {
             p.clearVideoSurface()
             emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
-            val uri = Uri.parse("zenify://media/$mediaId")
+            val uri = resolveMediaUri(mediaId, false)
             val mediaItem = MediaItem.Builder()
                 .setMediaId(mediaId)
                 .setCustomCacheKey(mediaId)
@@ -606,7 +614,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
             .build()
 
         if (!isVideo) {
-            val uri = Uri.parse("zenify://media/$mediaId")
+            val uri = resolveMediaUri(mediaId, false)
             val mediaItem = MediaItem.Builder()
                 .setMediaId(mediaId)
                 .setCustomCacheKey(mediaId)

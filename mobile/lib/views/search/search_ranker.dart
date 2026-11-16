@@ -549,14 +549,18 @@ class SearchRanker {
       final qLower = intent.normalizedQuery;
 
       // Penalties for cover / live / karaoke if NOT requested
-      if (tLower.contains('cover') && !qLower.contains('cover'))
+      if (tLower.contains('cover') && !qLower.contains('cover')) {
         penalties += 0.15;
-      if (tLower.contains('karaoke') && !qLower.contains('karaoke'))
+      }
+      if (tLower.contains('karaoke') && !qLower.contains('karaoke')) {
         penalties += 0.20;
-      if (tLower.contains('reaction') && !qLower.contains('reaction'))
+      }
+      if (tLower.contains('reaction') && !qLower.contains('reaction')) {
         penalties += 0.30;
-      if (tLower.contains('live') && !qLower.contains('live'))
+      }
+      if (tLower.contains('live') && !qLower.contains('live')) {
         penalties += 0.08;
+      }
     } else if (item is SearchArtistItem) {
       if (item.isVerified) qualityBoost += 0.04;
     }
