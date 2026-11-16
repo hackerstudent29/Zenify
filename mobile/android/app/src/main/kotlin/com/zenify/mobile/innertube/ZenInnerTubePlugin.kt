@@ -268,7 +268,7 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                     val matched = songs.flatMap { it.artists }
                                         .firstOrNull { it.id != null && it.id.isNotBlank() && it.name.contains(artistName, ignoreCase = true) }
                                     if (matched != null && !matched.id.isNullOrBlank()) {
-                                        browseId = matched.id!!
+                                        browseId = matched.id
                                         Log.i("ZenInnerTube", "Resolved artist browseId from song artist credit: $browseId (${matched.name})")
                                     }
                                 } catch (e: Exception) {
@@ -494,7 +494,7 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                             "id" to p.id,
                                             "browseId" to cleanBrowseId,
                                             "playlistId" to p.id,
-                                            "title" to (p.title ?: albumTitle),
+                                            "title" to p.title,
                                             "artists" to listOf(mapOf("id" to null, "name" to (p.author?.name ?: artistName))),
                                             "thumbnail" to (p.thumbnail ?: ""),
                                             "year" to 2026,
@@ -582,7 +582,7 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                                 "id" to p.id,
                                                 "browseId" to cleanBrowseId,
                                                 "playlistId" to p.id,
-                                                "title" to (p.title ?: albumTitle),
+                                                "title" to p.title,
                                                 "artists" to listOf(mapOf("id" to null, "name" to (p.author?.name ?: artistName))),
                                                 "thumbnail" to (p.thumbnail ?: ""),
                                                 "year" to 2026,
@@ -608,7 +608,7 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         if (fallbackSearchQuery.isNotBlank()) {
                             val searchSongs = YouTube.search(fallbackSearchQuery, YouTube.SearchFilter.FILTER_SONG)
                             val songs = searchSongs.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
-                            val foundAlbum = songs.firstOrNull { it.album?.id != null && it.album?.id?.isNotBlank() == true }?.album
+                            val foundAlbum = songs.firstOrNull { it.album != null && it.album.id.isNotBlank() }?.album
                             if (foundAlbum != null && foundAlbum.id != cleanBrowseId) {
                                 val secondAlbumOutcome = YouTube.album(foundAlbum.id)
                                 if (secondAlbumOutcome.isSuccess) {
@@ -835,12 +835,6 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 "type" to "podcast"
             )
             is EpisodeItem -> songItemToMap(item.asSongItem()) + ("type" to "episode")
-            else -> mapOf(
-                "id" to item.id,
-                "title" to item.title,
-                "thumbnail" to item.thumbnail,
-                "type" to "unknown"
-            )
         }
     }
 

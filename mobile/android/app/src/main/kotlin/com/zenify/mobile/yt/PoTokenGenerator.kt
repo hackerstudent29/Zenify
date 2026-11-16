@@ -88,8 +88,8 @@ class PoTokenGenerator(private val context: Context) : TokenProvider {
                                             )
                                             cachedResult = result
                                             try {
-                                                v?.stopLoading()
-                                                v?.pauseTimers()
+                                                v.stopLoading()
+                                                v.pauseTimers()
                                             } catch (_: Throwable) {}
                                             if (cont.isActive) cont.resume(result)
                                         } else {

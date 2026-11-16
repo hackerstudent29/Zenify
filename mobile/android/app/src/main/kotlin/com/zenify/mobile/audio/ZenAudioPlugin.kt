@@ -88,7 +88,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                         p.playbackState != Player.STATE_ENDED &&
                         p.playbackState != Player.STATE_IDLE)
             )
-            if (active && p != null) {
+            if (active) {
                 emitProgressSnapshot(p)
                 // Adaptive frequency: 500ms when user is actively watching UI, 1000ms when in background/screen-off
                 val intervalMs = if (isAppInForeground) 500L else 1000L
