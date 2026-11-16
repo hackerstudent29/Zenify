@@ -75,7 +75,7 @@ export default function LocalLibraryPage() {
   // Fast Parallel Directory & Multi-file scan handler with Stem Filtering & Duplicate Prevention
   const handleDirectoryScan = async (filesList: FileList | File[]) => {
     const allAudioFiles = Array.from(filesList).filter(f => 
-      /\.(mp3|m4a|flac|wav|ogg|aac)$/i.test(f.name)
+      /\.(mp3|m4a|flac|alac|wav|ogg|aac|opus|aif|aiff|caf)$/i.test(f.name)
     );
 
     const nonStemFiles = allAudioFiles.filter(f => !isStemAudioFile(f.name));
