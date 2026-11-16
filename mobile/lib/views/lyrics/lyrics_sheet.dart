@@ -30,24 +30,27 @@ const double _kInterludeMin = kInterludeMinSeconds;
 const double _kSameStartEps = 0.35;
 
 /// Karaoke glyph-fill subtle scale peak (1.0 to ~1.03-1.05 max).
-/// Transform-only around glyph center, ease in, then ease back to 1.0 after fill passes.
 const double kKaraokeGlyphScalePeak = 1.04;
 
 /// Apple Music lyric typography (SF Pro Display).
 const FontWeight _kLyricWeight = FontWeight.w800;
 
-/// Three-dot interlude animation tunables.
+/// Three-dot interlude tunables. (Pulse constants are kept only so existing
+/// imports do not break - the dots no longer resize while waiting.)
 const double kDotPopInOvershoot = 1.25;
 const double kDotPulseScaleMin = 1.0;
 const double kDotPulseScaleMax = 1.4;
-const double kDotClosingDuration =
-    0.55; // seconds before next line to complete fade/shrink
-const int kDotStaggerMs = 120;
+const double kDotClosingDuration = 0.60; // seconds, pop-out before next line
+const int kDotStaggerMs = 110;
 
 /// Apple-style "waterfall": every line below the active one starts its glide a
 /// little later than the one above it.
 const int _kGlideStaggerMs = 38;
 const int _kGlideMaxLines = 9;
+const int _kGlideRange = 14;
+
+/// Where the TOP of the active line sits in the viewport (0..1).
+const double _kAnchor = 0.28;
 
 /// Typography (Apple Music / SF Pro style).
 const double _kWordGap = 0.27; // space between words, x font size
@@ -169,9 +172,6 @@ enum LyricsLang {
 // Same-timing lines
 // ---------------------------------------------------------------------------
 
-/// Lines with (almost) the same start time would let the 2nd line steal focus
-/// instantly, so the 1st never fills. Give each line in such a group its own
-/// consecutive slice of time so they play one after another, each fully filled.
 List<LyricLine> _spreadSimultaneous(List<LyricLine> src) {
   if (src.length < 2) return src;
   double sec(Duration d) => d.inMicroseconds / 1e6;
@@ -228,7 +228,6 @@ List<LyricLine> _spreadSimultaneous(List<LyricLine> src) {
     final gs = sec(group.first.start);
     final nextStart = j < src.length ? sec(src[j].start) : null;
 
-    // Each line's own length: from its timing if known, else from its text.
     final durs = <double>[
       for (final l in group)
         () {
@@ -267,14 +266,7 @@ class LyricsSheet extends StatelessWidget {
 
   final ValueChanged<bool>? onImmersiveChanged;
   final ValueListenable<bool>? immersiveListenable;
-
-  /// Flip to false to play the liquid "close" cascade, true to play "open".
-  /// Ignored when [revealAnimation] is supplied.
   final bool open;
-
-  /// Optional 0..1 animation owned by the parent (e.g. the side panel / sheet
-  /// transition). When given, every line is driven by it, so lyrics open and
-  /// close in perfect sync with the container.
   final Animation<double>? revealAnimation;
 
   static Duration _ms(dynamic v) =>
@@ -456,14 +448,14 @@ class _Depth {
 
 const _after = [
   _Depth(0.62, 0, 0.97),
-  _Depth(0.40, 0, 0.94),
-  _Depth(0.24, 0, 0.92),
-  _Depth(0.14, 0, 0.90),
+  _Depth(0.40, 1.2, 0.94),
+  _Depth(0.24, 2.6, 0.92),
+  _Depth(0.14, 4.0, 0.90),
 ];
 const _before = [
-  _Depth(0.80, 0, 0.96),
-  _Depth(0.60, 0, 0.93),
-  _Depth(0.42, 0, 0.90),
+  _Depth(0.80, 0.8, 0.96),
+  _Depth(0.60, 2.2, 0.93),
+  _Depth(0.42, 3.8, 0.90),
 ];
 
 _Depth _depthFor(
@@ -481,9 +473,7 @@ _Depth _depthFor(
   return reduce ? _Depth(d.o, 0, 1) : d;
 }
 
-/// A real damped spring sampled as a Curve. [settle] is how many seconds of
-/// simulation time the 0..1 range maps to - pick it so the spring has settled
-/// by t = 1 (about 4 / (ratio * sqrt(stiffness)) seconds).
+/// A real damped spring sampled as a Curve.
 class _SpringCurve extends Curve {
   _SpringCurve({
     double stiffness = 170,
@@ -505,7 +495,6 @@ class _SpringCurve extends Curve {
   double transformInternal(double t) => t >= 1 ? 1 : _sim.x(t * _settle);
 }
 
-/// Springs used across the file.
 final Curve _depthSpring = _SpringCurve();
 final Curve _glideSpring = _SpringCurve(
   stiffness: 120,
@@ -525,12 +514,19 @@ final Curve _thumbSpring = _SpringCurve(
 );
 const Curve _liquidCurve = Cubic(0.16, 1.0, 0.30, 1.0);
 
-/// One "scroll happened" event. Every tile turns it into its own spring.
+/// One "layout moved" event. Every tile turns it into its own spring that
+/// starts from where the tile used to be on screen.
+///
+/// Tiles with index < [pivot] start [before] px away from rest, tiles with
+/// index > [pivot] start [after] px away. The pivot tile itself is skipped.
+/// A plain scroll uses pivot = -1 and before == after == scroll delta.
 class _Glide {
-  const _Glide(this.id, this.delta, this.active);
+  const _Glide(this.id, this.active, this.pivot, this.before, this.after);
   final int id;
-  final double delta; // scroll distance in px (positive = content moved up)
   final int active;
+  final int pivot;
+  final double before;
+  final double after;
 }
 
 // ---------------------------------------------------------------------------
@@ -608,7 +604,6 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
   final _clock = ValueNotifier<double>(0);
   late final Ticker _ticker = createTicker(_onFrame);
 
-  /// Own open/close controller, used when the parent gives no animation.
   late final AnimationController _revealCtl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 950),
@@ -622,6 +617,10 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
   late List<_Item> _items;
   late List<GlobalKey> _keys;
   late String _sig;
+
+  /// Signed distance of every item from the active one (computed once per
+  /// active change instead of O(n) per tile per build).
+  List<int> _dists = const [];
 
   late int _offsetMs = widget.initialOffsetMs;
   late LyricsLang _lang = widget.initialLang;
@@ -639,12 +638,6 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
   Duration _lastElapsed = Duration.zero;
 
   bool _didFirstFollow = false;
-
-  /// True while a long animateTo is running (pinning must not fight it).
-  bool _animating = false;
-
-  /// Bumped on every move; stale pin loops stop themselves.
-  int _pinToken = 0;
 
   bool get _hasTranslation =>
       widget.lines.any((l) => (l.translation ?? '').trim().isNotEmpty);
@@ -667,7 +660,6 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
     }
     if (widget.immersiveListenable == null) _armIdle();
 
-    // Lines start hidden, then cascade in after the first (jump) positioning.
     if (widget.revealAnimation == null && widget.open) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _revealCtl.forward();
@@ -695,10 +687,9 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
     final sig = _signature(widget.lines);
     if (sig != _sig || old.isSynced != widget.isSynced) {
       _sig = sig;
-      _rebuildItems();
+      _rebuildItems(); // also resets _active to -1
       _manual = false;
       _didFirstFollow = false;
-      _active = -1;
       _publish(_posSeconds());
       WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
     }
@@ -711,7 +702,6 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _pinToken++;
     widget.immersiveListenable?.removeListener(_onExternalImmersive);
     widget.position.removeListener(_onPosition);
     _ticker.dispose();
@@ -762,8 +752,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
   // ----- items -----
 
   void _rebuildItems() {
-    // Lines that share (almost) the same start time are spread out so each
-    // one gets its own full fill animation instead of being skipped.
+    _active = -1;
     final L = widget.isSynced
         ? _spreadSimultaneous(widget.lines)
         : widget.lines;
@@ -774,6 +763,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
         _items.add(_Item.line(0, 0, l));
       }
       _keys = List.generate(_items.length, (_) => GlobalKey());
+      _computeDists();
       return;
     }
     double s(Duration d) => d.inMicroseconds / 1e6;
@@ -805,7 +795,6 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
       final known = knownEnd(L[i]);
       final end = known ?? math.min(nextStart, start + 7).toDouble();
 
-      // Convert explicit instrumental placeholder lines or dot markers into three-dot interlude gaps
       if (_isInstrumentalOrDots(L[i].text)) {
         _items.add(
           _Item.gap(start, hasNext ? nextStart : math.max(start + 4.0, end)),
@@ -817,7 +806,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
       final sg = _normSinger(L[i].singer);
       bool right;
       if (backing) {
-        right = true; // Backing vocals always align right like Apple Music
+        right = true;
       } else if (!duet) {
         right = false;
       } else if (sg == null) {
@@ -836,6 +825,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
       }
     }
     _keys = List.generate(_items.length, (_) => GlobalKey());
+    _computeDists();
   }
 
   // ----- smooth clock -----
@@ -881,130 +871,129 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
     _clock.value = eff;
     final i = _indexFor(eff);
     if (i != _active) {
-      setState(() => _active = i);
+      setState(() {
+        _active = i;
+        _computeDists();
+      });
       WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
     }
   }
 
   int _indexFor(double eff) {
     if (!widget.isSynced) return -1;
-    for (var i = _items.length - 1; i >= 0; i--) {
+    final n = _items.length;
+    // Fast path: still inside the active item (runs every frame).
+    if (_active >= 0 &&
+        _active < n &&
+        _items[_active].start <= eff &&
+        (_active + 1 >= n || _items[_active + 1].start > eff)) {
+      return _active;
+    }
+    for (var i = n - 1; i >= 0; i--) {
       if (_items[i].start <= eff) return i;
     }
     return -1;
   }
 
-  int _distFor(int i) {
-    if (!widget.isSynced || i == _active) return 0;
-    var n = 0;
-    if (i > _active) {
-      for (var j = _active + 1; j <= i; j++) {
-        if (j == i || !_items[j].collapsible) n++;
+  /// Distance (in "visible lines") of each item from the active one.
+  /// Bracket lines / dots only count when they are the target itself.
+  void _computeDists() {
+    final n = _items.length;
+    final d = List<int>.filled(n, 0);
+    if (widget.isSynced) {
+      var c = 0;
+      for (var i = _active + 1; i < n; i++) {
+        d[i] = 1 + c;
+        if (!_items[i].collapsible) c++;
       }
-      return math.max(1, n);
-    } else {
-      for (var j = i; j < _active; j++) {
-        if (j == i || !_items[j].collapsible) n++;
+      c = 0;
+      for (var i = math.min(_active, n) - 1; i >= 0; i--) {
+        d[i] = -(1 + c);
+        if (!_items[i].collapsible) c++;
       }
-      return -math.max(1, n);
     }
+    _dists = d;
   }
 
   // ----- scrolling -----
   //
-  // Apple Music does NOT animate one big scroll. The scroll position snaps to
-  // the new place and every line springs from its old screen position to the
-  // new one, with a small extra delay for each line further down. That is the
-  // "liquid waterfall". We do exactly that (small moves) and fall back to a
-  // smooth expo-out scroll for long jumps (e.g. after manual scrolling).
+  // Layout changes are always DISCRETE and happen in the same frame as the
+  // scroll correction, so nothing ever drifts or flickers. All smoothness
+  // comes from per-tile springs (the Apple Music "liquid waterfall"):
   //
-  // Bracket lines and interlude dots collapse their height AFTER they finish,
-  // which shifts everything below them. To stop the focused line from
-  // drifting up and then back down, _startPin() keeps it locked to its target
-  // spot, frame by frame, for a short window after every move.
+  //  * active line changes  -> jump the scroll, every tile springs from where
+  //    it was (waterfall delay for tiles below the active line).
+  //  * a bracket line / dots tile finishes its pop-out and leaves layout ->
+  //    _onTileCollapse() compensates the scroll in the same frame and the
+  //    tiles spring from their old screen position.
+  //  * a bracket line / dots tile becomes active -> its height eases open
+  //    inside the tile (nothing above it moves) and the lines below it are
+  //    pushed down smoothly.
 
   void _follow({bool forceAnimated = false}) {
     if (!widget.isSynced || !mounted || _manual || !_scroll.hasClients) return;
-    _startPin();
+    final pos = _scroll.position;
     double target;
     if (_active < 0) {
       target = 0;
     } else {
       final ro = _keys[_active].currentContext?.findRenderObject();
       if (ro == null) return;
-      target = RenderAbstractViewport.of(ro).getOffsetToReveal(ro, 0.30).offset;
+      // Anchor the TOP of the active line (independent of its own height, so
+      // an expanding bracket line never changes the target).
+      final top = RenderAbstractViewport.of(ro).getOffsetToReveal(ro, 0.0).offset;
+      target = top - pos.viewportDimension * _kAnchor;
     }
-    final pos = _scroll.position;
     target = target.clamp(pos.minScrollExtent, pos.maxScrollExtent).toDouble();
     final delta = target - pos.pixels;
     if (delta.abs() < 0.5) return;
 
     final reduce = MediaQuery.disableAnimationsOf(context);
     if ((!_didFirstFollow && !forceAnimated) || reduce) {
-      _animating = false;
       _scroll.jumpTo(target);
       _didFirstFollow = true;
       return;
     }
     _didFirstFollow = true;
 
+    // Always jump + spring the tiles (also for long jumps / seeking backwards),
+    // so the waterfall never goes missing.
     final vh = math.max(1.0, pos.viewportDimension);
-    if (delta.abs() <= vh * 0.9) {
-      _animating = false;
-      _scroll.jumpTo(target);
-      _glide.value = _Glide(++_glideId, delta, _active);
-    } else {
-      final ms = (420 + (delta.abs() / vh).clamp(0.0, 2.5) * 260).round().clamp(
-        420,
-        760,
-      );
-      _animating = true;
-      _scroll
-          .animateTo(
-            target,
-            duration: Duration(milliseconds: ms),
-            curve: _liquidCurve,
-          )
-          .whenComplete(() => _animating = false);
-    }
+    final shown = delta.clamp(-vh * 1.1, vh * 1.1).toDouble();
+    _scroll.jumpTo(target);
+    _glide.value = _Glide(++_glideId, _active, -1, shown, shown);
   }
 
-  /// While bracket lines / dots open and close, the layout above the focused
-  /// line changes size. For a short window after every move, keep the focused
-  /// line pinned at its target spot so it never drifts.
-  void _startPin([int ms = 1100]) {
-    final token = ++_pinToken;
-    final until = DateTime.now().add(Duration(milliseconds: ms));
-    void tick(Duration _) {
-      if (!mounted || token != _pinToken) return;
-      _pin();
-      if (DateTime.now().isBefore(until)) {
-        WidgetsBinding.instance.addPostFrameCallback(tick);
-      }
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback(tick);
-  }
-
-  void _pin() {
-    if (!widget.isSynced ||
-        _manual ||
-        _animating ||
-        _pointers > 0 ||
-        _active < 0 ||
-        !_scroll.hasClients) {
-      return;
-    }
-    final ro = _keys[_active].currentContext?.findRenderObject();
-    if (ro == null) return;
+  /// Called synchronously by a tile right before it leaves the layout.
+  void _onTileCollapse(int index, double h) {
+    if (h < 0.5 || !_scroll.hasClients || !mounted) return;
     final pos = _scroll.position;
-    final target = RenderAbstractViewport.of(ro)
-        .getOffsetToReveal(ro, 0.30)
-        .offset
-        .clamp(pos.minScrollExtent, pos.maxScrollExtent)
-        .toDouble();
-    if ((target - pos.pixels).abs() < 0.5) return;
-    _scroll.jumpTo(target); // layout compensation only, no glide
+
+    var above = index < _active;
+    if (_manual) {
+      final ro = _keys[index].currentContext?.findRenderObject();
+      above =
+          ro != null &&
+          RenderAbstractViewport.of(ro).getOffsetToReveal(ro, 0.0).offset <
+              pos.pixels + pos.viewportDimension * _kAnchor;
+    }
+
+    double before = 0, after = h;
+    if (above) {
+      final np = math.max(pos.minScrollExtent, pos.pixels - h);
+      final shift = pos.pixels - np;
+      if (shift > 0) {
+        if (_manual) {
+          pos.correctBy(-shift); // do not kill the user's drag / fling
+        } else {
+          _scroll.jumpTo(np);
+        }
+      }
+      before = -shift;
+      after = h - shift;
+    }
+    _glide.value = _Glide(++_glideId, _active, index, before, after);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _follow());
   }
 
   // ----- offset / language -----
@@ -1046,8 +1035,6 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
     final h = MediaQuery.sizeOf(context).height;
     final showControls = _hasTranslation || widget.isSynced;
 
-    // MaterialType.transparency => no fill, no elevation, but ink/text styles
-    // still work. The lyrics now draw on whatever is behind them.
     return Material(
       type: MaterialType.transparency,
       child: Listener(
@@ -1093,8 +1080,6 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
                     ),
                     padding: EdgeInsets.only(top: 28, bottom: h * 0.36),
                     child: Column(
-                      // stretch => every tile is full width, so duet
-                      // right-alignment and scale pivots work correctly.
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         for (var i = 0; i < _items.length; i++)
@@ -1109,10 +1094,9 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
                             synced: widget.isSynced,
                             current: widget.isSynced && i == _active,
                             past: widget.isSynced && i < _active,
-                            dist: _distFor(i),
+                            dist: _dists[i],
                             manual: _manual,
-                            onCollapsed: () => WidgetsBinding.instance
-                                .addPostFrameCallback((_) => _follow()),
+                            onCollapse: _onTileCollapse,
                             onTap: () {
                               final line = _items[i].line;
                               if (!widget.isSynced || line == null) return;
@@ -1128,6 +1112,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
                               setState(() {
                                 _manual = false;
                                 _active = i;
+                                _computeDists();
                               });
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 if (mounted) _follow(forceAnimated: true);
@@ -1203,7 +1188,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
 // ---------------------------------------------------------------------------
 // Line tile
 //   depth (opacity/blur/scale) spring  +  waterfall glide  +  open/close
-//   reveal cascade  +  pop in/out  +  tap highlight border
+//   reveal cascade  +  pop in/out  +  height ease-open for bracket / dots
 // ---------------------------------------------------------------------------
 
 class _LineTile extends StatefulWidget {
@@ -1221,7 +1206,7 @@ class _LineTile extends StatefulWidget {
     required this.dist,
     required this.manual,
     required this.onTap,
-    required this.onCollapsed,
+    required this.onCollapse,
   });
 
   final _Item item;
@@ -1233,7 +1218,7 @@ class _LineTile extends StatefulWidget {
   final bool synced, current, past, manual;
   final int dist;
   final VoidCallback onTap;
-  final VoidCallback onCollapsed;
+  final void Function(int index, double height) onCollapse;
 
   @override
   State<_LineTile> createState() => _LineTileState();
@@ -1241,15 +1226,17 @@ class _LineTile extends StatefulWidget {
 
 class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   late final AnimationController _d; // depth
-  late final AnimationController _pop; // collapsible pop in/out
+  late final AnimationController _pop; // collapsible pop in/out (visual)
   late final AnimationController _g; // waterfall glide
+  late final AnimationController _sz; // collapsible height 0..1
   late final CurvedAnimation _popCurve;
+  late final CurvedAnimation _szCurve;
 
   late _Depth _from, _to;
   bool _ready = false;
   bool _present = true; // takes layout space
   bool _pressed = false;
-  double _gFrom = 0; // px offset the glide starts from
+  double _gFrom = 0;
   Timer? _dt, _exit, _glideT;
 
   @override
@@ -1269,6 +1256,11 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
       curve: _popSpring,
       reverseCurve: Curves.easeInCubic,
     );
+    _sz = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
+    _szCurve = CurvedAnimation(parent: _sz, curve: _liquidCurve);
     _g = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 760),
@@ -1299,8 +1291,6 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   double get _glideY =>
       _gFrom * (1 - _glideSpring.transform(_g.value.clamp(0.0, 1.0)));
 
-  /// Reveal (open/close) progress for THIS line: lines cascade top -> bottom
-  /// when opening (spring) and bottom -> top when closing.
   double _revealP() {
     final v = widget.reveal.value;
     if (v >= 1.0) return 1.0;
@@ -1319,19 +1309,25 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   void _onGlide() {
     final g = widget.glide.value;
     if (g == null || !mounted) return;
+    if (widget.index == g.pivot) return; // the tile that just left layout
     final rel = widget.index - g.active;
-    if (rel.abs() > 12) return;
-    final cur = _glideY;
+    if (rel.abs() > _kGlideRange) return;
+    final d = widget.index < g.pivot ? g.before : g.after;
+    if (d.abs() < 0.5) return;
     // The tile must visually stay where it was: offset = old leftover + delta.
-    _gFrom = cur + g.delta;
+    _gFrom = _glideY + d;
     _g.value = 0;
     _glideT?.cancel();
     final delay = _reduce
         ? 0
         : (rel > 0 ? math.min(rel, _kGlideMaxLines) * _kGlideStaggerMs : 0);
-    _glideT = Timer(Duration(milliseconds: delay), () {
-      if (mounted) _g.forward(from: 0);
-    });
+    if (delay == 0) {
+      _g.forward(from: 0);
+    } else {
+      _glideT = Timer(Duration(milliseconds: delay), () {
+        if (mounted) _g.forward(from: 0);
+      });
+    }
   }
 
   void _setPressed(bool down) {
@@ -1348,7 +1344,20 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
       final show = !_collapsible || widget.current;
       _present = show;
       _pop.value = show ? 1 : 0;
+      _sz.value = show ? 1 : 0;
     }
+  }
+
+  /// Pop-out is done: leave the layout. The parent fixes the scroll offset in
+  /// this very same frame and springs the other tiles, so nothing jumps.
+  void _collapse() {
+    if (!mounted || widget.current || !_present) return;
+    final ro = context.findRenderObject();
+    final h = (ro is RenderBox && ro.hasSize) ? ro.size.height : 0.0;
+    widget.onCollapse(widget.index, h);
+    _pop.value = 0;
+    _sz.value = 0;
+    setState(() => _present = false);
   }
 
   @override
@@ -1360,14 +1369,11 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
         _exit?.cancel();
         _present = true;
         _pop.forward();
+        _sz.forward();
       } else if (!widget.current && old.current) {
         _pop.reverse();
         _exit?.cancel();
-        // Let the pop-out play, THEN collapse the height with AnimatedSize.
-        _exit = Timer(const Duration(milliseconds: 260), () {
-          if (!mounted) return;
-          setState(() => _present = false);
-        });
+        _exit = Timer(const Duration(milliseconds: 300), _collapse);
       }
     }
 
@@ -1383,6 +1389,8 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
           duration: Duration(milliseconds: _reduce ? 0 : 180),
           curve: Curves.easeOutCubic,
         );
+      } else if (_waterfall == 0) {
+        _d.forward(from: 0);
       } else {
         _dt = Timer(Duration(milliseconds: _reduce ? 0 : _waterfall), () {
           if (mounted) _d.forward(from: 0);
@@ -1399,24 +1407,17 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
     _glideT?.cancel();
     _d.dispose();
     _popCurve.dispose();
+    _szCurve.dispose();
     _pop.dispose();
+    _sz.dispose();
     _g.dispose();
     super.dispose();
   }
 
-  Widget _sized(Widget child) => AnimatedSize(
-    duration: const Duration(milliseconds: 560),
-    curve: _liquidCurve,
-    alignment: Alignment.topCenter,
-    clipBehavior: Clip.none,
-    onEnd: widget.onCollapsed,
-    child: child,
-  );
-
   @override
   Widget build(BuildContext context) {
     if (_collapsible && !_present) {
-      return _sized(const SizedBox(width: double.infinity, height: 0));
+      return const SizedBox(width: double.infinity, height: 0);
     }
 
     final it = widget.item;
@@ -1446,12 +1447,7 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
     Widget content;
     if (it.interlude) {
       content = Center(
-        child: _Dots(
-          clock: widget.clock,
-          pop: _pop,
-          start: it.start,
-          end: it.end,
-        ),
+        child: _Dots(clock: widget.clock, start: it.start, end: it.end),
       );
     } else {
       content = Column(
@@ -1489,7 +1485,9 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
                   fontFamilyFallback: _kFontFamilyFallback,
                   fontSize: 18,
                   height: _hasComplexScript(sub) ? 1.32 : 1.2,
-                  fontWeight: _hasComplexScript(sub) ? FontWeight.w700 : FontWeight.w600,
+                  fontWeight: _hasComplexScript(sub)
+                      ? FontWeight.w700
+                      : FontWeight.w600,
                   letterSpacing: _hasComplexScript(sub) ? 0.0 : 0.35,
                   color: Colors.white.withValues(
                     alpha: widget.current ? 0.85 : 0.6,
@@ -1507,22 +1505,18 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
         : (right ? Alignment.centerRight : Alignment.centerLeft);
     final interactive = widget.synced && widget.item.line != null;
 
-    // Inner: depth + press highlight. Lives inside a RepaintBoundary so the
-    // glide / reveal transforms below are cheap compositor transforms.
     final inner = RepaintBoundary(
       child: AnimatedBuilder(
         animation: Listenable.merge([_d, _pop]),
         child: content,
         builder: (context, child) {
           final dp = _cur;
-          // Interlude dots animate themselves; bracket lines use a tile pop.
-          final pv = (_collapsible && !it.interlude) ? _popCurve.value : 1.0;
+          // Dots own their scale; bracket lines pop as a whole tile.
+          final pv = _collapsible ? _popCurve.value : 1.0;
           final popScale = (_collapsible && !it.interlude)
               ? 0.5 + 0.5 * pv
               : 1.0;
-          final popOpacity = (_collapsible && !it.interlude)
-              ? pv.clamp(0.0, 1.0)
-              : 1.0;
+          final popOpacity = _collapsible ? pv.clamp(0.0, 1.0) : 1.0;
 
           Widget w = Transform.scale(
             scale: dp.s * popScale,
@@ -1541,8 +1535,6 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
           }
           w = Opacity(opacity: (dp.o * popOpacity).clamp(0.0, 1.0), child: w);
 
-          // No card / border / fill behind the text: the lyrics sit directly on
-          // the transparent background. Only a subtle spring press-scale.
           final tile = AnimatedScale(
             scale: _pressed ? 0.975 : 1.0,
             duration: Duration(milliseconds: _pressed ? 120 : 460),
@@ -1587,7 +1579,25 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
       },
     );
 
-    return _collapsible ? _sized(body) : body;
+    if (!_collapsible) return body;
+
+    // Bracket lines / dots ease their height open when they become active.
+    // Nothing above them moves, only the lines below are pushed down.
+    return AnimatedBuilder(
+      animation: _szCurve,
+      child: body,
+      builder: (context, child) {
+        final f = _szCurve.value.clamp(0.0, 1.0).toDouble();
+        return ClipRect(
+          clipBehavior: f < 0.999 ? Clip.hardEdge : Clip.none,
+          child: Align(
+            alignment: Alignment.topCenter,
+            heightFactor: f,
+            child: child,
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -1657,11 +1667,9 @@ class _WordLineState extends State<_WordLine>
       fontSize: fs,
       height: _kLineHeight,
       leadingDistribution: TextLeadingDistribution.even,
-      // Slightly reduced boldness for English lyrics (w600/w500); full heavy weight for Indic/Asian scripts.
       fontWeight: complex
           ? (widget.backing ? FontWeight.w700 : _kLyricWeight)
           : (widget.backing ? FontWeight.w500 : FontWeight.w600),
-      // Visible letter gaps for SF Pro English lyrics; neutral for complex glyphs.
       letterSpacing: complex ? 0.0 : 0.55,
       color: c,
     );
@@ -1732,7 +1740,6 @@ class _WordLineState extends State<_WordLine>
           lineStart + 0.5,
           ws.last.end.inMicroseconds / 1e6,
         );
-        // Measure by grapheme cluster counts rather than code units
         final totalClusters = tokens.fold<int>(
           0,
           (a, t) => a + t.characters.length,
@@ -1751,7 +1758,6 @@ class _WordLineState extends State<_WordLine>
       }
     } else {
       final dur = math.max(0.5, widget.end - widget.start);
-      // Measure by grapheme cluster counts rather than code units
       final totalClusters = tokens.fold<int>(
         0,
         (a, t) => a + t.characters.length,
@@ -1848,8 +1854,6 @@ class _WordLineState extends State<_WordLine>
       style: _style,
       p: raw.clamp(0.0, 1.0).toDouble(),
       settle: settle,
-      // settle is 1 on the current line and eases 1 -> 0 once it is sung, so
-      // the glow fades out with a smooth curve as the line moves on.
       glow: widget.plain
           ? 0.0
           : Curves.easeOut.transform(settle.clamp(0.0, 1.0)),
@@ -1857,7 +1861,7 @@ class _WordLineState extends State<_WordLine>
   }
 }
 
-/// One word: dim base, soft-edged white fill (left to right) and pure white glow (Apple Music v1.0.2 style).
+/// One word: dim base, soft-edged white fill (left to right) and white glow.
 class _Word extends StatelessWidget {
   const _Word({
     required this.text,
@@ -1889,6 +1893,20 @@ class _Word extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
+        Opacity(
+          opacity: 0.55,
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (r) => LinearGradient(
+                colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
+                stops: [0, a, b],
+              ).createShader(r),
+              child: Text(text, style: style(fs, Colors.white)),
+            ),
+          ),
+        ),
         Text(text, style: style(fs, _dim)),
         ShaderMask(
           blendMode: BlendMode.dstIn,
@@ -1896,14 +1914,7 @@ class _Word extends StatelessWidget {
             colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
             stops: [0, a, b],
           ).createShader(r),
-          child: Text(
-            text,
-            style: style(fs, Colors.white).copyWith(
-              shadows: const [
-                Shadow(color: Color(0x80FFFFFF), blurRadius: 6),
-              ],
-            ),
-          ),
+          child: Text(text, style: style(fs, Colors.white)),
         ),
       ],
     );
@@ -1911,121 +1922,108 @@ class _Word extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Interlude dots: Pop-in overshoot, active breathing pulse, smooth closing.
+// Interlude dots (Apple Music style)
+//   * each dot springs in one after another (small overshoot),
+//   * dots keep a FIXED size while waiting - only their brightness fills
+//     left to right with the gap's progress,
+//   * just before the next line the dots swell slightly and pop out one
+//     after another.
 // ---------------------------------------------------------------------------
 
 class _Dots extends StatelessWidget {
-  const _Dots({
-    required this.clock,
-    required this.pop,
-    required this.start,
-    required this.end,
-  });
+  const _Dots({required this.clock, required this.start, required this.end});
 
   final ValueListenable<double> clock;
-  final Animation<double> pop;
   final double start, end;
+
+  static const double _size = 13;
+  static const double _gap = 10;
 
   @override
   Widget build(BuildContext context) {
+    final span = math.max(0.6, end - start);
+    final closeStart = end - kDotClosingDuration;
+    const stagger = kDotStaggerMs / 1000.0;
+    const closeStagger = 0.07;
+    final closeSpan = kDotClosingDuration - closeStagger * 2;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 10, 0, 10),
-      child: AnimatedBuilder(
-        animation: Listenable.merge([clock, pop]),
-        builder: (context, _) {
-          final t = clock.value;
-          final span = math.max(0.6, end - start);
-
-          // If outside bounds or pop is zero, render empty space
-          if (t < start - 0.1 || t >= end || pop.value <= 0.001) {
-            return const SizedBox(height: 18);
-          }
-
-          final closingWindow = kDotClosingDuration;
-          final isClosing = t >= (end - closingWindow);
-          final closingFactor = isClosing
-              ? ((end - t) / closingWindow).clamp(0.0, 1.0)
-              : 1.0;
-          final closingEase = Curves.easeInOutCubic.transform(closingFactor);
-
+      child: ValueListenableBuilder<double>(
+        valueListenable: clock,
+        builder: (_, t, _) {
+          final progress = ((t - start) / span).clamp(0.0, 1.0);
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               for (var i = 0; i < 3; i++)
-                () {
-                  final dotDelay = i * (kDotStaggerMs / 1000.0);
-                  final dotTime = t - start - dotDelay;
-                  if (dotTime < 0.0) {
-                    return const SizedBox(width: 23, height: 18);
-                  }
-
-                  // 1. Pop-in phase: 0 -> kDotPopInOvershoot (1.25) -> 1.0
-                  const popInDuration = 0.40;
-                  final popInRaw = (dotTime / popInDuration).clamp(0.0, 1.0);
-                  final double popInScale;
-                  if (popInRaw < 1.0) {
-                    popInScale =
-                        Curves.easeOutBack.transform(popInRaw) *
-                        (kDotPopInOvershoot / 1.15);
-                  } else {
-                    popInScale = 1.0;
-                  }
-
-                  // 2. Active breathing pulse: 1.0 to 1.4, staggered like a wave of pops
-                  final wave =
-                      (math.sin((t - start) * 3.6 - i * 0.95) + 1.0) / 2.0;
-                  final activePulse =
-                      kDotPulseScaleMin +
-                      (kDotPulseScaleMax - kDotPulseScaleMin) * wave;
-
-                  final baseScale = popInRaw < 1.0 ? popInScale : activePulse;
-
-                  // 3. Closing phase: shrink to 0 + fade smoothly before next line
-                  final scale = (baseScale * closingEase * pop.value).clamp(
-                    0.0,
-                    2.0,
-                  );
-                  final opacity = (popInRaw * closingEase * pop.value).clamp(
-                    0.0,
-                    1.0,
-                  );
-
-                  final fillProg = ((t - start) / span);
-                  final fill = ((fillProg * 3.0) - i).clamp(0.0, 1.0);
-
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: Transform.scale(
-                      scale: scale,
-                      child: Opacity(
-                        opacity: opacity,
-                        child: Container(
-                          width: 13,
-                          height: 13,
-                          decoration: BoxDecoration(
-                            color: Color.lerp(
-                              const Color(0x66FFFFFF),
-                              Colors.white,
-                              fill,
-                            ),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.white.withValues(
-                                  alpha: 0.15 + 0.45 * fill,
-                                ),
-                                blurRadius: 4 + 8 * fill,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }(),
+                Padding(
+                  padding: EdgeInsets.only(right: i < 2 ? _gap : 0),
+                  child: _dot(t, i, progress, stagger, closeStart, closeStagger,
+                      closeSpan),
+                ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _dot(
+    double t,
+    int i,
+    double progress,
+    double stagger,
+    double closeStart,
+    double closeStagger,
+    double closeSpan,
+  ) {
+    // Pop in.
+    final inT = t - start - i * stagger;
+    final inP = (inT / 0.5).clamp(0.0, 1.0).toDouble();
+    var scale = inT <= 0 ? 0.0 : _popSpring.transform(inP);
+    var opacity = (inP * 3).clamp(0.0, 1.0).toDouble();
+
+    // Pop out: small swell, then shrink away.
+    final cu = ((t - closeStart - i * closeStagger) / closeSpan)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    if (cu > 0) {
+      const swell = 0.28;
+      if (cu < swell) {
+        scale *= 1 + 0.2 * Curves.easeOut.transform(cu / swell);
+      } else {
+        final k = Curves.easeInCubic.transform((cu - swell) / (1 - swell));
+        scale *= 1.2 * (1 - k);
+        opacity *= 1 - k;
+      }
+    }
+
+    if (scale <= 0.001 || opacity <= 0.001) {
+      return const SizedBox(width: _size, height: _size);
+    }
+
+    // Brightness fill only (no size change).
+    final fill = ((progress * 3.0) - i).clamp(0.0, 1.0).toDouble();
+
+    return Transform.scale(
+      scale: scale,
+      child: Opacity(
+        opacity: opacity,
+        child: Container(
+          width: _size,
+          height: _size,
+          decoration: BoxDecoration(
+            color: Color.lerp(const Color(0x66FFFFFF), Colors.white, fill),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.12 + 0.42 * fill),
+                blurRadius: 4 + 8 * fill,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2141,7 +2139,6 @@ class _Controls extends StatelessWidget {
                   ),
                   child: Stack(
                     children: [
-                      // Liquid thumb: one pill that springs between segments.
                       AnimatedAlign(
                         alignment: Alignment(-1 + 2 * idx / (n - 1), 0),
                         duration: const Duration(milliseconds: 520),
@@ -2237,4 +2234,4 @@ class _Controls extends StatelessWidget {
       ),
     );
   }
-}
+}

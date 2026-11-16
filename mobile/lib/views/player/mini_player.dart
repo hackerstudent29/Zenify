@@ -61,6 +61,8 @@ class MiniPlayer extends StatelessWidget {
                           height: 44,
                           child: CachedNetworkImage(
                             imageUrl: track.coverUrl,
+                            memCacheWidth: 140,
+                            memCacheHeight: 140,
                             fit: BoxFit.cover,
                             placeholder: (context, _) => Container(color: AppColors.surface2),
                             errorWidget: (context, error, stackTrace) => Container(

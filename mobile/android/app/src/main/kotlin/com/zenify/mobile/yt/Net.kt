@@ -18,6 +18,7 @@ object Net {
     val ok: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .dns(PreferIpv4Dns)
+            .connectionPool(okhttp3.ConnectionPool(8, 10, TimeUnit.MINUTES))
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)

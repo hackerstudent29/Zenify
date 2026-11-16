@@ -559,7 +559,8 @@ class PlayerShellState extends State<PlayerShell>
     _bigRectKey = key;
     setState(() {
       _bigRect = Rect.fromLTWH(
-        (mq.size.width - side) / 2, // Always 100% mathematically centered on screen
+        (mq.size.width - side) /
+            2, // Always 100% mathematically centered on screen
         tl.dy + (r.size.height - side) * 0.2, // near the top, like Apple Music
         side,
         side,
@@ -1165,7 +1166,9 @@ class PlayerShellState extends State<PlayerShell>
                 borderRadius: BorderRadius.vertical(
                   top: Radius.circular(t >= 0.98 ? 0.0 : radius),
                 ),
-                clipBehavior: t < 0.98 && radius > 0.1 ? Clip.antiAlias : Clip.none,
+                clipBehavior: t < 0.98 && radius > 0.1
+                    ? Clip.antiAlias
+                    : Clip.none,
                 child: Stack(
                   key: _sheetKey,
                   clipBehavior: Clip.none,
@@ -1183,25 +1186,26 @@ class PlayerShellState extends State<PlayerShell>
                           children: [
                             Container(color: const Color(0xFF121214)),
                             RepaintBoundary(
-                              child: ArtworkMeshBackground(
-                                coverUrl: MediaNormalizer.upgradeArtworkUrl(
-                                  ((_shownCover?.isNotEmpty == true
-                                          ? _shownCover
-                                          : track?.coverUrl) ??
-                                      ''),
+                              child: TickerMode(
+                                enabled: _open || t > 0.05,
+                                child: ArtworkMeshBackground(
+                                  key: ValueKey('artmesh_${track?.id ?? "none"}'),
+                                  coverUrl: MediaNormalizer.upgradeArtworkUrl(
+                                    track?.coverUrl ?? '',
+                                  ),
+                                  fallbackAsset: 'assets/images/z_logo.png',
+                                  imageProviderBuilder: (url) =>
+                                      CachedNetworkImageProvider(
+                                        MediaNormalizer.upgradeArtworkUrl(url),
+                                      ),
+                                  palette: _palette.isNotEmpty ? _palette : null,
+                                  paused: !_open && t < 0.05,
+                                  speed: 1.0,
+                                  backgroundColor: _palette.isNotEmpty
+                                      ? _palette.first
+                                      : const Color(0xFF121214),
+                                  scrimOpacity: 0.15,
                                 ),
-                                fallbackAsset: 'assets/images/z_logo.png',
-                                imageProviderBuilder: (url) =>
-                                    CachedNetworkImageProvider(
-                                      MediaNormalizer.upgradeArtworkUrl(url),
-                                    ),
-                                palette: _palette.isNotEmpty ? _palette : null,
-                                paused: !_playing,
-                                speed: 1.0,
-                                backgroundColor: _palette.isNotEmpty
-                                    ? _palette.first
-                                    : const Color(0xFF121214),
-                                scrimOpacity: 0.10,
                               ),
                             ),
                             // Scrim: NONE for lyrics (they sit directly on the

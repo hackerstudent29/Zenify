@@ -37,6 +37,8 @@ class MediaCard extends StatelessWidget {
     final imageWidget = cleanImg.isNotEmpty && cleanImg.startsWith('http')
         ? CachedNetworkImage(
             imageUrl: cleanImg,
+            memCacheWidth: (width * 2.2).toInt().clamp(100, 600),
+            memCacheHeight: (width * 2.2).toInt().clamp(100, 600),
             fit: BoxFit.cover,
             width: width,
             height: width,
