@@ -88,6 +88,7 @@ assets/images/Ram*
 *.so
 *.dylib
 yt-dlp*
+backend/yt-dlp.exe
 ffmpeg*
 ffprobe*
 
@@ -96,7 +97,9 @@ ffprobe*
 # ==============================================================================
 node_modules/
 dist/
+**/dist/
 build/
+**/build/
 .next/
 .vercel/
 coverage/
@@ -107,8 +110,11 @@ flutter_app/build/
 flutter_app/.dart_tool/
 mobile/build/
 mobile/.dart_tool/
+mobile/android/.gradle/
 *.apk
-!frontend/public/downloads/zenify.apk
+backend/public/downloads/
+frontend/dist/
+frontend/public/downloads/
 /room_together_guide/
 *.aab
 *.ipa
