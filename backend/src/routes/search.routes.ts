@@ -11,6 +11,7 @@ import { upgradeInnerTubeArtwork } from '../utils/innertube-artwork';
 const searchSchema = z.object({
   q: z.string().min(1),
   limit: z.coerce.number().default(16),
+  source: z.enum(['all', 'youtube', 'jiosaavn']).optional().default('all'),
 });
 
 const autocompleteSchema = z.object({
@@ -232,6 +233,69 @@ function scoreItem(
 }
 
 export async function searchRoutes(server: FastifyInstance) {
+  const runYoutubeSearch = async (cleanQ: string) => {
+    const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
+    const ytRaw = await ExternalMetadataService.searchYoutubeMusic(cleanQ);
+    const tracks = ytRaw.map((item: any) => {
+      const videoId = item.videoId || item.id?.replace(/^yt-/, '');
+      const artistName = item.artist?.name || item.artist || 'YouTube Artist';
+      const cover = upgradeInnerTubeArtwork(item.thumbnail || item.coverUrl, {
+        videoId,
+        kind: item.isVideo ? 'video' : 'song'
+      });
+      const title = item.title || 'YouTube Track';
+      const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${title}`)}&trackId=yt-${videoId}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artistName)}`;
+      return {
+        id: `yt-${videoId}`,
+        title,
+        artist: { id: '', name: typeof artistName === 'string' ? artistName.trim() : 'YouTube Artist' },
+        album: { id: `yt-alb-${videoId}`, title: item.album?.title || item.album || 'YouTube Music', coverUrl: cover },
+        coverUrl: cover,
+        audioUrl: streamUrl,
+        duration: item.duration || 210,
+        source: 'youtube'
+      };
+    });
+
+    const artistMap = new Map<string, any>();
+    for (const t of tracks) {
+      const aName = t.artist.name;
+      if (aName && aName !== 'YouTube Artist' && !artistMap.has(aName.toLowerCase())) {
+        artistMap.set(aName.toLowerCase(), {
+          id: `yt-art-${encodeURIComponent(aName)}`,
+          name: aName,
+          imageUrl: t.coverUrl,
+          source: 'youtube'
+        });
+      }
+    }
+
+    const albumMap = new Map<string, any>();
+    for (const t of tracks) {
+      const albTitle = t.album.title;
+      if (albTitle && albTitle !== 'Single' && albTitle !== 'YouTube Music' && !albumMap.has(albTitle.toLowerCase())) {
+        albumMap.set(albTitle.toLowerCase(), {
+          id: t.album.id,
+          title: albTitle,
+          coverUrl: t.coverUrl,
+          artist: t.artist.name,
+          source: 'youtube'
+        });
+      }
+    }
+
+    const topResult = tracks.length > 0 ? { item: tracks[0], type: 'track' } : null;
+
+    return {
+      topResult,
+      tracks,
+      artists: Array.from(artistMap.values()).slice(0, 8),
+      albums: Array.from(albumMap.values()).slice(0, 8),
+      playlists: [],
+      otherVersions: []
+    };
+  };
+
   /**
    * 1. ULTRA-FAST HIGH-ACCURACY GLOBAL SEARCH
    * Runs Local PostgreSQL Indexed DB Search concurrently with External Catalog Search.
@@ -241,7 +305,7 @@ export async function searchRoutes(server: FastifyInstance) {
     schema: { querystring: searchSchema }
   }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
     const startTime = Date.now();
-    const { q, limit } = req.query;
+    const { q, limit, source } = req.query;
     const cleanQ = q.trim();
 
     if (!cleanQ) {
@@ -253,6 +317,16 @@ export async function searchRoutes(server: FastifyInstance) {
         playlists: [],
         otherVersions: []
       });
+    }
+
+    if (source === 'youtube') {
+      try {
+        const payload = await runYoutubeSearch(cleanQ);
+        return reply.send(payload);
+      } catch (err: any) {
+        server.log.warn(`[Search] YouTube direct search error: ${err.message}`);
+        return reply.status(500).send({ error: 'Failed to search YouTube Music', tracks: [] });
+      }
     }
 
     // 1. Resolve User ID, Language Weights & Storefront (Per-User Personalization)
@@ -879,33 +953,11 @@ export async function searchRoutes(server: FastifyInstance) {
   }, async (req: FastifyRequest<{ Querystring: z.infer<typeof searchSchema> }>, reply: FastifyReply) => {
     const { q } = req.query;
     const cleanQ = q.trim();
-    if (!cleanQ) return reply.send({ tracks: [] });
+    if (!cleanQ) return reply.send({ topResult: null, tracks: [], artists: [], albums: [], playlists: [], otherVersions: [] });
 
     try {
-      const { ExternalMetadataService } = await import('../services/external-metadata.service.js');
-      const ytRaw = await ExternalMetadataService.searchYoutubeMusic(cleanQ);
-      const tracks = ytRaw.map((item: any) => {
-        const videoId = item.videoId || item.id?.replace(/^yt-/, '');
-        const artistName = item.artist?.name || item.artist || 'YouTube Artist';
-        const cover = upgradeInnerTubeArtwork(item.thumbnail || item.coverUrl, {
-          videoId,
-          kind: item.isVideo ? 'video' : 'song'
-        });
-        const title = item.title || 'YouTube Track';
-        const streamUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(`${artistName} - ${title}`)}&trackId=yt-${videoId}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artistName)}`;
-        return {
-          id: `yt-${videoId}`,
-          title,
-          artist: { id: '', name: artistName },
-          album: { id: `yt-alb-${videoId}`, title: item.album?.title || 'YouTube Music', coverUrl: cover },
-          coverUrl: cover,
-          audioUrl: streamUrl,
-          duration: item.duration || 210,
-          source: 'youtube'
-        };
-      });
-
-      return reply.send({ tracks });
+      const payload = await runYoutubeSearch(cleanQ);
+      return reply.send(payload);
     } catch (err: any) {
       server.log.warn(`[Search] YouTube direct search error: ${err.message}`);
       return reply.status(500).send({ error: 'Failed to search YouTube Music', tracks: [] });

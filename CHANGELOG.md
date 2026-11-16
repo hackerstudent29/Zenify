@@ -2,7 +2,7 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
-## [1.0.14] - 2026-11-16
+## [1.1.12] - 2026-11-16
 
 ### What's New
 - **Multi-Source Catalog Search Toggle (Issue #26)**:
