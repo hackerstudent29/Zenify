@@ -1184,9 +1184,11 @@ class PlayerShellState extends State<PlayerShell>
                             Container(color: const Color(0xFF121214)),
                             RepaintBoundary(
                               child: ArtworkMeshBackground(
-                                key: ValueKey('artmesh_${track?.id ?? "none"}'),
                                 coverUrl: MediaNormalizer.upgradeArtworkUrl(
-                                  track?.coverUrl ?? '',
+                                  ((_shownCover?.isNotEmpty == true
+                                          ? _shownCover
+                                          : track?.coverUrl) ??
+                                      ''),
                                 ),
                                 fallbackAsset: 'assets/images/z_logo.png',
                                 imageProviderBuilder: (url) =>
@@ -1194,12 +1196,12 @@ class PlayerShellState extends State<PlayerShell>
                                       MediaNormalizer.upgradeArtworkUrl(url),
                                     ),
                                 palette: _palette.isNotEmpty ? _palette : null,
-                                paused: false,
+                                paused: !_playing,
                                 speed: 1.0,
                                 backgroundColor: _palette.isNotEmpty
                                     ? _palette.first
                                     : const Color(0xFF121214),
-                                scrimOpacity: 0.15,
+                                scrimOpacity: 0.10,
                               ),
                             ),
                             // Scrim: NONE for lyrics (they sit directly on the
@@ -1307,8 +1309,11 @@ class PlayerShellState extends State<PlayerShell>
               Padding(
                 padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
                 child: _edgeFade(
-                  widget.lyricsBuilder?.call(context) ??
-                      LyricsSheet(immersiveListenable: _lyricsImmersive),
+                  TickerMode(
+                    enabled: _open || _sheet.value > 0.05,
+                    child: widget.lyricsBuilder?.call(context) ??
+                        LyricsSheet(immersiveListenable: _lyricsImmersive),
+                  ),
                 ),
               ),
             ),

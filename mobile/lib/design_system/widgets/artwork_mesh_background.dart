@@ -558,10 +558,11 @@ class _MeshEngine extends ChangeNotifier {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _MeshPainter extends CustomPainter {
-  _MeshPainter(this.engine, this.bg) : super(repaint: engine);
+  _MeshPainter(this.engine, this.bg, this.palette) : super(repaint: engine);
 
   final _MeshEngine engine;
   final Color bg;
+  final List<Color>? palette;
 
   static final Paint _fill = Paint();
   static final Paint _img = Paint()..filterQuality = FilterQuality.low;
@@ -571,13 +572,56 @@ class _MeshPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final e = engine;
-    _fill.color = e.cur?.avg ?? bg;
+    final w = size.width, h = size.height;
+    final m = math.max(w, h);
+
+    // 1. Deep canvas base
+    _fill.color = e.cur?.avg ?? const Color(0xFF101012);
     canvas.drawRect(Offset.zero & size, _fill);
 
+    // 2. Liquid vector mesh gradient blobs (swirling, glowing, fluid motion)
+    final colors = (palette != null && palette!.isNotEmpty)
+        ? palette!
+        : const [
+            Color(0xFFE11D48), // Radiant crimson
+            Color(0xFF9E2339), // Academic Maroon
+            Color(0xFF7C3AED), // Purple
+            Color(0xFF1E3A8A), // Royal navy
+          ];
+
+    final a = e.t * 0.45;
+    for (int i = 0; i < e.nodes.length; i++) {
+      final node = e.nodes[i];
+      final col = colors[i % colors.length];
+      final phaseOffset = i * 1.4;
+
+      final sx = math.sin(a * 1.2 + phaseOffset) * 0.12;
+      final sy = math.cos(a * 0.9 + phaseOffset * 1.3) * 0.12;
+      final cx = (node.x + sx + e.px * 0.05).clamp(0.05, 0.95) * w;
+      final cy = (node.y + sy + e.py * 0.05).clamp(0.05, 0.95) * h;
+      final energyPulse = 1.0 + (e.energy * 0.18 + 0.06) * math.sin(a * 2.0 + phaseOffset);
+      final r = m * node.s * 0.52 * energyPulse;
+
+      final paint = Paint()
+        ..shader = ui.Gradient.radial(
+          Offset(cx, cy),
+          r,
+          [
+            col.withValues(alpha: 0.72),
+            col.withValues(alpha: 0.35),
+            col.withValues(alpha: 0.0),
+          ],
+          const [0.0, 0.55, 1.0],
+        );
+
+      canvas.drawCircle(Offset(cx, cy), r, paint);
+    }
+
+    // 3. If baked tiles are loaded from artwork, crossfade them smoothly
     final f = e.fade;
-    final a = f * f * (3 - 2 * f); // smoothstep crossfade
+    final smoothA = f * f * (3 - 2 * f);
     if (e.prev != null && f < 1) _scene(canvas, size, e.prev!, 1);
-    if (e.cur != null) _scene(canvas, size, e.cur!, a);
+    if (e.cur != null) _scene(canvas, size, e.cur!, smoothA);
   }
 
   void _scene(Canvas canvas, Size size, _Tile tile, double a) {
@@ -609,7 +653,8 @@ class _MeshPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_MeshPainter old) => old.engine != engine || old.bg != bg;
+  bool shouldRepaint(_MeshPainter old) =>
+      old.engine != engine || old.bg != bg || old.palette != palette;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1008,7 +1053,7 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
                             size: cs,
                             child: CustomPaint(
                               size: cs,
-                              painter: _MeshPainter(_engine, bg),
+                              painter: _MeshPainter(_engine, bg, widget.palette),
                             ),
                           ),
                         ),
@@ -1025,9 +1070,9 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withValues(alpha: 0.15 * widget.scrimOpacity),
-                          Colors.black.withValues(alpha: 0.30 * widget.scrimOpacity),
-                          bg.withValues(alpha: (0.65 * widget.scrimOpacity).clamp(0.0, 1.0)),
+                          Colors.black.withValues(alpha: 0.10 * widget.scrimOpacity),
+                          Colors.black.withValues(alpha: 0.20 * widget.scrimOpacity),
+                          bg.withValues(alpha: (0.40 * widget.scrimOpacity).clamp(0.0, 1.0)),
                         ],
                         stops: const [0, 0.6, 1],
                       ),

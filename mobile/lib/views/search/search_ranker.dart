@@ -12,13 +12,16 @@ class SearchRankingConfig {
   static const double kEntityTypeWeight = 0.20;
   static const double kPopularityWeight = 0.15;
   static const double kServerRankWeight = 0.10;
-  static const double kCountryWeight = 0.06; // Light weight, never overrides strong text match
+  static const double kCountryWeight =
+      0.06; // Light weight, never overrides strong text match
   static const double kQualityWeight = 0.04;
 
   // Thresholds & Windows
   static const double kArtistIntentThreshold = 0.85;
-  static const double kCountryTiebreakWindow = 0.15; // Only applied if textMatch is within 0.15 of best
-  static const double kMinMatchThreshold = 0.20; // Below this drops below the fold
+  static const double kCountryTiebreakWindow =
+      0.15; // Only applied if textMatch is within 0.15 of best
+  static const double kMinMatchThreshold =
+      0.20; // Below this drops below the fold
 
   // Cache & Trie Limits
   static const int kLruCacheCapacity = 50;
@@ -39,7 +42,10 @@ class QueryPreprocessor {
   QueryPreprocessor._();
 
   static final RegExp _diacriticsRegex = RegExp(r'[\u0300-\u036f]');
-  static final RegExp _punctuationRegex = RegExp(r'[^\p{L}\p{N}\s]', unicode: true);
+  static final RegExp _punctuationRegex = RegExp(
+    r'[^\p{L}\p{N}\s]',
+    unicode: true,
+  );
   static final RegExp _whitespaceRegex = RegExp(r'\s+');
 
   /// Normalizes a query or entity string: lowercase, strips diacritics, cleans punctuation.
@@ -150,7 +156,11 @@ class TextSimilarity {
       k++;
     }
 
-    final double jaro = ((matches / l1) + (matches / l2) + ((matches - transpositions / 2) / matches)) / 3.0;
+    final double jaro =
+        ((matches / l1) +
+            (matches / l2) +
+            ((matches - transpositions / 2) / matches)) /
+        3.0;
 
     // Winkler prefix adjustment
     int prefix = 0;
@@ -273,13 +283,30 @@ class SearchIntentDetector {
     } else if (artistIntent && intentType != null) {
       // 2. Artist + type query (e.g. "anirudh songs", "anirudh albums")
       mode = SearchLayoutMode.artistType;
-    } else if (intentType == SearchItemType.album || intentType == SearchItemType.playlist) {
+    } else if (intentType == SearchItemType.album ||
+        intentType == SearchItemType.playlist) {
       // 4. Album or playlist explicit query
       mode = SearchLayoutMode.albumOrPlaylist;
-    } else if (rawItems.any((it) => it is SearchSongItem && _computeTextScore(normalized, QueryPreprocessor.normalize(it.title)) >= 0.85)) {
+    } else if (rawItems.any(
+      (it) =>
+          it is SearchSongItem &&
+          _computeTextScore(
+                normalized,
+                QueryPreprocessor.normalize(it.title),
+              ) >=
+              0.85,
+    )) {
       // 3. Song title query (e.g. "kaavaalaa")
       mode = SearchLayoutMode.songTitle;
-    } else if (rawItems.any((it) => it is SearchAlbumItem && _computeTextScore(normalized, QueryPreprocessor.normalize(it.title)) >= 0.85)) {
+    } else if (rawItems.any(
+      (it) =>
+          it is SearchAlbumItem &&
+          _computeTextScore(
+                normalized,
+                QueryPreprocessor.normalize(it.title),
+              ) >=
+              0.85,
+    )) {
       mode = SearchLayoutMode.albumOrPlaylist;
     } else {
       // 5. Generic or mood query
@@ -313,7 +340,16 @@ class SearchRanker {
 
   /// Regional languages mapped to country codes for country boost
   static final Map<String, List<String>> _countryLanguages = {
-    'IN': ['tamil', 'telugu', 'hindi', 'malayalam', 'punjabi', 'kannada', 'bengali', 'marathi'],
+    'IN': [
+      'tamil',
+      'telugu',
+      'hindi',
+      'malayalam',
+      'punjabi',
+      'kannada',
+      'bengali',
+      'marathi',
+    ],
     'US': ['english', 'spanish'],
     'GB': ['english'],
     'CA': ['english', 'french'],
@@ -408,7 +444,9 @@ class SearchRanker {
     } else if (topResult != null && scoredItems.isNotEmpty) {
       // If we have an exact artist intent, make sure Top Result reflects the artist profile
       if (intent.artistIntent && topResult.type != SearchItemType.artist) {
-        final artistItem = scoredItems.whereType<SearchArtistItem>().firstOrNull;
+        final artistItem = scoredItems
+            .whereType<SearchArtistItem>()
+            .firstOrNull;
         if (artistItem != null) {
           topResult = _createTopResultFromItem(artistItem);
         }
@@ -448,14 +486,24 @@ class SearchRanker {
     // B. Entity Type Fit (0..1)
     double entityFit = 0.5;
     if (intent.artistIntent) {
-      if (item is SearchArtistItem && item.name.toLowerCase() == intent.matchedArtistName?.toLowerCase()) {
+      if (item is SearchArtistItem &&
+          item.name.toLowerCase() == intent.matchedArtistName?.toLowerCase()) {
         entityFit = 1.0;
       } else if (item is SearchSongItem) {
-        final isOwnSong = item.artists.any((a) => a.name.toLowerCase() == intent.matchedArtistName?.toLowerCase());
-        final isPrimary = item.artists.isNotEmpty && item.artists.first.name.toLowerCase() == intent.matchedArtistName?.toLowerCase();
+        final isOwnSong = item.artists.any(
+          (a) =>
+              a.name.toLowerCase() == intent.matchedArtistName?.toLowerCase(),
+        );
+        final isPrimary =
+            item.artists.isNotEmpty &&
+            item.artists.first.name.toLowerCase() ==
+                intent.matchedArtistName?.toLowerCase();
         entityFit = isPrimary ? 1.0 : (isOwnSong ? 0.85 : 0.40);
       } else if (item is SearchAlbumItem) {
-        final isOwnAlbum = item.artists.any((a) => a.name.toLowerCase() == intent.matchedArtistName?.toLowerCase());
+        final isOwnAlbum = item.artists.any(
+          (a) =>
+              a.name.toLowerCase() == intent.matchedArtistName?.toLowerCase(),
+        );
         entityFit = isOwnAlbum ? 0.90 : 0.45;
       }
     } else if (intent.intentType != null) {
@@ -480,7 +528,8 @@ class SearchRanker {
     // E. Country Boost (light weight: 0.06)
     // Rule: Apply ONLY when textMatch is within 0.15 of the best candidate
     double countryBoost = 0.0;
-    if (maxTextMatch - textScore <= SearchRankingConfig.kCountryTiebreakWindow) {
+    if (maxTextMatch - textScore <=
+        SearchRankingConfig.kCountryTiebreakWindow) {
       final signal = _evaluateCountrySignal(item, countryCode);
       if (signal == 2) {
         countryBoost = 1.0;
@@ -500,10 +549,14 @@ class SearchRanker {
       final qLower = intent.normalizedQuery;
 
       // Penalties for cover / live / karaoke if NOT requested
-      if (tLower.contains('cover') && !qLower.contains('cover')) penalties += 0.15;
-      if (tLower.contains('karaoke') && !qLower.contains('karaoke')) penalties += 0.20;
-      if (tLower.contains('reaction') && !qLower.contains('reaction')) penalties += 0.30;
-      if (tLower.contains('live') && !qLower.contains('live')) penalties += 0.08;
+      if (tLower.contains('cover') && !qLower.contains('cover'))
+        penalties += 0.15;
+      if (tLower.contains('karaoke') && !qLower.contains('karaoke'))
+        penalties += 0.20;
+      if (tLower.contains('reaction') && !qLower.contains('reaction'))
+        penalties += 0.30;
+      if (tLower.contains('live') && !qLower.contains('live'))
+        penalties += 0.08;
     } else if (item is SearchArtistItem) {
       if (item.isVerified) qualityBoost += 0.04;
     }
@@ -515,7 +568,8 @@ class SearchRanker {
       penalties += 0.25;
     }
 
-    final rawScore = textComponent +
+    final rawScore =
+        textComponent +
         entityComponent +
         popComponent +
         serverComponent +
@@ -529,7 +583,9 @@ class SearchRanker {
   // ─────────────────────────── Text Match Calculation ────────────────────────
 
   static double _calculateTextMatch(SearchItem item, SearchIntent intent) {
-    final q = intent.entityText.isNotEmpty ? intent.entityText : intent.normalizedQuery;
+    final q = intent.entityText.isNotEmpty
+        ? intent.entityText
+        : intent.normalizedQuery;
     final qTokens = QueryPreprocessor.tokenize(q);
     final qPhonetic = QueryPreprocessor.phoneticKey(q);
 
@@ -556,7 +612,12 @@ class SearchRanker {
     return titleScore;
   }
 
-  static double _scoreString(String q, List<String> qTokens, String qPhonetic, String target) {
+  static double _scoreString(
+    String q,
+    List<String> qTokens,
+    String qPhonetic,
+    String target,
+  ) {
     if (q == target) return 1.0;
     if (target.startsWith(q)) return 0.90;
 
@@ -595,7 +656,8 @@ class SearchRanker {
 
     // Check script presence (e.g. Tamil \u0B80-\u0BFF, Devanagari \u0900-\u097F)
     if (countryCode.toUpperCase() == 'IN') {
-      final hasIndianScript = RegExp(r'[\u0900-\u0D7F]').hasMatch(item.title) ||
+      final hasIndianScript =
+          RegExp(r'[\u0900-\u0D7F]').hasMatch(item.title) ||
           RegExp(r'[\u0900-\u0D7F]').hasMatch(item.subtitle);
       if (hasIndianScript) return 2;
     }
@@ -694,7 +756,8 @@ class SearchRanker {
     }
 
     // Special layout ordering for exact artist queries (e.g. "anirudh") and artist-type queries
-    if ((intent.layoutMode == SearchLayoutMode.exactArtist || intent.layoutMode == SearchLayoutMode.artistType) &&
+    if ((intent.layoutMode == SearchLayoutMode.exactArtist ||
+            intent.layoutMode == SearchLayoutMode.artistType) &&
         intent.matchedArtistName != null) {
       final artistNameLower = intent.matchedArtistName!.toLowerCase();
 
@@ -706,7 +769,8 @@ class SearchRanker {
 
         for (final s in songs) {
           if (s is SearchSongItem) {
-            final isOwn = s.artists.any((a) => a.name.toLowerCase() == artistNameLower) ||
+            final isOwn =
+                s.artists.any((a) => a.name.toLowerCase() == artistNameLower) ||
                 s.subtitle.toLowerCase().contains(artistNameLower);
             if (isOwn) {
               ownSongs.add(s);
@@ -834,8 +898,7 @@ class _LruCacheEntry {
   final SearchResult result;
   final DateTime timestamp;
 
-  bool isExpired(Duration ttl) =>
-      DateTime.now().difference(timestamp) > ttl;
+  bool isExpired(Duration ttl) => DateTime.now().difference(timestamp) > ttl;
 }
 
 /// LinkedHashMap-backed LRU Cache for query responses with TTL.

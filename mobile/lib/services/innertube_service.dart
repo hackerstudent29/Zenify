@@ -93,7 +93,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchSongs', {'query': query})
-          .timeout(const Duration(seconds: 10), onTimeout: () => null);
+          .timeout(const Duration(seconds: 14), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       final tracks = <Track>[];
       final seen = <String>{};
@@ -138,7 +138,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchSummary', {'query': query})
-          .timeout(const Duration(seconds: 10), onTimeout: () => null);
+          .timeout(const Duration(seconds: 14), onTimeout: () => null);
       if (res == null || res.isEmpty) return null;
       return {'summaries': res};
     } catch (e) {
@@ -152,7 +152,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchAlbums', {'query': query})
-          .timeout(const Duration(seconds: 10), onTimeout: () => null);
+          .timeout(const Duration(seconds: 14), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
     } catch (e) {
@@ -166,7 +166,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchArtists', {'query': query})
-          .timeout(const Duration(seconds: 10), onTimeout: () => null);
+          .timeout(const Duration(seconds: 14), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
     } catch (e) {
@@ -180,7 +180,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchPlaylists', {'query': query})
-          .timeout(const Duration(seconds: 10), onTimeout: () => null);
+          .timeout(const Duration(seconds: 14), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
     } catch (e) {
@@ -194,7 +194,7 @@ class InnerTubeService {
     try {
       final res = await _nativeChannel
           .invokeMethod<List<dynamic>>('searchVideos', {'query': query})
-          .timeout(const Duration(seconds: 10), onTimeout: () => null);
+          .timeout(const Duration(seconds: 14), onTimeout: () => null);
       if (res == null || res.isEmpty) return const [];
       return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
     } catch (e) {
