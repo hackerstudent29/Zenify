@@ -10,6 +10,7 @@ import 'package:flutter/cupertino.dart'
         CupertinoPageRoute,
         CupertinoSearchTextField,
         CupertinoSliverRefreshControl;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -23,6 +24,7 @@ import '../../design_system/zen.dart';
 import '../../features/story_sharing/story_sharing.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/api_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
@@ -285,6 +287,56 @@ Future<UserPlaylist?> _createPlaylist(BuildContext c, {Track? first}) async {
   HapticFeedback.mediumImpact();
   _push(c, _PlaylistPage(p));
   return p;
+}
+
+Future<void> _importPlaylist(BuildContext c) async {
+  final url = await _promptName(c, title: 'Import Playlist', confirm: 'Import');
+  if (url == null || url.trim().isEmpty || !c.mounted) return;
+
+  IslandNotifier.instance.show(
+    IslandNotification(
+      id: 'import_fetching',
+      title: 'Importing…',
+      body: 'Fetching playlist from link',
+      leading: const Icon(CupertinoIcons.arrow_down_circle, color: Color(0xFFE11D48), size: 18),
+    ),
+  );
+
+  try {
+    final res = await ApiService.importPlaylist(url.trim());
+    if (res != null && c.mounted) {
+      final name = (res['name'] ?? res['title'] ?? 'Imported Playlist').toString();
+      final rawTracks = res['tracks'];
+      final List<Track> tracks = [];
+      if (rawTracks is List) {
+        for (final pt in rawTracks) {
+          final dynamic rawItem = (pt is Map && pt['track'] != null) ? pt['track'] : pt;
+          if (rawItem is Map) {
+            final map = Map<String, dynamic>.from(rawItem);
+            tracks.add(Track.fromJson(map));
+          }
+        }
+      }
+      final store = LibraryStore.instance;
+      final p = store.importPlaylist(name, tracks);
+      HapticFeedback.mediumImpact();
+      _push(c, _PlaylistPage(p));
+      return;
+    }
+  } catch (e) {
+    if (kDebugMode) debugPrint('[LibraryScreen] importPlaylist error: $e');
+  }
+
+  if (c.mounted) {
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'import_fail',
+        title: 'Import Failed',
+        body: 'Check the URL and try again',
+        leading: const Icon(CupertinoIcons.exclamationmark_circle, color: Color(0xFFE11D48), size: 18),
+      ),
+    );
+  }
 }
 
 /// Long-press / ellipsis menu for any song.
@@ -794,6 +846,18 @@ class _PlaylistsPage extends StatelessWidget {
                   titleColor: _rose,
                   thumb: 44,
                   onTap: () => _createPlaylist(ctx),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: _ListRow(
+                  leading: Container(
+                    decoration: BoxDecoration(color: _rose.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(CupertinoIcons.link, color: _rose, size: 22),
+                  ),
+                  title: 'Import from YouTube / Spotify…',
+                  titleColor: _rose,
+                  thumb: 44,
+                  onTap: () => _importPlaylist(ctx),
                 ),
               ),
               if (lists.isEmpty)

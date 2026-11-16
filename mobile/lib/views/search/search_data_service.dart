@@ -27,8 +27,6 @@ class SearchDataService {
   final SearchLruCache _lruCache = SearchLruCache();
 
   bool _initializedRecents = false;
-  int _activeRequestId = 0;
-  String _activeSearchQuery = '';
 
   /// Initializes recent searches and populates the Trie prefix tree.
   Future<void> initRecents() async {
@@ -145,6 +143,7 @@ class SearchDataService {
   Future<SearchResult> search({
     required String query,
     SearchFilter filter = SearchFilter.all,
+    SearchSource source = SearchSource.all,
     bool forceRefresh = false,
   }) async {
     final q = query.trim();
@@ -166,6 +165,7 @@ class SearchDataService {
     final cacheKey = SearchLruCache.buildKey(
       query: q,
       filter: filter,
+      source: source,
       country: country,
       language: language,
     );
@@ -175,33 +175,81 @@ class SearchDataService {
       if (cached != null) return cached;
     }
 
-    _activeSearchQuery = q;
-    final requestId = ++_activeRequestId;
-
     List<SearchItem> candidateItems = [];
     SearchTopResult? topResult;
     String? didYouMean;
     String? continuation;
 
-    // Concurrently fire live backend cloud search (JioSaavn + iTunes + Database)
-    final cloudFuture = ApiService.searchCloud(q).timeout(
-      const Duration(seconds: 6),
-      onTimeout: () => null,
-    );
-
-    // 2. PRIMARY STRATEGY:
-    // If native InnerTube is available (Android), query native InnerTubeX
-    if (InnerTubeService.instance.isNativeAvailable) {
+    // ── STRATEGY A: JIO MUSIC / JIOSAAVN DIRECT FAST PATH (~250ms) ───────────
+    if (source == SearchSource.jiosaavn) {
       try {
-        if (filter == SearchFilter.all) {
-          final nativeData = await InnerTubeService.instance
-              .searchSummaryNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => null);
-          if (nativeData != null && nativeData['summaries'] is List) {
-            final parsed = SearchParser.parseNativeSummaries(
-              nativeData['summaries'] as List,
-              query: q,
-            );
+        final cloud = await ApiService.searchCloud(q).timeout(
+          const Duration(seconds: 4),
+          onTimeout: () => null,
+        );
+        if (cloud != null) {
+          final parsedCloud = _parseCloudSearch(cloud, q);
+          if (parsedCloud.items.isNotEmpty) {
+            candidateItems = parsedCloud.items;
+            topResult = parsedCloud.topResult;
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[SearchDataService] JioSaavn search error: $e');
+      }
+
+      if (candidateItems.isEmpty) {
+        candidateItems = await _fetchFallbackItems(q, filter);
+      }
+    }
+    // ── STRATEGY B: YOUTUBE MUSIC DIRECT PATH ─────────────────────────────────
+    else if (source == SearchSource.youtube) {
+      if (InnerTubeService.instance.isNativeAvailable) {
+        try {
+          if (filter == SearchFilter.all) {
+            final nativeData = await InnerTubeService.instance
+                .searchSummaryNative(q)
+                .timeout(const Duration(seconds: 4), onTimeout: () => null);
+            if (nativeData != null && nativeData['summaries'] is List) {
+              final parsed = SearchParser.parseNativeSummaries(
+                nativeData['summaries'] as List,
+                query: q,
+              );
+              if (parsed.items.isNotEmpty) {
+                candidateItems = parsed.items;
+                topResult = parsed.topResult;
+                didYouMean = parsed.didYouMean;
+                continuation = parsed.continuation;
+              }
+            }
+            if (candidateItems.isEmpty) {
+              final nativeSongs = await InnerTubeService.instance
+                  .searchSongsNative(q)
+                  .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
+              if (nativeSongs.isNotEmpty) {
+                candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
+              }
+            }
+          } else if (filter == SearchFilter.songs) {
+            final nativeSongs = await InnerTubeService.instance
+                .searchSongsNative(q)
+                .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
+            if (nativeSongs.isNotEmpty) {
+              candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (candidateItems.isEmpty) {
+        try {
+          final body = <String, dynamic>{'query': q};
+          if (filter.params != null) body['params'] = filter.params;
+          final rawJson = await InnerTubeService.instance
+              .post('search', body, countryCode: country, ttl: SearchRankingConfig.kLruCacheTtl)
+              .timeout(const Duration(seconds: 5), onTimeout: () => <String, dynamic>{});
+          if (rawJson.isNotEmpty) {
+            final parsed = SearchParser.parse(rawJson, query: q);
             if (parsed.items.isNotEmpty) {
               candidateItems = parsed.items;
               topResult = parsed.topResult;
@@ -209,167 +257,86 @@ class SearchDataService {
               continuation = parsed.continuation;
             }
           }
-          if (candidateItems.isEmpty || !candidateItems.any((i) => i is SearchSongItem)) {
-            final parallelResults = await Future.wait([
-              InnerTubeService.instance
-                  .searchSongsNative(q)
-                  .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]),
-              InnerTubeService.instance
-                  .searchAlbumsNative(q)
-                  .timeout(const Duration(seconds: 3), onTimeout: () => const []),
-              InnerTubeService.instance
-                  .searchArtistsNative(q)
-                  .timeout(const Duration(seconds: 3), onTimeout: () => const []),
-            ]);
+        } catch (_) {}
+      }
 
-            final nativeSongs = parallelResults[0] as List<Track>;
-            final nativeAlbums = parallelResults[1] as List<Map<String, dynamic>>;
-            final nativeArtists = parallelResults[2] as List<Map<String, dynamic>>;
+      if (candidateItems.isEmpty) {
+        candidateItems = await _fetchFallbackItems(q, filter);
+      }
+    }
+    // ── STRATEGY C: UNIVERSAL (BLENDED PARALLEL ACCELERATION) ─────────────────
+    else {
+      final cloudFuture = ApiService.searchCloud(q).timeout(
+        const Duration(seconds: 4),
+        onTimeout: () => null,
+      );
 
-            if (nativeSongs.isNotEmpty) {
-              final songItems = nativeSongs.map(_trackToSearchSongItem).toList();
-              if (candidateItems.isEmpty) {
-                candidateItems = songItems;
-              } else {
-                final seenIds = candidateItems.map((i) => i.id).toSet();
-                candidateItems.addAll(songItems.where((s) => seenIds.add(s.id)));
+      final nativeFuture = (InnerTubeService.instance.isNativeAvailable && filter == SearchFilter.all)
+          ? InnerTubeService.instance.searchSummaryNative(q).timeout(
+              const Duration(seconds: 4),
+              onTimeout: () => null,
+            )
+          : Future<Map<String, dynamic>?>.value(null);
+
+      try {
+        final parallelResults = await Future.wait([cloudFuture, nativeFuture]);
+        final cloudData = parallelResults[0];
+        final nativeData = parallelResults[1];
+
+        if (nativeData != null && nativeData['summaries'] is List) {
+          final parsed = SearchParser.parseNativeSummaries(
+            nativeData['summaries'] as List,
+            query: q,
+          );
+          if (parsed.items.isNotEmpty) {
+            candidateItems = parsed.items;
+            topResult = parsed.topResult;
+            didYouMean = parsed.didYouMean;
+            continuation = parsed.continuation;
+          }
+        }
+
+        if (cloudData != null) {
+          final parsedCloud = _parseCloudSearch(cloudData, q);
+          if (parsedCloud.items.isNotEmpty) {
+            if (candidateItems.isEmpty) {
+              candidateItems = parsedCloud.items;
+              if (parsedCloud.topResult != null) topResult = parsedCloud.topResult;
+            } else {
+              final seenIds = candidateItems.map((i) => i.id).toSet();
+              final seenTitles = candidateItems
+                  .map((i) => '${i.title.toLowerCase()}::${i.subtitle.toLowerCase()}')
+                  .toSet();
+              for (final ci in parsedCloud.items) {
+                final titleKey = '${ci.title.toLowerCase()}::${ci.subtitle.toLowerCase()}';
+                if (seenIds.add(ci.id) && seenTitles.add(titleKey)) {
+                  candidateItems.add(ci);
+                }
+              }
+              if (topResult == null && parsedCloud.topResult != null) {
+                topResult = parsedCloud.topResult;
               }
             }
-            if (nativeAlbums.isNotEmpty && !candidateItems.any((i) => i is SearchAlbumItem)) {
-              final albumItems = nativeAlbums
-                  .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
-                  .whereType<SearchAlbumItem>()
-                  .take(8);
-              final seenIds = candidateItems.map((i) => i.id).toSet();
-              candidateItems.addAll(albumItems.where((a) => seenIds.add(a.id)));
-            }
-            if (nativeArtists.isNotEmpty && !candidateItems.any((i) => i is SearchArtistItem)) {
-              final artistItems = nativeArtists
-                  .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
-                  .whereType<SearchArtistItem>()
-                  .take(6);
-              final seenIds = candidateItems.map((i) => i.id).toSet();
-              candidateItems.addAll(artistItems.where((a) => seenIds.add(a.id)));
-            }
           }
-        } else if (filter == SearchFilter.songs) {
+        }
+      } catch (_) {}
+
+      // If still empty, fast fallback to native songs
+      if (candidateItems.isEmpty && InnerTubeService.instance.isNativeAvailable) {
+        try {
           final nativeSongs = await InnerTubeService.instance
               .searchSongsNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
+              .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
           if (nativeSongs.isNotEmpty) {
             candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
           }
-        } else if (filter == SearchFilter.albums) {
-          final nativeAlbums = await InnerTubeService.instance
-              .searchAlbumsNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
-          if (nativeAlbums.isNotEmpty) {
-            candidateItems = nativeAlbums
-                .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
-                .whereType<SearchItem>()
-                .toList();
-          }
-        } else if (filter == SearchFilter.artists) {
-          final nativeArtists = await InnerTubeService.instance
-              .searchArtistsNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
-          if (nativeArtists.isNotEmpty) {
-            candidateItems = nativeArtists
-                .map((m) => SearchParser.parseNativeItem(m, rawRank: 0))
-                .whereType<SearchItem>()
-                .toList();
-          }
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('[SearchDataService] Native search attempt error: $e');
-        }
-      }
-    }
-
-    // 2.5 CLOUD ACCELERATION & UNION:
-    // Concurrently merge results from cloud (JioSaavn 320k, iTunes metadata, PostgreSQL)
-    try {
-      final cloud = await cloudFuture;
-      if (cloud != null) {
-        final parsedCloud = _parseCloudSearch(cloud, q);
-        if (parsedCloud.items.isNotEmpty) {
-          if (candidateItems.isEmpty) {
-            candidateItems = parsedCloud.items;
-            if (parsedCloud.topResult != null) topResult = parsedCloud.topResult;
-          } else {
-            final seenIds = candidateItems.map((i) => i.id).toSet();
-            final seenTitles = candidateItems
-                .map((i) => '${i.title.toLowerCase()}::${i.subtitle.toLowerCase()}')
-                .toSet();
-            for (final ci in parsedCloud.items) {
-              final titleKey = '${ci.title.toLowerCase()}::${ci.subtitle.toLowerCase()}';
-              if (seenIds.add(ci.id) && seenTitles.add(titleKey)) {
-                candidateItems.add(ci);
-              }
-            }
-            if (topResult == null && parsedCloud.topResult != null) {
-              topResult = parsedCloud.topResult;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 3. SECONDARY STRATEGY (Web / Desktop / HTTP fallback):
-    if (candidateItems.isEmpty) {
-      Map<String, dynamic>? rawJson;
-      try {
-        final body = <String, dynamic>{'query': q};
-        if (filter.params != null) {
-          body['params'] = filter.params;
-        }
-
-        rawJson = await InnerTubeService.instance
-            .post(
-              'search',
-              body,
-              countryCode: country,
-              ttl: SearchRankingConfig.kLruCacheTtl,
-              forceRefresh: forceRefresh,
-            )
-            .timeout(const Duration(seconds: 8));
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint(
-            '[SearchDataService] InnerTube HTTP search attempt failed: $e',
-          );
-        }
+        } catch (_) {}
       }
 
-      if (rawJson != null) {
-        final parsed = SearchParser.parse(rawJson, query: q);
-        if (parsed.items.isNotEmpty) {
-          candidateItems = parsed.items;
-          topResult = parsed.topResult;
-          didYouMean = parsed.didYouMean;
-          continuation = parsed.continuation;
-        }
+      // If still empty, tertiary fallback
+      if (candidateItems.isEmpty) {
+        candidateItems = await _fetchFallbackItems(q, filter);
       }
-    }
-
-    // Guard against out-of-order responses from cancelled/delayed searches
-    // Never drop if user is still on the same query
-    if (requestId != _activeRequestId && _activeSearchQuery != q) {
-      return _lruCache.get(cacheKey) ??
-          SearchResult(
-            originalQuery: q,
-            intent: const SearchIntent(
-              originalQuery: '',
-              normalizedQuery: '',
-              entityText: '',
-            ),
-          );
-    }
-
-    // 4. TERTIARY STRATEGY (Local Catalog / Featured Tracks / Cloud Fallback):
-    if (candidateItems.isEmpty) {
-      candidateItems = await _fetchFallbackItems(q, filter);
     }
 
     if (candidateItems.isEmpty) {

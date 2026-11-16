@@ -2,6 +2,26 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.0.14] - 2026-11-16
+
+### What's New
+- **Multi-Source Catalog Search Toggle (Issue #26)**:
+  - Added an Apple-style segmented source selector capsule directly above search filters and recents: **[ All · Universal | YouTube Music | Jio Music ]**.
+  - **Jio Music Direct Fast-Path**: Direct search against pristine 320kbps Akamai CDN catalog resolving queries in ~250ms with zero stalls.
+  - **YouTube Music Direct Path**: Direct query to high-performance InnerTube native streaming endpoints with a strict 4s timeout.
+  - **Universal Acceleration**: Parallel concurrent querying with 4-second bounded timeouts, completely eliminating search hangs and endless loading states.
+  - Remembers user's preferred search source across sessions with persistent storage.
+- **Playlist Import from YouTube Music & Spotify (Issue #25)**:
+  - Users can now import existing playlists directly from YouTube Music, YouTube, and Spotify share URLs.
+  - Fast headless metadata extraction via backend yt-dlp flat-playlist extraction and Spotify web scrapers.
+  - Automatic track resolution and database linking into user's personal Zenify library with dynamic island feedback.
+  - Available across Web Player ("Import Link" in Create Playlist modal) and Mobile Flutter App ("Import Playlist" in Library screen).
+- **Local Music Player Persistence & Codec Resilience (Issue #24)**:
+  - Resolved local library hanging bug when scanning large audio folders (FLAC, ALAC, CAF, Opus, AIFF).
+  - Added bounded 2.0s watchdog timer on HTML5 audio duration probes so unsupported platform codecs never freeze file parsing.
+  - Multi-tier IndexedDB persistence: folder structures and track metadata are saved with quota safety, preserving scanned folders across page reloads and tab closes.
+  - Auto-stream recovery for un-demuxable local codecs (e.g. Apple Lossless ALAC in Chromium on Windows) by falling back seamlessly to pristine 320kbps full-track CDN streams.
+
 ## [1.0.13] - 2026-11-15
 
 ### What's New

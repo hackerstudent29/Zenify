@@ -17,6 +17,8 @@ export async function playlistRoutes(server: FastifyInstance) {
             schema: { body: createPlaylistSchema }
         }, playlistController.create);
 
+        protectedRoutes.post('/import', playlistController.importFromUrl);
+
         protectedRoutes.get('/my', playlistController.getMyPlaylists);
 
         protectedRoutes.put('/:id', {

@@ -59,4 +59,15 @@ export class PlaylistController {
         await this.playlistService.removeTrack(req.params.id, req.params.trackId, req.user.id);
         return reply.send({ message: 'Track removed' });
     }
+
+    importFromUrl = async (req: FastifyRequest<{ Body: { url: string } }>, reply: FastifyReply) => {
+        const userId = (req as any).user?.id;
+        if (!userId) return reply.status(401).send({ error: 'Unauthorized' });
+        const { url } = req.body || {};
+        if (!url || typeof url !== 'string') {
+            return reply.status(400).send({ error: 'Playlist URL is required' });
+        }
+        const playlist = await this.playlistService.importFromUrl(userId, url);
+        return reply.status(201).send(playlist);
+    }
 }
