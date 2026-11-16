@@ -143,7 +143,7 @@ class SearchDataService {
   Future<SearchResult> search({
     required String query,
     SearchFilter filter = SearchFilter.all,
-    SearchSource source = SearchSource.all,
+    SearchSource source = SearchSource.youtube,
     bool forceRefresh = false,
   }) async {
     final q = query.trim();
@@ -165,7 +165,7 @@ class SearchDataService {
     final cacheKey = SearchLruCache.buildKey(
       query: q,
       filter: filter,
-      source: source,
+      source: SearchSource.youtube,
       country: country,
       language: language,
     );
@@ -187,7 +187,7 @@ class SearchDataService {
         try {
           final nativeData = await InnerTubeService.instance
               .searchSummaryNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => null);
+              .timeout(const Duration(seconds: 14), onTimeout: () => null);
           if (nativeData != null && nativeData['summaries'] is List) {
             final parsed = SearchParser.parseNativeSummaries(
               nativeData['summaries'] as List,
@@ -202,12 +202,15 @@ class SearchDataService {
           }
 
           // If summary didn't return any songs, supplement with direct native song search
-          if (candidateItems.isEmpty || !candidateItems.any((i) => i is SearchSongItem)) {
+          if (candidateItems.isEmpty ||
+              !candidateItems.any((i) => i is SearchSongItem)) {
             final nativeSongs = await InnerTubeService.instance
                 .searchSongsNative(q)
-                .timeout(const Duration(seconds: 6), onTimeout: () => <Track>[]);
+                .timeout(const Duration(seconds: 12), onTimeout: () => <Track>[]);
             if (nativeSongs.isNotEmpty) {
-              final songItems = nativeSongs.map(_trackToSearchSongItem).toList();
+              final songItems = nativeSongs
+                  .map(_trackToSearchSongItem)
+                  .toList();
               if (candidateItems.isEmpty) {
                 candidateItems = songItems;
               } else {
@@ -219,7 +222,8 @@ class SearchDataService {
             }
           }
         } catch (e) {
-          if (kDebugMode) debugPrint('[SearchDataService] native searchSummary error: $e');
+          if (kDebugMode)
+            debugPrint('[SearchDataService] native searchSummary error: $e');
         }
       }
 
@@ -234,7 +238,7 @@ class SearchDataService {
                 ttl: SearchRankingConfig.kLruCacheTtl,
                 forceRefresh: forceRefresh,
               )
-              .timeout(const Duration(seconds: 8));
+              .timeout(const Duration(seconds: 14));
 
           final parsed = SearchParser.parse(rawJson, query: q);
           if (parsed.items.isNotEmpty) {
@@ -244,7 +248,8 @@ class SearchDataService {
             continuation = parsed.continuation;
           }
         } catch (e) {
-          if (kDebugMode) debugPrint('[SearchDataService] HTTP search attempt failed: $e');
+          if (kDebugMode)
+            debugPrint('[SearchDataService] HTTP search attempt failed: $e');
         }
       }
     } else if (filter == SearchFilter.songs) {
@@ -330,7 +335,8 @@ class SearchDataService {
           if (parsed.items.isNotEmpty) candidateItems = parsed.items;
         } catch (_) {}
       }
-    } else if (filter == SearchFilter.featuredPlaylists || filter == SearchFilter.communityPlaylists) {
+    } else if (filter == SearchFilter.featuredPlaylists ||
+        filter == SearchFilter.communityPlaylists) {
       if (InnerTubeService.instance.isNativeAvailable) {
         try {
           final rawPlaylists = await InnerTubeService.instance
@@ -419,7 +425,9 @@ class SearchDataService {
       continuation: continuation,
     );
     if (kDebugMode) {
-      debugPrint('[SearchDataService] rankedResult isEmpty=${rankedResult.isEmpty}, songs=${rankedResult.songs.length}, artists=${rankedResult.artists.length}, albums=${rankedResult.albums.length}');
+      debugPrint(
+        '[SearchDataService] rankedResult isEmpty=${rankedResult.isEmpty}, songs=${rankedResult.songs.length}, artists=${rankedResult.artists.length}, albums=${rankedResult.albums.length}',
+      );
     }
 
     // 7. Store in LRU Cache
@@ -532,7 +540,10 @@ class SearchDataService {
         final aId = (a['id'] ?? a['browseId'] ?? '')?.toString() ?? '';
         final aName = (a['name'] ?? a['title'] ?? '')?.toString() ?? '';
         if (aName.isEmpty) continue;
-        final aImg = (a['imageUrl'] ?? a['coverUrl'] ?? a['thumbnail'] ?? '')?.toString() ?? '';
+        final aImg =
+            (a['imageUrl'] ?? a['coverUrl'] ?? a['thumbnail'] ?? '')
+                ?.toString() ??
+            '';
         final artistItem = SearchArtistItem(
           id: aId.isNotEmpty ? aId : 'artist-$aName',
           title: aName,
@@ -543,7 +554,9 @@ class SearchDataService {
           isVerified: true,
         );
         items.add(artistItem);
-        if (topRes == null && (aName.toLowerCase() == qLower || aName.toLowerCase().startsWith(qLower))) {
+        if (topRes == null &&
+            (aName.toLowerCase() == qLower ||
+                aName.toLowerCase().startsWith(qLower))) {
           topRes = SearchTopResult(item: artistItem);
         }
       }
@@ -574,7 +587,8 @@ class SearchDataService {
         final alId = (al['id'] ?? al['browseId'] ?? '')?.toString() ?? '';
         final alTitle = (al['title'] ?? al['name'] ?? '')?.toString() ?? '';
         if (alTitle.isEmpty) continue;
-        final alCover = (al['coverUrl'] ?? al['imageUrl'] ?? '')?.toString() ?? '';
+        final alCover =
+            (al['coverUrl'] ?? al['imageUrl'] ?? '')?.toString() ?? '';
         String alArtist = '';
         if (al['artist'] is String) {
           alArtist = al['artist'];
@@ -738,14 +752,20 @@ class SearchDataService {
         }
       }
 
-      // Resilient cloud fallback via ApiService
-      final tracks = await ApiService.search(
-        q,
-      ).timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+      // Local catalog matching fallback (offline resilience, pure on-device, NO JioSaavn)
+      final localMatches = CatalogDataSource.allTracks
+          .where(
+            (t) =>
+                t.title.toLowerCase().contains(qLower) ||
+                t.artist.toLowerCase().contains(qLower) ||
+                t.album.toLowerCase().contains(qLower),
+          )
+          .take(15)
+          .toList();
 
-      if (tracks.isNotEmpty) {
+      if (localMatches.isNotEmpty) {
         final items = <SearchItem>[];
-        final first = tracks.first;
+        final first = localMatches.first;
         if (first.artist.toLowerCase().contains(qLower) ||
             qLower.contains(first.artist.toLowerCase())) {
           items.add(
@@ -759,7 +779,7 @@ class SearchDataService {
             ),
           );
         }
-        items.addAll(tracks.map(_trackToSearchSongItem));
+        items.addAll(localMatches.map(_trackToSearchSongItem));
         return items;
       }
     } catch (e) {

@@ -627,5 +627,50 @@ void main() {
       expect(album.title, equals('Jailer'));
       expect(album.year, equals(2023));
     });
+
+    test('DEBUG: ganesh songs search returns results', () {
+      final nativeFixture = [
+        {
+          'title': 'Top result',
+          'items': [
+            {
+              'type': 'song',
+              'id': 's1',
+              'title': 'Ganesha Pancharatnam',
+              'artists': [
+                {'id': 'a1', 'name': 'SPB'}
+              ],
+              'duration': 300,
+              'thumbnail': 'https://lh3.googleusercontent.com/cover=s544',
+            }
+          ]
+        },
+        {
+          'title': 'Songs',
+          'items': [
+            {
+              'type': 'song',
+              'id': 's2',
+              'title': 'Maha Ganapathim',
+              'artists': [
+                {'id': 'a2', 'name': 'K. J. Yesudas'}
+              ],
+              'duration': 280,
+              'thumbnail': 'https://lh3.googleusercontent.com/cover=s544',
+            }
+          ]
+        }
+      ];
+
+      final payload = SearchParser.parseNativeSummaries(nativeFixture, query: 'ganesh songs');
+      final intent = SearchIntentDetector.detectIntent('ganesh songs', payload.items);
+      final res = SearchRanker.rank(
+        items: payload.items,
+        intent: intent,
+        countryCode: 'IN',
+        initialTopResult: payload.topResult,
+      );
+      expect(res.isEmpty, isFalse);
+    });
   });
 }

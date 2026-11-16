@@ -88,13 +88,14 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                         p.playbackState != Player.STATE_ENDED &&
                         p.playbackState != Player.STATE_IDLE)
             )
-            if (active) {
+            if (active && isAppInForeground) {
                 emitProgressSnapshot(p)
-                // Adaptive frequency: 500ms when user is actively watching UI, 1000ms when in background/screen-off
-                val intervalMs = if (isAppInForeground) 500L else 1000L
-                main.postDelayed(this, intervalMs)
+                main.postDelayed(this, 500L)
                 isTickerScheduled = true
             } else {
+                if (active) {
+                    emitProgressSnapshot(p)
+                }
                 isTickerScheduled = false
             }
         }
@@ -131,7 +132,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                     p.playbackState != Player.STATE_ENDED &&
                     p.playbackState != Player.STATE_IDLE)
         )
-        if (active) {
+        if (active && isAppInForeground) {
             startTicker()
         } else {
             stopTicker()
@@ -787,7 +788,14 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                     result.success(null)
                 }
                 "setLifecycle" -> {
+                    val wasForeground = isAppInForeground
                     isAppInForeground = call.argument<Boolean>("isForeground") ?: true
+                    if (!wasForeground && isAppInForeground) {
+                        player?.let { emitProgressSnapshot(it) }
+                        updateTickerState()
+                    } else if (!isAppInForeground) {
+                        stopTicker()
+                    }
                     result.success(null)
                 }
                 "setVolume" -> { player?.volume = (call.argument<Number>("v")?.toFloat() ?: 1f).coerceIn(0f, 1f); result.success(null) }

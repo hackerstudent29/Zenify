@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
@@ -21,6 +22,7 @@ import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
+import '../../services/api_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../services/search_nav.dart';
@@ -371,10 +373,10 @@ class _SearchScreenState extends State<SearchScreen>
   final ScrollController _scrollCtrl = ScrollController();
   final SearchDataService _dataService = SearchDataService.instance;
 
-  // Suggestions & Debounce
+  // Suggestions
   Timer? _suggestTimer;
-  Timer? _debounceTimer;
   int _suggestId = 0;
+  int _searchRequestId = 0;
   String _lastTyped = '';
   List<String> _liveSuggestions = [];
 
@@ -415,7 +417,6 @@ class _SearchScreenState extends State<SearchScreen>
   @override
   void dispose() {
     _suggestTimer?.cancel();
-    _debounceTimer?.cancel();
     _textCtrl.removeListener(_onTextChanged);
     _focusNode.removeListener(_onFocusChanged);
     _scrollCtrl.removeListener(_onScroll);
@@ -489,109 +490,113 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
-  // ── Typing / suggestions & debounced deep search ─────────────────────────
+  // ── Typing / suggestions (no deep search while typing) ─────────────────────
 
   void _onTextChanged() {
     final q = _textCtrl.text.trim();
     if (q == _lastTyped) return;
     _lastTyped = q;
     _suggestTimer?.cancel();
-    _debounceTimer?.cancel();
-    final id = ++_suggestId;
+    final suggestId = ++_suggestId;
 
     if (q.isEmpty) {
       setState(() {
         _liveSuggestions = [];
-        _submittedQuery = '';
-        _searchResults = _emptyResult();
-        _resultsKey = '';
-        _wantedKey = '';
-        _isLoading = false;
-        _selectedFilter = SearchFilter.all;
+        if (_submittedQuery.isNotEmpty) {
+          _submittedQuery = '';
+          _searchResults = _emptyResult();
+          _resultsKey = '';
+          _wantedKey = '';
+          _isLoading = false;
+          _selectedFilter = SearchFilter.all;
+        }
       });
       return;
     }
 
-    setState(
-      () => _liveSuggestions = _dataService.getInstantLocalSuggestions(q),
-    );
+    final searchId = ++_searchRequestId;
 
-    // 1. Live suggestions
+    setState(() {
+      _liveSuggestions = _dataService.getInstantLocalSuggestions(q);
+      _isLoading = true;
+    });
+
+    // 1. Live suggestions (80ms)
     _suggestTimer = Timer(const Duration(milliseconds: 80), () async {
       try {
         final s = await _dataService.getSuggestions(q);
-        if (mounted && id == _suggestId) {
+        if (mounted && suggestId == _suggestId) {
           setState(() => _liveSuggestions = s);
         }
       } catch (_) {}
     });
 
-    // 2. Debounced search execution (280ms) - live YouTube Music search as you type
-    _debounceTimer = Timer(const Duration(milliseconds: 280), () {
+    // 2. Debounced search execution (250ms) - live YouTube Music search as you type
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
       if (mounted && _lastTyped == q) {
-        _executeSearch(q, _selectedFilter);
+        _executeSearch(q, searchId, filter: _selectedFilter);
       }
     });
   }
 
   // ── Search execution ───────────────────────────────────────────────────────
 
-  String _keyOf(String q, SearchFilter f) {
-    return '${f.name}|${q.toLowerCase()}';
-  }
+  String _keyOf(String q, SearchFilter f) => '${f.name}|${q.toLowerCase()}';
 
   Future<void> _executeSearch(
     String query,
-    SearchFilter filter,
-  ) async {
+    int id, {
+    SearchFilter filter = SearchFilter.all,
+  }) async {
     final key = _keyOf(query, filter);
     _wantedKey = key;
+    if (!_isLoading) {
+      setState(() => _isLoading = true);
+    }
 
     // Safety failsafe: never allow _isLoading to remain true indefinitely
-    Timer(const Duration(seconds: 12), () {
-      if (mounted && _isLoading && _wantedKey == key) {
+    Timer(const Duration(seconds: 16), () {
+      if (mounted && _isLoading && id == _searchRequestId) {
         setState(() => _isLoading = false);
       }
     });
 
-    final future = _inflight[key] ??= _dataService
-        .search(query: query, filter: filter)
-        .whenComplete(() => _inflight.remove(key));
     try {
-      final results = await future.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => _dataService.getFallbackResult(query, filter),
-      );
+      final results = await _dataService
+          .search(query: query, filter: filter)
+          .timeout(
+            const Duration(seconds: 14),
+            onTimeout: () => _dataService.getFallbackResult(query, filter),
+          );
       if (!mounted) return;
-      if (_wantedKey == key) {
+      if (id == _searchRequestId) {
         setState(() {
           _searchResults = results;
           _resultsKey = key;
+          _submittedQuery = query;
           _isLoading = false;
         });
       }
     } catch (e, st) {
       if (kDebugMode) {
-        debugPrint('[SearchScreen] ERROR in _executeSearch for "$query": $e\n$st');
+        debugPrint(
+          '[SearchScreen] ERROR in _executeSearch for "$query": $e\n$st',
+        );
       }
-      if (mounted && _wantedKey == key) {
+      if (mounted && id == _searchRequestId) {
         setState(() => _isLoading = false);
       }
     } finally {
-      if (mounted && _wantedKey == key && _isLoading) {
+      if (mounted && id == _searchRequestId && _isLoading) {
         setState(() => _isLoading = false);
       }
     }
   }
 
-  void _submitSearch(
-    String query, {
-    SearchFilter filter = SearchFilter.all,
-  }) {
+  void _submitSearch(String query, {SearchFilter filter = SearchFilter.all}) {
     final clean = query.trim();
     if (clean.isEmpty) return;
     _suggestTimer?.cancel();
-    _debounceTimer?.cancel();
     _suggestId++;
     _focusNode.unfocus();
     _lastTyped = clean;
@@ -605,6 +610,7 @@ class _SearchScreenState extends State<SearchScreen>
 
     final key = _keyOf(clean, filter);
     final cached = _resultsKey == key && !_searchResults.isEmpty;
+    final id = ++_searchRequestId;
     setState(() {
       _submittedQuery = clean;
       _activeCategory = null;
@@ -618,12 +624,13 @@ class _SearchScreenState extends State<SearchScreen>
       }
     });
     _scrollTop();
-    if (!cached) _executeSearch(clean, filter);
+    if (!cached) {
+      _executeSearch(clean, id, filter: filter);
+    }
   }
 
   void _onFilterSelected(SearchFilter filter) {
-    final currentQ = _submittedQuery.isNotEmpty ? _submittedQuery : _textCtrl.text.trim();
-    if (_selectedFilter == filter || currentQ.isEmpty) return;
+    if (_selectedFilter == filter || _submittedQuery.isEmpty) return;
     HapticFeedback.selectionClick();
     final hasCachedForFilter = switch (filter) {
       SearchFilter.all => !_searchResults.isEmpty,
@@ -634,17 +641,18 @@ class _SearchScreenState extends State<SearchScreen>
       SearchFilter.communityPlaylists => _searchResults.playlists.length >= 6,
       SearchFilter.videos => _searchResults.videos.length >= 6,
     };
+    final id = ++_searchRequestId;
     setState(() {
       _selectedFilter = filter;
       if (!hasCachedForFilter) _isLoading = true;
     });
-    _executeSearch(currentQ, filter);
+    _executeSearch(currentQ, id, filter: filter);
   }
 
   void _clearSearch() {
     _suggestTimer?.cancel();
-    _debounceTimer?.cancel();
     _suggestId++;
+    _searchRequestId++;
     _wantedKey = '';
     _resultsKey = '';
     _submittedQuery = '';
@@ -661,7 +669,6 @@ class _SearchScreenState extends State<SearchScreen>
 
   void _cancelSearch() {
     _suggestTimer?.cancel();
-    _debounceTimer?.cancel();
     _focusNode.unfocus();
     SearchNav.phase.value = SearchPhase.bar;
     _clearSearch();
@@ -717,17 +724,33 @@ class _SearchScreenState extends State<SearchScreen>
     try {
       resAll = await _dataService
           .search(query: spec.query, filter: SearchFilter.all)
-          .timeout(const Duration(seconds: 6), onTimeout: () => _emptyResult());
+          .timeout(const Duration(seconds: 4), onTimeout: () => _emptyResult());
     } catch (_) {}
 
     if (resAll.songs.isEmpty) {
       try {
-        final resSongs = await _dataService
-            .search(query: spec.query, filter: SearchFilter.songs)
-            .timeout(const Duration(seconds: 6), onTimeout: () => _emptyResult());
-        if (resSongs.songs.isNotEmpty && mounted && id == _catRequestId) {
+        final cloudTracks = await ApiService.search(
+          spec.query,
+        ).timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+        if (cloudTracks.isNotEmpty && mounted && id == _catRequestId) {
+          final cloudSongs = cloudTracks
+              .map(
+                (t) => SearchSongItem(
+                  id: t.id,
+                  title: t.title,
+                  subtitle: t.artist,
+                  thumbnailUrl: t.coverUrl,
+                  thumbnailUrlHiRes: t.coverUrl,
+                  videoId: t.id.replaceAll('yt-', ''),
+                  artists: t.artists,
+                  albumName: t.album,
+                  durationSeconds: t.durationSeconds,
+                  durationText: t.formattedDuration,
+                ),
+              )
+              .toList();
           setState(() {
-            _catSongs = resSongs.songs;
+            _catSongs = cloudSongs;
             _catLoading = false;
           });
           return;
@@ -945,21 +968,34 @@ class _SearchScreenState extends State<SearchScreen>
     final topPad = MediaQuery.paddingOf(context).top;
     final typing = _isTyping;
     final text = _textCtrl.text.trim();
-    final effectiveQuery = text.isNotEmpty ? text : _submittedQuery;
-    final hasQuery = effectiveQuery.isNotEmpty;
+    final hasQuery = _submittedQuery.isNotEmpty;
     final category = _activeCategory;
 
+    final showSuggestions =
+        typing && _liveSuggestions.isNotEmpty && _searchResults.isEmpty;
+
+    final editing =
+        (_focusNode.hasFocus || _submittedQuery.isEmpty) &&
+        text.isNotEmpty &&
+        text != _submittedQuery;
+
     final _SearchViewPhase phase;
-    if (category != null) {
+    if (editing) {
+      phase = _SearchViewPhase.suggestions;
+    } else if (hasQuery) {
+      phase = (_isLoading && _searchResults.isEmpty)
+          ? _SearchViewPhase.loading
+          : _SearchViewPhase.results;
+    } else if (category != null) {
       phase = _SearchViewPhase.category;
-    } else if (!hasQuery) {
+    } else {
       phase = _SearchViewPhase.landing;
+    } else if (showSuggestions) {
+      phase = _SearchViewPhase.suggestions;
     } else if (_isLoading && _searchResults.isEmpty) {
       phase = _SearchViewPhase.loading;
     } else if (!_searchResults.isEmpty) {
       phase = _SearchViewPhase.results;
-    } else if (_liveSuggestions.isNotEmpty) {
-      phase = _SearchViewPhase.suggestions;
     } else {
       phase = _isLoading ? _SearchViewPhase.loading : _SearchViewPhase.results;
     }
@@ -1022,7 +1058,7 @@ class _SearchScreenState extends State<SearchScreen>
                         key: ValueKey('phase_loading'),
                       ),
                       _SearchViewPhase.results => _buildResults(
-                        key: ValueKey('phase_results_$effectiveQuery'),
+                        key: ValueKey('phase_results_$_submittedQuery'),
                       ),
                       _SearchViewPhase.category => _buildCategoryPage(
                         category!,
@@ -1054,7 +1090,9 @@ class _SearchScreenState extends State<SearchScreen>
                     : 'Search',
                 showBack: showBack,
                 isDockPage: !showBack,
-                scrollController: (showBack && category != null) ? _scrollCtrl : null,
+                scrollController: (showBack && category != null)
+                    ? _scrollCtrl
+                    : null,
                 revealOffset: 120.0,
                 showProfile: true,
                 topPadding: topPad + 4,
@@ -1643,83 +1681,83 @@ class _SearchScreenState extends State<SearchScreen>
               scale: 0.985,
               onTap: () => _submitSearch(s),
               child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: _kEdge,
-                vertical: 13,
-              ),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    width: 0.5,
-                  ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: _kEdge,
+                  vertical: 13,
                 ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    CupertinoIcons.search,
-                    size: 17,
-                    color: isDirectTyped
-                        ? AppColors.accent
-                        : AppColors.textTertiary,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: isDirectTyped
-                        ? RichText(
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            text: TextSpan(
-                              style: _bodyStyle(
-                                fontSize: 16,
-                                color: AppColors.textPrimary,
-                              ),
-                              children: [
-                                const TextSpan(
-                                  text: 'Search for ',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: '"$typed"',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : _highlighted(s, typed.toLowerCase()),
-                  ),
-                  PressableScale(
-                    scale: 0.90,
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      _textCtrl.value = TextEditingValue(
-                        text: s,
-                        selection: TextSelection.collapsed(offset: s.length),
-                      );
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.all(6),
-                      child: Icon(
-                        CupertinoIcons.arrow_up_left,
-                        size: 16,
-                        color: AppColors.textTertiary,
-                      ),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.06),
+                      width: 0.5,
                     ),
                   ),
-                ],
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      CupertinoIcons.search,
+                      size: 17,
+                      color: isDirectTyped
+                          ? AppColors.accent
+                          : AppColors.textTertiary,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: isDirectTyped
+                          ? RichText(
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              text: TextSpan(
+                                style: _bodyStyle(
+                                  fontSize: 16,
+                                  color: AppColors.textPrimary,
+                                ),
+                                children: [
+                                  const TextSpan(
+                                    text: 'Search for ',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: '"$typed"',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : _highlighted(s, typed.toLowerCase()),
+                    ),
+                    PressableScale(
+                      scale: 0.90,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        _textCtrl.value = TextEditingValue(
+                          text: s,
+                          selection: TextSelection.collapsed(offset: s.length),
+                        );
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(
+                          CupertinoIcons.arrow_up_left,
+                          size: 16,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      }),
-    ],
-  );
+          );
+        }),
+      ],
+    );
   }
 
   Widget _highlighted(String text, String queryLower) {
@@ -1941,6 +1979,8 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _buildEmptyResults() {
+    final displayQuery =
+        _submittedQuery.isNotEmpty ? _submittedQuery : _textCtrl.text.trim();
     return Padding(
       padding: const EdgeInsets.fromLTRB(32, 68, 32, 48),
       child: Center(
@@ -1948,7 +1988,7 @@ class _SearchScreenState extends State<SearchScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'No Results for "$_submittedQuery"',
+              'No Results for "$displayQuery"',
               style: _displayStyle(fontSize: 20),
               textAlign: TextAlign.center,
             ),
@@ -1986,11 +2026,16 @@ class _SearchScreenState extends State<SearchScreen>
   // ── Overview ("All") ───────────────────────────────────────────────────────
 
   Widget _buildOverview(SearchResult r) {
+    final rawQ = _submittedQuery.isNotEmpty ? _submittedQuery : _textCtrl.text.trim();
     final queries = <String>{
-      _norm(_submittedQuery),
+      _norm(rawQ),
+      _norm(r.originalQuery),
       if (r.correctedQuery != null) _norm(r.correctedQuery!),
     }..removeWhere((e) => e.isEmpty);
-    final tops = _rankTopResults(r, queries.toList());
+    var tops = _rankTopResults(r, queries.toList());
+    if (tops.isEmpty && r.topResult?.item != null) {
+      tops = [_TopCand(r.topResult!.item, 1.0)];
+    }
 
     final topSec = tops.isEmpty ? null : _buildTopResults(tops);
     final songsSec = r.songs.isEmpty
@@ -2086,7 +2131,6 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   List<_TopCand> _rankTopResults(SearchResult r, List<String> queries) {
-    if (queries.isEmpty) return const [];
     final mode = r.intent.layoutMode;
     final cands = <String, _TopCand>{};
 
@@ -2095,6 +2139,12 @@ class _SearchScreenState extends State<SearchScreen>
 
     final serviceTop = r.topResult?.item;
     final serviceKey = serviceTop == null ? null : keyOf(serviceTop);
+
+    if (queries.isEmpty) {
+      if (serviceTop != null) return [_TopCand(serviceTop, 1.0)];
+      if (r.songs.isNotEmpty) return [_TopCand(r.songs.first, 1.0)];
+      return const [];
+    }
 
     void add(SearchItem item) {
       final k = keyOf(item);
@@ -3598,7 +3648,6 @@ class _BrowseCategoryTile extends StatelessWidget {
     );
   }
 }
-
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Spring-animated filter pill bar

@@ -42,7 +42,8 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
   void _openLyrics(BuildContext context) {
     // Grab the cover now so the sheet can paint the same colour wash behind
     // the lyrics (no black card, no black barrier).
-    final coverUrl = context.read<PlayerState>().currentTrack?.coverUrl;
+    final ps = context.read<PlayerState>();
+    final coverUrl = ps.currentTrack?.coverUrl;
 
     DockVisibility.runModal(
       () => showModalBottomSheet<void>(
@@ -62,7 +63,7 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                   coverUrl: MediaNormalizer.upgradeArtworkUrl(coverUrl ?? ''),
                   imageProviderBuilder: (url) =>
                       CachedNetworkImageProvider(MediaNormalizer.upgradeArtworkUrl(url)),
-                  paused: false,
+                  paused: !ps.isPlaying,
                 ),
               ),
               const SafeArea(child: LyricsSheet()),
@@ -95,7 +96,7 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
               coverUrl: MediaNormalizer.upgradeArtworkUrl(track.coverUrl),
               imageProviderBuilder: (url) =>
                   CachedNetworkImageProvider(MediaNormalizer.upgradeArtworkUrl(url)),
-              paused: false,
+              paused: !player.isPlaying,
             ),
           ),
 

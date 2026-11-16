@@ -125,7 +125,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           coverUrl: MediaNormalizer.upgradeArtworkUrl(track?.coverUrl ?? ''),
           imageProviderBuilder: (url) =>
               CachedNetworkImageProvider(MediaNormalizer.upgradeArtworkUrl(url)),
-          paused: false,
+          paused: !playing,
         ),
         SafeArea(
           child: Padding(

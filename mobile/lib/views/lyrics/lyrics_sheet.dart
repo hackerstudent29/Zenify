@@ -456,14 +456,14 @@ class _Depth {
 
 const _after = [
   _Depth(0.62, 0, 0.97),
-  _Depth(0.40, 1.2, 0.94),
-  _Depth(0.24, 2.6, 0.92),
-  _Depth(0.14, 4.0, 0.90),
+  _Depth(0.40, 0, 0.94),
+  _Depth(0.24, 0, 0.92),
+  _Depth(0.14, 0, 0.90),
 ];
 const _before = [
-  _Depth(0.80, 0.8, 0.96),
-  _Depth(0.60, 2.2, 0.93),
-  _Depth(0.42, 3.8, 0.90),
+  _Depth(0.80, 0, 0.96),
+  _Depth(0.60, 0, 0.93),
+  _Depth(0.42, 0, 0.90),
 ];
 
 _Depth _depthFor(
@@ -1889,21 +1889,6 @@ class _Word extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Apple Music soft white glow behind active word
-        Opacity(
-          opacity: 0.55,
-          child: ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-            child: ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (r) => LinearGradient(
-                colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
-                stops: [0, a, b],
-              ).createShader(r),
-              child: Text(text, style: style(fs, Colors.white)),
-            ),
-          ),
-        ),
         Text(text, style: style(fs, _dim)),
         ShaderMask(
           blendMode: BlendMode.dstIn,
@@ -1911,7 +1896,14 @@ class _Word extends StatelessWidget {
             colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
             stops: [0, a, b],
           ).createShader(r),
-          child: Text(text, style: style(fs, Colors.white)),
+          child: Text(
+            text,
+            style: style(fs, Colors.white).copyWith(
+              shadows: const [
+                Shadow(color: Color(0x80FFFFFF), blurRadius: 6),
+              ],
+            ),
+          ),
         ),
       ],
     );
