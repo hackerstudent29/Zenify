@@ -1181,18 +1181,25 @@ class PlayerShellState extends State<PlayerShell>
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            Container(color: Colors.black),
+                            Container(color: const Color(0xFF121214)),
                             RepaintBoundary(
                               child: ArtworkMeshBackground(
-                                coverUrl: track?.coverUrl,
+                                key: ValueKey('artmesh_${track?.id ?? "none"}'),
+                                coverUrl: MediaNormalizer.upgradeArtworkUrl(
+                                  track?.coverUrl ?? '',
+                                ),
                                 fallbackAsset: 'assets/images/z_logo.png',
-                                // frozen while the sheet is moving: keeps the
-                                // open / close animation free of extra work
-                                paused: !_playing || t < 0.98,
+                                imageProviderBuilder: (url) =>
+                                    CachedNetworkImageProvider(
+                                      MediaNormalizer.upgradeArtworkUrl(url),
+                                    ),
+                                palette: _palette.isNotEmpty ? _palette : null,
+                                paused: false,
+                                speed: 1.0,
                                 backgroundColor: _palette.isNotEmpty
                                     ? _palette.first
-                                    : null,
-                                scrimOpacity: 0.0,
+                                    : const Color(0xFF121214),
+                                scrimOpacity: 0.15,
                               ),
                             ),
                             // Scrim: NONE for lyrics (they sit directly on the

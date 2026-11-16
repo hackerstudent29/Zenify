@@ -175,6 +175,34 @@ class InnerTubeService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> searchPlaylistsNative(String query) async {
+    if (!_useNative) return const [];
+    try {
+      final res = await _nativeChannel
+          .invokeMethod<List<dynamic>>('searchPlaylists', {'query': query})
+          .timeout(const Duration(seconds: 10), onTimeout: () => null);
+      if (res == null || res.isEmpty) return const [];
+      return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] Native searchPlaylists error: $e');
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> searchVideosNative(String query) async {
+    if (!_useNative) return const [];
+    try {
+      final res = await _nativeChannel
+          .invokeMethod<List<dynamic>>('searchVideos', {'query': query})
+          .timeout(const Duration(seconds: 10), onTimeout: () => null);
+      if (res == null || res.isEmpty) return const [];
+      return res.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] Native searchVideos error: $e');
+      return const [];
+    }
+  }
+
   Future<List<Track>> _searchNative(String query) async {
     try {
       final directSongs = await searchSongsNative(query);

@@ -180,76 +180,19 @@ class SearchDataService {
     String? didYouMean;
     String? continuation;
 
-    // ── STRATEGY A: JIO MUSIC / JIOSAAVN DIRECT FAST PATH (~250ms) ───────────
-    if (source == SearchSource.jiosaavn) {
-      try {
-        final cloud = await ApiService.searchCloud(q).timeout(
-          const Duration(seconds: 4),
-          onTimeout: () => null,
-        );
-        if (cloud != null) {
-          final parsedCloud = _parseCloudSearch(cloud, q);
-          if (parsedCloud.items.isNotEmpty) {
-            candidateItems = parsedCloud.items;
-            topResult = parsedCloud.topResult;
-          }
-        }
-      } catch (e) {
-        if (kDebugMode) debugPrint('[SearchDataService] JioSaavn search error: $e');
-      }
-
-      if (candidateItems.isEmpty) {
-        candidateItems = await _fetchFallbackItems(q, filter);
-      }
-    }
-    // ── STRATEGY B: YOUTUBE MUSIC DIRECT PATH ─────────────────────────────────
-    else if (source == SearchSource.youtube) {
+    // ── PURE YOUTUBE MUSIC SEARCH PIPELINE (ZERO JIOSAAVN) ───────────────────
+    if (filter == SearchFilter.all) {
+      // 1. Native Metrolist searchSummary (Android)
       if (InnerTubeService.instance.isNativeAvailable) {
         try {
-          if (filter == SearchFilter.all) {
-            final nativeData = await InnerTubeService.instance
-                .searchSummaryNative(q)
-                .timeout(const Duration(seconds: 4), onTimeout: () => null);
-            if (nativeData != null && nativeData['summaries'] is List) {
-              final parsed = SearchParser.parseNativeSummaries(
-                nativeData['summaries'] as List,
-                query: q,
-              );
-              if (parsed.items.isNotEmpty) {
-                candidateItems = parsed.items;
-                topResult = parsed.topResult;
-                didYouMean = parsed.didYouMean;
-                continuation = parsed.continuation;
-              }
-            }
-            if (candidateItems.isEmpty) {
-              final nativeSongs = await InnerTubeService.instance
-                  .searchSongsNative(q)
-                  .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
-              if (nativeSongs.isNotEmpty) {
-                candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
-              }
-            }
-          } else if (filter == SearchFilter.songs) {
-            final nativeSongs = await InnerTubeService.instance
-                .searchSongsNative(q)
-                .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
-            if (nativeSongs.isNotEmpty) {
-              candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (candidateItems.isEmpty) {
-        try {
-          final body = <String, dynamic>{'query': q};
-          if (filter.params != null) body['params'] = filter.params;
-          final rawJson = await InnerTubeService.instance
-              .post('search', body, countryCode: country, ttl: SearchRankingConfig.kLruCacheTtl)
-              .timeout(const Duration(seconds: 5), onTimeout: () => <String, dynamic>{});
-          if (rawJson.isNotEmpty) {
-            final parsed = SearchParser.parse(rawJson, query: q);
+          final nativeData = await InnerTubeService.instance
+              .searchSummaryNative(q)
+              .timeout(const Duration(seconds: 8), onTimeout: () => null);
+          if (nativeData != null && nativeData['summaries'] is List) {
+            final parsed = SearchParser.parseNativeSummaries(
+              nativeData['summaries'] as List,
+              query: q,
+            );
             if (parsed.items.isNotEmpty) {
               candidateItems = parsed.items;
               topResult = parsed.topResult;
@@ -257,86 +200,199 @@ class SearchDataService {
               continuation = parsed.continuation;
             }
           }
-        } catch (_) {}
+
+          // If summary didn't return any songs, supplement with direct native song search
+          if (candidateItems.isEmpty || !candidateItems.any((i) => i is SearchSongItem)) {
+            final nativeSongs = await InnerTubeService.instance
+                .searchSongsNative(q)
+                .timeout(const Duration(seconds: 6), onTimeout: () => <Track>[]);
+            if (nativeSongs.isNotEmpty) {
+              final songItems = nativeSongs.map(_trackToSearchSongItem).toList();
+              if (candidateItems.isEmpty) {
+                candidateItems = songItems;
+              } else {
+                final seenIds = candidateItems.map((i) => i.id).toSet();
+                for (final s in songItems) {
+                  if (seenIds.add(s.id)) candidateItems.add(s);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) debugPrint('[SearchDataService] native searchSummary error: $e');
+        }
       }
 
+      // 2. Direct HTTP InnerTube post search if native was unavailable or empty
       if (candidateItems.isEmpty) {
-        candidateItems = await _fetchFallbackItems(q, filter);
-      }
-    }
-    // ── STRATEGY C: UNIVERSAL (BLENDED PARALLEL ACCELERATION) ─────────────────
-    else {
-      final cloudFuture = ApiService.searchCloud(q).timeout(
-        const Duration(seconds: 4),
-        onTimeout: () => null,
-      );
+        try {
+          final rawJson = await InnerTubeService.instance
+              .post(
+                'search',
+                {'query': q},
+                countryCode: country,
+                ttl: SearchRankingConfig.kLruCacheTtl,
+                forceRefresh: forceRefresh,
+              )
+              .timeout(const Duration(seconds: 8));
 
-      final nativeFuture = (InnerTubeService.instance.isNativeAvailable && filter == SearchFilter.all)
-          ? InnerTubeService.instance.searchSummaryNative(q).timeout(
-              const Duration(seconds: 4),
-              onTimeout: () => null,
-            )
-          : Future<Map<String, dynamic>?>.value(null);
-
-      try {
-        final parallelResults = await Future.wait([cloudFuture, nativeFuture]);
-        final cloudData = parallelResults[0];
-        final nativeData = parallelResults[1];
-
-        if (nativeData != null && nativeData['summaries'] is List) {
-          final parsed = SearchParser.parseNativeSummaries(
-            nativeData['summaries'] as List,
-            query: q,
-          );
+          final parsed = SearchParser.parse(rawJson, query: q);
           if (parsed.items.isNotEmpty) {
             candidateItems = parsed.items;
             topResult = parsed.topResult;
             didYouMean = parsed.didYouMean;
             continuation = parsed.continuation;
           }
+        } catch (e) {
+          if (kDebugMode) debugPrint('[SearchDataService] HTTP search attempt failed: $e');
         }
-
-        if (cloudData != null) {
-          final parsedCloud = _parseCloudSearch(cloudData, q);
-          if (parsedCloud.items.isNotEmpty) {
-            if (candidateItems.isEmpty) {
-              candidateItems = parsedCloud.items;
-              if (parsedCloud.topResult != null) topResult = parsedCloud.topResult;
-            } else {
-              final seenIds = candidateItems.map((i) => i.id).toSet();
-              final seenTitles = candidateItems
-                  .map((i) => '${i.title.toLowerCase()}::${i.subtitle.toLowerCase()}')
-                  .toSet();
-              for (final ci in parsedCloud.items) {
-                final titleKey = '${ci.title.toLowerCase()}::${ci.subtitle.toLowerCase()}';
-                if (seenIds.add(ci.id) && seenTitles.add(titleKey)) {
-                  candidateItems.add(ci);
-                }
-              }
-              if (topResult == null && parsedCloud.topResult != null) {
-                topResult = parsedCloud.topResult;
-              }
-            }
-          }
-        }
-      } catch (_) {}
-
-      // If still empty, fast fallback to native songs
-      if (candidateItems.isEmpty && InnerTubeService.instance.isNativeAvailable) {
+      }
+    } else if (filter == SearchFilter.songs) {
+      if (InnerTubeService.instance.isNativeAvailable) {
         try {
           final nativeSongs = await InnerTubeService.instance
               .searchSongsNative(q)
-              .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+              .timeout(const Duration(seconds: 8), onTimeout: () => <Track>[]);
           if (nativeSongs.isNotEmpty) {
             candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
           }
         } catch (_) {}
       }
-
-      // If still empty, tertiary fallback
       if (candidateItems.isEmpty) {
-        candidateItems = await _fetchFallbackItems(q, filter);
+        try {
+          final rawJson = await InnerTubeService.instance
+              .post(
+                'search',
+                {'query': q, 'params': filter.params},
+                countryCode: country,
+                ttl: SearchRankingConfig.kLruCacheTtl,
+              )
+              .timeout(const Duration(seconds: 8));
+          final parsed = SearchParser.parse(rawJson, query: q);
+          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
+        } catch (_) {}
       }
+    } else if (filter == SearchFilter.artists) {
+      if (InnerTubeService.instance.isNativeAvailable) {
+        try {
+          final rawArtists = await InnerTubeService.instance
+              .searchArtistsNative(q)
+              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+          if (rawArtists.isNotEmpty) {
+            int rank = 0;
+            candidateItems = rawArtists
+                .map((m) => SearchParser.parseNativeItem(m, rawRank: rank++))
+                .whereType<SearchItem>()
+                .toList();
+          }
+        } catch (_) {}
+      }
+      if (candidateItems.isEmpty) {
+        try {
+          final rawJson = await InnerTubeService.instance
+              .post(
+                'search',
+                {'query': q, 'params': filter.params},
+                countryCode: country,
+                ttl: SearchRankingConfig.kLruCacheTtl,
+              )
+              .timeout(const Duration(seconds: 8));
+          final parsed = SearchParser.parse(rawJson, query: q);
+          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
+        } catch (_) {}
+      }
+    } else if (filter == SearchFilter.albums) {
+      if (InnerTubeService.instance.isNativeAvailable) {
+        try {
+          final rawAlbums = await InnerTubeService.instance
+              .searchAlbumsNative(q)
+              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+          if (rawAlbums.isNotEmpty) {
+            int rank = 0;
+            candidateItems = rawAlbums
+                .map((m) => SearchParser.parseNativeItem(m, rawRank: rank++))
+                .whereType<SearchItem>()
+                .toList();
+          }
+        } catch (_) {}
+      }
+      if (candidateItems.isEmpty) {
+        try {
+          final rawJson = await InnerTubeService.instance
+              .post(
+                'search',
+                {'query': q, 'params': filter.params},
+                countryCode: country,
+                ttl: SearchRankingConfig.kLruCacheTtl,
+              )
+              .timeout(const Duration(seconds: 8));
+          final parsed = SearchParser.parse(rawJson, query: q);
+          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
+        } catch (_) {}
+      }
+    } else if (filter == SearchFilter.featuredPlaylists || filter == SearchFilter.communityPlaylists) {
+      if (InnerTubeService.instance.isNativeAvailable) {
+        try {
+          final rawPlaylists = await InnerTubeService.instance
+              .searchPlaylistsNative(q)
+              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+          if (rawPlaylists.isNotEmpty) {
+            int rank = 0;
+            candidateItems = rawPlaylists
+                .map((m) => SearchParser.parseNativeItem(m, rawRank: rank++))
+                .whereType<SearchItem>()
+                .toList();
+          }
+        } catch (_) {}
+      }
+      if (candidateItems.isEmpty) {
+        try {
+          final rawJson = await InnerTubeService.instance
+              .post(
+                'search',
+                {'query': q, 'params': filter.params},
+                countryCode: country,
+                ttl: SearchRankingConfig.kLruCacheTtl,
+              )
+              .timeout(const Duration(seconds: 8));
+          final parsed = SearchParser.parse(rawJson, query: q);
+          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
+        } catch (_) {}
+      }
+    } else if (filter == SearchFilter.videos) {
+      if (InnerTubeService.instance.isNativeAvailable) {
+        try {
+          final rawVideos = await InnerTubeService.instance
+              .searchVideosNative(q)
+              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+          if (rawVideos.isNotEmpty) {
+            int rank = 0;
+            candidateItems = rawVideos
+                .map((m) => SearchParser.parseNativeItem(m, rawRank: rank++))
+                .whereType<SearchItem>()
+                .toList();
+          }
+        } catch (_) {}
+      }
+      if (candidateItems.isEmpty) {
+        try {
+          final rawJson = await InnerTubeService.instance
+              .post(
+                'search',
+                {'query': q, 'params': filter.params},
+                countryCode: country,
+                ttl: SearchRankingConfig.kLruCacheTtl,
+              )
+              .timeout(const Duration(seconds: 8));
+          final parsed = SearchParser.parse(rawJson, query: q);
+          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
+        } catch (_) {}
+      }
+    }
+
+    // Local catalog fallback only if network completely returned empty
+    if (candidateItems.isEmpty) {
+      candidateItems = await _fetchFallbackItems(q, filter);
     }
 
     if (candidateItems.isEmpty) {

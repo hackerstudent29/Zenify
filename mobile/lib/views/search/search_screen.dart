@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
@@ -22,7 +21,6 @@ import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
-import '../../services/api_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../services/search_nav.dart';
@@ -345,12 +343,6 @@ const List<({SearchFilter filter, String label})> _kResultFilters = [
   (filter: SearchFilter.videos, label: 'Videos'),
 ];
 
-const List<({SearchSource source, String label, IconData icon})> _kSearchSources = [
-  (source: SearchSource.all, label: 'All', icon: CupertinoIcons.sparkles),
-  (source: SearchSource.youtube, label: 'YouTube Music', icon: CupertinoIcons.play_rectangle_fill),
-  (source: SearchSource.jiosaavn, label: 'Jio Music', icon: CupertinoIcons.waveform),
-];
-
 enum _SearchViewPhase { landing, suggestions, loading, results, category }
 
 const double _kEdge = 20.0;
@@ -379,8 +371,9 @@ class _SearchScreenState extends State<SearchScreen>
   final ScrollController _scrollCtrl = ScrollController();
   final SearchDataService _dataService = SearchDataService.instance;
 
-  // Suggestions
+  // Suggestions & Debounce
   Timer? _suggestTimer;
+  Timer? _debounceTimer;
   int _suggestId = 0;
   String _lastTyped = '';
   List<String> _liveSuggestions = [];
@@ -394,7 +387,6 @@ class _SearchScreenState extends State<SearchScreen>
   bool _isLoadingMore = false;
   SearchResult _searchResults = _emptyResult();
   SearchFilter _selectedFilter = SearchFilter.all;
-  SearchSource _selectedSource = SearchSource.all;
 
   // Category page
   _SearchCategorySpec? _activeCategory;
@@ -411,7 +403,6 @@ class _SearchScreenState extends State<SearchScreen>
   void initState() {
     super.initState();
     _dataService.initRecents();
-    _loadSavedSource();
     if (CatalogDataSource.allTracks.isEmpty) {
       CatalogDataSource.initialize();
     }
@@ -421,42 +412,10 @@ class _SearchScreenState extends State<SearchScreen>
     SearchNav.phase.addListener(_onPhase);
   }
 
-  Future<void> _loadSavedSource() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString('zenify_search_source_pref');
-      if (saved != null) {
-        final match = SearchSource.values.firstWhere(
-          (s) => s.name == saved,
-          orElse: () => SearchSource.all,
-        );
-        if (mounted && match != _selectedSource) {
-          setState(() => _selectedSource = match);
-        }
-      }
-    } catch (_) {}
-  }
-
-  void _onSourceSelected(SearchSource source) {
-    if (_selectedSource == source) return;
-    HapticFeedback.selectionClick();
-    setState(() {
-      _selectedSource = source;
-      if (_submittedQuery.isNotEmpty) {
-        _isLoading = true;
-      }
-    });
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString('zenify_search_source_pref', source.name);
-    }).catchError((_) {});
-    if (_submittedQuery.isNotEmpty) {
-      _executeSearch(_submittedQuery, _selectedFilter, source: source);
-    }
-  }
-
   @override
   void dispose() {
     _suggestTimer?.cancel();
+    _debounceTimer?.cancel();
     _textCtrl.removeListener(_onTextChanged);
     _focusNode.removeListener(_onFocusChanged);
     _scrollCtrl.removeListener(_onScroll);
@@ -530,26 +489,25 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
-  // ── Typing / suggestions (no deep search while typing) ─────────────────────
+  // ── Typing / suggestions & debounced deep search ─────────────────────────
 
   void _onTextChanged() {
     final q = _textCtrl.text.trim();
     if (q == _lastTyped) return;
     _lastTyped = q;
     _suggestTimer?.cancel();
+    _debounceTimer?.cancel();
     final id = ++_suggestId;
 
     if (q.isEmpty) {
       setState(() {
         _liveSuggestions = [];
-        if (_submittedQuery.isNotEmpty) {
-          _submittedQuery = '';
-          _searchResults = _emptyResult();
-          _resultsKey = '';
-          _wantedKey = '';
-          _isLoading = false;
-          _selectedFilter = SearchFilter.all;
-        }
+        _submittedQuery = '';
+        _searchResults = _emptyResult();
+        _resultsKey = '';
+        _wantedKey = '';
+        _isLoading = false;
+        _selectedFilter = SearchFilter.all;
       });
       return;
     }
@@ -558,7 +516,8 @@ class _SearchScreenState extends State<SearchScreen>
       () => _liveSuggestions = _dataService.getInstantLocalSuggestions(q),
     );
 
-    _suggestTimer = Timer(const Duration(milliseconds: 120), () async {
+    // 1. Live suggestions
+    _suggestTimer = Timer(const Duration(milliseconds: 80), () async {
       try {
         final s = await _dataService.getSuggestions(q);
         if (mounted && id == _suggestId) {
@@ -566,22 +525,26 @@ class _SearchScreenState extends State<SearchScreen>
         }
       } catch (_) {}
     });
+
+    // 2. Debounced search execution (280ms) - live YouTube Music search as you type
+    _debounceTimer = Timer(const Duration(milliseconds: 280), () {
+      if (mounted && _lastTyped == q) {
+        _executeSearch(q, _selectedFilter);
+      }
+    });
   }
 
   // ── Search execution ───────────────────────────────────────────────────────
 
-  String _keyOf(String q, SearchFilter f, [SearchSource? s]) {
-    final src = s ?? _selectedSource;
-    return '${src.name}|${f.name}|${q.toLowerCase()}';
+  String _keyOf(String q, SearchFilter f) {
+    return '${f.name}|${q.toLowerCase()}';
   }
 
   Future<void> _executeSearch(
     String query,
-    SearchFilter filter, {
-    SearchSource? source,
-  }) async {
-    final activeSource = source ?? _selectedSource;
-    final key = _keyOf(query, filter, activeSource);
+    SearchFilter filter,
+  ) async {
+    final key = _keyOf(query, filter);
     _wantedKey = key;
 
     // Safety failsafe: never allow _isLoading to remain true indefinitely
@@ -592,7 +555,7 @@ class _SearchScreenState extends State<SearchScreen>
     });
 
     final future = _inflight[key] ??= _dataService
-        .search(query: query, filter: filter, source: activeSource)
+        .search(query: query, filter: filter)
         .whenComplete(() => _inflight.remove(key));
     try {
       final results = await future.timeout(
@@ -624,12 +587,11 @@ class _SearchScreenState extends State<SearchScreen>
   void _submitSearch(
     String query, {
     SearchFilter filter = SearchFilter.all,
-    SearchSource? source,
   }) {
     final clean = query.trim();
     if (clean.isEmpty) return;
-    final activeSource = source ?? _selectedSource;
     _suggestTimer?.cancel();
+    _debounceTimer?.cancel();
     _suggestId++;
     _focusNode.unfocus();
     _lastTyped = clean;
@@ -641,7 +603,7 @@ class _SearchScreenState extends State<SearchScreen>
     }
     _dataService.addRecent(clean);
 
-    final key = _keyOf(clean, filter, activeSource);
+    final key = _keyOf(clean, filter);
     final cached = _resultsKey == key && !_searchResults.isEmpty;
     setState(() {
       _submittedQuery = clean;
@@ -656,11 +618,12 @@ class _SearchScreenState extends State<SearchScreen>
       }
     });
     _scrollTop();
-    if (!cached) _executeSearch(clean, filter, source: activeSource);
+    if (!cached) _executeSearch(clean, filter);
   }
 
   void _onFilterSelected(SearchFilter filter) {
-    if (_selectedFilter == filter || _submittedQuery.isEmpty) return;
+    final currentQ = _submittedQuery.isNotEmpty ? _submittedQuery : _textCtrl.text.trim();
+    if (_selectedFilter == filter || currentQ.isEmpty) return;
     HapticFeedback.selectionClick();
     final hasCachedForFilter = switch (filter) {
       SearchFilter.all => !_searchResults.isEmpty,
@@ -675,11 +638,12 @@ class _SearchScreenState extends State<SearchScreen>
       _selectedFilter = filter;
       if (!hasCachedForFilter) _isLoading = true;
     });
-    _executeSearch(_submittedQuery, filter, source: _selectedSource);
+    _executeSearch(currentQ, filter);
   }
 
   void _clearSearch() {
     _suggestTimer?.cancel();
+    _debounceTimer?.cancel();
     _suggestId++;
     _wantedKey = '';
     _resultsKey = '';
@@ -697,6 +661,7 @@ class _SearchScreenState extends State<SearchScreen>
 
   void _cancelSearch() {
     _suggestTimer?.cancel();
+    _debounceTimer?.cancel();
     _focusNode.unfocus();
     SearchNav.phase.value = SearchPhase.bar;
     _clearSearch();
@@ -752,33 +717,17 @@ class _SearchScreenState extends State<SearchScreen>
     try {
       resAll = await _dataService
           .search(query: spec.query, filter: SearchFilter.all)
-          .timeout(const Duration(seconds: 4), onTimeout: () => _emptyResult());
+          .timeout(const Duration(seconds: 6), onTimeout: () => _emptyResult());
     } catch (_) {}
 
     if (resAll.songs.isEmpty) {
       try {
-        final cloudTracks = await ApiService.search(
-          spec.query,
-        ).timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
-        if (cloudTracks.isNotEmpty && mounted && id == _catRequestId) {
-          final cloudSongs = cloudTracks
-              .map(
-                (t) => SearchSongItem(
-                  id: t.id,
-                  title: t.title,
-                  subtitle: t.artist,
-                  thumbnailUrl: t.coverUrl,
-                  thumbnailUrlHiRes: t.coverUrl,
-                  videoId: t.id.replaceAll('yt-', ''),
-                  artists: t.artists,
-                  albumName: t.album,
-                  durationSeconds: t.durationSeconds,
-                  durationText: t.formattedDuration,
-                ),
-              )
-              .toList();
+        final resSongs = await _dataService
+            .search(query: spec.query, filter: SearchFilter.songs)
+            .timeout(const Duration(seconds: 6), onTimeout: () => _emptyResult());
+        if (resSongs.songs.isNotEmpty && mounted && id == _catRequestId) {
           setState(() {
-            _catSongs = cloudSongs;
+            _catSongs = resSongs.songs;
             _catLoading = false;
           });
           return;
@@ -996,25 +945,23 @@ class _SearchScreenState extends State<SearchScreen>
     final topPad = MediaQuery.paddingOf(context).top;
     final typing = _isTyping;
     final text = _textCtrl.text.trim();
-    final hasQuery = _submittedQuery.isNotEmpty;
+    final effectiveQuery = text.isNotEmpty ? text : _submittedQuery;
+    final hasQuery = effectiveQuery.isNotEmpty;
     final category = _activeCategory;
 
-    final editing =
-        (_focusNode.hasFocus || _submittedQuery.isEmpty) &&
-        text.isNotEmpty &&
-        text != _submittedQuery;
-
     final _SearchViewPhase phase;
-    if (editing) {
-      phase = _SearchViewPhase.suggestions;
-    } else if (hasQuery) {
-      phase = (_isLoading && _searchResults.isEmpty)
-          ? _SearchViewPhase.loading
-          : _SearchViewPhase.results;
-    } else if (category != null) {
+    if (category != null) {
       phase = _SearchViewPhase.category;
-    } else {
+    } else if (!hasQuery) {
       phase = _SearchViewPhase.landing;
+    } else if (_isLoading && _searchResults.isEmpty) {
+      phase = _SearchViewPhase.loading;
+    } else if (!_searchResults.isEmpty) {
+      phase = _SearchViewPhase.results;
+    } else if (_liveSuggestions.isNotEmpty) {
+      phase = _SearchViewPhase.suggestions;
+    } else {
+      phase = _isLoading ? _SearchViewPhase.loading : _SearchViewPhase.results;
     }
 
     final showBack = typing || hasQuery || category != null;
@@ -1075,7 +1022,7 @@ class _SearchScreenState extends State<SearchScreen>
                         key: ValueKey('phase_loading'),
                       ),
                       _SearchViewPhase.results => _buildResults(
-                        key: ValueKey('phase_results_$_submittedQuery'),
+                        key: ValueKey('phase_results_$effectiveQuery'),
                       ),
                       _SearchViewPhase.category => _buildCategoryPage(
                         category!,
@@ -1476,11 +1423,6 @@ class _SearchScreenState extends State<SearchScreen>
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SearchSourceBar(
-          selectedSource: _selectedSource,
-          onSelected: _onSourceSelected,
-        ),
-        const SizedBox(height: 6),
         ValueListenableBuilder<List<String>>(
           valueListenable: _dataService.recentsNotifier,
           builder: (context, recents, _) {
@@ -1690,11 +1632,6 @@ class _SearchScreenState extends State<SearchScreen>
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SearchSourceBar(
-          selectedSource: _selectedSource,
-          onSelected: _onSourceSelected,
-        ),
-        const SizedBox(height: 6),
         ...List.generate(list.length, (i) {
           final s = list[i];
           final isDirectTyped =
@@ -1912,10 +1849,6 @@ class _SearchScreenState extends State<SearchScreen>
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SearchSourceBar(
-          selectedSource: _selectedSource,
-          onSelected: _onSourceSelected,
-        ),
         _SearchFilterBar(
           selectedFilter: _selectedFilter,
           onSelected: _onFilterSelected,
@@ -3666,103 +3599,6 @@ class _BrowseCategoryTile extends StatelessWidget {
   }
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// Source Selector Bar (YouTube Music vs Jio Music vs All)
-// ═════════════════════════════════════════════════════════════════════════════
-
-class _SearchSourceBar extends StatelessWidget {
-  const _SearchSourceBar({
-    required this.selectedSource,
-    required this.onSelected,
-  });
-
-  final SearchSource selectedSource;
-  final ValueChanged<SearchSource> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Container(
-        padding: const EdgeInsets.all(3.5),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.08),
-            width: 0.8,
-          ),
-        ),
-        child: Row(
-          children: _kSearchSources.map((entry) {
-            final isSelected = entry.source == selectedSource;
-            return Expanded(
-              child: PressableScale(
-                scale: 0.96,
-                onTap: () => onSelected(entry.source),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOutCubic,
-                  padding: const EdgeInsets.symmetric(vertical: 7.5),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? (entry.source == SearchSource.youtube
-                            ? const Color(0xFFFF0000).withValues(alpha: 0.22)
-                            : entry.source == SearchSource.jiosaavn
-                                ? const Color(0xFF00D1B2).withValues(alpha: 0.22)
-                                : AppColors.accent.withValues(alpha: 0.25))
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    border: isSelected
-                        ? Border.all(
-                            color: (entry.source == SearchSource.youtube
-                                ? const Color(0xFFFF4D4D)
-                                : entry.source == SearchSource.jiosaavn
-                                    ? const Color(0xFF00E6C3)
-                                    : AppColors.accent),
-                            width: 1.2,
-                          )
-                        : Border.all(color: Colors.transparent, width: 1.2),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        entry.icon,
-                        size: 13,
-                        color: isSelected
-                            ? (entry.source == SearchSource.youtube
-                                ? const Color(0xFFFF4D4D)
-                                : entry.source == SearchSource.jiosaavn
-                                    ? const Color(0xFF00E6C3)
-                                    : Colors.white)
-                            : AppColors.textTertiary,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        entry.label,
-                        style: _bodyStyle(
-                          fontSize: 12,
-                          fontWeight:
-                              isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Spring-animated filter pill bar

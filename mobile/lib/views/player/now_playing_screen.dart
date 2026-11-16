@@ -10,6 +10,7 @@
 
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart' hide RepeatMode;
 import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/physics.dart';
@@ -19,6 +20,7 @@ import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/zen.dart';
 import '../../models/track.dart';
 import '../../services/playback_bridge.dart';
+import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import 'now_playing_widgets.dart';
@@ -120,8 +122,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       fit: StackFit.expand,
       children: [
         ArtworkMeshBackground(
-          coverUrl: track?.coverUrl,
-          paused: !playing,
+          coverUrl: MediaNormalizer.upgradeArtworkUrl(track?.coverUrl ?? ''),
+          imageProviderBuilder: (url) =>
+              CachedNetworkImageProvider(MediaNormalizer.upgradeArtworkUrl(url)),
+          paused: false,
         ),
         SafeArea(
           child: Padding(
