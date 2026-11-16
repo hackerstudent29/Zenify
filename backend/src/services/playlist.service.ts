@@ -431,4 +431,160 @@ export class PlaylistService {
             }
         });
     }
+
+    async importFromUrl(userId: string, inputUrl: string) {
+        let url = (inputUrl || '').trim();
+        if (!url) throw this.server.httpErrors.badRequest('Playlist URL is required');
+
+        // 1. Check if Spotify playlist link
+        if (url.includes('spotify.com/playlist/')) {
+            const match = url.match(/playlist\/([a-zA-Z0-9]+)/);
+            if (match && match[1]) {
+                const spId = match[1];
+                const resolved: any = await this.findOne(`sp-${spId}`, userId);
+                if (resolved && resolved.tracks) {
+                    const created = await prisma.playlist.create({
+                        data: {
+                            name: resolved.name || resolved.title || 'Imported Spotify Playlist',
+                            description: (resolved.description || 'Imported from Spotify').slice(0, 500),
+                            coverUrl: resolved.coverUrl,
+                            userId,
+                            isPublic: true,
+                        }
+                    });
+                    for (const pt of resolved.tracks) {
+                        const tr = (pt as any).track || pt;
+                        if (!tr) continue;
+                        let realTrackId = tr.id;
+                        const exists = await prisma.track.findUnique({ where: { id: tr.id } });
+                        if (!exists) {
+                            try {
+                                const ensured = await (this.server as any).trackService?.ensureTrack(tr.id, {
+                                    title: tr.title,
+                                    artist: tr.artist?.name || tr.artistName || 'Unknown Artist',
+                                    album: tr.album?.title || tr.album,
+                                    duration: tr.duration,
+                                    coverUrl: tr.coverUrl
+                                });
+                                if (ensured?.id) realTrackId = ensured.id;
+                            } catch (_) {}
+                        }
+                        try {
+                            await prisma.playlistTrack.create({
+                                data: {
+                                    playlistId: created.id,
+                                    trackId: realTrackId,
+                                }
+                            });
+                        } catch (_) {}
+                    }
+                    return this.findOne(created.id, userId);
+                }
+            }
+        }
+
+        // 2. YouTube & YouTube Music playlist extraction
+        if (url.includes('music.youtube.com')) {
+            url = url.replace('music.youtube.com', 'www.youtube.com');
+        }
+
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            url = `https://www.youtube.com/playlist?list=${url}`;
+        }
+
+        const { runYtDlp } = await import('./external-metadata.service.js');
+        let stdout = '';
+        try {
+            const res = await runYtDlp([
+                '--socket-timeout', '20',
+                '--no-check-certificates',
+                '--dump-single-json',
+                '--flat-playlist',
+                '--no-warnings',
+                url
+            ], { timeout: 40000, maxBuffer: 15 * 1024 * 1024 });
+            stdout = res.stdout;
+        } catch (ytErr: any) {
+            throw this.server.httpErrors.badRequest(`Failed to extract YouTube playlist: ${ytErr.message?.slice(0, 100)}`);
+        }
+
+        let parsedData: any = null;
+        try {
+            parsedData = JSON.parse(stdout);
+        } catch (_) {
+            throw this.server.httpErrors.badRequest('Could not parse YouTube playlist metadata');
+        }
+
+        const plTitle = parsedData?.title || 'Imported YouTube Playlist';
+        const plDesc = (parsedData?.description || `Imported from ${parsedData?.channel || parsedData?.uploader || 'YouTube'}`).slice(0, 500);
+        const thumbs = parsedData?.thumbnails;
+        const plCover = Array.isArray(thumbs) && thumbs.length > 0 ? thumbs[thumbs.length - 1]?.url : '';
+        const entries = Array.isArray(parsedData?.entries) ? parsedData.entries : [];
+
+        if (entries.length === 0) {
+            throw this.server.httpErrors.badRequest('No songs found in the provided YouTube playlist');
+        }
+
+        const created = await prisma.playlist.create({
+            data: {
+                name: plTitle,
+                description: plDesc,
+                coverUrl: plCover || undefined,
+                userId,
+                isPublic: true,
+            }
+        });
+
+        // Import tracks (up to 250 items)
+        for (const entry of entries.slice(0, 250)) {
+            const rawTitle = (entry.title || '').trim();
+            const rawArtist = (entry.uploader || entry.channel || 'Various Artists').trim();
+            const dur = Math.round(entry.duration || 180);
+            const entryThumbs = entry.thumbnails;
+            const cover = Array.isArray(entryThumbs) && entryThumbs.length > 0 ? entryThumbs[entryThumbs.length - 1]?.url : plCover;
+            const ytid = entry.id;
+
+            if (!rawTitle || rawTitle === '[Private video]' || rawTitle === '[Deleted video]') continue;
+
+            const cleanT = rawTitle.replace(/\(.*?\)|\[.*?\]/g, '').trim() || rawTitle;
+
+            let realTrackId: string | null = null;
+            if (ytid) {
+                const existing = await prisma.track.findFirst({
+                    where: { OR: [{ youtubeId: ytid }, { id: `yt-${ytid}` }] }
+                });
+                if (existing) {
+                    realTrackId = existing.id;
+                }
+            }
+
+            if (!realTrackId) {
+                try {
+                    const ensured = await (this.server as any).trackService?.ensureTrack(`yt-${ytid || Date.now()}`, {
+                        title: cleanT,
+                        artist: rawArtist,
+                        album: plTitle,
+                        duration: dur,
+                        coverUrl: cover,
+                        youtubeId: ytid,
+                        audioUrl: `/api/utils/stream-youtube?url=${encodeURIComponent(`${rawArtist} - ${cleanT}`)}&trackId=${ytid || ''}`
+                    });
+                    if (ensured?.id) realTrackId = ensured.id;
+                } catch (_) {}
+            }
+
+            if (realTrackId) {
+                try {
+                    await prisma.playlistTrack.create({
+                        data: {
+                            playlistId: created.id,
+                            trackId: realTrackId
+                        }
+                    });
+                } catch (_) {}
+            }
+        }
+
+        return this.findOne(created.id, userId);
+    }
 }

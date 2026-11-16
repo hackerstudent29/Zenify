@@ -465,6 +465,14 @@ export function GlobalAudio() {
         }
       };
 
+      // If local file handle is unsupported (e.g. ALAC in Windows Chrome) or expired across session reload,
+      // immediately trigger full online resolution for the song without invalid blob parameter requests
+      if (audio.src && (audio.src.startsWith('blob:') || audio.src.startsWith('data:'))) {
+        console.warn("[GlobalAudio] Local/blob audio source error. Triggering instant online stream resolution for:", currentTrackTitleRef.current);
+        triggerRecovery();
+        return;
+      }
+
       // Probe audio source before diagnosing CORS:
       if (audio.crossOrigin && audio.src && !audio.src.includes('no-cors-retry=true')) {
         const testUrl = audio.src;

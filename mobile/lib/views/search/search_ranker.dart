@@ -854,9 +854,10 @@ class SearchLruCache {
     required SearchFilter filter,
     required String country,
     required String language,
+    SearchSource source = SearchSource.all,
   }) {
     final norm = QueryPreprocessor.normalize(query);
-    return '$norm|${filter.name}|$country|$language';
+    return '$norm|${filter.name}|${source.name}|$country|$language';
   }
 
   SearchResult? get(String key) {

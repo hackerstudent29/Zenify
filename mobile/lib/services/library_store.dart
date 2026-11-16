@@ -585,6 +585,29 @@ class LibraryStore extends ChangeNotifier {
     return p;
   }
 
+  UserPlaylist importPlaylist(String name, List<Track> tracks) {
+    final p = UserPlaylist(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      name: name.trim().isEmpty ? 'Imported Playlist' : name.trim(),
+    );
+    for (final t in tracks) {
+      final k = _key(t);
+      _seen[k] = t;
+      p.trackIds.add(k);
+    }
+    _playlists.insert(0, p);
+    _save();
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'playlist_import_${p.id}',
+        title: 'Playlist Imported',
+        body: '${p.name} (${tracks.length} songs)',
+        leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
+      ),
+    );
+    return p;
+  }
+
   void renamePlaylist(String id, String name) {
     final p = playlistById(id);
     if (p == null || name.trim().isEmpty) return;

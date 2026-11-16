@@ -564,6 +564,13 @@ export function convertLocalToZenifyTrack(t: LocalAudioMetadata): Track {
     resolvedAudioUrl = getMediaUrl(t.audioUrl, 'audio') || "";
   }
 
+  // 5. High-fidelity stream fallback: if local file handle is unmounted or across browser reloads,
+  // stream full track cleanly via YouTube / JioSaavn
+  if (!resolvedAudioUrl) {
+    const query = `${displayArtist} - ${t.title}`.trim();
+    resolvedAudioUrl = `/api/utils/stream-youtube?url=${encodeURIComponent(query)}&title=${encodeURIComponent(t.title)}&artist=${encodeURIComponent(displayArtist)}&trackId=${encodeURIComponent(t.id)}`;
+  }
+
   return {
     id: t.id,
     title: t.title,

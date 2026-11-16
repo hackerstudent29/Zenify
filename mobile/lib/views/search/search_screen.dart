@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_colors.dart';
@@ -344,6 +345,12 @@ const List<({SearchFilter filter, String label})> _kResultFilters = [
   (filter: SearchFilter.videos, label: 'Videos'),
 ];
 
+const List<({SearchSource source, String label, IconData icon})> _kSearchSources = [
+  (source: SearchSource.all, label: 'All', icon: CupertinoIcons.sparkles),
+  (source: SearchSource.youtube, label: 'YouTube Music', icon: CupertinoIcons.play_rectangle_fill),
+  (source: SearchSource.jiosaavn, label: 'Jio Music', icon: CupertinoIcons.waveform),
+];
+
 enum _SearchViewPhase { landing, suggestions, loading, results, category }
 
 const double _kEdge = 20.0;
@@ -387,6 +394,7 @@ class _SearchScreenState extends State<SearchScreen>
   bool _isLoadingMore = false;
   SearchResult _searchResults = _emptyResult();
   SearchFilter _selectedFilter = SearchFilter.all;
+  SearchSource _selectedSource = SearchSource.all;
 
   // Category page
   _SearchCategorySpec? _activeCategory;
@@ -403,6 +411,7 @@ class _SearchScreenState extends State<SearchScreen>
   void initState() {
     super.initState();
     _dataService.initRecents();
+    _loadSavedSource();
     if (CatalogDataSource.allTracks.isEmpty) {
       CatalogDataSource.initialize();
     }
@@ -410,6 +419,39 @@ class _SearchScreenState extends State<SearchScreen>
     _focusNode.addListener(_onFocusChanged);
     _scrollCtrl.addListener(_onScroll);
     SearchNav.phase.addListener(_onPhase);
+  }
+
+  Future<void> _loadSavedSource() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('zenify_search_source_pref');
+      if (saved != null) {
+        final match = SearchSource.values.firstWhere(
+          (s) => s.name == saved,
+          orElse: () => SearchSource.all,
+        );
+        if (mounted && match != _selectedSource) {
+          setState(() => _selectedSource = match);
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _onSourceSelected(SearchSource source) {
+    if (_selectedSource == source) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _selectedSource = source;
+      if (_submittedQuery.isNotEmpty) {
+        _isLoading = true;
+      }
+    });
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('zenify_search_source_pref', source.name);
+    }).catchError((_) {});
+    if (_submittedQuery.isNotEmpty) {
+      _executeSearch(_submittedQuery, _selectedFilter, source: source);
+    }
   }
 
   @override
@@ -528,25 +570,33 @@ class _SearchScreenState extends State<SearchScreen>
 
   // ── Search execution ───────────────────────────────────────────────────────
 
-  String _keyOf(String q, SearchFilter f) => '${f.name}|${q.toLowerCase()}';
+  String _keyOf(String q, SearchFilter f, [SearchSource? s]) {
+    final src = s ?? _selectedSource;
+    return '${src.name}|${f.name}|${q.toLowerCase()}';
+  }
 
-  Future<void> _executeSearch(String query, SearchFilter filter) async {
-    final key = _keyOf(query, filter);
+  Future<void> _executeSearch(
+    String query,
+    SearchFilter filter, {
+    SearchSource? source,
+  }) async {
+    final activeSource = source ?? _selectedSource;
+    final key = _keyOf(query, filter, activeSource);
     _wantedKey = key;
 
     // Safety failsafe: never allow _isLoading to remain true indefinitely
-    Timer(const Duration(seconds: 18), () {
+    Timer(const Duration(seconds: 12), () {
       if (mounted && _isLoading && _wantedKey == key) {
         setState(() => _isLoading = false);
       }
     });
 
     final future = _inflight[key] ??= _dataService
-        .search(query: query, filter: filter)
+        .search(query: query, filter: filter, source: activeSource)
         .whenComplete(() => _inflight.remove(key));
     try {
       final results = await future.timeout(
-        const Duration(seconds: 16),
+        const Duration(seconds: 10),
         onTimeout: () => _dataService.getFallbackResult(query, filter),
       );
       if (!mounted) return;
@@ -571,9 +621,14 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
-  void _submitSearch(String query, {SearchFilter filter = SearchFilter.all}) {
+  void _submitSearch(
+    String query, {
+    SearchFilter filter = SearchFilter.all,
+    SearchSource? source,
+  }) {
     final clean = query.trim();
     if (clean.isEmpty) return;
+    final activeSource = source ?? _selectedSource;
     _suggestTimer?.cancel();
     _suggestId++;
     _focusNode.unfocus();
@@ -586,7 +641,7 @@ class _SearchScreenState extends State<SearchScreen>
     }
     _dataService.addRecent(clean);
 
-    final key = _keyOf(clean, filter);
+    final key = _keyOf(clean, filter, activeSource);
     final cached = _resultsKey == key && !_searchResults.isEmpty;
     setState(() {
       _submittedQuery = clean;
@@ -601,7 +656,7 @@ class _SearchScreenState extends State<SearchScreen>
       }
     });
     _scrollTop();
-    if (!cached) _executeSearch(clean, filter);
+    if (!cached) _executeSearch(clean, filter, source: activeSource);
   }
 
   void _onFilterSelected(SearchFilter filter) {
@@ -620,7 +675,7 @@ class _SearchScreenState extends State<SearchScreen>
       _selectedFilter = filter;
       if (!hasCachedForFilter) _isLoading = true;
     });
-    _executeSearch(_submittedQuery, filter);
+    _executeSearch(_submittedQuery, filter, source: _selectedSource);
   }
 
   void _clearSearch() {
@@ -1421,6 +1476,11 @@ class _SearchScreenState extends State<SearchScreen>
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _SearchSourceBar(
+          selectedSource: _selectedSource,
+          onSelected: _onSourceSelected,
+        ),
+        const SizedBox(height: 6),
         ValueListenableBuilder<List<String>>(
           valueListenable: _dataService.recentsNotifier,
           builder: (context, recents, _) {
@@ -1629,17 +1689,23 @@ class _SearchScreenState extends State<SearchScreen>
     return Column(
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(list.length, (i) {
-        final s = list[i];
-        final isDirectTyped =
-            typed.isNotEmpty && s.toLowerCase() == typed.toLowerCase();
-        return SpringIn(
-          delayMs: i * 18,
-          rise: 12,
-          child: PressableScale(
-            scale: 0.985,
-            onTap: () => _submitSearch(s),
-            child: Container(
+      children: [
+        _SearchSourceBar(
+          selectedSource: _selectedSource,
+          onSelected: _onSourceSelected,
+        ),
+        const SizedBox(height: 6),
+        ...List.generate(list.length, (i) {
+          final s = list[i];
+          final isDirectTyped =
+              typed.isNotEmpty && s.toLowerCase() == typed.toLowerCase();
+          return SpringIn(
+            delayMs: i * 18,
+            rise: 12,
+            child: PressableScale(
+              scale: 0.985,
+              onTap: () => _submitSearch(s),
+              child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: _kEdge,
                 vertical: 13,
@@ -1715,7 +1781,8 @@ class _SearchScreenState extends State<SearchScreen>
           ),
         );
       }),
-    );
+    ],
+  );
   }
 
   Widget _highlighted(String text, String queryLower) {
@@ -1845,6 +1912,10 @@ class _SearchScreenState extends State<SearchScreen>
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _SearchSourceBar(
+          selectedSource: _selectedSource,
+          onSelected: _onSourceSelected,
+        ),
         _SearchFilterBar(
           selectedFilter: _selectedFilter,
           onSelected: _onFilterSelected,
@@ -3589,6 +3660,104 @@ class _BrowseCategoryTile extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Source Selector Bar (YouTube Music vs Jio Music vs All)
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _SearchSourceBar extends StatelessWidget {
+  const _SearchSourceBar({
+    required this.selectedSource,
+    required this.onSelected,
+  });
+
+  final SearchSource selectedSource;
+  final ValueChanged<SearchSource> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.all(3.5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 0.8,
+          ),
+        ),
+        child: Row(
+          children: _kSearchSources.map((entry) {
+            final isSelected = entry.source == selectedSource;
+            return Expanded(
+              child: PressableScale(
+                scale: 0.96,
+                onTap: () => onSelected(entry.source),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(vertical: 7.5),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (entry.source == SearchSource.youtube
+                            ? const Color(0xFFFF0000).withValues(alpha: 0.22)
+                            : entry.source == SearchSource.jiosaavn
+                                ? const Color(0xFF00D1B2).withValues(alpha: 0.22)
+                                : AppColors.accent.withValues(alpha: 0.25))
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    border: isSelected
+                        ? Border.all(
+                            color: (entry.source == SearchSource.youtube
+                                ? const Color(0xFFFF4D4D)
+                                : entry.source == SearchSource.jiosaavn
+                                    ? const Color(0xFF00E6C3)
+                                    : AppColors.accent),
+                            width: 1.2,
+                          )
+                        : Border.all(color: Colors.transparent, width: 1.2),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        entry.icon,
+                        size: 13,
+                        color: isSelected
+                            ? (entry.source == SearchSource.youtube
+                                ? const Color(0xFFFF4D4D)
+                                : entry.source == SearchSource.jiosaavn
+                                    ? const Color(0xFF00E6C3)
+                                    : Colors.white)
+                            : AppColors.textTertiary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        entry.label,
+                        style: _bodyStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ),
     );

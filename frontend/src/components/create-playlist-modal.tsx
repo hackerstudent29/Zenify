@@ -9,9 +9,10 @@ import api from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Image as ImageIcon, Music, Type, Check, Search, X, Loader2 } from "lucide-react";
+import { Image as ImageIcon, Music, Type, Check, Search, X, Loader2, Link2, DownloadCloud } from "lucide-react";
 import { cn, getMediaUrl } from "@/lib/utils";
 import { useDebounce } from "use-debounce";
+import { toast } from "sonner";
 
 interface CreatePlaylistModalProps {
   isOpen: boolean;
@@ -19,10 +20,12 @@ interface CreatePlaylistModalProps {
 }
 
 export function CreatePlaylistModal({ isOpen, onClose }: CreatePlaylistModalProps) {
-  const [activeTab, setActiveTab] = useState<"details" | "image" | "tracks">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "image" | "tracks" | "import">("details");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
+  const [importUrl, setImportUrl] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery] = useDebounce(searchQuery, 400);
@@ -93,6 +96,28 @@ export function CreatePlaylistModal({ isOpen, onClose }: CreatePlaylistModalProp
     }
   };
 
+  const handleImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importUrl.trim()) return;
+    setIsImporting(true);
+    const toastId = toast.loading("Importing playlist from YouTube/Spotify link...");
+    try {
+      const res = await api.post("/playlists/import", { url: importUrl.trim() });
+      const newPlaylistId = res.data?.id;
+      toast.success(`Imported playlist "${res.data?.name || 'New Playlist'}" with ${res.data?.tracks?.length || 0} tracks!`, { id: toastId });
+      queryClient.invalidateQueries({ queryKey: ['my-playlists'] });
+      if (newPlaylistId) {
+        router.push(`/playlist/${newPlaylistId}`);
+      }
+      onClose();
+      setImportUrl("");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || "Failed to import playlist. Please check the link and try again.", { id: toastId });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const toggleTrack = (track: any) => {
     if (selectedTracks.some(t => t.id === track.id)) {
       setSelectedTracks(selectedTracks.filter(t => t.id !== track.id));
@@ -105,6 +130,7 @@ export function CreatePlaylistModal({ isOpen, onClose }: CreatePlaylistModalProp
     { id: "details", icon: Type, label: "Details" },
     { id: "image", icon: ImageIcon, label: "Cover Art" },
     { id: "tracks", icon: Music, label: "Add Tracks" },
+    { id: "import", icon: DownloadCloud, label: "Import Link" },
   ] as const;
 
   return (
@@ -285,26 +311,72 @@ export function CreatePlaylistModal({ isOpen, onClose }: CreatePlaylistModalProp
                   </div>
                 </motion.div>
               )}
+
+              {activeTab === "import" && (
+                <motion.div
+                  key="import"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-5"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="importUrl" className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 ml-1">
+                      YouTube / Spotify Playlist URL
+                    </Label>
+                    <div className="relative">
+                      <Link2 className="w-4 h-4 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2" />
+                      <Input
+                        id="importUrl"
+                        value={importUrl}
+                        onChange={(e) => setImportUrl(e.target.value)}
+                        className="bg-black/50 border border-white/10 text-white h-12 pl-11 pr-4 rounded-xl focus-visible:border-brand transition-all font-mono text-xs"
+                        placeholder="https://music.youtube.com/playlist?list=..."
+                        autoFocus
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2">
+                    <p className="text-xs font-semibold text-white/80">Instant One-Click Import</p>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      Paste any public playlist link from YouTube Music, YouTube, or Spotify. Zenify automatically extracts the playlist title, cover art, and songs and maps them to 320kbps audio streams.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
             </AnimatePresence>
           </form>
         </div>
 
         <div className="p-6 bg-black/40 border-t border-white/5 flex items-center justify-between">
           <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
-            {selectedTracks.length} Track{selectedTracks.length !== 1 && 's'} Selected
+            {activeTab === "import" ? "YouTube & Spotify Importer" : `${selectedTracks.length} Track${selectedTracks.length !== 1 ? 's' : ''} Selected`}
           </div>
           <div className="flex gap-3">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading} className="text-zinc-400 hover:text-white hover:bg-white/5 font-bold text-xs uppercase tracking-widest rounded-xl">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading || isImporting} className="text-zinc-400 hover:text-white hover:bg-white/5 font-bold text-xs uppercase tracking-widest rounded-xl">
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              form="create-playlist-form"
-              disabled={isLoading || !name.trim()} 
-              className="bg-brand text-black font-black px-6 h-10 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Playlist'}
-            </Button>
+            {activeTab === "import" ? (
+              <Button
+                type="button"
+                onClick={handleImport}
+                disabled={isImporting || !importUrl.trim()}
+                className="bg-brand text-black font-black px-6 h-10 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]"
+              >
+                {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Import Playlist'}
+              </Button>
+            ) : (
+              <Button 
+                type="submit" 
+                form="create-playlist-form"
+                disabled={isLoading || !name.trim()} 
+                className="bg-brand text-black font-black px-6 h-10 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(var(--accent-brand-rgb),0.3)]"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Playlist'}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

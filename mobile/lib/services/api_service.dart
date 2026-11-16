@@ -268,6 +268,27 @@ class ApiService {
     return false;
   }
 
+  /// Imports a playlist from a YouTube Music, YouTube, or Spotify URL.
+  static Future<Map<String, dynamic>?> importPlaylist(String url) async {
+    for (final base in _bases) {
+      try {
+        final uri = Uri.parse('$base/api/playlists/import');
+        final res = await _client.post(
+          uri,
+          headers: {'Content-Type': 'application/json', ..._headers},
+          body: jsonEncode({'url': url.trim()}),
+        ).timeout(const Duration(seconds: 40));
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          final data = jsonDecode(res.body);
+          if (data is Map) return Map<String, dynamic>.from(data);
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[ApiService] importPlaylist error: $e');
+      }
+    }
+    return null;
+  }
+
   /// Removes an album from the authenticated user's backend library.
   static Future<bool> removeUserAlbum(String title, String artist) async {
     for (final base in _bases) {
