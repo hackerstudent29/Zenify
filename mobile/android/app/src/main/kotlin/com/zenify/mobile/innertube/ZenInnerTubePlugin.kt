@@ -49,7 +49,8 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 Log.d("ZenInnerTube", "onMethodCall: ${call.method}")
                 when (call.method) {
                     "getStreamUrl" -> {
-                        val videoId = call.argument<String>("videoId")
+                        val rawVideoId = call.argument<String>("videoId")
+                        val videoId = rawVideoId?.removePrefix("yt-")?.trim()
                         if (videoId.isNullOrBlank()) {
                             replyError(result, "INVALID_ARG", "videoId is required", null)
                             return@launch
@@ -673,6 +674,41 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         replyError(result, "ALBUM_NOT_FOUND", "Could not load album for $browseId", null)
                     }
 
+                    "getSong" -> {
+                        val videoId = call.argument<String>("videoId")?.removePrefix("yt-")?.trim() ?: ""
+                        if (videoId.isBlank()) {
+                            replyError(result, "BAD_ARGS", "videoId cannot be blank", null)
+                            return@launch
+                        }
+                        try {
+                            val nextOutcome = YouTube.next(WatchEndpoint(videoId = videoId))
+                            val nextSongs = nextOutcome.getOrNull()?.items?.filterIsInstance<SongItem>() ?: emptyList()
+                            val match = nextSongs.firstOrNull { it.id == videoId } ?: nextSongs.firstOrNull()
+                            if (match != null) {
+                                replySuccess(result, songItemToMap(match))
+                                return@launch
+                            }
+                        } catch (e: Exception) {
+                            Log.w("ZenInnerTube", "getSong next fallback: ${e.message}")
+                        }
+
+                        try {
+                            val resolved = com.zenify.mobile.yt.YtEngine.resolve(videoId, wantVideo = false)
+                            val songMap = mapOf(
+                                "id" to videoId,
+                                "title" to (resolved.title ?: "YouTube Track"),
+                                "artists" to listOf(mapOf("name" to (resolved.artist ?: "YouTube Music"))),
+                                "thumbnail" to "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
+                                "duration" to 210
+                            )
+                            replySuccess(result, songMap)
+                            return@launch
+                        } catch (e: Exception) {
+                            Log.e("ZenInnerTube", "getSong error for $videoId: ${e.message}")
+                            replyError(result, "SONG_ERROR", e.message, null)
+                        }
+                    }
+
                     "getPlaylist" -> {
                         val playlistId = call.argument<String>("playlistId")
                             ?: call.argument<String>("browseId")
@@ -681,7 +717,59 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             replyError(result, "BAD_ARGS", "playlistId cannot be blank", null)
                             return@launch
                         }
-                        val cleanPlaylistId = playlistId.removePrefix("VL")
+                        val cleanPlaylistId = playlistId.removePrefix("VL").trim()
+
+                        // 1. If browse ID represents an album (OLAK... or MPREb_...)
+                        if (cleanPlaylistId.startsWith("OLAK") || cleanPlaylistId.startsWith("MPREb_")) {
+                            try {
+                                val albumOutcome = YouTube.album(cleanPlaylistId)
+                                var handled = false
+                                albumOutcome.onSuccess { albumPage ->
+                                    val map = mapOf(
+                                        "playlist" to mapOf(
+                                            "id" to albumPage.album.id,
+                                            "title" to albumPage.album.title,
+                                            "author" to (albumPage.album.artists?.firstOrNull()?.name ?: "Artist"),
+                                            "thumbnail" to albumPage.album.thumbnail
+                                        ),
+                                        "songs" to albumPage.songs.map { songItemToMap(it) }
+                                    )
+                                    replySuccess(result, map)
+                                    handled = true
+                                }
+                                if (handled) return@launch
+                            } catch (e: Exception) {
+                                Log.w("ZenInnerTube", "getPlaylist album branch failed for $cleanPlaylistId: ${e.message}")
+                            }
+                        }
+
+                        // 2. If browse ID represents a radio / mix (RD...)
+                        if (cleanPlaylistId.startsWith("RD")) {
+                            try {
+                                val nextOutcome = YouTube.next(WatchEndpoint(playlistId = cleanPlaylistId))
+                                var handled = false
+                                nextOutcome.onSuccess { nextPage ->
+                                    val songs = nextPage.items.filterIsInstance<SongItem>()
+                                    if (songs.isNotEmpty()) {
+                                        val map = mapOf(
+                                            "playlist" to mapOf(
+                                                "id" to cleanPlaylistId,
+                                                "title" to (nextPage.title ?: "YouTube Mix"),
+                                                "thumbnail" to songs.firstOrNull()?.thumbnail
+                                            ),
+                                            "songs" to songs.map { songItemToMap(it) }
+                                        )
+                                        replySuccess(result, map)
+                                        handled = true
+                                    }
+                                }
+                                if (handled) return@launch
+                            } catch (e: Exception) {
+                                Log.w("ZenInnerTube", "getPlaylist radio branch failed for $cleanPlaylistId: ${e.message}")
+                            }
+                        }
+
+                        // 3. Standard playlist resolution with album fallback
                         val outcome = YouTube.playlist(cleanPlaylistId)
                         outcome.fold(
                             onSuccess = { page ->
@@ -692,7 +780,25 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                                 replySuccess(result, map)
                             },
                             onFailure = { err ->
-                                replyError(result, "PLAYLIST_ERROR", err.message, null)
+                                Log.w("ZenInnerTube", "getPlaylist failed for $cleanPlaylistId: ${err.message}, trying album fallback...")
+                                val albumOutcome = YouTube.album(cleanPlaylistId)
+                                albumOutcome.fold(
+                                    onSuccess = { albumPage ->
+                                        val map = mapOf(
+                                            "playlist" to mapOf(
+                                                "id" to albumPage.album.id,
+                                                "title" to albumPage.album.title,
+                                                "author" to (albumPage.album.artists?.firstOrNull()?.name ?: "Artist"),
+                                                "thumbnail" to albumPage.album.thumbnail
+                                            ),
+                                            "songs" to albumPage.songs.map { songItemToMap(it) }
+                                        )
+                                        replySuccess(result, map)
+                                    },
+                                    onFailure = {
+                                        replyError(result, "PLAYLIST_ERROR", err.message, null)
+                                    }
+                                )
                             }
                         )
                     }
@@ -898,7 +1004,8 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         )
     }
 
-    private fun playlistItemToMap(p: PlaylistItem): Map<String, Any?> {
+    private fun playlistItemToMap(p: PlaylistItem?): Map<String, Any?> {
+        if (p == null) return emptyMap()
         return mapOf(
             "id" to p.id,
             "title" to p.title,

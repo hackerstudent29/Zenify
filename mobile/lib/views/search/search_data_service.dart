@@ -181,13 +181,42 @@ class SearchDataService {
     String? continuation;
 
     // ── PURE YOUTUBE MUSIC SEARCH PIPELINE (ZERO JIOSAAVN) ───────────────────
-    if (filter == SearchFilter.all) {
-      // 1. Native Metrolist searchSummary (Android)
-      if (InnerTubeService.instance.isNativeAvailable) {
-        try {
+    // 1. PRIMARY: Direct High-Speed YouTube Music InnerTube HTTP search (1-2s)
+    try {
+      final body = <String, dynamic>{'query': q};
+      if (filter.params != null) {
+        body['params'] = filter.params;
+      }
+      final rawJson = await InnerTubeService.instance
+          .post(
+            'search',
+            body,
+            countryCode: country,
+            ttl: SearchRankingConfig.kLruCacheTtl,
+            forceRefresh: forceRefresh,
+          )
+          .timeout(const Duration(seconds: 8));
+
+      final parsed = SearchParser.parse(rawJson, query: q);
+      if (parsed.items.isNotEmpty) {
+        candidateItems = parsed.items;
+        topResult = parsed.topResult;
+        didYouMean = parsed.didYouMean;
+        continuation = parsed.continuation;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[SearchDataService] Direct HTTP search attempt failed: $e');
+      }
+    }
+
+    // 2. SECONDARY FALLBACK: Native Metrolist search (Android) if HTTP returned empty
+    if (candidateItems.isEmpty && InnerTubeService.instance.isNativeAvailable) {
+      try {
+        if (filter == SearchFilter.all) {
           final nativeData = await InnerTubeService.instance
               .searchSummaryNative(q)
-              .timeout(const Duration(seconds: 14), onTimeout: () => null);
+              .timeout(const Duration(seconds: 4), onTimeout: () => null);
           if (nativeData != null && nativeData['summaries'] is List) {
             final parsed = SearchParser.parseNativeSummaries(
               nativeData['summaries'] as List,
@@ -200,91 +229,28 @@ class SearchDataService {
               continuation = parsed.continuation;
             }
           }
-
-          // If summary didn't return any songs, supplement with direct native song search
-          if (candidateItems.isEmpty ||
-              !candidateItems.any((i) => i is SearchSongItem)) {
+          if (candidateItems.isEmpty) {
             final nativeSongs = await InnerTubeService.instance
                 .searchSongsNative(q)
-                .timeout(const Duration(seconds: 12), onTimeout: () => <Track>[]);
+                .timeout(
+                  const Duration(seconds: 3),
+                  onTimeout: () => <Track>[],
+                );
             if (nativeSongs.isNotEmpty) {
-              final songItems = nativeSongs
-                  .map(_trackToSearchSongItem)
-                  .toList();
-              if (candidateItems.isEmpty) {
-                candidateItems = songItems;
-              } else {
-                final seenIds = candidateItems.map((i) => i.id).toSet();
-                for (final s in songItems) {
-                  if (seenIds.add(s.id)) candidateItems.add(s);
-                }
-              }
+              candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
             }
           }
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('[SearchDataService] native searchSummary error: $e');
-          }
-        }
-      }
-
-      // 2. Direct HTTP InnerTube post search if native was unavailable or empty
-      if (candidateItems.isEmpty) {
-        try {
-          final rawJson = await InnerTubeService.instance
-              .post(
-                'search',
-                {'query': q},
-                countryCode: country,
-                ttl: SearchRankingConfig.kLruCacheTtl,
-                forceRefresh: forceRefresh,
-              )
-              .timeout(const Duration(seconds: 14));
-
-          final parsed = SearchParser.parse(rawJson, query: q);
-          if (parsed.items.isNotEmpty) {
-            candidateItems = parsed.items;
-            topResult = parsed.topResult;
-            didYouMean = parsed.didYouMean;
-            continuation = parsed.continuation;
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('[SearchDataService] HTTP search attempt failed: $e');
-          }
-        }
-      }
-    } else if (filter == SearchFilter.songs) {
-      if (InnerTubeService.instance.isNativeAvailable) {
-        try {
+        } else if (filter == SearchFilter.songs) {
           final nativeSongs = await InnerTubeService.instance
               .searchSongsNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => <Track>[]);
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
           if (nativeSongs.isNotEmpty) {
             candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
           }
-        } catch (_) {}
-      }
-      if (candidateItems.isEmpty) {
-        try {
-          final rawJson = await InnerTubeService.instance
-              .post(
-                'search',
-                {'query': q, 'params': filter.params},
-                countryCode: country,
-                ttl: SearchRankingConfig.kLruCacheTtl,
-              )
-              .timeout(const Duration(seconds: 8));
-          final parsed = SearchParser.parse(rawJson, query: q);
-          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
-        } catch (_) {}
-      }
-    } else if (filter == SearchFilter.artists) {
-      if (InnerTubeService.instance.isNativeAvailable) {
-        try {
+        } else if (filter == SearchFilter.artists) {
           final rawArtists = await InnerTubeService.instance
               .searchArtistsNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
           if (rawArtists.isNotEmpty) {
             int rank = 0;
             candidateItems = rawArtists
@@ -292,28 +258,10 @@ class SearchDataService {
                 .whereType<SearchItem>()
                 .toList();
           }
-        } catch (_) {}
-      }
-      if (candidateItems.isEmpty) {
-        try {
-          final rawJson = await InnerTubeService.instance
-              .post(
-                'search',
-                {'query': q, 'params': filter.params},
-                countryCode: country,
-                ttl: SearchRankingConfig.kLruCacheTtl,
-              )
-              .timeout(const Duration(seconds: 8));
-          final parsed = SearchParser.parse(rawJson, query: q);
-          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
-        } catch (_) {}
-      }
-    } else if (filter == SearchFilter.albums) {
-      if (InnerTubeService.instance.isNativeAvailable) {
-        try {
+        } else if (filter == SearchFilter.albums) {
           final rawAlbums = await InnerTubeService.instance
               .searchAlbumsNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
           if (rawAlbums.isNotEmpty) {
             int rank = 0;
             candidateItems = rawAlbums
@@ -321,29 +269,11 @@ class SearchDataService {
                 .whereType<SearchItem>()
                 .toList();
           }
-        } catch (_) {}
-      }
-      if (candidateItems.isEmpty) {
-        try {
-          final rawJson = await InnerTubeService.instance
-              .post(
-                'search',
-                {'query': q, 'params': filter.params},
-                countryCode: country,
-                ttl: SearchRankingConfig.kLruCacheTtl,
-              )
-              .timeout(const Duration(seconds: 8));
-          final parsed = SearchParser.parse(rawJson, query: q);
-          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
-        } catch (_) {}
-      }
-    } else if (filter == SearchFilter.featuredPlaylists ||
-        filter == SearchFilter.communityPlaylists) {
-      if (InnerTubeService.instance.isNativeAvailable) {
-        try {
+        } else if (filter == SearchFilter.featuredPlaylists ||
+            filter == SearchFilter.communityPlaylists) {
           final rawPlaylists = await InnerTubeService.instance
               .searchPlaylistsNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
           if (rawPlaylists.isNotEmpty) {
             int rank = 0;
             candidateItems = rawPlaylists
@@ -351,28 +281,10 @@ class SearchDataService {
                 .whereType<SearchItem>()
                 .toList();
           }
-        } catch (_) {}
-      }
-      if (candidateItems.isEmpty) {
-        try {
-          final rawJson = await InnerTubeService.instance
-              .post(
-                'search',
-                {'query': q, 'params': filter.params},
-                countryCode: country,
-                ttl: SearchRankingConfig.kLruCacheTtl,
-              )
-              .timeout(const Duration(seconds: 8));
-          final parsed = SearchParser.parse(rawJson, query: q);
-          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
-        } catch (_) {}
-      }
-    } else if (filter == SearchFilter.videos) {
-      if (InnerTubeService.instance.isNativeAvailable) {
-        try {
+        } else if (filter == SearchFilter.videos) {
           final rawVideos = await InnerTubeService.instance
               .searchVideosNative(q)
-              .timeout(const Duration(seconds: 8), onTimeout: () => const []);
+              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
           if (rawVideos.isNotEmpty) {
             int rank = 0;
             candidateItems = rawVideos
@@ -380,21 +292,11 @@ class SearchDataService {
                 .whereType<SearchItem>()
                 .toList();
           }
-        } catch (_) {}
-      }
-      if (candidateItems.isEmpty) {
-        try {
-          final rawJson = await InnerTubeService.instance
-              .post(
-                'search',
-                {'query': q, 'params': filter.params},
-                countryCode: country,
-                ttl: SearchRankingConfig.kLruCacheTtl,
-              )
-              .timeout(const Duration(seconds: 8));
-          final parsed = SearchParser.parse(rawJson, query: q);
-          if (parsed.items.isNotEmpty) candidateItems = parsed.items;
-        } catch (_) {}
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[SearchDataService] native search fallback error: $e');
+        }
       }
     }
 

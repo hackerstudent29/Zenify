@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'data/datasources/catalog_datasource.dart';
 import 'design_system/zen.dart';
+import 'services/download_service.dart';
 import 'services/player_state.dart';
 import 'services/queue_state.dart';
 import 'services/smart_queue_engine.dart';
@@ -56,6 +58,7 @@ void main() async {
       );
   playerState.attachQueue(queueState);
   await LibraryStore.instance.ensureLoaded();
+  unawaited(DownloadService.instance.init());
 
   // Initialize background media notifications and lock screen controls
   try {
