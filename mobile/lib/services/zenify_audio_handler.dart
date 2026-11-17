@@ -53,10 +53,13 @@ typedef _Snap = ({
 });
 
 class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
+  static ZenifyAudioHandler? instance;
+
   ZenifyAudioHandler(
     this._bridge, {
     MultiPressConfig pressConfig = const MultiPressConfig(),
   }) {
+    instance = this;
     _detector = MultiPressDetector(
       config: pressConfig,
       onAction: _runPressAction,
@@ -107,15 +110,17 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
       return;
     }
     final dur = _bridge.duration;
-    mediaItem.add(MediaItem(
-      id: t.id,
-      title: t.title,
-      artist: t.artist,
-      album: t.album,
-      artUri: t.coverUrl.isNotEmpty ? Uri.tryParse(t.coverUrl) : null,
-      duration: dur > Duration.zero ? dur : null,
-      extras: {'source': t.source, 'isVideo': t.isVideo},
-    ));
+    mediaItem.add(
+      MediaItem(
+        id: t.id,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        artUri: t.coverUrl.isNotEmpty ? Uri.tryParse(t.coverUrl) : null,
+        duration: dur > Duration.zero ? dur : null,
+        extras: {'source': t.source, 'isVideo': t.isVideo},
+      ),
+    );
   }
 
   void _publishState() {
@@ -128,66 +133,69 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
     final now = DateTime.now();
     _lastStateSyncAt = now;
 
-    playbackState.add(PlaybackState(
-      controls: [
-        const MediaControl(
-          androidIcon: 'drawable/zen_ic_prev',
-          label: 'Previous',
-          action: MediaAction.skipToPrevious,
-        ),
-        s.playing
-            ? const MediaControl(
-                androidIcon: 'drawable/zen_ic_pause',
-                label: 'Pause',
-                action: MediaAction.pause,
-              )
-            : const MediaControl(
-                androidIcon: 'drawable/zen_ic_play',
-                label: 'Play',
-                action: MediaAction.play,
-              ),
-        const MediaControl(
-          androidIcon: 'drawable/zen_ic_next',
-          label: 'Next',
-          action: MediaAction.skipToNext,
-        ),
-        MediaControl.custom(
-          androidIcon: s.favorite
-              ? 'drawable/zen_ic_star_fill'
-              : 'drawable/zen_ic_star',
-          label: s.favorite ? 'Unfavourite' : 'Favourite',
-          name: 'toggleFavorite',
-        ),
-      ],
-      systemActions: const {
-        MediaAction.play,
-        MediaAction.pause,
-        MediaAction.playPause,
-        MediaAction.skipToNext,
-        MediaAction.skipToPrevious,
-        MediaAction.seek,
-        MediaAction.setShuffleMode,
-        MediaAction.setRepeatMode,
-      },
-      androidCompactActionIndices: const [0, 1, 2],
-      processingState: !hasTrack
-          ? AudioProcessingState.idle
-          : (s.playing || !s.buffering
-              ? AudioProcessingState.ready
-              : AudioProcessingState.buffering),
-      playing: s.playing,
-      updatePosition: pos,
-      bufferedPosition: dur > pos ? dur : pos,
-      speed: s.playing ? 1.0 : 0.0,
-      updateTime: now,
-      shuffleMode:
-          s.shuffle ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
-      repeatMode: switch (s.repeat) {
-        RepeatMode.off => AudioServiceRepeatMode.none,
-        RepeatMode.all => AudioServiceRepeatMode.all,
-        RepeatMode.one => AudioServiceRepeatMode.one,
-      },
-    ));
+    playbackState.add(
+      PlaybackState(
+        controls: [
+          const MediaControl(
+            androidIcon: 'drawable/zen_ic_prev',
+            label: 'Previous',
+            action: MediaAction.skipToPrevious,
+          ),
+          s.playing
+              ? const MediaControl(
+                  androidIcon: 'drawable/zen_ic_pause',
+                  label: 'Pause',
+                  action: MediaAction.pause,
+                )
+              : const MediaControl(
+                  androidIcon: 'drawable/zen_ic_play',
+                  label: 'Play',
+                  action: MediaAction.play,
+                ),
+          const MediaControl(
+            androidIcon: 'drawable/zen_ic_next',
+            label: 'Next',
+            action: MediaAction.skipToNext,
+          ),
+          MediaControl.custom(
+            androidIcon: s.favorite
+                ? 'drawable/zen_ic_star_fill'
+                : 'drawable/zen_ic_star',
+            label: s.favorite ? 'Unfavourite' : 'Favourite',
+            name: 'toggleFavorite',
+          ),
+        ],
+        systemActions: const {
+          MediaAction.play,
+          MediaAction.pause,
+          MediaAction.playPause,
+          MediaAction.skipToNext,
+          MediaAction.skipToPrevious,
+          MediaAction.seek,
+          MediaAction.setShuffleMode,
+          MediaAction.setRepeatMode,
+        },
+        androidCompactActionIndices: const [0, 1, 2],
+        processingState: !hasTrack
+            ? AudioProcessingState.idle
+            : (s.playing || !s.buffering
+                  ? AudioProcessingState.ready
+                  : AudioProcessingState.buffering),
+        playing: s.playing,
+        updatePosition: pos,
+        bufferedPosition: dur > pos ? dur : pos,
+        speed: s.playing ? 1.0 : 0.0,
+        updateTime: now,
+        shuffleMode: s.shuffle
+            ? AudioServiceShuffleMode.all
+            : AudioServiceShuffleMode.none,
+        repeatMode: switch (s.repeat) {
+          RepeatMode.off => AudioServiceRepeatMode.none,
+          RepeatMode.all => AudioServiceRepeatMode.all,
+          RepeatMode.one => AudioServiceRepeatMode.one,
+        },
+      ),
+    );
   }
 
   /// Syncs OS playback position whenever real progress drifts (seeking,
@@ -199,13 +207,14 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
     final elapsed = now.difference(state.updateTime);
     final extrapolated = state.playing && !elapsed.isNegative
         ? state.updatePosition +
-            Duration(
-              milliseconds: (elapsed.inMilliseconds * state.speed).round(),
-            )
+              Duration(
+                milliseconds: (elapsed.inMilliseconds * state.speed).round(),
+              )
         : state.updatePosition;
     final actual = _bridge.position.value;
     final drift = (actual - extrapolated).abs();
-    final needsPeriodicSync = state.playing &&
+    final needsPeriodicSync =
+        state.playing &&
         now.difference(_lastStateSyncAt) >= const Duration(seconds: 5);
     if (drift > const Duration(milliseconds: 750) || needsPeriodicSync) {
       _publishState();
@@ -252,7 +261,10 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   @override
-  Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
+  Future<dynamic> customAction(
+    String name, [
+    Map<String, dynamic>? extras,
+  ]) async {
     if (name == 'toggleFavorite') _toggleFavorite();
   }
 
@@ -311,5 +323,14 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
     _bridge.removeListener(_onBridgeChanged);
     _bridge.position.removeListener(_onPosition);
     _detector.dispose();
+    if (instance == this) instance = null;
+  }
+
+  /// Shuts down the background audio service when exiting or stopping playback.
+  Future<void> shutdown() async {
+    disposeHandler();
+    try {
+      await stop();
+    } catch (_) {}
   }
 }
