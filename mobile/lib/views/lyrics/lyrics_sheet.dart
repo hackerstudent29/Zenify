@@ -32,9 +32,6 @@ const double _kSameStartEps = 0.35;
 /// Karaoke glyph-fill subtle scale peak (1.0 to ~1.03-1.05 max).
 const double kKaraokeGlyphScalePeak = 1.04;
 
-/// Apple Music lyric typography (SF Pro Display).
-const FontWeight _kLyricWeight = FontWeight.w800;
-
 /// Three-dot interlude tunables. (Pulse constants are kept only so existing
 /// imports do not break - the dots no longer resize while waiting.)
 const double kDotPopInOvershoot = 1.25;
@@ -124,6 +121,23 @@ final _tagRe = RegExp(r'<[^>]+>');
 bool _isBackingText(String t) {
   final s = t.replaceAll(_tagRe, ' ').trim();
   return s.length >= 2 && s.startsWith('(') && s.endsWith(')');
+}
+
+/// True when the first strong character of [s] is a right-to-left letter
+/// (Hebrew, Arabic, Syriac, Thaana, presentation forms).
+bool _isRtl(String s) {
+  for (final r in s.runes) {
+    if ((r >= 0x0590 && r <= 0x08FF) || (r >= 0xFB1D && r <= 0xFEFC)) {
+      return true;
+    }
+    if ((r >= 0x41 && r <= 0x5A) ||
+        (r >= 0x61 && r <= 0x7A) ||
+        (r >= 0x0900 && r <= 0x1FFF) ||
+        (r >= 0x3040 && r <= 0xD7FF)) {
+      return false;
+    }
+  }
+  return false;
 }
 
 String? _normSinger(String? s) {
@@ -760,7 +774,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
     _items = [];
     if (!widget.isSynced) {
       for (final l in L) {
-        _items.add(_Item.line(0, 0, l));
+        _items.add(_Item.line(0, 0, l, right: _isRtl(l.text)));
       }
       _keys = List.generate(_items.length, (_) => GlobalKey());
       _computeDists();
@@ -808,7 +822,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
       if (backing) {
         right = true;
       } else if (!duet) {
-        right = false;
+        right = _isRtl(L[i].text); // Arabic / Hebrew lines sit on the right
       } else if (sg == null) {
         right = lastRight;
       } else if (_kGroupSingers.contains(sg)) {
@@ -941,7 +955,9 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
       if (ro == null) return;
       // Anchor the TOP of the active line (independent of its own height, so
       // an expanding bracket line never changes the target).
-      final top = RenderAbstractViewport.of(ro).getOffsetToReveal(ro, 0.0).offset;
+      final top = RenderAbstractViewport.of(
+        ro,
+      ).getOffsetToReveal(ro, 0.0).offset;
       target = top - pos.viewportDimension * _kAnchor;
     }
     target = target.clamp(pos.minScrollExtent, pos.maxScrollExtent).toDouble();
@@ -1189,6 +1205,7 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
 // Line tile
 //   depth (opacity/blur/scale) spring  +  waterfall glide  +  open/close
 //   reveal cascade  +  pop in/out  +  height ease-open for bracket / dots
+//   +  tap highlight rectangle
 // ---------------------------------------------------------------------------
 
 class _LineTile extends StatefulWidget {
@@ -1237,7 +1254,7 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
   bool _present = true; // takes layout space
   bool _pressed = false;
   double _gFrom = 0;
-  Timer? _dt, _exit, _glideT;
+  Timer? _dt, _exit, _glideT, _pressT;
 
   @override
   void initState() {
@@ -1334,6 +1351,15 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
     if (_pressed != down) setState(() => _pressed = down);
   }
 
+  /// Keep the highlight visible briefly after the finger lifts so it fades
+  /// out smoothly (Apple Music behaviour).
+  void _releasePressed() {
+    _pressT?.cancel();
+    _pressT = Timer(const Duration(milliseconds: 160), () {
+      if (mounted) _setPressed(false);
+    });
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -1405,6 +1431,7 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
     _dt?.cancel();
     _exit?.cancel();
     _glideT?.cancel();
+    _pressT?.cancel();
     _d.dispose();
     _popCurve.dispose();
     _szCurve.dispose();
@@ -1471,23 +1498,24 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
           ),
           if (sub != null) ...[
             const SizedBox(height: 5),
-            FittedBox(
-              fit: BoxFit.scaleDown,
+            Align(
               alignment: isCenter
                   ? Alignment.center
                   : (right ? Alignment.centerRight : Alignment.centerLeft),
               child: Text(
                 sub,
-                maxLines: 1,
-                softWrap: false,
+                textDirection: _isRtl(sub)
+                    ? TextDirection.rtl
+                    : TextDirection.ltr,
+                textAlign: isCenter
+                    ? TextAlign.center
+                    : (right ? TextAlign.right : TextAlign.left),
                 style: TextStyle(
                   fontFamily: _kTextFont,
                   fontFamilyFallback: _kFontFamilyFallback,
                   fontSize: 18,
                   height: _hasComplexScript(sub) ? 1.32 : 1.2,
-                  fontWeight: _hasComplexScript(sub)
-                      ? FontWeight.w700
-                      : FontWeight.w600,
+                  fontWeight: FontWeight.w600,
                   letterSpacing: _hasComplexScript(sub) ? 0.0 : 0.35,
                   color: Colors.white.withValues(
                     alpha: widget.current ? 0.85 : 0.6,
@@ -1540,8 +1568,15 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
             duration: Duration(milliseconds: _pressed ? 120 : 460),
             curve: _pressed ? Curves.easeOutCubic : _popSpring,
             alignment: alignment,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: _pressed ? 90 : 320),
+              curve: Curves.easeOutCubic,
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: _pressed ? 0.14 : 0.0),
+                borderRadius: BorderRadius.circular(18),
+              ),
               child: w,
             ),
           );
@@ -1550,8 +1585,11 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
 
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTapDown: (_) => _setPressed(true),
-            onTapUp: (_) => _setPressed(false),
+            onTapDown: (_) {
+              _pressT?.cancel();
+              _setPressed(true);
+            },
+            onTapUp: (_) => _releasePressed(),
             onTapCancel: () => _setPressed(false),
             onTap: widget.onTap,
             child: tile,
@@ -1659,17 +1697,17 @@ class _WordLineState extends State<_WordLine>
     );
   }
 
+  /// One SF Pro style for every script: same weight and size, only the line
+  /// height / letter spacing differ for scripts that need it (joined glyphs).
   TextStyle _style(double fs, Color c) {
     final complex = _hasComplexScript(widget.text);
     return TextStyle(
       fontFamily: _kDisplayFont,
       fontFamilyFallback: _kFontFamilyFallback,
       fontSize: fs,
-      height: _kLineHeight,
+      height: complex ? 1.3 : _kLineHeight,
       leadingDistribution: TextLeadingDistribution.even,
-      fontWeight: complex
-          ? (widget.backing ? FontWeight.w700 : _kLyricWeight)
-          : (widget.backing ? FontWeight.w500 : FontWeight.w600),
+      fontWeight: widget.backing ? FontWeight.w500 : FontWeight.w600,
       letterSpacing: complex ? 0.0 : 0.55,
       color: c,
     );
@@ -1687,42 +1725,8 @@ class _WordLineState extends State<_WordLine>
     final primary = (maxW * 0.10).clamp(28.0, 40.0).toDouble();
     final secondary = (primary * 0.82).roundToDouble();
 
-    List<double> measure(double fs) {
-      final out = <double>[];
-      for (final t in tokens) {
-        final tp = TextPainter(
-          text: TextSpan(text: t, style: _style(fs, Colors.white)),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        out.add(tp.width);
-        tp.dispose();
-      }
-      return out;
-    }
-
-    int lines(List<double> w, double fs) {
-      final sp = fs * _kWordGap;
-      final limit = maxW - 2;
-      var n = 1;
-      var x = 0.0;
-      for (final wd in w) {
-        if (wd > limit) n += (wd / limit).ceil() - 1;
-        if (x == 0) {
-          x = wd;
-        } else if (x + sp + wd <= limit) {
-          x += sp + wd;
-        } else {
-          n++;
-          x = wd;
-        }
-      }
-      return n;
-    }
-
-    var fs = widget.backing ? secondary : primary;
-    if (!widget.backing && lines(measure(fs), fs) > widget.maxLines) {
-      fs = secondary;
-    }
+    // Fixed size for every language; long lines simply wrap.
+    final fs = widget.backing ? secondary : primary;
 
     final n = tokens.length;
     final s = List<double>.filled(n, 0);
@@ -1803,19 +1807,23 @@ class _WordLineState extends State<_WordLine>
   @override
   Widget build(BuildContext context) {
     final reduce = MediaQuery.disableAnimationsOf(context);
+    final rtl = _isRtl(widget.text);
     return LayoutBuilder(
       builder: (context, cons) {
         final lay = _layout(cons.maxWidth);
         Widget wrap(double? t, double settle) => Wrap(
+          textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
           alignment: widget.center
               ? WrapAlignment.center
-              : (widget.right ? WrapAlignment.end : WrapAlignment.start),
+              : ((widget.right != rtl)
+                    ? WrapAlignment.end
+                    : WrapAlignment.start),
           spacing: lay.fs * _kWordGap,
           runSpacing: lay.fs * 0.04,
           crossAxisAlignment: WrapCrossAlignment.end,
           children: [
             for (var i = 0; i < lay.tokens.length; i++)
-              _buildWord(lay, i, t, reduce, settle),
+              _buildWord(lay, i, t, reduce, settle, rtl),
           ],
         );
 
@@ -1837,7 +1845,14 @@ class _WordLineState extends State<_WordLine>
     );
   }
 
-  Widget _buildWord(_Layout lay, int i, double? t, bool reduce, double settle) {
+  Widget _buildWord(
+    _Layout lay,
+    int i,
+    double? t,
+    bool reduce,
+    double settle,
+    bool rtl,
+  ) {
     final span = math.max(0.001, lay.e[i] - lay.s[i]);
     final double raw;
     if (widget.plain) {
@@ -1848,12 +1863,22 @@ class _WordLineState extends State<_WordLine>
       raw = (t - lay.s[i]) / span;
     }
 
+    // Apple-style per-word lift: the word rises as it is sung, and settles
+    // back down smoothly once the line is over.
+    final lift = (widget.plain || reduce)
+        ? 0.0
+        : widget.current
+        ? Curves.easeOutCubic.transform((raw * 2.5).clamp(0.0, 1.0))
+        : (widget.past ? settle : 0.0);
+
     return _Word(
       text: lay.tokens[i],
       fs: lay.fs,
       style: _style,
       p: raw.clamp(0.0, 1.0).toDouble(),
       settle: settle,
+      rtl: rtl,
+      lift: lift,
       glow: widget.plain
           ? 0.0
           : Curves.easeOut.transform(settle.clamp(0.0, 1.0)),
@@ -1861,7 +1886,8 @@ class _WordLineState extends State<_WordLine>
   }
 }
 
-/// One word: dim base, soft-edged white fill (left to right) and white glow.
+/// One word: dim base, soft-edged white fill (left to right, or right to left
+/// for RTL scripts), white glow and a gentle lift while it is sung.
 class _Word extends StatelessWidget {
   const _Word({
     required this.text,
@@ -1870,53 +1896,64 @@ class _Word extends StatelessWidget {
     required this.p,
     this.settle = 1,
     this.glow = 0,
+    this.lift = 0,
+    this.rtl = false,
   });
 
   final String text;
-  final double fs;
+  final double fs, p, settle, glow, lift;
+  final bool rtl;
   final TextStyle Function(double, Color) style;
-  final double p;
-  final double settle;
-  final double glow;
 
   static const _dim = Color(0x6BFFFFFF); // white 42%
 
   @override
   Widget build(BuildContext context) {
-    if (p <= 0.0) return Text(text, style: style(fs, _dim));
-    if (p >= 1.0) return Text(text, style: style(fs, Colors.white));
+    final dir = rtl ? TextDirection.rtl : TextDirection.ltr;
+    Widget t(Color c) => Text(text, textDirection: dir, style: style(fs, c));
+    Widget out;
 
-    const soft = 0.18;
-    final a = (p * (1 + soft) - soft).clamp(0.0, 1.0).toDouble();
-    final b = (p * (1 + soft)).clamp(0.0, 1.0).toDouble();
-
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Opacity(
-          opacity: 0.55,
-          child: ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-            child: ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (r) => LinearGradient(
-                colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
-                stops: [0, a, b],
-              ).createShader(r),
-              child: Text(text, style: style(fs, Colors.white)),
+    if (p <= 0.0) {
+      out = t(_dim);
+    } else if (p >= 1.0) {
+      out = t(Colors.white);
+    } else {
+      const soft = 0.18;
+      final a = (p * (1 + soft) - soft).clamp(0.0, 1.0).toDouble();
+      final b = (p * (1 + soft)).clamp(0.0, 1.0).toDouble();
+      Shader mask(Rect r) => LinearGradient(
+        begin: rtl ? Alignment.centerRight : Alignment.centerLeft,
+        end: rtl ? Alignment.centerLeft : Alignment.centerRight,
+        colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
+        stops: [0, a, b],
+      ).createShader(r);
+      out = Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Opacity(
+            opacity: 0.55,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: mask,
+                child: t(Colors.white),
+              ),
             ),
           ),
-        ),
-        Text(text, style: style(fs, _dim)),
-        ShaderMask(
-          blendMode: BlendMode.dstIn,
-          shaderCallback: (r) => LinearGradient(
-            colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
-            stops: [0, a, b],
-          ).createShader(r),
-          child: Text(text, style: style(fs, Colors.white)),
-        ),
-      ],
+          t(_dim),
+          ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: mask,
+            child: t(Colors.white),
+          ),
+        ],
+      );
+    }
+    if (lift == 0) return out;
+    return Transform.translate(
+      offset: Offset(0, -fs * 0.07 * lift),
+      child: out,
     );
   }
 }
@@ -1959,8 +1996,15 @@ class _Dots extends StatelessWidget {
               for (var i = 0; i < 3; i++)
                 Padding(
                   padding: EdgeInsets.only(right: i < 2 ? _gap : 0),
-                  child: _dot(t, i, progress, stagger, closeStart, closeStagger,
-                      closeSpan),
+                  child: _dot(
+                    t,
+                    i,
+                    progress,
+                    stagger,
+                    closeStart,
+                    closeStagger,
+                    closeSpan,
+                  ),
                 ),
             ],
           );
@@ -2234,4 +2278,4 @@ class _Controls extends StatelessWidget {
       ),
     );
   }
-}
+}
