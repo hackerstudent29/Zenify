@@ -9,6 +9,7 @@ import '../../models/track.dart';
 import '../../services/api_service.dart';
 import '../../services/country_service.dart';
 import '../../services/innertube_service.dart';
+import '../../services/user_preferences_service.dart';
 import '../../utils/media_normalizer.dart';
 import 'search_models.dart';
 import 'search_parser.dart';
@@ -148,7 +149,8 @@ class SearchDataService {
   }) async {
     final q = query.trim();
     final country = CountryService.instance.currentCode;
-    const language = 'en';
+    final userLanguages = UserPreferencesService.instance.currentPrefs.languages;
+    final language = userLanguages.isNotEmpty ? userLanguages.first.toLowerCase() : 'en';
 
     if (q.isEmpty) {
       return SearchResult(
@@ -180,25 +182,63 @@ class SearchDataService {
     String? didYouMean;
     String? continuation;
 
-    // ── PURE YOUTUBE MUSIC SEARCH PIPELINE (ZERO JIOSAAVN) ───────────────────
-    // 1. PRIMARY: Direct High-Speed YouTube Music InnerTube HTTP search (1-2s)
+    // ── HIGH-SPEED PARALLEL YOUTUBE MUSIC SEARCH PIPELINE (< 2s) ──────────────
     try {
-      final body = <String, dynamic>{'query': q};
-      if (filter.params != null) {
-        body['params'] = filter.params;
-      }
-      final rawJson = await InnerTubeService.instance
-          .post(
-            'search',
-            body,
-            countryCode: country,
-            ttl: SearchRankingConfig.kLruCacheTtl,
-            forceRefresh: forceRefresh,
-          )
-          .timeout(const Duration(seconds: 8));
+      if (filter == SearchFilter.all) {
+        // Parallel fetch: All query (top result card + albums/artists/playlists/videos carousels)
+        // AND Songs-filtered query (fetches 25-30 songs directly)
+        final futureGeneral = InnerTubeService.instance
+            .post(
+              'search',
+              {'query': q},
+              countryCode: country,
+              ttl: SearchRankingConfig.kLruCacheTtl,
+              forceRefresh: forceRefresh,
+            )
+            .timeout(const Duration(milliseconds: 2800));
 
-      final parsed = SearchParser.parse(rawJson, query: q);
-      if (parsed.items.isNotEmpty) {
+        final futureSongs = InnerTubeService.instance
+            .post(
+              'search',
+              {'query': q, 'params': SearchFilter.songs.params},
+              countryCode: country,
+              ttl: SearchRankingConfig.kLruCacheTtl,
+              forceRefresh: forceRefresh,
+            )
+            .timeout(const Duration(milliseconds: 2800));
+
+        final responses = await Future.wait([
+          futureGeneral.catchError((_) => <String, dynamic>{}),
+          futureSongs.catchError((_) => <String, dynamic>{}),
+        ]);
+
+        final parsedGeneral = SearchParser.parse(responses[0], query: q);
+        final parsedSongs = SearchParser.parse(responses[1], query: q);
+
+        topResult = parsedGeneral.topResult ?? parsedSongs.topResult;
+        didYouMean = parsedGeneral.didYouMean ?? parsedSongs.didYouMean;
+        continuation = parsedGeneral.continuation ?? parsedSongs.continuation;
+
+        candidateItems = [
+          ...parsedGeneral.items,
+          ...parsedSongs.items,
+        ];
+      } else {
+        final body = <String, dynamic>{'query': q};
+        if (filter.params != null) {
+          body['params'] = filter.params;
+        }
+        final rawJson = await InnerTubeService.instance
+            .post(
+              'search',
+              body,
+              countryCode: country,
+              ttl: SearchRankingConfig.kLruCacheTtl,
+              forceRefresh: forceRefresh,
+            )
+            .timeout(const Duration(milliseconds: 2800));
+
+        final parsed = SearchParser.parse(rawJson, query: q);
         candidateItems = parsed.items;
         topResult = parsed.topResult;
         didYouMean = parsed.didYouMean;
@@ -216,7 +256,7 @@ class SearchDataService {
         if (filter == SearchFilter.all) {
           final nativeData = await InnerTubeService.instance
               .searchSummaryNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => null);
+              .timeout(const Duration(seconds: 2), onTimeout: () => null);
           if (nativeData != null && nativeData['summaries'] is List) {
             final parsed = SearchParser.parseNativeSummaries(
               nativeData['summaries'] as List,
@@ -233,7 +273,7 @@ class SearchDataService {
             final nativeSongs = await InnerTubeService.instance
                 .searchSongsNative(q)
                 .timeout(
-                  const Duration(seconds: 3),
+                  const Duration(milliseconds: 1500),
                   onTimeout: () => <Track>[],
                 );
             if (nativeSongs.isNotEmpty) {
@@ -243,14 +283,14 @@ class SearchDataService {
         } else if (filter == SearchFilter.songs) {
           final nativeSongs = await InnerTubeService.instance
               .searchSongsNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
+              .timeout(const Duration(milliseconds: 1500), onTimeout: () => <Track>[]);
           if (nativeSongs.isNotEmpty) {
             candidateItems = nativeSongs.map(_trackToSearchSongItem).toList();
           }
         } else if (filter == SearchFilter.artists) {
           final rawArtists = await InnerTubeService.instance
               .searchArtistsNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
+              .timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
           if (rawArtists.isNotEmpty) {
             int rank = 0;
             candidateItems = rawArtists
@@ -261,7 +301,7 @@ class SearchDataService {
         } else if (filter == SearchFilter.albums) {
           final rawAlbums = await InnerTubeService.instance
               .searchAlbumsNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
+              .timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
           if (rawAlbums.isNotEmpty) {
             int rank = 0;
             candidateItems = rawAlbums
@@ -273,7 +313,7 @@ class SearchDataService {
             filter == SearchFilter.communityPlaylists) {
           final rawPlaylists = await InnerTubeService.instance
               .searchPlaylistsNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
+              .timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
           if (rawPlaylists.isNotEmpty) {
             int rank = 0;
             candidateItems = rawPlaylists
@@ -284,7 +324,7 @@ class SearchDataService {
         } else if (filter == SearchFilter.videos) {
           final rawVideos = await InnerTubeService.instance
               .searchVideosNative(q)
-              .timeout(const Duration(seconds: 4), onTimeout: () => const []);
+              .timeout(const Duration(milliseconds: 1500), onTimeout: () => const []);
           if (rawVideos.isNotEmpty) {
             int rank = 0;
             candidateItems = rawVideos
@@ -324,6 +364,7 @@ class SearchDataService {
       items: candidateItems,
       intent: intent,
       countryCode: country,
+      preferredLanguages: userLanguages,
       initialTopResult: topResult,
       didYouMean: didYouMean,
       continuation: continuation,
@@ -352,6 +393,7 @@ class SearchDataService {
     if (token == null || token.isEmpty) return currentResult;
 
     final country = CountryService.instance.currentCode;
+    final userLanguages = UserPreferencesService.instance.currentPrefs.languages;
     try {
       final res = await InnerTubeService.instance
           .post(
@@ -360,7 +402,7 @@ class SearchDataService {
             countryCode: country,
             ttl: SearchRankingConfig.kLruCacheTtl,
           )
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 4));
 
       final parsed = SearchParser.parse(
         res,
@@ -380,6 +422,7 @@ class SearchDataService {
         items: combinedItems,
         intent: currentResult.intent,
         countryCode: country,
+        preferredLanguages: userLanguages,
         initialTopResult: currentResult.topResult,
         didYouMean: currentResult.correctedQuery,
         continuation: parsed.continuation,
@@ -530,9 +573,10 @@ class SearchDataService {
     try {
       final qLower = q.toLowerCase();
 
-      // 1. Check live backend cloud catalog (JioSaavn + iTunes + Database)
+      // 1. Check live backend cloud catalog (JioSaavn + iTunes + Database) with fast 1.5s timeout
       try {
-        final cloud = await ApiService.searchCloud(q);
+        final cloud = await ApiService.searchCloud(q)
+            .timeout(const Duration(milliseconds: 1500), onTimeout: () => null);
         if (cloud != null) {
           final parsed = _parseCloudSearch(cloud, q);
           if (parsed.items.isNotEmpty) return parsed.items;

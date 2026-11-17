@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/datasources/catalog_datasource.dart';
 import '../../models/track.dart';
 import '../../services/api_service.dart';
+import '../../services/country_service.dart';
 import '../../services/innertube_service.dart';
 import '../../services/user_preferences_service.dart';
 
@@ -22,32 +23,26 @@ class ExploreCountry {
   final String query;
 }
 
+/// All default countries supported in Zenify + major global music markets.
 const List<ExploreCountry> kExploreCountries = [
-  ExploreCountry(code: 'IN', name: 'India', flag: '🇮🇳', query: 'trending india'),
-  ExploreCountry(code: 'US', name: 'United States', flag: '🇺🇸', query: 'top hits usa'),
-  ExploreCountry(code: 'GB', name: 'United Kingdom', flag: '🇬🇧', query: 'uk top charts'),
-  ExploreCountry(code: 'GLOBAL', name: 'Global', flag: '🌐', query: 'global top 50'),
+  ExploreCountry(code: 'IN', name: 'India', flag: '🇮🇳', query: 'trending india hindi tamil'),
+  ExploreCountry(code: 'US', name: 'United States', flag: '🇺🇸', query: 'top hits usa billboard'),
+  ExploreCountry(code: 'GB', name: 'United Kingdom', flag: '🇬🇧', query: 'uk top charts official'),
+  ExploreCountry(code: 'DE', name: 'Germany', flag: '🇩🇪', query: 'germany top hits charts'),
+  ExploreCountry(code: 'CA', name: 'Canada', flag: '🇨🇦', query: 'canada top hits hot'),
+  ExploreCountry(code: 'AU', name: 'Australia', flag: '🇦🇺', query: 'australia top hits aria'),
+  ExploreCountry(code: 'JP', name: 'Japan', flag: '🇯🇵', query: 'japan top hits jpop'),
+  ExploreCountry(code: 'FR', name: 'France', flag: '🇫🇷', query: 'france top hits charts'),
+  ExploreCountry(code: 'BR', name: 'Brazil', flag: '🇧🇷', query: 'brazil top hits funk sertanejo'),
+  ExploreCountry(code: 'KR', name: 'South Korea', flag: '🇰🇷', query: 'kpop top hits melon'),
+  ExploreCountry(code: 'AE', name: 'United Arab Emirates', flag: '🇦🇪', query: 'uae dubai top hits trending'),
+  ExploreCountry(code: 'GLOBAL', name: 'Global', flag: '🌐', query: 'global top 50 hits worldwide'),
+  ExploreCountry(code: 'ES', name: 'Spain', flag: '🇪🇸', query: 'top espana hits'),
+  ExploreCountry(code: 'MX', name: 'Mexico', flag: '🇲🇽', query: 'mexico top hits regional'),
+  ExploreCountry(code: 'IT', name: 'Italy', flag: '🇮🇹', query: 'italia top hits fimi'),
+  ExploreCountry(code: 'ID', name: 'Indonesia', flag: '🇮🇩', query: 'indonesia top hits pop'),
+  ExploreCountry(code: 'NG', name: 'Nigeria', flag: '🇳🇬', query: 'afrobeats nigeria top hits'),
 ];
-
-class ExploreFeaturedItem {
-  const ExploreFeaturedItem({
-    required this.badge,
-    required this.title,
-    required this.subtitle,
-    required this.coverUrl,
-    required this.tracks,
-    this.albumTitle,
-    this.artistName,
-  });
-
-  final String badge;
-  final String title;
-  final String subtitle;
-  final String coverUrl;
-  final List<Track> tracks;
-  final String? albumTitle;
-  final String? artistName;
-}
 
 class ExploreReleaseItem {
   const ExploreReleaseItem({
@@ -56,6 +51,7 @@ class ExploreReleaseItem {
     required this.coverUrl,
     required this.type,
     this.year = '2026',
+    this.browseId,
     required this.tracks,
   });
 
@@ -64,7 +60,40 @@ class ExploreReleaseItem {
   final String coverUrl;
   final String type; // 'Album', 'EP', 'Single'
   final String year;
+  final String? browseId;
   final List<Track> tracks;
+}
+
+class ExploreArtistItem {
+  const ExploreArtistItem({
+    required this.name,
+    this.browseId,
+    required this.photo,
+    this.subs = 'Top Artist',
+  });
+
+  final String name;
+  final String? browseId;
+  final String photo;
+  final String subs;
+}
+
+class ExplorePlaylistItem {
+  const ExplorePlaylistItem({
+    required this.title,
+    required this.description,
+    required this.coverUrl,
+    required this.trackCount,
+    required this.searchQuery,
+    this.playlistId,
+  });
+
+  final String title;
+  final String description;
+  final String coverUrl;
+  final int trackCount;
+  final String searchQuery;
+  final String? playlistId;
 }
 
 class ExploreGenreItem {
@@ -101,20 +130,27 @@ class ExploreMoodItem {
   final String searchQuery;
 }
 
-class ExplorePlaylistItem {
-  const ExplorePlaylistItem({
-    required this.title,
-    required this.description,
-    required this.coverUrl,
-    required this.trackCount,
-    required this.searchQuery,
+/// Encapsulates full realtime Explore content for a specific country and week.
+class ExplorePageData {
+  const ExplorePageData({
+    required this.country,
+    required this.featured,
+    required this.weeklyTopSongs,
+    required this.topArtists,
+    required this.newReleases,
+    required this.playlists,
+    required this.updatedAt,
+    required this.weekNumber,
   });
 
-  final String title;
-  final String description;
-  final String coverUrl;
-  final int trackCount;
-  final String searchQuery;
+  final ExploreCountry country;
+  final List<Track> featured;
+  final List<Track> weeklyTopSongs;
+  final List<ExploreArtistItem> topArtists;
+  final List<ExploreReleaseItem> newReleases;
+  final List<ExplorePlaylistItem> playlists;
+  final DateTime updatedAt;
+  final int weekNumber;
 }
 
 class ExploreDataService {
@@ -125,7 +161,7 @@ class ExploreDataService {
   ExploreCountry _currentCountry = kExploreCountries[0];
   ExploreCountry get currentCountry => _currentCountry;
 
-  final Map<String, List<Track>> _countryTrackCache = {};
+  final Map<String, ExplorePageData> _exploreCache = {};
   bool _initialized = false;
 
   final List<ExploreGenreItem> genres = const [
@@ -291,6 +327,10 @@ class ExploreDataService {
       final prefs = await SharedPreferences.getInstance();
       var code = prefs.getString(_countryPrefKey);
       if (code == null || code.isEmpty) {
+        await CountryService.instance.init();
+        code = CountryService.instance.currentCode;
+      }
+      if (code.isEmpty) {
         await UserPreferencesService.instance.ensureLoaded();
         code = UserPreferencesService.instance.currentPrefs.countryCode;
       }
@@ -302,6 +342,235 @@ class ExploreDataService {
         _currentCountry = match;
       }
     } catch (_) {}
+  }
+
+  Future<void> setCountry(ExploreCountry country) async {
+    _currentCountry = country;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_countryPrefKey, country.code);
+      
+      // Keep CountryService in two-way sync
+      final matchedInfo = CountryService.supportedCountries.firstWhere(
+        (info) => info.code.toUpperCase() == country.code.toUpperCase(),
+        orElse: () => CountryService.defaultCountry,
+      );
+      CountryService.instance.setCountry(matchedInfo);
+    } catch (_) {}
+  }
+
+  /// Calculates current calendar week number for weekly updates.
+  int _currentWeekNumber() {
+    final now = DateTime.now();
+    final firstDayOfYear = DateTime(now.year, 1, 1);
+    final daysOffset = firstDayOfYear.weekday - 1;
+    final firstMonday = firstDayOfYear.subtract(Duration(days: daysOffset));
+    return (now.difference(firstMonday).inDays / 7).ceil();
+  }
+
+  /// Fetches live realtime explore content for [country] via InnerTube.
+  /// Content refreshes on a weekly boundary or when [forceRefresh] is true.
+  Future<ExplorePageData> getExploreDataForCountry(
+    ExploreCountry country, {
+    bool forceRefresh = false,
+  }) async {
+    final weekNum = _currentWeekNumber();
+    final now = DateTime.now();
+    final cacheKey = '${country.code}_${now.year}_w$weekNum';
+
+    if (!forceRefresh && _exploreCache.containsKey(cacheKey)) {
+      return _exploreCache[cacheKey]!;
+    }
+
+    final glCode = country.code == 'GLOBAL' ? 'US' : country.code;
+    List<Track> chartTracks = [];
+    List<ExploreArtistItem> topArtists = [];
+    List<ExploreReleaseItem> newReleases = [];
+
+    // 1. Fetch Live InnerTube Charts (Top Songs & Famous Artists of the Week)
+    try {
+      final chartsRes = await InnerTubeService.instance
+          .getCharts(countryCode: glCode)
+          .timeout(const Duration(seconds: 5),
+              onTimeout: () => (
+                    tracks: <Track>[],
+                    artists: <({String image, String name, String subs})>[],
+                  ));
+
+      if (chartsRes.tracks.isNotEmpty) {
+        chartTracks = chartsRes.tracks;
+      }
+      if (chartsRes.artists.isNotEmpty) {
+        topArtists = chartsRes.artists.map((a) {
+          return ExploreArtistItem(
+            name: a.name,
+            photo: a.image,
+            subs: a.subs.isNotEmpty ? a.subs : 'Top Artist • ${country.name}',
+          );
+        }).toList();
+      }
+    } catch (_) {}
+
+    // 2. Fetch Live InnerTube New Releases for country
+    List<Track> freshReleases = [];
+    try {
+      freshReleases = await InnerTubeService.instance
+          .getNewReleases(countryCode: glCode)
+          .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
+    } catch (_) {}
+
+    // 3. Fallback to regional search if charts endpoint was blocked or empty
+    if (chartTracks.isEmpty) {
+      try {
+        final searchTracks = await InnerTubeService.instance
+            .search(country.query)
+            .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
+        if (searchTracks.isNotEmpty) {
+          chartTracks = searchTracks;
+        } else {
+          final cloudTracks = await ApiService.search(country.query)
+              .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
+          chartTracks = cloudTracks.isNotEmpty ? cloudTracks : CatalogDataSource.allTracks;
+        }
+      } catch (_) {
+        chartTracks = CatalogDataSource.allTracks;
+      }
+    }
+
+    // 4. Group / Derive New Releases
+    final releasePool = freshReleases.isNotEmpty ? freshReleases : chartTracks;
+    final seenAlbums = <String>{};
+    for (final t in releasePool) {
+      if (t.album.isEmpty || !seenAlbums.add('${t.album}|${t.artist}')) {
+        continue;
+      }
+      newReleases.add(
+        ExploreReleaseItem(
+          title: t.album,
+          artist: t.artist,
+          coverUrl: t.coverUrl,
+          type: (t.album.toLowerCase().contains('single')) ? 'Single' : 'Album',
+          year: '${now.year}',
+          browseId: t.albumBrowseId,
+          tracks: releasePool.where((x) => x.album == t.album).toList(),
+        ),
+      );
+      if (newReleases.length >= 14) break;
+    }
+
+    // 5. Ensure Top Artists Shelf has rich items
+    if (topArtists.isEmpty || topArtists.length < 6) {
+      final seenNames = <String>{for (final a in topArtists) a.name.toLowerCase()};
+      
+      // Inject user favorite artists matching country or general favorites
+      final prefs = UserPreferencesService.instance.currentPrefs;
+      for (final fa in prefs.favoriteArtists) {
+        final lower = fa.name.trim().toLowerCase();
+        if (lower.isNotEmpty && seenNames.add(lower)) {
+          topArtists.add(ExploreArtistItem(
+            name: fa.name,
+            browseId: fa.id.isNotEmpty ? fa.id : null,
+            photo: fa.image,
+            subs: 'Favorite Artist',
+          ));
+        }
+      }
+
+      // Add artists extracted from top chart tracks
+      for (final t in chartTracks) {
+        final resolved = t.resolvedArtists;
+        final name = resolved.isNotEmpty ? resolved.first.name : t.artist;
+        final lower = name.trim().toLowerCase();
+        if (lower.isEmpty || lower == 'unknown artist' || !seenNames.add(lower)) {
+          continue;
+        }
+        topArtists.add(
+          ExploreArtistItem(
+            name: name,
+            browseId: resolved.isNotEmpty ? resolved.first.id : null,
+            photo: t.coverUrl,
+            subs: 'Top Artist • ${country.name}',
+          ),
+        );
+        if (topArtists.length >= 14) break;
+      }
+    }
+
+    // 6. Curated Playlists for this country
+    String coverAt(int idx, String fallback) {
+      if (chartTracks.isEmpty) return fallback;
+      final t = chartTracks[(idx * 4) % chartTracks.length];
+      return t.coverUrl.isNotEmpty ? t.coverUrl : fallback;
+    }
+
+    final playlists = <ExplorePlaylistItem>[
+      ExplorePlaylistItem(
+        title: '${country.name} Top 50',
+        description: 'Most streamed tracks this week in ${country.name}',
+        coverUrl: coverAt(0, 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600'),
+        trackCount: 50,
+        searchQuery: '${country.name} top 50 hits official',
+      ),
+      ExplorePlaylistItem(
+        title: '${country.name} Viral Weekly',
+        description: 'Fastest rising viral songs and chart breakers',
+        coverUrl: coverAt(1, 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600'),
+        trackCount: 40,
+        searchQuery: '${country.name} viral hits charts',
+      ),
+      ExplorePlaylistItem(
+        title: 'Today\'s Biggest Hits',
+        description: 'Chart-toppers across pop, rap and international charts',
+        coverUrl: coverAt(2, 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600'),
+        trackCount: 35,
+        searchQuery: 'todays top hits official playlist',
+      ),
+      ExplorePlaylistItem(
+        title: 'Late Night Chill',
+        description: 'Mellow acoustic, lo-fi and ambient sessions',
+        coverUrl: coverAt(3, 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600'),
+        trackCount: 40,
+        searchQuery: 'chill acoustic songs relax',
+      ),
+      ExplorePlaylistItem(
+        title: 'Workout Energy',
+        description: 'High-tempo cardio and gym motivation beats',
+        coverUrl: coverAt(4, 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600'),
+        trackCount: 45,
+        searchQuery: 'workout motivation songs gym',
+      ),
+      ExplorePlaylistItem(
+        title: 'Deep Focus & Flow',
+        description: 'Instrumentals and beats for intense concentration',
+        coverUrl: coverAt(5, 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600'),
+        trackCount: 50,
+        searchQuery: 'deep focus study instrumental beats',
+      ),
+    ];
+
+    // 7. Select Top 6 Featured Spotlight Tracks
+    final seenFeatured = <String>{};
+    final featured = <Track>[];
+    for (final t in chartTracks) {
+      final key = t.artist.toLowerCase();
+      if (key.isEmpty || !seenFeatured.add(key)) continue;
+      featured.add(t);
+      if (featured.length >= 6) break;
+    }
+
+    final pageData = ExplorePageData(
+      country: country,
+      featured: featured.isNotEmpty ? featured : chartTracks.take(6).toList(),
+      weeklyTopSongs: chartTracks,
+      topArtists: topArtists,
+      newReleases: newReleases,
+      playlists: playlists,
+      updatedAt: now,
+      weekNumber: weekNum,
+    );
+
+    _exploreCache[cacheKey] = pageData;
+    return pageData;
   }
 
   /// Sorts and prioritizes genres dynamically so user-selected onboarding genres
@@ -331,101 +600,7 @@ class ExploreDataService {
     return copy;
   }
 
-  /// Fetches personalized seed tracks matching the user's selected artists,
-  /// languages, and genres.
-  Future<List<Track>> getPersonalizedRecommendations({bool forceRefresh = false}) async {
-    final prefs = UserPreferencesService.instance.currentPrefs;
-    final queries = <String>[];
-    for (final artist in prefs.favoriteArtists.take(3)) {
-      queries.add('${artist.name} hits');
-    }
-    for (final genre in prefs.genres.take(2)) {
-      queries.add('$genre top songs');
-    }
-    for (final lang in prefs.languages.take(2)) {
-      queries.add('$lang trending hits');
-    }
-
-    if (queries.isEmpty) {
-      queries.add(_currentCountry.query);
-    }
-
-    final tracks = <Track>[];
-    final seen = <String>{};
-
-    for (final q in queries.take(3)) {
-      try {
-        var res = await InnerTubeService.instance
-            .search(q)
-            .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
-        if (res.isEmpty) {
-          res = await ApiService.search(q)
-              .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
-        }
-        for (final t in res) {
-          if (seen.add(t.id)) tracks.add(t);
-          if (tracks.length >= 24) break;
-        }
-      } catch (_) {}
-      if (tracks.length >= 24) break;
-    }
-
-    return tracks;
-  }
-
-  Future<void> setCountry(ExploreCountry country) async {
-    _currentCountry = country;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_countryPrefKey, country.code);
-    } catch (_) {}
-  }
-
-  Future<List<Track>> getTrendingForCountry(ExploreCountry country, {bool forceRefresh = false}) async {
-    final key = country.code;
-    if (!forceRefresh && _countryTrackCache.containsKey(key) && _countryTrackCache[key]!.isNotEmpty) {
-      return _countryTrackCache[key]!;
-    }
-
-    try {
-      // 1. If India, prefer on-device direct home feed
-      if (country.code == 'IN') {
-        final homeFeed = await InnerTubeService.instance
-            .getHomeFeed()
-            .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
-        if (homeFeed.isNotEmpty) {
-          _countryTrackCache[key] = homeFeed;
-          return homeFeed;
-        }
-      }
-
-      // 2. Query regional trending via search
-      final regionalTracks = await InnerTubeService.instance
-          .search(country.query)
-          .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
-      if (regionalTracks.isNotEmpty) {
-        _countryTrackCache[key] = regionalTracks;
-        return regionalTracks;
-      }
-    } catch (_) {}
-
-    // 3. Fallback to ApiService or catalog
-    try {
-      final cloud = await ApiService.search(country.query)
-          .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
-      if (cloud.isNotEmpty) {
-        _countryTrackCache[key] = cloud;
-        return cloud;
-      }
-    } catch (_) {}
-
-    // 4. Fallback to catalog
-    final catalog = CatalogDataSource.allTracks;
-    _countryTrackCache[key] = catalog;
-    return catalog;
-  }
-
   void clearCache() {
-    _countryTrackCache.clear();
+    _exploreCache.clear();
   }
 }

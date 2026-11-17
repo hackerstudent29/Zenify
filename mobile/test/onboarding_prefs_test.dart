@@ -197,6 +197,7 @@ void main() {
 
     await tester.tap(find.text('Start Listening'));
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 16));
 
     expect(completedCalled, isTrue);
     expect(UserPreferencesService.instance.hasCompleted, isTrue);

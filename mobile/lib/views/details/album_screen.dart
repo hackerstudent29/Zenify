@@ -515,29 +515,53 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
         bId = firstTrack.albumBrowseId!;
       }
 
-      if (bId.isNotEmpty) {
-        if (bId.startsWith('VLPL') || bId.startsWith('PL') || bId.startsWith('RD') || bId.startsWith('OLAK5uy_')) {
-          final pRes = await InnerTubeService.instance.getPlaylist(bId);
-          if (pRes != null && pRes.tracks.isNotEmpty) {
-            if (mounted) {
-              setState(() {
-                _tracks = pRes.tracks;
-                if (pRes.coverUrl.isNotEmpty) _resolvedCover = pRes.coverUrl;
-                if (pRes.title.isNotEmpty) _resolvedAlbumTitle = MediaNormalizer.cleanAlbumTitle(pRes.title);
-                if (pRes.author.isNotEmpty) _resolvedArtistName = MediaNormalizer.formatArtists(pRes.author);
-                _loading = false;
-              });
-              _inspectTracksMetadata();
-            }
-            return;
+      // If we were opened from a song (firstTrack != null), NEVER treat bId as a playlist!
+      // A song belongs to its original album, not a user-created or curated playlist.
+      final bool isExplicitPlaylist = firstTrack == null &&
+          (bId.startsWith('VLPL') || bId.startsWith('PL') || bId.startsWith('RD'));
+
+      if (isExplicitPlaylist) {
+        final pRes = await InnerTubeService.instance.getPlaylist(bId);
+        if (pRes != null && pRes.tracks.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _tracks = pRes.tracks;
+              if (pRes.coverUrl.isNotEmpty) _resolvedCover = pRes.coverUrl;
+              if (pRes.title.isNotEmpty) _resolvedAlbumTitle = MediaNormalizer.cleanAlbumTitle(pRes.title);
+              if (pRes.author.isNotEmpty) _resolvedArtistName = MediaNormalizer.formatArtists(pRes.author);
+              _loading = false;
+            });
+            _inspectTracksMetadata();
+          }
+          return;
+        }
+      }
+
+      // If bId is a playlist ID but we have a song, discard the playlist ID so it doesn't hijack the album view
+      if (bId.startsWith('VLPL') || bId.startsWith('PL') || bId.startsWith('RD')) {
+        bId = '';
+      }
+
+      // If bId is missing or not a true album release ID (MPREb_), resolve the song's true album from YouTube Music!
+      if ((bId.isEmpty || !bId.startsWith('MPREb_')) && firstTrack != null) {
+        final details = await InnerTubeService.instance.resolveSongAlbumDetails(firstTrack.id);
+        if (details != null) {
+          if (details.albumBrowseId != null && details.albumBrowseId!.isNotEmpty) {
+            bId = details.albumBrowseId!;
+          }
+          if (details.albumTitle != null && details.albumTitle!.isNotEmpty) {
+            _resolvedAlbumTitle = MediaNormalizer.cleanAlbumTitle(details.albumTitle!);
+          }
+          if (details.artistName != null && details.artistName!.isNotEmpty) {
+            _resolvedArtistName = MediaNormalizer.formatArtists(details.artistName!);
           }
         }
       }
 
       final res = await InnerTubeService.instance.getAlbum(
         bId,
-        albumTitle: MediaNormalizer.stripIdNoise(MediaNormalizer.cleanTitle(widget.albumTitle)),
-        artistName: MediaNormalizer.stripIdNoise(MediaNormalizer.formatArtists(widget.artistName)),
+        albumTitle: MediaNormalizer.stripIdNoise(MediaNormalizer.cleanTitle(_resolvedAlbumTitle ?? widget.albumTitle)),
+        artistName: MediaNormalizer.stripIdNoise(MediaNormalizer.formatArtists(_resolvedArtistName ?? widget.artistName)),
         videoId: firstTrack?.id,
         songTitle: firstTrack?.title,
       );

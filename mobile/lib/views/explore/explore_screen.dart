@@ -110,13 +110,6 @@ class _SnapSpringPhysics extends ScrollPhysics {
   }
 }
 
-class _ArtistEntry {
-  const _ArtistEntry(this.name, this.id, this.photo);
-  final String name;
-  final String? id;
-  final String photo;
-}
-
 // ═════════════════════════════════════════════════════════════════════════════
 // ExploreScreen
 // ═════════════════════════════════════════════════════════════════════════════
@@ -147,31 +140,29 @@ class _ExploreScreenState extends State<ExploreScreen>
   final ExploreDataService _dataService = ExploreDataService.instance;
   late ExploreCountry _country;
 
-  List<Track> _trendingTracks = [];
+  ExplorePageData? _pageData;
   bool _isLoading = true;
 
   final PageController _featuredCtrl = PageController(viewportFraction: 0.80);
-
-  // Derived lists are cached so build() never does O(n²) work.
-  List<Track>? _derivedSrc;
-  int _derivedLen = -1;
-  List<Track> _featured = const [];
-  List<ExploreReleaseItem> _releases = const [];
-  List<_ArtistEntry> _artists = const [];
 
   @override
   void initState() {
     super.initState();
     _country = _dataService.currentCountry;
     _dataService.initCountry().then((_) {
-      if (mounted) setState(() => _country = _dataService.currentCountry);
+      if (mounted) {
+        setState(() => _country = _dataService.currentCountry);
+        _loadData();
+      }
     });
     _loadData();
     CatalogDataSource.tracksNotifier.addListener(_onCatalogUpdated);
   }
 
   void _onCatalogUpdated() {
-    if (mounted && _trendingTracks.isEmpty && !_isLoading) _loadData();
+    if (mounted && (_pageData == null || _pageData!.weeklyTopSongs.isEmpty) && !_isLoading) {
+      _loadData();
+    }
   }
 
   @override
@@ -185,22 +176,17 @@ class _ExploreScreenState extends State<ExploreScreen>
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final trending =
-          await _dataService.getTrendingForCountry(_country, forceRefresh: force);
-      final personalized =
-          await _dataService.getPersonalizedRecommendations(forceRefresh: force);
-      final combined = <Track>[];
-      final seen = <String>{};
-      for (final t in personalized) {
-        if (seen.add(t.id)) combined.add(t);
+      final data = await _dataService.getExploreDataForCountry(
+        _country,
+        forceRefresh: force,
+      );
+      if (mounted) {
+        setState(() {
+          _pageData = data;
+          _isLoading = false;
+        });
       }
-      for (final t in trending) {
-        if (seen.add(t.id)) combined.add(t);
-      }
-      if (mounted) setState(() => _trendingTracks = combined.isNotEmpty ? combined : trending);
     } catch (_) {
-      // keep whatever we had; the empty state offers a retry
-    } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -211,7 +197,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       context: context,
       title: 'Explore Music Region',
       subtitle:
-          'Select a country to discover localized charts, new releases, and trending songs.',
+          'Select a country to discover live weekly charts, top artists, and fresh releases.',
       items: [
         for (final c in kExploreCountries)
           ZenDropdownItem(
@@ -222,7 +208,7 @@ class _ExploreScreenState extends State<ExploreScreen>
               if (c.code != _country.code) {
                 setState(() => _country = c);
                 _dataService.setCountry(c);
-                _loadData(force: true);
+                _loadData(force: false);
               }
             },
           ),
@@ -232,12 +218,12 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   // ── Playback / navigation ──────────────────────────────────────────────────
 
-  void _play(List<Track> list, int index, {String title = 'Trending'}) {
+  void _play(List<Track> list, int index, {String title = 'Weekly Top'}) {
     if (list.isEmpty) return;
     final startIdx = index.clamp(0, list.length - 1);
     final ctx = PlaybackContext(
       type: PlaybackContextType.homeSection,
-      id: 'explore_trending',
+      id: 'explore_trending_${_country.code}',
       tracks: list,
       startTrack: list[startIdx],
       title: title,
@@ -251,10 +237,10 @@ class _ExploreScreenState extends State<ExploreScreen>
     if (list.isEmpty) return;
     final ctx = PlaybackContext(
       type: PlaybackContextType.homeSection,
-      id: 'explore_trending',
+      id: 'explore_trending_${_country.code}',
       tracks: list,
       startTrack: list.first,
-      title: 'Trending',
+      title: 'Weekly Top • ${_country.name}',
     );
     context
         .read<PlayerState>()
@@ -276,13 +262,14 @@ class _ExploreScreenState extends State<ExploreScreen>
             albumTitle: title,
             artistName: 'Curated by Zenify',
             coverUrl: tracks.first.coverUrl,
+            initialTracks: tracks,
           ),
         ),
       );
     });
   }
 
-  void _openAlbum(String title, String artist, String cover) {
+  void _openAlbum(String title, String artist, String cover, {String? browseId, List<Track>? initialTracks}) {
     HapticFeedback.lightImpact();
     Navigator.push(
       context,
@@ -291,12 +278,14 @@ class _ExploreScreenState extends State<ExploreScreen>
           albumTitle: title,
           artistName: artist,
           coverUrl: cover,
+          browseId: browseId,
+          initialTracks: initialTracks,
         ),
       ),
     );
   }
 
-  void _openArtist(_ArtistEntry a) {
+  void _openArtist(ExploreArtistItem a) {
     HapticFeedback.lightImpact();
     Navigator.push(
       context,
@@ -304,7 +293,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         builder: (_) => ArtistScreen(
           artistName: a.name,
           imageUrl: a.photo,
-          browseId: a.id,
+          browseId: a.browseId,
         ),
       ),
     );
@@ -339,7 +328,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         }
       },
       onGoToAlbum: track.album.isNotEmpty
-          ? () => _openAlbum(track.album, track.artist, track.coverUrl)
+          ? () => _openAlbum(track.album, track.artist, track.coverUrl, browseId: track.albumBrowseId)
           : null,
     );
   }
@@ -349,104 +338,6 @@ class _ExploreScreenState extends State<ExploreScreen>
     return activeId == t.id ||
         activeId == 'yt-${t.id}' ||
         t.id == 'yt-$activeId';
-  }
-
-  // ── Derived data (cached) ──────────────────────────────────────────────────
-
-  void _ensureDerived(List<Track> src) {
-    if (identical(src, _derivedSrc) && src.length == _derivedLen) return;
-    _derivedSrc = src;
-    _derivedLen = src.length;
-
-    // Featured: top tracks, prioritizing user preferences, one per artist, max 6.
-    final prefs = UserPreferencesService.instance.currentPrefs;
-    final seenArtists = <String>{};
-    final featured = <Track>[];
-
-    // First pick tracks from user's favorite artists
-    if (prefs.favoriteArtists.isNotEmpty) {
-      for (final fa in prefs.favoriteArtists) {
-        final faLower = fa.name.trim().toLowerCase();
-        for (final t in src) {
-          if (t.artist.toLowerCase().contains(faLower)) {
-            final key = t.artist.toLowerCase();
-            if (seenArtists.add(key)) {
-              featured.add(t);
-              break;
-            }
-          }
-        }
-        if (featured.length >= 3) break;
-      }
-    }
-
-    // Fill remaining with trending tracks
-    for (final t in src) {
-      final key = t.artist.toLowerCase();
-      if (key.isEmpty || !seenArtists.add(key)) continue;
-      featured.add(t);
-      if (featured.length >= 6) break;
-    }
-    _featured = featured;
-
-    // Releases: unique albums with a real album name.
-    final albumCount = <String, int>{};
-    for (final t in src) {
-      if (t.album.isNotEmpty) {
-        albumCount[t.album] = (albumCount[t.album] ?? 0) + 1;
-      }
-    }
-    final seenAlbums = <String>{};
-    final releases = <ExploreReleaseItem>[];
-    for (final t in src) {
-      if (t.album.isEmpty || !seenAlbums.add('${t.album}|${t.artist}')) {
-        continue;
-      }
-      releases.add(
-        ExploreReleaseItem(
-          title: t.album,
-          artist: t.artist,
-          coverUrl: t.coverUrl,
-          type: (albumCount[t.album] ?? 1) > 3 ? 'Album' : 'Single',
-          tracks: src.where((x) => x.album == t.album).toList(),
-        ),
-      );
-      if (releases.length >= 10) break;
-    }
-    _releases = releases;
-
-    // Artists: prioritize user's onboarded favorite artists first, then resolved track artists.
-    final seenNames = <String>{};
-    final artists = <_ArtistEntry>[];
-
-    for (final fa in prefs.favoriteArtists) {
-      final lower = fa.name.trim().toLowerCase();
-      if (lower.isNotEmpty && seenNames.add(lower)) {
-        artists.add(_ArtistEntry(
-          fa.name,
-          fa.id.isNotEmpty ? fa.id : null,
-          fa.image,
-        ));
-      }
-    }
-
-    for (final t in src) {
-      final resolved = t.resolvedArtists;
-      final name = resolved.isNotEmpty ? resolved.first.name : t.artist;
-      final lower = name.trim().toLowerCase();
-      if (lower.isEmpty || lower == 'unknown artist' || !seenNames.add(lower)) {
-        continue;
-      }
-      artists.add(
-        _ArtistEntry(
-          name,
-          resolved.isNotEmpty ? resolved.first.id : null,
-          t.coverUrl,
-        ),
-      );
-      if (artists.length >= 12) break;
-    }
-    _artists = artists;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -459,37 +350,56 @@ class _ExploreScreenState extends State<ExploreScreen>
     final topInset = MediaQuery.paddingOf(context).top;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    final src = _trendingTracks.isNotEmpty
-        ? _trendingTracks
-        : CatalogDataSource.allTracks;
-    _ensureDerived(src);
-
+    final data = _pageData;
     Widget body;
-    if (src.isEmpty && _isLoading) {
+
+    if (data == null && _isLoading) {
       body = const _ExploreSkeleton();
-    } else if (src.isEmpty) {
+    } else if (data == null || data.weeklyTopSongs.isEmpty) {
       body = _buildEmpty();
     } else {
       var n = 0;
       Widget stage(Widget w) =>
-          SpringIn(delayMs: 40 * n++, rise: 14, child: w);
+          SpringIn(delayMs: 35 * n++, rise: 12, child: w);
+
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          stage(_buildFeatured()),
-          const SizedBox(height: 30),
-          stage(_buildTrending(src)),
-          if (_releases.isNotEmpty) ...[
-            const SizedBox(height: 30),
-            stage(_buildReleases()),
+          // 0. Live weekly update capsule indicator
+          stage(_buildLiveWeekBanner(data)),
+          const SizedBox(height: 14),
+
+          // 1. Featured Spotlight Carousel (Exact design preserved)
+          if (data.featured.isNotEmpty) ...[
+            stage(_buildFeatured(data.featured)),
+            const SizedBox(height: 32),
           ],
-          if (_artists.isNotEmpty) ...[
-            const SizedBox(height: 30),
-            stage(_buildArtists()),
+
+          // 2. Weekly Top 20 Charts (Apple Music 4-row paged shelf)
+          if (data.weeklyTopSongs.isNotEmpty) ...[
+            stage(_buildWeeklyTopCharts(data.weeklyTopSongs)),
+            const SizedBox(height: 32),
           ],
-          const SizedBox(height: 30),
-          stage(_buildPlaylists(src)),
-          const SizedBox(height: 30),
+
+          // 3. Famous Artists of the Week
+          if (data.topArtists.isNotEmpty) ...[
+            stage(_buildTopArtists(data.topArtists)),
+            const SizedBox(height: 32),
+          ],
+
+          // 4. New Releases & Fresh Drops
+          if (data.newReleases.isNotEmpty) ...[
+            stage(_buildNewReleases(data.newReleases)),
+            const SizedBox(height: 32),
+          ],
+
+          // 5. Essential Weekly Playlists
+          if (data.playlists.isNotEmpty) ...[
+            stage(_buildPlaylists(data.playlists)),
+            const SizedBox(height: 32),
+          ],
+
+          // 6. Browse by Mood & Genre
           stage(_buildBrowse()),
         ],
       );
@@ -519,7 +429,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             right: 0,
             child: DynamicIslandHeader(
               title: 'Explore',
-              subtitle: '${_country.flag} ${_country.name}',
+              subtitle: '${_country.flag} ${_country.name} • Weekly Top',
               showBack: false,
               isDockPage: true,
               onCenterTap: _pickCountry,
@@ -532,21 +442,85 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
   }
 
-  Widget _header(String title, {Widget? trailing}) {
+  Widget _header(String title, {String? subtitle, Widget? trailing}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(_kEdge, 0, _kEdge, 12),
+      padding: const EdgeInsets.fromLTRB(_kEdge, 0, _kEdge, 14),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              title,
-              style: _display(size: 22, spacing: -0.5),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: _display(size: 22, spacing: -0.5),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subtitle != null && subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: _body(size: 13, color: AppColors.textTertiary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
             ),
           ),
           ?trailing,
         ],
+      ),
+    );
+  }
+
+  Widget _buildLiveWeekBanner(ExplorePageData data) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: _kEdge),
+      child: PressableScale(
+        scale: 0.98,
+        onTap: _pickCountry,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 0.6,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(
+                  color: AppColors.accent,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'LIVE CHARTS • WEEK ${data.weekNumber} IN ${data.country.name.toUpperCase()}',
+                style: _body(
+                  size: 11,
+                  weight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ).copyWith(letterSpacing: 0.7),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                CupertinoIcons.chevron_down,
+                size: 11,
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -595,29 +569,27 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
   }
 
-  // ── 1. Featured: big cover cards, text below the art (never over it) ───────
+  // ── 1. Featured: big cover cards, text below the art (User's Loved Design) ───
 
-  Widget _buildFeatured() {
-    if (_featured.isEmpty) return const SizedBox.shrink();
+  Widget _buildFeatured(List<Track> featured) {
     final width = MediaQuery.sizeOf(context).width;
     final cardW = width * 0.80 - 16;
     final height = cardW + 92;
-    final ranked = _trendingTracks.isNotEmpty;
 
     return SizedBox(
       height: height,
       child: PageView.builder(
         controller: _featuredCtrl,
-        itemCount: _featured.length,
+        itemCount: featured.length,
         padEnds: false,
         clipBehavior: Clip.none,
         itemBuilder: (context, i) {
-          final t = _featured[i];
-          final rank = _trendingTracks.indexOf(t) + 1;
-          final isPreferred = UserPreferencesService.instance.currentPrefs.favoriteArtists.any((a) => t.artist.toLowerCase().contains(a.name.toLowerCase()));
+          final t = featured[i];
+          final isPreferred = UserPreferencesService.instance.currentPrefs.favoriteArtists
+              .any((a) => t.artist.toLowerCase().contains(a.name.toLowerCase()));
           final eyebrow = isPreferred
               ? 'Recommended For You'
-              : (ranked && rank > 0 ? 'No. $rank in ${_country.name}' : 'Featured');
+              : 'No. ${i + 1} in ${_country.name}';
 
           return AnimatedBuilder(
             animation: _featuredCtrl,
@@ -646,7 +618,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 scale: 0.98,
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  _play(_featured, i, title: 'Featured');
+                  _play(featured, i, title: 'Featured');
                 },
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -705,7 +677,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                               iconSize: 19,
                               onTap: () {
                                 HapticFeedback.mediumImpact();
-                                _play(_featured, i, title: 'Featured');
+                                _play(featured, i, title: 'Featured');
                               },
                             ),
                           ),
@@ -742,9 +714,9 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
   }
 
-  // ── 2. Trending: ranked 4-row columns, fixed row height (no overflow) ──────
+  // ── 2. Weekly Top Charts (Apple Music 4-row paged shelf) ─────────────────────
 
-  Widget _buildTrending(List<Track> tracks) {
+  Widget _buildWeeklyTopCharts(List<Track> tracks) {
     final top = tracks.take(20).toList();
     final colW = (MediaQuery.sizeOf(context).width - 56).clamp(280.0, 340.0);
     const rowH = 66.0;
@@ -754,7 +726,8 @@ class _ExploreScreenState extends State<ExploreScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _header(
-          'Trending in ${_country.name}',
+          'Weekly Top Charts',
+          subtitle: 'Top ${top.length} songs in ${_country.name}',
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -765,7 +738,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 backgroundColor: Colors.white,
                 idleColor: Colors.black,
                 activeColor: Colors.black,
-                onTap: () => _play(top, 0),
+                onTap: () => _play(top, 0, title: 'Weekly Top • ${_country.name}'),
               ),
               const SizedBox(width: 8),
               ZenActionCircle(
@@ -809,7 +782,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                                   active.playing,
                               onTap: () {
                                 HapticFeedback.lightImpact();
-                                _play(top, r);
+                                _play(top, r, title: 'Weekly Top • ${_country.name}');
                               },
                               onMore: () => _showTrackMenu(top[r]),
                             ),
@@ -826,57 +799,28 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
   }
 
-  // ── 3. New releases ────────────────────────────────────────────────────────
+  // ── 3. Famous Artists of the Week ──────────────────────────────────────────
 
-  Widget _buildReleases() {
-    const w = 158.0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _header('New Releases'),
-        SizedBox(
-          height: _CoverCard.heightFor(w),
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const _SnapSpringPhysics(itemExtent: w + 14),
-            padding: const EdgeInsets.symmetric(horizontal: _kEdge),
-            itemCount: _releases.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 14),
-            itemBuilder: (context, i) {
-              final r = _releases[i];
-              return _CoverCard(
-                width: w,
-                url: r.coverUrl,
-                title: MediaNormalizer.cleanCompactTitle(r.title),
-                subtitle: MediaNormalizer.formatArtists(r.artist),
-                onTap: () => _openAlbum(r.title, r.artist, r.coverUrl),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── 4. Artists: circle + name + always-visible Follow pill ─────────────────
-
-  Widget _buildArtists() {
+  Widget _buildTopArtists(List<ExploreArtistItem> artists) {
     const w = 128.0;
     final store = LibraryStore.instance;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _header('Artists You\'ll Like'),
+        _header(
+          'Famous Artists of the Week',
+          subtitle: 'Trending & most streamed in ${_country.name}',
+        ),
         SizedBox(
-          height: w + 82,
+          height: w + 84,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const _SnapSpringPhysics(itemExtent: w + 16),
             padding: const EdgeInsets.symmetric(horizontal: _kEdge),
-            itemCount: _artists.length,
+            itemCount: artists.length,
             separatorBuilder: (_, _) => const SizedBox(width: 16),
             itemBuilder: (context, i) {
-              final a = _artists[i];
+              final a = artists[i];
               return SizedBox(
                 width: w,
                 child: Column(
@@ -915,6 +859,14 @@ class _ExploreScreenState extends State<ExploreScreen>
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      a.subs,
+                      style: _body(size: 12, color: AppColors.textTertiary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 8),
                     AnimatedBuilder(
                       animation: store,
@@ -929,15 +881,15 @@ class _ExploreScreenState extends State<ExploreScreen>
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             curve: Curves.easeOutCubic,
-                            height: 30,
+                            height: 28,
                             padding:
-                                const EdgeInsets.symmetric(horizontal: 18),
+                                const EdgeInsets.symmetric(horizontal: 16),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: followed
                                   ? Colors.white.withValues(alpha: 0.12)
                                   : Colors.white,
-                              borderRadius: BorderRadius.circular(15),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -945,7 +897,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                                 if (followed) ...[
                                   const Icon(
                                     CupertinoIcons.checkmark_alt,
-                                    size: 13,
+                                    size: 12,
                                     color: Colors.white,
                                   ),
                                   const SizedBox(width: 4),
@@ -953,7 +905,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                                 Text(
                                   followed ? 'Following' : 'Follow',
                                   style: _body(
-                                    size: 12.5,
+                                    size: 12,
                                     weight: FontWeight.w700,
                                     color:
                                         followed ? Colors.white : Colors.black,
@@ -975,63 +927,68 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
   }
 
-  // ── 5. Playlists ───────────────────────────────────────────────────────────
+  // ── 4. New Releases & Fresh Drops ──────────────────────────────────────────
 
-  Widget _buildPlaylists(List<Track> tracks) {
+  Widget _buildNewReleases(List<ExploreReleaseItem> releases) {
     const w = 158.0;
-    String cover(int i, String fallback) => tracks.isEmpty
-        ? fallback
-        : tracks[(i * 5) % tracks.length].coverUrl;
-
-    final lists = <ExplorePlaylistItem>[
-      ExplorePlaylistItem(
-        title: '${_country.name} Top 50',
-        description: 'Most streamed right now',
-        coverUrl: cover(0,
-            'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600'),
-        trackCount: 50,
-        searchQuery: '${_country.query} playlist',
-      ),
-      ExplorePlaylistItem(
-        title: 'Today\'s Hits',
-        description: 'Pop, rap and international charts',
-        coverUrl: cover(1,
-            'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600'),
-        trackCount: 35,
-        searchQuery: 'todays top hits',
-      ),
-      ExplorePlaylistItem(
-        title: 'Late Night Chill',
-        description: 'Acoustic and ambient',
-        coverUrl: cover(2,
-            'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600'),
-        trackCount: 40,
-        searchQuery: 'chill acoustic songs',
-      ),
-      ExplorePlaylistItem(
-        title: 'Workout Energy',
-        description: 'High-tempo motivation',
-        coverUrl: cover(3,
-            'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600'),
-        trackCount: 45,
-        searchQuery: 'workout motivation songs',
-      ),
-    ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _header('Playlists'),
+        _header(
+          'New Releases',
+          subtitle: 'Fresh albums & singles in ${_country.name}',
+        ),
         SizedBox(
           height: _CoverCard.heightFor(w),
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const _SnapSpringPhysics(itemExtent: w + 14),
             padding: const EdgeInsets.symmetric(horizontal: _kEdge),
-            itemCount: lists.length,
+            itemCount: releases.length,
             separatorBuilder: (_, _) => const SizedBox(width: 14),
             itemBuilder: (context, i) {
-              final p = lists[i];
+              final r = releases[i];
+              return _CoverCard(
+                width: w,
+                url: r.coverUrl,
+                title: MediaNormalizer.cleanCompactTitle(r.title),
+                subtitle: '${r.artist} • ${r.type}',
+                onTap: () => _openAlbum(
+                  r.title,
+                  r.artist,
+                  r.coverUrl,
+                  browseId: r.browseId,
+                  initialTracks: r.tracks,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── 5. Essential Weekly Playlists ──────────────────────────────────────────
+
+  Widget _buildPlaylists(List<ExplorePlaylistItem> playlists) {
+    const w = 158.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _header(
+          'Essential Playlists',
+          subtitle: 'Curated charts for ${_country.name}',
+        ),
+        SizedBox(
+          height: _CoverCard.heightFor(w),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const _SnapSpringPhysics(itemExtent: w + 14),
+            padding: const EdgeInsets.symmetric(horizontal: _kEdge),
+            itemCount: playlists.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (context, i) {
+              final p = playlists[i];
               return _CoverCard(
                 width: w,
                 url: p.coverUrl,
@@ -1046,7 +1003,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
   }
 
-  // ── 6. Browse: ONE compact section (genres + moods merged) ─────────────────
+  // ── 6. Browse by Mood & Genre ──────────────────────────────────────────────
 
   Widget _buildBrowse() {
     final prefs = UserPreferencesService.instance.currentPrefs;
@@ -1081,7 +1038,10 @@ class _ExploreScreenState extends State<ExploreScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _header('Browse'),
+        _header(
+          'Browse by Mood & Genre',
+          subtitle: 'Explore sounds that fit your day',
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: _kEdge),
           child: GridView.builder(

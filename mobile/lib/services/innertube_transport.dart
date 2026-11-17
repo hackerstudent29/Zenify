@@ -53,11 +53,11 @@ class InnerTubeTransport {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-  // ---- Politeness knobs ---------------------------------------------------
-  static const Duration _timeout = Duration(seconds: 8);
+  // ---- Politeness & High-Speed Performance Knobs --------------------------
+  static const Duration _timeout = Duration(seconds: 4);
   static const int _maxAttempts = 2;
 
-  final _TokenBucket _bucket = _TokenBucket(capacity: 12, refillPerSecond: 5.0);
+  final _TokenBucket _bucket = _TokenBucket(capacity: 16, refillPerSecond: 8.0);
   final _Breaker _breaker = _Breaker();
   final _TtlCache _cache = _TtlCache(maxEntries: 200);
   final Map<String, Future<Map<String, dynamic>>> _inflight = {};

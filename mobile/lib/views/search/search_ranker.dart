@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:math' as math;
 
+import '../../models/track.dart';
 import 'search_models.dart';
 
 /// Configuration of all weights, thresholds, and limits for search ranking.
@@ -28,13 +29,13 @@ class SearchRankingConfig {
   static const Duration kLruCacheTtl = Duration(minutes: 10);
   static const int kMaxRecentSearches = 20;
 
-  // Shelf Section Capacities in Overview View
-  static const int kMaxSongsInOverview = 6;
-  static const int kMaxArtistsInOverview = 10;
-  static const int kMaxAlbumsInOverview = 10;
-  static const int kMaxPlaylistsInOverview = 10;
-  static const int kMaxVideosInOverview = 8;
-  static const int kMaxPodcastsInOverview = 8;
+  // Shelf Section Capacities in Overview View (minimum 10 per section, up to 25-30)
+  static const int kMaxSongsInOverview = 25;
+  static const int kMaxArtistsInOverview = 20;
+  static const int kMaxAlbumsInOverview = 25;
+  static const int kMaxPlaylistsInOverview = 25;
+  static const int kMaxVideosInOverview = 20;
+  static const int kMaxPodcastsInOverview = 12;
 }
 
 /// Normalization, transliteration, and phonetic utilities for Indian and international queries.
@@ -366,6 +367,7 @@ class SearchRanker {
     required List<SearchItem> items,
     required SearchIntent intent,
     required String countryCode,
+    List<String> preferredLanguages = const [],
     SearchTopResult? initialTopResult,
     String? didYouMean,
     String? continuation,
@@ -410,6 +412,7 @@ class SearchRanker {
         item: it,
         intent: intent,
         countryCode: countryCode,
+        preferredLanguages: preferredLanguages,
         textScore: textScore,
         maxTextMatch: maxTextMatch,
         maxBatchPopularity: maxPopularityByType[it.type] ?? 0,
@@ -476,6 +479,7 @@ class SearchRanker {
     required SearchItem item,
     required SearchIntent intent,
     required String countryCode,
+    List<String> preferredLanguages = const [],
     required double textScore,
     required double maxTextMatch,
     required int maxBatchPopularity,
@@ -525,44 +529,57 @@ class SearchRanker {
     final serverPrior = 1.0 / (1.0 + item.rawRank);
     final serverComponent = serverPrior * SearchRankingConfig.kServerRankWeight;
 
-    // E. Country Boost (light weight: 0.06)
-    // Rule: Apply ONLY when textMatch is within 0.15 of the best candidate
-    double countryBoost = 0.0;
-    if (maxTextMatch - textScore <=
-        SearchRankingConfig.kCountryTiebreakWindow) {
-      final signal = _evaluateCountrySignal(item, countryCode);
-      if (signal == 2) {
-        countryBoost = 1.0;
-      } else if (signal == 1) {
-        countryBoost = 0.5;
+    // E. User Language & Country Relevance Boost (DSA Vector Relevance)
+    double regionalBoost = 0.0;
+    final itemLang = _detectItemLanguage(item);
+
+    if (itemLang != null && itemLang.isNotEmpty) {
+      final userLangsLower = preferredLanguages.map((l) => l.toLowerCase().trim()).toList();
+      if (userLangsLower.contains(itemLang.toLowerCase().trim())) {
+        regionalBoost += 0.16; // Direct user language preference match
       }
     }
-    final countryComponent = countryBoost * SearchRankingConfig.kCountryWeight;
+
+    final countrySignal = _evaluateCountrySignal(item, countryCode);
+    if (countrySignal == 2) {
+      regionalBoost += 0.10;
+    } else if (countrySignal == 1) {
+      regionalBoost += 0.05;
+    }
+
+    double countryComponent = 0.0;
+    if (textScore >= 0.30 || (maxTextMatch - textScore <= 0.20)) {
+      countryComponent = regionalBoost.clamp(0.0, 0.25);
+    }
 
     // F. Quality Boost & Penalties
     double qualityBoost = 0.0;
     double penalties = 0.0;
 
     if (item is SearchSongItem) {
-      if (item.isOfficialAudio) qualityBoost += 0.04;
+      if (item.isOfficialAudio) qualityBoost += 0.06;
       final tLower = item.title.toLowerCase();
       final qLower = intent.normalizedQuery;
 
       // Penalties for cover / live / karaoke if NOT requested
       if (tLower.contains('cover') && !qLower.contains('cover')) {
-        penalties += 0.15;
+        penalties += 0.25;
       }
       if (tLower.contains('karaoke') && !qLower.contains('karaoke')) {
-        penalties += 0.20;
-      }
-      if (tLower.contains('reaction') && !qLower.contains('reaction')) {
         penalties += 0.30;
       }
+      if (tLower.contains('reaction') && !qLower.contains('reaction')) {
+        penalties += 0.40;
+      }
       if (tLower.contains('live') && !qLower.contains('live')) {
-        penalties += 0.08;
+        penalties += 0.10;
+      }
+      if ((tLower.contains('8d') || tLower.contains('slowed') || tLower.contains('reverb')) &&
+          !qLower.contains('8d') && !qLower.contains('slowed')) {
+        penalties += 0.20;
       }
     } else if (item is SearchArtistItem) {
-      if (item.isVerified) qualityBoost += 0.04;
+      if (item.isVerified) qualityBoost += 0.08;
     }
 
     final qualityComponent = qualityBoost * SearchRankingConfig.kQualityWeight;
@@ -582,6 +599,19 @@ class SearchRanker {
         penalties;
 
     return rawScore.clamp(0.0, 1.0);
+  }
+
+  static String? _detectItemLanguage(SearchItem item) {
+    if (item is SearchSongItem) {
+      return Track.detectLanguage(item.title, item.subtitle, item.albumName ?? '');
+    } else if (item is SearchAlbumItem) {
+      return Track.detectLanguage(item.title, item.subtitle);
+    } else if (item is SearchPlaylistItem) {
+      return Track.detectLanguage(item.title, item.subtitle);
+    } else if (item is SearchVideoItem) {
+      return Track.detectLanguage(item.title, item.subtitle);
+    }
+    return Track.detectLanguage(item.title, item.subtitle);
   }
 
   // ─────────────────────────── Text Match Calculation ────────────────────────

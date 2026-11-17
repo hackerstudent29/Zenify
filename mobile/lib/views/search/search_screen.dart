@@ -480,17 +480,6 @@ const List<_SearchCategorySpec> _kSearchCategories = [
   ),
 ];
 
-const List<String> _kTrendingPills = [
-  'Anirudh Ravichander',
-  'A.R. Rahman',
-  'The Weeknd',
-  'Arijit Singh',
-  'Taylor Swift',
-  'Ilaiyaraaja',
-  'Billie Eilish',
-  'Sid Sriram',
-];
-
 const List<({SearchFilter filter, String label})> _kResultFilters = [
   (filter: SearchFilter.all, label: 'Top Results'),
   (filter: SearchFilter.artists, label: 'Artists'),
@@ -690,8 +679,8 @@ class _SearchScreenState extends State<SearchScreen>
       _isLoading = true;
     });
 
-    // 1. Live suggestions (80ms)
-    _suggestTimer = Timer(const Duration(milliseconds: 80), () async {
+    // 1. Live suggestions (60ms)
+    _suggestTimer = Timer(const Duration(milliseconds: 60), () async {
       try {
         final s = await _dataService.getSuggestions(q);
         if (mounted && suggestId == _suggestId) {
@@ -700,8 +689,8 @@ class _SearchScreenState extends State<SearchScreen>
       } catch (_) {}
     });
 
-    // 2. Debounced search execution (350ms)
-    _debounceTimer = Timer(const Duration(milliseconds: 350), () {
+    // 2. High-speed debounced search execution (200ms)
+    _debounceTimer = Timer(const Duration(milliseconds: 200), () {
       if (mounted && _lastTyped == q) {
         _executeSearch(q, searchId, filter: _selectedFilter);
       }
@@ -723,8 +712,8 @@ class _SearchScreenState extends State<SearchScreen>
       setState(() => _isLoading = true);
     }
 
-    // Safety failsafe: never allow _isLoading to remain true indefinitely
-    Timer(const Duration(seconds: 16), () {
+    // Safety failsafe: never allow _isLoading to remain true for more than 4 seconds
+    Timer(const Duration(seconds: 4), () {
       if (mounted && _isLoading && id == _searchRequestId) {
         setState(() => _isLoading = false);
       }
@@ -734,7 +723,7 @@ class _SearchScreenState extends State<SearchScreen>
       final results = await _dataService
           .search(query: query, filter: filter)
           .timeout(
-            const Duration(seconds: 14),
+            const Duration(milliseconds: 3200),
             onTimeout: () => _dataService.getFallbackResult(query, filter),
           );
       if (!mounted) return;
@@ -1225,10 +1214,10 @@ class _SearchScreenState extends State<SearchScreen>
     final useSearchBar = typing || hasQuery;
     final showTabs =
         phase == _SearchViewPhase.results || phase == _SearchViewPhase.loading;
-    final barBlock = topPad + 8 + _kTopBarH + 10;
+    final barBlock = topPad + 14 + _kTopBarH + 10;
 
     final double spacer = switch (phase) {
-      _SearchViewPhase.landing => topPad + 60,
+      _SearchViewPhase.landing => topPad + 78,
       _SearchViewPhase.category => 0,
       _SearchViewPhase.recents || _SearchViewPhase.suggestions => barBlock + 6,
       _SearchViewPhase.loading ||
@@ -1418,7 +1407,7 @@ class _SearchScreenState extends State<SearchScreen>
         filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
           color: AppColors.bg.withValues(alpha: 0.86),
-          padding: EdgeInsets.fromLTRB(16, topPad + 8, 16, 10),
+          padding: EdgeInsets.fromLTRB(16, topPad + 14, 16, 10),
           child: Container(
             height: _kTopBarH,
             decoration: BoxDecoration(
@@ -1788,75 +1777,8 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Phase: Landing  (search bar · trending · category grid)
+  // Phase: Landing  (search bar · category grid)
   // ═══════════════════════════════════════════════════════════════════════════
-
-  Widget _trendingSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionHeader('Trending Now'),
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: _kEdge),
-            itemCount: _kTrendingPills.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final pill = _kTrendingPills[i];
-              return SpringIn(
-                delayMs: 20 * i,
-                rise: 10,
-                child: PressableScale(
-                  scale: 0.95,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    _submitSearch(pill);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.11),
-                        width: 0.6,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          CupertinoIcons.arrow_up_right,
-                          size: 13,
-                          color: AppColors.accent,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          pill,
-                          style: _bodyStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 12),
-      ],
-    );
-  }
 
   Widget _buildLanding({Key? key}) {
     return Column(
@@ -1868,11 +1790,17 @@ class _SearchScreenState extends State<SearchScreen>
           rise: 10,
           child: _LandingSearchBar(onTap: _activateSearch),
         ),
-        const SizedBox(height: 14),
-        _trendingSection(),
-        _sectionHeader('Browse Categories'),
+        const SizedBox(height: 22),
         Padding(
-          padding: const EdgeInsets.fromLTRB(_kEdge, 2, _kEdge, 26),
+          padding: const EdgeInsets.symmetric(horizontal: _kEdge),
+          child: Text(
+            'Browse Categories',
+            style: _displayStyle(fontSize: 22, letterSpacing: -0.4),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_kEdge, 0, _kEdge, 26),
           child: GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -1921,7 +1849,7 @@ class _SearchScreenState extends State<SearchScreen>
         ValueListenableBuilder<List<String>>(
           valueListenable: _dataService.recentsNotifier,
           builder: (context, recents, _) {
-            if (recents.isEmpty) return _trendingSection();
+            if (recents.isEmpty) return const SizedBox.shrink();
             final visible = recents.take(12).toList();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2501,10 +2429,10 @@ class _SearchScreenState extends State<SearchScreen>
             children: [
               _sectionHeader(
                 'Songs',
-                actionTitle: 'See All',
+                actionTitle: r.songs.length > 10 ? 'See All' : null,
                 onTap: () => _onFilterSelected(SearchFilter.songs),
               ),
-              _songRows(r.songs.take(5).toList()),
+              _songRows(r.songs.take(12).toList()),
               const SizedBox(height: 14),
             ],
           );
@@ -2619,11 +2547,11 @@ class _SearchScreenState extends State<SearchScreen>
     }
 
     if (serviceTop != null) add(serviceTop);
-    r.songs.take(15).forEach(add);
-    r.albums.take(10).forEach(add);
-    r.artists.take(10).forEach(add);
-    r.playlists.take(8).forEach(add);
-    r.videos.take(8).forEach(add);
+    r.songs.take(25).forEach(add);
+    r.albums.take(25).forEach(add);
+    r.artists.take(20).forEach(add);
+    r.playlists.take(25).forEach(add);
+    r.videos.take(20).forEach(add);
 
     final sorted = cands.values.toList()
       ..sort((a, b) => b.score.compareTo(a.score));
