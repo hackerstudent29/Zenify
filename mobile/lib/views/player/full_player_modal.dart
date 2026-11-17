@@ -61,8 +61,6 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
               Positioned.fill(
                 child: ArtworkMeshBackground(
                   coverUrl: MediaNormalizer.upgradeArtworkUrl(coverUrl ?? ''),
-                  imageProviderBuilder: (url) =>
-                      CachedNetworkImageProvider(MediaNormalizer.upgradeArtworkUrl(url)),
                   paused: !ps.isPlaying,
                 ),
               ),
@@ -94,8 +92,6 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
           Positioned.fill(
             child: ArtworkMeshBackground(
               coverUrl: MediaNormalizer.upgradeArtworkUrl(track.coverUrl),
-              imageProviderBuilder: (url) =>
-                  CachedNetworkImageProvider(MediaNormalizer.upgradeArtworkUrl(url)),
               paused: !player.isPlaying,
             ),
           ),

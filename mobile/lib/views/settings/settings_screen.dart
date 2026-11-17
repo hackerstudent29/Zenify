@@ -22,6 +22,7 @@ import '../auth/welcome_screen.dart';
 import '../player/studio_fx_sheet.dart';
 import '../profile/profile_edit_sheets.dart';
 import '../profile/profile_screen.dart';
+import 'glass_customizer_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -490,6 +491,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: GroupedSection(
                     title: 'APPEARANCE & HAPTICS',
                     children: [
+                      AppleRow(
+                        title: 'Glass & Dock Styling',
+                        subtitle: switch (settings.glassStyle) {
+                          'black' => 'Pure Black Solid (0% fluid)',
+                          'grey' => 'Neutral Grey Solid (0% fluid)',
+                          'frosted' => 'Slight Glass (50% fluid)',
+                          'fluid' => 'Liquid Glass (100% fluid)',
+                          _ => '${(settings.glassFluidity * 100).round()}% Fluidity',
+                        },
+                        leading: const Icon(CupertinoIcons.sparkles, color: Color(0xFFFA2D48)),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFA2D48).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${(settings.glassFluidity * 100).round()}%',
+                            style: const TextStyle(
+                              color: Color(0xFFFA2D48),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        chevron: true,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          Navigator.of(context).push(
+                            CupertinoPageRoute(
+                              builder: (_) => const GlassCustomizerScreen(),
+                            ),
+                          );
+                        },
+                      ),
                       AppleSwitchRow(
                         title: 'Album Color Glow',
                         subtitle: 'Subtle ambient glow from artwork',

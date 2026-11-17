@@ -6,6 +6,7 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import '../../services/dock_visibility.dart';
+import '../widgets/apple_glass.dart';
 import 'apple_tokens.dart';
 
 // ═══════════════════════════ SpringPressable ═══════════════════════════
@@ -219,15 +220,32 @@ class CircleIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Widget surface;
+    if (filled) {
+      surface = Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color ?? AT.accent),
+        child: Icon(icon, size: iconSize, color: Colors.white),
+      );
+    } else {
+      surface = AppleGlass(
+        borderRadius: BorderRadius.circular(size / 2),
+        shadow: false,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Center(
+            child: Icon(icon, size: iconSize, color: color ?? AT.label),
+          ),
+        ),
+      );
+    }
+
     final btn = SpringPressable(
       onTap: onTap,
       pressedScale: 0.9,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: filled ? (color ?? AT.accent) : AT.fillStrong),
-        child: Icon(icon, size: iconSize, color: filled ? Colors.white : (color ?? AT.label)),
-      ),
+      child: surface,
     );
     return tooltip == null ? btn : Tooltip(message: tooltip!, child: btn);
   }

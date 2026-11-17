@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
+import '../../services/settings_service.dart';
 import 'pressable_scale.dart';
 import '../zen.dart';
 
@@ -29,6 +30,10 @@ class AppleGlass extends StatelessWidget {
     this.saturation = 1.7,
     this.tint = const Color(0x0F101014),
     this.shadow = true,
+    this.overrideFluidity,
+    this.overrideBaseColor,
+    this.overrideBlur,
+    this.overrideSpecularRim,
   });
 
   final BorderRadius borderRadius;
@@ -41,6 +46,12 @@ class AppleGlass extends StatelessWidget {
   final double saturation;
   final Color tint;
   final bool shadow;
+
+  /// Optional preview or local overrides
+  final double? overrideFluidity;
+  final String? overrideBaseColor;
+  final double? overrideBlur;
+  final bool? overrideSpecularRim;
 
   static final Map<double, ui.ColorFilter> _satCache = {};
 
@@ -59,44 +70,115 @@ class AppleGlass extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filter = ui.ImageFilter.compose(
-      outer: _saturate(saturation),
-      inner: ui.ImageFilter.blur(
-        sigmaX: blur,
-        sigmaY: blur,
-        tileMode: TileMode.clamp,
-      ),
-    );
+    return ListenableBuilder(
+      listenable: SettingsState.instance,
+      builder: (context, _) {
+        final settings = SettingsState.instance;
+        final bool isInit = settings.isInitialized;
 
-    return RepaintBoundary(
-      child: CustomPaint(
-        painter: shadow ? _GlassShadowPainter(borderRadius) : null,
-        child: ClipRRect(
-          borderRadius: borderRadius,
-          child: BackdropFilter(
-            filter: filter,
+        final double f = (overrideFluidity ?? (isInit ? settings.glassFluidity : 1.0)).clamp(0.0, 1.0);
+        final String baseColorKey = overrideBaseColor ?? (isInit ? settings.glassBaseColor : 'default');
+        final double rawBlur = overrideBlur ?? (isInit ? settings.glassBlur : blur);
+        final bool specularRim = overrideSpecularRim ?? (isInit ? settings.glassSpecularRim : true);
+
+        final Color baseColor = switch (baseColorKey) {
+          'black' => const Color(0xFF0C0C0E),
+          'grey' => const Color(0xFF222226),
+          'crimson' => const Color(0xFF1E0A12),
+          _ => const Color(0xFF121216),
+        };
+
+        // Opacity / tint alpha:
+        // f = 1.0: 0.10 (translucent liquid glass)
+        // f = 0.5: 0.55 (frosted)
+        // f = 0.0: 1.00 (solid matte)
+        final double effectiveAlpha = (1.0 - f * 0.90).clamp(0.08, 1.0);
+        final Color effectiveTint = (tint != const Color(0x0F101014) && baseColorKey == 'default' && f >= 0.95)
+            ? tint
+            : baseColor.withValues(alpha: effectiveAlpha);
+
+        // Blur sigma:
+        final double effectiveBlur = f <= 0.01
+            ? 0.0
+            : (f >= 0.95
+                ? rawBlur
+                : (rawBlur * (1.0 + (1.0 - f) * 1.8))).clamp(0.0, 25.0);
+
+        final double effectiveSaturation = ui.lerpDouble(1.0, saturation, f) ?? saturation;
+        final double rimAlpha = specularRim ? (ui.lerpDouble(0.12, 0.55, f) ?? 0.55) : 0.12;
+        final double glowWidth = specularRim ? (ui.lerpDouble(0.0, 5.0, f) ?? 5.0) : 0.0;
+        final bool isSolid = f <= 0.05;
+
+        final rimPainter = _GlassRimPainter(
+          borderRadius,
+          rimAlpha: rimAlpha,
+          glowWidth: glowWidth,
+          isSolid: isSolid,
+        );
+
+        final surfaceDecoration = BoxDecoration(
+          color: effectiveTint,
+          gradient: f > 0.05
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.10 * f),
+                    Colors.white.withValues(alpha: 0.0),
+                    Colors.white.withValues(alpha: 0.03 * f),
+                  ],
+                  stops: const [0, 0.55, 1],
+                )
+              : null,
+        );
+
+        // If blur is disabled or 0% fluid, skip BackdropFilter entirely for battery/GPU performance!
+        if (effectiveBlur <= 0.01) {
+          return RepaintBoundary(
             child: CustomPaint(
-              foregroundPainter: _GlassRimPainter(borderRadius),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: tint,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.10),
-                      Colors.white.withValues(alpha: 0.0),
-                      Colors.white.withValues(alpha: 0.03),
-                    ],
-                    stops: const [0, 0.55, 1],
+              painter: shadow ? _GlassShadowPainter(borderRadius) : null,
+              child: ClipRRect(
+                borderRadius: borderRadius,
+                child: CustomPaint(
+                  foregroundPainter: rimPainter,
+                  child: DecoratedBox(
+                    decoration: surfaceDecoration,
+                    child: child,
                   ),
                 ),
-                child: child,
+              ),
+            ),
+          );
+        }
+
+        final filter = ui.ImageFilter.compose(
+          outer: _saturate(effectiveSaturation),
+          inner: ui.ImageFilter.blur(
+            sigmaX: effectiveBlur,
+            sigmaY: effectiveBlur,
+            tileMode: TileMode.clamp,
+          ),
+        );
+
+        return RepaintBoundary(
+          child: CustomPaint(
+            painter: shadow ? _GlassShadowPainter(borderRadius) : null,
+            child: ClipRRect(
+              borderRadius: borderRadius,
+              child: BackdropFilter(
+                filter: filter,
+                child: CustomPaint(
+                  foregroundPainter: rimPainter,
+                  child: DecoratedBox(
+                    decoration: surfaceDecoration,
+                    child: child,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -134,8 +216,16 @@ class _GlassShadowPainter extends CustomPainter {
 }
 
 class _GlassRimPainter extends CustomPainter {
-  _GlassRimPainter(this.radius);
+  _GlassRimPainter(
+    this.radius, {
+    this.rimAlpha = 0.55,
+    this.glowWidth = 5.0,
+    this.isSolid = false,
+  });
   final BorderRadius radius;
+  final double rimAlpha;
+  final double glowWidth;
+  final bool isSolid;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -145,40 +235,46 @@ class _GlassRimPainter extends CustomPainter {
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [
-        Colors.white.withValues(alpha: 0.55),
-        Colors.white.withValues(alpha: 0.06),
-        Colors.white.withValues(alpha: 0.06),
-        Colors.white.withValues(alpha: 0.30),
+        Colors.white.withValues(alpha: rimAlpha),
+        Colors.white.withValues(alpha: (rimAlpha * 0.11).clamp(0.02, 0.15)),
+        Colors.white.withValues(alpha: (rimAlpha * 0.11).clamp(0.02, 0.15)),
+        Colors.white.withValues(alpha: (rimAlpha * 0.55).clamp(0.05, 0.35)),
       ],
       stops: const [0, 0.35, 0.65, 1],
     ).createShader(rect);
 
     // thick, soft inner edge glow: this is what sells the "glass thickness"
-    canvas.save();
-    canvas.clipRRect(full);
-    canvas.drawRRect(
-      full.deflate(1),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..shader = shader
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5)
-        ..color = Colors.white.withValues(alpha: 0.5),
-    );
-    canvas.restore();
+    if (glowWidth > 0.5) {
+      canvas.save();
+      canvas.clipRRect(full);
+      canvas.drawRRect(
+        full.deflate(1),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = glowWidth
+          ..shader = shader
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5)
+          ..color = Colors.white.withValues(alpha: (rimAlpha * 0.8).clamp(0.1, 0.5)),
+      );
+      canvas.restore();
+    }
 
     // crisp specular rim
     canvas.drawRRect(
       full.deflate(0.5),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
+        ..strokeWidth = isSolid ? 0.8 : 1.0
         ..shader = shader,
     );
   }
 
   @override
-  bool shouldRepaint(covariant _GlassRimPainter old) => old.radius != radius;
+  bool shouldRepaint(covariant _GlassRimPainter old) =>
+      old.radius != radius ||
+      old.rimAlpha != rimAlpha ||
+      old.glowWidth != glowWidth ||
+      old.isSolid != isSolid;
 }
 
 /* ====================================================================== */
