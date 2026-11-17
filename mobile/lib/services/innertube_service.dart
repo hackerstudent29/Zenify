@@ -1611,19 +1611,41 @@ class InnerTubeService {
           ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
           ?['contents'] as List?;
 
+      final List<Map<String, dynamic>> shelves = [];
       if (sectionList != null && sectionList.isNotEmpty) {
         for (final sec in sectionList) {
           final shelf = sec['musicShelfRenderer'] ?? sec['musicPlaylistShelfRenderer'];
-          final contents = shelf?['contents'] as List?;
-          if (contents != null) {
-            for (final item in contents) {
-              final t = _parseResponsiveListItem(item['musicResponsiveListItemRenderer']);
-              if (t != null) {
-                if (titleToUse.isNotEmpty && (t.album == 'Single' || t.album.isEmpty)) {
-                  tracks.add(t.copyWith(album: titleToUse));
-                } else {
-                  tracks.add(t);
-                }
+          if (shelf is Map<String, dynamic>) shelves.add(shelf);
+        }
+      }
+      final twoCol = res['contents']?['twoColumnBrowseResultsRenderer'];
+      if (twoCol != null) {
+        final secContents = twoCol['secondaryContents']?['sectionListRenderer']?['contents'] as List?;
+        if (secContents != null) {
+          for (final s in secContents) {
+            final shelf = s['musicPlaylistShelfRenderer'] ?? s['musicShelfRenderer'];
+            if (shelf is Map<String, dynamic>) shelves.add(shelf);
+          }
+        }
+        final tabSecs = twoCol['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents'] as List?;
+        if (tabSecs != null) {
+          for (final s in tabSecs) {
+            final shelf = s['musicPlaylistShelfRenderer'] ?? s['musicShelfRenderer'];
+            if (shelf is Map<String, dynamic>) shelves.add(shelf);
+          }
+        }
+      }
+
+      for (final shelf in shelves) {
+        final contents = shelf['contents'] as List?;
+        if (contents != null) {
+          for (final item in contents) {
+            final t = _parseResponsiveListItem(item['musicResponsiveListItemRenderer']);
+            if (t != null) {
+              if (titleToUse.isNotEmpty && (t.album == 'Single' || t.album.isEmpty)) {
+                tracks.add(t.copyWith(album: titleToUse));
+              } else {
+                tracks.add(t);
               }
             }
           }
@@ -1651,6 +1673,82 @@ class InnerTubeService {
   /// Fetches playlist tracklist and metadata from YouTube Music playlistId / browseId.
   Future<({List<Track> tracks, String coverUrl, String title, String author})?> getPlaylist(String playlistId) async {
     final cleanId = playlistId.startsWith('VL') ? playlistId.substring(2) : playlistId;
+
+    // 1. PRIMARY: High-Speed Direct InnerTube HTTP Browse (500ms - 1s)
+    try {
+      final browseRes = await post('browse', {'browseId': 'VL$cleanId'}, ttl: const Duration(hours: 6))
+          .timeout(const Duration(seconds: 10));
+
+      final twoCol = browseRes['contents']?['twoColumnBrowseResultsRenderer'];
+      final singleCol = browseRes['contents']?['singleColumnBrowseResultsRenderer'];
+
+      final header = browseRes['header']?['musicDetailHeaderRenderer'] ??
+          browseRes['header']?['musicResponsiveHeaderRenderer'] ??
+          browseRes['header']?['musicEditablePlaylistDetailHeaderRenderer']?['header']?['musicResponsiveHeaderRenderer'] ??
+          twoCol?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents']?[0]?['musicResponsiveHeaderRenderer'] ??
+          twoCol?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents']?[0]?['musicEditablePlaylistDetailHeaderRenderer']?['header']?['musicResponsiveHeaderRenderer'];
+
+      String coverUrl = '';
+      final thumbs = (header?['thumbnail']?['croppedSquareThumbnailRenderer']?['thumbnail']?['thumbnails'] ??
+              header?['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']) as List?;
+      if (thumbs != null && thumbs.isNotEmpty) {
+        coverUrl = upgradeArtworkUrl(thumbs.last['url'] as String);
+      }
+
+      final title = (header?['title']?['runs']?[0]?['text'] ?? '').toString();
+      final author = (header?['subtitle']?['runs']?[0]?['text'] ?? '').toString();
+
+      final List<Map<String, dynamic>> shelves = [];
+      if (singleCol != null) {
+        final secs = singleCol['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents'] as List?;
+        if (secs != null) {
+          for (final s in secs) {
+            final shelf = s['musicPlaylistShelfRenderer'] ?? s['musicShelfRenderer'];
+            if (shelf is Map<String, dynamic>) shelves.add(shelf);
+          }
+        }
+      }
+      if (twoCol != null) {
+        final secContents = twoCol['secondaryContents']?['sectionListRenderer']?['contents'] as List?;
+        if (secContents != null) {
+          for (final s in secContents) {
+            final shelf = s['musicPlaylistShelfRenderer'] ?? s['musicShelfRenderer'];
+            if (shelf is Map<String, dynamic>) shelves.add(shelf);
+          }
+        }
+        final tabSecs = twoCol['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents'] as List?;
+        if (tabSecs != null) {
+          for (final s in tabSecs) {
+            final shelf = s['musicPlaylistShelfRenderer'] ?? s['musicShelfRenderer'];
+            if (shelf is Map<String, dynamic>) shelves.add(shelf);
+          }
+        }
+      }
+
+      final tracks = <Track>[];
+      for (final shelf in shelves) {
+        final contents = shelf['contents'] as List?;
+        if (contents != null) {
+          for (final item in contents) {
+            final t = _parseResponsiveListItem(item['musicResponsiveListItemRenderer']);
+            if (t != null) tracks.add(t);
+          }
+        }
+      }
+
+      if (tracks.isNotEmpty) {
+        return (
+          tracks: tracks,
+          coverUrl: coverUrl,
+          title: title.isNotEmpty ? title : 'YouTube Playlist',
+          author: author.isNotEmpty ? author : 'YouTube Music',
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[InnerTube] Direct getPlaylist error for $cleanId: $e');
+    }
+
+    // 2. FALLBACK: Native Android Channel if available and HTTP returned empty
     if (_useNative) {
       try {
         final res = await _nativeChannel
@@ -1658,7 +1756,7 @@ class InnerTubeService {
               'playlistId': cleanId,
               'browseId': cleanId,
             })
-            .timeout(const Duration(seconds: 14), onTimeout: () => null);
+            .timeout(const Duration(seconds: 8), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final tracks = <Track>[];
           final rawTracks = (res['songs'] as List?) ?? (res['tracks'] as List?) ?? const [];
@@ -1688,40 +1786,7 @@ class InnerTubeService {
       }
     }
 
-    try {
-      final browseRes = await post('browse', {'browseId': 'VL$cleanId'}, ttl: const Duration(hours: 6))
-          .timeout(const Duration(seconds: 8));
-      final header = browseRes['header']?['musicDetailHeaderRenderer'] ??
-          browseRes['header']?['musicResponsiveHeaderRenderer'];
-      String coverUrl = '';
-      final thumbs = (header?['thumbnail']?['croppedSquareThumbnailRenderer']?['thumbnail']?['thumbnails'] ??
-              header?['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']) as List?;
-      if (thumbs != null && thumbs.isNotEmpty) {
-        coverUrl = upgradeArtworkUrl(thumbs.last['url'] as String);
-      }
-      final title = (header?['title']?['runs']?[0]?['text'] ?? '').toString();
-      final author = (header?['subtitle']?['runs']?[0]?['text'] ?? '').toString();
-      final tracks = <Track>[];
-      final sectionList = browseRes['contents']?['singleColumnBrowseResultsRenderer']
-          ?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']
-          ?['contents'] as List?;
-      if (sectionList != null) {
-        for (final sec in sectionList) {
-          final shelf = sec['musicPlaylistShelfRenderer'] ?? sec['musicShelfRenderer'];
-          final contents = shelf?['contents'] as List?;
-          if (contents != null) {
-            for (final item in contents) {
-              final t = _parseResponsiveListItem(item['musicResponsiveListItemRenderer']);
-              if (t != null) tracks.add(t);
-            }
-          }
-        }
-      }
-      return (tracks: tracks, coverUrl: coverUrl, title: title, author: author);
-    } catch (e) {
-      if (kDebugMode) debugPrint('[InnerTube] getPlaylist error: $e');
-      return null;
-    }
+    return null;
   }
 
   /// Fetches single song/video details by videoId using native InnerTube / next queue.
