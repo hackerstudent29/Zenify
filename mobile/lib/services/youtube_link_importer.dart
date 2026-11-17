@@ -29,9 +29,9 @@ class YouTubeLinkImporter {
   Future<YouTubeImportResult?> resolve(String rawUrl) async {
     try {
       return await _resolveInternal(rawUrl).timeout(
-        const Duration(seconds: 14),
+        const Duration(seconds: 20),
         onTimeout: () {
-          if (kDebugMode) debugPrint('[YouTubeLinkImporter] resolve timed out after 14s');
+          if (kDebugMode) debugPrint('[YouTubeLinkImporter] resolve timed out after 20s');
           return null;
         },
       );
@@ -214,7 +214,10 @@ class YouTubeLinkImporter {
     String? albumId;
     String? videoId;
 
-    String clean = raw.trim();
+    // Normalize string by removing all carriage returns, newlines, tabs, and whitespace
+    // that messaging apps (like WhatsApp) insert when line-wrapping long URLs across messages.
+    String clean = raw.replaceAll(RegExp(r'[\r\n\t\s]+'), '').trim();
+
     final urlRegex = RegExp(r'https?:\/\/[^\s]+');
     final urlMatch = urlRegex.firstMatch(clean);
     if (urlMatch != null) {

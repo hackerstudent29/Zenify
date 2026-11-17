@@ -499,7 +499,7 @@ class _GlassCustomizerScreenState extends State<GlassCustomizerScreen> with Sing
               height: 36,
               child: Center(
                 child: Icon(
-                  _demoLiked ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+                  _demoLiked ? CupertinoIcons.star_fill : CupertinoIcons.star,
                   color: _demoLiked ? const Color(0xFFFA2D48) : Colors.white,
                   size: 18,
                 ),

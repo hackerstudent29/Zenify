@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/services.dart';
@@ -197,7 +199,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     }
   }
 
-  void _handleBack() {
+  Future<void> _handleBack() async {
     // 0. Full player sheet (or a sub-panel like lyrics/queue) closes first.
     final player = _playerShellKey.currentState;
     if (player != null && player.isOpen) {
@@ -216,47 +218,78 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
       return;
     }
 
-    if (SearchNav.phase.value == SearchPhase.bar) {
+    // If on search tab and search bar/input is open, return to category shelves.
+    if (_currentIndex == 1 && SearchNav.phase.value == SearchPhase.bar) {
       _onSearchBack();
       return;
     }
 
-    // 2. Go back through tab history.
-    if (_tabHistory.isNotEmpty) {
-      final prevTab = _tabHistory.removeLast();
-      FocusManager.instance.primaryFocus?.unfocus();
-      ZenHaptics.tap();
-      setState(() => _currentIndex = prevTab);
-      return;
-    }
-
-    // 3. Any other tab with empty history → Home.
+    // 2. When end of inner navigation stack is reached, navigate back to the Home page.
+    // The app should ONLY consider exiting when the user is already on the Home page.
     if (_currentIndex != 0) {
+      _tabHistory.clear();
       _select(0);
       return;
     }
 
-    // 4. Double-back guard at the root of Home.
+    // 3. User is already on the Home page at root: double-back-to-exit guard.
     final now = DateTime.now();
     if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ZenHaptics.light();
+
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      scaffoldMessenger.hideCurrentSnackBar();
+
+      final safeBottom = MediaQuery.paddingOf(context).bottom;
+      final hasTrack = context.read<PlayerState>().currentTrack != null;
+      // Position snackbar cleanly above the MiniPlayer + bottom dock clearance without overlapping
+      final bottomMargin = hasTrack
+          ? (safeBottom + _navHeight + _navMargin + _miniGap + 60.0 + 14.0)
+          : (safeBottom + _navHeight + _navMargin + 16.0);
+
+      scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: const Text(
-            'Swipe or press back again to exit',
-            style: TextStyle(color: Colors.white, fontSize: 13),
+          content: const Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(CupertinoIcons.arrow_uturn_left, size: 14, color: Color(0xFFE11D48)),
+              SizedBox(width: 8),
+              Text(
+                'Press back again to exit the app.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
           ),
-          backgroundColor: const Color(0xFF18181B),
+          backgroundColor: const Color(0xE618181B),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          margin: const EdgeInsets.fromLTRB(20, 0, 20, 90),
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.12), width: 0.8),
+          ),
+          margin: EdgeInsets.fromLTRB(28, 0, 28, bottomMargin),
         ),
       );
       return;
     }
 
-    SystemNavigator.pop();
+    // 4. Confirmed double-back exit: stop playback immediately, clear background service & exit.
+    try {
+      final playerState = context.read<PlayerState>();
+      await playerState.stopAndCleanForExit();
+    } catch (_) {}
+    try {
+      await SystemNavigator.pop();
+    } catch (_) {}
+    exit(0);
   }
 
   void _goToArtist(dynamic trackOrArtist) {

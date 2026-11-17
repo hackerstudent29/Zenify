@@ -24,6 +24,7 @@ import 'lyrics_service.dart';
 import 'permission_service.dart';
 import 'queue_state.dart';
 import 'stream_resolver_service.dart';
+import 'zenify_audio_handler.dart';
 
 typedef ZenifyRepeatMode = RepeatMode;
 
@@ -33,7 +34,9 @@ typedef ZenifyRepeatMode = RepeatMode;
 /// [positionNotifier]. Everything that changes at frame rate (position, lyric
 /// line, scrubbing, volume, sheet expansion) has its own notifier so the
 /// whole tree never rebuilds for it.
-class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements PlaybackBridge {
+class PlayerState extends ChangeNotifier
+    with WidgetsBindingObserver
+    implements PlaybackBridge {
   PlayerState() {
     _initAudioPlayer();
     WidgetsBinding.instance.addObserver(this);
@@ -208,7 +211,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     if (_queueState != null) {
       return _queueState!.hasNext || (_autoplay && !_collectionLocked);
     }
-    return _currentIndex < _queue.length - 1 || (_autoplay && !_collectionLocked);
+    return _currentIndex < _queue.length - 1 ||
+        (_autoplay && !_collectionLocked);
   }
 
   @override
@@ -316,7 +320,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
 
     try {
       final resumePosMs = livePosition.inMilliseconds;
-      final canResumeAtOffset = _lastReportedPosition > const Duration(seconds: 2) &&
+      final canResumeAtOffset =
+          _lastReportedPosition > const Duration(seconds: 2) &&
           resumePosMs > 2000 &&
           (_duration.inMilliseconds <= 10000 ||
               resumePosMs < (_duration.inMilliseconds - 5000));
@@ -345,7 +350,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     String message,
   ) async {
     if (token != _playToken) return;
-    final hasMore = (_queueState?.hasNext ?? false) ||
+    final hasMore =
+        (_queueState?.hasNext ?? false) ||
         (_queueState?.autoplay == true && !_collectionLocked) ||
         _currentIndex < _queue.length - 1;
     if (hasMore && _consecutiveErrorCount < 3) {
@@ -433,9 +439,12 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     _lastPrefetchedNextKey = '__none__';
     unawaited(_audioPlayer.setNext(null));
 
-    final ctx = context ??
+    final ctx =
+        context ??
         PlaybackContext(
-          type: collectionLocked ? PlaybackContextType.album : PlaybackContextType.queueOnly,
+          type: collectionLocked
+              ? PlaybackContextType.album
+              : PlaybackContextType.queueOnly,
           id: 'ctx_${DateTime.now().millisecondsSinceEpoch}',
           tracks: tracks,
           startTrack: tracks[startIndex.clamp(0, tracks.length - 1)],
@@ -504,8 +513,15 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       IslandNotification(
         id: 'play_next_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Playing Next',
-        body: IslandNotification.artistOrTitle(artist: track.artist, title: track.title),
-        leading: IslandNotification.trackThumb(track.coverUrl, fallbackIcon: CupertinoIcons.arrow_turn_right_up, iconColor: const Color(0xFFE11D48)),
+        body: IslandNotification.artistOrTitle(
+          artist: track.artist,
+          title: track.title,
+        ),
+        leading: IslandNotification.trackThumb(
+          track.coverUrl,
+          fallbackIcon: CupertinoIcons.arrow_turn_right_up,
+          iconColor: const Color(0xFFE11D48),
+        ),
       ),
     );
     notifyListeners();
@@ -525,8 +541,15 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       IslandNotification(
         id: 'add_queue_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Queued',
-        body: IslandNotification.artistOrTitle(artist: track.artist, title: track.title),
-        leading: IslandNotification.trackThumb(track.coverUrl, fallbackIcon: CupertinoIcons.text_badge_plus, iconColor: const Color(0xFFE11D48)),
+        body: IslandNotification.artistOrTitle(
+          artist: track.artist,
+          title: track.title,
+        ),
+        leading: IslandNotification.trackThumb(
+          track.coverUrl,
+          fallbackIcon: CupertinoIcons.text_badge_plus,
+          iconColor: const Color(0xFFE11D48),
+        ),
       ),
     );
     notifyListeners();
@@ -603,7 +626,11 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       IslandNotification(
         id: 'queue_clear_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Queue Cleared',
-        leading: const Icon(CupertinoIcons.clear_circled, color: Colors.white70, size: 18),
+        leading: const Icon(
+          CupertinoIcons.clear_circled,
+          color: Colors.white70,
+          size: 18,
+        ),
       ),
     );
     notifyListeners();
@@ -612,7 +639,11 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
   // ---- Transport ------------------------------------------------------------------
 
   /// Plays a track directly (used by search, library, and Room Together)
-  Future<void> playMedia(Track track, {int? startMs, String source = 'manual'}) async {
+  Future<void> playMedia(
+    Track track, {
+    int? startMs,
+    String source = 'manual',
+  }) async {
     _currentTrack = track;
     final idx = _queue.indexWhere((t) => t.id == track.id);
     if (idx >= 0) {
@@ -648,7 +679,9 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     _lastPrefetchedNextKey = null;
     videoSizeNotifier.value = Size.zero;
     _duration = Duration(seconds: track.durationSeconds);
-    _setPosition(startMs != null ? Duration(milliseconds: startMs) : Duration.zero);
+    _setPosition(
+      startMs != null ? Duration(milliseconds: startMs) : Duration.zero,
+    );
     _pushHistory(track);
     ListeningTrackerService.instance.startTrack(
       trackId: track.id,
@@ -757,7 +790,9 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
         );
         return;
       } catch (e) {
-        if (kDebugMode) debugPrint('[PlayerState] offline local audio play error: $e');
+        if (kDebugMode) {
+          debugPrint('[PlayerState] offline local audio play error: $e');
+        }
       }
     }
 
@@ -825,8 +860,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
 
     if (track.isVideo && videoId.length == 11 && !videoId.contains(' ')) {
       try {
-        final streams =
-            await StreamResolverService.instance.resolveVideoStreams(videoId);
+        final streams = await StreamResolverService.instance
+            .resolveVideoStreams(videoId);
         if (token != _playToken) return false;
         if (streams != null && streams.audioUrl.isNotEmpty) {
           await _audioPlayer.playUrl(
@@ -869,7 +904,8 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     if (videoId.length == 11 && !videoId.contains(' ')) {
       try {
         final ytWatchUrl = 'https://www.youtube.com/watch?v=$videoId';
-        final proxyUrl = '${ApiService.baseUrl}/api/utils/stream-youtube'
+        final proxyUrl =
+            '${ApiService.baseUrl}/api/utils/stream-youtube'
             '?url=${Uri.encodeQueryComponent(ytWatchUrl)}'
             '&title=${Uri.encodeQueryComponent(track.title)}'
             '&artist=${Uri.encodeQueryComponent(track.artist)}'
@@ -908,8 +944,9 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       }
     }
 
-    final nextKey =
-        nextTrack != null ? '${nextTrack.id}:${nextTrack.isVideo}' : '__none__';
+    final nextKey = nextTrack != null
+        ? '${nextTrack.id}:${nextTrack.isVideo}'
+        : '__none__';
     if (_lastPrefetchedNextKey == nextKey) return;
     _lastPrefetchedNextKey = nextKey;
 
@@ -919,7 +956,9 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
         unawaited(_ensureVideoTexturePrepared());
       }
       // Gapless next track setup & native engine prefetch with metadata
-      final nextLocal = DownloadService.instance.getLocalAudioPath(nextTrack.id);
+      final nextLocal = DownloadService.instance.getLocalAudioPath(
+        nextTrack.id,
+      );
       unawaited(
         _audioPlayer.setNext(
           nextLocal ?? nextTrack.id,
@@ -1086,8 +1125,9 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       }
 
       // 2. Delegate advance to QueueState single advance path
-      final nextSource =
-          reason == AdvanceReason.trackCompleted ? 'auto' : 'manual';
+      final nextSource = reason == AdvanceReason.trackCompleted
+          ? 'auto'
+          : 'manual';
       final nextEntry = q.advance(reason: reason);
       Track? track = nextEntry?.track;
 
@@ -1190,8 +1230,9 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
 
     // Fallback if _queueState is not attached
     if (_queue.isEmpty) return;
-    final fallbackSource =
-        reason == AdvanceReason.trackCompleted ? 'auto' : 'manual';
+    final fallbackSource = reason == AdvanceReason.trackCompleted
+        ? 'auto'
+        : 'manual';
     if (_currentIndex < _queue.length - 1) {
       _currentIndex++;
       await _startCurrent(source: fallbackSource);
@@ -1396,7 +1437,11 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
         IslandNotification(
           id: 'sleep_timer_ended_${DateTime.now().millisecondsSinceEpoch}',
           title: 'Timer Ended',
-          leading: const Icon(CupertinoIcons.moon_zzz_fill, color: Color(0xFFE11D48), size: 18),
+          leading: const Icon(
+            CupertinoIcons.moon_zzz_fill,
+            color: Color(0xFFE11D48),
+            size: 18,
+          ),
         ),
       );
       notifyListeners();
@@ -1406,7 +1451,11 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
         id: 'sleep_timer_set_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Sleep Timer',
         body: '${after.inMinutes}m',
-        leading: const Icon(CupertinoIcons.moon_zzz_fill, color: Color(0xFFE11D48), size: 18),
+        leading: const Icon(
+          CupertinoIcons.moon_zzz_fill,
+          color: Color(0xFFE11D48),
+          size: 18,
+        ),
       ),
     );
     notifyListeners();
@@ -1420,7 +1469,11 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
         id: 'sleep_timer_track_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Sleep Timer',
         body: 'End of song',
-        leading: const Icon(CupertinoIcons.moon_zzz_fill, color: Color(0xFFE11D48), size: 18),
+        leading: const Icon(
+          CupertinoIcons.moon_zzz_fill,
+          color: Color(0xFFE11D48),
+          size: 18,
+        ),
       ),
     );
     notifyListeners();
@@ -1432,7 +1485,11 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
       IslandNotification(
         id: 'sleep_timer_cancel_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Timer Off',
-        leading: const Icon(CupertinoIcons.moon_zzz, color: Colors.white70, size: 18),
+        leading: const Icon(
+          CupertinoIcons.moon_zzz,
+          color: Colors.white70,
+          size: 18,
+        ),
       ),
     );
     notifyListeners();
@@ -1459,7 +1516,9 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
     if (offlineLyrics != null && offlineLyrics.isNotEmpty) {
       if (token != _playToken) return;
       _lyricsLines = offlineLyrics.lines;
-      _lyricTimes = offlineLyrics.lines.map((l) => ((l['timeMs'] ?? l['startMs']) as num?)?.toInt() ?? 0).toList();
+      _lyricTimes = offlineLyrics.lines
+          .map((l) => ((l['timeMs'] ?? l['startMs']) as num?)?.toInt() ?? 0)
+          .toList();
       _lyricsSynced = offlineLyrics.synced;
       _isLoadingLyrics = false;
       notifyListeners();
@@ -1535,6 +1594,22 @@ class PlayerState extends ChangeNotifier with WidgetsBindingObserver implements 
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final isForeground = state == AppLifecycleState.resumed;
     unawaited(_audioPlayer.setLifecycle(isForeground));
+  }
+
+  /// Completely stops audio playback, releases engine resources,
+  /// and clears the background audio service/notification when the app is exited.
+  Future<void> stopAndCleanForExit() async {
+    _isPlaying = false;
+    notifyListeners();
+    try {
+      ListeningTrackerService.instance.onPlaybackStateChanged(false);
+    } catch (_) {}
+    try {
+      await _audioPlayer.stop();
+    } catch (_) {}
+    try {
+      await ZenifyAudioHandler.instance?.shutdown();
+    } catch (_) {}
   }
 
   @override

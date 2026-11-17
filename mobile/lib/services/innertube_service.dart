@@ -1677,7 +1677,7 @@ class InnerTubeService {
     // 1. PRIMARY: High-Speed Direct InnerTube HTTP Browse (500ms - 1s)
     try {
       final browseRes = await post('browse', {'browseId': 'VL$cleanId'}, ttl: const Duration(hours: 6))
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 16));
 
       final twoCol = browseRes['contents']?['twoColumnBrowseResultsRenderer'];
       final singleCol = browseRes['contents']?['singleColumnBrowseResultsRenderer'];

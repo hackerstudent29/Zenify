@@ -1796,21 +1796,7 @@ class _ArtistScreenState extends State<ArtistScreen> with TickerProviderStateMix
                   scrollController: _sc,
                   revealOffset: heroSpace - 40,
                   onBack: () => Navigator.pop(context),
-                  trailing: _Press(
-                    scale: 0.88,
-                    onTap: () => _menu(name, songs, img),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.45),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 0.8),
-                      ),
-                      alignment: Alignment.center,
-                      child: const Icon(CupertinoIcons.ellipsis, color: Colors.white, size: 18),
-                    ),
-                  ),
+                  onMore: () => _menu(name, songs, img),
                 ),
               ),
             ],

@@ -80,7 +80,7 @@ enum _Cat {
   artists('Artists', Icons.mic_external_on_rounded),
   albums('Albums', Icons.album_rounded),
   songs('Songs', Icons.music_note_rounded),
-  liked('Liked Songs', Icons.favorite_rounded),
+  liked('Favourite Songs', CupertinoIcons.star_fill),
   downloaded('Downloaded', CupertinoIcons.arrow_down_circle_fill);
 
   const _Cat(this.label, this.icon);
@@ -1320,7 +1320,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   List<_Item> _recent(LibraryStore s) {
     final items = <_Item>[
       _Item(
-        title: 'Liked Songs',
+        title: 'Favourite Songs',
         sub: _n(s.likedCount, 'song', 'songs'),
         cover: const _LikedCover(),
         onTap: () => _push(context, const _LikedPage()),
@@ -2096,7 +2096,7 @@ class _AddSongsPageState extends State<_AddSongsPage> {
         final suggested = CatalogDataSource.allTracks;
 
         if (liked.isNotEmpty) {
-          slivers.add(sectionHeader('From Liked Songs'));
+          slivers.add(sectionHeader('From Favourite Songs'));
           slivers.add(
             SliverList(
               delegate: SliverChildBuilderDelegate(
@@ -2711,14 +2711,14 @@ class _LikedPageState extends State<_LikedPage> {
       final empty = s.likedCount == 0;
       final songs = _filterTracks(s.likedTracks, _q.text, _sort);
       return _page(
-        title: 'Liked Songs',
+        title: 'Favourite Songs',
         previous: 'Library',
         slivers: [
           if (!empty)
             SliverToBoxAdapter(
               child: _Search(
                 controller: _q,
-                hint: 'Find in Liked Songs',
+                hint: 'Find in Favourite Songs',
                 onChanged: (_) => setState(() {}),
               ),
             ),
@@ -2730,12 +2730,12 @@ class _LikedPageState extends State<_LikedPage> {
                 _sortSheet(ctx, _sort, (v) => setState(() => _sort = v)),
             empty: _Empty(
               icon: empty
-                  ? Icons.favorite_border_rounded
+                  ? CupertinoIcons.star
                   : Icons.search_off_rounded,
-              title: empty ? 'No Liked Songs Yet' : 'No Results',
+              title: empty ? 'No Favourite Songs Yet' : 'No Results',
               message: empty
-                  ? 'Press and hold any song, then choose “Add to Liked Songs”.'
-                  : 'Nothing in Liked Songs matches “${_q.text.trim()}”.',
+                  ? 'Press and hold any song, then choose “Add to Favourite Songs”.'
+                  : 'Nothing in Favourite Songs matches “${_q.text.trim()}”.',
             ),
           ),
         ],
@@ -3484,7 +3484,7 @@ class _LikedCover extends StatelessWidget {
       color: _tile,
       alignment: Alignment.center,
       child: Icon(
-        Icons.favorite_rounded,
+        CupertinoIcons.star_fill,
         color: _rose,
         size: c.maxWidth * 0.46,
       ),

@@ -338,6 +338,7 @@ class DynamicIslandHeader extends StatefulWidget {
     this.leading,
     this.centerWidget,
     this.trailing,
+    this.onMore,
     this.height = 44.0,
     this.topPadding,
     this.horizontalMargin = 14.0,
@@ -357,6 +358,7 @@ class DynamicIslandHeader extends StatefulWidget {
   final Widget? leading;
   final Widget? centerWidget;
   final Widget? trailing;
+  final VoidCallback? onMore;
   final double height;
   final double? topPadding;
   final double horizontalMargin;
@@ -529,7 +531,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     // On dock root pages, the full transparent logo is ~82px wide.
     // On subpages with back button, left dock is 44px.
     final double leftDockW = isDock ? 96.0 : (canPop ? h : 0.0);
-    final double rightDockW = widget.trailing != null
+    final double rightDockW = (widget.trailing != null || widget.onMore != null)
         ? 44.0
         : (widget.showProfile ? h : 0.0);
     final double leftClearance = leftDockW > 0 ? leftDockW + 8.0 : 8.0;
@@ -794,6 +796,13 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 
   Widget _buildRightDock(BuildContext context) {
     if (widget.trailing != null) return widget.trailing!;
+    if (widget.onMore != null) {
+      return DynamicIslandActionButton(
+        icon: CupertinoIcons.ellipsis,
+        onTap: widget.onMore!,
+        size: widget.height,
+      );
+    }
     if (!widget.showProfile) return const SizedBox(width: 44);
     final h = widget.height;
 
@@ -834,6 +843,45 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
                 },
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Standard Apple-Glass circular action button for Dynamic Island header docks
+/// (e.g. Three-Dot more options button, search button, etc.).
+class DynamicIslandActionButton extends StatelessWidget {
+  const DynamicIslandActionButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    this.size = 44.0,
+    this.iconSize = 18.0,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final double size;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      scale: 0.88,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: AppleGlass(
+        borderRadius: BorderRadius.circular(size / 2),
+        tint: const Color(0x26121216),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Center(
+            child: Icon(icon, color: Colors.white, size: iconSize),
           ),
         ),
       ),

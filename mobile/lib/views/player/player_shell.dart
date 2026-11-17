@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show lerpDouble;
+import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
@@ -31,23 +31,51 @@ const double _kPaused = 0.86; // artwork shrink while paused
 const double _kMiniH = 58;
 const double _kMiniArt = 40;
 
+/// Artwork corner radii (visual points, independent of the morph scale).
+/// Subtle, Apple Music-like: tiny in the mini player, slightly larger when big.
+const double _kRadiusMini = 6;
+const double _kRadiusBig = 10;
+const double _kRadiusDocked = 7;
+
 /// Lyrics open + no touch for this long → the bottom controls glide away.
 const Duration _kIdleHide = Duration(seconds: 3);
 
-/// Cover docking spring (art <-> header). Critically damped (2*sqrt(k) ≈ 45.6):
-/// no bounce, settles in roughly a quarter of a second.
+/// Blur applied to the lyrics while the controls are visible. It melts to 0
+/// (crisp lyrics) as the controls hide, and comes back as they return.
+/// Set to 0 to disable the effect.
+const double _kLyricsBlurWithControls = 1.8;
+
+/// Cover docking spring (art <-> header). Critically damped: no bounce.
 const SpringDescription _kDockSpring = SpringDescription(
   mass: 1,
   stiffness: 520,
   damping: 46,
 );
 
-/// Sheet close spring. Stiff + critically damped so closing feels instant
-/// and never lingers at the end.
+/// Sheet close spring. Stiff + critically damped so closing feels instant.
 const SpringDescription _kCloseSpring = SpringDescription(
   mass: 1,
   stiffness: 520,
   damping: 46,
+);
+
+/// Sheet open spring. Slightly softer than close, tiny settle, like iOS.
+const SpringDescription _kOpenSpring = SpringDescription(
+  mass: 1,
+  stiffness: 430,
+  damping: 38,
+);
+
+/// Button press: fast, no overshoot. Release: lively bounce back.
+const SpringDescription _kPressSpring = SpringDescription(
+  mass: 1,
+  stiffness: 700,
+  damping: 40,
+);
+const SpringDescription _kReleaseSpring = SpringDescription(
+  mass: 1,
+  stiffness: 420,
+  damping: 15,
 );
 
 /// Heavy lyrics/queue body mounts almost immediately after the cover starts
@@ -69,14 +97,14 @@ enum _Panel { art, lyrics, queue }
 ///
 /// Motion model (all springs):
 ///  • `_sheet`  0 = docked mini, 1 = fully open. Drives the sheet slide, the
-///    corner radius, the mini fade AND the artwork morph.
+///    corner radius, the mini fade, the artwork morph and the staggered rise
+///    of the controls.
 ///  • `_dock`   0 = big artwork, 1 = artwork docked top-left in the header.
-///    Drives the lyrics / queue transitions. Critically damped: no bounce.
 ///  • `_chrome` 0 = bottom controls shown, 1 = hidden. Lyrics open and idle for
-///    3 s → 1. Any touch → 0.
+///    3 s → 1. Any touch → 0. Hiding NEVER changes layout (only opacity,
+///    offset and blur), so the lyrics stay perfectly still.
 ///  • ONE artwork widget lives in an overlay, laid out once at the big size and
-///    moved/scaled with a matrix between mini → big → header, so there is no
-///    per-frame relayout.
+///    moved/scaled with a matrix between mini → big → header.
 class PlayerShell extends StatefulWidget {
   static final ValueNotifier<bool> isPlayerOpenNotifier = ValueNotifier<bool>(
     false,
@@ -188,8 +216,6 @@ class PlayerShellState extends State<PlayerShell>
   // when something it actually shows changes (not on every PlayerState tick)
   bool _playing = false;
   bool _isVideo = false;
-  bool _shuffle = false;
-  ZenifyRepeatMode _repeat = ZenifyRepeatMode.off;
   dynamic _duration;
 
   // gesture state
@@ -382,7 +408,7 @@ class PlayerShellState extends State<PlayerShell>
         }
       });
     }
-    _sheet.springTo(1, spring: kSnappySpring, velocity: velocity);
+    _sheet.springTo(1, spring: _kOpenSpring, velocity: velocity);
   }
 
   void _close({double velocity = 0}) {
@@ -559,8 +585,7 @@ class PlayerShellState extends State<PlayerShell>
     _bigRectKey = key;
     setState(() {
       _bigRect = Rect.fromLTWH(
-        (mq.size.width - side) /
-            2, // Always 100% mathematically centered on screen
+        (mq.size.width - side) / 2, // always centred on screen
         tl.dy + (r.size.height - side) * 0.2, // near the top, like Apple Music
         side,
         side,
@@ -584,9 +609,7 @@ class PlayerShellState extends State<PlayerShell>
       if (_miniAxis == _Axis.y) {
         _dragStart();
         if (!_open) setState(() => _open = true);
-        _dragUpdate(
-          -_miniAcc.dy.abs() * (_miniAcc.dy < 0 ? -1 : 1) * 0 + _miniAcc.dy,
-        );
+        _dragUpdate(_miniAcc.dy);
         return;
       }
     }
@@ -704,10 +727,6 @@ class PlayerShellState extends State<PlayerShell>
     if (track == null) return const SizedBox.shrink();
     _playing = context.select<PlayerState, bool>((p) => p.isPlaying);
     _isVideo = context.select<PlayerState, bool>((p) => p.isCurrentVideo);
-    _shuffle = context.select<PlayerState, bool>((p) => p.isShuffle);
-    _repeat = context.select<PlayerState, ZenifyRepeatMode>(
-      (p) => p.repeatMode,
-    );
     _duration = context.select<PlayerState, dynamic>((p) => p.duration);
     final player = context.read<PlayerState>();
 
@@ -748,8 +767,7 @@ class PlayerShellState extends State<PlayerShell>
   /* ───────────────────────── MINI PLAYER (Apple Music glass pill) ───────────────────────── */
 
   /// 1 → fully visible (sheet closed), 0 → gone. Smoothstep over the first
-  /// [_kMiniFadeSpan] of the sheet's travel, so opening fades the pill out
-  /// immediately and closing fades it back in only at the very end.
+  /// [_kMiniFadeSpan] of the sheet's travel.
   double _miniOpacity(double t) {
     final x = (t / _kMiniFadeSpan).clamp(0.0, 1.0);
     return 1 - x * x * (3 - 2 * x);
@@ -757,7 +775,6 @@ class PlayerShellState extends State<PlayerShell>
 
   Widget _buildMini(PlayerState player, dynamic track, EdgeInsets safe) {
     final dp = widget.dockProgress.clamp(0.0, 1.0);
-    // Interpolate horizontal margins: 16pt (full resting mini player) -> 76pt (center island between left and right docks)
     final miniLeft = lerpDouble(76.0, 16.0, dp)!;
     final miniRight = lerpDouble(76.0, 16.0, dp)!;
     final miniH = lerpDouble(52.0, _kMiniH, dp)!;
@@ -790,7 +807,7 @@ class PlayerShellState extends State<PlayerShell>
                       children: [
                         DecoratedBox(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(_kRadiusMini),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.28),
@@ -800,7 +817,7 @@ class PlayerShellState extends State<PlayerShell>
                             ],
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(_kRadiusMini),
                             child: SizedBox(
                               width: miniArt,
                               height: miniArt,
@@ -1000,7 +1017,7 @@ class PlayerShellState extends State<PlayerShell>
         width: side,
         height: side,
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 320),
+          duration: const Duration(milliseconds: 360),
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeIn,
           transitionBuilder: (child, anim) {
@@ -1047,16 +1064,21 @@ class PlayerShellState extends State<PlayerShell>
           final target = Rect.lerp(big, docked, d)!;
 
           // Diagonal flight: horizontal position + size lead (ease-out) while
-          // the vertical position follows the sheet linearly. The cover sweeps
-          // toward its destination instead of rising straight up, and the same
-          // path is retraced when closing.
+          // the vertical position follows the sheet linearly. The same path is
+          // retraced when closing.
           final px = Curves.easeOutQuad.transform(t);
           final sp = (t + px) / 2;
           final cx = lerpDouble(mini.center.dx, target.center.dx, px)!;
           final cy = lerpDouble(mini.center.dy, target.center.dy, t)!;
           final rw = lerpDouble(mini.width, target.width, sp)!;
 
-          final radius = lerpDouble(8, lerpDouble(12, 8, d)!, t)!;
+          // subtle Apple Music corners: small at mini, slightly larger big,
+          // a touch tighter again in the header
+          final radius = lerpDouble(
+            _kRadiusMini,
+            lerpDouble(_kRadiusBig, _kRadiusDocked, d)!,
+            t,
+          )!;
           final pauseScale =
               (1 - (1 - _pause.value) * (1 - d) * t) * _press.value;
           final dx = _artX.value * t * (1 - d);
@@ -1080,37 +1102,42 @@ class PlayerShellState extends State<PlayerShell>
                   transform: m,
                   child: IgnorePointer(
                     ignoring: t < 0.95,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTapDown: (_) =>
-                          _press.springTo(0.94, spring: kSnappySpring),
-                      onTapUp: (_) => _press.springTo(1, spring: kPauseSpring),
-                      onTapCancel: () =>
-                          _press.springTo(1, spring: kPauseSpring),
-                      // big cover → open lyrics; docked top-left → back to centre
-                      onTap: () =>
-                          _setPanel(_docked ? _Panel.art : _Panel.lyrics),
-                      onPanStart: _docked ? null : _artStart,
-                      onPanUpdate: _docked ? null : _artUpdate,
-                      onPanEnd: _docked ? null : _artEnd,
-                      onPanCancel: _docked
-                          ? null
-                          : () => _artEnd(DragEndDetails()),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF27272A),
-                          borderRadius: BorderRadius.circular(r),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: shadowA),
-                              blurRadius: 36, // fixed; scales with the matrix
-                              offset: const Offset(0, 16),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(r),
-                          child: child,
+                    child: Semantics(
+                      button: true,
+                      label: _docked ? 'Show album art' : 'Show lyrics',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTapDown: (_) =>
+                            _press.springTo(0.94, spring: _kPressSpring),
+                        onTapUp: (_) =>
+                            _press.springTo(1, spring: _kReleaseSpring),
+                        onTapCancel: () =>
+                            _press.springTo(1, spring: _kReleaseSpring),
+                        // big cover → open lyrics; docked top-left → back to centre
+                        onTap: () =>
+                            _setPanel(_docked ? _Panel.art : _Panel.lyrics),
+                        onPanStart: _docked ? null : _artStart,
+                        onPanUpdate: _docked ? null : _artUpdate,
+                        onPanEnd: _docked ? null : _artEnd,
+                        onPanCancel: _docked
+                            ? null
+                            : () => _artEnd(DragEndDetails()),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF27272A),
+                            borderRadius: BorderRadius.circular(r),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: shadowA),
+                                blurRadius: 36, // fixed; scales with the matrix
+                                offset: const Offset(0, 16),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(r),
+                            child: child,
+                          ),
                         ),
                       ),
                     ),
@@ -1150,11 +1177,10 @@ class PlayerShellState extends State<PlayerShell>
           final radius = math.min(1.0, (1 - t) * _travel / 140) * 32;
           // content fades in late so the artwork morph reads first
           final contentOpacity = Curves.easeOut.transform(
-            ((t - 0.3) / 0.7).clamp(0.0, 1.0),
+            ((t - 0.25) / 0.75).clamp(0.0, 1.0),
           );
 
-          // background card fades with how far the sheet is on screen:
-          // 1 when fully open → 0 when docked at the bottom (mini player)
+          // background card fades with how far the sheet is on screen
           final bgOpacity = Curves.easeInOut.transform(t);
 
           return GestureDetector(
@@ -1173,7 +1199,7 @@ class PlayerShellState extends State<PlayerShell>
                   key: _sheetKey,
                   clipBehavior: Clip.none,
                   children: [
-                    // ── BACKGROUND CARD: spans completely edge to edge with zero gaps ──
+                    // ── BACKGROUND CARD: edge to edge with zero gaps ──
                     Positioned(
                       left: -40.0,
                       right: -40.0,
@@ -1212,9 +1238,7 @@ class PlayerShellState extends State<PlayerShell>
                                 ),
                               ),
                             ),
-                            // Scrim: NONE for lyrics (they sit directly on the
-                            // colour wash). Queue keeps a soft scrim so the
-                            // list stays readable.
+                            // Scrim: NONE for lyrics. Queue keeps a soft scrim.
                             IgnorePointer(
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 300),
@@ -1286,6 +1310,30 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
+  /// Blur that follows the controls' visibility. `_chrome` 0 = controls shown
+  /// (soft blur), 1 = controls hidden (crisp). Pure paint effect: it never
+  /// touches layout, so the lyrics cannot move, resize or reflow.
+  /// The widget structure is identical at every value, so no state is lost.
+  Widget _lyricsBlur({required Widget child}) {
+    if (_kLyricsBlurWithControls <= 0) return child;
+    return AnimatedBuilder(
+      animation: _chrome,
+      child: child,
+      builder: (_, c) {
+        final h = _chrome.value.clamp(0.0, 1.0).toDouble();
+        final sigma = _kLyricsBlurWithControls * (1 - h);
+        final filter = sigma < 0.05
+            ? ImageFilter.matrix(Matrix4.identity().storage)
+            : ImageFilter.blur(
+                sigmaX: sigma,
+                sigmaY: sigma,
+                tileMode: TileMode.decal,
+              );
+        return ImageFiltered(imageFilter: filter, child: c);
+      },
+    );
+  }
+
   Widget _panelBody(dynamic track) {
     switch (_bodyPanel) {
       case _Panel.art:
@@ -1297,9 +1345,8 @@ class PlayerShellState extends State<PlayerShell>
           key: ValueKey('lyrics-$_trackKey'),
           child: NotificationListener<ScrollNotification>(
             onNotification: (n) {
-              // Only user-initiated touch drag gestures (with non-null dragDetails and active pointer touch)
-              // should reset the idle timer or reveal controls. Programmatic auto-scrolls
-              // when lyrics advance to the next line must NEVER wake or re-show controls.
+              // Only user-initiated touch drags reset the idle timer. Auto
+              // scrolls (lyrics advancing) must never wake the controls.
               if ((n is ScrollUpdateNotification &&
                       n.dragDetails != null &&
                       _activePointers > 0) ||
@@ -1310,18 +1357,17 @@ class PlayerShellState extends State<PlayerShell>
               }
               return false;
             },
-            // No card, gradient, border or shadow behind the lyrics: they are
-            // drawn straight onto the artwork colour wash. Only the soft
-            // top/bottom edge fade remains.
             child: _dismissOnOverscroll(
               Padding(
                 padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
                 child: _edgeFade(
-                  TickerMode(
-                    enabled: _open || _sheet.value > 0.05,
-                    child:
-                        widget.lyricsBuilder?.call(context) ??
-                        LyricsSheet(immersiveListenable: _lyricsImmersive),
+                  _lyricsBlur(
+                    child: TickerMode(
+                      enabled: _open || _sheet.value > 0.05,
+                      child:
+                          widget.lyricsBuilder?.call(context) ??
+                          LyricsSheet(immersiveListenable: _lyricsImmersive),
+                    ),
                   ),
                 ),
               ),
@@ -1344,8 +1390,8 @@ class PlayerShellState extends State<PlayerShell>
     }
   }
 
-  /// Lyrics / queue arriving: quick fade while rising ~28px. Leaving is a
-  /// very quick fade. Short and simple so nothing feels heavy.
+  /// Lyrics / queue arriving: quick fade while rising. Leaving is a very
+  /// quick fade.
   Widget _panelTransition(Widget c, Animation<double> anim) {
     return AnimatedBuilder(
       animation: anim,
@@ -1379,8 +1425,7 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   /// Collapses / reveals [child] following the `_dock` spring. The child stays
-  /// mounted at every value (no pop-in, no first-frame rebuild hitch).
-  /// [inverse]: visible while the big artwork is shown.
+  /// mounted at every value.
   Widget _dockCollapse({required bool inverse, required Widget child}) {
     return AnimatedBuilder(
       animation: _dock,
@@ -1402,8 +1447,11 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Glides the whole bottom block away (and back) with the `_chrome` spring.
-  /// Same widget structure at every value, so the child never loses state.
+  /// Glides the bottom controls away (and back) with the `_chrome` spring.
+  ///
+  /// IMPORTANT: this only changes opacity, a small downward offset and a blur.
+  /// It does NOT collapse the height, so the middle region (lyrics) keeps the
+  /// exact same size and position whether the controls are shown or hidden.
   Widget _chromeCollapse({required Widget child}) {
     return AnimatedBuilder(
       animation: _chrome,
@@ -1411,18 +1459,41 @@ class PlayerShellState extends State<PlayerShell>
       builder: (_, c) {
         final h = _chrome.value.clamp(0.0, 1.0).toDouble();
         final f = 1 - h;
+        final sigma = h * 10;
+        final filter = sigma < 0.05
+            ? ImageFilter.matrix(Matrix4.identity().storage)
+            : ImageFilter.blur(
+                sigmaX: sigma,
+                sigmaY: sigma,
+                tileMode: TileMode.decal,
+              );
         return IgnorePointer(
           ignoring: h > 0.35,
-          child: ClipRect(
-            child: Align(
-              alignment: Alignment.topCenter,
-              heightFactor: f,
-              child: Opacity(
-                opacity: f,
-                child: Transform.translate(offset: Offset(0, h * 28), child: c),
-              ),
+          child: Opacity(
+            opacity: f,
+            child: Transform.translate(
+              offset: Offset(0, h * 26),
+              child: ImageFiltered(imageFilter: filter, child: c),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  /// Staggered rise-in of the controls as the sheet opens (and the reverse on
+  /// close). [begin] is the sheet progress at which this element starts.
+  Widget _rise({required double begin, required Widget child}) {
+    return AnimatedBuilder(
+      animation: _sheet,
+      child: child,
+      builder: (_, c) {
+        final t = _sheet.value.clamp(0.0, 1.0);
+        final v = ((t - begin) / (1 - begin)).clamp(0.0, 1.0);
+        final e = Curves.easeOutCubic.transform(v);
+        return Opacity(
+          opacity: e,
+          child: Transform.translate(offset: Offset(0, (1 - e) * 22), child: c),
         );
       },
     );
@@ -1432,7 +1503,7 @@ class PlayerShellState extends State<PlayerShell>
     final isLyrics = _panel == _Panel.lyrics;
 
     // Raw pointer listener (never steals gestures): any touch while lyrics are
-    // open wakes the bottom controls and re-arms the 3 s idle timer.
+    // open wakes the bottom controls and re-arms the idle timer.
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: (_) {
@@ -1445,21 +1516,25 @@ class PlayerShellState extends State<PlayerShell>
       child: Column(
         children: [
           // Grabber (drag down or tap to close)
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _close,
-            onPanStart: (_) => _dragStart(),
-            onPanUpdate: (d) => _dragUpdate(d.delta.dy),
-            onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-            child: Padding(
-              padding: EdgeInsets.only(top: safe.top + 12, bottom: 12),
-              child: Center(
-                child: Container(
-                  width: 36,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(3),
+          Semantics(
+            button: true,
+            label: 'Close player',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _close,
+              onPanStart: (_) => _dragStart(),
+              onPanUpdate: (d) => _dragUpdate(d.delta.dy),
+              onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
+              child: Padding(
+                padding: EdgeInsets.only(top: safe.top + 12, bottom: 12),
+                child: Center(
+                  child: Container(
+                    width: 36,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
                 ),
               ),
@@ -1469,7 +1544,8 @@ class PlayerShellState extends State<PlayerShell>
           // Compact header (lyrics / queue): the artwork overlay docks onto it
           _dockCollapse(inverse: false, child: _compactHeader(track)),
 
-          // Middle region: lyrics / queue live here (artwork lives in the overlay)
+          // Middle region: lyrics / queue live here (artwork lives in the
+          // overlay). Its size never depends on the controls' visibility.
           Expanded(
             child: SizedBox.expand(
               key: _regionKey,
@@ -1492,7 +1568,8 @@ class PlayerShellState extends State<PlayerShell>
             ),
           ),
 
-          // Bottom block: glides away after 3 s idle while lyrics are open.
+          // Bottom block: fades / blurs away after idle while lyrics are open
+          // (layout size is constant, so nothing above it ever moves).
           _chromeCollapse(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -1501,41 +1578,60 @@ class PlayerShellState extends State<PlayerShell>
               onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
               onVerticalDragCancel: () => _dragEnd(0),
               child: Padding(
+                // bottom padding unchanged: Studio FX / Lyrics / Queue stay put
                 padding: EdgeInsets.fromLTRB(24, 8, 24, safe.bottom + 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // title / artist / like / more: smoothly moves with artwork into compact header
-                    _dockCollapse(inverse: true, child: _metaRow(track)),
+                    // title / artist / star / more: moves with artwork into
+                    // the compact header when a panel opens
+                    _rise(
+                      begin: 0.34,
+                      child: _dockCollapse(
+                        inverse: true,
+                        child: _metaRow(track),
+                      ),
+                    ),
 
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: ScrubberSlider(
-                          positionNotifier: player.positionNotifier,
-                          duration: _duration,
-                          onSeek: (pos) => player.seek(pos),
-                          activeColor: _seekTint.withValues(alpha: 0.62),
-                          trackColor: _seekTint.withValues(alpha: 0.22),
+                    // Seekbar + duration: design unchanged
+                    _rise(
+                      begin: 0.40,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: ScrubberSlider(
+                            positionNotifier: player.positionNotifier,
+                            duration: _duration,
+                            onSeek: (pos) => player.seek(pos),
+                            activeColor: _seekTint.withValues(alpha: 0.62),
+                            trackColor: _seekTint.withValues(alpha: 0.22),
+                          ),
                         ),
                       ),
                     ),
 
-                    // Transport remains visible on Lyrics open; only hides after 3s idle
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 360),
-                        child: Padding(
-                          // more air between seekbar → transport → tools
-                          padding: const EdgeInsets.only(top: 18, bottom: 24),
-                          child: _transport(player),
+                    // Big three-button transport. Slightly more air below it
+                    // lifts it (and everything above) up while the tool row
+                    // keeps its position at the bottom.
+                    _rise(
+                      begin: 0.46,
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 340),
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 14, bottom: 30),
+                            child: _transport(player),
+                          ),
                         ),
                       ),
                     ),
 
-                    _tools(
-                      isLyrics,
-                      hasLyrics: player.hasLyrics || player.isLoadingLyrics,
+                    _rise(
+                      begin: 0.52,
+                      child: _tools(
+                        isLyrics,
+                        hasLyrics: player.hasLyrics || player.isLoadingLyrics,
+                      ),
                     ),
                   ],
                 ),
@@ -1604,13 +1700,9 @@ class PlayerShellState extends State<PlayerShell>
             const SizedBox(width: 8),
             PopLikeButton(liked: _isLiked, onToggle: _toggleLike),
             const SizedBox(width: 8),
-            GlassCircle(
+            PlayerMoreButton(
               onTap: () => _showTrackMenu(track),
-              child: const Icon(
-                CupertinoIcons.ellipsis_vertical,
-                color: Colors.white,
-                size: 18,
-              ),
+              icon: CupertinoIcons.ellipsis,
             ),
           ],
         ),
@@ -1669,124 +1761,73 @@ class PlayerShellState extends State<PlayerShell>
           const SizedBox(width: 12),
           PopLikeButton(liked: _isLiked, onToggle: _toggleLike),
           const SizedBox(width: 8),
-          GlassCircle(
+          PlayerMoreButton(
             onTap: () => _showTrackMenu(track),
-            child: const Icon(
-              CupertinoIcons.ellipsis_vertical,
-              color: Colors.white,
-              size: 18,
-            ),
+            icon: CupertinoIcons.ellipsis,
           ),
         ],
       ),
     );
   }
 
-  /// Shuffle · Previous · Play/Pause · Next · Repeat.
-  /// Centre three are bigger (prev/next 68, play 80). Prev / next nudge in
-  /// their own direction on a spring, play/pause morphs + bounces.
+  /// Previous · Play/Pause · Next. Three big, widely spaced buttons (Apple
+  /// Music style). Each one springs down under the finger, shows a soft glass
+  /// halo, and bounces back on release. Prev / next also nudge in their own
+  /// direction; play/pause morphs + bounces.
   Widget _transport(PlayerState player) {
-    final repeatOn = _repeat != ZenifyRepeatMode.off;
-    return LayoutBuilder(
-      builder: (context, c) {
-        // 300 = natural width; scales down (never wraps) on very narrow screens
-        final w = math.max(c.maxWidth.isFinite ? c.maxWidth : 300.0, 300.0);
-        return FittedBox(
-          fit: BoxFit.scaleDown,
-          child: SizedBox(
-            width: w,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                PlateButton(
-                  size: 42,
-                  active: _shuffle,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    player.toggleShuffle();
-                  },
-                  child: SpringPop(
-                    trigger: _shuffle,
-                    scale: 0.3,
-                    child: const Icon(CupertinoIcons.shuffle, size: 22),
-                  ),
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: SizedBox(
+        width: 320,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _SpringButton(
+              size: 84,
+              label: 'Previous track',
+              onTap: _prev,
+              child: SpringPop(
+                pulse: _prevPulse,
+                dx: -12,
+                scale: 0.12,
+                child: const Icon(
+                  CupertinoIcons.backward_fill,
+                  color: Colors.white,
+                  size: 50,
                 ),
-                PressableScale(
-                  onTap: _prev,
-                  child: SizedBox(
-                    width: 68,
-                    height: 68,
-                    child: Center(
-                      child: SpringPop(
-                        pulse: _prevPulse,
-                        dx: -12,
-                        scale: 0.12,
-                        child: const Icon(
-                          CupertinoIcons.backward_fill,
-                          color: Colors.white,
-                          size: 46,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                PressableScale(
-                  onTap: player.togglePlay,
-                  scale: 0.9,
-                  child: SizedBox(
-                    width: 80,
-                    height: 80,
-                    child: _PlayGlyph(playing: _playing, size: 60),
-                  ),
-                ),
-                PressableScale(
-                  onTap: _next,
-                  child: SizedBox(
-                    width: 68,
-                    height: 68,
-                    child: Center(
-                      child: SpringPop(
-                        pulse: _nextPulse,
-                        dx: 12,
-                        scale: 0.12,
-                        child: const Icon(
-                          CupertinoIcons.forward_fill,
-                          color: Colors.white,
-                          size: 46,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                PlateButton(
-                  size: 42,
-                  active: repeatOn,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    player.toggleRepeat();
-                  },
-                  child: SpringPop(
-                    trigger: _repeat,
-                    scale: 0.3,
-                    child: Icon(
-                      _repeat == ZenifyRepeatMode.one
-                          ? CupertinoIcons.repeat_1
-                          : CupertinoIcons.repeat,
-                      size: 22,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
+            _SpringButton(
+              size: 96,
+              label: _playing ? 'Pause' : 'Play',
+              pressedScale: 0.9,
+              onTap: player.togglePlay,
+              child: _PlayGlyph(playing: _playing, size: 68),
+            ),
+            _SpringButton(
+              size: 84,
+              label: 'Next track',
+              onTap: _next,
+              child: SpringPop(
+                pulse: _nextPulse,
+                dx: 12,
+                scale: 0.12,
+                child: const Icon(
+                  CupertinoIcons.forward_fill,
+                  color: Colors.white,
+                  size: 50,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  /// Studio FX · Lyrics · Queue.
-  /// All three action buttons stay visible when Lyrics opens (moving the cover
-  /// only), and hide smoothly together with the rest of chrome after 3s idle.
+  /// Studio FX · Lyrics · Queue (order unchanged).
+  /// All three stay visible when Lyrics opens and hide together with the rest
+  /// of the controls after idle.
   Widget _tools(bool lyricsOpen, {bool hasLyrics = true}) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 260),
@@ -1836,6 +1877,113 @@ class PlayerShellState extends State<PlayerShell>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Spring button: press-down spring, glass halo, bouncy release       */
+/* ------------------------------------------------------------------ */
+class _SpringButton extends StatefulWidget {
+  const _SpringButton({
+    required this.onTap,
+    required this.child,
+    required this.size,
+    required this.label,
+    this.pressedScale = 0.84,
+  });
+
+  final VoidCallback onTap;
+  final Widget child;
+  final double size;
+  final String label;
+  final double pressedScale;
+
+  @override
+  State<_SpringButton> createState() => _SpringButtonState();
+}
+
+class _SpringButtonState extends State<_SpringButton>
+    with SingleTickerProviderStateMixin {
+  // 0 = rest, 1 = fully pressed. Unbounded so the release can overshoot
+  // below 0 (→ scale slightly above 1) for a lively bounce.
+  late final AnimationController _c = AnimationController.unbounded(
+    vsync: this,
+    value: 0,
+  );
+
+  bool get _reduceMotion => MediaQuery.disableAnimationsOf(context);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _down(TapDownDetails _) {
+    if (_reduceMotion) {
+      _c.value = 1;
+      return;
+    }
+    _c.springTo(1, spring: _kPressSpring, velocity: _c.velocity);
+  }
+
+  void _release() {
+    if (_reduceMotion) {
+      _c.value = 0;
+      return;
+    }
+    _c.springTo(0, spring: _kReleaseSpring, velocity: _c.velocity);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: widget.label,
+      onTap: widget.onTap,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: _down,
+          onTapUp: (_) => _release(),
+          onTapCancel: _release,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.onTap();
+          },
+          child: AnimatedBuilder(
+            animation: _c,
+            child: widget.child,
+            builder: (_, child) {
+              final v = _c.value;
+              final s = 1 - (1 - widget.pressedScale) * v;
+              final halo = v.clamp(0.0, 1.0) * 0.16;
+              return SizedBox(
+                width: widget.size,
+                height: widget.size,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Transform.scale(
+                      scale: s,
+                      child: Container(
+                        width: widget.size * 0.9,
+                        height: widget.size * 0.9,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: halo),
+                        ),
+                      ),
+                    ),
+                    Transform.scale(scale: s, child: child),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

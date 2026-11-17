@@ -13,16 +13,16 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart' hide RepeatMode;
 import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/physics.dart';
-import 'package:flutter/services.dart';
 
 import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/zen.dart';
 import '../../models/track.dart';
 import '../../services/playback_bridge.dart';
 import '../../utils/media_normalizer.dart';
-import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
+import '../../design_system/widgets/media_navigation_sheet.dart';
 import 'now_playing_widgets.dart';
+import 'player_kit.dart';
 
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({
@@ -46,12 +46,17 @@ class NowPlayingScreen extends StatefulWidget {
 
 class _NowPlayingScreenState extends State<NowPlayingScreen>
     with SingleTickerProviderStateMixin {
-  static const _snapBack =
-      SpringDescription(mass: 1, stiffness: 320, damping: 26);
+  static const _snapBack = SpringDescription(
+    mass: 1,
+    stiffness: 320,
+    damping: 26,
+  );
 
   /// value = vertical drag offset in px (unbounded so the spring can overshoot)
-  late final AnimationController _drag =
-      AnimationController.unbounded(vsync: this, value: 0);
+  late final AnimationController _drag = AnimationController.unbounded(
+    vsync: this,
+    value: 0,
+  );
 
   @override
   void dispose() {
@@ -91,7 +96,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             scale: scale,
             alignment: Alignment.topCenter,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(math.min(dy / 5.0, 40.0).toDouble()),
+              borderRadius: BorderRadius.circular(
+                math.min(dy / 5.0, 40.0).toDouble(),
+              ),
               child: child,
             ),
           ),
@@ -129,7 +136,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: track == null
                 ? const Center(
-                    child: Text('Nothing playing', style: Zen.subhead))
+                    child: Text('Nothing playing', style: Zen.subhead),
+                  )
                 : Column(
                     children: [
                       const SizedBox(height: 10),
@@ -148,13 +156,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, c) {
-                            final side =
-                                math.min(c.maxWidth, c.maxHeight);
+                            final side = math.min(c.maxWidth, c.maxHeight);
                             return Center(
                               child: SizedBox.square(
                                 dimension: side,
                                 child: AppleArtwork(
-                                    track: track, isPlaying: playing),
+                                  track: track,
+                                  isPlaying: playing,
+                                ),
                               ),
                             );
                           },
@@ -187,16 +196,22 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                         },
                         onScan: (delta) {
                           final target = b.position.value + delta;
-                          b.seek(Duration(
-                            milliseconds: target.inMilliseconds
-                                .clamp(0, b.duration.inMilliseconds),
-                          ));
+                          b.seek(
+                            Duration(
+                              milliseconds: target.inMilliseconds.clamp(
+                                0,
+                                b.duration.inMilliseconds,
+                              ),
+                            ),
+                          );
                         },
                       ),
                       const SizedBox(height: 4),
 
                       AppleVolumeSlider(
-                          value: b.volume, onChanged: b.setVolume),
+                        value: b.volume,
+                        onChanged: b.setVolume,
+                      ),
                       const SizedBox(height: 14),
 
                       _bottomRow(track, b),
@@ -220,9 +235,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               opacity: anim,
               child: SlideTransition(
                 position: Tween<Offset>(
-                        begin: const Offset(0, 0.25), end: Offset.zero)
-                    .chain(CurveTween(curve: Zen.springSmooth))
-                    .animate(anim),
+                  begin: const Offset(0, 0.25),
+                  end: Offset.zero,
+                ).chain(CurveTween(curve: Zen.springSmooth)).animate(anim),
                 child: child,
               ),
             ),
@@ -230,11 +245,20 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               key: ValueKey(track.id),
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(track.title,
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () =>
+                      MediaNavigationSheet.show(context: context, track: track),
+                  child: Text(
+                    track.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Zen.title3.copyWith(
-                        fontSize: 23, fontWeight: FontWeight.w700)),
+                      fontSize: 23,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 2),
                 InteractiveArtistsText(
                   artists: track.resolvedArtists,
@@ -245,23 +269,17 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                     fontWeight: FontWeight.w600,
                   ),
                   maxLines: 1,
+                  onTapArtist: (_) =>
+                      MediaNavigationSheet.show(context: context, track: track),
                 ),
                 if (track.album.isNotEmpty && track.album != 'Single') ...[
                   const SizedBox(height: 2),
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      Navigator.of(context).push(
-                        CupertinoPageRoute(
-                          builder: (_) => AlbumScreen(
-                            albumTitle: track.album,
-                            artistName: track.artist,
-                            coverUrl: track.coverUrl,
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: () => MediaNavigationSheet.show(
+                      context: context,
+                      track: track,
+                    ),
                     child: Text(
                       track.album,
                       maxLines: 1,
@@ -279,39 +297,15 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
             ),
           ),
         ),
-        const SizedBox(width: 12),
-        SpringPress(
-          onTap: () => b.toggleFavorite(track),
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 500),
-              transitionBuilder: (c, a) => ScaleTransition(
-                scale: a.drive(CurveTween(curve: Zen.springBouncy)),
-                child: c,
-              ),
-              child: Icon(
-                fav ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                key: ValueKey(fav),
-                size: 26,
-                color: fav ? Zen.rose : Colors.white,
-              ),
-            ),
-          ),
+        const SizedBox(width: 8),
+        PopLikeButton(
+          liked: fav,
+          onToggle: () => b.toggleFavorite(track),
         ),
-        SpringPress(
-          onTap: widget.onMore,
-          child: Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.18),
-            ),
-            child: const Icon(CupertinoIcons.ellipsis,
-                size: 18, color: Colors.white),
-          ),
+        const SizedBox(width: 8),
+        PlayerMoreButton(
+          onTap: widget.onMore ?? () {},
+          icon: CupertinoIcons.ellipsis,
         ),
       ],
     );

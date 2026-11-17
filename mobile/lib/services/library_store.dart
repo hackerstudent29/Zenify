@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show Color, Colors, Icon, Icons;
+import 'package:flutter/material.dart' show Color, Colors, Icon;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/datasources/catalog_datasource.dart';
@@ -451,18 +451,18 @@ class LibraryStore extends ChangeNotifier {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'like_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Liked',
+          title: 'Favourited',
           body: target,
-          leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: Icons.favorite_rounded, iconColor: const Color(0xFFE11D48)),
+          leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: CupertinoIcons.star_fill, iconColor: const Color(0xFFE11D48)),
         ),
       );
     } else {
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'unlike_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
-          title: 'Unliked',
+          title: 'Removed from Favourites',
           body: target,
-          leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: Icons.favorite_border_rounded, iconColor: Colors.white70),
+          leading: IslandNotification.trackThumb(t.coverUrl, fallbackIcon: CupertinoIcons.star, iconColor: Colors.white70),
         ),
       );
     }
