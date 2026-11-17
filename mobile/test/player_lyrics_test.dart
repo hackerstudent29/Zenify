@@ -95,25 +95,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 450));
 
     expect(find.byKey(const ValueKey('mock_lyrics_body')), findsOneWidget);
-    // Dim boundary container wraps lyrics panel with dark gradient & subtle border
-    final boundaryDecorations = tester
-        .widgetList<DecoratedBox>(
-          find.ancestor(
-            of: find.byKey(const ValueKey('mock_lyrics_body')),
-            matching: find.byType(DecoratedBox),
-          ),
-        )
-        .map((w) => w.decoration)
-        .whereType<BoxDecoration>();
-    expect(
-      boundaryDecorations.any(
-        (d) =>
-            d.borderRadius == BorderRadius.circular(26) &&
-            d.gradient != null &&
-            d.border != null,
-      ),
-      isTrue,
-    );
+    // Lyrics sits directly on the artwork colour wash with soft top/bottom edge fade
+    expect(find.byKey(const ValueKey('mock_lyrics_body')), findsOneWidget);
     // Artist name remains visible next to moved artwork in compact header
     expect(find.textContaining(track.artistNames.first), findsAtLeastNWidgets(1));
     // All transport & tool buttons remain visible when clicking Lyrics

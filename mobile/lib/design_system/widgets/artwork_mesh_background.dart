@@ -572,52 +572,12 @@ class _MeshPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final e = engine;
-    final w = size.width, h = size.height;
-    final m = math.max(w, h);
 
-    // 1. Deep canvas base
-    _fill.color = e.cur?.avg ?? const Color(0xFF101012);
+    // 1. Canvas base: vibrant song average or extracted background color
+    _fill.color = e.cur?.avg ?? bg;
     canvas.drawRect(Offset.zero & size, _fill);
 
-    // 2. Liquid vector mesh gradient blobs (swirling, glowing, fluid motion)
-    final colors = (palette != null && palette!.isNotEmpty)
-        ? palette!
-        : const [
-            Color(0xFFE11D48), // Radiant crimson
-            Color(0xFF9E2339), // Academic Maroon
-            Color(0xFF7C3AED), // Purple
-            Color(0xFF1E3A8A), // Royal navy
-          ];
-
-    final a = e.t * 0.45;
-    for (int i = 0; i < e.nodes.length; i++) {
-      final node = e.nodes[i];
-      final col = colors[i % colors.length];
-      final phaseOffset = i * 1.4;
-
-      final sx = math.sin(a * 1.2 + phaseOffset) * 0.12;
-      final sy = math.cos(a * 0.9 + phaseOffset * 1.3) * 0.12;
-      final cx = (node.x + sx + e.px * 0.05).clamp(0.05, 0.95) * w;
-      final cy = (node.y + sy + e.py * 0.05).clamp(0.05, 0.95) * h;
-      final energyPulse = 1.0 + (e.energy * 0.18 + 0.06) * math.sin(a * 2.0 + phaseOffset);
-      final r = m * node.s * 0.52 * energyPulse;
-
-      final paint = Paint()
-        ..shader = ui.Gradient.radial(
-          Offset(cx, cy),
-          r,
-          [
-            col.withValues(alpha: 0.72),
-            col.withValues(alpha: 0.35),
-            col.withValues(alpha: 0.0),
-          ],
-          const [0.0, 0.55, 1.0],
-        );
-
-      canvas.drawCircle(Offset(cx, cy), r, paint);
-    }
-
-    // 3. If baked tiles are loaded from artwork, crossfade them smoothly
+    // 2. Liquid artwork mesh: smoothstep crossfade of baked artwork tiles (v1-v4 authentic physics)
     final f = e.fade;
     final smoothA = f * f * (3 - 2 * f);
     if (e.prev != null && f < 1) _scene(canvas, size, e.prev!, 1);
@@ -632,11 +592,11 @@ class _MeshPainter extends CustomPainter {
       final alpha = (a * c.alpha).clamp(0.0, 1.0);
       if (alpha < 0.003) continue;
 
-      final sx = math.sin(e.t * c.w1 * 1.5 + c.ph) * 0.070;
-      final sy = math.cos(e.t * c.w2 * 1.5 + c.ph * 1.3) * 0.070;
-      final x = (n.x + sx + e.px * c.depth * 0.06) * w;
-      final y = (n.y + sy + e.py * c.depth * 0.06) * h;
-      final sz = m * n.s * (1 + (e.energy * 0.12 + 0.04) * math.sin(e.t * 1.7 + c.ph));
+      final sx = math.sin(e.t * c.w1 + c.ph) * 0.035;
+      final sy = math.cos(e.t * c.w2 + c.ph * 1.3) * 0.035;
+      final x = (n.x + sx + e.px * c.depth * 0.05) * w;
+      final y = (n.y + sy + e.py * c.depth * 0.05) * h;
+      final sz = m * n.s * (1 + e.energy * 0.08 * math.sin(e.t * 1.7 + c.ph));
 
       _img.color = Color.fromRGBO(255, 255, 255, alpha);
       canvas.save();
@@ -849,7 +809,20 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
           ? await _TileCache.getPalette(key, widget.palette!)
           : await _TileCache.get(key, () => _providerFor(key));
       if (token == _loadToken) _applyTile(tile);
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ArtworkMeshBackground] Failed to load cover $key: $e');
+      if (widget.palette != null && widget.palette!.isNotEmpty) {
+        try {
+          final paletteSig = widget.palette!
+              .map((c) => c.toARGB32().toRadixString(16).padLeft(8, '0'))
+              .join('_');
+          final paletteTile = await _TileCache.getPalette('palette:$paletteSig', widget.palette!);
+          if (token == _loadToken) {
+            _applyTile(paletteTile);
+            return;
+          }
+        } catch (_) {}
+      }
       if (key == _fallbackKey || token != _loadToken) return;
       try {
         final fb = await _TileCache.get(

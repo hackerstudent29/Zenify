@@ -10,7 +10,6 @@
 
 import 'dart:math' as math;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart' hide RepeatMode;
 import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/physics.dart';
@@ -123,8 +122,6 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       children: [
         ArtworkMeshBackground(
           coverUrl: MediaNormalizer.upgradeArtworkUrl(track?.coverUrl ?? ''),
-          imageProviderBuilder: (url) =>
-              CachedNetworkImageProvider(MediaNormalizer.upgradeArtworkUrl(url)),
           paused: !playing,
         ),
         SafeArea(

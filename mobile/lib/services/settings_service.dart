@@ -91,6 +91,25 @@ class SettingsState extends ChangeNotifier {
   bool _glassEffects = true;
   bool get glassEffects => _glassEffects;
 
+  // ==================== GLASS & SURFACE STYLING ====================
+  // 0.0 (solid matte) to 1.0 (ultra-fluid liquid glass)
+  double _glassFluidity = 1.0;
+  double get glassFluidity => _glassFluidity;
+
+  // 'fluid' | 'frosted' | 'grey' | 'black' | 'custom'
+  String _glassStyle = 'fluid';
+  String get glassStyle => _glassStyle;
+
+  // 'default' | 'black' | 'grey' | 'crimson'
+  String _glassBaseColor = 'default';
+  String get glassBaseColor => _glassBaseColor;
+
+  double _glassBlur = 5.0;
+  double get glassBlur => _glassBlur;
+
+  bool _glassSpecularRim = true;
+  bool get glassSpecularRim => _glassSpecularRim;
+
   bool _hapticsEnabled = true;
   bool get hapticsEnabled => _hapticsEnabled;
 
@@ -190,6 +209,11 @@ class SettingsState extends ChangeNotifier {
     _reduceMotion = _prefs.getBool('zen_reduce_motion') ?? false;
     _themeMode = _prefs.getString('zen_theme_mode') ?? 'dark';
     _glassEffects = _prefs.getBool('zen_glass_effects') ?? true;
+    _glassFluidity = _prefs.getDouble('zen_glass_fluidity') ?? 1.0;
+    _glassStyle = _prefs.getString('zen_glass_style') ?? 'fluid';
+    _glassBaseColor = _prefs.getString('zen_glass_base_color') ?? 'default';
+    _glassBlur = _prefs.getDouble('zen_glass_blur') ?? 5.0;
+    _glassSpecularRim = _prefs.getBool('zen_glass_specular_rim') ?? true;
     _hapticsEnabled = _prefs.getBool('zen_haptics_enabled') ?? true;
 
     _emailNotifications = _prefs.getBool('zen_email_notif') ?? false;
@@ -519,7 +543,88 @@ class SettingsState extends ChangeNotifier {
     if (_glassEffects == val) return;
     _glassEffects = val;
     _prefs.setBool('zen_glass_effects', val);
+    if (!val) {
+      _glassFluidity = 0.0;
+      _prefs.setDouble('zen_glass_fluidity', 0.0);
+    }
     notifyListeners();
+  }
+
+  void setGlassFluidity(double val) {
+    final clamped = val.clamp(0.0, 1.0);
+    if ((_glassFluidity - clamped).abs() < 0.001) return;
+    _glassFluidity = clamped;
+    _prefs.setDouble('zen_glass_fluidity', _glassFluidity);
+    if (_glassFluidity >= 0.95 && _glassBaseColor == 'default') {
+      _glassStyle = 'fluid';
+    } else if (_glassFluidity <= 0.05 && _glassBaseColor == 'black') {
+      _glassStyle = 'black';
+    } else if (_glassFluidity <= 0.05 && _glassBaseColor == 'grey') {
+      _glassStyle = 'grey';
+    } else if (_glassFluidity >= 0.40 && _glassFluidity <= 0.65) {
+      _glassStyle = 'frosted';
+    } else {
+      _glassStyle = 'custom';
+    }
+    _prefs.setString('zen_glass_style', _glassStyle);
+    notifyListeners();
+  }
+
+  void setGlassStyle(String style) {
+    _glassStyle = style;
+    _prefs.setString('zen_glass_style', _glassStyle);
+    if (style == 'fluid') {
+      _glassFluidity = 1.0;
+      _glassBaseColor = 'default';
+      _glassBlur = 5.0;
+      _glassSpecularRim = true;
+    } else if (style == 'frosted') {
+      _glassFluidity = 0.50;
+      _glassBaseColor = 'default';
+      _glassBlur = 12.0;
+      _glassSpecularRim = true;
+    } else if (style == 'grey') {
+      _glassFluidity = 0.0;
+      _glassBaseColor = 'grey';
+      _glassBlur = 0.0;
+      _glassSpecularRim = false;
+    } else if (style == 'black') {
+      _glassFluidity = 0.0;
+      _glassBaseColor = 'black';
+      _glassBlur = 0.0;
+      _glassSpecularRim = false;
+    }
+    _prefs.setDouble('zen_glass_fluidity', _glassFluidity);
+    _prefs.setString('zen_glass_base_color', _glassBaseColor);
+    _prefs.setDouble('zen_glass_blur', _glassBlur);
+    _prefs.setBool('zen_glass_specular_rim', _glassSpecularRim);
+    notifyListeners();
+  }
+
+  void setGlassBaseColor(String color) {
+    if (_glassBaseColor == color) return;
+    _glassBaseColor = color;
+    _prefs.setString('zen_glass_base_color', color);
+    notifyListeners();
+  }
+
+  void setGlassBlur(double val) {
+    final clamped = val.clamp(0.0, 25.0);
+    if ((_glassBlur - clamped).abs() < 0.1) return;
+    _glassBlur = clamped;
+    _prefs.setDouble('zen_glass_blur', _glassBlur);
+    notifyListeners();
+  }
+
+  void setGlassSpecularRim(bool val) {
+    if (_glassSpecularRim == val) return;
+    _glassSpecularRim = val;
+    _prefs.setBool('zen_glass_specular_rim', val);
+    notifyListeners();
+  }
+
+  void resetGlassToDefault() {
+    setGlassStyle('fluid');
   }
 
   void setHapticsEnabled(bool val) {
