@@ -297,11 +297,22 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     }
     final title = MediaNormalizer.cleanAlbumTitle(rawTitle);
     final artist = MediaNormalizer.formatArtists(rawArtist);
+
+    // CRITICAL: A song's album browseId MUST be an album (MPREb_... or OLAK5uy_...),
+    // NEVER a user or curated playlist (PL..., VLPL..., RD...).
+    String? albumBrowseId = t?.albumBrowseId;
+    if (albumBrowseId != null &&
+        (albumBrowseId.startsWith('VLPL') ||
+         albumBrowseId.startsWith('PL') ||
+         albumBrowseId.startsWith('RD'))) {
+      albumBrowseId = null;
+    }
+
     _openInActiveTab(AlbumScreen(
       albumTitle: title,
       artistName: artist,
       coverUrl: cover,
-      browseId: t?.albumBrowseId,
+      browseId: albumBrowseId,
       initialTracks: t != null ? [t] : null,
     ));
   }

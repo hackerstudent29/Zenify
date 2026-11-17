@@ -43,7 +43,7 @@ void main() {
     test('StoryTemplate.byId resolves known IDs correctly', () {
       expect(StoryTemplate.byId('song_nowplaying_glass_story').id, equals('song_nowplaying_glass_story'));
       expect(StoryTemplate.byId('lyr_glasscard_glass_story').id, equals('lyr_glasscard_glass_story'));
-      expect(StoryTemplate.byId('unknown_id').id, equals('song_nowplaying_glass_story'));
+      expect(StoryTemplate.byId('unknown_id').id, equals(StoryTemplate.songTemplates.first.id));
     });
   });
 

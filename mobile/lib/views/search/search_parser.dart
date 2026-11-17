@@ -100,7 +100,15 @@ class SearchParser {
           continuationToken ??= _extractContinuationToken(shelf);
         }
 
-        // C. itemSectionRenderer (Default wrapper in modern InnerTube)
+        // C. Direct musicCarouselShelfRenderer (Albums, Artists, Playlists, Videos carousel)
+        final carouselShelf = sMap['musicCarouselShelfRenderer'];
+        if (carouselShelf is Map) {
+          final carouselItems = _parseCarouselShelfItems(carouselShelf, rawRankOffset: rawRankCounter);
+          rawRankCounter += carouselItems.length;
+          items.addAll(carouselItems);
+        }
+
+        // D. itemSectionRenderer (Default wrapper in modern InnerTube)
         final itemSection = sMap['itemSectionRenderer'];
         if (itemSection is Map) {
           final isContents = itemSection['contents'] as List?;
@@ -152,6 +160,14 @@ class SearchParser {
                 rawRankCounter += subItems.length;
                 items.addAll(subItems);
                 continuationToken ??= _extractContinuationToken(subShelf);
+              }
+
+              // Sub-carousel shelf (Albums, Playlists, Artists, Videos)
+              if (it['musicCarouselShelfRenderer'] is Map) {
+                final subCarousel = it['musicCarouselShelfRenderer'] as Map;
+                final carouselItems = _parseCarouselShelfItems(subCarousel, rawRankOffset: rawRankCounter);
+                rawRankCounter += carouselItems.length;
+                items.addAll(carouselItems);
               }
             }
           }
@@ -499,6 +515,41 @@ class SearchParser {
       } else if (item['musicTwoRowItemRenderer'] is Map) {
         parsed = _parseTwoRowItem(
           Map<String, dynamic>.from(item['musicTwoRowItemRenderer']),
+          rawRank: rank++,
+          shelfCategory: shelfTitle,
+        );
+      }
+      if (parsed != null) results.add(parsed);
+    }
+    return results;
+  }
+
+  // ─────────────────────────── Carousel Shelf Parser ─────────────────────────
+
+  static List<SearchItem> _parseCarouselShelfItems(Map carousel, {required int rawRankOffset}) {
+    final results = <SearchItem>[];
+    final header = carousel['header']?['musicCarouselShelfBasicHeaderRenderer'];
+    final titleRuns = header?['title']?['runs'] as List?;
+    final shelfTitle = titleRuns?.isNotEmpty == true
+        ? (titleRuns![0]['text'] as String? ?? '').toLowerCase()
+        : '';
+
+    final contents = carousel['contents'] as List?;
+    if (contents == null) return results;
+
+    int rank = rawRankOffset;
+    for (final item in contents) {
+      if (item is! Map) continue;
+      SearchItem? parsed;
+      if (item['musicTwoRowItemRenderer'] is Map) {
+        parsed = _parseTwoRowItem(
+          Map<String, dynamic>.from(item['musicTwoRowItemRenderer']),
+          rawRank: rank++,
+          shelfCategory: shelfTitle,
+        );
+      } else if (item['musicResponsiveListItemRenderer'] is Map) {
+        parsed = _parseResponsiveListItem(
+          Map<String, dynamic>.from(item['musicResponsiveListItemRenderer']),
           rawRank: rank++,
           shelfCategory: shelfTitle,
         );
