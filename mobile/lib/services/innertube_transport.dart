@@ -15,12 +15,16 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
-import 'dart:io' show HandshakeException, SocketException;
+import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+const bool _kDebugMode = !bool.fromEnvironment('dart.vm.product');
+void _debugPrint(String message) {
+  if (_kDebugMode) {
+    // ignore: avoid_print
+    print(message);
+  }
+}
 
 class InnerTubeException implements Exception {
   InnerTubeException(this.statusCode, [this.message, this.rateLimited = false]);
@@ -48,13 +52,11 @@ class InnerTubeTransport {
   static const String _userAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
-  static const String _visitorPref = 'zenify_yt_visitor_data';
 
   // ---- Politeness knobs ---------------------------------------------------
   static const Duration _timeout = Duration(seconds: 8);
   static const int _maxAttempts = 2;
 
-  final http.Client _http = http.Client();
   final _TokenBucket _bucket = _TokenBucket(capacity: 12, refillPerSecond: 5.0);
   final _Breaker _breaker = _Breaker();
   final _TtlCache _cache = _TtlCache(maxEntries: 200);
@@ -62,7 +64,6 @@ class InnerTubeTransport {
   final math.Random _rng = math.Random();
 
   String? _visitorData;
-  Future<void>? _init;
 
   /// True while the breaker is open. UI can show a soft "try again shortly".
   bool get coolingDown => _breaker.open;
@@ -73,35 +74,30 @@ class InnerTubeTransport {
     _breaker.success();
   }
 
-  Future<void> _ensureInit() => _init ??= () async {
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          _visitorData = prefs.getString(_visitorPref);
-        } catch (_) {}
-      }();
-
   static const String _clientVersion = '1.20250101.01.00';
 
   Map<String, dynamic> _payload(Map<String, dynamic> body, String gl) => {
-        'context': {
-          'client': {
-            'clientName': _clientName,
-            'clientVersion': _clientVersion,
-            'hl': hl,
-            'gl': gl,
-            if (_visitorData != null) 'visitorData': _visitorData,
-          },
-        },
-        ...body,
-      };
+    'context': {
+      'client': {
+        'clientName': _clientName,
+        'clientVersion': _clientVersion,
+        'hl': hl,
+        'gl': gl,
+        if (_visitorData != null) 'visitorData': _visitorData,
+      },
+    },
+    ...body,
+  };
 
   Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'Origin': _origin,
-        'Referer': '$_origin/',
-        'User-Agent': _userAgent,
-        'X-Goog-Visitor-Id': ?_visitorData,
-      };
+    'Content-Type': 'application/json',
+    'Origin': _origin,
+    'Referer': '$_origin/',
+    'User-Agent': _userAgent,
+    'Connection': 'close',
+    if (_visitorData != null && _visitorData!.isNotEmpty)
+      'X-Goog-Visitor-Id': _visitorData!,
+  };
 
   /// POST to /youtubei/v1/[endpoint].
   ///
@@ -114,7 +110,6 @@ class InnerTubeTransport {
     Duration ttl = Duration.zero,
     bool forceRefresh = false,
   }) async {
-    await _ensureInit();
     final key = '$gl|$endpoint|${jsonEncode(body)}';
 
     if (!forceRefresh && ttl > Duration.zero) {
@@ -125,8 +120,13 @@ class InnerTubeTransport {
     final running = _inflight[key];
     if (running != null) return running;
 
-    final future = _execute(endpoint, body, gl, key, ttl)
-        .whenComplete(() => _inflight.remove(key));
+    final future = _execute(
+      endpoint,
+      body,
+      gl,
+      key,
+      ttl,
+    ).whenComplete(() => _inflight.remove(key));
     _inflight[key] = future;
     return future;
   }
@@ -148,27 +148,32 @@ class InnerTubeTransport {
 
     for (var attempt = 0; attempt < _maxAttempts; attempt++) {
       await _bucket.acquire();
+      final client = HttpClient()..connectionTimeout = _timeout;
       try {
-        final res = await _http
-            .post(
+        final req = await client
+            .postUrl(
               Uri.parse('$_origin/youtubei/v1/$endpoint?prettyPrint=false'),
-              headers: _headers,
-              body: jsonEncode(_payload(body, gl)),
             )
             .timeout(_timeout);
+        _headers.forEach((k, v) => req.headers.set(k, v));
+        final payloadBytes = utf8.encode(jsonEncode(_payload(body, gl)));
+        req.contentLength = payloadBytes.length;
+        req.add(payloadBytes);
 
+        final res = await req.close().timeout(_timeout);
         final code = res.statusCode;
-        if (kDebugMode) {
-          debugPrint('[IT] $endpoint gl=$gl status=$code attempt=$attempt');
-        }
+        _debugPrint('[IT] $endpoint gl=$gl status=$code attempt=$attempt');
+
+        final bodyBytes = await res
+            .fold<List<int>>(<int>[], (acc, chunk) => acc..addAll(chunk))
+            .timeout(_timeout);
 
         if (code == 200) {
           final Map<String, dynamic> json;
           try {
-            json = jsonDecode(utf8.decode(res.bodyBytes))
-                as Map<String, dynamic>;
-          } catch (_) {
-            throw InnerTubeException(200, 'Unexpected response format');
+            json = jsonDecode(utf8.decode(bodyBytes)) as Map<String, dynamic>;
+          } catch (e) {
+            throw InnerTubeException(200, 'Unexpected response format: $e');
           }
           _breaker.success();
           _learnVisitor(json);
@@ -176,12 +181,18 @@ class InnerTubeTransport {
           return json;
         }
 
+        final bodyStr = utf8.decode(bodyBytes, allowMalformed: true);
+
         if (code == 429 || code == 403) {
           // Being asked to slow down or being blocked: back off hard.
           _breaker.failure(hard: true);
-          last = InnerTubeException(code, _snippet(res.body), true);
+          last = InnerTubeException(code, _snippet(bodyStr), true);
           if (code == 403) break; // retrying a block only makes it worse
-          final wait = _retryAfter(res) ?? _backoff(attempt);
+          final retryHeader = res.headers.value('retry-after');
+          final wait =
+              (retryHeader != null ? int.tryParse(retryHeader) : null) != null
+              ? Duration(seconds: int.parse(retryHeader!).clamp(1, 30))
+              : _backoff(attempt);
           if (attempt < _maxAttempts - 1 && wait.inSeconds <= 20) {
             await Future<void>.delayed(wait);
             continue;
@@ -191,7 +202,7 @@ class InnerTubeTransport {
 
         if (code >= 500) {
           _breaker.failure();
-          last = InnerTubeException(code, _snippet(res.body));
+          last = InnerTubeException(code, _snippet(bodyStr));
           if (attempt < _maxAttempts - 1) {
             await Future<void>.delayed(_backoff(attempt));
             continue;
@@ -199,15 +210,14 @@ class InnerTubeTransport {
           break;
         }
 
-        // Other 4xx: our request is wrong; retrying will not help and it is
-        // not a sign we are being throttled.
-        throw InnerTubeException(code, _snippet(res.body));
+        throw InnerTubeException(code, _snippet(bodyStr));
       } on Exception catch (e) {
         if (e is InnerTubeException) rethrow;
-        final transient = e is TimeoutException ||
+        final transient =
+            e is TimeoutException ||
             e is SocketException ||
             e is HandshakeException ||
-            e is http.ClientException;
+            e is HttpException;
         if (!transient) rethrow;
         _breaker.failure();
         last = InnerTubeException(0, e.toString());
@@ -215,12 +225,14 @@ class InnerTubeTransport {
           await Future<void>.delayed(_backoff(attempt));
           continue;
         }
+      } finally {
+        client.close(force: true);
       }
     }
 
     final stale = _cache.get(key, allowStale: true);
     if (stale != null) {
-      if (kDebugMode) debugPrint('[InnerTube] serving stale for $endpoint');
+      _debugPrint('[InnerTube] serving stale for $endpoint');
       return stale;
     }
     throw last ?? InnerTubeException(0, 'Request failed');
@@ -230,21 +242,12 @@ class InnerTubeTransport {
     final v = (json['responseContext'] as Map?)?['visitorData'];
     if (v is String && v.isNotEmpty && v != _visitorData) {
       _visitorData = v;
-      SharedPreferences.getInstance()
-          .then((p) => p.setString(_visitorPref, v))
-          .catchError((_) => false);
     }
   }
 
   Duration _backoff(int attempt) => Duration(
-        milliseconds:
-            (600 * math.pow(2, attempt)).round() + _rng.nextInt(400),
-      );
-
-  Duration? _retryAfter(http.Response r) {
-    final secs = int.tryParse(r.headers['retry-after'] ?? '');
-    return secs == null ? null : Duration(seconds: secs.clamp(1, 30).toInt());
-  }
+    milliseconds: (600 * math.pow(2, attempt)).round() + _rng.nextInt(400),
+  );
 
   String _snippet(String body) =>
       body.length > 200 ? '${body.substring(0, 200)}…' : body;
@@ -256,7 +259,7 @@ class InnerTubeTransport {
 
 class _TokenBucket {
   _TokenBucket({required this.capacity, required this.refillPerSecond})
-      : _tokens = capacity.toDouble();
+    : _tokens = capacity.toDouble();
 
   final int capacity;
   final double refillPerSecond;
@@ -293,9 +296,8 @@ class _Breaker {
 
   bool get open => _openUntil != null && DateTime.now().isBefore(_openUntil!);
 
-  Duration get remaining => open
-      ? _openUntil!.difference(DateTime.now())
-      : Duration.zero;
+  Duration get remaining =>
+      open ? _openUntil!.difference(DateTime.now()) : Duration.zero;
 
   void success() {
     _failures = 0;
@@ -347,8 +349,12 @@ class _TtlCache {
     return null;
   }
 
-  void put(String key, Map<String, dynamic> value, Duration ttl,
-      {Duration staleFor = const Duration(hours: 6)}) {
+  void put(
+    String key,
+    Map<String, dynamic> value,
+    Duration ttl, {
+    Duration staleFor = const Duration(hours: 6),
+  }) {
     final now = DateTime.now();
     _m.remove(key);
     _m[key] = _CacheEntry(value, now.add(ttl), now.add(ttl + staleFor));

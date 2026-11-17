@@ -571,7 +571,6 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
           title: 'Share Lyrics',
           icon: CupertinoIcons.paperplane_fill,
           onTap: () {
-            Navigator.of(context).pop();
             final p = player;
             final lyricsRes = (p != null && p.hasLyrics)
                 ? LyricsResult(
@@ -619,7 +618,6 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
           icon: CupertinoIcons.arrow_down_circle_fill,
           isDestructive: true,
           onTap: () async {
-            Navigator.of(context).pop();
             await dl.deleteDownload(effectiveTrack.id);
             HapticFeedback.lightImpact();
             IslandNotifier.instance.show(
@@ -647,7 +645,6 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
           icon: CupertinoIcons.arrow_down_circle,
           iconColor: const Color(0xFFE11D48),
           onTap: () async {
-            Navigator.of(context).pop();
             HapticFeedback.lightImpact();
             IslandNotifier.instance.show(
               IslandNotification(

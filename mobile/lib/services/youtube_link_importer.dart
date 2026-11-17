@@ -27,6 +27,21 @@ class YouTubeLinkImporter {
 
   /// Resolves any pasted YouTube Music, YouTube, or Spotify link into a tracklist.
   Future<YouTubeImportResult?> resolve(String rawUrl) async {
+    try {
+      return await _resolveInternal(rawUrl).timeout(
+        const Duration(seconds: 14),
+        onTimeout: () {
+          if (kDebugMode) debugPrint('[YouTubeLinkImporter] resolve timed out after 14s');
+          return null;
+        },
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[YouTubeLinkImporter] resolve unhandled error: $e');
+      return null;
+    }
+  }
+
+  Future<YouTubeImportResult?> _resolveInternal(String rawUrl) async {
     final input = rawUrl.trim();
     if (input.isEmpty) return null;
 
@@ -101,6 +116,22 @@ class YouTubeLinkImporter {
           }
         } catch (_) {}
       }
+
+      // If playlist resolution failed and this was a watch?v=...&list=RD... link, fall back to single video
+      if (videoId != null && videoId.isNotEmpty) {
+        try {
+          final track = await InnerTubeService.instance.getTrack(videoId);
+          if (track != null) {
+            return YouTubeImportResult(
+              title: track.title,
+              author: track.artist,
+              coverUrl: track.coverUrl,
+              tracks: [track],
+              type: 'song',
+            );
+          }
+        } catch (_) {}
+      }
     }
 
     // 4. Resolve Album if albumId is present
@@ -151,6 +182,23 @@ class YouTubeLinkImporter {
           type: 'playlist',
         );
       }
+    }
+
+    // 7. General search fallback if input is text/query
+    if (!input.startsWith('http') && input.length >= 3) {
+      try {
+        final songs = await InnerTubeService.instance.searchSongsNative(input);
+        if (songs.isNotEmpty) {
+          final track = songs.first;
+          return YouTubeImportResult(
+            title: track.title,
+            author: track.artist,
+            coverUrl: track.coverUrl,
+            tracks: [track],
+            type: 'song',
+          );
+        }
+      } catch (_) {}
     }
 
     return null;

@@ -497,6 +497,7 @@ class _SearchScreenState extends State<SearchScreen>
     if (q == _lastTyped) return;
     _lastTyped = q;
     _suggestTimer?.cancel();
+    _debounceTimer?.cancel();
     final suggestId = ++_suggestId;
 
     if (q.isEmpty) {
@@ -531,8 +532,8 @@ class _SearchScreenState extends State<SearchScreen>
       } catch (_) {}
     });
 
-    // 2. Debounced search execution (250ms) - live YouTube Music search as you type
-    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
+    // 2. Debounced search execution (350ms) - live YouTube Music search as you type
+    _debounceTimer = Timer(const Duration(milliseconds: 350), () {
       if (mounted && _lastTyped == q) {
         _executeSearch(q, searchId, filter: _selectedFilter);
       }
@@ -569,7 +570,7 @@ class _SearchScreenState extends State<SearchScreen>
             onTimeout: () => _dataService.getFallbackResult(query, filter),
           );
       if (!mounted) return;
-      if (id == _searchRequestId) {
+      if (id == _searchRequestId || _wantedKey == key) {
         setState(() {
           _searchResults = results;
           _resultsKey = key;
@@ -597,6 +598,7 @@ class _SearchScreenState extends State<SearchScreen>
     final clean = query.trim();
     if (clean.isEmpty) return;
     _suggestTimer?.cancel();
+    _debounceTimer?.cancel();
     _suggestId++;
     _focusNode.unfocus();
     _lastTyped = clean;
@@ -652,6 +654,7 @@ class _SearchScreenState extends State<SearchScreen>
 
   void _clearSearch() {
     _suggestTimer?.cancel();
+    _debounceTimer?.cancel();
     _suggestId++;
     _searchRequestId++;
     _wantedKey = '';

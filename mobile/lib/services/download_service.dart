@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/track.dart';
+import 'api_service.dart';
 import 'innertube_service.dart';
 import 'lyrics_service.dart';
 
@@ -226,13 +227,15 @@ class DownloadService extends ChangeNotifier {
       String? streamUrl;
       Map<String, String> streamHeaders = {};
 
-      final resolvedNative = await InnerTubeService.instance.getStreamUrl(track.id);
+      final cleanVideoId = track.id.replaceFirst('yt-', '').trim();
+      final resolvedNative = await InnerTubeService.instance.getStreamUrl(cleanVideoId);
       if (resolvedNative != null && resolvedNative.url.isNotEmpty) {
         streamUrl = resolvedNative.url;
         streamHeaders = resolvedNative.headers;
       } else {
-        // Fallback to Heroku proxy
-        streamUrl = 'https://zenify-78e257420386.herokuapp.com/api/stream?id=${track.id}';
+        // Fallback to proxy
+        final watch = 'https://www.youtube.com/watch?v=$cleanVideoId';
+        streamUrl = '${ApiService.liveCloudUrl}/api/utils/stream-youtube?url=${Uri.encodeComponent(watch)}&trackId=yt-$cleanVideoId';
       }
 
       _downloadingProgress[track.id] = 0.15;

@@ -1689,7 +1689,8 @@ class InnerTubeService {
     }
 
     try {
-      final browseRes = await post('browse', {'browseId': 'VL$cleanId'}, ttl: const Duration(hours: 6));
+      final browseRes = await post('browse', {'browseId': 'VL$cleanId'}, ttl: const Duration(hours: 6))
+          .timeout(const Duration(seconds: 8));
       final header = browseRes['header']?['musicDetailHeaderRenderer'] ??
           browseRes['header']?['musicResponsiveHeaderRenderer'];
       String coverUrl = '';
@@ -1730,6 +1731,36 @@ class InnerTubeService {
 
     if (_useNative) {
       try {
+        final res = await _nativeChannel.invokeMapMethod<String, dynamic>(
+          'getSong',
+          {'videoId': cleanId},
+        ).timeout(const Duration(seconds: 10), onTimeout: () => null);
+
+        if (res != null && res.isNotEmpty) {
+          final id = res['id'] as String? ?? cleanId;
+          final title = MediaNormalizer.cleanTitle(res['title'] as String?);
+          final artistsRaw = (res['artists'] as List?)?.map((a) => a is Map ? a['name'] : a).toList();
+          final artist = MediaNormalizer.formatArtists(artistsRaw);
+          final albRaw = res['album'];
+          final album = albRaw is Map ? MediaNormalizer.cleanTitle(albRaw['name'] as String?) : 'Single';
+          final thumb = MediaNormalizer.upgradeArtworkUrl(res['thumbnail'] as String?, videoId: id);
+          final dur = (res['duration'] as num?)?.toInt() ?? 210;
+
+          return Track(
+            id: 'yt-$id',
+            title: title.isNotEmpty ? title : 'YouTube Track',
+            artist: artist.isNotEmpty ? artist : 'YouTube Music',
+            album: album,
+            coverUrl: thumb,
+            durationSeconds: dur,
+            source: 'youtube',
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[InnerTube] Native getTrack error: $e');
+      }
+
+      try {
         final songs = await searchSongsNative(cleanId);
         for (final t in songs) {
           if (t.id == 'yt-$cleanId' || t.id == cleanId) return t;
@@ -1739,7 +1770,7 @@ class InnerTubeService {
     }
 
     try {
-      final queue = await getNextQueue(cleanId);
+      final queue = await getNextQueue(cleanId).timeout(const Duration(seconds: 8), onTimeout: () => const []);
       if (queue.isNotEmpty) {
         for (final t in queue) {
           if (t.id == 'yt-$cleanId' || t.id == cleanId) return t;
@@ -1749,7 +1780,7 @@ class InnerTubeService {
     } catch (_) {}
 
     try {
-      final res = await post('player', {'videoId': cleanId});
+      final res = await post('player', {'videoId': cleanId}).timeout(const Duration(seconds: 8));
       final details = res['videoDetails'] as Map?;
       if (details != null) {
         final title = MediaNormalizer.cleanTitle(details['title']?.toString());
