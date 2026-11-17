@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../design_system/tokens/app_colors.dart';
@@ -11,8 +12,8 @@ import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
-import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
+import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../lyrics/lyrics_sheet.dart';
 import 'studio_fx_sheet.dart';
 
@@ -206,16 +207,23 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              track.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro Display',
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.45,
-                                color: AppColors.textPrimary,
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => MediaNavigationSheet.show(
+                                context: context,
+                                track: track,
+                              ),
+                              child: Text(
+                                track.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro Display',
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.45,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -227,25 +235,20 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                                 fontWeight: FontWeight.w600,
                               ),
                               maxLines: 1,
+                              onTapArtist: (_) => MediaNavigationSheet.show(
+                                context: context,
+                                track: track,
+                              ),
                             ),
                             if (track.album.isNotEmpty &&
                                 track.album != 'Single') ...[
                               const SizedBox(height: 2),
                               GestureDetector(
                                 behavior: HitTestBehavior.opaque,
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => AlbumScreen(
-                                        albumTitle: track.album,
-                                        artistName: track.artist,
-                                        coverUrl: track.coverUrl,
-                                        browseId: track.albumBrowseId,
-                                        initialTracks: [track],
-                                      ),
-                                    ),
-                                  );
-                                },
+                                onTap: () => MediaNavigationSheet.show(
+                                  context: context,
+                                  track: track,
+                                ),
                                 child: Text(
                                   track.album,
                                   maxLines: 1,
@@ -273,8 +276,8 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                           alignment: Alignment.center,
                           child: Icon(
                             _isLiked
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
+                                ? CupertinoIcons.star_fill
+                                : CupertinoIcons.star,
                             color: _isLiked ? AppColors.accent : Colors.white,
                             size: 26,
                           ),

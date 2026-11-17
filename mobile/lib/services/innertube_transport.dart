@@ -54,7 +54,7 @@ class InnerTubeTransport {
       '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
   // ---- Politeness & High-Speed Performance Knobs --------------------------
-  static const Duration _timeout = Duration(seconds: 4);
+  static const Duration _timeout = Duration(seconds: 12);
   static const int _maxAttempts = 2;
 
   final _TokenBucket _bucket = _TokenBucket(capacity: 16, refillPerSecond: 8.0);

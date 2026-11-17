@@ -1754,7 +1754,7 @@ class _SearchScreenState extends State<SearchScreen>
           size: 44,
           iconSize: 20,
           active: liked,
-          icon: liked ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+          icon: liked ? CupertinoIcons.star_fill : CupertinoIcons.star,
           onTap: () => store.toggleLike(track),
         );
       },

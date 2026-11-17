@@ -402,12 +402,18 @@ class PlateButton extends StatelessWidget {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Like button with heart pop                                          */
+/*  Like button with heart pop (consistent with Queue buttons)         */
 /* ------------------------------------------------------------------ */
 class PopLikeButton extends StatefulWidget {
-  const PopLikeButton({super.key, required this.liked, required this.onToggle});
+  const PopLikeButton({
+    super.key,
+    required this.liked,
+    required this.onToggle,
+    this.size = 36.0,
+  });
   final bool liked;
   final VoidCallback onToggle;
+  final double size;
 
   @override
   State<PopLikeButton> createState() => _PopLikeButtonState();
@@ -438,16 +444,72 @@ class _PopLikeButtonState extends State<PopLikeButton>
 
   @override
   Widget build(BuildContext context) {
-    return GlassCircle(
+    return PressableScale(
       onTap: widget.onToggle,
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (_, _) => Transform.scale(
-          scale: 1 + 0.5 * _c.value.clamp(-0.3, 1.0),
+      scale: 0.88,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        width: widget.size,
+        height: widget.size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.liked
+              ? Colors.white.withValues(alpha: 0.92)
+              : Colors.white.withValues(alpha: 0.14),
+        ),
+        child: Center(
+          child: AnimatedBuilder(
+            animation: _c,
+            builder: (_, _) => Transform.scale(
+              scale: 1 + 0.45 * _c.value.clamp(-0.3, 1.0),
+              child: Icon(
+                widget.liked ? CupertinoIcons.star_fill : CupertinoIcons.star,
+                size: 18,
+                color: widget.liked ? const Color(0xFFE11D48) : Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  More options (three-dot) button consistent with Queue buttons      */
+/* ------------------------------------------------------------------ */
+class PlayerMoreButton extends StatelessWidget {
+  const PlayerMoreButton({
+    super.key,
+    required this.onTap,
+    this.size = 36.0,
+    this.icon = CupertinoIcons.ellipsis,
+  });
+
+  final VoidCallback onTap;
+  final double size;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      scale: 0.88,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: 0.14),
+        ),
+        child: Center(
           child: Icon(
-            widget.liked ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-            size: 17,
-            color: widget.liked ? kAppleRed : Colors.white,
+            icon,
+            size: 18,
+            color: Colors.white,
           ),
         ),
       ),

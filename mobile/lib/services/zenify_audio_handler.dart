@@ -153,9 +153,9 @@ class ZenifyAudioHandler extends BaseAudioHandler with SeekHandler {
         ),
         MediaControl.custom(
           androidIcon: s.favorite
-              ? 'drawable/zen_ic_heart_fill'
-              : 'drawable/zen_ic_heart',
-          label: s.favorite ? 'Unlike' : 'Like',
+              ? 'drawable/zen_ic_star_fill'
+              : 'drawable/zen_ic_star',
+          label: s.favorite ? 'Unfavourite' : 'Favourite',
           name: 'toggleFavorite',
         ),
       ],

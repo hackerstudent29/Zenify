@@ -177,15 +177,24 @@ class ZenDropdown {
 
     final resolvedTitle = track != null
         ? MediaNormalizer.cleanTitle(track.title)
-        : (trackTitle?.isNotEmpty == true ? MediaNormalizer.cleanTitle(trackTitle!) : 'Song');
+        : (trackTitle?.isNotEmpty == true
+              ? MediaNormalizer.cleanTitle(trackTitle!)
+              : 'Song');
     final resolvedArtist = track != null
         ? MediaNormalizer.formatArtists(track.artist)
-        : (artistName?.isNotEmpty == true ? MediaNormalizer.formatArtists(artistName!) : 'Unknown Artist');
-    final resolvedAlbum = (track != null && track.album.isNotEmpty && track.album != 'Single')
+        : (artistName?.isNotEmpty == true
+              ? MediaNormalizer.formatArtists(artistName!)
+              : 'Unknown Artist');
+    final resolvedAlbum =
+        (track != null && track.album.isNotEmpty && track.album != 'Single')
         ? MediaNormalizer.cleanAlbumTitle(track.album)
         : (albumName ?? '');
-    final resolvedCover = (track != null && track.coverUrl.isNotEmpty) ? track.coverUrl : (coverUrl ?? '');
-    final resolvedDur = track != null ? track.durationSeconds : (durationSeconds ?? 0);
+    final resolvedCover = (track != null && track.coverUrl.isNotEmpty)
+        ? track.coverUrl
+        : (coverUrl ?? '');
+    final resolvedDur = track != null
+        ? track.durationSeconds
+        : (durationSeconds ?? 0);
 
     final callerNav = Navigator.of(context);
 
@@ -247,7 +256,10 @@ class ZenDropdown {
   }
 
   /// Shows the Apple Music-styled playlist picker sheet.
-  static Future<void> showPlaylistPicker(BuildContext context, Track track) async {
+  static Future<void> showPlaylistPicker(
+    BuildContext context,
+    Track track,
+  ) async {
     HapticFeedback.lightImpact();
     final store = LibraryStore.instance;
 
@@ -259,175 +271,217 @@ class ZenDropdown {
         barrierColor: Colors.black.withValues(alpha: 0.50),
         isScrollControlled: true,
         builder: (ctx) {
-        final playlists = store.playlists;
-        final safeBottom = MediaQuery.paddingOf(ctx).bottom;
+          final playlists = store.playlists;
+          final safeBottom = MediaQuery.paddingOf(ctx).bottom;
 
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-          child: Container(
-            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.70),
-            decoration: BoxDecoration(
-              color: const Color(0xF21C1C1E),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-              border: Border(
-                top: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  width: 0.6,
+          return BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(ctx).height * 0.70,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xF21C1C1E),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    width: 0.6,
+                  ),
                 ),
               ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Grabber
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4.5,
-                      margin: const EdgeInsets.only(top: 10, bottom: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(2.5),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Grabber
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4.5,
+                        margin: const EdgeInsets.only(top: 10, bottom: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(2.5),
+                        ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Add to Playlist',
-                          style: const TextStyle(
-                            fontFamily: 'SF Pro',
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
-                            color: Colors.white,
-                          ),
-                        ),
-                        PressableScale(
-                          onTap: () => Navigator.pop(ctx),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const ShapeDecoration(
-                              shape: CircleBorder(),
-                              color: Color(0x1FFFFFFF),
-                            ),
-                            child: const Icon(Icons.close_rounded, size: 18, color: Colors.white70),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Divider(height: 0.5, thickness: 0.5, color: const Color(0xFF38383A)),
-                  Flexible(
-                    child: ListView(
-                      shrinkWrap: true,
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(16, 8, 16, math.max(16, safeBottom + 8)),
-                      children: [
-                        // New Playlist row
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          leading: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Zen.rose.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(CupertinoIcons.add, color: Zen.rose, size: 22),
-                          ),
-                          title: const Text(
-                            'New Playlist…',
-                            style: TextStyle(
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Add to Playlist',
+                            style: const TextStyle(
                               fontFamily: 'SF Pro',
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w600,
-                              color: Zen.rose,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3,
+                              color: Colors.white,
                             ),
                           ),
-                          onTap: () async {
-                            Navigator.pop(ctx);
-                            final name = await ZenDropdown.showInputSheet(
-                              context: context,
-                              title: 'New Playlist',
-                              subtitle: 'Add “${MediaNormalizer.cleanTitle(track.title)}”',
-                              hintText: 'Playlist name',
-                              confirmLabel: 'Create',
-                            );
-                            if (name != null && name.isNotEmpty) {
-                              store.createPlaylist(name, first: track);
-                              HapticFeedback.lightImpact();
-                              IslandNotifier.instance.show(
-                                IslandNotification(
-                                  id: 'pl_create_${DateTime.now().millisecondsSinceEpoch}',
-                                  title: 'Created',
-                                  body: name,
-                                  leading: const Icon(
-                                    CupertinoIcons.music_note_list,
-                                    color: Zen.rose,
-                                    size: 18,
-                                  ),
-                                ),
-                              );
-                            }
-                          },
+                          PressableScale(
+                            onTap: () => Navigator.pop(ctx),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const ShapeDecoration(
+                                shape: CircleBorder(),
+                                color: Color(0x1FFFFFFF),
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                size: 18,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(
+                      height: 0.5,
+                      thickness: 0.5,
+                      color: const Color(0xFF38383A),
+                    ),
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          8,
+                          16,
+                          math.max(16, safeBottom + 8),
                         ),
-                        Divider(height: 0.5, thickness: 0.5, indent: 64, color: const Color(0xFF38383A)),
-                        for (int i = 0; i < playlists.length; i++) ...[
+                        children: [
+                          // New Playlist row
                           ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
                             leading: Container(
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2C2C2E),
+                                color: Zen.rose.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(CupertinoIcons.music_albums, color: Colors.white70, size: 22),
+                              child: const Icon(
+                                CupertinoIcons.add,
+                                color: Zen.rose,
+                                size: 22,
+                              ),
                             ),
-                            title: Text(
-                              playlists[i].name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                            title: const Text(
+                              'New Playlist…',
+                              style: TextStyle(
                                 fontFamily: 'SF Pro',
                                 fontSize: 15.5,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white,
+                                color: Zen.rose,
                               ),
                             ),
-                            subtitle: Text(
-                              '${playlists[i].trackIds.length} songs',
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro',
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFFA1A1A6),
-                              ),
-                            ),
-                            onTap: () {
-                              store.addToPlaylist(playlists[i].id, track);
-                              HapticFeedback.lightImpact();
+                            onTap: () async {
                               Navigator.pop(ctx);
+                              final name = await ZenDropdown.showInputSheet(
+                                context: context,
+                                title: 'New Playlist',
+                                subtitle:
+                                    'Add “${MediaNormalizer.cleanTitle(track.title)}”',
+                                hintText: 'Playlist name',
+                                confirmLabel: 'Create',
+                              );
+                              if (name != null && name.isNotEmpty) {
+                                store.createPlaylist(name, first: track);
+                                HapticFeedback.lightImpact();
+                                IslandNotifier.instance.show(
+                                  IslandNotification(
+                                    id: 'pl_create_${DateTime.now().millisecondsSinceEpoch}',
+                                    title: 'Created',
+                                    body: name,
+                                    leading: const Icon(
+                                      CupertinoIcons.music_note_list,
+                                      color: Zen.rose,
+                                      size: 18,
+                                    ),
+                                  ),
+                                );
+                              }
                             },
                           ),
-                          if (i < playlists.length - 1)
-                            Divider(height: 0.5, thickness: 0.5, indent: 64, color: const Color(0xFF38383A)),
+                          Divider(
+                            height: 0.5,
+                            thickness: 0.5,
+                            indent: 64,
+                            color: const Color(0xFF38383A),
+                          ),
+                          for (int i = 0; i < playlists.length; i++) ...[
+                            ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
+                              leading: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2C2C2E),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  CupertinoIcons.music_albums,
+                                  color: Colors.white70,
+                                  size: 22,
+                                ),
+                              ),
+                              title: Text(
+                                playlists[i].name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${playlists[i].trackIds.length} songs',
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFFA1A1A6),
+                                ),
+                              ),
+                              onTap: () {
+                                store.addToPlaylist(playlists[i].id, track);
+                                HapticFeedback.lightImpact();
+                                Navigator.pop(ctx);
+                              },
+                            ),
+                            if (i < playlists.length - 1)
+                              Divider(
+                                height: 0.5,
+                                thickness: 0.5,
+                                indent: 64,
+                                color: const Color(0xFF38383A),
+                              ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
       ),
     );
   }
@@ -476,7 +530,8 @@ class _TrackActionSheetContent extends StatefulWidget {
   final List<ZenDropdownItem>? extraItems;
 
   @override
-  State<_TrackActionSheetContent> createState() => _TrackActionSheetContentState();
+  State<_TrackActionSheetContent> createState() =>
+      _TrackActionSheetContentState();
 }
 
 class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
@@ -525,7 +580,9 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
 
   String get _shareUrl {
     final id = widget.track?.id ?? '';
-    return id.isNotEmpty ? 'https://listenzenify.com/track/$id' : 'https://listenzenify.com';
+    return id.isNotEmpty
+        ? 'https://listenzenify.com/track/$id'
+        : 'https://listenzenify.com';
   }
 
   void _handleLikeToggle() {
@@ -548,7 +605,8 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
       player = null;
     }
 
-    final effectiveTrack = widget.track ??
+    final effectiveTrack =
+        widget.track ??
         Track(
           id: 'trk_${widget.title.hashCode}_${widget.artist.hashCode}',
           title: widget.title,
@@ -566,7 +624,8 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
     // Build Action Menu Rows
     final List<ZenDropdownItem> rows = [
       // 1. Share Lyrics (when lyrics are available for the song)
-      if (player != null && (player.hasLyrics || player.currentTrack?.id == effectiveTrack.id))
+      if (player != null &&
+          (player.hasLyrics || player.currentTrack?.id == effectiveTrack.id))
         ZenDropdownItem(
           title: 'Share Lyrics',
           icon: CupertinoIcons.paperplane_fill,
@@ -601,10 +660,14 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
       ZenDropdownItem(
         title: 'Add to playlist',
         icon: CupertinoIcons.text_badge_plus,
-        onTap: widget.onAddToPlaylist ??
+        onTap:
+            widget.onAddToPlaylist ??
             () {
               if (widget.callerContext.mounted) {
-                ZenDropdown.showPlaylistPicker(widget.callerContext, effectiveTrack);
+                ZenDropdown.showPlaylistPicker(
+                  widget.callerContext,
+                  effectiveTrack,
+                );
               }
             },
       ),
@@ -625,7 +688,11 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                 id: 'del_dl_${effectiveTrack.id}',
                 title: 'Removed from Downloads',
                 body: effectiveTrack.title,
-                leading: const Icon(CupertinoIcons.trash, color: Colors.white70, size: 18),
+                leading: const Icon(
+                  CupertinoIcons.trash,
+                  color: Colors.white70,
+                  size: 18,
+                ),
               ),
             );
           },
@@ -633,7 +700,8 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
       else if (isDownloading)
         ZenDropdownItem(
           title: 'Downloading...',
-          subtitle: '${(dl.getDownloadProgress(effectiveTrack.id) * 100).toInt()}% • Saving Audio & Lyrics',
+          subtitle:
+              '${(dl.getDownloadProgress(effectiveTrack.id) * 100).toInt()}% • Saving Audio & Lyrics',
           icon: CupertinoIcons.arrow_down_circle,
           iconColor: const Color(0xFFE11D48),
           onTap: () {},
@@ -651,18 +719,28 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                 id: 'start_dl_${effectiveTrack.id}',
                 title: 'Downloading',
                 body: effectiveTrack.title,
-                leading: const Icon(CupertinoIcons.arrow_down_circle, color: Color(0xFFE11D48), size: 18),
+                leading: const Icon(
+                  CupertinoIcons.arrow_down_circle,
+                  color: Color(0xFFE11D48),
+                  size: 18,
+                ),
               ),
             );
             final ok = await dl.downloadTrack(effectiveTrack);
             if (ok) {
-              final sz = dl.getDownloaded(effectiveTrack.id)?.formattedSize ?? '3.5 MB';
+              final sz =
+                  dl.getDownloaded(effectiveTrack.id)?.formattedSize ??
+                  '3.5 MB';
               IslandNotifier.instance.show(
                 IslandNotification(
                   id: 'done_dl_${effectiveTrack.id}',
                   title: 'Downloaded Offline',
                   body: '${effectiveTrack.title} · $sz',
-                  leading: const Icon(CupertinoIcons.checkmark_circle_fill, color: Color(0xFFE11D48), size: 18),
+                  leading: const Icon(
+                    CupertinoIcons.checkmark_circle_fill,
+                    color: Color(0xFFE11D48),
+                    size: 18,
+                  ),
                 ),
               );
             } else {
@@ -671,7 +749,11 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                   id: 'fail_dl_${effectiveTrack.id}',
                   title: 'Download Failed',
                   body: effectiveTrack.title,
-                  leading: const Icon(CupertinoIcons.exclamationmark_circle, color: Colors.white70, size: 18),
+                  leading: const Icon(
+                    CupertinoIcons.exclamationmark_circle,
+                    color: Colors.white70,
+                    size: 18,
+                  ),
                 ),
               );
             }
@@ -681,7 +763,8 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
       ZenDropdownItem(
         title: 'Go to artist',
         icon: CupertinoIcons.person,
-        onTap: widget.onGoToArtist ??
+        onTap:
+            widget.onGoToArtist ??
             () {
               final resolved = effectiveTrack.resolvedArtists;
               if (resolved.length > 1 && widget.callerContext.mounted) {
@@ -691,13 +774,17 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                   ZenPageRoute(
                     builder: (_) => ArtistScreen(
                       artistName: resolved.first.name,
-                      browseId: resolved.first.id.isNotEmpty ? resolved.first.id : null,
+                      browseId: resolved.first.id.isNotEmpty
+                          ? resolved.first.id
+                          : null,
                     ),
                   ),
                 );
               } else {
                 widget.callerNav.push(
-                  ZenPageRoute(builder: (_) => ArtistScreen(artistName: widget.artist)),
+                  ZenPageRoute(
+                    builder: (_) => ArtistScreen(artistName: widget.artist),
+                  ),
                 );
               }
             },
@@ -707,7 +794,8 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
         ZenDropdownItem(
           title: 'Go to album',
           icon: CupertinoIcons.music_albums,
-          onTap: widget.onGoToAlbum ??
+          onTap:
+              widget.onGoToAlbum ??
               () {
                 widget.callerNav.push(
                   ZenPageRoute(
@@ -716,7 +804,9 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       artistName: widget.artist,
                       coverUrl: widget.coverUrl,
                       browseId: widget.track?.albumBrowseId,
-                      initialTracks: widget.track != null ? [widget.track!] : [effectiveTrack],
+                      initialTracks: widget.track != null
+                          ? [widget.track!]
+                          : [effectiveTrack],
                     ),
                   ),
                 );
@@ -726,11 +816,14 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
       ZenDropdownItem(
         title: 'Start mix',
         icon: CupertinoIcons.antenna_radiowaves_left_right,
-        onTap: widget.onStartMix ??
+        onTap:
+            widget.onStartMix ??
             () {
               player?.playMedia(effectiveTrack);
               if (widget.track != null) {
-                InnerTubeService.instance.getNextQueue(widget.track!.id).then((nextTracks) {
+                InnerTubeService.instance.getNextQueue(widget.track!.id).then((
+                  nextTracks,
+                ) {
                   for (final next in nextTracks) {
                     player?.playLast(next);
                   }
@@ -740,8 +833,15 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                 IslandNotification(
                   id: 'mix_${effectiveTrack.id}',
                   title: 'Mix',
-                  body: IslandNotification.artistOrTitle(artist: widget.artist, title: widget.title),
-                  leading: const Icon(CupertinoIcons.antenna_radiowaves_left_right, color: Color(0xFFE11D48), size: 18),
+                  body: IslandNotification.artistOrTitle(
+                    artist: widget.artist,
+                    title: widget.title,
+                  ),
+                  leading: const Icon(
+                    CupertinoIcons.antenna_radiowaves_left_right,
+                    color: Color(0xFFE11D48),
+                    size: 18,
+                  ),
                 ),
               );
             },
@@ -750,14 +850,22 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
       ZenDropdownItem(
         title: 'Report',
         icon: CupertinoIcons.flag,
-        onTap: widget.onReport ??
+        onTap:
+            widget.onReport ??
             () {
               IslandNotifier.instance.show(
                 IslandNotification(
                   id: 'report_${widget.title.hashCode}',
                   title: 'Reported',
-                  body: IslandNotification.artistOrTitle(artist: widget.artist, title: widget.title),
-                  leading: const Icon(CupertinoIcons.checkmark_shield_fill, color: Color(0xFFE11D48), size: 18),
+                  body: IslandNotification.artistOrTitle(
+                    artist: widget.artist,
+                    title: widget.title,
+                  ),
+                  leading: const Icon(
+                    CupertinoIcons.checkmark_shield_fill,
+                    color: Color(0xFFE11D48),
+                    size: 18,
+                  ),
                 ),
               );
             },
@@ -809,7 +917,10 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
 
               // ── B. Song Information Header ──
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     // Squircle Artwork
@@ -828,10 +939,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                                   size: 50,
                                 ),
                               )
-                            : MonogramAvatar(
-                                name: widget.title,
-                                size: 50,
-                              ),
+                            : MonogramAvatar(name: widget.title, size: 50),
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -872,7 +980,7 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                     ),
                     const SizedBox(width: 10),
 
-                    // Favorite / Heart Button
+                    // Favorite / Star Button
                     PressableScale(
                       onTap: _handleLikeToggle,
                       child: Container(
@@ -880,7 +988,9 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                         height: 40,
                         alignment: Alignment.center,
                         child: Icon(
-                          _liked ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+                          _liked
+                              ? CupertinoIcons.star_fill
+                              : CupertinoIcons.star,
                           color: _liked ? Zen.rose : Colors.white,
                           size: 24,
                         ),
@@ -894,7 +1004,10 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
 
               // ── C. Quick Sharing Actions ──
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -910,8 +1023,15 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                           IslandNotification(
                             id: 'copy_link_${DateTime.now().millisecondsSinceEpoch}',
                             title: 'Copied',
-                            body: IslandNotification.artistOrTitle(artist: widget.artist, title: widget.title),
-                            leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
+                            body: IslandNotification.artistOrTitle(
+                              artist: widget.artist,
+                              title: widget.title,
+                            ),
+                            leading: const Icon(
+                              CupertinoIcons.link,
+                              color: Color(0xFFE11D48),
+                              size: 18,
+                            ),
                           ),
                         );
                       },
@@ -923,7 +1043,11 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       gradient: const LinearGradient(
                         begin: Alignment.bottomLeft,
                         end: Alignment.topRight,
-                        colors: [Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF)],
+                        colors: [
+                          Color(0xFFF58529),
+                          Color(0xFFDD2A7B),
+                          Color(0xFF8134AF),
+                        ],
                       ),
                       onTap: () {
                         Navigator.of(context).pop();
@@ -943,10 +1067,15 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       onTap: () {
                         Navigator.of(context).pop();
                         if (widget.callerContext.mounted) {
-                          Navigator.of(widget.callerContext, rootNavigator: true).push(
+                          Navigator.of(
+                            widget.callerContext,
+                            rootNavigator: true,
+                          ).push(
                             CupertinoPageRoute(
                               builder: (_) => StoryPreviewScreen(
-                                content: SongStoryContent(track: effectiveTrack),
+                                content: SongStoryContent(
+                                  track: effectiveTrack,
+                                ),
                                 initialShareTarget: StoryShareTarget.whatsapp,
                               ),
                             ),
@@ -962,10 +1091,15 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
                       onTap: () {
                         Navigator.of(context).pop();
                         if (widget.callerContext.mounted) {
-                          Navigator.of(widget.callerContext, rootNavigator: true).push(
+                          Navigator.of(
+                            widget.callerContext,
+                            rootNavigator: true,
+                          ).push(
                             CupertinoPageRoute(
                               builder: (_) => StoryPreviewScreen(
-                                content: SongStoryContent(track: effectiveTrack),
+                                content: SongStoryContent(
+                                  track: effectiveTrack,
+                                ),
                                 initialShareTarget: StoryShareTarget.facebook,
                               ),
                             ),
@@ -983,7 +1117,9 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
               Flexible(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.only(bottom: math.max(16, safeBottom + 8)),
+                  padding: EdgeInsets.only(
+                    bottom: math.max(16, safeBottom + 8),
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1041,7 +1177,9 @@ class _QuickShareBtn extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: gradient == null ? (color ?? const Color(0xFF2C2C2E)) : null,
+              color: gradient == null
+                  ? (color ?? const Color(0xFF2C2C2E))
+                  : null,
               gradient: gradient,
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.08),
@@ -1081,7 +1219,8 @@ class _ActionMenuRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = item.iconColor ?? (item.isDestructive ? AppColors.danger : Zen.rose);
+    final iconColor =
+        item.iconColor ?? (item.isDestructive ? AppColors.danger : Zen.rose);
 
     return PressableScale(
       onTap: () {
@@ -1096,11 +1235,7 @@ class _ActionMenuRow extends StatelessWidget {
           children: [
             SizedBox(
               width: 24,
-              child: Icon(
-                item.icon,
-                size: 22,
-                color: iconColor,
-              ),
+              child: Icon(item.icon, size: 22, color: iconColor),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1115,8 +1250,12 @@ class _ActionMenuRow extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'SF Pro',
                       fontSize: 15.5,
-                      fontWeight: item.isSelected ? FontWeight.w600 : FontWeight.w500,
-                      color: item.isDestructive ? AppColors.danger : Colors.white,
+                      fontWeight: item.isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: item.isDestructive
+                          ? AppColors.danger
+                          : Colors.white,
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -1139,11 +1278,7 @@ class _ActionMenuRow extends StatelessWidget {
               ),
             ),
             if (item.isSelected)
-              const Icon(
-                CupertinoIcons.checkmark,
-                size: 18,
-                color: Zen.rose,
-              ),
+              const Icon(CupertinoIcons.checkmark, size: 18, color: Zen.rose),
           ],
         ),
       ),
@@ -1176,10 +1311,14 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    final hasRichHeader = coverUrl != null || shareUrl != null || shareText != null;
+    final hasRichHeader =
+        coverUrl != null || shareUrl != null || shareText != null;
     final effectiveShareUrl = shareUrl ?? 'https://listenzenify.com';
-    final effectiveShareMsg = shareText ??
-        (title != null ? 'Check out "$title" on Zenify: $effectiveShareUrl' : effectiveShareUrl);
+    final effectiveShareMsg =
+        shareText ??
+        (title != null
+            ? 'Check out "$title" on Zenify: $effectiveShareUrl'
+            : effectiveShareUrl);
 
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
@@ -1227,11 +1366,16 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                 header!
               else if (hasRichHeader && title != null) ...[
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(isCircularCover ? 25 : 12),
+                        borderRadius: BorderRadius.circular(
+                          isCircularCover ? 25 : 12,
+                        ),
                         child: Container(
                           width: 50,
                           height: 50,
@@ -1240,10 +1384,8 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                               ? CachedNetworkImage(
                                   imageUrl: coverUrl!,
                                   fit: BoxFit.cover,
-                                  errorWidget: (_, _, _) => MonogramAvatar(
-                                    name: title!,
-                                    size: 50,
-                                  ),
+                                  errorWidget: (_, _, _) =>
+                                      MonogramAvatar(name: title!, size: 50),
                                 )
                               : MonogramAvatar(name: title!, size: 50),
                         ),
@@ -1289,7 +1431,10 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                 ),
                 if (shareUrl != null || shareText != null)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
@@ -1297,7 +1442,9 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                           icon: CupertinoIcons.link,
                           label: 'Copy Link',
                           onTap: () {
-                            Clipboard.setData(ClipboardData(text: effectiveShareMsg));
+                            Clipboard.setData(
+                              ClipboardData(text: effectiveShareMsg),
+                            );
                             HapticFeedback.lightImpact();
                             Navigator.of(context, rootNavigator: true).pop();
                             IslandNotifier.instance.show(
@@ -1305,7 +1452,11 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                                 id: 'copy_link_${DateTime.now().millisecondsSinceEpoch}',
                                 title: 'Copied',
                                 body: title ?? subtitle,
-                                leading: const Icon(CupertinoIcons.link, color: Color(0xFFE11D48), size: 18),
+                                leading: const Icon(
+                                  CupertinoIcons.link,
+                                  color: Color(0xFFE11D48),
+                                  size: 18,
+                                ),
                               ),
                             );
                           },
@@ -1315,7 +1466,9 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                           label: 'Message',
                           onTap: () {
                             Navigator.of(context, rootNavigator: true).pop();
-                            SharePlus.instance.share(ShareParams(text: effectiveShareMsg));
+                            SharePlus.instance.share(
+                              ShareParams(text: effectiveShareMsg),
+                            );
                           },
                         ),
                         _QuickShareBtn(
@@ -1324,11 +1477,17 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                           gradient: const LinearGradient(
                             begin: Alignment.bottomLeft,
                             end: Alignment.topRight,
-                            colors: [Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF)],
+                            colors: [
+                              Color(0xFFF58529),
+                              Color(0xFFDD2A7B),
+                              Color(0xFF8134AF),
+                            ],
                           ),
                           onTap: () {
                             Navigator.of(context, rootNavigator: true).pop();
-                            SharePlus.instance.share(ShareParams(text: effectiveShareMsg));
+                            SharePlus.instance.share(
+                              ShareParams(text: effectiveShareMsg),
+                            );
                           },
                         ),
                         _QuickShareBtn(
@@ -1337,13 +1496,19 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                           color: const Color(0xFF1877F2),
                           onTap: () {
                             Navigator.of(context, rootNavigator: true).pop();
-                            SharePlus.instance.share(ShareParams(text: effectiveShareMsg));
+                            SharePlus.instance.share(
+                              ShareParams(text: effectiveShareMsg),
+                            );
                           },
                         ),
                       ],
                     ),
                   ),
-                const Divider(height: 0.5, thickness: 0.5, color: Color(0xFF38383A)),
+                const Divider(
+                  height: 0.5,
+                  thickness: 0.5,
+                  color: Color(0xFF38383A),
+                ),
               ] else if (title != null) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
@@ -1382,14 +1547,20 @@ class _GenericActionSheetContent<T> extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Divider(height: 0.5, thickness: 0.5, color: Color(0xFF38383A)),
+                const Divider(
+                  height: 0.5,
+                  thickness: 0.5,
+                  color: Color(0xFF38383A),
+                ),
               ],
 
               // Items List with Dividers between items only
               Flexible(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.only(bottom: math.max(16, safeBottom + 8)),
+                  padding: EdgeInsets.only(
+                    bottom: math.max(16, safeBottom + 8),
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1436,12 +1607,14 @@ class _InputBottomSheetContent extends StatefulWidget {
   final int maxLength;
 
   @override
-  State<_InputBottomSheetContent> createState() => _InputBottomSheetContentState();
+  State<_InputBottomSheetContent> createState() =>
+      _InputBottomSheetContentState();
 }
 
 class _InputBottomSheetContentState extends State<_InputBottomSheetContent> {
-  late final TextEditingController _ctrl =
-      TextEditingController(text: widget.initialValue);
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.initialValue,
+  );
 
   @override
   void dispose() {
@@ -1488,7 +1661,12 @@ class _InputBottomSheetContentState extends State<_InputBottomSheetContent> {
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: EdgeInsets.fromLTRB(20, 10, 20, math.max(18, safeBottom + 10)),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                10,
+                20,
+                math.max(18, safeBottom + 10),
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1533,7 +1711,8 @@ class _InputBottomSheetContentState extends State<_InputBottomSheetContent> {
                                 letterSpacing: -0.3,
                               ),
                             ),
-                            if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                            if (widget.subtitle != null &&
+                                widget.subtitle!.isNotEmpty) ...[
                               const SizedBox(height: 2),
                               Text(
                                 widget.subtitle!,
@@ -1551,14 +1730,19 @@ class _InputBottomSheetContentState extends State<_InputBottomSheetContent> {
                         ),
                       ),
                       PressableScale(
-                        onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+                        onTap: () =>
+                            Navigator.of(context, rootNavigator: true).pop(),
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: const ShapeDecoration(
                             shape: CircleBorder(),
                             color: Color(0x1FFFFFFF),
                           ),
-                          child: const Icon(Icons.close_rounded, size: 18, color: Colors.white70),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 18,
+                            color: Colors.white70,
+                          ),
                         ),
                       ),
                     ],
@@ -1571,7 +1755,10 @@ class _InputBottomSheetContentState extends State<_InputBottomSheetContent> {
                     placeholder: widget.hintText,
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _submit(),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
                     style: const TextStyle(
                       fontFamily: 'SF Pro',
                       color: Colors.white,
@@ -1587,7 +1774,9 @@ class _InputBottomSheetContentState extends State<_InputBottomSheetContent> {
                     decoration: BoxDecoration(
                       color: const Color(0xFF2C2C2E),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1595,7 +1784,8 @@ class _InputBottomSheetContentState extends State<_InputBottomSheetContent> {
                     children: [
                       Expanded(
                         child: PressableScale(
-                          onTap: () => Navigator.of(context, rootNavigator: true).pop(),
+                          onTap: () =>
+                              Navigator.of(context, rootNavigator: true).pop(),
                           child: Container(
                             height: 48,
                             decoration: BoxDecoration(
@@ -1637,7 +1827,9 @@ class _InputBottomSheetContentState extends State<_InputBottomSheetContent> {
                                   widget.confirmLabel,
                                   style: TextStyle(
                                     fontFamily: 'SF Pro',
-                                    color: Colors.white.withValues(alpha: canSubmit ? 1.0 : 0.6),
+                                    color: Colors.white.withValues(
+                                      alpha: canSubmit ? 1.0 : 0.6,
+                                    ),
                                     fontSize: 15.5,
                                     fontWeight: FontWeight.w700,
                                   ),
