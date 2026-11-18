@@ -41,11 +41,6 @@ const double _kRadiusDocked = 7;
 /// Lyrics open + no touch for this long → the bottom controls glide away.
 const Duration _kIdleHide = Duration(seconds: 3);
 
-/// Blur applied to the lyrics while the controls are visible. It melts to 0
-/// (crisp lyrics) as the controls hide, and comes back as they return.
-/// Set to 0 to disable the effect.
-const double _kLyricsBlurWithControls = 1.8;
-
 /// Cover docking spring (art <-> header). Critically damped: no bounce.
 const SpringDescription _kDockSpring = SpringDescription(
   mass: 1,
@@ -1326,29 +1321,8 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Blur that follows the controls' visibility. `_chrome` 0 = controls shown
-  /// (soft blur), 1 = controls hidden (crisp). Pure paint effect: it never
-  /// touches layout, so the lyrics cannot move, resize or reflow.
-  /// The widget structure is identical at every value, so no state is lost.
-  Widget _lyricsBlur({required Widget child}) {
-    if (_kLyricsBlurWithControls <= 0) return child;
-    return AnimatedBuilder(
-      animation: _chrome,
-      child: child,
-      builder: (_, c) {
-        final h = _chrome.value.clamp(0.0, 1.0).toDouble();
-        final sigma = _kLyricsBlurWithControls * (1 - h);
-        final filter = sigma < 0.05
-            ? ImageFilter.matrix(Matrix4.identity().storage)
-            : ImageFilter.blur(
-                sigmaX: sigma,
-                sigmaY: sigma,
-                tileMode: TileMode.decal,
-              );
-        return ImageFiltered(imageFilter: filter, child: c);
-      },
-    );
-  }
+  /// Lyrics blur is disabled to preserve Apple Music crispness at all times.
+  Widget _lyricsBlur({required Widget child}) => child;
 
   Widget _panelBody(dynamic track) {
     switch (_bodyPanel) {
@@ -1518,6 +1492,90 @@ class PlayerShellState extends State<PlayerShell>
   Widget _sheetColumn(PlayerState player, dynamic track, EdgeInsets safe) {
     final isLyrics = _panel == _Panel.lyrics;
 
+    final middleRegion = Expanded(
+      child: SizedBox.expand(
+        key: _regionKey,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onVerticalDragStart: (_) => _dragStart(),
+          onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
+          onVerticalDragEnd: (d) =>
+              _dragEnd(d.velocity.pixelsPerSecond.dy),
+          onVerticalDragCancel: () => _dragEnd(0),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            reverseDuration: const Duration(milliseconds: 160),
+            transitionBuilder: _panelTransition,
+            layoutBuilder: (cur, prev) =>
+                Stack(fit: StackFit.expand, children: [...prev, ?cur]),
+            child: _panelBody(track),
+          ),
+        ),
+      ),
+    );
+
+    final grabber = Semantics(
+      button: true,
+      label: 'Close player',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _close,
+        onPanStart: (_) => _dragStart(),
+        onPanUpdate: (d) => _dragUpdate(d.delta.dy),
+        onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
+        child: Padding(
+          padding: EdgeInsets.only(top: safe.top + 12, bottom: 12),
+          child: Center(
+            child: Container(
+              width: 36,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final compactHeader =
+        _dockCollapse(inverse: false, child: _compactHeader(track));
+
+    Widget content;
+    if (isLyrics) {
+      // Full immersion: Lyrics expand all the way to the bottom edge of the screen,
+      // with floating bottom controls sitting over them.
+      content = Stack(
+        fit: StackFit.expand,
+        children: [
+          Column(
+            children: [
+              grabber,
+              compactHeader,
+              middleRegion,
+            ],
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _bottomBlock(player, track, safe, isLyrics),
+          ),
+        ],
+      );
+    } else {
+      // Art / Queue: Standard column structure so artwork is sized cleanly above the controls
+      content = Column(
+        children: [
+          grabber,
+          compactHeader,
+          middleRegion,
+          _bottomBlock(player, track, safe, isLyrics),
+        ],
+      );
+    }
+
     // Raw pointer listener (never steals gestures): any touch while lyrics are
     // open wakes the bottom controls and re-arms the idle timer.
     return Listener(
@@ -1529,132 +1587,82 @@ class PlayerShellState extends State<PlayerShell>
       onPointerMove: (_) => _bumpIdle(),
       onPointerUp: (_) => _pointerReleased(),
       onPointerCancel: (_) => _pointerReleased(),
-      child: Column(
-        children: [
-          // Grabber (drag down or tap to close)
-          Semantics(
-            button: true,
-            label: 'Close player',
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _close,
-              onPanStart: (_) => _dragStart(),
-              onPanUpdate: (d) => _dragUpdate(d.delta.dy),
-              onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-              child: Padding(
-                padding: EdgeInsets.only(top: safe.top + 12, bottom: 12),
+      child: content,
+    );
+  }
+
+  Widget _bottomBlock(
+    PlayerState player,
+    dynamic track,
+    EdgeInsets safe,
+    bool isLyrics,
+  ) {
+    return _chromeCollapse(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragStart: (_) => _dragStart(),
+        onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
+        onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
+        onVerticalDragCancel: () => _dragEnd(0),
+        child: Padding(
+          // bottom padding unchanged: Studio FX / Lyrics / Queue stay put
+          padding: EdgeInsets.fromLTRB(24, 8, 24, safe.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // title / artist / star / more: moves with artwork into
+              // the compact header when a panel opens
+              _rise(
+                begin: 0.34,
+                child: _dockCollapse(
+                  inverse: true,
+                  child: _metaRow(track),
+                ),
+              ),
+
+              // Seekbar + duration: design unchanged
+              _rise(
+                begin: 0.40,
                 child: Center(
-                  child: Container(
-                    width: 36,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(3),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: ScrubberSlider(
+                      positionNotifier: player.positionNotifier,
+                      duration: _duration,
+                      onSeek: (pos) => player.seek(pos),
+                      activeColor: _seekTint.withValues(alpha: 0.62),
+                      trackColor: _seekTint.withValues(alpha: 0.22),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
 
-          // Compact header (lyrics / queue): the artwork overlay docks onto it
-          _dockCollapse(inverse: false, child: _compactHeader(track)),
-
-          // Middle region: lyrics / queue live here (artwork lives in the
-          // overlay). Its size never depends on the controls' visibility.
-          Expanded(
-            child: SizedBox.expand(
-              key: _regionKey,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onVerticalDragStart: (_) => _dragStart(),
-                onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
-                onVerticalDragEnd: (d) =>
-                    _dragEnd(d.velocity.pixelsPerSecond.dy),
-                onVerticalDragCancel: () => _dragEnd(0),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 280),
-                  reverseDuration: const Duration(milliseconds: 160),
-                  transitionBuilder: _panelTransition,
-                  layoutBuilder: (cur, prev) =>
-                      Stack(fit: StackFit.expand, children: [...prev, ?cur]),
-                  child: _panelBody(track),
+              // Big three-button transport. Slightly more air below it
+              // lifts it (and everything above) up while the tool row
+              // keeps its position at the bottom.
+              _rise(
+                begin: 0.46,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 340),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 14, bottom: 30),
+                      child: _transport(player),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
 
-          // Bottom block: fades / blurs away after idle while lyrics are open
-          // (layout size is constant, so nothing above it ever moves).
-          _chromeCollapse(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onVerticalDragStart: (_) => _dragStart(),
-              onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
-              onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-              onVerticalDragCancel: () => _dragEnd(0),
-              child: Padding(
-                // bottom padding unchanged: Studio FX / Lyrics / Queue stay put
-                padding: EdgeInsets.fromLTRB(24, 8, 24, safe.bottom + 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // title / artist / star / more: moves with artwork into
-                    // the compact header when a panel opens
-                    _rise(
-                      begin: 0.34,
-                      child: _dockCollapse(
-                        inverse: true,
-                        child: _metaRow(track),
-                      ),
-                    ),
-
-                    // Seekbar + duration: design unchanged
-                    _rise(
-                      begin: 0.40,
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 420),
-                          child: ScrubberSlider(
-                            positionNotifier: player.positionNotifier,
-                            duration: _duration,
-                            onSeek: (pos) => player.seek(pos),
-                            activeColor: _seekTint.withValues(alpha: 0.62),
-                            trackColor: _seekTint.withValues(alpha: 0.22),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Big three-button transport. Slightly more air below it
-                    // lifts it (and everything above) up while the tool row
-                    // keeps its position at the bottom.
-                    _rise(
-                      begin: 0.46,
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 340),
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 14, bottom: 30),
-                            child: _transport(player),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    _rise(
-                      begin: 0.52,
-                      child: _tools(
-                        isLyrics,
-                        hasLyrics: player.hasLyrics || player.isLoadingLyrics,
-                      ),
-                    ),
-                  ],
+              _rise(
+                begin: 0.52,
+                child: _tools(
+                  isLyrics,
+                  hasLyrics: player.hasLyrics || player.isLoadingLyrics,
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

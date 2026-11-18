@@ -603,12 +603,25 @@ class LyricsService {
     // TIER 1 (PRIORITY #1): WORD-BY-WORD (WBW) SYNCED LYRICS
     // =========================================================================
 
-    // 1a. Query lrc.red for Word-by-Word Enhanced LRC
+    // 1a. Query lrc.red for Word-by-Word Enhanced LRC (with duration validation)
     LyricsResult? lrcRedLineCandidate;
     try {
-      final lrcRed = await _fetchLrcRed(cleanT, cleanA, lang);
+      final lrcRed = await _fetchLrcRed(
+        cleanT,
+        cleanA,
+        lang,
+        track.durationSeconds,
+      );
       if (lrcRed.wbw != null && lrcRed.wbw!.isNotEmpty) {
-        return _saveAndReturn(cacheKey, lrcRed.wbw!.lines, true, 'lrc_red_wbw', rawLrc: lrcRed.wbw!.rawLrc, artist: cleanA, title: cleanT);
+        return _saveAndReturn(
+          cacheKey,
+          lrcRed.wbw!.lines,
+          true,
+          'lrc_red_wbw',
+          rawLrc: lrcRed.wbw!.rawLrc,
+          artist: cleanA,
+          title: cleanT,
+        );
       }
       lrcRedLineCandidate = lrcRed.line;
     } catch (e) {
@@ -648,7 +661,30 @@ class LyricsService {
       if (kDebugMode) debugPrint('[LyricsService] Tier 2 (LRCLIB synced) error: $e');
     }
 
-    // 2c. Use Zenify Backend line-synced lyrics if available
+    // 2c. InnerTube official lyrics if synced
+    String? officialYtLyrics;
+    try {
+      final videoId = track.id.startsWith('yt-') ? track.id.substring(3) : track.id;
+      officialYtLyrics = await InnerTubeService.instance.getLyrics(videoId);
+      if (officialYtLyrics != null &&
+          officialYtLyrics.trim().isNotEmpty &&
+          (lang.isEmpty || isLanguageCompatible(officialYtLyrics, lang))) {
+        final parsed = LrcParser.parse(officialYtLyrics);
+        if (parsed.lines.isNotEmpty && parsed.synced) {
+          return _saveAndReturn(
+            cacheKey,
+            parsed.lines,
+            true,
+            'innertube_official_synced',
+            rawLrc: officialYtLyrics,
+            artist: cleanA,
+            title: cleanT,
+          );
+        }
+      }
+    } catch (_) {}
+
+    // 2d. Use Zenify Backend line-synced lyrics if available
     if (backendCandidate != null &&
         backendCandidate.isNotEmpty &&
         backendCandidate.synced &&
@@ -661,20 +697,14 @@ class LyricsService {
     // =========================================================================
 
     // 3a. YouTube Music InnerTube Official Plain Lyrics (Tied directly to videoId - 100% accurate!)
-    try {
-      final videoId = track.id.startsWith('yt-') ? track.id.substring(3) : track.id;
-      final ytLyrics = await InnerTubeService.instance.getLyrics(videoId);
-      if (ytLyrics != null && ytLyrics.trim().isNotEmpty && (lang.isEmpty || isLanguageCompatible(ytLyrics, lang))) {
-        final parsed = LrcParser.parse(ytLyrics);
-        if (parsed.lines.isNotEmpty) {
-          if (parsed.synced) {
-            return _saveAndReturn(cacheKey, parsed.lines, true, 'innertube_official_synced');
-          } else {
-            return _returnPlainMemoryOnly(cacheKey, parsed.lines, 'innertube_official_plain');
-          }
-        }
+    if (officialYtLyrics != null &&
+        officialYtLyrics.trim().isNotEmpty &&
+        (lang.isEmpty || isLanguageCompatible(officialYtLyrics, lang))) {
+      final parsed = LrcParser.parse(officialYtLyrics);
+      if (parsed.lines.isNotEmpty) {
+        return _returnPlainMemoryOnly(cacheKey, parsed.lines, 'innertube_official_plain');
       }
-    } catch (_) {}
+    }
 
     // 3b. LRCLIB plainLyrics (strictly validated with title match)
     try {
@@ -696,7 +726,12 @@ class LyricsService {
 
   // ───────────────────────── Tier 1: lrc.red Provider ───────────────────────
 
-  Future<({LyricsResult? wbw, LyricsResult? line})> _fetchLrcRed(String title, String artist, String lang) async {
+  Future<({LyricsResult? wbw, LyricsResult? line})> _fetchLrcRed(
+    String title,
+    String artist,
+    String lang,
+    int durationSeconds,
+  ) async {
     final normTitle = normalizeDiacritics(title);
     final normArtist = normalizeDiacritics(artist);
     final aLower = artist.toLowerCase();
@@ -770,6 +805,25 @@ class LyricsService {
 
               final parsed = LrcParser.parse(lrcContent);
               if (parsed.lines.isNotEmpty && parsed.synced) {
+                // Duration verification: Reject mismatched versions or cuts
+                if (durationSeconds > 30) {
+                  final lastLineTimeMs = (parsed.lines.last['timeMs'] as num?)?.toInt() ??
+                      (parsed.lines.last['startMs'] as num?)?.toInt() ??
+                      0;
+                  if (lastLineTimeMs > 0) {
+                    if (lastLineTimeMs < (durationSeconds * 0.40 * 1000) ||
+                        lastLineTimeMs > ((durationSeconds + 20) * 1000)) {
+                      if (kDebugMode) {
+                        debugPrint(
+                          '[LyricsService] lrc.red REJECTED: duration mismatch '
+                          '(lastLine=${lastLineTimeMs / 1000}s vs track=${durationSeconds}s)',
+                        );
+                      }
+                      continue;
+                    }
+                  }
+                }
+
                 final hasWordTimings = parsed.lines.any((l) => l['words'] != null && (l['words'] as List).isNotEmpty);
                 if (syncType == 'word' || hasWordTimings) {
                   return (
@@ -905,33 +959,41 @@ class LyricsService {
     ];
 
     for (final pair in directPairs) {
-      try {
-        final uri = Uri.https('lrclib.net', '/api/get', {
-          'track_name': pair.t,
-          'artist_name': pair.a,
-          if (album.isNotEmpty && album != 'Single') 'album_name': album,
-          if (durationSeconds > 0 && durationSeconds != 210) 'duration': durationSeconds.toString(),
-        });
+      final durationAttempts = <String?>[
+        if (durationSeconds > 0 && durationSeconds != 210) durationSeconds.toString(),
+        if (durationSeconds > 0 && durationSeconds != 210) (durationSeconds - 1).toString(),
+        if (durationSeconds > 0 && durationSeconds != 210) (durationSeconds + 1).toString(),
+        null, // Fallback without duration constraint
+      ];
 
-        final res = await _client.get(uri, headers: {
-          'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
-        }).timeout(const Duration(seconds: 4));
+      for (final durStr in durationAttempts) {
+        try {
+          final uri = Uri.https('lrclib.net', '/api/get', {
+            'track_name': pair.t,
+            'artist_name': pair.a,
+            'duration': ?durStr,
+          });
 
-        if (res.statusCode == 200) {
-          final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-          final syncedLyrics = json['syncedLyrics'] as String?;
+          final res = await _client.get(uri, headers: {
+            'User-Agent': 'Zenify Mobile App v1.0 (https://zenify.app)',
+          }).timeout(const Duration(seconds: 4));
 
-          if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
-            // Verify language compatibility
-            if (lang.isEmpty || isLanguageCompatible(syncedLyrics, lang)) {
-              final parsed = LrcParser.parse(syncedLyrics);
-              if (parsed.lines.isNotEmpty && parsed.synced) {
-                return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_synced', rawLrc: syncedLyrics);
+          if (res.statusCode == 200) {
+            final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+            final syncedLyrics = json['syncedLyrics'] as String?;
+
+            if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
+              // Verify language compatibility
+              if (lang.isEmpty || isLanguageCompatible(syncedLyrics, lang)) {
+                final parsed = LrcParser.parse(syncedLyrics);
+                if (parsed.lines.isNotEmpty && parsed.synced) {
+                  return LyricsResult(lines: parsed.lines, synced: true, source: 'lrclib_synced', rawLrc: syncedLyrics);
+                }
               }
             }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
     }
 
     // 2. Multi-query search fallback with candidate language scoring
@@ -987,9 +1049,26 @@ class LyricsService {
                 final candAlbum = (map['albumName'] ?? '').toString().toLowerCase();
                 final candMeta = '$candTrackLower $candAlbum';
 
+                // Exact title match gets huge boost
+                if (candTrackLower == title.toLowerCase() ||
+                    candTrackLower == normTitle.toLowerCase()) {
+                  score += 300;
+                } else {
+                  score += 100;
+                }
+
+                // Exact artist match gets huge boost
+                if (candArtist.toLowerCase() == artist.toLowerCase() ||
+                    candArtist.toLowerCase() == normArtist.toLowerCase()) {
+                  score += 250;
+                }
+
                 if (album.isNotEmpty && album != 'Single') {
                   final cleanAlb = album.toLowerCase();
-                  if (candAlbum.isNotEmpty && (candAlbum == cleanAlb || candAlbum.contains(cleanAlb) || cleanAlb.contains(candAlbum))) {
+                  if (candAlbum.isNotEmpty &&
+                      (candAlbum == cleanAlb ||
+                          candAlbum.contains(cleanAlb) ||
+                          cleanAlb.contains(candAlbum))) {
                     score += 200; // Major score boost for matching album/movie!
                   }
                 }
@@ -999,7 +1078,14 @@ class LyricsService {
                     score += 150;
                   }
                   // Check competing languages
-                  final otherLangs = ['tamil', 'telugu', 'hindi', 'malayalam', 'kannada', 'punjabi'];
+                  final otherLangs = [
+                    'tamil',
+                    'telugu',
+                    'hindi',
+                    'malayalam',
+                    'kannada',
+                    'punjabi'
+                  ];
                   for (final ol in otherLangs) {
                     if (ol != lang && candMeta.contains(ol)) {
                       score -= 500; // Penalize wrong language tags
@@ -1009,15 +1095,23 @@ class LyricsService {
 
                 if (durationSeconds > 0 && durationSeconds != 210) {
                   final candDur = (map['duration'] as num?)?.toInt() ?? 0;
-                  final diff = (candDur - durationSeconds).abs();
-                  if (diff <= 4) {
-                    score += 50;
-                  } else if (diff > 15) {
-                    score -= 50;
+                  if (candDur > 0) {
+                    final diff = (candDur - durationSeconds).abs();
+                    if (diff <= 2) {
+                      score += 400; // High confidence duration match!
+                    } else if (diff <= 5) {
+                      score += 200;
+                    } else if (diff <= 10) {
+                      score += 50;
+                    } else if (diff > 15) {
+                      score -= 400; // Heavily penalize different cuts!
+                    }
                   }
                 }
 
-                scored.add((item: map, score: score, lyrics: syncedLyrics));
+                if (score > 0) {
+                  scored.add((item: map, score: score, lyrics: syncedLyrics));
+                }
               }
             }
 
