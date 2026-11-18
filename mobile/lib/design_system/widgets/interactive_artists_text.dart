@@ -1,9 +1,10 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../models/artist_ref.dart';
+import '../../models/track.dart';
 import '../../utils/media_normalizer.dart';
 import '../../views/details/artist_popup.dart';
-import '../../views/details/artist_screen.dart';
+import 'media_navigation_sheet.dart';
 
 /// Interactive artist text widget that parses and renders individual artists
 /// as distinct, clickable links rather than a single monolithic un-navigable string.
@@ -11,6 +12,7 @@ class InteractiveArtistsText extends StatelessWidget {
   const InteractiveArtistsText({
     super.key,
     required this.artists,
+    this.track,
     this.style,
     this.separatorStyle,
     this.maxLines = 1,
@@ -21,6 +23,7 @@ class InteractiveArtistsText extends StatelessWidget {
 
   /// Can be a composite [String], a [List<String>], or a [List<ArtistRef>].
   final dynamic artists;
+  final Track? track;
   final TextStyle? style;
   final TextStyle? separatorStyle;
   final int maxLines;
@@ -34,26 +37,11 @@ class InteractiveArtistsText extends StatelessWidget {
     if (onTapArtist != null) {
       onTapArtist!(clean);
     } else {
-      String? browseId;
-      String? imageUrl;
-      if (refs != null && refs.isNotEmpty) {
-        final match = refs.where((r) => r.name.toLowerCase() == clean.toLowerCase()).firstOrNull;
-        if (match != null) {
-          if (match.id.isNotEmpty && !match.id.contains('_')) {
-            browseId = match.id;
-          }
-          imageUrl = match.imageUrl;
-        }
-      }
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ArtistScreen(
-            artistName: clean,
-            browseId: browseId,
-            imageUrl: imageUrl,
-          ),
-        ),
+      MediaNavigationSheet.show(
+        context: context,
+        track: track,
+        artistName: clean,
+        artists: refs,
       );
     }
   }

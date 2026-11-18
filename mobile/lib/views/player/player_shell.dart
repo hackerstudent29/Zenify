@@ -24,6 +24,7 @@ import 'studio_fx_sheet.dart';
 import '../details/artist_screen.dart';
 import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
+import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../../models/track.dart';
 import '../../utils/media_normalizer.dart';
 
@@ -362,6 +363,24 @@ class PlayerShellState extends State<PlayerShell>
         ),
       );
     }
+  }
+
+  void _showMediaNavigationSheet(dynamic track) {
+    final effectiveTrack = track is Track
+        ? track
+        : (context.read<PlayerState>().currentTrack ??
+            Track(
+              id: track?.id?.toString() ?? '',
+              title: track?.title?.toString() ?? '',
+              artist: track?.artist?.toString() ?? '',
+              album: track?.album?.toString() ?? '',
+              coverUrl: track?.coverUrl?.toString() ?? '',
+            ));
+
+    MediaNavigationSheet.show(
+      context: context,
+      track: effectiveTrack,
+    );
   }
 
   dynamic _artistsOf(dynamic track) => track is Track
@@ -1661,22 +1680,26 @@ class PlayerShellState extends State<PlayerShell>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  MarqueeScroll(
-                    resetKey: _trackKey,
-                    child: SwapText(
-                      track is Track
-                          ? track.compactTitle
-                          : MediaNormalizer.cleanCompactTitle(
-                              track?.title?.toString(),
-                            ),
-                      dir: _dir,
-                      style: const TextStyle(
-                        fontFamily: 'SF Pro',
-                        color: Colors.white,
-                        fontSize: 17,
-                        height: 22 / 17,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.25,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _showMediaNavigationSheet(track),
+                    child: MarqueeScroll(
+                      resetKey: _trackKey,
+                      child: SwapText(
+                        track is Track
+                            ? track.compactTitle
+                            : MediaNormalizer.cleanCompactTitle(
+                                track?.title?.toString(),
+                              ),
+                        dir: _dir,
+                        style: const TextStyle(
+                          fontFamily: 'SF Pro',
+                          color: Colors.white,
+                          fontSize: 17,
+                          height: 22 / 17,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.25,
+                        ),
                       ),
                     ),
                   ),
@@ -1691,7 +1714,7 @@ class PlayerShellState extends State<PlayerShell>
                         height: 20 / 15,
                         fontWeight: FontWeight.w500,
                       ),
-                      onTapArtist: _openArtist,
+                      onTapArtist: (_) => _showMediaNavigationSheet(track),
                     ),
                   ),
                 ],
@@ -1720,7 +1743,8 @@ class PlayerShellState extends State<PlayerShell>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GestureDetector(
-                  onTap: () => _openAlbum(track),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _showMediaNavigationSheet(track),
                   child: MarqueeScroll(
                     resetKey: _trackKey,
                     child: SwapText(
@@ -1752,7 +1776,7 @@ class PlayerShellState extends State<PlayerShell>
                       height: 22 / 17,
                       fontWeight: FontWeight.w500,
                     ),
-                    onTapArtist: _openArtist,
+                    onTapArtist: (_) => _showMediaNavigationSheet(track),
                   ),
                 ),
               ],

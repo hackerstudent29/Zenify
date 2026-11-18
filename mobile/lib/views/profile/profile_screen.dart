@@ -1,400 +1,362 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
-import '../../design_system/apple/apple_kit.dart';
-import '../../design_system/apple/apple_tokens.dart';
+import '../../design_system/apple/apple_kit.dart' show Avatar;
+import '../../design_system/apple/apple_music_kit.dart';
+import '../../services/api_service.dart';
+import '../../services/auth_service.dart';
 import '../../services/auth_state.dart';
 import '../../services/country_service.dart';
 import '../../services/user_preferences_service.dart';
 import '../auth/onboarding_sheet.dart';
 import '../auth/welcome_screen.dart';
 import '../insights/insights_screen.dart';
-import '../player/studio_fx_sheet.dart';
 import '../room_together/room_together_screen.dart';
 import '../settings/settings_screen.dart';
 import 'profile_edit_sheets.dart';
 
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+class ProfileScreen extends StatelessWidget {
+  /// When opened from Settings, the Settings row pops back instead of stacking.
+  const ProfileScreen({super.key, this.fromSettings = false});
+  final bool fromSettings;
 
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
+  static const _edit = Text(
+    'Edit',
+    style: TextStyle(color: AM.rose, fontSize: 17, fontWeight: FontWeight.w500),
+  );
 
-class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
     final user = auth.user;
 
-    return Scaffold(
-      backgroundColor: AT.bg,
-      body: SafeArea(
-        bottom: false,
-        child: ListenableBuilder(
-          listenable: Listenable.merge([
-            UserPreferencesService.instance.prefsNotifier,
-            CountryService.instance.countryNotifier,
-          ]),
-          builder: (context, _) {
-            final prefs = UserPreferencesService.instance.current;
-            final country = CountryService.instance.currentCountry;
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        UserPreferencesService.instance.prefsNotifier,
+        CountryService.instance.countryNotifier,
+      ]),
+      builder: (context, _) {
+        final prefs = UserPreferencesService.instance.current;
+        final country = CountryService.instance.currentCountry;
+        final name = UserPreferencesService.resolveDisplayName(
+          accountName: user?.name,
+          displayName: user?.displayName,
+          username: user?.username,
+        );
+        final handle = [
+          if (user != null && user.username.trim().isNotEmpty && user.username != 'guest')
+            '@${user.username.trim()}',
+          if (user != null && user.email.trim().isNotEmpty) user.email.trim(),
+        ].join(' · ');
 
-            final displayName = UserPreferencesService.resolveDisplayName(
-              accountName: user?.name,
-              displayName: user?.displayName,
-              username: user?.username,
-            );
-            final handleParts = <String>[
-              if (user?.username != null &&
-                  user!.username.trim().isNotEmpty &&
-                  user.username != 'guest')
-                '@${user.username.trim()}',
-              if (user?.email != null && user!.email.trim().isNotEmpty)
-                user.email.trim(),
-            ];
-            final subtitleLine = handleParts.isNotEmpty
-                ? handleParts.join(' · ')
-                : (auth.isLoggedIn ? 'Zenify Member' : 'Guest Listener');
+        String summary(Iterable<String>? items, String empty) =>
+            items == null || items.isEmpty ? empty : items.join(', ');
 
-            final langSummary = prefs != null && prefs.languages.isNotEmpty
-                ? prefs.languages.join(', ')
-                : 'Not set';
-            final genreSummary = prefs != null && prefs.genres.isNotEmpty
-                ? prefs.genres.join(', ')
-                : 'Not set';
-            final artistSummary = prefs != null && prefs.favoriteArtists.isNotEmpty
-                ? prefs.favoriteArtists.map((a) => a.name).join(', ')
-                : 'Not set';
-
-            return CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                    child: Row(
-                      children: [
-                        CircleIconButton(
-                          icon: CupertinoIcons.chevron_left,
-                          onTap: () => Navigator.of(context).pop(),
-                        ),
-                        const Spacer(),
-                        CircleIconButton(
-                          icon: CupertinoIcons.gear_alt_fill,
-                          tooltip: 'Settings',
-                          onTap: () => Navigator.of(context).push(
-                            CupertinoPageRoute<void>(
-                              builder: (_) => const SettingsScreen(),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Hero identity block (no overlapping cards)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
-                    child: Column(
-                      children: [
-                        Avatar(
-                          name: displayName,
-                          size: 80,
-                          ring: AT.accent.withValues(alpha: 0.45),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          displayName,
-                          style: AT.title1,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          subtitleLine,
-                          style: AT.subhead,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            PillButton(
-                              label: 'Edit Profile',
-                              icon: CupertinoIcons.pencil,
-                              compact: true,
-                              style: PillStyle.glass,
-                              onTap: () => showIdentityEditSheet(context),
-                            ),
-                            const SizedBox(width: 10),
-                            if (!auth.isLoggedIn)
-                              PillButton(
-                                label: 'Sign In',
-                                icon: CupertinoIcons.person_crop_circle_badge_plus,
-                                compact: true,
-                                style: PillStyle.filled,
-                                onTap: () => Navigator.of(context).push(
-                                  CupertinoPageRoute<void>(
-                                    fullscreenDialog: true,
-                                    builder: (_) => WelcomeScreen(
-                                      onFinished: () => Navigator.of(context).pop(),
-                                    ),
-                                  ),
-                                ),
-                              )
-                            else
-                              PillButton(
-                                label: 'Sign Out',
-                                icon: CupertinoIcons.square_arrow_left,
-                                compact: true,
-                                style: PillStyle.tinted,
-                                onTap: () => _confirmSignOut(auth),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Quick Actions strip (Room Together style glass pills)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 22),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: PillButton(
-                            label: 'Replay',
-                            icon: CupertinoIcons.chart_bar_fill,
-                            compact: true,
-                            style: PillStyle.glass,
-                            onTap: () => Navigator.of(context).push(
-                              CupertinoPageRoute<void>(
-                                builder: (_) => const InsightsScreen(),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: PillButton(
-                            label: 'Together',
-                            icon: CupertinoIcons.person_2_fill,
-                            compact: true,
-                            style: PillStyle.glass,
-                            onTap: () => Navigator.of(context).push(
-                              CupertinoPageRoute<void>(
-                                builder: (_) => const RoomTogetherScreen(),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: PillButton(
-                            label: 'Studio FX',
-                            icon: CupertinoIcons.waveform,
-                            compact: true,
-                            style: PillStyle.glass,
-                            onTap: () => showStudioFxSheet(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Personal Identity Section
-                SliverToBoxAdapter(
-                  child: GroupedSection(
-                    title: 'IDENTITY',
-                    children: [
-                      AppleRow(
-                        leading: const IconTile(
-                          CupertinoIcons.person_fill,
-                          color: AT.accent,
-                        ),
-                        title: 'Name & Username',
-                        subtitle: displayName,
-                        trailing: const _RowChevron(),
-                        onTap: () => showIdentityEditSheet(context),
-                      ),
-                      AppleRow(
-                        leading: const IconTile(
-                          CupertinoIcons.calendar,
-                          color: AT.blue,
-                        ),
-                        title: 'Age',
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              prefs?.age != null ? '${prefs!.age}' : 'Add',
-                              style: AT.subhead,
-                            ),
-                            const SizedBox(width: 6),
-                            const _RowChevron(),
-                          ],
-                        ),
-                        onTap: () => showIdentityEditSheet(context),
-                      ),
-                      AppleRow(
-                        leading: const IconTile(
-                          CupertinoIcons.person_2_fill,
-                          color: AT.green,
-                        ),
-                        title: 'Gender',
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              prefs?.gender ?? 'Add',
-                              style: AT.subhead,
-                            ),
-                            const SizedBox(width: 6),
-                            const _RowChevron(),
-                          ],
-                        ),
-                        onTap: () => showIdentityEditSheet(context),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Music Tastes & Region Section
-                SliverToBoxAdapter(
-                  child: GroupedSection(
-                    title: 'MUSIC TASTES & REGION',
-                    footer: 'Tap any row to edit your music preferences individually, or run the guided setup.',
-                    children: [
-                      AppleRow(
-                        leading: Text(country.flag, style: const TextStyle(fontSize: 22)),
-                        title: 'Music Region',
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(country.name, style: AT.subhead),
-                            const SizedBox(width: 6),
-                            const _RowChevron(),
-                          ],
-                        ),
-                        onTap: () => showRegionPickerSheet(context),
-                      ),
-                      AppleRow(
-                        leading: const IconTile(
-                          CupertinoIcons.chat_bubble_2_fill,
-                          color: AT.accent,
-                        ),
-                        title: 'Languages',
-                        subtitle: langSummary,
-                        trailing: const _RowChevron(),
-                        onTap: () => showLanguagesPickerSheet(context),
-                      ),
-                      AppleRow(
-                        leading: const IconTile(
-                          CupertinoIcons.music_note_2,
-                          color: AT.amber,
-                        ),
-                        title: 'Genres & Vibes',
-                        subtitle: genreSummary,
-                        trailing: const _RowChevron(),
-                        onTap: () => showGenresPickerSheet(context),
-                      ),
-                      AppleRow(
-                        leading: const IconTile(
-                          CupertinoIcons.music_mic,
-                          color: Color(0xFFBF5AF2),
-                        ),
-                        title: 'Favorite Artists',
-                        subtitle: artistSummary,
-                        trailing: const _RowChevron(),
-                        onTap: () => showArtistsPickerSheet(context),
-                      ),
-                      AppleRow(
-                        leading: const IconTile(
-                          CupertinoIcons.sparkles,
-                          color: AT.blue,
-                        ),
-                        title: 'Guided Setup Wizard',
-                        subtitle: 'Step through all preferences cleanly',
-                        trailing: const _RowChevron(),
-                        onTap: () => OnboardingSheet.show(context, isEditing: true),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // App Preferences Shortcut
-                SliverToBoxAdapter(
-                  child: GroupedSection(
-                    title: 'APPLICATION',
-                    children: [
-                      AppleRow(
-                        leading: const IconTile(
-                          CupertinoIcons.slider_horizontal_3,
-                          color: Color(0xFF8E8E93),
-                        ),
-                        title: 'All Settings',
-                        subtitle: 'Audio quality, playback, downloads & security',
-                        trailing: const _RowChevron(),
-                        onTap: () => Navigator.of(context).push(
-                          CupertinoPageRoute<void>(
-                            builder: (_) => const SettingsScreen(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                SliverToBoxAdapter(
-                  child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 32),
+        return AMPage(
+          title: 'Account',
+          children: [
+            AMSection(
+              children: [
+                AMRow(
+                  leading: Avatar(name: name, size: 46),
+                  title: name,
+                  subtitle: handle.isNotEmpty ? handle : (auth.isLoggedIn ? 'Zenify Member' : 'Guest Listener'),
+                  trailing: _edit,
+                  onTap: () => showIdentityEditSheet(context),
                 ),
               ],
-            );
-          },
-        ),
-      ),
+            ),
+            if (!auth.isLoggedIn)
+              AMSection(
+                children: [
+                  AMRow(
+                    title: 'Sign In',
+                    subtitle: 'Sync your library and see your Replay stats on every device.',
+                    chevron: true,
+                    onTap: () => Navigator.of(context).push(
+                      CupertinoPageRoute<void>(
+                        fullscreenDialog: true,
+                        builder: (_) => WelcomeScreen(onFinished: () => Navigator.of(context).pop()),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            AMSection(
+              header: 'Music Preferences',
+              footer: 'These shape Home, Quick Picks and regional charts.',
+              children: [
+                AMRow(
+                  title: 'Music Region',
+                  value: '${country.flag} ${country.name}',
+                  chevron: true,
+                  onTap: () => showRegionPickerSheet(context),
+                ),
+                AMRow(
+                  title: 'Languages',
+                  subtitle: summary(prefs?.languages, 'Not set'),
+                  chevron: true,
+                  onTap: () => showLanguagesPickerSheet(context),
+                ),
+                AMRow(
+                  title: 'Genres & Vibes',
+                  subtitle: summary(prefs?.genres, 'Not set'),
+                  chevron: true,
+                  onTap: () => showGenresPickerSheet(context),
+                ),
+                AMRow(
+                  title: 'Favorite Artists',
+                  subtitle: summary(prefs?.favoriteArtists.map((a) => a.name), 'Not set'),
+                  chevron: true,
+                  onTap: () => showArtistsPickerSheet(context),
+                ),
+                AMRow(
+                  title: 'Guided Setup',
+                  chevron: true,
+                  onTap: () => OnboardingSheet.show(context, isEditing: true),
+                ),
+              ],
+            ),
+            AMSection(
+              header: 'Activity',
+              children: [
+                AMRow(
+                  title: 'Replay',
+                  subtitle: 'Your listening stats',
+                  chevron: true,
+                  onTap: () => Navigator.of(context)
+                      .push(CupertinoPageRoute<void>(builder: (_) => const InsightsScreen())),
+                ),
+                AMRow(
+                  title: 'Room Together',
+                  subtitle: 'Listen with friends in real time',
+                  chevron: true,
+                  onTap: () => Navigator.of(context)
+                      .push(CupertinoPageRoute<void>(builder: (_) => const RoomTogetherScreen())),
+                ),
+              ],
+            ),
+            AMSection(
+              children: [
+                AMRow(
+                  title: 'Settings',
+                  chevron: true,
+                  onTap: () {
+                    if (fromSettings) {
+                      Navigator.of(context).pop();
+                    } else {
+                      Navigator.of(context)
+                          .push(CupertinoPageRoute<void>(builder: (_) => const SettingsScreen()));
+                    }
+                  },
+                ),
+              ],
+            ),
+            if (auth.isLoggedIn)
+              AMSection(
+                header: 'Security',
+                footer: 'Export includes your playlists, preferences and listening stats.',
+                children: [
+                  AMRow(
+                    title: 'Active Sessions',
+                    subtitle: 'Devices signed in to your account',
+                    chevron: true,
+                    onTap: () => _showSessions(context),
+                  ),
+                  AMRow(
+                    title: 'Export My Data',
+                    chevron: true,
+                    onTap: () => _exportData(context),
+                  ),
+                ],
+              ),
+            if (auth.isLoggedIn)
+              AMSection(
+                children: [
+                  AMRow(
+                    title: 'Sign Out',
+                    titleColor: AM.rose,
+                    subtitle: user?.email,
+                    onTap: () => _confirm(
+                      context,
+                      title: 'Sign Out',
+                      message: 'Are you sure you want to sign out of Zenify?',
+                      action: 'Sign Out',
+                      onConfirm: auth.signOut,
+                    ),
+                  ),
+                  AMRow(
+                    title: 'Delete Account',
+                    titleColor: AM.rose,
+                    onTap: () => _confirm(
+                      context,
+                      title: 'Delete Account',
+                      message: 'This is permanent. Playlists, favorites and preferences will be deleted.',
+                      action: 'Delete',
+                      onConfirm: () async {
+                        final token = await AuthService.instance.getAccessToken();
+                        if (token != null) {
+                          await http.delete(
+                            Uri.parse('${ApiService.baseUrl}/api/me/account'),
+                            headers: {'Authorization': 'Bearer $token'},
+                          );
+                        }
+                        auth.signOut();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        );
+      },
     );
   }
 
-  void _confirmSignOut(AuthState auth) {
-    HapticFeedback.mediumImpact();
+  void _confirm(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required String action,
+    required FutureOr<void> Function() onConfirm,
+  }) {
     showCupertinoDialog<void>(
       context: context,
       useRootNavigator: true,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out of Zenify?'),
+        title: Text(title),
+        content: Text(message),
         actions: [
-          CupertinoDialogAction(
-            child: const Text('Cancel'),
-            onPressed: () => Navigator.pop(ctx),
-          ),
+          CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
           CupertinoDialogAction(
             isDestructiveAction: true,
-            child: const Text('Sign Out'),
             onPressed: () {
-              Navigator.pop(ctx);
-              auth.signOut();
+              Navigator.of(ctx).pop();
+              onConfirm();
             },
+            child: Text(action),
           ),
         ],
       ),
     );
   }
+
+  Future<void> _showSessions(BuildContext context) async {
+    final token = await AuthService.instance.getAccessToken();
+    if (token == null || !context.mounted) return;
+    showAMSheet<void>(context, (_) => _SessionsSheet(token: token));
+  }
+
+  Future<void> _exportData(BuildContext context) async {
+    final token = await AuthService.instance.getAccessToken();
+    if (token == null) return;
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiService.baseUrl}/api/me/export'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (res.statusCode == 200 && context.mounted) {
+        showCupertinoDialog<void>(
+          context: context,
+          useRootNavigator: true,
+          builder: (ctx) => CupertinoAlertDialog(
+            title: const Text('Data Export Ready'),
+            content: const Text('Your archive has been prepared.'),
+            actions: [
+              CupertinoDialogAction(
+                isDefaultAction: true,
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (_) {}
+  }
 }
 
-class _RowChevron extends StatelessWidget {
-  const _RowChevron();
+class _SessionsSheet extends StatefulWidget {
+  const _SessionsSheet({required this.token});
+  final String token;
+
+  @override
+  State<_SessionsSheet> createState() => _SessionsSheetState();
+}
+
+class _SessionsSheetState extends State<_SessionsSheet> {
+  late Future<List<Map<String, dynamic>>?> _future = _load();
+
+  Map<String, String> get _headers => {'Authorization': 'Bearer ${widget.token}'};
+
+  Future<List<Map<String, dynamic>>?> _load() async {
+    try {
+      final r = await http.get(Uri.parse('${ApiService.baseUrl}/api/me/sessions'), headers: _headers);
+      if (r.statusCode != 200) return null;
+      return (jsonDecode(r.body) as List<dynamic>).cast<Map<String, dynamic>>();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _revoke(Object? id) async {
+    try {
+      await http.delete(Uri.parse('${ApiService.baseUrl}/api/me/sessions/$id'), headers: _headers);
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _future = _load();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return const Icon(CupertinoIcons.chevron_forward, size: 15, color: AT.label3);
+    return AMSheetFrame(
+      title: 'Active Sessions',
+      heightFactor: 0.6,
+      body: FutureBuilder<List<Map<String, dynamic>>?>(
+        future: _future,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) {
+            return const Center(child: CupertinoActivityIndicator());
+          }
+          final list = snap.data;
+          if (list == null) {
+            return const Center(child: Text('Could not load sessions', style: AM.sub));
+          }
+          return ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              AMSection(
+                footer: '${list.length} signed-in device${list.length == 1 ? '' : 's'}',
+                children: [
+                  for (final s in list)
+                    AMRow(
+                      title: (s['deviceName'] as String?) ?? 'Device',
+                      subtitle: s['isCurrent'] == true
+                          ? '${s['platform'] ?? 'Mobile'} · This device'
+                          : '${s['platform'] ?? 'Mobile'}',
+                      trailing: s['isCurrent'] == true
+                          ? null
+                          : CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(28, 28),
+                              onPressed: () => _revoke(s['id']),
+                              child: const Text('Revoke', style: TextStyle(color: AM.rose, fontSize: 15)),
+                            ),
+                    ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }

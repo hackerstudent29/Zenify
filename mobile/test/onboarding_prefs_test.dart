@@ -245,9 +245,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Karthik'), findsWidgets);
-    expect(find.text('Age'), findsOneWidget);
-    expect(find.text('22'), findsOneWidget);
-    expect(find.text('Male'), findsOneWidget);
+    expect(find.text('MUSIC PREFERENCES'), findsOneWidget);
+    expect(find.text('Guided Setup'), findsOneWidget);
 
     // 2. SettingsScreen
     await tester.pumpWidget(

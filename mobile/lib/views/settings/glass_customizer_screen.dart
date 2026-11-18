@@ -1,10 +1,12 @@
 import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import '../../design_system/apple/apple_kit.dart';
-import '../../design_system/widgets/apple_glass.dart';
+import '../../design_system/apple/apple_kit.dart' show appleToast;
+import '../../design_system/apple/apple_music_kit.dart';
+import '../../design_system/widgets/glass_surface.dart';
+import '../../services/glass_engine.dart';
 import '../../services/settings_service.dart';
 
 class GlassCustomizerScreen extends StatefulWidget {
@@ -14,346 +16,334 @@ class GlassCustomizerScreen extends StatefulWidget {
   State<GlassCustomizerScreen> createState() => _GlassCustomizerScreenState();
 }
 
-class _GlassCustomizerScreenState extends State<GlassCustomizerScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _eqController;
-  bool _previewVibrantBg = true;
-  bool _demoLiked = true;
+class _GlassCustomizerScreenState extends State<GlassCustomizerScreen>
+    with SingleTickerProviderStateMixin {
+  final _engine = GlassEngine.instance;
+  final _settings = SettingsState.instance;
+  late final AnimationController _drift =
+      AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
+
+  int _backdrop = 0; // 0 artwork, 1 dark, 2 light
+  int _tab = 0;
+  bool _liked = true;
+  bool _playing = true;
 
   @override
   void initState() {
     super.initState();
-    _eqController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat();
+    _engine.ensureLoaded();
   }
 
   @override
   void dispose() {
-    _eqController.dispose();
+    _drift.dispose();
     super.dispose();
   }
+
+  void _edit(GlassConfig Function(GlassConfig c) f) => _engine.update(f);
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: SettingsState.instance,
+      listenable: Listenable.merge([_engine, _settings]),
       builder: (context, _) {
-        final settings = SettingsState.instance;
-        final fluidityPercent = (settings.glassFluidity * 100).round();
-
-        return Scaffold(
-          backgroundColor: const Color(0xFF0C0C0E),
-          appBar: CupertinoNavigationBar(
-            backgroundColor: const Color(0xCC0C0C0E),
-            border: const Border(bottom: BorderSide(color: Color(0x1FFFFFFF), width: 0.5)),
-            leading: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                HapticFeedback.lightImpact();
-                Navigator.of(context).maybePop();
-              },
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(CupertinoIcons.chevron_back, color: Color(0xFFFA2D48), size: 24),
-                  SizedBox(width: 2),
-                  Text('Settings', style: TextStyle(color: Color(0xFFFA2D48), fontSize: 16)),
-                ],
+        final c = _engine.config;
+        final custom = c.preset == 'custom';
+        return AMPage(
+          title: 'Glass Style',
+          children: [
+            _preview(c),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: AMSegmented<int>(
+                options: const [(0, 'Artwork'), (1, 'Dark'), (2, 'Light')],
+                value: _backdrop,
+                onChanged: (v) => setState(() => _backdrop = v),
               ),
             ),
-            middle: const Text(
-              'Glass & Surface Styling',
-              style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600),
+            AMSection(
+              footer: 'Turn off for solid surfaces. Helps older devices stay smooth.',
+              children: [
+                AMSwitchRow(
+                  title: 'Glass Effects',
+                  value: _settings.glassEffects,
+                  onChanged: _settings.setGlassEffects,
+                ),
+              ],
             ),
-            trailing: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                settings.resetGlassToDefault();
-                appleToast(context, 'Reset to 100% Liquid Glass', icon: CupertinoIcons.arrow_counterclockwise);
-              },
-              child: const Text(
-                'Reset',
-                style: TextStyle(color: Color(0xFFFA2D48), fontSize: 15, fontWeight: FontWeight.w500),
-              ),
-            ),
-          ),
-          body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-            physics: const BouncingScrollPhysics(),
-            children: [
-              // 1. LIVE INTERACTIVE DEMO PREVIEW
-              _buildLivePreviewBox(settings),
-
-              const SizedBox(height: 24),
-
-              // 2. QUICK STYLE PRESETS
-              const _SectionHeader(
-                title: 'STYLE PRESETS',
-                subtitle: 'Tap to instantly switch dock, mini player & island material',
-              ),
-              const SizedBox(height: 10),
-              _buildPresetsGrid(settings),
-
-              const SizedBox(height: 24),
-
-              // 3. FLUIDITY & OPACITY CONTROLLER
-              _SectionHeader(
-                title: 'FLUIDITY & TRANSPARENCY',
-                badge: '$fluidityPercent% FLUID',
-              ),
-              const SizedBox(height: 8),
-              _buildFluiditySliderCard(settings),
-
-              const SizedBox(height: 24),
-
-              // 4. BASE COLOR PALETTE
-              const _SectionHeader(
-                title: 'BASE MATERIAL SHADE',
-                subtitle: 'Underlying tint when rendered in low fluid or solid mode',
-              ),
-              const SizedBox(height: 10),
-              _buildBaseColorRow(settings),
-
-              const SizedBox(height: 24),
-
-              // 5. BLUR & SPECULAR EDGES
-              const _SectionHeader(
-                title: 'SURFACE REACTION & EDGES',
-              ),
-              const SizedBox(height: 10),
-              _buildSurfaceReactionCard(settings),
-
-              const SizedBox(height: 32),
-
-              // 6. BOTTOM RESET BUTTON
-              Center(
-                child: CupertinoButton(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  color: Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(14),
-                  onPressed: () {
-                    HapticFeedback.mediumImpact();
-                    settings.resetGlassToDefault();
-                    appleToast(context, 'Reset to Apple Liquid Glass Default', icon: CupertinoIcons.sparkles);
+            AMSection(
+              header: 'Material',
+              footer: custom
+                  ? 'Custom. Based on your adjustments below.'
+                  : GlassPresets.byId(c.preset)?.blurb,
+              bare: true,
+              children: [
+                LayoutBuilder(
+                  builder: (context, box) {
+                    final w = (box.maxWidth - 12) / 2;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        for (final p in GlassPresets.all)
+                          SizedBox(
+                            width: w,
+                            child: _PresetTile(
+                              preset: p,
+                              selected: c.preset == p.id,
+                              onTap: () {
+                                AM.tick();
+                                _engine.apply(p.id);
+                              },
+                            ),
+                          ),
+                      ],
+                    );
                   },
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(CupertinoIcons.sparkles, color: Color(0xFFFA2D48), size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Reset to Apple Liquid Glass Default',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
+                ),
+              ],
+            ),
+            AMSection(
+              header: 'Transparency',
+              footer: 'Fluidity sets how clear the surface is. Blur diffuses what sits behind it.',
+              children: [
+                AMSliderRow(
+                  title: 'Fluidity',
+                  valueLabel: '${(c.fluidity * 100).round()}%',
+                  value: c.fluidity,
+                  onChanged: (v) => _edit((x) => x.copyWith(fluidity: v)),
+                ),
+                AMSliderRow(
+                  title: 'Blur',
+                  valueLabel: '${c.blur.round()} px',
+                  value: c.blur,
+                  max: 40,
+                  onChanged: (v) => _edit((x) => x.copyWith(blur: v)),
+                ),
+                AMSliderRow(
+                  title: 'Frost',
+                  valueLabel: '${(c.frost * 100).round()}%',
+                  value: c.frost,
+                  onChanged: (v) => _edit((x) => x.copyWith(frost: v)),
+                ),
+                AMSliderRow(
+                  title: 'Depth',
+                  valueLabel: '${(c.depth * 100).round()}%',
+                  value: c.depth,
+                  onChanged: (v) => _edit((x) => x.copyWith(depth: v)),
+                ),
+              ],
+            ),
+            AMSection(
+              header: 'Color',
+              children: [
+                _Swatches(
+                  title: 'Base',
+                  selected: c.base,
+                  items: [
+                    for (final e in GlassPalette.bases.entries)
+                      _Swatch(e.key, e.value.label, color: e.value.color),
+                  ],
+                  onSelect: (id) => _edit((x) => x.copyWith(base: id)),
+                ),
+                _Swatches(
+                  title: 'Tint',
+                  selected: c.tint,
+                  items: [
+                    for (final e in GlassPalette.tints.entries)
+                      _Swatch(
+                        e.key,
+                        e.value.label,
+                        color: e.value.color,
+                        gradient: e.key == 'aurora',
+                        none: e.key == 'none',
                       ),
-                    ],
+                  ],
+                  onSelect: (id) => _edit((x) => x.copyWith(tint: id)),
+                ),
+                AMCollapse(
+                  show: c.tint != 'none',
+                  child: AMSliderRow(
+                    title: 'Tint Strength',
+                    valueLabel: '${(c.tintStrength * 100).round()}%',
+                    value: c.tintStrength,
+                    onChanged: (v) => _edit((x) => x.copyWith(tintStrength: v)),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+            AMSection(
+              header: 'Light & Edges',
+              footer: 'Prism splits light into a rainbow along the edge. Light direction moves the highlight.',
+              children: [
+                AMSwitchRow(
+                  title: 'Specular Edge',
+                  subtitle: 'Bright rim where light catches the glass',
+                  value: c.rim,
+                  onChanged: (v) => _edit((x) => x.copyWith(rim: v)),
+                ),
+                AMCollapse(
+                  show: c.rim,
+                  child: AMSliderRow(
+                    title: 'Edge Intensity',
+                    valueLabel: '${(c.rimStrength * 100).round()}%',
+                    value: c.rimStrength,
+                    onChanged: (v) => _edit((x) => x.copyWith(rimStrength: v)),
+                  ),
+                ),
+                AMSliderRow(
+                  title: 'Light Direction',
+                  valueLabel: '${c.lightAngle.round()}°',
+                  value: c.lightAngle,
+                  max: 360,
+                  onChanged: (v) => _edit((x) => x.copyWith(lightAngle: v)),
+                ),
+                AMSliderRow(
+                  title: 'Prism Dispersion',
+                  valueLabel: '${(c.prism * 100).round()}%',
+                  value: c.prism,
+                  onChanged: (v) => _edit((x) => x.copyWith(prism: v)),
+                ),
+              ],
+            ),
+            AMSection(
+              header: 'Motion',
+              footer: 'Shimmer sweeps light across the surface. Flow drifts colour behind it. '
+                  'Motion pauses when Reduce Motion is on.',
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: AMSegmented<GlassMotion>(
+                    trackColor: AM.cardHi,
+                    options: const [
+                      (GlassMotion.still, 'Still'),
+                      (GlassMotion.shimmer, 'Shimmer'),
+                      (GlassMotion.flow, 'Flow'),
+                    ],
+                    value: c.motion,
+                    onChanged: (v) => _edit((x) => x.copyWith(motion: v)),
+                  ),
+                ),
+                AMCollapse(
+                  show: c.motion != GlassMotion.still,
+                  child: AMSliderRow(
+                    title: 'Speed',
+                    valueLabel: '${c.speed.toStringAsFixed(1)}×',
+                    value: c.speed,
+                    min: 0.25,
+                    max: 2.5,
+                    onChanged: (v) => _edit((x) => x.copyWith(speed: v)),
+                  ),
+                ),
+              ],
+            ),
+            AMSection(
+              children: [
+                AMRow(
+                  title: 'Reset Glass Style',
+                  titleColor: AM.rose,
+                  onTap: () {
+                    _engine.reset();
+                    appleToast(context, 'Reset to Liquid Glass', icon: CupertinoIcons.arrow_counterclockwise);
+                  },
+                ),
+              ],
+            ),
+          ],
         );
       },
     );
   }
 
-  // ===========================================================================
-  // LIVE PREVIEW CONTAINER
-  // ===========================================================================
-  Widget _buildLivePreviewBox(SettingsState settings) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 0.8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.40),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
+  // ───────────────────────── live preview ─────────────────────────
+  Widget _preview(GlassConfig c) {
+    final ink = GlassPalette.isLight(c.base) ? Colors.black : Colors.white;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            // Background Canvas
-            Positioned.fill(
-              child: AnimatedCrossFade(
-                duration: const Duration(milliseconds: 300),
-                crossFadeState: _previewVibrantBg ? CrossFadeState.showFirst : CrossFadeState.showSecond,
-                firstChild: _buildVibrantBackdrop(),
-                secondChild: Container(color: const Color(0xFF141418)),
-              ),
-            ),
-
-            // Content inside preview
+            Positioned.fill(child: _backdropLayer()),
             Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                // Header with Badge + Toggle
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE11D48).withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE11D48).withValues(alpha: 0.40), width: 0.8),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(CupertinoIcons.sparkles, color: Color(0xFFE11D48), size: 11),
-                          SizedBox(width: 4),
-                          Text(
-                            'LIVE INTERACTIVE DEMO',
-                            style: TextStyle(
-                              color: Color(0xFFE11D48),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() => _previewVibrantBg = !_previewVibrantBg);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.40),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 0.6),
-                        ),
-                        child: Text(
-                          _previewVibrantBg ? 'Artwork Backdrop' : 'Studio Dark',
-                          style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 14),
-
-                // 1. DYNAMIC ISLAND PREVIEW
-                _buildDemoDynamicIsland(),
-
-                const SizedBox(height: 14),
-
-                // 2. MINIPLAYER PREVIEW
-                _buildDemoMiniPlayer(),
-
-                const SizedBox(height: 14),
-
-                // 3. FULLSCREEN PLAYER GLASS BUTTONS
-                _buildDemoPlayerGlassButtons(),
-
-                const SizedBox(height: 14),
-
-                // 4. APPLE DOCK PREVIEW
-                _buildDemoAppleDock(),
-              ],
+                  _island(ink),
+                  const SizedBox(height: 14),
+                  _miniPlayer(ink),
+                  const SizedBox(height: 14),
+                  _dock(ink),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-  Widget _buildVibrantBackdrop() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF500724), // deep wine red
-            Color(0xFF831843), // crimson
-            Color(0xFF312E81), // indigo
-            Color(0xFF1E1B4B), // dark night
           ],
         ),
-      ),
-      child: Stack(
-        children: [
-          // Blurred color orbs to test glass refraction
-          Positioned(
-            left: 20,
-            top: 40,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFE11D48).withValues(alpha: 0.45),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 10,
-            bottom: 20,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF38BDF8).withValues(alpha: 0.35),
-              ),
-            ),
-          ),
-          // Subtle background decorative text
-          Positioned(
-            left: 30,
-            top: 90,
-            child: Text(
-              'JAILER · HUKUM',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.15),
-                fontSize: 26,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  // Dynamic Island Mockup
-  Widget _buildDemoDynamicIsland() {
+  Widget _backdropLayer() {
+    final light = _backdrop == 2;
+    return AnimatedContainer(
+      duration: AM.dur(400),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: switch (_backdrop) {
+            0 => const [Color(0xFF500724), Color(0xFF831843), Color(0xFF312E81), Color(0xFF1E1B4B)],
+            1 => const [Color(0xFF141418), Color(0xFF0C0C0E)],
+            _ => const [Color(0xFFF2F2F7), Color(0xFFFFD6DC)],
+          },
+        ),
+      ),
+      child: AnimatedBuilder(
+        animation: _drift,
+        builder: (context, _) {
+          final t = _drift.value * 2 * math.pi;
+          return Stack(
+            children: [
+              if (_backdrop == 1)
+                Positioned.fill(child: CustomPaint(painter: _StripesPainter()))
+              else ...[
+                Positioned(
+                  left: 20 + 50 * math.sin(t),
+                  top: 24 + 30 * math.cos(t),
+                  child: _orb(150, GlassPalette.rose.withValues(alpha: light ? 0.5 : 0.5)),
+                ),
+                Positioned(
+                  right: 10 + 40 * math.cos(t),
+                  bottom: 10 + 26 * math.sin(t),
+                  child: _orb(130, const Color(0xFF38BDF8).withValues(alpha: light ? 0.45 : 0.38)),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _orb(double d, Color c) =>
+      Container(width: d, height: d, decoration: BoxDecoration(shape: BoxShape.circle, color: c));
+
+  Widget _circleButton(IconData icon, Color ink, {VoidCallback? onTap, Color? color}) {
+    return AMTap(
+      onTap: onTap,
+      child: GlassSurface(
+        borderRadius: BorderRadius.circular(18),
+        child: SizedBox(width: 36, height: 36, child: Icon(icon, size: 18, color: color ?? ink)),
+      ),
+    );
+  }
+
+  Widget _island(Color ink) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Back Button
-        AppleGlass(
-          borderRadius: BorderRadius.circular(18),
-          child: const SizedBox(
-            width: 36,
-            height: 36,
-            child: Center(
-              child: Icon(CupertinoIcons.chevron_back, color: Colors.white, size: 18),
-            ),
-          ),
-        ),
-
-        // Center Dynamic Island
-        AppleGlass(
+        _circleButton(CupertinoIcons.chevron_back, ink),
+        GlassSurface(
           borderRadius: BorderRadius.circular(20),
           child: Container(
             height: 36,
@@ -361,677 +351,254 @@ class _GlassCustomizerScreenState extends State<GlassCustomizerScreen> with Sing
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Animated Equalizer waveform
                 AnimatedBuilder(
-                  animation: _eqController,
-                  builder: (_, _) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: List.generate(3, (i) {
-                        final val = (math.sin(_eqController.value * 2 * math.pi + i * 1.5) + 1) / 2;
-                        final barH = 5.0 + val * 9.0;
-                        return Container(
-                          width: 2.2,
-                          height: barH,
+                  animation: _drift,
+                  builder: (context, _) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Container(
+                          width: 2.4,
+                          height: 5 + 9 * (math.sin(_drift.value * 2 * math.pi * 6 + i * 1.5) + 1) / 2,
                           margin: const EdgeInsets.symmetric(horizontal: 1),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE11D48),
+                            color: AM.rose,
                             borderRadius: BorderRadius.circular(2),
                           ),
-                        );
-                      }),
-                    );
-                  },
+                        ),
+                    ],
+                  ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'Hukum · Anirudh',
-                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                ),
+                Text('Hukum · Anirudh',
+                    style: TextStyle(color: ink, fontSize: 12, fontWeight: FontWeight.w700)),
                 const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: ink.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
-                    'LOSSLESS',
-                    style: TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.w700),
-                  ),
+                  child: Text('LOSSLESS',
+                      style: TextStyle(color: ink.withValues(alpha: 0.7), fontSize: 8, fontWeight: FontWeight.w700)),
                 ),
               ],
             ),
           ),
         ),
-
-        // More Action Button
-        AppleGlass(
-          borderRadius: BorderRadius.circular(18),
-          child: const SizedBox(
-            width: 36,
-            height: 36,
-            child: Center(
-              child: Icon(CupertinoIcons.ellipsis, color: Colors.white, size: 18),
-            ),
-          ),
-        ),
+        _circleButton(CupertinoIcons.ellipsis, ink),
       ],
     );
   }
 
-  // MiniPlayer Mockup
-  Widget _buildDemoMiniPlayer() {
-    return AppleGlass(
-      borderRadius: BorderRadius.circular(16),
+  Widget _miniPlayer(Color ink) {
+    return GlassSurface(
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Row(
           children: [
-            // Artwork thumb
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF9E2339), Color(0xFFE11D48)],
-                  ),
-                ),
-                child: const Center(
-                  child: Icon(CupertinoIcons.music_note, color: Colors.white, size: 18),
-                ),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: const LinearGradient(colors: [Color(0xFF9E2339), AM.rose]),
               ),
+              child: const Icon(CupertinoIcons.music_note, color: Colors.white, size: 18),
             ),
             const SizedBox(width: 10),
-
-            // Song & Artist Info
-            const Expanded(
+            Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Hukum - Thalaivar Alappara',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Jailer · Anirudh Ravichander',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w500),
-                  ),
+                  Text('Hukum',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: ink, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('Jailer',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: ink.withValues(alpha: 0.6), fontSize: 12)),
                 ],
               ),
             ),
-
-            // Controls
-            const Icon(CupertinoIcons.pause_fill, color: Colors.white, size: 20),
-            const SizedBox(width: 14),
-            const Icon(CupertinoIcons.forward_fill, color: Colors.white70, size: 18),
-            const SizedBox(width: 6),
+            AMTap(
+              onTap: () => setState(() => _liked = !_liked),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(
+                  _liked ? CupertinoIcons.star_fill : CupertinoIcons.star,
+                  size: 19,
+                  color: _liked ? AM.rose : ink,
+                ),
+              ),
+            ),
+            AMTap(
+              onTap: () => setState(() => _playing = !_playing),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(
+                  _playing ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
+                  size: 21,
+                  color: ink,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // Fullscreen Player Glass Buttons Mockup (Heart, Three-Dot, Share, Lyrics)
-  Widget _buildDemoPlayerGlassButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        // Heart Button
-        GestureDetector(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            setState(() => _demoLiked = !_demoLiked);
-          },
-          child: AppleGlass(
-            borderRadius: BorderRadius.circular(18),
-            child: SizedBox(
-              width: 36,
-              height: 36,
-              child: Center(
-                child: Icon(
-                  _demoLiked ? CupertinoIcons.star_fill : CupertinoIcons.star,
-                  color: _demoLiked ? const Color(0xFFFA2D48) : Colors.white,
-                  size: 18,
-                ),
-              ),
-            ),
-          ),
-        ),
-
-        // Three-Dot More Button
-        AppleGlass(
-          borderRadius: BorderRadius.circular(18),
-          child: const SizedBox(
-            width: 36,
-            height: 36,
-            child: Center(
-              child: Icon(
-                CupertinoIcons.ellipsis_vertical,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-          ),
-        ),
-
-        // Share Glass Button
-        AppleGlass(
-          borderRadius: BorderRadius.circular(18),
-          child: const SizedBox(
-            width: 36,
-            height: 36,
-            child: Center(
-              child: Icon(
-                CupertinoIcons.share,
-                color: Colors.white,
-                size: 17,
-              ),
-            ),
-          ),
-        ),
-
-        // Lyrics Glass Pill
-        AppleGlass(
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            height: 36,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(CupertinoIcons.quote_bubble, color: Colors.white, size: 16),
-                SizedBox(width: 4),
-                Text(
-                  'Lyrics',
-                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // AppleDock Mockup
-  Widget _buildDemoAppleDock() {
+  Widget _dock(Color ink) {
+    const tabs = [
+      (CupertinoIcons.house_fill, 'Home'),
+      (CupertinoIcons.square_grid_2x2_fill, 'Explore'),
+      (CupertinoIcons.music_albums_fill, 'Library'),
+    ];
     return Row(
       children: [
-        // Main Dock Pill
         Expanded(
-          child: AppleGlass(
-            borderRadius: BorderRadius.circular(24),
-            child: Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: const Row(
+          child: GlassSurface(
+            borderRadius: BorderRadius.circular(26),
+            child: SizedBox(
+              height: 52,
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _DemoDockTab(icon: CupertinoIcons.house_fill, label: 'Home', isSelected: true),
-                  _DemoDockTab(icon: CupertinoIcons.square_grid_2x2_fill, label: 'Explore', isSelected: false),
-                  _DemoDockTab(icon: CupertinoIcons.music_albums_fill, label: 'Library', isSelected: false),
+                  for (var i = 0; i < tabs.length; i++)
+                    AMTap(
+                      onTap: () => setState(() => _tab = i),
+                      child: TweenAnimationBuilder<Color?>(
+                        tween: ColorTween(end: _tab == i ? AM.rose : ink.withValues(alpha: 0.55)),
+                        duration: AM.dur(240),
+                        builder: (context, color, _) => Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(tabs[i].$1, size: 20, color: color),
+                            const SizedBox(height: 2),
+                            Text(tabs[i].$2, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
         ),
-
         const SizedBox(width: 10),
-
-        // Round Search Circle
-        AppleGlass(
-          borderRadius: BorderRadius.circular(24),
-          child: const SizedBox(
-            width: 48,
-            height: 48,
-            child: Center(
-              child: Icon(CupertinoIcons.search, color: Colors.white, size: 20),
-            ),
-          ),
+        GlassSurface(
+          borderRadius: BorderRadius.circular(26),
+          child: SizedBox(width: 52, height: 52, child: Icon(CupertinoIcons.search, size: 20, color: ink)),
         ),
       ],
-    );
-  }
-
-  // ===========================================================================
-  // PRESETS GRID
-  // ===========================================================================
-  Widget _buildPresetsGrid(SettingsState settings) {
-    final curStyle = settings.glassStyle;
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _PresetCard(
-                title: 'Liquid Glass',
-                subtitle: '100% Fluidity · Specular Rim',
-                icon: CupertinoIcons.sparkles,
-                isSelected: curStyle == 'fluid',
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  settings.setGlassStyle('fluid');
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _PresetCard(
-                title: 'Slight Glass',
-                subtitle: '50% Fluidity · Soft Frosted',
-                icon: CupertinoIcons.drop,
-                isSelected: curStyle == 'frosted',
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  settings.setGlassStyle('frosted');
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _PresetCard(
-                title: 'Neutral Grey',
-                subtitle: '0% Fluid · Sleek Matte Charcoal',
-                icon: CupertinoIcons.square_fill,
-                isSelected: curStyle == 'grey',
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  settings.setGlassStyle('grey');
-                },
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _PresetCard(
-                title: 'Pure Black',
-                subtitle: '0% Fluid · Deep OLED Black',
-                icon: CupertinoIcons.moon_fill,
-                isSelected: curStyle == 'black',
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  settings.setGlassStyle('black');
-                },
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ===========================================================================
-  // FLUIDITY SLIDER CARD
-  // ===========================================================================
-  Widget _buildFluiditySliderCard(SettingsState settings) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141418),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 0.6),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Fluidity Range',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-              Text(
-                '${(settings.glassFluidity * 100).round()}%',
-                style: const TextStyle(
-                  color: Color(0xFFE11D48),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Slide from 0% (solid matte) to 100% (liquid clear glass)',
-            style: TextStyle(color: Colors.white54, fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(CupertinoIcons.square_fill, color: Colors.white38, size: 16),
-              Expanded(
-                child: CupertinoSlider(
-                  value: settings.glassFluidity,
-                  min: 0.0,
-                  max: 1.0,
-                  activeColor: const Color(0xFFE11D48),
-                  thumbColor: Colors.white,
-                  onChanged: (val) {
-                    settings.setGlassFluidity(val);
-                  },
-                ),
-              ),
-              const Icon(CupertinoIcons.sparkles, color: Color(0xFFE11D48), size: 16),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // BASE COLOR SHADE
-  // ===========================================================================
-  Widget _buildBaseColorRow(SettingsState settings) {
-    final curBase = settings.glassBaseColor;
-
-    final swatches = [
-      ('default', 'Default Dark', const Color(0xFF121216)),
-      ('black', 'Pure Black', const Color(0xFF0C0C0E)),
-      ('grey', 'Neutral Grey', const Color(0xFF222226)),
-      ('crimson', 'Crimson Wine', const Color(0xFF1E0A12)),
-    ];
-
-    return Row(
-      children: swatches.map((item) {
-        final (key, label, color) = item;
-        final isSelected = curBase == key;
-
-        return Expanded(
-          child: GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              settings.setGlassBaseColor(key);
-            },
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF141418),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isSelected ? const Color(0xFFE11D48) : Colors.white.withValues(alpha: 0.08),
-                  width: isSelected ? 1.5 : 0.6,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white24, width: 0.8),
-                    ),
-                    child: isSelected
-                        ? const Center(
-                            child: Icon(CupertinoIcons.checkmark, size: 13, color: Color(0xFFE11D48)),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.white60,
-                      fontSize: 10,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // ===========================================================================
-  // BLUR & SPECULAR EDGES
-  // ===========================================================================
-  Widget _buildSurfaceReactionCard(SettingsState settings) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF141418),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08), width: 0.6),
-      ),
-      child: Column(
-        children: [
-          // Blur Slider Row
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Blur Intensity',
-                      style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                    ),
-                    Text(
-                      '${settings.glassBlur.round()} px',
-                      style: const TextStyle(
-                        color: Color(0xFFE11D48),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Diffusion level behind the glass surface (lower is clearer)',
-                  style: TextStyle(color: Colors.white54, fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                CupertinoSlider(
-                  value: settings.glassBlur,
-                  min: 0.0,
-                  max: 20.0,
-                  activeColor: const Color(0xFFE11D48),
-                  thumbColor: Colors.white,
-                  onChanged: (val) {
-                    settings.setGlassBlur(val);
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
-
-          // Specular Edge Reflection Switch
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Specular Edge Reflection',
-                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Luminescent light refraction along glass edges',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                CupertinoSwitch(
-                  value: settings.glassSpecularRim,
-                  activeTrackColor: const Color(0xFFE11D48),
-                  onChanged: (val) {
-                    HapticFeedback.selectionClick();
-                    settings.setGlassSpecularRim(val);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
 
-// =============================================================================
-// HELPER SUB-WIDGETS
-// =============================================================================
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    this.subtitle,
-    this.badge,
-  });
-
-  final String title;
-  final String? subtitle;
-  final String? badge;
+// ═════════════════════════════════════════════════════════════════════════════
+class _StripesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = Colors.white.withValues(alpha: 0.07)
+      ..strokeWidth = 2;
+    for (double x = -size.height; x < size.width; x += 18) {
+      canvas.drawLine(Offset(x, size.height), Offset(x + size.height, 0), p);
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Color(0xFF8E8E93),
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-              ),
-            ),
-            if (badge != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE11D48).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  badge!,
-                  style: const TextStyle(
-                    color: Color(0xFFE11D48),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 3),
-          Text(
-            subtitle!,
-            style: const TextStyle(color: Colors.white54, fontSize: 12),
-          ),
-        ],
-      ],
-    );
-  }
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
-class _PresetCard extends StatelessWidget {
-  const _PresetCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final bool isSelected;
+/// Live preview of one material: the real glass renderer over a small scene.
+class _PresetTile extends StatelessWidget {
+  const _PresetTile({required this.preset, required this.selected, required this.onTap});
+  final GlassPreset preset;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final ink = GlassPalette.isLight(preset.config.base) ? Colors.black : Colors.white;
+    return AMTap(
       onTap: onTap,
+      scale: 0.96,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
+        duration: AM.dur(240),
+        curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFE11D48).withValues(alpha: 0.12)
-              : const Color(0xFF141418),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFFE11D48)
-                : Colors.white.withValues(alpha: 0.08),
-            width: isSelected ? 1.5 : 0.6,
-          ),
+          color: AM.card,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: selected ? AM.rose : Colors.transparent, width: 2),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(
-                  icon,
-                  size: 20,
-                  color: isSelected ? const Color(0xFFE11D48) : Colors.white70,
-                ),
-                if (isSelected)
-                  const Icon(
-                    CupertinoIcons.checkmark_circle_fill,
-                    size: 16,
-                    color: Color(0xFFE11D48),
+            SizedBox(
+              height: 76,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF831843), Color(0xFF312E81), Color(0xFF0E7490)],
+                        ),
+                      ),
+                    ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.85),
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+                  Positioned(
+                    left: -10,
+                    top: -14,
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: GlassPalette.rose.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                  GlassSurface(
+                    config: preset.config,
+                    borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
+                      width: 88,
+                      height: 36,
+                      child: Icon(CupertinoIcons.music_note_2, size: 16, color: ink),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 3),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: isSelected ? Colors.white70 : Colors.white38,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      preset.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AM.label, fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  AnimatedOpacity(
+                    opacity: selected ? 1 : 0,
+                    duration: AM.dur(200),
+                    child: const Icon(CupertinoIcons.checkmark_circle_fill, size: 17, color: AM.rose),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1041,35 +608,105 @@ class _PresetCard extends StatelessWidget {
   }
 }
 
-class _DemoDockTab extends StatelessWidget {
-  const _DemoDockTab({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
+class _Swatch {
+  const _Swatch(this.id, this.label, {this.color, this.gradient = false, this.none = false});
+  final String id;
+  final String label;
+  final Color? color;
+  final bool gradient;
+  final bool none;
+}
+
+class _Swatches extends StatelessWidget {
+  const _Swatches({
+    required this.title,
+    required this.items,
+    required this.selected,
+    required this.onSelect,
   });
 
-  final IconData icon;
-  final String label;
-  final bool isSelected;
+  final String title;
+  final List<_Swatch> items;
+  final String selected;
+  final ValueChanged<String> onSelect;
 
   @override
   Widget build(BuildContext context) {
-    final color = isSelected ? const Color(0xFFFA2D48) : const Color(0xFF8E8E93);
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 10,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 13, 0, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(title, style: AM.rowTitle),
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                for (final s in items)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 14),
+                    child: AMTap(
+                      onTap: () {
+                        AM.tick();
+                        onSelect(s.id);
+                      },
+                      child: Column(
+                        children: [
+                          AnimatedContainer(
+                            duration: AM.dur(220),
+                            curve: Curves.easeOutCubic,
+                            width: 40,
+                            height: 40,
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: selected == s.id ? AM.rose : AM.sep,
+                                width: selected == s.id ? 2 : 1,
+                              ),
+                            ),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: s.gradient ? null : (s.color ?? AM.cardHi),
+                                gradient: s.gradient
+                                    ? const SweepGradient(colors: [
+                                        Color(0xFFFA2D48),
+                                        Color(0xFFBF5AF2),
+                                        Color(0xFF38BDF8),
+                                        Color(0xFFFA2D48),
+                                      ])
+                                    : null,
+                              ),
+                              child: s.none
+                                  ? const Icon(CupertinoIcons.nosign, size: 16, color: AM.label2)
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            s.label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: selected == s.id ? AM.label : AM.label2,
+                              fontWeight: selected == s.id ? FontWeight.w600 : FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -32,13 +32,16 @@ const double _kSameStartEps = 0.35;
 /// Karaoke glyph-fill subtle scale peak (1.0 to ~1.03-1.05 max).
 const double kKaraokeGlyphScalePeak = 1.04;
 
+/// Apple Music lyric typography (SF Pro Display).
+const FontWeight _kLyricWeight = FontWeight.w800;
+
 /// Three-dot interlude tunables. (Pulse constants are kept only so existing
 /// imports do not break - the dots no longer resize while waiting.)
 const double kDotPopInOvershoot = 1.25;
 const double kDotPulseScaleMin = 1.0;
 const double kDotPulseScaleMax = 1.4;
 const double kDotClosingDuration = 0.60; // seconds, pop-out before next line
-const int kDotStaggerMs = 110;
+const int kDotStaggerMs = 130;
 
 /// Apple-style "waterfall": every line below the active one starts its glide a
 /// little later than the one above it.
@@ -527,6 +530,16 @@ final Curve _thumbSpring = _SpringCurve(
   settle: 0.6,
 );
 const Curve _liquidCurve = Cubic(0.16, 1.0, 0.30, 1.0);
+
+/// Per-word lift: soft, slightly underdamped (about 5% overshoot).
+final Curve _liftSpring = _SpringCurve(
+  stiffness: 95,
+  ratio: 0.68,
+  settle: 0.95,
+);
+
+/// Interlude dots pop-in: bouncier.
+final Curve _dotSpring = _SpringCurve(stiffness: 190, ratio: 0.5, settle: 0.6);
 
 /// One "layout moved" event. Every tile turns it into its own spring that
 /// starts from where the tile used to be on screen.
@@ -1692,7 +1705,7 @@ class _WordLineState extends State<_WordLine>
     super.initState();
     _settle = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 520),
+      duration: const Duration(milliseconds: 1200),
       value: 0,
     );
   }
@@ -1707,7 +1720,7 @@ class _WordLineState extends State<_WordLine>
       fontSize: fs,
       height: complex ? 1.3 : _kLineHeight,
       leadingDistribution: TextLeadingDistribution.even,
-      fontWeight: widget.backing ? FontWeight.w500 : FontWeight.w600,
+      fontWeight: widget.backing ? FontWeight.w500 : _kLyricWeight,
       letterSpacing: complex ? 0.0 : 0.55,
       color: c,
     );
@@ -1863,13 +1876,36 @@ class _WordLineState extends State<_WordLine>
       raw = (t - lay.s[i]) / span;
     }
 
-    // Apple-style per-word lift: the word rises as it is sung, and settles
-    // back down smoothly once the line is over.
-    final lift = (widget.plain || reduce)
-        ? 0.0
-        : widget.current
-        ? Curves.easeOutCubic.transform((raw * 2.5).clamp(0.0, 1.0))
-        : (widget.past ? settle : 0.0);
+    // lift: 0 = rest, 1 = fully raised. glow: 0..1 bloom.
+    var lift = 0.0;
+    var glow = 0.0;
+    if (!widget.plain && !reduce) {
+      if (widget.current && t != null) {
+        // Time based (not word-length based) so short words are just as
+        // smooth: the word starts rising a hair BEFORE the fill reaches it
+        // and springs up with a tiny overshoot.
+        final u = ((t - lay.s[i] + 0.12) / 0.95).clamp(0.0, 1.0).toDouble();
+        lift = _liftSpring.transform(u);
+        // Glow blooms while the word is being filled, then relaxes to a
+        // soft resting glow.
+        final g = ((t - lay.s[i]) / (span + 0.7)).clamp(0.0, 1.0).toDouble();
+        glow = math.max(math.sin(math.pi * g), t >= lay.s[i] ? 0.18 : 0.0);
+      } else if (widget.past) {
+        // Sentence finished: a wave runs through the words. Each word glows,
+        // floats a little further up, then settles back down.
+        final fin = 1 - settle.clamp(0.0, 1.0);
+        final n = lay.tokens.length;
+        const stag = 0.35;
+        final step = n > 1 ? stag / (n - 1) : 0.0;
+        final local = ((fin - i * step) / (1 - stag))
+            .clamp(0.0, 1.0)
+            .toDouble();
+        final e = Curves.easeInOutCubic.transform(local);
+        final pulse = math.sin(math.pi * local);
+        lift = 1 + 0.9 * pulse - e;
+        glow = math.max(0.95 * pulse, 0.18 * (1 - e));
+      }
+    }
 
     return _Word(
       text: lay.tokens[i],
@@ -1879,15 +1915,13 @@ class _WordLineState extends State<_WordLine>
       settle: settle,
       rtl: rtl,
       lift: lift,
-      glow: widget.plain
-          ? 0.0
-          : Curves.easeOut.transform(settle.clamp(0.0, 1.0)),
+      glow: glow.clamp(0.0, 1.0).toDouble(),
     );
   }
 }
 
 /// One word: dim base, soft-edged white fill (left to right, or right to left
-/// for RTL scripts), white glow and a gentle lift while it is sung.
+/// for RTL scripts), white glow bloom and a spring lift while it is sung.
 class _Word extends StatelessWidget {
   const _Word({
     required this.text,
@@ -1917,8 +1951,24 @@ class _Word extends StatelessWidget {
       out = t(_dim);
     } else if (p >= 1.0) {
       out = t(Colors.white);
+      if (glow > 0.01) {
+        final sigma = 5.0 + 5.0 * glow;
+        out = Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Opacity(
+              opacity: (0.5 * glow).clamp(0.0, 1.0),
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                child: t(Colors.white),
+              ),
+            ),
+            out,
+          ],
+        );
+      }
     } else {
-      const soft = 0.18;
+      const soft = 0.3; // wider soft edge = smoother sweep
       final a = (p * (1 + soft) - soft).clamp(0.0, 1.0).toDouble();
       final b = (p * (1 + soft)).clamp(0.0, 1.0).toDouble();
       Shader mask(Rect r) => LinearGradient(
@@ -1927,13 +1977,16 @@ class _Word extends StatelessWidget {
         colors: const [Colors.white, Colors.white, Color(0x00FFFFFF)],
         stops: [0, a, b],
       ).createShader(r);
+
+      final sweepSigma = 4.0 + 4.0 * glow;
+      final sweepOpacity = (0.55 + 0.35 * glow).clamp(0.0, 0.95);
       out = Stack(
         clipBehavior: Clip.none,
         children: [
           Opacity(
-            opacity: 0.55,
+            opacity: sweepOpacity,
             child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+              imageFilter: ImageFilter.blur(sigmaX: sweepSigma, sigmaY: sweepSigma),
               child: ShaderMask(
                 blendMode: BlendMode.dstIn,
                 shaderCallback: mask,
@@ -1950,10 +2003,15 @@ class _Word extends StatelessWidget {
         ],
       );
     }
+
     if (lift == 0) return out;
     return Transform.translate(
-      offset: Offset(0, -fs * 0.07 * lift),
-      child: out,
+      offset: Offset(0, -fs * 0.09 * lift),
+      child: Transform.scale(
+        scale: 1 + 0.025 * lift.clamp(0.0, 1.3),
+        alignment: Alignment.bottomCenter,
+        child: out,
+      ),
     );
   }
 }
@@ -1974,7 +2032,8 @@ class _Dots extends StatelessWidget {
   final double start, end;
 
   static const double _size = 13;
-  static const double _gap = 10;
+  static const double _gap = 11;
+  static const double _breathHz = 0.55; // breaths per second
 
   @override
   Widget build(BuildContext context) {
@@ -1985,7 +2044,7 @@ class _Dots extends StatelessWidget {
     final closeSpan = kDotClosingDuration - closeStagger * 2;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 10, 0, 10),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: ValueListenableBuilder<double>(
         valueListenable: clock,
         builder: (_, t, _) {
@@ -2022,16 +2081,19 @@ class _Dots extends StatelessWidget {
     double closeStagger,
     double closeSpan,
   ) {
-    // Pop in.
+    // ---- Opening: each dot rises from below and springs in (overshoot).
     final inT = t - start - i * stagger;
-    final inP = (inT / 0.5).clamp(0.0, 1.0).toDouble();
-    var scale = inT <= 0 ? 0.0 : _popSpring.transform(inP);
+    final inP = (inT / 0.65).clamp(0.0, 1.0).toDouble();
+    final sp = inT <= 0 ? 0.0 : _dotSpring.transform(inP);
+    var scale = sp;
     var opacity = (inP * 3).clamp(0.0, 1.0).toDouble();
+    var y = 14 * (1 - sp);
 
-    // Pop out: small swell, then shrink away.
+    // ---- Closing: small swell, then shrink away + float up, staggered.
     final cu = ((t - closeStart - i * closeStagger) / closeSpan)
         .clamp(0.0, 1.0)
         .toDouble();
+    var closeK = 1.0;
     if (cu > 0) {
       const swell = 0.28;
       if (cu < swell) {
@@ -2040,32 +2102,52 @@ class _Dots extends StatelessWidget {
         final k = Curves.easeInCubic.transform((cu - swell) / (1 - swell));
         scale *= 1.2 * (1 - k);
         opacity *= 1 - k;
+        y -= 8 * k;
       }
+      closeK = 1 - Curves.easeIn.transform(cu);
     }
 
     if (scale <= 0.001 || opacity <= 0.001) {
       return const SizedBox(width: _size, height: _size);
     }
 
-    // Brightness fill only (no size change).
+    // ---- Looping: a breathing wave runs left -> right through the dots.
+    // Starts only once the dot has settled and fades out while closing.
+    final openK = Curves.easeIn.transform(((inT - 0.4) / 0.4).clamp(0.0, 1.0));
+    final phase = 2 * math.pi * (_breathHz * (t - start) - i * 0.14);
+    final breath = Curves.easeInOut.transform(0.5 - 0.5 * math.cos(phase));
+    final b = breath * openK * closeK;
+    scale *= 1 + 0.22 * b;
+    y -= 4 * b;
+
+    // Brightness fill follows the gap's progress (left to right).
     final fill = ((progress * 3.0) - i).clamp(0.0, 1.0).toDouble();
 
-    return Transform.scale(
-      scale: scale,
-      child: Opacity(
-        opacity: opacity,
-        child: Container(
-          width: _size,
-          height: _size,
-          decoration: BoxDecoration(
-            color: Color.lerp(const Color(0x66FFFFFF), Colors.white, fill),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.12 + 0.42 * fill),
-                blurRadius: 4 + 8 * fill,
+    return Transform.translate(
+      offset: Offset(0, y),
+      child: Transform.scale(
+        scale: scale,
+        child: Opacity(
+          opacity: opacity,
+          child: Container(
+            width: _size,
+            height: _size,
+            decoration: BoxDecoration(
+              color: Color.lerp(
+                const Color(0x59FFFFFF),
+                Colors.white,
+                (fill + 0.3 * b).clamp(0.0, 1.0),
               ),
-            ],
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(
+                    alpha: 0.10 + 0.40 * fill + 0.15 * b,
+                  ),
+                  blurRadius: 4 + 8 * fill + 6 * b,
+                ),
+              ],
+            ),
           ),
         ),
       ),

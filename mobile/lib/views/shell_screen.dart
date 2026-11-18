@@ -27,6 +27,26 @@ import 'room_together/room_together_screen.dart';
 /// AppShell: 4 tabs, an Apple Music style liquid-glass dock (slide-to-switch lens +
 /// round search button) and the persistent morphing PlayerShell whose mini player
 /// floats as a glass pill right above the dock.
+/// Scope allowing descendant sheets and modals to open pages inside the active tab navigator
+/// without covering or hiding the bottom dock and mini player.
+class ShellNavigationScope extends InheritedWidget {
+  const ShellNavigationScope({
+    super.key,
+    required this.openInActiveTab,
+    required this.closePlayerSheet,
+    required super.child,
+  });
+
+  final void Function(Widget page) openInActiveTab;
+  final VoidCallback closePlayerSheet;
+
+  static ShellNavigationScope? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ShellNavigationScope>();
+
+  @override
+  bool updateShouldNotify(ShellNavigationScope oldWidget) => false;
+}
+
 class ShellScreen extends StatefulWidget {
   const ShellScreen({super.key});
 
@@ -355,13 +375,21 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     final hasTrack = context.select<PlayerState, bool>((p) => p.currentTrack != null);
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        _handleBack();
+    return ShellNavigationScope(
+      openInActiveTab: _openInActiveTab,
+      closePlayerSheet: () {
+        final player = _playerShellKey.currentState;
+        if (player != null && player.isOpen) {
+          player.closeSheet();
+        }
       },
-      child: Scaffold(
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          _handleBack();
+        },
+        child: Scaffold(
         resizeToAvoidBottomInset: false,
         extendBody: true,
         backgroundColor: Zen.bg,
@@ -526,6 +554,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
           },
         ),
       ),
+    ),
     );
   }
 }

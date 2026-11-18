@@ -20,6 +20,7 @@ import 'package:provider/provider.dart';
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_typography.dart';
 import '../../design_system/widgets/apple_glass.dart';
+import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
@@ -3295,11 +3296,20 @@ class _SongRow extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: _t(16, c: active ? _rose : Colors.white),
                               ),
-                              Text(
-                                track.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: _t(14, c: _sub),
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () {
+                                  MediaNavigationSheet.show(
+                                    context: context,
+                                    track: track,
+                                  );
+                                },
+                                child: Text(
+                                  track.artist,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: _t(14, c: _sub),
+                                ),
                               ),
                             ],
                           ),
@@ -3352,9 +3362,7 @@ class _CircleBtn extends StatelessWidget {
       child: SizedBox(
         width: 32,
         height: 32,
-        child: Center(
-          child: Icon(icon, size: 18, color: Colors.white),
-        ),
+        child: Center(child: Icon(icon, size: 18, color: Colors.white)),
       ),
     ),
   );
