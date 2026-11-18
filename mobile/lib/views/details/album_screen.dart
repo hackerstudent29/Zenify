@@ -14,6 +14,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
+import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../features/story_sharing/story_sharing.dart';
@@ -746,12 +747,15 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
 
   void _openArtist([String? specificArtist]) {
     final target = specificArtist ?? _displayArtistName;
-    final artists = MediaNormalizer.splitArtistNames(target);
-    if (artists.length > 1 && specificArtist == null) {
-      showArtistPopup(context, currentArtistName: target);
-    } else if (artists.isNotEmpty) {
-      Navigator.push(context, ZenPageRoute(builder: (_) => ArtistScreen(artistName: artists.first)));
-    }
+    MediaNavigationSheet.show(
+      context: context,
+      artistName: target,
+      albumTitle: _resolvedAlbumTitle,
+      albumArtist: _displayArtistName,
+      albumCoverUrl: _displayCoverUrl,
+      albumBrowseId: _resolvedBrowseId,
+      initialTracks: _tracks,
+    );
   }
 
   void _toggleSaved(String cover) {
@@ -915,6 +919,22 @@ class _AlbumScreenState extends State<AlbumScreen> with TickerProviderStateMixin
       }
     }
     return a.isNotEmpty ? a : 'Artist';
+  }
+
+  String get _displayCoverUrl {
+    return _resolvedCover ??
+        widget.coverUrl ??
+        (_tracks.isNotEmpty ? _tracks.first.coverUrl : '');
+  }
+
+  String? get _resolvedBrowseId {
+    if (widget.browseId != null && widget.browseId!.isNotEmpty) {
+      return widget.browseId;
+    }
+    if (_tracks.isNotEmpty && _tracks.first.albumBrowseId != null && _tracks.first.albumBrowseId!.isNotEmpty) {
+      return _tracks.first.albumBrowseId;
+    }
+    return null;
   }
 
   int get _totalDurationSeconds =>
@@ -1533,15 +1553,24 @@ class _TrackRow extends StatelessWidget {
                             ),
                           ),
                           if (showArtist)
-                            Text(
-                              MediaNormalizer.formatArtists(track.artist),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontFamily: 'SF Pro',
-                                color: AppColors.textSecondary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                MediaNavigationSheet.show(
+                                  context: context,
+                                  track: track,
+                                );
+                              },
+                              child: Text(
+                                MediaNormalizer.formatArtists(track.artist),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                ),
                               ),
                             ),
                         ],
