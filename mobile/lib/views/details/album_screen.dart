@@ -25,8 +25,6 @@ import '../../services/innertube_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../utils/media_normalizer.dart';
-import 'artist_popup.dart';
-import 'artist_screen.dart';
 
 /* ------------------------------------------------------------------ */
 /*  Spring primitives                                                   */
