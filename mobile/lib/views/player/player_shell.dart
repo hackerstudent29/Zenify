@@ -1227,31 +1227,31 @@ class PlayerShellState extends State<PlayerShell>
                           fit: StackFit.expand,
                           children: [
                             Container(
-                              color: _palette.isNotEmpty
-                                  ? _palette.first
-                                  : const Color(0xFF121214),
+                              color: const Color(0xFF121214),
                             ),
                             RepaintBoundary(
-                              child: TickerMode(
-                                enabled: _open || t > 0.05,
-                                child: ArtworkMeshBackground(
-                                  coverUrl: MediaNormalizer.upgradeArtworkUrl(
-                                    ((_shownCover?.isNotEmpty == true
-                                            ? _shownCover
-                                            : track?.coverUrl) ??
-                                        ''),
-                                  ),
-                                  fallbackAsset: 'assets/images/z_logo.png',
-                                  palette: _palette.isNotEmpty
-                                      ? _palette
-                                      : null,
-                                  paused: !_playing,
-                                  speed: 1.0,
-                                  backgroundColor: _palette.isNotEmpty
-                                      ? _palette.first
-                                      : const Color(0xFF121214),
-                                  scrimOpacity: 0.15,
+                              child: ArtworkMeshBackground(
+                                key: ValueKey(
+                                  'artmesh_${track?.id ?? "none"}_${_shownCover ?? ""}',
                                 ),
+                                coverUrl: MediaNormalizer.upgradeArtworkUrl(
+                                  ((_shownCover?.isNotEmpty == true
+                                          ? _shownCover
+                                          : track?.coverUrl) ??
+                                      ''),
+                                ),
+                                fallbackAsset: 'assets/images/z_logo.png',
+                                imageProviderBuilder: (url) =>
+                                    CachedNetworkImageProvider(
+                                      MediaNormalizer.upgradeArtworkUrl(url),
+                                    ),
+                                palette: _palette.isNotEmpty
+                                    ? _palette
+                                    : null,
+                                paused: !_open && t < 0.05,
+                                speed: 1.0,
+                                backgroundColor: const Color(0xFF121214),
+                                scrimOpacity: 0.15,
                               ),
                             ),
                             // Scrim: NONE for lyrics. Queue keeps a soft scrim.

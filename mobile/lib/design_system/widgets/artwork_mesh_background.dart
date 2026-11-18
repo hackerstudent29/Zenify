@@ -23,6 +23,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -732,6 +733,11 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
       _reduce = reduce;
       _wake();
     }
+    // ignore: deprecated_member_use
+    final tickerEnabled = TickerMode.of(context);
+    if (tickerEnabled && !_ticker.isActive) {
+      _wake();
+    }
   }
 
   @override
@@ -790,7 +796,11 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
 
   ImageProvider _providerFor(String key) {
     if (key.startsWith('asset:')) return AssetImage(key.substring(6));
-    return widget.imageProviderBuilder?.call(key) ?? NetworkImage(key);
+    if (widget.imageProviderBuilder != null) return widget.imageProviderBuilder!(key);
+    if (key.startsWith('http://') || key.startsWith('https://')) {
+      return CachedNetworkImageProvider(key);
+    }
+    return NetworkImage(key);
   }
 
   Future<void> _loadCover() async {
