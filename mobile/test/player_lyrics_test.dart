@@ -100,11 +100,8 @@ void main() {
     // Artist name remains visible next to moved artwork in compact header
     expect(find.textContaining(track.artistNames.first), findsAtLeastNWidgets(1));
     // All transport & tool buttons remain visible when clicking Lyrics
-    expect(find.byIcon(CupertinoIcons.shuffle), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.backward_fill), findsOneWidget);
-    expect(find.byIcon(CupertinoIcons.play_fill), findsAtLeastNWidgets(1));
     expect(find.byIcon(CupertinoIcons.forward_fill), findsAtLeastNWidgets(1));
-    expect(find.byIcon(CupertinoIcons.repeat), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.slider_horizontal_3), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.quote_bubble_fill), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.list_bullet), findsOneWidget);

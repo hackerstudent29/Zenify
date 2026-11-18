@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
@@ -38,6 +39,13 @@ import '../../utils/media_normalizer.dart';
 const _kPressSpring = SpringDescription(mass: 1, stiffness: 430, damping: 21);
 const _kRevealSpring = SpringDescription(mass: 1, stiffness: 170, damping: 22);
 
+const _kGray = ColorFilter.matrix(<double>[
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0.2126, 0.7152, 0.0722, 0, 0,
+  0, 0, 0, 1, 0,
+]);
+
 /// Horizontal shelf physics: flings settle on a card with a real spring.
 class SnapSpringPhysics extends ScrollPhysics {
   const SnapSpringPhysics({super.parent, required this.itemExtent});
@@ -49,7 +57,7 @@ class SnapSpringPhysics extends ScrollPhysics {
 
   @override
   SpringDescription get spring =>
-      SpringDescription.withDampingRatio(mass: 0.5, stiffness: 120, ratio: 1.05);
+      SpringDescription.withDampingRatio(mass: 0.5, stiffness: 110, ratio: 1.0);
 
   double _target(ScrollMetrics m, double velocity) {
     final page = m.pixels / itemExtent;
@@ -175,10 +183,11 @@ class _RevealState extends State<Reveal> with SingleTickerProviderStateMixin {
 /*  Small shared widgets                                                */
 /* ------------------------------------------------------------------ */
 class _Img extends StatelessWidget {
-  const _Img(this.url, {this.radius = 10, this.circular = false});
+  const _Img(this.url, {this.radius = 10, this.circular = false, this.cacheWidth = 520});
   final String url;
   final double radius;
   final bool circular;
+  final int cacheWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -186,6 +195,7 @@ class _Img extends StatelessWidget {
     final img = CachedNetworkImage(
       imageUrl: resolved,
       fit: BoxFit.cover,
+      memCacheWidth: cacheWidth,
       fadeInDuration: const Duration(milliseconds: 220),
       placeholder: (context, url) => Container(color: AppColors.surface2),
       errorWidget: (context, errUrl, error) {
@@ -193,11 +203,13 @@ class _Img extends StatelessWidget {
           return CachedNetworkImage(
             imageUrl: errUrl.replaceAll('maxresdefault.jpg', 'sddefault.jpg'),
             fit: BoxFit.cover,
+            memCacheWidth: cacheWidth,
             fadeInDuration: const Duration(milliseconds: 220),
             placeholder: (_, _) => Container(color: AppColors.surface2),
             errorWidget: (_, sdUrl, _) => CachedNetworkImage(
               imageUrl: sdUrl.replaceAll('sddefault.jpg', 'hqdefault.jpg'),
               fit: BoxFit.cover,
+              memCacheWidth: cacheWidth,
               errorWidget: (_, _, _) => Container(
                 color: AppColors.surface2,
                 child: Icon(circular ? CupertinoIcons.person_fill : Icons.music_note_rounded, color: AppColors.textTertiary),
@@ -211,7 +223,39 @@ class _Img extends StatelessWidget {
         );
       },
     );
-    return circular ? ClipOval(child: img) : ClipRRect(borderRadius: BorderRadius.circular(radius), child: img);
+    if (circular) return ClipOval(child: img);
+    if (radius <= 0) return img;
+    return ClipRRect(borderRadius: BorderRadius.circular(radius), child: img);
+  }
+}
+
+/// Duotone artwork (grey image washed with a colour) - Apple's category look.
+class _TintedArt extends StatelessWidget {
+  const _TintedArt({required this.url, required this.color, required this.size, this.radius = 12});
+  final String url;
+  final Color color;
+  final double size, radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 5))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColorFiltered(colorFilter: _kGray, child: _Img(url, radius: 0, cacheWidth: 300)),
+            ColoredBox(color: color.withValues(alpha: 0.62)),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -280,7 +324,7 @@ class _SecHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 30, 20, 12),
+      padding: const EdgeInsets.fromLTRB(20, 34, 20, 14),
       child: SpringPress(
         scale: 0.985,
         onTap: onMore,
@@ -291,9 +335,19 @@ class _SecHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (overline != null)
-                    Text(
-                      overline!,
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        overline!.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
                     ),
                   Row(
                     children: [
@@ -305,15 +359,15 @@ class _SecHeader extends StatelessWidget {
                           style: const TextStyle(
                             fontFamily: 'SF Pro Display',
                             color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.5,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.7,
                           ),
                         ),
                       ),
                       if (onMore != null) ...[
                         const SizedBox(width: 2),
-                        const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary, size: 24),
+                        const Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary, size: 26),
                       ],
                     ],
                   ),
@@ -343,15 +397,330 @@ class _Shelf extends StatelessWidget {
         physics: SnapSpringPhysics(parent: const BouncingScrollPhysics(), itemExtent: itemExtent),
         itemExtent: itemExtent,
         itemCount: count,
-        itemBuilder: (c, i) => Padding(padding: const EdgeInsets.only(right: 14), child: builder(c, i)),
+        addAutomaticKeepAlives: false,
+        // ignore: deprecated_member_use
+        cacheExtent: itemExtent * 2,
+        itemBuilder: (c, i) => RepaintBoundary(
+          child: Padding(padding: const EdgeInsets.only(right: 14), child: builder(c, i)),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayPill extends StatelessWidget {
+  const _PlayPill({required this.label, required this.icon, this.onTap});
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool dark = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = dark ? Colors.white : Colors.black;
+    return SpringPress(
+      onTap: onTap,
+      scale: 0.93,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 16, 8),
+        decoration: BoxDecoration(
+          color: dark ? Colors.white.withValues(alpha: 0.2) : Colors.white,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: fg, size: 20),
+            const SizedBox(width: 4),
+            Text(label, style: TextStyle(color: fg, fontSize: 14, fontWeight: FontWeight.w700)),
+          ],
+        ),
       ),
     );
   }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Cards                                                               */
+/*  HERO (Apple Music "Listen Now" carousel with parallax + ambience)   */
 /* ------------------------------------------------------------------ */
+class _HeroItem {
+  const _HeroItem(this.track, this.tag);
+  final Track track;
+  final String tag;
+}
+
+class _Hero extends StatefulWidget {
+  const _Hero({super.key, required this.items, required this.player, required this.onPlay});
+  final List<_HeroItem> items;
+  final PlayerState player;
+  final void Function(int index) onPlay;
+
+  @override
+  State<_Hero> createState() => _HeroState();
+}
+
+class _HeroState extends State<_Hero> {
+  final _pc = PageController(viewportFraction: 0.84);
+  final ValueNotifier<int> _idx = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    _idx.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.items;
+    final w = MediaQuery.sizeOf(context).width;
+    final h = math.min(450.0, w * 1.1);
+
+    return SizedBox(
+      height: h + 44,
+      child: Stack(
+        children: [
+          // Ambient blurred backdrop that crossfades with the current artwork.
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: ValueListenableBuilder<int>(
+                valueListenable: _idx,
+                builder: (context, i, _) {
+                  final url = MediaNormalizer.upgradeArtworkUrl(items[i.clamp(0, items.length - 1)].track.coverUrl,
+                      isArtistAvatar: false);
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 700),
+                        child: SizedBox.expand(
+                          key: ValueKey(url),
+                          child: ImageFiltered(
+                            imageFilter: ui.ImageFilter.blur(sigmaX: 40, sigmaY: 40, tileMode: TileMode.clamp),
+                            child: CachedNetworkImage(
+                              imageUrl: url,
+                              fit: BoxFit.cover,
+                              memCacheWidth: 120,
+                              errorWidget: (_, _, _) => const SizedBox.shrink(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              AppColors.bg,
+                              AppColors.bg.withValues(alpha: 0.35),
+                              AppColors.bg.withValues(alpha: 0.55),
+                              AppColors.bg,
+                            ],
+                            stops: const [0, 0.25, 0.7, 1],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+          Column(
+            children: [
+              SizedBox(
+                height: h,
+                child: PageView.builder(
+                  controller: _pc,
+                  physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
+                  itemCount: items.length,
+                  onPageChanged: (i) => _idx.value = i,
+                  itemBuilder: (context, i) {
+                    return AnimatedBuilder(
+                      animation: _pc,
+                      builder: (context, _) {
+                        double page = 0;
+                        if (_pc.hasClients && _pc.position.haveDimensions) {
+                          page = _pc.page ?? 0;
+                        }
+                        final d = (page - i).clamp(-1.0, 1.0).toDouble();
+                        final scale = 1 - d.abs() * 0.07;
+                        final it = items[i];
+                        final cur = widget.player.currentTrack?.id == it.track.id;
+                        return Transform.scale(
+                          scale: scale,
+                          child: _HeroCard(
+                            item: it,
+                            parallax: d,
+                            current: cur,
+                            playing: cur && widget.player.isPlaying,
+                            onTap: () => widget.onPlay(i),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              ValueListenableBuilder<int>(
+                valueListenable: _idx,
+                builder: (context, cur, _) => Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(items.length, (i) {
+                    final on = i == cur;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: on ? 18 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: on ? Colors.white : Colors.white.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({
+    required this.item,
+    required this.parallax,
+    required this.current,
+    required this.playing,
+    required this.onTap,
+  });
+  final _HeroItem item;
+  final double parallax;
+  final bool current, playing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = item.track;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      child: SpringPress(
+        scale: 0.975,
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 28, offset: const Offset(0, 14))],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Transform.translate(
+                  offset: Offset(-parallax * 44, 0),
+                  child: Transform.scale(scale: 1.2, child: _Img(t.coverUrl, radius: 0, cacheWidth: 900)),
+                ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.32),
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.88),
+                      ],
+                      stops: const [0, 0.4, 1],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 18,
+                  top: 18,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      item.tag.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 20,
+                  child: Transform.translate(
+                    offset: Offset(parallax * 24, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          MediaNormalizer.cleanCompactTitle(t.title),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro Display',
+                            color: Colors.white,
+                            fontSize: 28,
+                            height: 1.05,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.9,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          MediaNormalizer.formatArtists(t.artist),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 15),
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            _PlayPill(
+                              label: current && playing ? 'Playing' : 'Play',
+                              icon: current && playing ? Icons.graphic_eq_rounded : Icons.play_arrow_rounded,
+                              onTap: onTap,
+                            ),
+                            const Spacer(),
+                            if (current) _EqBars(playing: playing, height: 18),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Card layouts (each section uses a different one)                    */
+/* ------------------------------------------------------------------ */
+
+/// Classic Apple card: art + title + artist underneath.
 class _CoverCard extends StatelessWidget {
   const _CoverCard({
     required this.url,
@@ -362,7 +731,7 @@ class _CoverCard extends StatelessWidget {
     this.playing = false,
     this.current = false,
     this.circular = false,
-    this.radius = 10,
+    this.radius = 12,
   });
   final String url, title, subtitle;
   final List<ArtistRef>? artists;
@@ -384,7 +753,7 @@ class _CoverCard extends StatelessWidget {
                 shape: circular ? BoxShape.circle : BoxShape.rectangle,
                 borderRadius: circular ? null : BorderRadius.circular(radius),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.32), blurRadius: 14, offset: const Offset(0, 6)),
                 ],
               ),
               child: Stack(
@@ -416,9 +785,9 @@ class _CoverCard extends StatelessWidget {
             textAlign: circular ? TextAlign.center : TextAlign.start,
             style: TextStyle(
               color: current ? AppColors.accent : Colors.white,
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
-              letterSpacing: -0.15,
+              letterSpacing: -0.2,
             ),
           ),
           const SizedBox(height: 2),
@@ -426,7 +795,7 @@ class _CoverCard extends StatelessWidget {
             InteractiveArtistsText(
               artists: artists!,
               maxLines: 1,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
             )
           else
             Text(
@@ -438,9 +807,451 @@ class _CoverCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: circular ? TextAlign.center : TextAlign.start,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Art-first card with title burned into the artwork + play button.
+class _OverlayCard extends StatelessWidget {
+  const _OverlayCard({required this.track, required this.current, required this.playing, required this.onTap});
+  final Track track;
+  final bool current, playing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringPress(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 6))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _Img(track.coverUrl, radius: 0),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.82)],
+                    stops: const [0.45, 1],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.4), shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: current
+                      ? _EqBars(playing: playing, height: 14)
+                      : const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
+                ),
+              ),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      MediaNormalizer.cleanCompactTitle(track.title),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: current ? AppColors.accent : Colors.white,
+                        fontSize: 15,
+                        height: 1.1,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      MediaNormalizer.formatArtists(track.artist),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12.5),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tall poster card (3:4) with bold title at the bottom.
+class _PosterCard extends StatelessWidget {
+  const _PosterCard({required this.track, required this.onTap, required this.index});
+  final Track track;
+  final VoidCallback onTap;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringPress(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 8))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _Img(track.coverUrl, radius: 0, cacheWidth: 640),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.9)],
+                    stops: const [0.5, 1],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 14,
+                top: 12,
+                child: Text(
+                  '${index + 1}'.padLeft(2, '0'),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 14,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      MediaNormalizer.cleanCompactTitle(track.title),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        height: 1.05,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      MediaNormalizer.formatArtists(track.artist),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12.5),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Cover with a vinyl record peeking out - for "Rediscover".
+class _VinylCard extends StatelessWidget {
+  const _VinylCard({required this.track, required this.onTap});
+  final Track track;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringPress(
+      onTap: onTap,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final s = box.maxWidth * 0.8;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: box.maxWidth,
+                height: s,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: box.maxWidth - s,
+                      top: 0,
+                      child: Container(
+                        width: s,
+                        height: s,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(colors: [Color(0xFF2A2A2E), Color(0xFF050505)]),
+                        ),
+                        alignment: Alignment.center,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            for (final f in [0.9, 0.78, 0.66])
+                              Container(
+                                width: s * f,
+                                height: s * f,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.05), width: 1),
+                                ),
+                              ),
+                            SizedBox(width: s * 0.34, height: s * 0.34, child: _Img(track.coverUrl, circular: true, cacheWidth: 200)),
+                            Container(width: 7, height: 7, decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Container(
+                        width: s,
+                        height: s,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 14, offset: const Offset(3, 6))],
+                        ),
+                        child: _Img(track.coverUrl, radius: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: s,
+                child: Text(
+                  MediaNormalizer.cleanCompactTitle(track.title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -0.2),
+                ),
+              ),
+              const SizedBox(height: 2),
+              SizedBox(
+                width: s,
+                child: Text(
+                  MediaNormalizer.formatArtists(track.artist),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Full-width artist feature banner.
+class _ArtistBanner extends StatelessWidget {
+  const _ArtistBanner({
+    required this.artist,
+    required this.overline,
+    required this.coverUrl,
+    required this.onPlay,
+    required this.onOpen,
+  });
+  final String artist, overline, coverUrl;
+  final VoidCallback onPlay, onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      child: SpringPress(
+        scale: 0.98,
+        onTap: onOpen,
+        child: SizedBox(
+          height: 220,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 18, offset: const Offset(0, 8))],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(26),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Transform.scale(scale: 1.25, child: _Img(coverUrl, radius: 0, cacheWidth: 800)),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [Colors.black.withValues(alpha: 0.9), Colors.black.withValues(alpha: 0.15)],
+                        stops: const [0.15, 1],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          overline.toUpperCase(),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: 210,
+                          child: Text(
+                            artist,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'SF Pro Display',
+                              color: Colors.white,
+                              fontSize: 30,
+                              height: 1.02,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        _PlayPill(label: 'Play hits', icon: Icons.play_arrow_rounded, onTap: onPlay),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// #1 chart feature card.
+class _ChartHeroCard extends StatelessWidget {
+  const _ChartHeroCard({required this.track, required this.onTap, required this.playing, required this.current});
+  final Track track;
+  final VoidCallback onTap;
+  final bool playing, current;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: SpringPress(
+        scale: 0.98,
+        onTap: onTap,
+        child: SizedBox(
+          height: 190,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ImageFiltered(
+                  imageFilter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: Transform.scale(scale: 1.4, child: _Img(track.coverUrl, radius: 0, cacheWidth: 200)),
+                ),
+                ColoredBox(color: Colors.black.withValues(alpha: 0.45)),
+                Positioned(
+                  left: 18,
+                  top: 6,
+                  child: Text(
+                    '1',
+                    style: TextStyle(
+                      fontFamily: 'SF Pro Display',
+                      color: Colors.white.withValues(alpha: 0.95),
+                      fontSize: 120,
+                      height: 1.05,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -6,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 18,
+                  top: 18,
+                  bottom: 18,
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 16, offset: const Offset(0, 6))],
+                      ),
+                      child: _Img(track.coverUrl, radius: 16),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 20,
+                  bottom: 18,
+                  right: 170,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        MediaNormalizer.cleanCompactTitle(track.title),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: current ? AppColors.accent : Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      Text(
+                        MediaNormalizer.formatArtists(track.artist),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -490,7 +1301,7 @@ class _SongRow extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      _Img(track.coverUrl, radius: 8),
+                      _Img(track.coverUrl, radius: 8, cacheWidth: 200),
                       if (current)
                         Container(
                           decoration: BoxDecoration(
@@ -630,6 +1441,7 @@ class _PagedRows extends StatefulWidget {
     required this.onPlay,
     this.style = _RowStyle.plain,
     this.album = false,
+    this.rankOffset = 0,
   });
   final List<dynamic> tracks;
   final int rows;
@@ -637,6 +1449,7 @@ class _PagedRows extends StatefulWidget {
   final void Function(int index) onPlay;
   final _RowStyle style;
   final bool album;
+  final int rankOffset;
 
   @override
   State<_PagedRows> createState() => _PagedRowsState();
@@ -663,7 +1476,7 @@ class _PagedRowsState extends State<_PagedRows> {
       child: PageView.builder(
         controller: _pc,
         padEnds: false,
-        physics: const BouncingScrollPhysics(),
+        physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
         itemCount: pages,
         itemBuilder: (_, p) {
           final list = Column(
@@ -676,25 +1489,27 @@ class _PagedRowsState extends State<_PagedRows> {
                 track: t,
                 current: cur,
                 playing: cur && widget.player.isPlaying,
-                rank: widget.style == _RowStyle.ranked ? i + 1 : null,
+                rank: widget.style == _RowStyle.ranked ? i + 1 + widget.rankOffset : null,
                 subtitleAlbum: widget.album,
                 divider: !(grouped && r == rows - 1),
                 onTap: () => widget.onPlay(i),
               );
             }),
           );
-          return Padding(
-            padding: EdgeInsets.only(left: p == 0 ? 20 : 8, right: 8),
-            child: grouped
-                ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: list,
-                  )
-                : list,
+          return RepaintBoundary(
+            child: Padding(
+              padding: EdgeInsets.only(left: p == 0 ? 20 : 8, right: 8),
+              child: grouped
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface2,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: list,
+                    )
+                  : list,
+            ),
           );
         },
       ),
@@ -702,9 +1517,8 @@ class _PagedRowsState extends State<_PagedRows> {
   }
 }
 
-
 /* ------------------------------------------------------------------ */
-/*  Mood chips (YT Music filter row, Apple pill style)                  */
+/*  Mood chips                                                          */
 /* ------------------------------------------------------------------ */
 const _moods = ['Energize', 'Relax', 'Workout', 'Commute', 'Focus', 'Party', 'Romance', 'Sad', 'Sleep'];
 
@@ -766,7 +1580,7 @@ class _Chips extends StatelessWidget {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Genre tiles (flat colour, Apple "Browse" style)                     */
+/*  Categories - Apple Music "Browse" tiles with tilted duotone art     */
 /* ------------------------------------------------------------------ */
 class _Genre {
   const _Genre(this.name, this.icon, this.color);
@@ -777,48 +1591,72 @@ class _Genre {
 
 const _genres = [
   _Genre('Pop', Icons.star_rounded, Color(0xFFFA2D48)),
-  _Genre('Hip-Hop', Icons.mic_rounded, Color(0xFF5E5CE6)),
-  _Genre('Chill', Icons.spa_rounded, Color(0xFF30B0C7)),
+  _Genre('Hip-Hop', Icons.mic_rounded, Color(0xFF8E5CE6)),
+  _Genre('Chill', Icons.spa_rounded, Color(0xFF1FA2B8)),
   _Genre('Romance', Icons.favorite_rounded, Color(0xFFFF375F)),
   _Genre('Workout', Icons.fitness_center_rounded, Color(0xFFFF9F0A)),
   _Genre('Party', Icons.celebration_rounded, Color(0xFFBF5AF2)),
-  _Genre('Focus', Icons.center_focus_strong_rounded, Color(0xFF34C759)),
+  _Genre('Focus', Icons.center_focus_strong_rounded, Color(0xFF1FB86B)),
   _Genre('Sleep', Icons.nightlight_round, Color(0xFF4A5AA8)),
 ];
 
 class _GenreTile extends StatelessWidget {
-  const _GenreTile(this.g);
+  const _GenreTile(this.g, {required this.onTap, this.imageUrl, this.tilt = 0.24});
   final _Genre g;
+  final VoidCallback onTap;
+  final String? imageUrl;
+  final double tilt;
 
   @override
   Widget build(BuildContext context) {
     return SpringPress(
-      onTap: () => HapticFeedback.selectionClick(),
+      onTap: onTap,
+      scale: 0.95,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: ColoredBox(
-          color: g.color,
+        borderRadius: BorderRadius.circular(14),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [g.color, Color.lerp(g.color, Colors.black, 0.32)!],
+            ),
+          ),
           child: Stack(
+            fit: StackFit.expand,
             children: [
               Positioned(
-                right: -8,
-                bottom: -10,
+                right: -16,
+                top: -14,
+                child: Icon(g.icon, size: 92, color: Colors.white.withValues(alpha: 0.12)),
+              ),
+              Positioned(
+                right: -12,
+                bottom: -16,
                 child: Transform.rotate(
-                  angle: -0.3,
-                  child: Icon(g.icon, size: 64, color: Colors.white.withValues(alpha: 0.25)),
+                  angle: tilt,
+                  child: imageUrl != null
+                      ? _TintedArt(url: imageUrl!, color: g.color, size: 96)
+                      : Icon(g.icon, size: 84, color: Colors.white.withValues(alpha: 0.3)),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(14),
+              Positioned(
+                left: 14,
+                bottom: 12,
                 child: Text(
                   g.name,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
                   ),
                 ),
+              ),
+              Positioned(
+                left: 14,
+                top: 12,
+                child: Icon(g.icon, size: 20, color: Colors.white.withValues(alpha: 0.9)),
               ),
             ],
           ),
@@ -829,7 +1667,7 @@ class _GenreTile extends StatelessWidget {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Personalized Mix Cards (Apple Music / YT Music Mix Station style)  */
+/*  Mix cards (tall, duotone art peeking in)                            */
 /* ------------------------------------------------------------------ */
 class _MixCard extends StatelessWidget {
   const _MixCard({
@@ -838,6 +1676,8 @@ class _MixCard extends StatelessWidget {
     required this.gradient,
     required this.icon,
     required this.onTap,
+    this.imageUrl,
+    this.tilt = 0.2,
   });
 
   final String title;
@@ -845,71 +1685,403 @@ class _MixCard extends StatelessWidget {
   final List<Color> gradient;
   final IconData icon;
   final VoidCallback onTap;
+  final String? imageUrl;
+  final double tilt;
 
   @override
   Widget build(BuildContext context) {
     return SpringPress(
       onTap: onTap,
-      child: Container(
-        width: 164,
-        height: 164,
-        padding: const EdgeInsets.all(16),
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: gradient,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 14, offset: const Offset(0, 7))],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.20),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: Colors.white, size: 20),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
+                Positioned(
+                  right: -30,
+                  top: 54,
+                  child: Transform.rotate(
+                    angle: tilt,
+                    child: imageUrl != null
+                        ? _TintedArt(url: imageUrl!, color: gradient.first, size: 140, radius: 16)
+                        : Icon(icon, size: 130, color: Colors.white.withValues(alpha: 0.2)),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
+                Positioned(
+                  left: 14,
+                  top: 14,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
+                    child: Icon(icon, color: Colors.white, size: 20),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                ),
+                Positioned(
+                  left: 14,
+                  right: 14,
+                  bottom: 14,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 21,
+                          height: 1.05,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.6,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12.5, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  "See all" sheet (rendered above everything via the root navigator)  */
+/* ------------------------------------------------------------------ */
+class _ListEntry {
+  const _ListEntry({
+    required this.title,
+    required this.subtitle,
+    required this.cover,
+    required this.onTap,
+    this.track,
+    this.circular = false,
+    this.closeOnTap = false,
+  });
+  final String title, subtitle, cover;
+  final Track? track;
+  final bool circular, closeOnTap;
+  final VoidCallback onTap;
+}
+
+class _SectionSheet extends StatefulWidget {
+  const _SectionSheet({
+    required this.title,
+    required this.entries,
+    required this.player,
+    required this.open,
+    this.overline,
+  });
+  final String title;
+  final String? overline;
+  final List<_ListEntry> entries;
+  final PlayerState player;
+  final void Function(Widget screen) open;
+
+  @override
+  State<_SectionSheet> createState() => _SectionSheetState();
+}
+
+class _SectionSheetState extends State<_SectionSheet> with SingleTickerProviderStateMixin {
+  final ValueNotifier<double> _dy = ValueNotifier<double>(0);
+  late final AnimationController _back =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 280));
+  double _from = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _back.addListener(() => _dy.value = _from * (1 - Curves.easeOutCubic.transform(_back.value)));
+  }
+
+  @override
+  void dispose() {
+    _back.dispose();
+    _dy.dispose();
+    super.dispose();
+  }
+
+  void _close() => Navigator.of(context).pop();
+
+  void _go(Widget screen) {
+    Navigator.of(context).pop();
+    widget.open(screen);
+  }
+
+  void _menu(Track t) {
+    final p = widget.player;
+    final artists = t.resolvedArtists;
+    ZenDropdown.showTrackMenu(
+      context: context,
+      track: t,
+      trackTitle: t.title,
+      artistName: t.artist,
+      albumName: t.album,
+      coverUrl: t.coverUrl,
+      onPlayNext: () => p.playNext(t),
+      onPlayLater: () => p.playLast(t),
+      onGoToArtist: () {
+        if (artists.length > 1) {
+          showArtistPopup(context, artists: artists);
+        } else if (artists.isNotEmpty) {
+          _go(ArtistScreen(artistName: artists.first.name));
+        }
+      },
+      onGoToAlbum: t.album.isNotEmpty && t.album != 'Single'
+          ? () => _go(AlbumScreen(
+                albumTitle: MediaNormalizer.cleanTitle(t.album),
+                artistName: MediaNormalizer.formatArtists(t.artist),
+                coverUrl: t.coverUrl,
+              ))
+          : null,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final topGap = mq.padding.top + 10;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ValueListenableBuilder<double>(
+          valueListenable: _dy,
+          builder: (context, dy, child) => Transform.translate(offset: Offset(0, dy), child: child),
+          child: Container(
+            height: mq.size.height - topGap,
+            decoration: const BoxDecoration(
+              color: AppColors.bg,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+              child: Column(
+                children: [
+                  // Header (drag down to dismiss)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onVerticalDragStart: (_) => _back.stop(),
+                    onVerticalDragUpdate: (d) => _dy.value = math.max(0, _dy.value + d.delta.dy),
+                    onVerticalDragEnd: (d) {
+                      if (_dy.value > 140 || (d.primaryVelocity ?? 0) > 800) {
+                        _close();
+                      } else {
+                        _from = _dy.value;
+                        _back.forward(from: 0);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 16, 14),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (widget.overline != null)
+                                      Text(
+                                        widget.overline!.toUpperCase(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.6,
+                                        ),
+                                      ),
+                                    Text(
+                                      widget.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontFamily: 'SF Pro Display',
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.7,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SpringPress(
+                                scale: 0.9,
+                                onTap: _close,
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: const BoxDecoration(color: AppColors.surface2, shape: BoxShape.circle),
+                                  child: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 18),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(height: 0.5, color: AppColors.hairline),
+                  Expanded(
+                    child: ListenableBuilder(
+                      listenable: widget.player,
+                      builder: (context, _) {
+                        final cur = widget.player.currentTrack?.id;
+                        return ListView.builder(
+                          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                          padding: EdgeInsets.only(bottom: mq.padding.bottom + 24),
+                          itemExtent: 76,
+                          itemCount: widget.entries.length,
+                          addAutomaticKeepAlives: false,
+                          itemBuilder: (context, i) {
+                            final e = widget.entries[i];
+                            final isCur = e.track != null && cur == e.track!.id;
+                            return _SheetRow(
+                              entry: e,
+                              current: isCur,
+                              playing: isCur && widget.player.isPlaying,
+                              onTap: () {
+                                if (e.closeOnTap) Navigator.of(context).pop();
+                                e.onTap();
+                              },
+                              onMenu: e.track == null ? null : () => _menu(e.track!),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetRow extends StatelessWidget {
+  const _SheetRow({
+    required this.entry,
+    required this.current,
+    required this.playing,
+    required this.onTap,
+    this.onMenu,
+  });
+  final _ListEntry entry;
+  final bool current, playing;
+  final VoidCallback onTap;
+  final VoidCallback? onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringPress(
+      scale: 0.985,
+      onTap: onTap,
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 20),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _Img(entry.cover, radius: 5, circular: entry.circular, cacheWidth: 220),
+                      if (current)
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                          alignment: Alignment.center,
+                          child: _EqBars(playing: playing, height: 18),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: current ? AppColors.accent : Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        entry.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onMenu != null)
+                  IconButton(
+                    onPressed: onMenu,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary, size: 22),
+                  )
+                else
+                  const SizedBox(width: 20),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 90,
+            right: 0,
+            bottom: 0,
+            child: Container(height: 0.5, color: AppColors.hairline),
+          ),
+        ],
       ),
     );
   }
@@ -1242,11 +2414,56 @@ class _HomeScreenState extends State<HomeScreen> {
     context.read<PlayerState>().setQueue(list, startIndex: startIdx, context: ctx);
   }
 
+  List<_ListEntry> _trackEntries(List<Track> list) => [
+        for (var i = 0; i < list.length; i++)
+          _ListEntry(
+            title: MediaNormalizer.cleanCompactTitle(list[i].title),
+            subtitle: 'Song • ${MediaNormalizer.formatArtists(list[i].artist)}',
+            cover: list[i].coverUrl,
+            track: list[i],
+            onTap: () => play(list, i),
+          ),
+      ];
+
+  void _openSection({required String title, String? overline, required List<_ListEntry> entries}) {
+    if (entries.isEmpty) return;
+    HapticFeedback.selectionClick();
+    final player = context.read<PlayerState>();
+    showGeneralDialog(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: true,
+      barrierLabel: 'Close',
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      transitionDuration: const Duration(milliseconds: 420),
+      pageBuilder: (ctx, _, _) => _SectionSheet(
+        title: title,
+        overline: overline,
+        entries: entries,
+        player: player,
+        open: _open,
+      ),
+      transitionBuilder: (ctx, anim, _, child) => SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(
+          CurvedAnimation(parent: anim, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic),
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  String? _cover(List<Track> l, int i) => l.length > i && l[i].coverUrl.isNotEmpty ? l[i].coverUrl : null;
+
   @override
   Widget build(BuildContext context) {
     final player = context.watch<PlayerState>();
     final top = MediaQuery.paddingOf(context).top;
     final country = CountryService.instance.currentCountry;
+    final w = MediaQuery.sizeOf(context).width;
+
+    // Card geometry: ~2.35 cards visible (two full + a third peeking)
+    final ext = (w - 20) / 2.35;
+    final cw = ext - 14;
 
     // Real dynamic datasets
     final listenAgain = _recentHistory.isNotEmpty
@@ -1267,6 +2484,33 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final albums = albumMap.values.take(10).toList();
 
+    // Hero items (mixed from real data, de-duplicated)
+    final heroItems = <_HeroItem>[];
+    final seen = <String>{};
+    void addHero(Iterable<Track> ts, String tag, int n) {
+      var c = 0;
+      for (final t in ts) {
+        if (c >= n) break;
+        if (seen.add(t.id)) {
+          heroItems.add(_HeroItem(t, tag));
+          c++;
+        }
+      }
+    }
+
+    addHero(_recentHistory, 'Jump back in', 1);
+    addHero(quick, 'Made for you', 2);
+    addHero(fresh, 'New release', 2);
+    addHero(charts, 'Trending in ${country.name}', 2);
+    final heroTracks = heroItems.map((e) => e.track).toList();
+
+    // Artwork pool for category tiles
+    final artPool = <String>[];
+    for (final t in [..._chartTracks, ..._newReleases, ..._quickPicks, ..._recentHistory, ..._timeOfDayTracks]) {
+      if (t.coverUrl.isNotEmpty && !artPool.contains(t.coverUrl)) artPool.add(t.coverUrl);
+    }
+    String? genreArt(int i) => artPool.isEmpty ? null : artPool[(i * 3 + 1) % artPool.length];
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: _loading && _quickPicks.isEmpty && _chartTracks.isEmpty && _recentHistory.isEmpty
@@ -1275,6 +2519,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 CustomScrollView(
                   physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                  // ignore: deprecated_member_use
+                  cacheExtent: 900,
                   slivers: [
                     SliverToBoxAdapter(child: SizedBox(height: top + 56)),
                     CupertinoSliverRefreshControl(
@@ -1377,6 +2623,53 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
 
+                    // Large title greeting
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _timeOfDayMoodLabel.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _timeOfDayGreeting,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'SF Pro Display',
+                                color: Colors.white,
+                                fontSize: 36,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // HERO carousel
+                    if (heroItems.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: _Hero(
+                          key: ValueKey('hero-$_refresh-${heroItems.length}'),
+                          items: heroItems,
+                          player: player,
+                          onPlay: (i) => play(heroTracks, i),
+                        ),
+                      ),
+
                     // Mood Chips (Interactive)
                     SliverToBoxAdapter(
                       child: _Chips(
@@ -1393,7 +2686,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _SecHeader(
                             title: '${_moods[_mood]} Spotlight',
                             overline: 'Curated for this moment',
-                            onMore: () {},
+                            onMore: () => _openSection(title: '${_moods[_mood]} Spotlight', overline: 'Curated for this moment', entries: _trackEntries(_moodTracks)),
                           ),
                           if (_loadingMood)
                             const Padding(
@@ -1412,7 +2705,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       )),
 
-                    // 2. Personalized Time-of-Day Adaptive Section
+                    // 2. Time-of-day: art-first overlay cards
                     if (_timeOfDayTracks.isNotEmpty && _mood == -1)
                       _sec('time-of-day', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1420,18 +2713,27 @@ class _HomeScreenState extends State<HomeScreen> {
                           _SecHeader(
                             title: _timeOfDayMoodLabel,
                             overline: _timeOfDayGreeting,
-                            onMore: () {},
+                            onMore: () => _openSection(title: _timeOfDayMoodLabel, overline: _timeOfDayGreeting, entries: _trackEntries(_timeOfDayTracks)),
                           ),
-                          _PagedRows(
-                            tracks: _timeOfDayTracks,
-                            rows: 4,
-                            player: player,
-                            onPlay: (i) => play(_timeOfDayTracks, i),
+                          _Shelf(
+                            height: cw * 1.12,
+                            itemExtent: ext,
+                            count: _timeOfDayTracks.length,
+                            builder: (c, i) {
+                              final t = _timeOfDayTracks[i];
+                              final cur = player.currentTrack?.id == t.id;
+                              return _OverlayCard(
+                                track: t,
+                                current: cur,
+                                playing: cur && player.isPlaying,
+                                onTap: () => play(_timeOfDayTracks, i),
+                              );
+                            },
                           ),
                         ],
                       )),
 
-                    // 3. Personalized "Listen Again" / "Jump Back In"
+                    // 3. Listen again: classic big cards
                     if (listenAgain.isNotEmpty)
                       _sec('again', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1439,11 +2741,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           _SecHeader(
                             title: 'Listen again',
                             overline: _recentHistory.isNotEmpty ? 'Jump back in' : 'Trending for you',
-                            onMore: () {},
+                            onMore: () => _openSection(title: 'Listen again', overline: _recentHistory.isNotEmpty ? 'Jump back in' : 'Trending for you', entries: _trackEntries(listenAgain)),
                           ),
                           _Shelf(
-                            height: 236,
-                            itemExtent: 170,
+                            height: cw + 62,
+                            itemExtent: ext,
                             count: listenAgain.length,
                             builder: (c, i) {
                               final t = listenAgain[i];
@@ -1462,7 +2764,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       )),
 
-                    // 4. Personalized Quick Picks
+                    // 4. Quick picks: swipeable pages of rows
                     if (quick.isNotEmpty)
                       _sec('quick', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1470,6 +2772,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _SecHeader(
                             title: 'Quick picks',
                             overline: _favoriteArtist != null ? 'Tailored to your taste' : 'Start radio from a song',
+                            onMore: () => _openSection(title: 'Quick picks', overline: 'Tailored to your taste', entries: _trackEntries(quick)),
                           ),
                           _PagedRows(
                             tracks: quick,
@@ -1480,14 +2783,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       )),
 
-                    // 5. "Mixed For You" (Personalized AI Mix Stations)
+                    // 5. Mixed for you: tall gradient cards with duotone art
                     _sec('mixes', Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const _SecHeader(title: 'Mixed for you', overline: 'Personalized stations'),
                         _Shelf(
-                          height: 176,
-                          itemExtent: 170,
+                          height: cw * 1.3,
+                          itemExtent: ext,
                           count: 4,
                           builder: (c, i) {
                             switch (i) {
@@ -1495,32 +2798,38 @@ class _HomeScreenState extends State<HomeScreen> {
                                 return _MixCard(
                                   title: 'My Supermix',
                                   subtitle: 'Your blended favorites',
-                                  gradient: const [Color(0xFF9E2339), Color(0xFF4A0E17)],
+                                  gradient: const [Color(0xFFB02A44), Color(0xFF4A0E17)],
                                   icon: Icons.all_inclusive_rounded,
+                                  imageUrl: _cover(_favoriteArtistTracks, 0) ?? _cover(_quickPicks, 0),
                                   onTap: () => _playMix('supermix'),
                                 );
                               case 1:
                                 return _MixCard(
                                   title: 'Discover Mix',
                                   subtitle: 'Fresh weekly finds',
-                                  gradient: const [Color(0xFF0F766E), Color(0xFF134E4A)],
+                                  gradient: const [Color(0xFF0F8F84), Color(0xFF134E4A)],
                                   icon: Icons.explore_rounded,
+                                  imageUrl: _cover(_newReleases, 1),
+                                  tilt: -0.2,
                                   onTap: () => _playMix('discover'),
                                 );
                               case 2:
                                 return _MixCard(
                                   title: 'Chill Mix',
                                   subtitle: 'Mellow & unhurried',
-                                  gradient: const [Color(0xFF1D4ED8), Color(0xFF1E3A8A)],
+                                  gradient: const [Color(0xFF2563EB), Color(0xFF1E3A8A)],
                                   icon: Icons.spa_rounded,
+                                  imageUrl: _cover(_timeOfDayTracks, 2),
                                   onTap: () => _playMix('chill'),
                                 );
                               default:
                                 return _MixCard(
                                   title: 'Energy Mix',
                                   subtitle: 'High-tempo momentum',
-                                  gradient: const [Color(0xFFD97706), Color(0xFF78350F)],
+                                  gradient: const [Color(0xFFEA8A0A), Color(0xFF78350F)],
                                   icon: Icons.bolt_rounded,
+                                  imageUrl: _cover(_chartTracks, 3),
+                                  tilt: -0.2,
                                   onTap: () => _playMix('energy'),
                                 );
                             }
@@ -1529,19 +2838,26 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     )),
 
-                    // 6. Because you listen to [_favoriteArtist] (#1 Spotlight)
+                    // 6. #1 artist: feature banner + compact shelf
                     if (_favoriteArtist != null && _favoriteArtistTracks.isNotEmpty)
                       _sec('similar', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _SecHeader(
+                            title: 'Your top artist',
                             overline: 'Because you listen to',
-                            title: _favoriteArtist!,
-                            onMore: () => _open(ArtistScreen(artistName: _favoriteArtist!)),
+                            onMore: () => _openSection(title: _favoriteArtist!, overline: 'Because you listen to', entries: _trackEntries(_favoriteArtistTracks)),
+                          ),
+                          _ArtistBanner(
+                            artist: _favoriteArtist!,
+                            overline: 'Because you listen to',
+                            coverUrl: _favoriteArtistTracks.first.coverUrl,
+                            onPlay: () => play(_favoriteArtistTracks, 0),
+                            onOpen: () => _open(ArtistScreen(artistName: _favoriteArtist!)),
                           ),
                           _Shelf(
-                            height: 236,
-                            itemExtent: 170,
+                            height: cw * 0.78 + 58,
+                            itemExtent: cw * 0.78 + 14,
                             count: _favoriteArtistTracks.length,
                             builder: (c, i) {
                               final t = _favoriteArtistTracks[i];
@@ -1550,6 +2866,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 title: MediaNormalizer.cleanCompactTitle(t.title),
                                 subtitle: t.artist,
                                 artists: t.resolvedArtists,
+                                radius: 10,
                                 onTap: () => play(_favoriteArtistTracks, i),
                               );
                             },
@@ -1557,7 +2874,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       )),
 
-                    // 7. Because you listen to [_secondFavoriteArtist] (#2 Spotlight)
+                    // 7. #2 artist: tall posters
                     if (_secondFavoriteArtist != null && _secondFavoriteArtistTracks.isNotEmpty)
                       _sec('similar-second', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1565,19 +2882,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           _SecHeader(
                             overline: 'More by',
                             title: _secondFavoriteArtist!,
-                            onMore: () => _open(ArtistScreen(artistName: _secondFavoriteArtist!)),
+                            onMore: () => _openSection(title: _secondFavoriteArtist!, overline: 'More by', entries: _trackEntries(_secondFavoriteArtistTracks)),
                           ),
                           _Shelf(
-                            height: 236,
-                            itemExtent: 170,
+                            height: cw * 1.36,
+                            itemExtent: ext,
                             count: _secondFavoriteArtistTracks.length,
                             builder: (c, i) {
                               final t = _secondFavoriteArtistTracks[i];
-                              return _CoverCard(
-                                url: t.coverUrl,
-                                title: MediaNormalizer.cleanCompactTitle(t.title),
-                                subtitle: t.artist,
-                                artists: t.resolvedArtists,
+                              return _PosterCard(
+                                track: t,
+                                index: i,
                                 onTap: () => play(_secondFavoriteArtistTracks, i),
                               );
                             },
@@ -1585,34 +2900,29 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       )),
 
-                    // 8. Rediscover Your Favorites (Deep cuts from earlier user history)
+                    // 8. Rediscover: vinyl cards
                     if (_rediscover.isNotEmpty)
                       _sec('rediscover', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const _SecHeader(
+                          _SecHeader(
                             overline: 'From your past listening',
                             title: 'Rediscover your favorites',
+                            onMore: () => _openSection(title: 'Rediscover your favorites', overline: 'From your past listening', entries: _trackEntries(_rediscover)),
                           ),
                           _Shelf(
-                            height: 236,
-                            itemExtent: 170,
+                            height: cw * 0.8 + 62,
+                            itemExtent: ext,
                             count: _rediscover.length,
                             builder: (c, i) {
                               final t = _rediscover[i];
-                              return _CoverCard(
-                                url: t.coverUrl,
-                                title: MediaNormalizer.cleanCompactTitle(t.title),
-                                subtitle: t.artist,
-                                artists: t.resolvedArtists,
-                                onTap: () => play(_rediscover, i),
-                              );
+                              return _VinylCard(track: t, onTap: () => play(_rediscover, i));
                             },
                           ),
                         ],
                       )),
 
-                    // 9. New Releases (Tailored to user's language)
+                    // 9. New releases: grouped rounded panels
                     if (fresh.isNotEmpty)
                       _sec('new', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1622,7 +2932,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             overline: _effectivePrimaryLanguage.isNotEmpty
                                 ? 'Fresh drops in ${_effectivePrimaryLanguage.toUpperCase()}'
                                 : 'Just dropped',
-                            onMore: () {},
+                            onMore: () => _openSection(title: 'New releases', overline: 'Just dropped', entries: _trackEntries(fresh)),
                           ),
                           _PagedRows(
                             tracks: fresh,
@@ -1635,7 +2945,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       )),
 
-                    // 10. Country-specific Trending & Charts (Ranked 1 to 12)
+                    // 10. Charts: #1 feature card + ranked pages
                     if (charts.isNotEmpty)
                       _sec('charts', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1643,19 +2953,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           _SecHeader(
                             title: 'Top Hits in ${country.name}',
                             overline: '${country.flag} Regional Charts',
-                            onMore: () {},
+                            onMore: () => _openSection(title: 'Top Hits in ${country.name}', overline: 'Regional Charts', entries: _trackEntries(charts)),
                           ),
-                          _PagedRows(
-                            tracks: charts,
-                            rows: 4,
-                            player: player,
-                            style: _RowStyle.ranked,
-                            onPlay: (i) => play(charts, i),
+                          _ChartHeroCard(
+                            track: charts.first,
+                            current: player.currentTrack?.id == charts.first.id,
+                            playing: player.currentTrack?.id == charts.first.id && player.isPlaying,
+                            onTap: () => play(charts, 0),
                           ),
+                          if (charts.length > 1) ...[
+                            const SizedBox(height: 10),
+                            _PagedRows(
+                              tracks: charts.sublist(1),
+                              rows: 4,
+                              player: player,
+                              style: _RowStyle.ranked,
+                              rankOffset: 1,
+                              onPlay: (i) => play(charts, i + 1),
+                            ),
+                          ],
                         ],
                       )),
 
-                    // 11. Top Artists for You (User's favorites + regional charts)
+                    // 11. Top artists: big circles
                     if (_chartArtists.isNotEmpty)
                       _sec('artists', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1663,11 +2983,25 @@ class _HomeScreenState extends State<HomeScreen> {
                           _SecHeader(
                             title: 'Top Artists for You',
                             overline: 'Trending in ${country.name}',
-                            onMore: () {},
+                            onMore: () => _openSection(
+                              title: 'Top Artists for You',
+                              overline: 'Trending in ${country.name}',
+                              entries: [
+                                for (final a in _chartArtists)
+                                  _ListEntry(
+                                    title: a.name,
+                                    subtitle: 'Artist',
+                                    cover: a.image,
+                                    circular: true,
+                                    closeOnTap: true,
+                                    onTap: () => _open(ArtistScreen(artistName: a.name, imageUrl: a.image)),
+                                  ),
+                              ],
+                            ),
                           ),
                           _Shelf(
-                            height: 236,
-                            itemExtent: 170,
+                            height: cw + 58,
+                            itemExtent: ext,
                             count: _chartArtists.length,
                             builder: (c, i) {
                               final a = _chartArtists[i];
@@ -1683,40 +3017,62 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       )),
 
-                    // 12. Albums For You
+                    // 12. Albums: staggered cards
                     if (albums.isNotEmpty)
                       _sec('albums', Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _SecHeader(title: 'Albums for you', onMore: () {}),
+                          _SecHeader(
+                            title: 'Albums for you',
+                            onMore: () => _openSection(
+                              title: 'Albums for you',
+                              entries: [
+                                for (final t in albums)
+                                  _ListEntry(
+                                    title: MediaNormalizer.cleanTitle(t.album),
+                                    subtitle: 'Album • ${MediaNormalizer.formatArtists(t.artist)}',
+                                    cover: t.coverUrl,
+                                    closeOnTap: true,
+                                    onTap: () => _open(AlbumScreen(
+                                      albumTitle: MediaNormalizer.cleanTitle(t.album),
+                                      artistName: MediaNormalizer.formatArtists(t.artist),
+                                      coverUrl: t.coverUrl,
+                                    )),
+                                  ),
+                              ],
+                            ),
+                          ),
                           _Shelf(
-                            height: 236,
-                            itemExtent: 170,
+                            height: cw + 62 + 26,
+                            itemExtent: ext,
                             count: albums.length,
                             builder: (c, i) {
                               final t = albums[i];
-                              return _CoverCard(
-                                url: t.coverUrl,
-                                title: t.album,
-                                subtitle: t.artist,
-                                artists: t.resolvedArtists,
-                                radius: 8,
-                                onTap: () => _open(AlbumScreen(
-                                  albumTitle: MediaNormalizer.cleanTitle(t.album),
-                                  artistName: MediaNormalizer.formatArtists(t.artist),
-                                  coverUrl: t.coverUrl,
-                                )),
+                              return Padding(
+                                padding: EdgeInsets.only(top: i.isOdd ? 26 : 0),
+                                child: _CoverCard(
+                                  url: t.coverUrl,
+                                  title: t.album,
+                                  subtitle: t.artist,
+                                  artists: t.resolvedArtists,
+                                  radius: 8,
+                                  onTap: () => _open(AlbumScreen(
+                                    albumTitle: MediaNormalizer.cleanTitle(t.album),
+                                    artistName: MediaNormalizer.formatArtists(t.artist),
+                                    coverUrl: t.coverUrl,
+                                  )),
+                                ),
                               );
                             },
                           ),
                         ],
                       )),
 
-                    // 13. Moods & Genres Flat Color Grid
+                    // 13. Browse categories: Apple Music style tiles
                     SliverToBoxAdapter(
                       child: Reveal(
                         key: ValueKey('$_seed-genres-h'),
-                        child: const _SecHeader(title: 'Moods & genres'),
+                        child: const _SecHeader(title: 'Moods & genres', overline: 'Browse all'),
                       ),
                     ),
                     SliverPadding(
@@ -1724,15 +3080,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       sliver: SliverGrid(
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 2.2,
+                          mainAxisSpacing: 14,
+                          crossAxisSpacing: 14,
+                          childAspectRatio: 1.62,
                         ),
                         delegate: SliverChildBuilderDelegate(
                           (c, i) => Reveal(
                             key: ValueKey('$_seed-g$i'),
                             delay: Duration(milliseconds: 40 * (i % 2) + 60 * (i ~/ 2)),
-                            child: SpringPress(
+                            child: _GenreTile(
+                              _genres[i],
+                              imageUrl: genreArt(i),
+                              tilt: i.isEven ? 0.24 : -0.2,
                               onTap: () {
                                 HapticFeedback.selectionClick();
                                 final genre = _genres[i].name;
@@ -1742,7 +3101,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   if (tracks.isNotEmpty) play(tracks, 0);
                                 });
                               },
-                              child: _GenreTile(_genres[i]),
                             ),
                           ),
                           childCount: _genres.length,
