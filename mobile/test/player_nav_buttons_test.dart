@@ -36,7 +36,7 @@ void main() {
       final iconFinder = find.byType(Icon);
       expect(iconFinder, findsOneWidget);
       final iconWidget = tester.widget<Icon>(iconFinder);
-      expect(iconWidget.icon, equals(CupertinoIcons.heart));
+      expect(iconWidget.icon, equals(CupertinoIcons.star));
 
       // Tap to like
       await tester.tap(find.byType(PopLikeButton));
@@ -44,7 +44,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(liked, isTrue);
-      expect(find.byIcon(CupertinoIcons.heart_fill), findsOneWidget);
+      expect(find.byIcon(CupertinoIcons.star_fill), findsOneWidget);
       expect(find.byType(AppleGlass), findsNothing);
     });
 
