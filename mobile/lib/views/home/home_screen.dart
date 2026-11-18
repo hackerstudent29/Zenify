@@ -33,13 +33,14 @@ import '../../services/user_preferences_service.dart';
 import '../../services/update_service.dart';
 import '../../utils/media_normalizer.dart';
 
-typedef _ArtistItem = ({String name, String subs, String image});
-
 /* ------------------------------------------------------------------ */
 /*  Physics primitives                                                  */
 /* ------------------------------------------------------------------ */
 const _kPressSpring = SpringDescription(mass: 1, stiffness: 430, damping: 21);
 const _kRevealSpring = SpringDescription(mass: 1, stiffness: 170, damping: 22);
+
+/// Apple Music media-card corner radius (minimal, not bubbly).
+const double _kCardR = 10;
 
 const _kGray = ColorFilter.matrix(<double>[
   0.2126, 0.7152, 0.0722, 0, 0, //
@@ -199,7 +200,7 @@ class _RevealState extends State<Reveal> with SingleTickerProviderStateMixin {
         return Opacity(
           opacity: v.clamp(0.0, 1.0).toDouble(),
           child: Transform.translate(
-            offset: Offset(0, (1 - v) * 28),
+            offset: Offset(0, (1 - v) * 24),
             child: child,
           ),
         );
@@ -494,43 +495,56 @@ class _Shelf extends StatelessWidget {
   }
 }
 
-class _PlayPill extends StatelessWidget {
-  const _PlayPill({
-    required this.label,
-    required this.icon,
-    this.onTap,
-  });
-  final String label;
-  final IconData icon;
-  final VoidCallback? onTap;
-  final bool dark = false;
+/// Frosted round play button (Apple Music artwork overlay).
+class _GlassPlay extends StatelessWidget {
+  const _GlassPlay({required this.playing, this.size = 42, this.solid = false});
+  final bool playing;
+  final double size;
+  final bool solid;
 
   @override
   Widget build(BuildContext context) {
-    final fg = dark ? Colors.white : Colors.black;
-    return SpringPress(
-      onTap: onTap,
-      scale: 0.93,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 16, 8),
-        decoration: BoxDecoration(
-          color: dark ? Colors.white.withValues(alpha: 0.2) : Colors.white,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: fg, size: 20),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: fg,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
+    final icon = AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      switchInCurve: Curves.easeOutCubic,
+      transitionBuilder: (c, a) => FadeTransition(
+        opacity: a,
+        child: ScaleTransition(scale: a, child: c),
+      ),
+      child: playing
+          ? _EqBars(
+              key: const ValueKey('eq'),
+              playing: true,
+              height: size * 0.38,
+            )
+          : Icon(
+              Icons.play_arrow_rounded,
+              key: const ValueKey('pl'),
+              color: solid ? Colors.black : Colors.white,
+              size: size * 0.62,
             ),
-          ],
+    );
+    if (solid) {
+      return Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: playing ? AppColors.accent : Colors.white,
+          shape: BoxShape.circle,
+        ),
+        child: icon,
+      );
+    }
+    return ClipOval(
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          color: Colors.white.withValues(alpha: 0.24),
+          child: icon,
         ),
       ),
     );
@@ -538,7 +552,8 @@ class _PlayPill extends StatelessWidget {
 }
 
 /* ------------------------------------------------------------------ */
-/*  HERO - 3D cover-flow with ambient backdrop                          */
+/*  HERO - Apple Music "Top Picks" carousel                             */
+/*  Caption above the artwork, big square media card, soft parallax.    */
 /* ------------------------------------------------------------------ */
 class _HeroItem {
   const _HeroItem(this.track, this.tag);
@@ -562,25 +577,24 @@ class _Hero extends StatefulWidget {
 }
 
 class _HeroState extends State<_Hero> {
-  final _pc = PageController(viewportFraction: 0.62);
-  final ValueNotifier<int> _idx = ValueNotifier<int>(0);
+  final _pc = PageController(viewportFraction: 0.88);
+  int _cur = 0;
 
   @override
   void dispose() {
     _pc.dispose();
-    _idx.dispose();
     super.dispose();
   }
 
   void _tapCard(int i) {
-    if (i == _idx.value) {
+    if (i == _cur) {
       widget.onPlay(i);
     } else {
       HapticFeedback.selectionClick();
       _pc.animateToPage(
         i,
-        duration: const Duration(milliseconds: 520),
-        curve: Curves.easeOutCubic,
+        duration: const Duration(milliseconds: 620),
+        curve: Curves.easeOutQuart,
       );
     }
   }
@@ -589,199 +603,119 @@ class _HeroState extends State<_Hero> {
   Widget build(BuildContext context) {
     final items = widget.items;
     final w = MediaQuery.sizeOf(context).width;
-    final artH = w * 0.62 + 40;
+    final art = w * 0.88 - 16;
+    const headH = 74.0;
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: _HeroBackdrop(index: _idx, items: items),
-        ),
-        Column(
-          children: [
-            const SizedBox(height: 6),
-            SizedBox(
-              height: artH,
-              child: PageView.builder(
-                controller: _pc,
-                clipBehavior: Clip.none,
-                physics: const PageScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                itemCount: items.length,
-                onPageChanged: (i) {
-                  _idx.value = i;
-                  HapticFeedback.selectionClick();
-                },
-                itemBuilder: (context, i) {
-                  return AnimatedBuilder(
-                    animation: _pc,
-                    builder: (context, _) {
-                      double page = _idx.value.toDouble();
-                      if (_pc.hasClients && _pc.position.haveDimensions) {
-                        page = _pc.page ?? page;
-                      }
-                      final d = (page - i).clamp(-1.5, 1.5).toDouble();
-                      final a = d.abs().clamp(0.0, 1.0).toDouble();
-                      final m = Matrix4.identity()
-                        ..setEntry(3, 2, 0.0012)
-                        ..rotateY(-d * 0.62);
-                      final it = items[i];
-                      final cur = widget.player.currentTrack?.id == it.track.id;
-                      return Center(
-                        child: Transform.translate(
-                          offset: Offset(d * 22, 0),
-                          child: Transform(
-                            alignment: Alignment.center,
-                            transform: m,
-                            child: Transform.scale(
-                              scale: 1 - a * 0.16,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                ),
-                                child: AspectRatio(
-                                  aspectRatio: 1,
-                                  child: SpringPress(
-                                    scale: 0.97,
-                                    onTap: () => _tapCard(i),
-                                    child: _HeroArt(
-                                      url: it.track.coverUrl,
-                                      dim: a * 0.45,
-                                      current: cur,
-                                      playing: cur && widget.player.isPlaying,
-                                    ),
+    return SizedBox(
+      height: headH + 12 + art + 26,
+      child: PageView.builder(
+        controller: _pc,
+        clipBehavior: Clip.none,
+        physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
+        itemCount: items.length,
+        onPageChanged: (i) {
+          _cur = i;
+          HapticFeedback.selectionClick();
+        },
+        itemBuilder: (context, i) {
+          return AnimatedBuilder(
+            animation: _pc,
+            builder: (context, _) {
+              double page = _cur.toDouble();
+              if (_pc.hasClients && _pc.position.haveDimensions) {
+                page = _pc.page ?? page;
+              }
+              final d = (page - i).clamp(-1.0, 1.0).toDouble();
+              final a = d.abs();
+              final it = items[i];
+              final t = it.track;
+              final cur = widget.player.currentTrack?.id == t.id;
+              final playing = cur && widget.player.isPlaying;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        height: headH,
+                        child: Opacity(
+                          opacity: (1 - a * 0.75).clamp(0.0, 1.0).toDouble(),
+                          child: Transform.translate(
+                            offset: Offset(-d * 18, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  it.tag.toUpperCase(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.7,
                                   ),
                                 ),
-                              ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  MediaNormalizer.cleanCompactTitle(t.title),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: 'SF Pro Display',
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  MediaNormalizer.formatArtists(t.artist),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 17,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 6),
-            ValueListenableBuilder<int>(
-              valueListenable: _idx,
-              builder: (context, i, _) {
-                final it = items[i.clamp(0, items.length - 1)];
-                final t = it.track;
-                final cur = widget.player.currentTrack?.id == t.id;
-                final playing = cur && widget.player.isPlaying;
-                return Column(
-                  children: [
-                    SizedBox(
-                      height: 92,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 380),
-                        switchInCurve: Curves.easeOutCubic,
-                        transitionBuilder: (child, anim) => FadeTransition(
-                          opacity: anim,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.12),
-                              end: Offset.zero,
-                            ).animate(anim),
-                            child: child,
-                          ),
-                        ),
-                        child: Padding(
-                          key: ValueKey('${t.id}-$i'),
-                          padding: const EdgeInsets.symmetric(horizontal: 28),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.accent,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    it.tag.toUpperCase(),
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.8,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                MediaNormalizer.cleanCompactTitle(t.title),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontFamily: 'SF Pro Display',
-                                  color: Colors.white,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.8,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                MediaNormalizer.formatArtists(t.artist),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ],
+                      ),
+                      const SizedBox(height: 12),
+                      Transform.scale(
+                        scale: 1 - a * 0.05,
+                        alignment: Alignment.topCenter,
+                        child: SizedBox(
+                          width: art,
+                          height: art,
+                          child: SpringPress(
+                            scale: 0.98,
+                            onTap: () => _tapCard(i),
+                            child: _HeroArt(
+                              url: t.coverUrl,
+                              parallax: d,
+                              current: cur,
+                              playing: playing,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    _PlayPill(
-                      label: playing ? 'Playing' : 'Play',
-                      icon: playing
-                          ? Icons.graphic_eq_rounded
-                          : Icons.play_arrow_rounded,
-                      onTap: () => widget.onPlay(i),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(items.length, (k) {
-                        final on = k == i;
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 350),
-                          curve: Curves.easeOutCubic,
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          width: on ? 18 : 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: on
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -789,62 +723,57 @@ class _HeroState extends State<_Hero> {
 class _HeroArt extends StatelessWidget {
   const _HeroArt({
     required this.url,
-    required this.dim,
+    required this.parallax,
     required this.current,
     required this.playing,
   });
   final String url;
-  final double dim;
+  final double parallax;
   final bool current, playing;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(_kCardR),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.55),
-            blurRadius: 26,
-            offset: const Offset(0, 16),
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(_kCardR),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            _Img(url, radius: 0, cacheWidth: 700),
+            Transform.translate(
+              offset: Offset(-parallax * 28, 0),
+              child: Transform.scale(
+                scale: 1.14,
+                child: _Img(url, radius: 0, cacheWidth: 900),
+              ),
+            ),
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                   colors: [
-                    Colors.white.withValues(alpha: 0.14),
                     Colors.transparent,
-                    Colors.black.withValues(alpha: 0.12),
+                    Colors.black.withValues(alpha: 0.38),
                   ],
-                  stops: const [0, 0.4, 1],
+                  stops: const [0.6, 1],
                 ),
               ),
             ),
-            if (dim > 0.01)
-              ColoredBox(color: Colors.black.withValues(alpha: dim)),
-            if (current)
-              Positioned(
-                left: 10,
-                bottom: 10,
-                child: Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: _EqBars(playing: playing, height: 13),
-                ),
-              ),
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: _GlassPlay(playing: playing, size: 44),
+            ),
           ],
         ),
       ),
@@ -852,73 +781,11 @@ class _HeroArt extends StatelessWidget {
   }
 }
 
-class _HeroBackdrop extends StatelessWidget {
-  const _HeroBackdrop({required this.index, required this.items});
-  final ValueNotifier<int> index;
-  final List<_HeroItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: ClipRect(
-        child: ValueListenableBuilder<int>(
-          valueListenable: index,
-          builder: (context, i, _) {
-            final url = MediaNormalizer.upgradeArtworkUrl(
-              items[i.clamp(0, items.length - 1)].track.coverUrl,
-              isArtistAvatar: false,
-            );
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 800),
-                  child: SizedBox.expand(
-                    key: ValueKey(url),
-                    child: ImageFiltered(
-                      imageFilter: ui.ImageFilter.blur(
-                        sigmaX: 50,
-                        sigmaY: 50,
-                        tileMode: TileMode.decal,
-                      ),
-                      child: CachedNetworkImage(
-                        imageUrl: url,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 100,
-                        errorWidget: (_, _, _) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                ),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AppColors.bg,
-                        AppColors.bg.withValues(alpha: 0.45),
-                        AppColors.bg.withValues(alpha: 0.6),
-                        AppColors.bg,
-                      ],
-                      stops: const [0, 0.22, 0.7, 1],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
 /* ------------------------------------------------------------------ */
-/*  Card layouts (each section uses a different one)                    */
+/*  Card layouts                                                        */
 /* ------------------------------------------------------------------ */
 
-/// Classic Apple card: art + title + artist underneath.
+/// Classic Apple card: art + title + artist underneath. (unchanged)
 class _CoverCard extends StatelessWidget {
   const _CoverCard({
     required this.url,
@@ -1026,9 +893,9 @@ class _CoverCard extends StatelessWidget {
   }
 }
 
-/// Art-first card with title burned into the artwork + play button.
-class _OverlayCard extends StatelessWidget {
-  const _OverlayCard({
+/// Apple-style artwork card with a frosted caption bar (time-of-day shelf).
+class _FrostCard extends StatelessWidget {
+  const _FrostCard({
     required this.track,
     required this.current,
     required this.playing,
@@ -1044,7 +911,7 @@ class _OverlayCard extends StatelessWidget {
       onTap: onTap,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(_kCardR),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.35),
@@ -1054,75 +921,77 @@ class _OverlayCard extends StatelessWidget {
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(_kCardR),
           child: Stack(
             fit: StackFit.expand,
             children: [
-              _Img(track.coverUrl, radius: 0),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.82),
-                    ],
-                    stops: const [0.45, 1],
-                  ),
-                ),
-              ),
+              _Img(track.coverUrl, radius: 0, cacheWidth: 640),
               Positioned(
-                top: 10,
-                right: 10,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: current
-                      ? _EqBars(playing: playing, height: 14)
-                      : const Icon(
-                          Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                ),
-              ),
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: 12,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      MediaNormalizer.cleanCompactTitle(track.title),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: current ? AppColors.accent : Colors.white,
-                        fontSize: 15,
-                        height: 1.1,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.3,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: ClipRect(
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.34),
+                      padding: const EdgeInsets.fromLTRB(12, 9, 10, 9),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  MediaNormalizer.cleanCompactTitle(
+                                    track.title,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: current
+                                        ? AppColors.accent
+                                        : Colors.white,
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  MediaNormalizer.formatArtists(track.artist),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 30,
+                            height: 30,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: current
+                                ? _EqBars(playing: playing, height: 12)
+                                : const Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      MediaNormalizer.formatArtists(track.artist),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 12.5,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -1133,7 +1002,96 @@ class _OverlayCard extends StatelessWidget {
   }
 }
 
-/// Wide landscape card: cover thumbnail + big numeral + title.
+/// Large Apple "New Music" card: art, accent overline, title, artist.
+class _FeatureCard extends StatelessWidget {
+  const _FeatureCard({
+    required this.track,
+    required this.tag,
+    required this.current,
+    required this.playing,
+    required this.onTap,
+  });
+  final Track track;
+  final String tag;
+  final bool current, playing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringPress(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(_kCardR),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.38),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(_kCardR),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _Img(track.coverUrl, radius: 0, cacheWidth: 720),
+                    Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: _GlassPlay(playing: current && playing, size: 36),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            tag.toUpperCase(),
+            maxLines: 1,
+            style: const TextStyle(
+              color: AppColors.accent,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            MediaNormalizer.cleanCompactTitle(track.title),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: current ? AppColors.accent : Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            MediaNormalizer.formatArtists(track.artist),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Landscape card on a flat surface: art, index, title, artist, play.
 class _WideCard extends StatelessWidget {
   const _WideCard({
     required this.track,
@@ -1149,118 +1107,81 @@ class _WideCard extends StatelessWidget {
     return SpringPress(
       onTap: onTap,
       scale: 0.97,
-      child: DecoratedBox(
+      child: Container(
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(_kCardR),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Transform.scale(
-                scale: 1.8,
-                child: _Img(track.coverUrl, radius: 0, cacheWidth: 260),
-              ),
-              ColoredBox(color: Colors.black.withValues(alpha: 0.62)),
-              Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  children: [
-                    AspectRatio(
-                      aspectRatio: 1,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.5),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: _Img(
-                          track.coverUrl,
-                          radius: 16,
-                          cacheWidth: 360,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${index + 1}'.padLeft(2, '0'),
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.55),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            MediaNormalizer.cleanCompactTitle(track.title),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              height: 1.05,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            MediaNormalizer.formatArtists(track.artist),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.play_arrow_rounded,
-                              color: Colors.black,
-                              size: 22,
-                            ),
-                          ),
-                        ],
-                      ),
+        child: Row(
+          children: [
+            AspectRatio(
+              aspectRatio: 1,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
+                child: _Img(track.coverUrl, radius: 8, cacheWidth: 360),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${index + 1}'.padLeft(2, '0'),
+                    style: const TextStyle(
+                      color: AppColors.textTertiary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    MediaNormalizer.cleanCompactTitle(track.title),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      height: 1.1,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    MediaNormalizer.formatArtists(track.artist),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const _GlassPlay(playing: false, size: 34, solid: true),
+          ],
         ),
       ),
     );
   }
 }
 
-/// One editorial collage page: 1 big tile + 2 small (mirrored on odd pages).
+/// One editorial collage page: 1 big tile + 2 small (mirrored on odd pages). (unchanged)
 class _GalleryCluster extends StatelessWidget {
   const _GalleryCluster({
     required this.tracks,
@@ -1426,304 +1347,7 @@ class _GalleryTile extends StatelessWidget {
   }
 }
 
-/// Swipeable card deck: fling the top card away to reveal the next.
-class _CardDeck extends StatefulWidget {
-  const _CardDeck({super.key, required this.tracks, required this.onPlay});
-  final List<Track> tracks;
-  final void Function(int index) onPlay;
-
-  @override
-  State<_CardDeck> createState() => _CardDeckState();
-}
-
-class _CardDeckState extends State<_CardDeck>
-    with SingleTickerProviderStateMixin {
-  static const _backSpring = SpringDescription(
-    mass: 1,
-    stiffness: 240,
-    damping: 19,
-  );
-  late final AnimationController _c = AnimationController.unbounded(
-    vsync: this,
-    value: 0,
-  );
-  int _top = 0;
-  bool _flying = false;
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  void _end(DragEndDetails d, double w) {
-    if (_flying) return;
-    final v = d.primaryVelocity ?? 0;
-    final n = widget.tracks.length;
-    if (n > 1 && (_c.value.abs() > 100 || v.abs() > 700)) {
-      final dir = (_c.value.abs() > 20 ? _c.value : v).sign;
-      _flying = true;
-      HapticFeedback.lightImpact();
-      _c
-          .animateTo(
-            dir * w * 1.25,
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeIn,
-          )
-          .whenComplete(() {
-            if (!mounted) return;
-            setState(() => _top = (_top + 1) % n);
-            _c.value = 0;
-            _flying = false;
-          });
-    } else {
-      _c.animateWith(SpringSimulation(_backSpring, _c.value, 0, v));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final w = MediaQuery.sizeOf(context).width;
-    final cardW = w - 56;
-    final cardH = cardW * 1.06;
-    final n = widget.tracks.length;
-    final depth = math.min(3, n);
-
-    return Column(
-      children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onHorizontalDragStart: (_) {
-            if (!_flying) _c.stop();
-          },
-          onHorizontalDragUpdate: (d) {
-            if (!_flying) _c.value += d.delta.dx;
-          },
-          onHorizontalDragEnd: (d) => _end(d, w),
-          child: SizedBox(
-            width: w,
-            height: cardH + 56,
-            child: AnimatedBuilder(
-              animation: _c,
-              builder: (context, _) {
-                final dx = _c.value;
-                final p = (dx.abs() / 150).clamp(0.0, 1.0).toDouble();
-                final kids = <Widget>[];
-                for (var k = depth - 1; k >= 0; k--) {
-                  final idx = (_top + k) % n;
-                  final card = _DeckCard(
-                    track: widget.tracks[idx],
-                    index: idx,
-                    total: n,
-                    interactive: k == 0,
-                    onTap: () => widget.onPlay(idx),
-                  );
-                  if (k == 0) {
-                    kids.add(
-                      Positioned(
-                        top: 8,
-                        left: 28,
-                        width: cardW,
-                        height: cardH,
-                        child: Transform.translate(
-                          offset: Offset(dx, 0),
-                          child: Transform.rotate(
-                            angle: dx / w * 0.3,
-                            child: card,
-                          ),
-                        ),
-                      ),
-                    );
-                  } else {
-                    final e = k - p;
-                    kids.add(
-                      Positioned(
-                        top: 8 + 32 * e,
-                        left: 28,
-                        width: cardW,
-                        height: cardH,
-                        child: Transform.scale(
-                          scale: 1 - 0.07 * e,
-                          alignment: Alignment.topCenter,
-                          child: card,
-                        ),
-                      ),
-                    );
-                  }
-                }
-                return Stack(clipBehavior: Clip.none, children: kids);
-              },
-            ),
-          ),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(n, (i) {
-            final on = i == _top;
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              margin: const EdgeInsets.symmetric(horizontal: 2.5),
-              width: on ? 16 : 5,
-              height: 5,
-              decoration: BoxDecoration(
-                color: on ? Colors.white : Colors.white.withValues(alpha: 0.28),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-}
-
-class _DeckCard extends StatelessWidget {
-  const _DeckCard({
-    required this.track,
-    required this.index,
-    required this.total,
-    required this.interactive,
-    required this.onTap,
-  });
-  final Track track;
-  final int index, total;
-  final bool interactive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final body = DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            _Img(track.coverUrl, radius: 0, cacheWidth: 800),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.25),
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.88),
-                  ],
-                  stops: const [0, 0.4, 1],
-                ),
-              ),
-            ),
-            Positioned(
-              left: 16,
-              top: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  'NEW',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.9,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 18,
-              top: 18,
-              child: Text(
-                '${index + 1} / $total',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 20,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    MediaNormalizer.cleanCompactTitle(track.title),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      color: Colors.white,
-                      fontSize: 27,
-                      height: 1.04,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.9,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    MediaNormalizer.formatArtists(track.artist),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      _PlayPill(
-                        label: 'Play',
-                        icon: Icons.play_arrow_rounded,
-                        onTap: interactive ? onTap : null,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Swipe for next',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-    return SpringPress(
-      onTap: interactive ? onTap : null,
-      scale: 0.985,
-      child: body,
-    );
-  }
-}
-
-/// Grey artwork washed with a colour (used inside mix mosaics).
+/// Grey artwork washed with a colour (used inside mix tiles).
 class _Duo extends StatelessWidget {
   const _Duo(this.url, this.color);
   final String url;
@@ -1736,9 +1360,9 @@ class _Duo extends StatelessWidget {
       children: [
         ColorFiltered(
           colorFilter: _kGray,
-          child: _Img(url, radius: 0, cacheWidth: 260),
+          child: _Img(url, radius: 0, cacheWidth: 420),
         ),
-        ColoredBox(color: color.withValues(alpha: 0.5)),
+        ColoredBox(color: color.withValues(alpha: 0.55)),
       ],
     );
   }
@@ -1759,471 +1383,206 @@ class _MixSpec {
   final List<String> covers;
 }
 
-/// Focus carousel: centred card scales up, neighbours recede.
-class _MixCarousel extends StatefulWidget {
-  const _MixCarousel({
-    required this.mixes,
-    required this.activeId,
-    required this.isPlaying,
-    required this.onPlay,
-  });
-  final List<_MixSpec> mixes;
-  final String? activeId;
-  final bool isPlaying;
-  final void Function(String id) onPlay;
-
-  @override
-  State<_MixCarousel> createState() => _MixCarouselState();
-}
-
-class _MixCarouselState extends State<_MixCarousel> {
-  final _pc = PageController(viewportFraction: 0.68);
-  int _cur = 0;
-
-  @override
-  void dispose() {
-    _pc.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final w = MediaQuery.sizeOf(context).width;
-    final cw = w * 0.68 - 18;
-    final ch = cw * 1.42;
-
-    return SizedBox(
-      height: ch + 40,
-      child: PageView.builder(
-        controller: _pc,
-        clipBehavior: Clip.none,
-        physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
-        itemCount: widget.mixes.length,
-        onPageChanged: (i) {
-          _cur = i;
-          HapticFeedback.selectionClick();
-        },
-        itemBuilder: (context, i) {
-          final m = widget.mixes[i];
-          return AnimatedBuilder(
-            animation: _pc,
-            builder: (context, _) {
-              double page = _cur.toDouble();
-              if (_pc.hasClients && _pc.position.haveDimensions) {
-                page = _pc.page ?? page;
-              }
-              final a = (page - i).abs().clamp(0.0, 1.0).toDouble();
-              return Align(
-                child: Transform.translate(
-                  offset: Offset(0, a * 18),
-                  child: Transform.scale(
-                    scale: 1 - a * 0.1,
-                    child: SizedBox(
-                      width: cw,
-                      height: ch,
-                      child: _MixCard(
-                        spec: m,
-                        active: widget.activeId == m.id,
-                        playing: widget.isPlaying,
-                        focus: 1 - a,
-                        onTap: () {
-                          if (i == _cur) {
-                            widget.onPlay(m.id);
-                          } else {
-                            _pc.animateToPage(
-                              i,
-                              duration: const Duration(milliseconds: 520),
-                              curve: Curves.easeOutCubic,
-                            );
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _MixCard extends StatelessWidget {
-  const _MixCard({
+/// Apple "Made for You" mix tile: duotone artwork, tiny label, title, play.
+class _MixTile extends StatelessWidget {
+  const _MixTile({
     required this.spec,
     required this.active,
     required this.playing,
-    required this.focus,
     required this.onTap,
   });
   final _MixSpec spec;
   final bool active, playing;
-  final double focus;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final g = spec.gradient;
-    final covers = spec.covers;
     return SpringPress(
       onTap: onTap,
       scale: 0.97,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(_kCardR),
           boxShadow: [
             BoxShadow(
-              color: g.first.withValues(alpha: 0.2 + 0.3 * focus),
-              blurRadius: 26,
-              offset: const Offset(0, 14),
+              color: g.first.withValues(alpha: 0.32),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(_kCardR),
           child: Container(
             foregroundDecoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(_kCardR),
               border: Border.all(
-                color: Colors.white.withValues(alpha: active ? 0.6 : 0),
-                width: 2,
+                color: Colors.white.withValues(alpha: active ? 0.7 : 0),
+                width: 1.5,
               ),
             ),
-            color: g.last,
-            child: LayoutBuilder(
-              builder: (context, box) {
-                final top = box.maxHeight * 0.6;
-                Widget mosaic;
-                if (covers.length >= 4) {
-                  mosaic = Column(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(child: _Duo(covers[0], g.first)),
-                            const SizedBox(width: 2),
-                            Expanded(child: _Duo(covers[1], g.first)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(child: _Duo(covers[2], g.first)),
-                            const SizedBox(width: 2),
-                            Expanded(child: _Duo(covers[3], g.first)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                } else if (covers.isNotEmpty) {
-                  mosaic = _Duo(covers.first, g.first);
-                } else {
-                  mosaic = ColoredBox(
-                    color: g.first,
-                    child: Center(
-                      child: Icon(
-                        spec.icon,
-                        size: 80,
-                        color: Colors.white.withValues(alpha: 0.3),
-                      ),
-                    ),
-                  );
-                }
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      height: top,
-                      child: mosaic,
-                    ),
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      top: top - 110,
-                      height: 112,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [g.last.withValues(alpha: 0), g.last],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: 14,
-                      top: 14,
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.32),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(spec.icon, color: Colors.white, size: 20),
-                      ),
-                    ),
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 16,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  spec.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 22,
-                                    height: 1.04,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.7,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  active && playing
-                                      ? 'Now playing'
-                                      : spec.subtitle,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.75),
-                                    fontSize: 12.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOutCubic,
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              color: active ? g.first : Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white.withValues(
-                                  alpha: active ? 0.8 : 0,
-                                ),
-                                width: 2,
-                              ),
-                            ),
-                            alignment: Alignment.center,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 250),
-                              child: active && playing
-                                  ? const _EqBars(
-                                      key: ValueKey('eq'),
-                                      playing: true,
-                                      height: 16,
-                                    )
-                                  : Icon(
-                                      Icons.play_arrow_rounded,
-                                      key: const ValueKey('pl'),
-                                      color: active
-                                          ? Colors.white
-                                          : Colors.black,
-                                      size: 28,
-                                    ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ArtistBubble extends StatelessWidget {
-  const _ArtistBubble({
-    super.key,
-    required this.name,
-    required this.image,
-    required this.onTap,
-    required this.order,
-  });
-  final String name, image;
-  final VoidCallback onTap;
-  final int order;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: Duration(milliseconds: 380 + order * 70),
-      curve: Curves.easeOutBack,
-      builder: (context, v, child) => Opacity(
-        opacity: v.clamp(0.0, 1.0).toDouble(),
-        child: Transform.scale(scale: 0.6 + 0.4 * v, child: child),
-      ),
-      child: SpringPress(
-        onTap: onTap,
-        scale: 0.92,
-        child: Column(
-          children: [
-            AspectRatio(
-              aspectRatio: 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: _Img(image, circular: true, cacheWidth: 240),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [g.first, g.last],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11.5,
-                height: 1.1,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Artist bubbles: 5 by default, expands to 10.
-class _ArtistsGrid extends StatefulWidget {
-  const _ArtistsGrid({required this.artists, required this.onTap});
-  final List<_ArtistItem> artists;
-  final void Function(_ArtistItem a) onTap;
-
-  @override
-  State<_ArtistsGrid> createState() => _ArtistsGridState();
-}
-
-class _ArtistsGridState extends State<_ArtistsGrid> {
-  bool _more = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final total = math.min(widget.artists.length, 10);
-    final shown = _more ? total : math.min(5, total);
-    final rows = (shown / 5).ceil();
-
-    return Column(
-      children: [
-        AnimatedSize(
-          duration: const Duration(milliseconds: 520),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          child: Column(
-            children: [
-              for (var r = 0; r < rows; r++)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(20, r == 0 ? 0 : 18, 20, 0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var c = 0; c < 5; c++) ...[
-                        if (c > 0) const SizedBox(width: 12),
-                        Expanded(
-                          child: r * 5 + c < shown
-                              ? _ArtistBubble(
-                                  key: ValueKey('ab${r * 5 + c}'),
-                                  name: widget.artists[r * 5 + c].name,
-                                  image: widget.artists[r * 5 + c].image,
-                                  order: c,
-                                  onTap: () =>
-                                      widget.onTap(widget.artists[r * 5 + c]),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (spec.covers.isNotEmpty)
+                  _Duo(spec.covers.first, g.first)
+                else
+                  Center(
+                    child: Icon(
+                      spec.icon,
+                      size: 72,
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
+                  ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        g.last.withValues(alpha: 0.92),
                       ],
+                      stops: const [0.3, 1],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 12,
+                  top: 12,
+                  child: Row(
+                    children: [
+                      Icon(spec.icon, color: Colors.white, size: 15),
+                      const SizedBox(width: 5),
+                      Text(
+                        'MIX',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-            ],
-          ),
-        ),
-        if (total > 5)
-          Padding(
-            padding: const EdgeInsets.only(top: 20),
-            child: SpringPress(
-              scale: 0.94,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() => _more = !_more);
-              },
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(18, 9, 12, 9),
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _more ? 'Show less' : 'Show ${total - 5} more',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              spec.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                height: 1.05,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.6,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              active && playing ? 'Now playing' : spec.subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 2),
-                    AnimatedRotation(
-                      turns: _more ? 0.5 : 0,
-                      duration: const Duration(milliseconds: 420),
-                      curve: Curves.easeOutCubic,
-                      child: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      _GlassPlay(playing: active && playing, size: 34),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 }
 
-/// Full-width artist feature banner.
+/// Apple-style circular artist (shelf item).
+class _ArtistCircle extends StatelessWidget {
+  const _ArtistCircle({
+    required this.name,
+    required this.image,
+    required this.onTap,
+  });
+  final String name, image;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringPress(
+      onTap: onTap,
+      scale: 0.94,
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.38),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: _Img(image, circular: true, cacheWidth: 320),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 1),
+          const Text(
+            'Artist',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-width artist feature: art, gradient, name, play.
 class _ArtistBanner extends StatelessWidget {
   const _ArtistBanner({
     required this.artist,
@@ -2240,46 +1599,46 @@ class _ArtistBanner extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
       child: SpringPress(
-        scale: 0.98,
+        scale: 0.985,
         onTap: onOpen,
         child: SizedBox(
-          height: 220,
+          height: 210,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(26),
+              borderRadius: BorderRadius.circular(_kCardR),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.4),
+                  color: Colors.black.withValues(alpha: 0.38),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(26),
+              borderRadius: BorderRadius.circular(_kCardR),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Transform.scale(
-                    scale: 1.25,
-                    child: _Img(coverUrl, radius: 0, cacheWidth: 800),
-                  ),
+                  _Img(coverUrl, radius: 0, cacheWidth: 900),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withValues(alpha: 0.9),
-                          Colors.black.withValues(alpha: 0.15),
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.85),
                         ],
-                        stops: const [0.15, 1],
+                        stops: const [0.35, 1],
                       ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
+                  Positioned(
+                    left: 16,
+                    right: 70,
+                    bottom: 16,
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
@@ -2291,30 +1650,30 @@ class _ArtistBanner extends StatelessWidget {
                             letterSpacing: 0.8,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        SizedBox(
-                          width: 210,
-                          child: Text(
-                            artist,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'SF Pro Display',
-                              color: Colors.white,
-                              fontSize: 30,
-                              height: 1.02,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1,
-                            ),
+                        const SizedBox(height: 4),
+                        Text(
+                          artist,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'SF Pro Display',
+                            color: Colors.white,
+                            fontSize: 28,
+                            height: 1.04,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.9,
                           ),
                         ),
-                        const Spacer(),
-                        _PlayPill(
-                          label: 'Play hits',
-                          icon: Icons.play_arrow_rounded,
-                          onTap: onPlay,
-                        ),
                       ],
+                    ),
+                  ),
+                  Positioned(
+                    right: 14,
+                    bottom: 14,
+                    child: SpringPress(
+                      scale: 0.9,
+                      onTap: onPlay,
+                      child: const _GlassPlay(playing: false, size: 44),
                     ),
                   ),
                 ],
@@ -2344,91 +1703,105 @@ class _ChartHeroCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
       child: SpringPress(
-        scale: 0.98,
+        scale: 0.985,
         onTap: onTap,
         child: SizedBox(
-          height: 190,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ImageFiltered(
-                  imageFilter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                  child: Transform.scale(
-                    scale: 1.4,
-                    child: _Img(track.coverUrl, radius: 0, cacheWidth: 200),
-                  ),
-                ),
-                ColoredBox(color: Colors.black.withValues(alpha: 0.45)),
-                Positioned(
-                  left: 18,
-                  top: 6,
-                  child: Text(
-                    '1',
-                    style: TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      color: Colors.white.withValues(alpha: 0.95),
-                      fontSize: 120,
-                      height: 1.05,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -6,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 18,
-                  top: 18,
-                  bottom: 18,
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: _Img(track.coverUrl, radius: 16),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 20,
-                  bottom: 18,
-                  right: 170,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        MediaNormalizer.cleanCompactTitle(track.title),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: current ? AppColors.accent : Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      Text(
-                        MediaNormalizer.formatArtists(track.artist),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
+          height: 200,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(_kCardR),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.38),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
                 ),
               ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(_kCardR),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _Img(track.coverUrl, radius: 0, cacheWidth: 900),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.85),
+                        ],
+                        stops: const [0.35, 1],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 14,
+                    top: 14,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: BackdropFilter(
+                        filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
+                          ),
+                          color: Colors.black.withValues(alpha: 0.35),
+                          child: const Text(
+                            '#1',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 16,
+                    right: 70,
+                    bottom: 16,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          MediaNormalizer.cleanCompactTitle(track.title),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: current ? AppColors.accent : Colors.white,
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.6,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          MediaNormalizer.formatArtists(track.artist),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    right: 14,
+                    bottom: 14,
+                    child: _GlassPlay(playing: current && playing, size: 44),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -2726,7 +2099,7 @@ class _PagedRowsState extends State<_PagedRows> {
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(_kCardR),
                       ),
                       child: list,
                     )
@@ -2740,7 +2113,7 @@ class _PagedRowsState extends State<_PagedRows> {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Mood chips                                                          */
+/*  Mood chips (Apple filter pills, minimal radius)                     */
 /* ------------------------------------------------------------------ */
 const _moods = [
   'Energize',
@@ -2762,18 +2135,18 @@ class _Chips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 52,
+      height: 54,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
         itemCount: _moods.length,
         separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (ctx, i) {
           final on = i == selected;
           return Builder(
             builder: (c) => SpringPress(
-              scale: 0.92,
+              scale: 0.93,
               onTap: () {
                 HapticFeedback.selectionClick();
                 onSelect(on ? -1 : i);
@@ -2785,13 +2158,13 @@ class _Chips extends StatelessWidget {
                 );
               },
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 380),
-                curve: Curves.easeOutBack,
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: on ? Colors.white : AppColors.surface2,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 260),
@@ -2813,6 +2186,7 @@ class _Chips extends StatelessWidget {
 
 /* ------------------------------------------------------------------ */
 /*  Categories - auto-drifting marquee of Apple-style browse tiles      */
+/*  (unchanged)                                                         */
 /* ------------------------------------------------------------------ */
 class _Genre {
   const _Genre(this.name, this.icon, this.color);
@@ -3115,11 +2489,11 @@ class _SectionSheetState extends State<_SectionSheet>
             height: mq.size.height - topGap,
             decoration: const BoxDecoration(
               color: AppColors.bg,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(26),
+                top: Radius.circular(16),
               ),
               child: Column(
                 children: [
@@ -3372,6 +2746,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late final ScrollController _homeScrollController = ScrollController();
   int _mood = -1;
   String? _activeMix;
   int _refresh = 0;
@@ -3459,6 +2834,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _homeScrollController.dispose();
     CountryService.instance.countryNotifier.removeListener(_onCountryChanged);
     UserPreferencesService.instance.prefsNotifier.removeListener(
       _onCountryChanged,
@@ -3809,6 +3185,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final ext = (w - 20) / 2.35;
     final cw = ext - 14;
 
+    // Apple-style shelf geometry
+    final frostExt = w * 0.64; // time-of-day frosted cards
+    final frostSize = frostExt - 14;
+    final mixExt = w * 0.56; // "Made for you" mix tiles
+    final mixSize = mixExt - 14;
+    final featExt = w * 0.72; // new-release feature cards
+    final featSize = featExt - 14;
+    final artistExt = (w - 20) / 3.3; // circular artists
+    final artistSize = artistExt - 14;
+
     // Real dynamic datasets
     final listenAgain = _recentHistory.isNotEmpty
         ? _recentHistory
@@ -3890,6 +3276,46 @@ class _HomeScreenState extends State<HomeScreen> {
       return out.isEmpty ? artPool.take(4).toList() : out;
     }
 
+    final mixes = <_MixSpec>[
+      _MixSpec(
+        id: 'supermix',
+        title: 'My Supermix',
+        subtitle: 'Your blended favorites',
+        gradient: const [Color(0xFFD13A57), Color(0xFF3A0A13)],
+        icon: Icons.all_inclusive_rounded,
+        covers: covs([
+          ..._favoriteArtistTracks,
+          ..._secondFavoriteArtistTracks,
+          ..._quickPicks,
+          ..._recentHistory,
+        ]),
+      ),
+      _MixSpec(
+        id: 'discover',
+        title: 'Discover Mix',
+        subtitle: 'Fresh weekly finds',
+        gradient: const [Color(0xFF14B8A6), Color(0xFF0B3B38)],
+        icon: Icons.explore_rounded,
+        covers: covs(_newReleases),
+      ),
+      _MixSpec(
+        id: 'chill',
+        title: 'Chill Mix',
+        subtitle: 'Mellow & unhurried',
+        gradient: const [Color(0xFF3B82F6), Color(0xFF14264F)],
+        icon: Icons.spa_rounded,
+        covers: covs(_timeOfDayTracks),
+      ),
+      _MixSpec(
+        id: 'energy',
+        title: 'Energy Mix',
+        subtitle: 'High-tempo momentum',
+        gradient: const [Color(0xFFF59E0B), Color(0xFF4A2406)],
+        icon: Icons.bolt_rounded,
+        covers: covs(_chartTracks),
+      ),
+    ];
+
     void playGenre(_Genre g) {
       HapticFeedback.selectionClick();
       final userLang = _effectivePrimaryLanguage;
@@ -3900,6 +3326,8 @@ class _HomeScreenState extends State<HomeScreen> {
         if (tracks.isNotEmpty) play(tracks, 0);
       });
     }
+
+    final artistCount = math.min(_chartArtists.length, 10);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -3917,6 +3345,7 @@ class _HomeScreenState extends State<HomeScreen> {
           : Stack(
               children: [
                 CustomScrollView(
+                  controller: _homeScrollController,
                   physics: const BouncingScrollPhysics(
                     parent: AlwaysScrollableScrollPhysics(),
                   ),
@@ -3962,20 +3391,15 @@ class _HomeScreenState extends State<HomeScreen> {
                             return const SizedBox.shrink();
                           }
                           return Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 6),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF18181B),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.crimson.withValues(
-                                    alpha: 0.35,
-                                  ),
-                                ),
+                                color: AppColors.surface2,
+                                borderRadius: BorderRadius.circular(_kCardR),
                               ),
                               child: Row(
                                 children: [
@@ -3986,7 +3410,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       color: AppColors.crimson.withValues(
                                         alpha: 0.18,
                                       ),
-                                      borderRadius: BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: const Icon(
                                       Icons.system_update_rounded,
@@ -4003,7 +3427,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         Text(
                                           'Zenify v${update.latestVersion} Available',
                                           style: const TextStyle(
-                                            fontSize: 12.5,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w700,
                                             color: Colors.white,
                                           ),
@@ -4012,7 +3436,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         Text(
                                           'Tap to view release notes & update',
                                           style: TextStyle(
-                                            fontSize: 11,
+                                            fontSize: 11.5,
                                             color: Colors.white.withValues(
                                               alpha: 0.6,
                                             ),
@@ -4021,7 +3445,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ],
                                     ),
                                   ),
-                                  GestureDetector(
+                                  SpringPress(
+                                    scale: 0.92,
                                     onTap: () {
                                       HapticFeedback.lightImpact();
                                       UpdateService.instance.showUpdateSheet(
@@ -4036,7 +3461,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: AppColors.crimson,
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: const Text(
                                         'UPDATE',
@@ -4060,7 +3485,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     // Large title greeting
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 6),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -4093,7 +3518,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
 
-                    // HERO (3D cover-flow) + mood pills in ONE sliver so the pills always render below it
+                    // HERO (Apple Music top-picks carousel) + mood pills
                     SliverToBoxAdapter(
                       child: Column(
                         children: [
@@ -4148,7 +3573,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 2. Time-of-day: art-first overlay cards
+                    // 2. Time-of-day: artwork with frosted caption bar
                     if (_timeOfDayTracks.isNotEmpty && _mood == -1)
                       _sec(
                         'time-of-day',
@@ -4165,17 +3590,20 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             _Shelf(
-                              height: cw * 1.12,
-                              itemExtent: ext,
+                              height: frostSize + 16,
+                              itemExtent: frostExt,
                               count: _timeOfDayTracks.length,
                               builder: (c, i) {
                                 final t = _timeOfDayTracks[i];
                                 final cur = player.currentTrack?.id == t.id;
-                                return _OverlayCard(
-                                  track: t,
-                                  current: cur,
-                                  playing: cur && player.isPlaying,
-                                  onTap: () => play(_timeOfDayTracks, i),
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: _FrostCard(
+                                    track: t,
+                                    current: cur,
+                                    playing: cur && player.isPlaying,
+                                    onTap: () => play(_timeOfDayTracks, i),
+                                  ),
                                 );
                               },
                             ),
@@ -4183,7 +3611,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 3. Listen again: classic big cards
+                    // 3. Listen again: classic big cards (unchanged)
                     if (listenAgain.isNotEmpty)
                       _sec(
                         'again',
@@ -4227,7 +3655,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 4. Quick picks: swipeable pages of rows
+                    // 4. Quick picks: swipeable pages of rows (unchanged)
                     if (quick.isNotEmpty)
                       _sec(
                         'quick',
@@ -4255,7 +3683,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // Artists: 5 by default, tap "Show more" for up to 10
+                    // Artists: Apple-style circular shelf
                     if (_chartArtists.isNotEmpty)
                       _sec(
                         'artists',
@@ -4286,84 +3714,54 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ],
                               ),
                             ),
-                            _ArtistsGrid(
-                              artists: _chartArtists,
-                              onTap: (a) => _open(
-                                ArtistScreen(
-                                  artistName: a.name,
-                                  imageUrl: a.image,
-                                ),
-                              ),
+                            _Shelf(
+                              height: artistSize + 56,
+                              itemExtent: artistExt,
+                              count: artistCount,
+                              builder: (c, i) {
+                                final a = _chartArtists[i];
+                                return _ArtistCircle(
+                                  name: a.name,
+                                  image: a.image,
+                                  onTap: () => _open(
+                                    ArtistScreen(
+                                      artistName: a.name,
+                                      imageUrl: a.image,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
                       ),
 
-                    // 5. Mixed for you: interactive focus carousel
+                    // 5. Made for you: mix tiles shelf
                     _sec(
                       'mixes',
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const _SecHeader(
-                            title: 'Mixed for you',
+                            title: 'Made for You',
                             overline: 'Personalized stations',
                           ),
-                          _MixCarousel(
-                            activeId: _activeMix,
-                            isPlaying: player.isPlaying,
-                            onPlay: _playMix,
-                            mixes: [
-                              _MixSpec(
-                                id: 'supermix',
-                                title: 'My Supermix',
-                                subtitle: 'Your blended favorites',
-                                gradient: const [
-                                  Color(0xFFD13A57),
-                                  Color(0xFF3A0A13),
-                                ],
-                                icon: Icons.all_inclusive_rounded,
-                                covers: covs([
-                                  ..._favoriteArtistTracks,
-                                  ..._secondFavoriteArtistTracks,
-                                  ..._quickPicks,
-                                  ..._recentHistory,
-                                ]),
-                              ),
-                              _MixSpec(
-                                id: 'discover',
-                                title: 'Discover Mix',
-                                subtitle: 'Fresh weekly finds',
-                                gradient: const [
-                                  Color(0xFF14B8A6),
-                                  Color(0xFF0B3B38),
-                                ],
-                                icon: Icons.explore_rounded,
-                                covers: covs(_newReleases),
-                              ),
-                              _MixSpec(
-                                id: 'chill',
-                                title: 'Chill Mix',
-                                subtitle: 'Mellow & unhurried',
-                                gradient: const [
-                                  Color(0xFF3B82F6),
-                                  Color(0xFF14264F),
-                                ],
-                                icon: Icons.spa_rounded,
-                                covers: covs(_timeOfDayTracks),
-                              ),
-                              _MixSpec(
-                                id: 'energy',
-                                title: 'Energy Mix',
-                                subtitle: 'High-tempo momentum',
-                                gradient: const [
-                                  Color(0xFFF59E0B),
-                                  Color(0xFF4A2406),
-                                ],
-                                icon: Icons.bolt_rounded,
-                                covers: covs(_chartTracks),
-                              ),
-                            ],
+                          _Shelf(
+                            height: mixSize + 20,
+                            itemExtent: mixExt,
+                            count: mixes.length,
+                            builder: (c, i) {
+                              final m = mixes[i];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 20),
+                                child: _MixTile(
+                                  spec: m,
+                                  active: _activeMix == m.id,
+                                  playing: player.isPlaying,
+                                  onTap: () => _playMix(m.id),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -4408,7 +3806,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                   subtitle: t.artist,
                                   artists: t.resolvedArtists,
-                                  radius: 10,
+                                  radius: _kCardR,
                                   onTap: () => play(_favoriteArtistTracks, i),
                                 );
                               },
@@ -4417,7 +3815,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 7. #2 artist: wide landscape cards
+                    // 7. #2 artist: wide cards on a flat surface
                     if (_secondFavoriteArtist != null &&
                         _secondFavoriteArtistTracks.isNotEmpty)
                       _sec(
@@ -4437,7 +3835,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             _Shelf(
-                              height: 168,
+                              height: 134,
                               itemExtent: w * 0.8,
                               count: _secondFavoriteArtistTracks.length,
                               builder: (c, i) => Padding(
@@ -4454,7 +3852,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 8. Rediscover: editorial collage gallery
+                    // 8. Rediscover: editorial collage gallery (unchanged)
                     if (_rediscover.isNotEmpty)
                       _sec(
                         'rediscover',
@@ -4496,7 +3894,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 9. New releases: swipeable card deck
+                    // 9. New releases: large feature cards
                     if (fresh.isNotEmpty)
                       _sec(
                         'new',
@@ -4514,10 +3912,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                 entries: _trackEntries(fresh),
                               ),
                             ),
-                            _CardDeck(
-                              key: ValueKey('deck-$_refresh-${fresh.length}'),
-                              tracks: fresh,
-                              onPlay: (i) => play(fresh, i),
+                            _Shelf(
+                              height: featSize + 84,
+                              itemExtent: featExt,
+                              count: fresh.length,
+                              builder: (c, i) {
+                                final t = fresh[i];
+                                final cur = player.currentTrack?.id == t.id;
+                                return _FeatureCard(
+                                  track: t,
+                                  tag: 'New',
+                                  current: cur,
+                                  playing: player.isPlaying,
+                                  onTap: () => play(fresh, i),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -4543,9 +3952,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               track: charts.first,
                               current:
                                   player.currentTrack?.id == charts.first.id,
-                              playing:
-                                  player.currentTrack?.id == charts.first.id &&
-                                  player.isPlaying,
+                              playing: player.isPlaying,
                               onTap: () => play(charts, 0),
                             ),
                             if (charts.length > 1) ...[
@@ -4563,7 +3970,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 12. Albums: staggered cards
+                    // 12. Albums: staggered cards (unchanged)
                     if (albums.isNotEmpty)
                       _sec(
                         'albums',
@@ -4637,7 +4044,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
 
-                    // 13. Browse categories: two drifting marquee rows
+                    // 13. Browse categories: two drifting marquee rows (unchanged)
                     SliverToBoxAdapter(
                       child: Reveal(
                         key: ValueKey('$_seed-genres'),
@@ -4684,6 +4091,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Home',
                     showBack: false,
                     isDockPage: true,
+                    scrollController: _homeScrollController,
                     showProfile: true,
                   ),
                 ),

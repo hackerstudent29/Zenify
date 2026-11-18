@@ -393,6 +393,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
       AnimationController.unbounded(vsync: this, value: IslandNotifier.instance.current == null ? 0.0 : 1.0);
   bool _shown = false;
   ScrollController? _activeSc;
+  double _scrollOffset = 0.0;
 
   bool get _isSubpage {
     if (widget.isDockPage == true) return false;
@@ -401,7 +402,24 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     return mounted && Navigator.canPop(context);
   }
 
-  void _listener() => _check(false);
+  void _syncScrollOffset() {
+    final sc = _findController();
+    if (sc != null && sc.hasClients) {
+      final off = sc.offset;
+      if ((off - _scrollOffset).abs() > 0.5) {
+        if (mounted) {
+          setState(() {
+            _scrollOffset = off;
+          });
+        }
+      }
+    }
+  }
+
+  void _listener() {
+    _syncScrollOffset();
+    _check(false);
+  }
 
   ScrollController? _findController() {
     if (widget.scrollController != null) return widget.scrollController;
@@ -462,6 +480,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     _activeSc = widget.scrollController;
     IslandNotifier.instance.addListener(_onNotifChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncScrollOffset();
       _check(true);
       if (IslandNotifier.instance.current != null) {
         _n.value = 1.0;
@@ -480,7 +499,10 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
       _activeSc?.removeListener(_listener);
       _activeSc = newSc;
       _activeSc?.addListener(_listener);
-      WidgetsBinding.instance.addPostFrameCallback((_) => _check(true));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncScrollOffset();
+        _check(true);
+      });
     }
   }
 
@@ -491,6 +513,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
       _activeSc?.removeListener(_listener);
       _activeSc = widget.scrollController ?? PrimaryScrollController.maybeOf(context);
       _activeSc?.addListener(_listener);
+      _syncScrollOffset();
       if (_isSubpage) {
         _shown = false;
         _c.value = 0;
@@ -538,11 +561,47 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     final double rightClearance = rightDockW > 0 ? rightDockW + 8.0 : 8.0;
     final double symmetricClearance = math.max(leftClearance, rightClearance);
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(widget.horizontalMargin, top, widget.horizontalMargin, 0),
-      child: SizedBox(
-        height: h,
-        child: AnimatedBuilder(
+    final double scrollProgress = (_scrollOffset / 50.0).clamp(0.0, 1.0);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Top edge black fade-in effect when content scrolls up.
+        // Provides a dark background vignette so clock, notifications, battery and header
+        // controls remain crystal clear and legible over bright scrolling artwork.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: top + h + 24,
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: scrollProgress,
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black,
+                      Color(0xD9000000),
+                      Color(0x66000000),
+                      Colors.transparent,
+                    ],
+                    stops: [0.0, 0.42, 0.78, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Header interactive controls
+        Padding(
+          padding: EdgeInsets.fromLTRB(widget.horizontalMargin, top, widget.horizontalMargin, 0),
+          child: SizedBox(
+            height: h,
+            child: AnimatedBuilder(
           animation: Listenable.merge([_c, _n]),
           builder: (context, _) {
             final double nVal = _n.value.clamp(0.0, 1.0);
@@ -648,7 +707,9 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
           },
         ),
       ),
-    );
+    ),
+  ],
+);
   }
 
   Widget _buildLeftDock(BuildContext context, bool canPop, bool isDock) {
