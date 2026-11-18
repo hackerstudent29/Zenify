@@ -369,18 +369,15 @@ class PlayerShellState extends State<PlayerShell>
     final effectiveTrack = track is Track
         ? track
         : (context.read<PlayerState>().currentTrack ??
-            Track(
-              id: track?.id?.toString() ?? '',
-              title: track?.title?.toString() ?? '',
-              artist: track?.artist?.toString() ?? '',
-              album: track?.album?.toString() ?? '',
-              coverUrl: track?.coverUrl?.toString() ?? '',
-            ));
+              Track(
+                id: track?.id?.toString() ?? '',
+                title: track?.title?.toString() ?? '',
+                artist: track?.artist?.toString() ?? '',
+                album: track?.album?.toString() ?? '',
+                coverUrl: track?.coverUrl?.toString() ?? '',
+              ));
 
-    MediaNavigationSheet.show(
-      context: context,
-      track: effectiveTrack,
-    );
+    MediaNavigationSheet.show(context: context, track: effectiveTrack);
   }
 
   dynamic _artistsOf(dynamic track) => track is Track
