@@ -32,8 +32,8 @@ const double _kSameStartEps = 0.35;
 /// Karaoke glyph-fill subtle scale peak (1.0 to ~1.03-1.05 max).
 const double kKaraokeGlyphScalePeak = 1.04;
 
-/// Apple Music lyric typography (SF Pro Display).
-const FontWeight _kLyricWeight = FontWeight.w800;
+/// Apple Music lyric typography (SF Pro).
+const FontWeight _kLyricWeight = FontWeight.w600;
 
 /// Three-dot interlude tunables. (Pulse constants are kept only so existing
 /// imports do not break - the dots no longer resize while waiting.)
@@ -105,7 +105,7 @@ bool _isInstrumentalOrDots(String text) {
 /// Controls auto-hide after this much time without touching the screen.
 const Duration _kIdleHide = Duration(seconds: 3);
 
-const String _kDisplayFont = 'SF Pro Display';
+const String _kDisplayFont = 'SF Pro';
 const String _kTextFont = 'SF Pro';
 
 /// Singers that mean "everyone" (stay on the left side).
@@ -464,15 +464,17 @@ class _Depth {
 }
 
 const _after = [
-  _Depth(0.62, 0, 0.97),
-  _Depth(0.40, 1.2, 0.94),
-  _Depth(0.24, 2.6, 0.92),
-  _Depth(0.14, 4.0, 0.90),
+  _Depth(0.74, 0.9, 0.98), // +1: visible with slight blur
+  _Depth(0.54, 2.0, 0.95), // +2: more slight blurness
+  _Depth(0.38, 3.6, 0.92), // +3: deeper blur
+  _Depth(0.26, 5.2, 0.89), // +4: heavy blur
+  _Depth(0.14, 6.8, 0.86), // +5+: even more blur for last bottom lines
 ];
 const _before = [
-  _Depth(0.80, 0.8, 0.96),
-  _Depth(0.60, 2.2, 0.93),
-  _Depth(0.42, 3.8, 0.90),
+  _Depth(0.78, 1.0, 0.97), // -1: slight blur
+  _Depth(0.56, 2.4, 0.94), // -2: more blur
+  _Depth(0.38, 4.2, 0.91), // -3: deeper blur
+  _Depth(0.20, 5.8, 0.88), // -4+: deep blur
 ];
 
 _Depth _depthFor(
@@ -1073,6 +1075,56 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
         onPointerCancel: (_) => _pointerUp(),
         child: Column(
           children: [
+            if (showControls)
+              AnimatedBuilder(
+                animation: _reveal,
+                builder: (context, child) {
+                  final v = Curves.easeOut.transform(
+                    _reveal.value.clamp(0.0, 1.0),
+                  );
+                  return Opacity(
+                    opacity: v,
+                    child: Transform.translate(
+                      offset: Offset(0, (v - 1) * 12),
+                      child: child,
+                    ),
+                  );
+                },
+                child: ClipRect(
+                  child: AnimatedAlign(
+                    alignment: Alignment.topCenter,
+                    heightFactor: _immersive ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 460),
+                    curve: _liquidCurve,
+                    child: AnimatedOpacity(
+                      opacity: _immersive ? 0.0 : 1.0,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      child: IgnorePointer(
+                        ignoring: _immersive,
+                        child: _Controls(
+                          lang: _lang,
+                          showLang: _hasTranslation,
+                          showOffset: widget.isSynced,
+                          offsetLabel: _offsetLabel,
+                          offsetIsZero: _offsetMs == 0,
+                          onLang: (l) {
+                            HapticFeedback.selectionClick();
+                            setState(() => _lang = l);
+                            WidgetsBinding.instance.addPostFrameCallback(
+                              (_) => _follow(forceAnimated: true),
+                            );
+                          },
+                          onMinus: () => _changeOffset(-_step),
+                          onPlus: () => _changeOffset(_step),
+                          onReset: _resetOffset,
+                          onShareLyrics: widget.onShareLyrics,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             Expanded(
               child: ShaderMask(
                 blendMode: BlendMode.dstIn,
@@ -1157,56 +1209,6 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
                 ),
               ),
             ),
-            if (showControls)
-              AnimatedBuilder(
-                animation: _reveal,
-                builder: (context, child) {
-                  final v = Curves.easeOut.transform(
-                    _reveal.value.clamp(0.0, 1.0),
-                  );
-                  return Opacity(
-                    opacity: v,
-                    child: Transform.translate(
-                      offset: Offset(0, (1 - v) * 18),
-                      child: child,
-                    ),
-                  );
-                },
-                child: ClipRect(
-                  child: AnimatedAlign(
-                    alignment: Alignment.topCenter,
-                    heightFactor: _immersive ? 0.0 : 1.0,
-                    duration: const Duration(milliseconds: 460),
-                    curve: _liquidCurve,
-                    child: AnimatedOpacity(
-                      opacity: _immersive ? 0.0 : 1.0,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOutCubic,
-                      child: IgnorePointer(
-                        ignoring: _immersive,
-                        child: _Controls(
-                          lang: _lang,
-                          showLang: _hasTranslation,
-                          showOffset: widget.isSynced,
-                          offsetLabel: _offsetLabel,
-                          offsetIsZero: _offsetMs == 0,
-                          onLang: (l) {
-                            HapticFeedback.selectionClick();
-                            setState(() => _lang = l);
-                            WidgetsBinding.instance.addPostFrameCallback(
-                              (_) => _follow(forceAnimated: true),
-                            );
-                          },
-                          onMinus: () => _changeOffset(-_step),
-                          onPlus: () => _changeOffset(_step),
-                          onReset: _resetOffset,
-                          onShareLyrics: widget.onShareLyrics,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -1715,13 +1717,13 @@ class _WordLineState extends State<_WordLine>
   TextStyle _style(double fs, Color c) {
     final complex = _hasComplexScript(widget.text);
     return TextStyle(
-      fontFamily: _kDisplayFont,
+      fontFamily: _kTextFont,
       fontFamilyFallback: _kFontFamilyFallback,
       fontSize: fs,
       height: complex ? 1.3 : _kLineHeight,
       leadingDistribution: TextLeadingDistribution.even,
       fontWeight: widget.backing ? FontWeight.w500 : _kLyricWeight,
-      letterSpacing: complex ? 0.0 : 0.55,
+      letterSpacing: complex ? 0.0 : 0.2,
       color: c,
     );
   }
@@ -1735,7 +1737,7 @@ class _WordLineState extends State<_WordLine>
     }
     final tokens = widget.text.split(' ').where((t) => t.isNotEmpty).toList();
 
-    final primary = (maxW * 0.10).clamp(28.0, 40.0).toDouble();
+    final primary = (maxW * 0.09).clamp(26.0, 36.0).toDouble();
     final secondary = (primary * 0.82).roundToDouble();
 
     // Fixed size for every language; long lines simply wrap.
@@ -2234,11 +2236,9 @@ class _Controls extends StatelessWidget {
     final n = values.length;
     final idx = values.indexOf(lang);
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-        child: Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 2, 24, 8),
+      child: Row(
           children: [
             if (showLang)
               Expanded(
@@ -2343,7 +2343,6 @@ class _Controls extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
+      );
   }
 }

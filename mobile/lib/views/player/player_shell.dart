@@ -1597,6 +1597,93 @@ class PlayerShellState extends State<PlayerShell>
     EdgeInsets safe,
     bool isLyrics,
   ) {
+    Widget controls = Padding(
+      // Lift components up with comfortable breathing room from the bottom
+      padding: EdgeInsets.fromLTRB(24, 6, 24, safe.bottom + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // title / artist / star / more: moves with artwork into
+          // the compact header when a panel opens
+          _rise(
+            begin: 0.34,
+            child: _dockCollapse(
+              inverse: true,
+              child: _metaRow(track),
+            ),
+          ),
+
+          // Seekbar + duration: lifted slightly
+          _rise(
+            begin: 0.40,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 2),
+                  child: ScrubberSlider(
+                    positionNotifier: player.positionNotifier,
+                    duration: _duration,
+                    onSeek: (pos) => player.seek(pos),
+                    activeColor: _seekTint.withValues(alpha: 0.62),
+                    trackColor: _seekTint.withValues(alpha: 0.22),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Big three-button transport: lifted up with balanced spacing
+          _rise(
+            begin: 0.46,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 340),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 16),
+                  child: _transport(player),
+                ),
+              ),
+            ),
+          ),
+
+          _rise(
+            begin: 0.52,
+            child: _tools(
+              isLyrics,
+              hasLyrics: player.hasLyrics || player.isLoadingLyrics,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    Widget content = controls;
+    if (isLyrics) {
+      // In lyrics mode while controls are visible: completely frosted blur
+      // behind the bottom components so lyrics scrolling underneath are blurred
+      content = ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.0),
+                  Colors.black.withValues(alpha: 0.48),
+                  Colors.black.withValues(alpha: 0.82),
+                ],
+                stops: const [0.0, 0.28, 1.0],
+              ),
+            ),
+            child: controls,
+          ),
+        ),
+      );
+    }
+
     return _chromeCollapse(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -1604,65 +1691,7 @@ class PlayerShellState extends State<PlayerShell>
         onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
         onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
         onVerticalDragCancel: () => _dragEnd(0),
-        child: Padding(
-          // bottom padding unchanged: Studio FX / Lyrics / Queue stay put
-          padding: EdgeInsets.fromLTRB(24, 8, 24, safe.bottom + 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // title / artist / star / more: moves with artwork into
-              // the compact header when a panel opens
-              _rise(
-                begin: 0.34,
-                child: _dockCollapse(
-                  inverse: true,
-                  child: _metaRow(track),
-                ),
-              ),
-
-              // Seekbar + duration: design unchanged
-              _rise(
-                begin: 0.40,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: ScrubberSlider(
-                      positionNotifier: player.positionNotifier,
-                      duration: _duration,
-                      onSeek: (pos) => player.seek(pos),
-                      activeColor: _seekTint.withValues(alpha: 0.62),
-                      trackColor: _seekTint.withValues(alpha: 0.22),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Big three-button transport. Slightly more air below it
-              // lifts it (and everything above) up while the tool row
-              // keeps its position at the bottom.
-              _rise(
-                begin: 0.46,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 340),
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 14, bottom: 30),
-                      child: _transport(player),
-                    ),
-                  ),
-                ),
-              ),
-
-              _rise(
-                begin: 0.52,
-                child: _tools(
-                  isLyrics,
-                  hasLyrics: player.hasLyrics || player.isLoadingLyrics,
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: content,
       ),
     );
   }
@@ -1809,42 +1838,44 @@ class PlayerShellState extends State<PlayerShell>
       child: SizedBox(
         width: 320,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _SpringButton(
-              size: 84,
+              size: 78,
               label: 'Previous track',
               onTap: _prev,
               child: SpringPop(
                 pulse: _prevPulse,
-                dx: -12,
+                dx: -10,
                 scale: 0.12,
                 child: const Icon(
                   CupertinoIcons.backward_fill,
                   color: Colors.white,
-                  size: 50,
+                  size: 44,
                 ),
               ),
             ),
+            const SizedBox(width: 30),
             _SpringButton(
-              size: 96,
+              size: 90,
               label: _playing ? 'Pause' : 'Play',
               pressedScale: 0.9,
               onTap: player.togglePlay,
-              child: _PlayGlyph(playing: _playing, size: 68),
+              child: _PlayGlyph(playing: _playing, size: 60),
             ),
+            const SizedBox(width: 30),
             _SpringButton(
-              size: 84,
+              size: 78,
               label: 'Next track',
               onTap: _next,
               child: SpringPop(
                 pulse: _nextPulse,
-                dx: 12,
+                dx: 10,
                 scale: 0.12,
                 child: const Icon(
                   CupertinoIcons.forward_fill,
                   color: Colors.white,
-                  size: 50,
+                  size: 44,
                 ),
               ),
             ),
