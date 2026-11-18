@@ -1944,31 +1944,30 @@ class _Word extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dir = rtl ? TextDirection.rtl : TextDirection.ltr;
-    Widget t(Color c) => Text(text, textDirection: dir, style: style(fs, c));
+    Widget t(Color c, {List<Shadow>? shadows}) => Text(
+          text,
+          textDirection: dir,
+          style: style(fs, c).copyWith(shadows: shadows),
+        );
     Widget out;
+
+    final subtleShadow = glow > 0.08
+        ? [
+            Shadow(
+              color: Colors.white.withValues(
+                alpha: (0.16 * glow).clamp(0.0, 0.28),
+              ),
+              blurRadius: 3.0 + 3.0 * glow,
+            ),
+          ]
+        : null;
 
     if (p <= 0.0) {
       out = t(_dim);
     } else if (p >= 1.0) {
-      out = t(Colors.white);
-      if (glow > 0.01) {
-        final sigma = 5.0 + 5.0 * glow;
-        out = Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Opacity(
-              opacity: (0.5 * glow).clamp(0.0, 1.0),
-              child: ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-                child: t(Colors.white),
-              ),
-            ),
-            out,
-          ],
-        );
-      }
+      out = t(Colors.white, shadows: subtleShadow);
     } else {
-      const soft = 0.3; // wider soft edge = smoother sweep
+      const soft = 0.25; // crisp, clean Apple Music sweep edge
       final a = (p * (1 + soft) - soft).clamp(0.0, 1.0).toDouble();
       final b = (p * (1 + soft)).clamp(0.0, 1.0).toDouble();
       Shader mask(Rect r) => LinearGradient(
@@ -1978,27 +1977,14 @@ class _Word extends StatelessWidget {
         stops: [0, a, b],
       ).createShader(r);
 
-      final sweepSigma = 4.0 + 4.0 * glow;
-      final sweepOpacity = (0.55 + 0.35 * glow).clamp(0.0, 0.95);
       out = Stack(
         clipBehavior: Clip.none,
         children: [
-          Opacity(
-            opacity: sweepOpacity,
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: sweepSigma, sigmaY: sweepSigma),
-              child: ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: mask,
-                child: t(Colors.white),
-              ),
-            ),
-          ),
           t(_dim),
           ShaderMask(
             blendMode: BlendMode.dstIn,
             shaderCallback: mask,
-            child: t(Colors.white),
+            child: t(Colors.white, shadows: subtleShadow),
           ),
         ],
       );
@@ -2006,9 +1992,9 @@ class _Word extends StatelessWidget {
 
     if (lift == 0) return out;
     return Transform.translate(
-      offset: Offset(0, -fs * 0.09 * lift),
+      offset: Offset(0, -fs * 0.04 * lift),
       child: Transform.scale(
-        scale: 1 + 0.025 * lift.clamp(0.0, 1.3),
+        scale: 1 + 0.012 * lift.clamp(0.0, 1.2),
         alignment: Alignment.bottomCenter,
         child: out,
       ),

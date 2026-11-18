@@ -733,8 +733,7 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
       _reduce = reduce;
       _wake();
     }
-    // ignore: deprecated_member_use
-    final tickerEnabled = TickerMode.of(context);
+    final tickerEnabled = TickerMode.valuesOf(context).enabled;
     if (tickerEnabled && !_ticker.isActive) {
       _wake();
     }
