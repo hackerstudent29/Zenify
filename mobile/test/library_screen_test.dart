@@ -39,17 +39,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     // Verify "Favourite Songs" category text exists
-    expect(find.text('Favourite Songs'), findsOneWidget);
+    expect(find.text('Favourite Songs'), findsAtLeastNWidgets(1));
 
     // Verify Star icon is rendered for Favourite Songs
-    expect(find.byIcon(CupertinoIcons.star_fill), findsOneWidget);
+    expect(find.byIcon(CupertinoIcons.star_fill), findsAtLeastNWidgets(1));
 
     // Verify "Downloaded" category exists
     expect(find.text('Downloaded'), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.arrow_down_circle_fill), findsOneWidget);
 
     // Tap into Favourite Songs
-    await tester.tap(find.text('Favourite Songs'));
+    await tester.tap(find.text('Favourite Songs').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 

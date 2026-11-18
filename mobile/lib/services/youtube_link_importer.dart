@@ -214,20 +214,41 @@ class YouTubeLinkImporter {
     String? albumId;
     String? videoId;
 
-    // Normalize string by removing all carriage returns, newlines, tabs, and whitespace
-    // that messaging apps (like WhatsApp) insert when line-wrapping long URLs across messages.
-    String clean = raw.replaceAll(RegExp(r'[\r\n\t\s]+'), '').trim();
+    final trimmed = raw.trim();
+    String clean;
 
-    final urlRegex = RegExp(r'https?:\/\/[^\s]+');
-    final urlMatch = urlRegex.firstMatch(clean);
-    if (urlMatch != null) {
-      clean = urlMatch.group(0)!;
-    } else if (clean.contains('youtube.com') ||
-        clean.contains('youtu.be') ||
-        clean.contains('spotify.com')) {
-      if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
-        clean = 'https://$clean';
+    final urlStart = trimmed.indexOf(RegExp(r'https?:\/\/'));
+    if (urlStart != -1) {
+      final sub = trimmed.substring(urlStart);
+      final lines = sub.split(RegExp(r'[\r\n]+'));
+      final buffer = StringBuffer();
+
+      for (int i = 0; i < lines.length; i++) {
+        final line = lines[i].trim();
+        if (line.isEmpty) continue;
+
+        if (i == 0) {
+          final spaceIdx = line.indexOf(RegExp(r'[ \t]'));
+          if (spaceIdx != -1) {
+            buffer.write(line.substring(0, spaceIdx));
+            break;
+          } else {
+            buffer.write(line);
+          }
+        } else {
+          // If multiline URL continues (e.g. from WhatsApp line-wrapping),
+          // ensure line does not contain space-separated text (which marks normal chat).
+          if (line.contains(RegExp(r'[ \t]'))) break;
+          buffer.write(line);
+        }
       }
+      clean = buffer.toString();
+    } else if (trimmed.contains('youtube.com') ||
+        trimmed.contains('youtu.be') ||
+        trimmed.contains('spotify.com')) {
+      clean = 'https://${trimmed.replaceAll(RegExp(r'[\r\n\t\s]+'), '')}';
+    } else {
+      clean = trimmed.replaceAll(RegExp(r'[\r\n\t\s]+'), '');
     }
 
     try {
