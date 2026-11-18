@@ -144,6 +144,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _isLoading = true;
 
   final PageController _featuredCtrl = PageController(viewportFraction: 0.80);
+  final ScrollController _exploreScrollController = ScrollController();
 
   @override
   void initState() {
@@ -167,6 +168,7 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   @override
   void dispose() {
+    _exploreScrollController.dispose();
     CatalogDataSource.tracksNotifier.removeListener(_onCatalogUpdated);
     _featuredCtrl.dispose();
     super.dispose();
@@ -410,6 +412,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       body: Stack(
         children: [
           CustomScrollView(
+            controller: _exploreScrollController,
             key: const PageStorageKey<String>('explore_scroll_view'),
             physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics(),
@@ -432,6 +435,7 @@ class _ExploreScreenState extends State<ExploreScreen>
               subtitle: '${_country.flag} ${_country.name} • Weekly Top',
               showBack: false,
               isDockPage: true,
+              scrollController: _exploreScrollController,
               onCenterTap: _pickCountry,
               showProfile: true,
               onProfileTap: widget.onOpenProfile,

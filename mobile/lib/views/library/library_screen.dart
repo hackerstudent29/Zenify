@@ -1252,7 +1252,7 @@ class _LibraryPageShellState extends State<_LibraryPageShell> {
                   title: widget.title,
                   showBack: !widget.root,
                   isDockPage: widget.root,
-                  scrollController: widget.root ? null : _sc,
+                  scrollController: _sc,
                   revealOffset: 50.0,
                   onBack: () => Navigator.maybePop(context),
                   showProfile: widget.root,

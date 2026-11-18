@@ -1383,9 +1383,7 @@ class _SearchScreenState extends State<SearchScreen>
                           title: category != null ? category.title : 'Search',
                           showBack: showBack,
                           isDockPage: !showBack,
-                          scrollController: (showBack && category != null)
-                              ? _scrollCtrl
-                              : null,
+                          scrollController: _scrollCtrl,
                           revealOffset: 120.0,
                           showProfile: true,
                           topPadding: topPad + 4,
