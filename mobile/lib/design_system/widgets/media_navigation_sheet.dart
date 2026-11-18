@@ -9,6 +9,7 @@ import '../../services/dock_visibility.dart';
 import '../../utils/media_normalizer.dart';
 import '../../views/details/album_screen.dart';
 import '../../views/details/artist_screen.dart';
+import '../../views/shell_screen.dart' show ShellNavigationScope;
 import '../zen.dart';
 import 'monogram_avatar.dart';
 import 'pressable_scale.dart';
@@ -50,6 +51,8 @@ class MediaNavigationSheet extends StatefulWidget {
     String? albumBrowseId,
     List<Track>? initialTracks,
     bool showAlbum = true,
+    void Function(ArtistRef artist)? onOpenArtist,
+    VoidCallback? onOpenAlbum,
     VoidCallback? onBeforeNavigate,
   }) async {
     HapticFeedback.lightImpact();
@@ -109,8 +112,10 @@ class MediaNavigationSheet extends StatefulWidget {
     final effectiveAlbumArtist = albumArtist ??
         (track?.artist ?? (effectiveArtists.isNotEmpty ? effectiveArtists.first.name : ''));
 
-    await DockVisibility.runModal(
-      () => showModalBottomSheet<void>(
+    final token = DockVisibility.acquire(hideNav: true, hideMini: true);
+
+    try {
+      await showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,
         backgroundColor: Colors.transparent,
@@ -125,42 +130,71 @@ class MediaNavigationSheet extends StatefulWidget {
           albumBrowseId: effectiveBrowseId,
           initialTracks: initialTracks ?? (track != null ? [track] : null),
           onOpenArtist: (a) {
+            DockVisibility.release(token);
             Navigator.of(sheetContext).pop();
             onBeforeNavigate?.call();
-            final nav = callerNav.mounted ? callerNav : rootNav;
-            nav.push(
-              ZenPageRoute(
-                builder: (_) => ArtistScreen(
-                  artistName: a.name,
-                  browseId: a.id.isNotEmpty && !a.id.contains('_') ? a.id : null,
-                  imageUrl: a.imageUrl,
-                ),
-              ),
+            if (onOpenArtist != null) {
+              onOpenArtist(a);
+              return;
+            }
+            final page = ArtistScreen(
+              artistName: a.name,
+              browseId: a.id.isNotEmpty && !a.id.contains('_') ? a.id : null,
+              imageUrl: a.imageUrl,
             );
+            final shell = ShellNavigationScope.of(context);
+            if (shell != null) {
+              shell.openInActiveTab(page);
+            } else {
+              final nav = callerNav.mounted ? callerNav : rootNav;
+              nav.push(
+                ZenPageRoute(
+                  builder: (_) => page,
+                ),
+              );
+            }
           },
           onOpenAlbum: effectiveAlbum != null
               ? () {
+                  DockVisibility.release(token);
                   Navigator.of(sheetContext).pop();
                   onBeforeNavigate?.call();
-                  final nav = callerNav.mounted ? callerNav : rootNav;
-                  nav.push(
-                    ZenPageRoute(
-                      builder: (_) => AlbumScreen(
-                        albumTitle: effectiveAlbum!,
-                        artistName: effectiveAlbumArtist,
-                        coverUrl: effectiveCover,
-                        browseId: effectiveBrowseId,
-                        initialTracks: initialTracks ?? (track != null ? [track] : null),
-                      ),
-                    ),
+                  if (onOpenAlbum != null) {
+                    onOpenAlbum();
+                    return;
+                  }
+                  String? browseId = effectiveBrowseId;
+                  if (browseId != null &&
+                      (browseId.startsWith('VLPL') ||
+                       browseId.startsWith('PL') ||
+                       browseId.startsWith('RD'))) {
+                    browseId = null;
+                  }
+                  final page = AlbumScreen(
+                    albumTitle: effectiveAlbum!,
+                    artistName: effectiveAlbumArtist,
+                    coverUrl: effectiveCover,
+                    browseId: browseId,
+                    initialTracks: initialTracks ?? (track != null ? [track] : null),
                   );
+                  final shell = ShellNavigationScope.of(context);
+                  if (shell != null) {
+                    shell.openInActiveTab(page);
+                  } else {
+                    final nav = callerNav.mounted ? callerNav : rootNav;
+                    nav.push(
+                      ZenPageRoute(
+                        builder: (_) => page,
+                      ),
+                    );
+                  }
                 }
               : null,
         ),
-      ),
-      hideNav: true,
-      hideMini: true,
-    );
+      );
+    } finally {
+      DockVisibility.release(token);
+    }
   }
 
   @override
