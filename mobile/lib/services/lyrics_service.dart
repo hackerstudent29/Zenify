@@ -599,6 +599,15 @@ class LyricsService {
     final cleanT = cleanTitle(track.title);
     final cleanA = cleanArtist(track.artist);
 
+    // Fetch YouTube Music official lyrics directly via videoId (authoritative lyric source)
+    String? officialYtLyrics;
+    try {
+      final videoId = track.id.startsWith('yt-') ? track.id.substring(3) : track.id;
+      if (videoId.isNotEmpty) {
+        officialYtLyrics = await InnerTubeService.instance.getLyrics(videoId);
+      }
+    } catch (_) {}
+
     // =========================================================================
     // TIER 1 (PRIORITY #1): WORD-BY-WORD (WBW) SYNCED LYRICS
     // =========================================================================
@@ -621,6 +630,7 @@ class LyricsService {
           rawLrc: lrcRed.wbw!.rawLrc,
           artist: cleanA,
           title: cleanT,
+          officialYtLyrics: officialYtLyrics,
         );
       }
       lrcRedLineCandidate = lrcRed.line;
@@ -636,7 +646,16 @@ class LyricsService {
           backendCandidate.synced &&
           (lang.isEmpty || backendCandidate.rawLrc == null || isLanguageCompatible(backendCandidate.rawLrc!, lang)) &&
           backendCandidate.lines.any((l) => l['words'] != null && (l['words'] as List).isNotEmpty)) {
-        return _saveAndReturn(cacheKey, backendCandidate.lines, true, backendCandidate.source, rawLrc: backendCandidate.rawLrc, artist: cleanA, title: cleanT);
+        return _saveAndReturn(
+          cacheKey,
+          backendCandidate.lines,
+          true,
+          backendCandidate.source,
+          rawLrc: backendCandidate.rawLrc,
+          artist: cleanA,
+          title: cleanT,
+          officialYtLyrics: officialYtLyrics,
+        );
       }
     } catch (e) {
       if (kDebugMode) debugPrint('[LyricsService] Tier 1 (Backend) error: $e');
@@ -648,24 +667,39 @@ class LyricsService {
 
     // 2a. Use lrc.red line-synced result if found during Tier 1
     if (lrcRedLineCandidate != null && lrcRedLineCandidate.isNotEmpty && lrcRedLineCandidate.synced) {
-      return _saveAndReturn(cacheKey, lrcRedLineCandidate.lines, true, 'lrc_red_line', rawLrc: lrcRedLineCandidate.rawLrc, artist: cleanA, title: cleanT);
+      return _saveAndReturn(
+        cacheKey,
+        lrcRedLineCandidate.lines,
+        true,
+        'lrc_red_line',
+        rawLrc: lrcRedLineCandidate.rawLrc,
+        artist: cleanA,
+        title: cleanT,
+        officialYtLyrics: officialYtLyrics,
+      );
     }
 
     // 2b. Query LRCLIB STRICTLY for syncedLyrics (reject plain lyrics & conflicting languages)
     try {
       final lrclibSynced = await _fetchLrclibSynced(cleanT, cleanA, track.album, track.durationSeconds, lang);
       if (lrclibSynced != null && lrclibSynced.isNotEmpty && lrclibSynced.synced) {
-        return _saveAndReturn(cacheKey, lrclibSynced.lines, true, 'lrclib_synced', rawLrc: lrclibSynced.rawLrc, artist: cleanA, title: cleanT);
+        return _saveAndReturn(
+          cacheKey,
+          lrclibSynced.lines,
+          true,
+          'lrclib_synced',
+          rawLrc: lrclibSynced.rawLrc,
+          artist: cleanA,
+          title: cleanT,
+          officialYtLyrics: officialYtLyrics,
+        );
       }
     } catch (e) {
       if (kDebugMode) debugPrint('[LyricsService] Tier 2 (LRCLIB synced) error: $e');
     }
 
     // 2c. InnerTube official lyrics if synced
-    String? officialYtLyrics;
     try {
-      final videoId = track.id.startsWith('yt-') ? track.id.substring(3) : track.id;
-      officialYtLyrics = await InnerTubeService.instance.getLyrics(videoId);
       if (officialYtLyrics != null &&
           officialYtLyrics.trim().isNotEmpty &&
           (lang.isEmpty || isLanguageCompatible(officialYtLyrics, lang))) {
@@ -689,7 +723,16 @@ class LyricsService {
         backendCandidate.isNotEmpty &&
         backendCandidate.synced &&
         (lang.isEmpty || backendCandidate.rawLrc == null || isLanguageCompatible(backendCandidate.rawLrc!, lang))) {
-      return _saveAndReturn(cacheKey, backendCandidate.lines, true, backendCandidate.source, rawLrc: backendCandidate.rawLrc, artist: cleanA, title: cleanT);
+      return _saveAndReturn(
+        cacheKey,
+        backendCandidate.lines,
+        true,
+        backendCandidate.source,
+        rawLrc: backendCandidate.rawLrc,
+        artist: cleanA,
+        title: cleanT,
+        officialYtLyrics: officialYtLyrics,
+      );
     }
 
     // =========================================================================
@@ -1223,6 +1266,79 @@ class LyricsService {
 
   // ───────────────────────── Storage Helpers ────────────────────────────────
 
+  static List<Map<String, dynamic>> _alignOfficialLyrics(
+    List<Map<String, dynamic>> timedLines,
+    String? officialYtLyrics,
+  ) {
+    if (officialYtLyrics == null || officialYtLyrics.trim().isEmpty || timedLines.isEmpty) {
+      return timedLines;
+    }
+
+    final rawOfficial = officialYtLyrics
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty && !l.startsWith('[') && !l.startsWith('<'))
+        .toList();
+
+    if (rawOfficial.isEmpty) return timedLines;
+
+    // If line counts match identically, swap in official lyrics lines with zero drift
+    if (rawOfficial.length == timedLines.length) {
+      final merged = <Map<String, dynamic>>[];
+      for (var i = 0; i < timedLines.length; i++) {
+        final timed = Map<String, dynamic>.from(timedLines[i]);
+        timed['text'] = rawOfficial[i];
+        merged.add(timed);
+      }
+      return merged;
+    }
+
+    // Windowed fuzzy match for slightly varying line counts (interludes, repeated lines)
+    final merged = <Map<String, dynamic>>[];
+    var lastOfficialIdx = 0;
+
+    for (final timed in timedLines) {
+      final tCopy = Map<String, dynamic>.from(timed);
+      final timedText = (tCopy['text'] as String? ?? '').trim().toLowerCase();
+      if (timedText.isEmpty || timedText == '• • •') {
+        merged.add(tCopy);
+        continue;
+      }
+
+      int bestMatchIdx = -1;
+      double bestScore = 0.0;
+      final searchEnd = math.min(rawOfficial.length, lastOfficialIdx + 5);
+
+      for (var j = lastOfficialIdx; j < searchEnd; j++) {
+        final offText = rawOfficial[j].toLowerCase();
+        if (offText == timedText) {
+          bestMatchIdx = j;
+          bestScore = 1.0;
+          break;
+        }
+        final timedWords = timedText.split(RegExp(r'\s+')).toSet();
+        final offWords = offText.split(RegExp(r'\s+')).toSet();
+        if (timedWords.isNotEmpty && offWords.isNotEmpty) {
+          final inter = timedWords.intersection(offWords).length;
+          final score = inter / math.max(timedWords.length, offWords.length);
+          if (score > 0.6 && score > bestScore) {
+            bestScore = score;
+            bestMatchIdx = j;
+          }
+        }
+      }
+
+      if (bestMatchIdx != -1) {
+        tCopy['text'] = rawOfficial[bestMatchIdx];
+        lastOfficialIdx = bestMatchIdx + 1;
+      }
+
+      merged.add(tCopy);
+    }
+
+    return merged;
+  }
+
   LyricsResult _saveAndReturn(
     String cacheKey,
     List<Map<String, dynamic>> lines,
@@ -1231,8 +1347,12 @@ class LyricsService {
     String? rawLrc,
     String? artist,
     String? title,
+    String? officialYtLyrics,
   }) {
-    final result = LyricsResult(lines: lines, synced: synced, source: source, rawLrc: rawLrc);
+    final finalLines = (officialYtLyrics != null && officialYtLyrics.trim().isNotEmpty)
+        ? _alignOfficialLyrics(lines, officialYtLyrics)
+        : lines;
+    final result = LyricsResult(lines: finalLines, synced: synced, source: source, rawLrc: rawLrc);
     _memCache[cacheKey] = result;
 
     // Cache persistently on disk only when synced
@@ -1241,7 +1361,7 @@ class LyricsService {
         prefs.setString(
           '$_kCachePrefix$cacheKey',
           jsonEncode({
-            'lines': lines,
+            'lines': finalLines,
             'synced': true,
             'source': source,
             'rawLrc': rawLrc,

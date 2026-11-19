@@ -81,6 +81,9 @@ class SettingsState extends ChangeNotifier {
   bool _fluidMeshBg = true;
   bool get fluidMeshBg => _fluidMeshBg;
 
+  bool _fullBleedArtworkPlayer = false;
+  bool get fullBleedArtworkPlayer => _fullBleedArtworkPlayer;
+
   bool _reduceMotion = false;
   bool get reduceMotion => _reduceMotion;
 
@@ -206,6 +209,7 @@ class SettingsState extends ChangeNotifier {
     _accentColor = _prefs.getString('zen_accent_color') ?? 'crimson';
     _dynamicAlbumColors = _prefs.getBool('zen_dynamic_album_colors') ?? true;
     _fluidMeshBg = _prefs.getBool('zen_fluid_mesh_bg') ?? true;
+    _fullBleedArtworkPlayer = _prefs.getBool('zen_full_bleed_artwork_player') ?? false;
     _reduceMotion = _prefs.getBool('zen_reduce_motion') ?? false;
     _themeMode = _prefs.getString('zen_theme_mode') ?? 'dark';
     _glassEffects = _prefs.getBool('zen_glass_effects') ?? true;
@@ -522,6 +526,13 @@ class SettingsState extends ChangeNotifier {
     if (_fluidMeshBg == val) return;
     _fluidMeshBg = val;
     _prefs.setBool('zen_fluid_mesh_bg', val);
+    notifyListeners();
+  }
+
+  void setFullBleedArtworkPlayer(bool val) {
+    if (_fullBleedArtworkPlayer == val) return;
+    _fullBleedArtworkPlayer = val;
+    _prefs.setBool('zen_full_bleed_artwork_player', val);
     notifyListeners();
   }
 

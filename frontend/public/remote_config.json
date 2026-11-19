@@ -1,29 +1,29 @@
 {
-  "version": 2029,
+  "version": 2030,
   "streamMode": "device",
   "minAppVersion": "1.0.12",
-  "latestAppVersion": "1.1.16",
+  "latestAppVersion": "1.1.17",
   "isForceUpdate": false,
   "releaseDate": "November 19, 2026",
-  "releaseTime": "10:45 AM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.16/zenify-v1.1.16.apk",
+  "releaseTime": "10:30 PM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.17/zenify-v1.1.17.apk",
   "features": [
-    "Unified Liquid Glass Dropdown Sheets: Migrated all dropdown pickers, action sheets, region selection, and confirmation modals to a unified ZenDropdown liquid glass component",
-    "Instant First-Click Search Results: Submitting a search now immediately loads and renders results on the very first tap with zero delays or suggestion traps",
-    "Smart Relevance & Popularity Search Ranking: Prioritizes famous, most-streamed tracks, official audio studio recordings, and exact keyword matches while preventing random artist profiles from dominating search results",
-    "Automatic Update Notification: Older version users are now automatically notified on app startup with a full interactive changelog and 1-tap in-app APK installer"
+    "System-Wide Real Glass Customizer: All presets (Liquid, Prism, Aurora, Frosted, Midnight, Rosé, Crystal), fluid motion shaders, rainbow prism dispersion, depth highlights, and frost veils now apply universally in real time to the MiniPlayer, bottom dock, and Dynamic Island",
+    "Full-Bleed Artwork Player & Bottom Color Expansion: Dynamic fullview layout displaying the full song cover directly above the seekbar and expanding the extracted vibrant artwork palette smoothly to the bottom of the screen with optional settings toggle",
+    "Pure YouTube InnerTube Audio & Synced Timestamp Lyrics: Optimized direct streaming pipeline for high-fidelity full tracks with sub-second word-by-word timestamp synchronization matching YouTube releases",
+    "Smart Battery & Performance Conservation: Dynamic animations, background artwork meshes, and liquid motion tickers automatically pause when leaving the screen or backgrounding the player, preventing battery drain"
   ],
   "fixes": [
-    "Fixed search results requiring a second click to display",
-    "Fixed search queries mistakenly defaulting to random artist profiles over songs",
-    "Fixed fragmented sheets by replacing legacy Cupertino and custom dialogs with unified ZenDropdown",
-    "Fixed all static analysis warnings across search, settings, and profile modules"
+    "Fixed glass customizer presets and tints failing to apply to MiniPlayer, Navbar dock, and Dynamic Island buttons",
+    "Fixed ArtworkMeshBackground multiple tickers crash by upgrading to TickerProviderStateMixin",
+    "Fixed missing bracket and undefined heroHeight syntax error in category details view",
+    "Resolved all static analyzer warnings and lint issues across search, album, and player screens"
   ],
   "improvements": [
-    "Optimized search ranker server prior weighting and duration scoring",
-    "Refined SF Pro typography hierarchy across all lyrics and sheet titles",
-    "Ultra-compact release APK with instant install and zero ad overhead"
+    "Enhanced listening history tracker and insights payload validation for robust playback analytics",
+    "Streamlined ExoPlayer audio seekbar clearance and responsive docked layouts",
+    "Ultra-lean ARM64 and universal release APKs with instant installation"
   ],
-  "releaseNotes": "• Unified liquid glass sheets across Settings, Profile, and Apple Music options\n• Instant first-click search results with no suggestions trap\n• Weighted YouTube Music search ranking prioritizing popular tracks over random artists\n• Automatic background update notifications with changelog",
-  "message": "Update to v1.1.16 for unified liquid glass sheets, instant search results, and enhanced song ranking"
+  "releaseNotes": "• Real-time glass customizer presets & motion applied universally to MiniPlayer, dock & Dynamic Island\n• Full-bleed artwork mode with extracted color expanding beneath the seekbar\n• Pure YouTube InnerTube direct streaming & synced lyrics\n• Intelligent battery saver: automatic rendering pauses when off-screen",
+  "message": "Update to v1.1.17 for system-wide liquid glass customization, full-bleed artwork mode, and battery optimization"
 }

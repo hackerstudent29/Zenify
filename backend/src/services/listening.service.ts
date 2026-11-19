@@ -248,15 +248,25 @@ export class ListeningService {
       prevEndDate = startDate;
     }
 
-    // 1. Fetch current period qualified events
+    // 1. Fetch current period qualified events (or all listens >= 3s if no qualified yet)
     const whereCurrent: any = { userId, qualified: true };
     if (startDate) whereCurrent.startedAt = { gte: startDate };
 
-    const currentEvents = await prisma.listeningEvent.findMany({
+    let currentEvents = await prisma.listeningEvent.findMany({
       where: whereCurrent,
       orderBy: { startedAt: 'desc' },
       take: 3000,
     });
+
+    if (currentEvents.length === 0) {
+      const whereFallback: any = { userId, listenedMs: { gte: 3000 } };
+      if (startDate) whereFallback.startedAt = { gte: startDate };
+      currentEvents = await prisma.listeningEvent.findMany({
+        where: whereFallback,
+        orderBy: { startedAt: 'desc' },
+        take: 3000,
+      });
+    }
 
     // 2. Fetch previous period for delta calculations
     let prevEvents: any[] = [];

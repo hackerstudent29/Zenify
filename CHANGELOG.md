@@ -2,6 +2,25 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.1.17] - 2026-11-19
+
+### What's New
+- **Universal Real-Time Glass Customizer**:
+  - Connected `AppleGlass` directly to `GlassSurface` and `GlassEngine`: all presets (Liquid, Prism, Aurora, Frosted, Midnight, Rosé, Crystal, etc.), fluid flow and shimmer motions, prism rainbow dispersion, bevel depth highlights, and frost veils apply instantaneously across the **MiniPlayer**, **Navbar Dock**, and **Dynamic Island buttons/header**.
+  - Stripped out legacy hardcoded dark tints that previously blocked dynamic glass effects from rendering outside of the settings navigation buttons.
+- **Full-Bleed Artwork Player & Bottom Color Expansion**:
+  - Introduced full-bleed album artwork presentation anchored directly above the seekbar, gracefully transitioning into vibrant artwork palette color that expands to the bottom of the screen.
+  - Added user preference toggle in Settings to switch between standard floating card and full-bleed artwork mode.
+- **Pure YouTube InnerTube Audio & Synced Timestamp Lyrics**:
+  - Direct streaming engine prioritizing YouTube InnerTube high-fidelity full audio without snippet fallbacks.
+  - Sub-second word-by-word timestamp lyric synchronization aligned directly with official YouTube releases.
+- **Intelligent Battery & Performance Optimization**:
+  - Active rendering pause: Artwork mesh backgrounds, dynamic shaders, and glass motion tickers automatically pause when leaving the screen or backgrounding the player, preventing CPU and battery waste.
+- **Stability & Static Analysis Fixes**:
+  - Fixed multiple tickers error in `_ArtworkMeshBackgroundState` with `TickerProviderStateMixin`.
+  - Resolved missing parenthesis and undefined `heroHeight` in Category details screen.
+  - Cleaned up all linter warnings, flow control braces, and unnecessary parentheses across search, album, and player screens.
+
 ## [1.1.16] - 2026-11-19
 
 ### What's New

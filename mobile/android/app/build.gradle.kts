@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.zenify.mobile"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

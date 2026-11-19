@@ -45,7 +45,6 @@ class MiniPlayer extends StatelessWidget {
           ),
           child: GlassSurface(
             borderRadius: BorderRadius.circular(AppSpacing.rCard),
-            tintColor: const Color(0xE61C1C1E),
             child: Stack(
               children: [
                 // Main Row Content

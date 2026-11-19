@@ -33,7 +33,7 @@ const double _kSameStartEps = 0.35;
 const double kKaraokeGlyphScalePeak = 1.04;
 
 /// Apple Music lyric typography (SF Pro).
-const FontWeight _kLyricWeight = FontWeight.w600;
+const FontWeight _kLyricWeight = FontWeight.w700;
 
 /// Three-dot interlude tunables. (Pulse constants are kept only so existing
 /// imports do not break - the dots no longer resize while waiting.)
@@ -108,7 +108,7 @@ const Duration _kIdleHide = Duration(seconds: 3);
 const String _kDisplayFont = 'SF Pro';
 const String _kTextFont = 'SF Pro';
 
-/// Singers that mean "everyone" (stay on the left side).
+/// Singers that mean "everyone" / group chorus (centered alignment).
 const _kGroupSingers = {
   'both',
   'all',
@@ -117,13 +117,147 @@ const _kGroupSingers = {
   'duet',
   'v1000',
   'chorus',
+  'choir',
+  'ensemble',
+  'everyone',
+  'crowd',
 };
 
 final _tagRe = RegExp(r'<[^>]+>');
 
+/// Detects if text represents backing vocals / ad-libs (wrapped or containing
+/// parentheses '()' or brackets '[]').
 bool _isBackingText(String t) {
   final s = t.replaceAll(_tagRe, ' ').trim();
-  return s.length >= 2 && s.startsWith('(') && s.endsWith(')');
+  if (s.isEmpty) return false;
+  if (_isInstrumentalOrDots(s)) return false;
+  // If wrapped in parentheses ( ... ) or brackets [ ... ]
+  if ((s.startsWith('(') && s.endsWith(')')) ||
+      (s.startsWith('[') && s.endsWith(']'))) {
+    return true;
+  }
+  // Also check if line has parentheses: e.g. "(Yeah)" or "Hold on (hold on)"
+  if (s.contains('(') && s.contains(')')) {
+    return true;
+  }
+  if (s.contains('[') && s.contains(']')) {
+    return true;
+  }
+  return false;
+}
+
+/// Detects short vocal hooks, chants, crowd refrains, and musical interjections
+/// that sit best center-stage.
+bool _isCenterHook(String text) {
+  final clean = text
+      .replaceAll(_tagRe, ' ')
+      .replaceAll(RegExp(r'[\(\)\[\]\{\}]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim()
+      .toLowerCase();
+  if (clean.isEmpty) return false;
+
+  final words = clean.split(' ').where((w) => w.isNotEmpty).toList();
+  if (words.length > 3) return false;
+
+  const hooks = {
+    'yeah',
+    'oh yeah',
+    'yeah yeah',
+    'yeah yeah yeah',
+    'ooh',
+    'ooh yeah',
+    'woah',
+    'whoa',
+    'hey',
+    'hey hey',
+    'alright',
+    'all right',
+    'baby',
+    'woo',
+    'uh-huh',
+    'uh huh',
+    'ha ha',
+    'la la',
+    'la la la',
+    'na na',
+    'na na na',
+    'da da',
+    'oh oh',
+    'oh oh oh',
+    'let\'s go',
+    'come on',
+    'amen',
+    'hallelujah',
+    'aye',
+    'ay',
+    'yo',
+  };
+
+  final stripped = clean.replaceAll(RegExp(r'[^\w\s]'), '').trim();
+  if (hooks.contains(clean) || hooks.contains(stripped)) {
+    return true;
+  }
+
+  // Repetitive syllable hooks like "la-la-la", "na na na", "oh oh oh"
+  final syllableRe = RegExp(
+    r'^(la|na|da|oh|ah|ooh|woah|whoa|yeah|hey|ay|yo)(\s*[-,\s!.]\s*(la|na|da|oh|ah|ooh|woah|whoa|yeah|hey|ay|yo))*[!?,.]*$',
+  );
+  return syllableRe.hasMatch(clean);
+}
+
+/// Clean and format lyric casing according to standard English grammar:
+/// - Strips brackets '()' and '[]' from display text.
+/// - If text is all-uppercase, converts to lowercase before formatting.
+/// - Capitalizes first letter of line and sentences.
+/// - Capitalizes English pronoun 'I' and contractions ('I'm', 'I've', 'I'll', 'I'd', 'I'mma').
+String _formatLyricCasing(String input) {
+  var s = input
+      .replaceAll(_tagRe, ' ')
+      .replaceAll(RegExp(r'[\(\)\[\]\{\}]'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
+  if (s.isEmpty) return '';
+
+  final hasAlpha = s.contains(RegExp(r'[a-zA-Z]'));
+  if (!hasAlpha) return s;
+
+  final lettersOnly = s.replaceAll(RegExp(r'[^a-zA-Z]'), '');
+  final isAllUpper =
+      lettersOnly.isNotEmpty && lettersOnly == lettersOnly.toUpperCase();
+
+  if (isAllUpper) {
+    s = s.toLowerCase();
+  }
+
+  // 1. Capitalize first alphabetic letter in the string
+  s = s.replaceFirstMapped(RegExp(r'^([^a-zA-Z]*)([a-z])'), (m) {
+    return '${m[1]}${m[2]!.toUpperCase()}';
+  });
+
+  // 2. Capitalize after sentence terminators (., !, ?) followed by whitespace
+  s = s.replaceAllMapped(RegExp(r'([.?!]\s+)([a-z])'), (m) {
+    return '${m[1]}${m[2]!.toUpperCase()}';
+  });
+
+  // 3. Capitalize standalone pronoun "I" and contractions ("I'm", "I've", "I'll", "I'd", "I'mma")
+  s = s.replaceAllMapped(
+    RegExp(r"(^|[^\w])i([’'](?:m|ve|ll|d|mma)\b|\b)", caseSensitive: true),
+    (m) => '${m[1]}I${m[2]}',
+  );
+
+  // 4. Common English acronyms / abbreviations
+  s = s.replaceAllMapped(
+    RegExp(r'\bok\b', caseSensitive: false),
+    (m) => 'OK',
+  );
+  s = s.replaceAllMapped(
+    RegExp(r'\btv\b', caseSensitive: false),
+    (m) => 'TV',
+  );
+
+  return s;
 }
 
 /// True when the first strong character of [s] is a right-to-left letter
@@ -568,18 +702,21 @@ class _Item {
     this.end,
     this.line, {
     this.right = false,
+    this.center = false,
     this.backing = false,
   }) : interlude = false;
   const _Item.gap(this.start, this.end)
     : interlude = true,
       line = null,
       right = false,
+      center = true,
       backing = false;
   final bool interlude;
   final double start; // seconds
   final double end; // seconds
   final LyricLine? line;
   final bool right;
+  final bool center;
   final bool backing;
 
   bool get collapsible => interlude || backing;
@@ -789,7 +926,16 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
     _items = [];
     if (!widget.isSynced) {
       for (final l in L) {
-        _items.add(_Item.line(0, 0, l, right: _isRtl(l.text)));
+        final backing = _isBackingText(l.text);
+        final center = _isCenterHook(l.text);
+        _items.add(_Item.line(
+          0,
+          0,
+          l,
+          right: backing || _isRtl(l.text),
+          center: center,
+          backing: backing,
+        ));
       }
       _keys = List.generate(_items.length, (_) => GlobalKey());
       _computeDists();
@@ -833,21 +979,31 @@ class _LyricsViewState extends State<LyricsView> with TickerProviderStateMixin {
 
       final backing = _isBackingText(L[i].text);
       final sg = _normSinger(L[i].singer);
-      bool right;
+      bool center = false;
+      bool right = false;
+
       if (backing) {
         right = true;
+      } else if (_isCenterHook(L[i].text) ||
+          (sg != null && _kGroupSingers.contains(sg))) {
+        center = true;
       } else if (!duet) {
         right = _isRtl(L[i].text); // Arabic / Hebrew lines sit on the right
       } else if (sg == null) {
         right = lastRight;
-      } else if (_kGroupSingers.contains(sg)) {
-        right = false;
       } else {
         right = singers.indexOf(sg) > 0;
       }
-      if (duet && !backing) lastRight = right;
+      if (duet && !backing && !center) lastRight = right;
 
-      _items.add(_Item.line(start, end, L[i], right: right, backing: backing));
+      _items.add(_Item.line(
+        start,
+        end,
+        L[i],
+        right: right,
+        center: center,
+        backing: backing,
+      ));
 
       if (known != null && hasNext && nextStart - known >= _kInterludeMin) {
         _items.add(_Item.gap(known, nextStart));
@@ -1464,7 +1620,6 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
 
     final it = widget.item;
     final line = it.line;
-    final right = it.right;
     final backing = it.backing;
 
     String main = '';
@@ -1483,9 +1638,33 @@ class _LineTileState extends State<_LineTile> with TickerProviderStateMixin {
           sub = tr.isNotEmpty ? tr : null;
       }
     }
-    main = main.replaceAll(_tagRe, ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    main = _formatLyricCasing(main);
+    if (sub != null) {
+      sub = _formatLyricCasing(sub);
+    }
 
-    final isCenter = it.interlude || _isInstrumentalOrDots(main);
+    if (words != null && words.isNotEmpty) {
+      final cleanedWords = <LyricWord>[];
+      for (final w in words) {
+        final cleanText = w.text
+            .replaceAll(_tagRe, '')
+            .replaceAll(RegExp(r'[\(\)\[\]\{\}]'), '')
+            .trim();
+        if (cleanText.isNotEmpty) {
+          cleanedWords.add(
+            LyricWord(
+              text: cleanText,
+              start: w.start,
+              end: w.end,
+            ),
+          );
+        }
+      }
+      words = cleanedWords;
+    }
+
+    final isCenter = it.interlude || it.center || _isInstrumentalOrDots(main);
+    final right = it.right && !isCenter;
     Widget content;
     if (it.interlude) {
       content = Center(
@@ -1722,7 +1901,8 @@ class _WordLineState extends State<_WordLine>
       fontSize: fs,
       height: complex ? 1.3 : _kLineHeight,
       leadingDistribution: TextLeadingDistribution.even,
-      fontWeight: widget.backing ? FontWeight.w500 : _kLyricWeight,
+      fontWeight: widget.backing ? FontWeight.w600 : _kLyricWeight,
+      fontStyle: widget.backing ? FontStyle.italic : FontStyle.normal,
       letterSpacing: complex ? 0.0 : 0.2,
       color: c,
     );
@@ -1923,7 +2103,7 @@ class _WordLineState extends State<_WordLine>
 }
 
 /// One word: dim base, soft-edged white fill (left to right, or right to left
-/// for RTL scripts), white glow bloom and a spring lift while it is sung.
+/// for RTL scripts), light golden glow bloom and a spring lift while it is sung.
 class _Word extends StatelessWidget {
   const _Word({
     required this.text,
@@ -1953,21 +2133,43 @@ class _Word extends StatelessWidget {
         );
     Widget out;
 
-    final subtleShadow = glow > 0.08
-        ? [
-            Shadow(
-              color: Colors.white.withValues(
-                alpha: (0.16 * glow).clamp(0.0, 0.28),
-              ),
-              blurRadius: 3.0 + 3.0 * glow,
-            ),
-          ]
-        : null;
+    // Apple Music signature warm golden bloom:
+    // Multi-layered diffuse champagne and amber shadows that bloom around
+    // active vocal words and leave a soft luminous aura on finished sung words.
+    final List<Shadow>? goldenShadows;
+    if (glow > 0.04) {
+      final g = glow.clamp(0.0, 1.0);
+      goldenShadows = [
+        // 1. Crisp inner champagne core (tight radiance)
+        Shadow(
+          color: const Color(0xFFFFF6D6).withValues(
+            alpha: (0.80 * g).clamp(0.0, 0.95),
+          ),
+          blurRadius: 3.0 + 3.0 * g,
+        ),
+        // 2. Warm golden luminous body (mid-range bloom)
+        Shadow(
+          color: const Color(0xFFFFD54F).withValues(
+            alpha: (0.60 * g).clamp(0.0, 0.82),
+          ),
+          blurRadius: 8.0 + 8.0 * g,
+        ),
+        // 3. Diffuse amber atmospheric radiance (wide diffuse aura)
+        Shadow(
+          color: const Color(0xFFFF9E1B).withValues(
+            alpha: (0.35 * g).clamp(0.0, 0.55),
+          ),
+          blurRadius: 18.0 + 12.0 * g,
+        ),
+      ];
+    } else {
+      goldenShadows = null;
+    }
 
     if (p <= 0.0) {
       out = t(_dim);
     } else if (p >= 1.0) {
-      out = t(Colors.white, shadows: subtleShadow);
+      out = t(Colors.white, shadows: goldenShadows);
     } else {
       const soft = 0.25; // crisp, clean Apple Music sweep edge
       final a = (p * (1 + soft) - soft).clamp(0.0, 1.0).toDouble();
@@ -1986,7 +2188,7 @@ class _Word extends StatelessWidget {
           ShaderMask(
             blendMode: BlendMode.dstIn,
             shaderCallback: mask,
-            child: t(Colors.white, shadows: subtleShadow),
+            child: t(Colors.white, shadows: goldenShadows),
           ),
         ],
       );

@@ -28,11 +28,10 @@ enum SearchFilter {
   final String label;
 }
 
-/// Search catalog source provider (Universal blended vs YouTube Music vs Jio Music).
+/// Search catalog source provider (YouTube Music / InnerTube native).
 enum SearchSource {
   all('All', 'Universal'),
-  youtube('YouTube Music', 'YT Music'),
-  jiosaavn('Jio Music', 'JioSaavn');
+  youtube('YouTube Music', 'YT Music');
 
   const SearchSource(this.label, this.shortLabel);
   final String label;

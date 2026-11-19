@@ -5,29 +5,43 @@ import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
-import '../../design_system/apple/apple_kit.dart' show Avatar;
+import '../../design_system/apple/apple_kit.dart' show Avatar, appleToast;
 import '../../design_system/apple/apple_music_kit.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_state.dart';
 import '../../services/country_service.dart';
+import '../../services/dock_visibility.dart';
+import '../../services/settings_service.dart';
 import '../../services/user_preferences_service.dart';
-import '../auth/onboarding_sheet.dart';
 import '../auth/welcome_screen.dart';
 import '../insights/insights_screen.dart';
 import '../room_together/room_together_screen.dart';
 import '../settings/settings_screen.dart';
 import 'profile_edit_sheets.dart';
 
-class ProfileScreen extends StatelessWidget {
-  /// When opened from Settings, the Settings row pops back instead of stacking.
+class ProfileScreen extends StatefulWidget {
+  /// When opened from Settings, the navigation bar avoids redundant gear icon.
   const ProfileScreen({super.key, this.fromSettings = false});
   final bool fromSettings;
 
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
+  @override
+  bool get hideMiniPlayerWhileActive => true;
+
   static const _edit = Text(
     'Edit',
-    style: TextStyle(color: AM.rose, fontSize: 17, fontWeight: FontWeight.w500),
+    style: TextStyle(
+      fontFamily: 'SF Pro',
+      color: AM.rose,
+      fontSize: 17,
+      fontWeight: FontWeight.w500,
+    ),
   );
 
   @override
@@ -49,7 +63,9 @@ class ProfileScreen extends StatelessWidget {
           username: user?.username,
         );
         final handle = [
-          if (user != null && user.username.trim().isNotEmpty && user.username != 'guest')
+          if (user != null &&
+              user.username.trim().isNotEmpty &&
+              user.username != 'guest')
             '@${user.username.trim()}',
           if (user != null && user.email.trim().isNotEmpty) user.email.trim(),
         ].join(' · ');
@@ -59,13 +75,34 @@ class ProfileScreen extends StatelessWidget {
 
         return AMPage(
           title: 'Account',
+          trailing: widget.fromSettings
+              ? null
+              : CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(32, 32),
+                  onPressed: () => Navigator.of(context).push(
+                    CupertinoPageRoute<void>(
+                      builder: (_) => const SettingsScreen(),
+                    ),
+                  ),
+                  child: const Icon(
+                    CupertinoIcons.gear,
+                    color: AM.rose,
+                    size: 22,
+                  ),
+                ),
           children: [
+            // 1. Identity
             AMSection(
               children: [
                 AMRow(
                   leading: Avatar(name: name, size: 46),
                   title: name,
-                  subtitle: handle.isNotEmpty ? handle : (auth.isLoggedIn ? 'Zenify Member' : 'Guest Listener'),
+                  subtitle: handle.isNotEmpty
+                      ? handle
+                      : (auth.isLoggedIn
+                          ? 'Zenify Member'
+                          : 'Guest Listener'),
                   trailing: _edit,
                   onTap: () => showIdentityEditSheet(context),
                 ),
@@ -76,17 +113,22 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   AMRow(
                     title: 'Sign In',
-                    subtitle: 'Sync your library and see your Replay stats on every device.',
+                    subtitle:
+                        'Sync your library and see your Replay stats on every device.',
                     chevron: true,
                     onTap: () => Navigator.of(context).push(
                       CupertinoPageRoute<void>(
                         fullscreenDialog: true,
-                        builder: (_) => WelcomeScreen(onFinished: () => Navigator.of(context).pop()),
+                        builder: (_) => WelcomeScreen(
+                          onFinished: () => Navigator.of(context).pop(),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
+
+            // 2. Music Preferences
             AMSection(
               header: 'Music Preferences',
               footer: 'These shape Home, Quick Picks and regional charts.',
@@ -111,56 +153,56 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 AMRow(
                   title: 'Favorite Artists',
-                  subtitle: summary(prefs?.favoriteArtists.map((a) => a.name), 'Not set'),
+                  subtitle: summary(
+                    prefs?.favoriteArtists.map((a) => a.name),
+                    'Not set',
+                  ),
                   chevron: true,
                   onTap: () => showArtistsPickerSheet(context),
                 ),
+              ],
+            ),
+
+            // 3. Your Music
+            AMSection(
+              header: 'Your Music',
+              children: [
                 AMRow(
-                  title: 'Guided Setup',
+                  title: 'Replay & Insights',
+                  subtitle: 'Your listening statistics and highlights',
                   chevron: true,
-                  onTap: () => OnboardingSheet.show(context, isEditing: true),
+                  onTap: () => Navigator.of(context).push(
+                    CupertinoPageRoute<void>(
+                      builder: (_) => const InsightsScreen(),
+                    ),
+                  ),
                 ),
               ],
             ),
+
+            // 4. Social
             AMSection(
-              header: 'Activity',
+              header: 'Social',
               children: [
-                AMRow(
-                  title: 'Replay',
-                  subtitle: 'Your listening stats',
-                  chevron: true,
-                  onTap: () => Navigator.of(context)
-                      .push(CupertinoPageRoute<void>(builder: (_) => const InsightsScreen())),
-                ),
                 AMRow(
                   title: 'Room Together',
                   subtitle: 'Listen with friends in real time',
                   chevron: true,
-                  onTap: () => Navigator.of(context)
-                      .push(CupertinoPageRoute<void>(builder: (_) => const RoomTogetherScreen())),
+                  onTap: () => Navigator.of(context).push(
+                    CupertinoPageRoute<void>(
+                      builder: (_) => const RoomTogetherScreen(),
+                    ),
+                  ),
                 ),
               ],
             ),
-            AMSection(
-              children: [
-                AMRow(
-                  title: 'Settings',
-                  chevron: true,
-                  onTap: () {
-                    if (fromSettings) {
-                      Navigator.of(context).pop();
-                    } else {
-                      Navigator.of(context)
-                          .push(CupertinoPageRoute<void>(builder: (_) => const SettingsScreen()));
-                    }
-                  },
-                ),
-              ],
-            ),
+
+            // 5. Account & Security
             if (auth.isLoggedIn)
               AMSection(
-                header: 'Security',
-                footer: 'Export includes your playlists, preferences and listening stats.',
+                header: 'Account & Security',
+                footer:
+                    'Export includes your playlists, preferences and listening stats.',
                 children: [
                   AMRow(
                     title: 'Active Sessions',
@@ -173,8 +215,19 @@ class ProfileScreen extends StatelessWidget {
                     chevron: true,
                     onTap: () => _exportData(context),
                   ),
+                  AMRow(
+                    title: 'Clear Listening History',
+                    subtitle: 'Reset personal playback history and stats',
+                    titleColor: AM.rose,
+                    onTap: () => _confirmClearHistory(
+                      context,
+                      context.read<SettingsState>(),
+                    ),
+                  ),
                 ],
               ),
+
+            // 6. Sign Out
             if (auth.isLoggedIn)
               AMSection(
                 children: [
@@ -190,16 +243,26 @@ class ProfileScreen extends StatelessWidget {
                       onConfirm: auth.signOut,
                     ),
                   ),
+                ],
+              ),
+
+            // 7. Delete Account
+            if (auth.isLoggedIn)
+              AMSection(
+                children: [
                   AMRow(
                     title: 'Delete Account',
                     titleColor: AM.rose,
+                    subtitle: 'Permanently remove your account and data',
                     onTap: () => _confirm(
                       context,
                       title: 'Delete Account',
-                      message: 'This is permanent. Playlists, favorites and preferences will be deleted.',
+                      message:
+                          'This is permanent. Playlists, favorites and preferences will be deleted.',
                       action: 'Delete',
                       onConfirm: () async {
-                        final token = await AuthService.instance.getAccessToken();
+                        final token =
+                            await AuthService.instance.getAccessToken();
                         if (token != null) {
                           await http.delete(
                             Uri.parse('${ApiService.baseUrl}/api/me/account'),
@@ -238,6 +301,33 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _confirmClearHistory(
+    BuildContext context,
+    SettingsState s,
+  ) async {
+    final ok = await ZenDropdown.showConfirmSheet(
+      context: context,
+      title: 'Clear Listening History',
+      message:
+          'This permanently resets your listening events, stats and Replay history on all devices.',
+      confirmLabel: 'Clear History',
+      isDestructive: true,
+      icon: CupertinoIcons.trash,
+    );
+    if (ok && context.mounted) {
+      final done = await s.clearListeningHistory();
+      if (context.mounted) {
+        appleToast(
+          context,
+          done ? 'Listening history cleared' : 'Could not clear history',
+          icon: done
+              ? CupertinoIcons.checkmark_circle_fill
+              : CupertinoIcons.exclamationmark_circle,
+        );
+      }
+    }
+  }
+
   Future<void> _showSessions(BuildContext context) async {
     final token = await AuthService.instance.getAccessToken();
     if (token == null || !context.mounted) return;
@@ -253,20 +343,10 @@ class ProfileScreen extends StatelessWidget {
         headers: {'Authorization': 'Bearer $token'},
       );
       if (res.statusCode == 200 && context.mounted) {
-        showCupertinoDialog<void>(
-          context: context,
-          useRootNavigator: true,
-          builder: (ctx) => CupertinoAlertDialog(
-            title: const Text('Data Export Ready'),
-            content: const Text('Your archive has been prepared.'),
-            actions: [
-              CupertinoDialogAction(
-                isDefaultAction: true,
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Done'),
-              ),
-            ],
-          ),
+        appleToast(
+          context,
+          'Data archive export is ready',
+          icon: CupertinoIcons.checkmark_circle_fill,
         );
       }
     } catch (_) {}
@@ -284,13 +364,19 @@ class _SessionsSheet extends StatefulWidget {
 class _SessionsSheetState extends State<_SessionsSheet> {
   late Future<List<Map<String, dynamic>>?> _future = _load();
 
-  Map<String, String> get _headers => {'Authorization': 'Bearer ${widget.token}'};
+  Map<String, String> get _headers => {
+    'Authorization': 'Bearer ${widget.token}',
+  };
 
   Future<List<Map<String, dynamic>>?> _load() async {
     try {
-      final r = await http.get(Uri.parse('${ApiService.baseUrl}/api/me/sessions'), headers: _headers);
+      final r = await http.get(
+        Uri.parse('${ApiService.baseUrl}/api/me/sessions'),
+        headers: _headers,
+      );
       if (r.statusCode != 200) return null;
-      return (jsonDecode(r.body) as List<dynamic>).cast<Map<String, dynamic>>();
+      return (jsonDecode(r.body) as List<dynamic>)
+          .cast<Map<String, dynamic>>();
     } catch (_) {
       return null;
     }
@@ -298,7 +384,10 @@ class _SessionsSheetState extends State<_SessionsSheet> {
 
   Future<void> _revoke(Object? id) async {
     try {
-      await http.delete(Uri.parse('${ApiService.baseUrl}/api/me/sessions/$id'), headers: _headers);
+      await http.delete(
+        Uri.parse('${ApiService.baseUrl}/api/me/sessions/$id'),
+        headers: _headers,
+      );
     } catch (_) {}
     if (mounted) {
       setState(() {
@@ -320,14 +409,24 @@ class _SessionsSheetState extends State<_SessionsSheet> {
           }
           final list = snap.data;
           if (list == null) {
-            return const Center(child: Text('Could not load sessions', style: AM.sub));
+            return const Center(
+              child: Text(
+                'Could not load sessions',
+                style: TextStyle(
+                  fontFamily: 'SF Pro',
+                  color: AM.label2,
+                  fontSize: 15,
+                ),
+              ),
+            );
           }
           return ListView(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               AMSection(
-                footer: '${list.length} signed-in device${list.length == 1 ? '' : 's'}',
+                footer:
+                    '${list.length} signed-in device${list.length == 1 ? '' : 's'}',
                 children: [
                   for (final s in list)
                     AMRow(
@@ -341,7 +440,15 @@ class _SessionsSheetState extends State<_SessionsSheet> {
                               padding: EdgeInsets.zero,
                               minimumSize: const Size(28, 28),
                               onPressed: () => _revoke(s['id']),
-                              child: const Text('Revoke', style: TextStyle(color: AM.rose, fontSize: 15)),
+                              child: const Text(
+                                'Revoke',
+                                style: TextStyle(
+                                  fontFamily: 'SF Pro',
+                                  color: AM.rose,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                     ),
                 ],
