@@ -22,12 +22,12 @@ import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
-import '../../services/api_service.dart';
 import '../../services/library_store.dart';
 import '../../services/player_state.dart';
 import '../../services/search_nav.dart';
 import '../details/album_screen.dart';
 import '../details/artist_screen.dart';
+import '../details/category_screen.dart';
 import '../player/player_shell.dart';
 import 'search_data_service.dart';
 import 'search_models.dart';
@@ -550,12 +550,11 @@ class _SearchScreenState extends State<SearchScreen>
   _SearchCategorySpec? _activeCategory;
   bool _catLoading = false;
   bool _catSongsExpanded = false;
-  int _catRequestId = 0;
-  List<SearchSongItem> _catSongs = const [];
-  List<SearchAlbumItem> _catAlbums = const [];
-  List<SearchArtistItem> _catArtists = const [];
-  List<SearchPlaylistItem> _catPlaylists = const [];
-  List<SearchVideoItem> _catVideos = const [];
+  final List<SearchSongItem> _catSongs = const [];
+  final List<SearchAlbumItem> _catAlbums = const [];
+  final List<SearchArtistItem> _catArtists = const [];
+  final List<SearchPlaylistItem> _catPlaylists = const [];
+  final List<SearchVideoItem> _catVideos = const [];
 
   @override
   void initState() {
@@ -790,7 +789,6 @@ class _SearchScreenState extends State<SearchScreen>
     setState(() {
       _submittedQuery = clean;
       _activeCategory = null;
-      _catRequestId++;
       _liveSuggestions = [];
       _selectedFilter = filter;
       _isLoading = !cached;
@@ -921,76 +919,22 @@ class _SearchScreenState extends State<SearchScreen>
 
   // ── Category page ──────────────────────────────────────────────────────────
 
-  Future<void> _openCategory(_SearchCategorySpec spec) async {
+  void _openCategory(_SearchCategorySpec spec) {
     HapticFeedback.lightImpact();
     _focusNode.unfocus();
-    if (SearchNav.phase.value != SearchPhase.bar) {
-      SearchNav.phase.value = SearchPhase.bar;
-    }
-    final id = ++_catRequestId;
-    if (_scrollCtrl.hasClients) _scrollCtrl.jumpTo(0);
-    setState(() {
-      _activeCategory = spec;
-      _catLoading = true;
-      _catSongsExpanded = false;
-      _catSongs = const [];
-      _catAlbums = const [];
-      _catArtists = const [];
-      _catPlaylists = const [];
-      _catVideos = const [];
-    });
-
-    SearchResult resAll = _emptyResult();
-    try {
-      resAll = await _dataService
-          .search(query: spec.query, filter: SearchFilter.all)
-          .timeout(const Duration(seconds: 4), onTimeout: () => _emptyResult());
-    } catch (_) {}
-
-    if (resAll.songs.isEmpty) {
-      try {
-        final cloudTracks = await ApiService.search(
-          spec.query,
-        ).timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
-        if (cloudTracks.isNotEmpty && mounted && id == _catRequestId) {
-          final cloudSongs = cloudTracks
-              .map(
-                (t) => SearchSongItem(
-                  id: t.id,
-                  title: t.title,
-                  subtitle: t.artist,
-                  thumbnailUrl: t.coverUrl,
-                  thumbnailUrlHiRes: t.coverUrl,
-                  videoId: t.id.replaceAll('yt-', ''),
-                  artists: t.artists,
-                  albumName: t.album,
-                  durationSeconds: t.durationSeconds,
-                  durationText: t.formattedDuration,
-                ),
-              )
-              .toList();
-          setState(() {
-            _catSongs = cloudSongs;
-            _catLoading = false;
-          });
-          return;
-        }
-      } catch (_) {}
-    }
-
-    if (!mounted || id != _catRequestId) return;
-    setState(() {
-      _catSongs = resAll.songs;
-      _catAlbums = resAll.albums;
-      _catArtists = resAll.artists;
-      _catPlaylists = resAll.playlists;
-      _catVideos = resAll.videos;
-      _catLoading = false;
-    });
+    Navigator.push(
+      context,
+      ZenPageRoute(
+        builder: (_) => CategoryScreen(
+          title: spec.title,
+          query: spec.query,
+          colors: spec.colors,
+        ),
+      ),
+    );
   }
 
   void _closeCategory() {
-    _catRequestId++;
     setState(() {
       _activeCategory = null;
       _catLoading = false;

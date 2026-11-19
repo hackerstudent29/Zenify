@@ -3358,7 +3358,6 @@ class _CircleBtn extends StatelessWidget {
     },
     child: AppleGlass(
       borderRadius: BorderRadius.circular(16),
-      tint: const Color(0x26121216),
       child: SizedBox(
         width: 32,
         height: 32,

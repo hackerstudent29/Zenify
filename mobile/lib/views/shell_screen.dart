@@ -547,7 +547,10 @@ class _ShellScreenState extends State<ShellScreen>
                             valueListenable: PlayerShell.isPlayerOpenNotifier,
                             builder: (_, isPlayerOpen, child) => IgnorePointer(
                               ignoring: isPlayerOpen,
-                              child: child!,
+                              child: TickerMode(
+                                enabled: !isPlayerOpen,
+                                child: child!,
+                              ),
                             ),
                             child: _AnimatedTabStack(
                               index: _currentIndex,
@@ -704,7 +707,10 @@ class _AnimatedTabStackState extends State<_AnimatedTabStack>
           for (var i = 0; i < widget.children.length; i++)
             DockActiveTabScope(
               isActive: i == widget.index,
-              child: widget.children[i],
+              child: TickerMode(
+                enabled: i == widget.index,
+                child: widget.children[i],
+              ),
             ),
         ],
       ),

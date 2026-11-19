@@ -9,6 +9,7 @@ import '../../../models/playback_context.dart';
 import '../../../models/track.dart';
 import '../../../services/api_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/listening_history_service.dart';
 import '../../../services/player_state.dart';
 
 class HistoryView extends StatefulWidget {
@@ -42,18 +43,20 @@ class _HistoryViewState extends State<HistoryView> {
       _error = null;
     });
 
+    final q = query ?? _searchCtrl.text.trim();
+    final localSessions = ListeningHistoryService.instance.getLocalSessions(query: q);
+
     try {
       final token = await AuthService.instance.getAccessToken();
       if (token == null) {
         if (!mounted) return;
         setState(() {
-          _error = 'Sign in to view your listening history.';
+          _sessions = localSessions;
           _loading = false;
         });
         return;
       }
 
-      final q = query ?? _searchCtrl.text.trim();
       final uri = Uri.parse(
         '${ApiService.baseUrl}/api/me/history${q.isNotEmpty ? '?search=${Uri.encodeComponent(q)}' : ''}',
       );
@@ -61,58 +64,64 @@ class _HistoryViewState extends State<HistoryView> {
       final res = await http.get(
         uri,
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(const Duration(seconds: 6));
 
       if (!mounted) return;
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final serverSessions = data['sessions'] as List<dynamic>? ?? [];
         setState(() {
-          _sessions = data['sessions'] as List<dynamic>? ?? [];
+          _sessions = serverSessions.isNotEmpty ? serverSessions : localSessions;
           _loading = false;
         });
       } else {
         setState(() {
-          _error = 'Could not load listening history.';
+          _sessions = localSessions;
           _loading = false;
         });
       }
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Check your connection and try again.';
+        _sessions = localSessions;
         _loading = false;
       });
     }
   }
 
   Future<void> _deleteEvent(String eventId) async {
+    ListeningHistoryService.instance.deleteLocalEvent(eventId);
     try {
       final token = await AuthService.instance.getAccessToken();
-      if (token == null) return;
-      final res = await http.delete(
-        Uri.parse('${ApiService.baseUrl}/api/me/history/$eventId'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-      if (res.statusCode == 200 && mounted) {
+      if (token != null && !eventId.startsWith('local_')) {
+        await http.delete(
+          Uri.parse('${ApiService.baseUrl}/api/me/history/$eventId'),
+          headers: {'Authorization': 'Bearer $token'},
+        ).timeout(const Duration(seconds: 4));
+      }
+      if (mounted) {
         appleToast(context, 'Removed from history');
         _fetchHistory();
       }
     } catch (_) {
       if (mounted) {
-        appleToast(context, 'Could not remove entry');
+        _fetchHistory();
       }
     }
   }
 
   void _replayTrack(Map<String, dynamic> event) {
-    final track = Track(
-      id: event['trackId']?.toString() ?? 'hist_${event['eventId']}',
-      title: event['trackTitle']?.toString() ?? 'Unknown',
-      artist: event['artistName']?.toString() ?? 'Unknown Artist',
-      album: event['trackAlbum']?.toString() ?? '',
-      coverUrl: '',
-      durationSeconds: (event['trackDurationMs'] as num? ?? 210000) ~/ 1000,
-    );
+    final trackId = event['trackId']?.toString() ?? 'hist_${event['eventId']}';
+    final localTrack = ListeningHistoryService.instance.findTrackById(trackId);
+    final track = localTrack ??
+        Track(
+          id: trackId,
+          title: event['trackTitle']?.toString() ?? 'Unknown',
+          artist: event['artistName']?.toString() ?? 'Unknown Artist',
+          album: event['trackAlbum']?.toString() ?? '',
+          coverUrl: event['coverUrl']?.toString() ?? '',
+          durationSeconds: (event['trackDurationMs'] as num? ?? 210000) ~/ 1000,
+        );
 
     context.read<PlayerState>().setQueue(
       [track],
@@ -163,8 +172,8 @@ class _HistoryViewState extends State<HistoryView> {
             controller: _searchCtrl,
             placeholder: 'Search songs or artists',
             backgroundColor: AT.fill,
-            style: AT.body,
-            placeholderStyle: AT.body.copyWith(color: AT.label3),
+            style: AT.body.copyWith(fontFamily: 'SF Pro'),
+            placeholderStyle: AT.body.copyWith(color: AT.label3, fontFamily: 'SF Pro'),
             prefixIcon: const Icon(CupertinoIcons.search, color: AT.label2, size: 18),
             onSubmitted: (v) => _fetchHistory(query: v.trim()),
             onChanged: (v) {
@@ -184,7 +193,7 @@ class _HistoryViewState extends State<HistoryView> {
       );
     }
 
-    if (_error != null) {
+    if (_error != null && _sessions.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -199,7 +208,7 @@ class _HistoryViewState extends State<HistoryView> {
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: AT.subhead.copyWith(color: AT.label2),
+                style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -231,14 +240,14 @@ class _HistoryViewState extends State<HistoryView> {
               const SizedBox(height: 12),
               Text(
                 hasQuery ? 'No matching plays' : 'No listening history yet',
-                style: AT.title3,
+                style: AT.title3.copyWith(fontFamily: 'SF Pro'),
               ),
               const SizedBox(height: 6),
               Text(
                 hasQuery
                     ? 'Try another song title or artist name.'
                     : 'Tracks you listen to will appear here by session.',
-                style: AT.subhead.copyWith(color: AT.label2),
+                style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -271,21 +280,41 @@ class _HistoryViewState extends State<HistoryView> {
                 children: events.map((raw) {
                   final event = raw as Map<String, dynamic>? ?? const {};
                   final title = event['trackTitle']?.toString() ?? 'Unknown';
-                  final artist =
-                      event['artistName']?.toString() ?? 'Unknown Artist';
-                  final listenedMs =
-                      (event['listenedMs'] as num? ?? 0).toInt();
+                  final artist = event['artistName']?.toString() ?? 'Unknown Artist';
+                  final listenedMs = (event['listenedMs'] as num? ?? 0).toInt();
                   final eventId = event['eventId']?.toString() ?? '';
                   final isSkip = event['isSkip'] as bool? ?? false;
+                  final trackId = event['trackId']?.toString() ?? '';
 
-                  return AppleRow(
-                    leading: IconTile(
-                      isSkip
-                          ? CupertinoIcons.forward_fill
-                          : CupertinoIcons.music_note,
+                  final localTrack = ListeningHistoryService.instance.findTrackById(trackId);
+                  final coverUrl = (event['coverUrl']?.toString() ?? localTrack?.coverUrl ?? '').trim();
+
+                  Widget leadingWidget;
+                  if (coverUrl.isNotEmpty) {
+                    leadingWidget = ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        coverUrl,
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => IconTile(
+                          isSkip ? CupertinoIcons.forward_fill : CupertinoIcons.music_note,
+                          color: isSkip ? AT.label3 : AT.accent,
+                          size: 32,
+                        ),
+                      ),
+                    );
+                  } else {
+                    leadingWidget = IconTile(
+                      isSkip ? CupertinoIcons.forward_fill : CupertinoIcons.music_note,
                       color: isSkip ? AT.label3 : AT.accent,
                       size: 32,
-                    ),
+                    );
+                  }
+
+                  return AppleRow(
+                    leading: leadingWidget,
                     title: title,
                     subtitle: artist,
                     trailing: Row(
@@ -295,6 +324,7 @@ class _HistoryViewState extends State<HistoryView> {
                           isSkip ? 'Skipped' : '${(listenedMs / 1000).round()}s',
                           style: AT.footnote.copyWith(
                             color: AT.label3,
+                            fontFamily: 'SF Pro',
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),

@@ -492,12 +492,13 @@ class MediaNormalizer {
   static final RegExp _ytimgIdRe = RegExp(r'(?:ytimg\.com|img\.youtube\.com)/vi(?:_webp)?/([A-Za-z0-9_-]{6,20})/', caseSensitive: false);
   static final RegExp _ytimgLowRe = RegExp(r'/(?:default|mqdefault|sddefault|hqdefault|hq720)\.(?:jpg|webp)(?:\?.*)?$', caseSensitive: false);
 
-  /// Resolves high-definition InnerTube artwork (1200x1200 square covers/avatars,
-  /// 1920x1080/2880x1200 wide banners, or 1280x720 maxresdefault video thumbnails).
+  /// Resolves high-definition InnerTube artwork (retina 720x720 square covers/avatars,
+  /// 1920x1080 wide banners, or 1280x720 maxresdefault video thumbnails) optimized
+  /// for minimum data consumption with pristine visual fidelity.
   static String upgradeArtworkUrl(
     String? url, {
     String? videoId,
-    int targetSize = 1200,
+    int targetSize = 720,
     bool isBanner = false,
     bool isArtistAvatar = false,
   }) {
@@ -527,7 +528,7 @@ class MediaNormalizer {
 
       if (preserveLandscape && !isArtistAvatar) {
         if (w >= 1920) return u;
-        const bannerSuffix = '=w1920-h1080-p-l90-rj';
+        const bannerSuffix = '=w1920-h1080-p-l85-rj';
         return dimMatch != null
             ? u.replaceFirst(_googleDimRe, bannerSuffix)
             : '$u$bannerSuffix';
@@ -535,8 +536,8 @@ class MediaNormalizer {
 
       final keepPortrait = isArtistAvatar || u.contains('-p') || u.contains('-c');
       final squareSuffix = keepPortrait
-          ? '=w$targetSize-h$targetSize-p-l90-rj'
-          : '=w$targetSize-h$targetSize-l90-rj';
+          ? '=w$targetSize-h$targetSize-p-l85-rj'
+          : '=w$targetSize-h$targetSize-l85-rj';
 
       if (dimMatch != null) {
         if (w >= targetSize && w == h && !isArtistAvatar) return u;

@@ -762,7 +762,6 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
       },
       child: AppleGlass(
         borderRadius: BorderRadius.circular(h / 2),
-        tint: const Color(0x26121216),
         child: SizedBox(
           width: h,
           height: h,
@@ -797,7 +796,9 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
         ),
         child: AppleGlass(
           borderRadius: BorderRadius.circular(h / 2),
-          tint: Color.lerp(const Color(0x30121216), const Color(0x4D1E0A12), nVal)!,
+          tint: (active != null && nVal > 0.02)
+              ? const Color(0xFFE11D48).withValues(alpha: 0.20 * nVal)
+              : null,
           child: Container(
             height: h,
             padding: active != null
@@ -879,7 +880,6 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
       },
       child: AppleGlass(
         borderRadius: BorderRadius.circular(h / 2),
-        tint: const Color(0x26121216),
         child: SizedBox(
           width: h,
           height: h,
@@ -937,7 +937,6 @@ class DynamicIslandActionButton extends StatelessWidget {
       },
       child: AppleGlass(
         borderRadius: BorderRadius.circular(size / 2),
-        tint: const Color(0x26121216),
         child: SizedBox(
           width: size,
           height: size,

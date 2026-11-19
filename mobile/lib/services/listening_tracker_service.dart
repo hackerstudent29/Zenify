@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'api_service.dart';
 import 'auth_service.dart';
+import 'listening_history_service.dart';
 import 'settings_service.dart';
 
 class ActiveListenSession {
@@ -80,11 +81,11 @@ class ActiveListenSession {
       'trackSource': 'youtube',
       'trackId': trackId,
       'trackTitle': trackTitle,
-      'trackAlbum': trackAlbum,
-      'language': language,
-      'genre': genre,
-      'contextType': contextType,
-      'contextId': contextId,
+      if (trackAlbum != null && trackAlbum!.isNotEmpty) 'trackAlbum': trackAlbum,
+      if (language != null && language!.isNotEmpty) 'language': language,
+      if (genre != null && genre!.isNotEmpty) 'genre': genre,
+      if (contextType != null && contextType!.isNotEmpty) 'contextType': contextType,
+      if (contextId != null && contextId!.isNotEmpty) 'contextId': contextId,
       'offline': offline,
       'quality': quality,
       'artists': artists,
@@ -183,8 +184,14 @@ class ListeningTrackerService {
     final eventMap = _activeSession!.finalize(endReason);
     _activeSession = null;
 
-    // Only record if user listened for at least 3 seconds
-    if ((eventMap['listenedMs'] as int? ?? 0) >= 3000) {
+    final ms = (eventMap['listenedMs'] as int? ?? 0);
+    // Record into local listening history service for instant local replay & history
+    if (ms >= 1000) {
+      unawaited(ListeningHistoryService.instance.recordCompletedListen(eventMap));
+    }
+
+    // Only record to journal for server sync if user listened for at least 3 seconds
+    if (ms >= 3000) {
       _writeToJournal(eventMap);
     }
   }

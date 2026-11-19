@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,8 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_state.dart';
 import '../../services/dock_visibility.dart';
+import '../../services/listening_history_service.dart';
+import '../../services/listening_tracker_service.dart';
 import '../../services/player_state.dart';
 import '../auth/welcome_screen.dart';
 import 'widgets/achievements_card.dart';
@@ -57,10 +60,11 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   Future<void> _fetchInsights() async {
     final auth = context.read<AuthState>();
     if (!auth.isLoggedIn) {
+      final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
       if (mounted) {
         setState(() {
           _loading = false;
-          _insightsData = null;
+          _insightsData = localData;
           _error = null;
         });
       }
@@ -77,23 +81,28 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
     try {
       final token = await AuthService.instance.getAccessToken();
       if (token == null) {
+        final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
         if (!mounted) return;
         setState(() {
           _loading = false;
-          _error = 'Authentication required';
+          _insightsData = localData;
+          _error = null;
         });
         return;
       }
+
+      // Proactively trigger background journal sync so un-uploaded events reach server
+      unawaited(ListeningTrackerService.instance.drainJournal());
 
       final responses = await Future.wait([
         http.get(
           Uri.parse('${ApiService.baseUrl}/api/me/insights?range=$_selectedRange'),
           headers: {'Authorization': 'Bearer $token'},
-        ),
+        ).timeout(const Duration(seconds: 6)),
         http.get(
           Uri.parse('${ApiService.baseUrl}/api/me/achievements'),
           headers: {'Authorization': 'Bearer $token'},
-        ),
+        ).timeout(const Duration(seconds: 6)),
       ]);
 
       final insightsRes = responses[0];
@@ -107,21 +116,37 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
           final achData = jsonDecode(achRes.body) as Map<String, dynamic>;
           ach = achData['achievements'] as List<dynamic>? ?? [];
         }
-        setState(() {
-          _insightsData = data;
-          _achievements = ach;
-          _loading = false;
-        });
+
+        final serverPlays = (data['totalPlays'] as num? ?? 0).toInt();
+        if (serverPlays > 0) {
+          setState(() {
+            _insightsData = data;
+            _achievements = ach;
+            _loading = false;
+          });
+        } else {
+          // Server returned 0 plays, check if local has plays
+          final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
+          final localPlays = (localData['totalPlays'] as num? ?? 0).toInt();
+          setState(() {
+            _insightsData = localPlays > 0 ? localData : data;
+            _achievements = ach;
+            _loading = false;
+          });
+        }
       } else {
+        // Server error: fall back to local insights
+        final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
         setState(() {
-          _error = 'Unable to load your Replay stats right now.';
+          _insightsData = localData;
           _loading = false;
         });
       }
     } catch (_) {
       if (!mounted) return;
+      final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
       setState(() {
-        _error = 'Check your connection and try again.';
+        _insightsData = localData;
         _loading = false;
       });
     }
@@ -140,14 +165,17 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   }
 
   void _onPlayTrack(Map<String, dynamic> trackData) {
-    final track = Track(
-      id: trackData['trackId']?.toString() ?? 'top_track',
-      title: trackData['trackTitle']?.toString() ?? 'Unknown Track',
-      artist: trackData['artistName']?.toString() ?? 'Unknown Artist',
-      album: trackData['trackAlbum']?.toString() ?? '',
-      coverUrl: '',
-      durationSeconds: 210,
-    );
+    final trackId = trackData['trackId']?.toString() ?? 'top_track';
+    final localTrack = ListeningHistoryService.instance.findTrackById(trackId);
+    final track = localTrack ??
+        Track(
+          id: trackId,
+          title: trackData['trackTitle']?.toString() ?? 'Unknown Track',
+          artist: trackData['artistName']?.toString() ?? 'Unknown Artist',
+          album: trackData['trackAlbum']?.toString() ?? '',
+          coverUrl: trackData['coverUrl']?.toString() ?? '',
+          durationSeconds: (trackData['trackDurationMs'] as num? ?? 210000) ~/ 1000,
+        );
 
     context.read<PlayerState>().setQueue(
       [track],
@@ -197,7 +225,7 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
                     onTap: () => Navigator.of(context).maybePop(),
                   ),
                   const Spacer(),
-                  if (auth.isLoggedIn && _viewIndex == 0)
+                  if (_viewIndex == 0)
                     CircleIconButton(
                       icon: CupertinoIcons.refresh,
                       tooltip: 'Refresh Replay',
@@ -214,48 +242,44 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Replay', style: AT.largeTitle),
+                  Text('Replay', style: AT.largeTitle.copyWith(fontFamily: 'SF Pro')),
                   const SizedBox(height: 4),
                   Text(
                     _subtitleForState(auth.isLoggedIn),
-                    style: AT.subhead.copyWith(color: AT.label2),
+                    style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
                   ),
                 ],
               ),
             ),
-            if (auth.isLoggedIn) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: PillTabs(
+                labels: const ['Replay', 'History'],
+                index: _viewIndex,
+                onChanged: (i) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _viewIndex = i);
+                },
+              ),
+            ),
+            if (_viewIndex == 0)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 child: PillTabs(
-                  labels: const ['Replay', 'History'],
-                  index: _viewIndex,
+                  labels: _rangeLabels,
+                  index: _rangeIndex,
                   onChanged: (i) {
+                    if (i == _rangeIndex) return;
                     HapticFeedback.selectionClick();
-                    setState(() => _viewIndex = i);
+                    setState(() => _rangeIndex = i);
+                    _fetchInsights();
                   },
                 ),
               ),
-              if (_viewIndex == 0)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: PillTabs(
-                    labels: _rangeLabels,
-                    index: _rangeIndex,
-                    onChanged: (i) {
-                      if (i == _rangeIndex) return;
-                      HapticFeedback.selectionClick();
-                      setState(() => _rangeIndex = i);
-                      _fetchInsights();
-                    },
-                  ),
-                ),
-            ],
             Expanded(
-              child: !auth.isLoggedIn
-                  ? _buildAuthPrompt()
-                  : _viewIndex == 1
-                      ? const HistoryView()
-                      : _buildInsightsBody(),
+              child: _viewIndex == 1
+                  ? const HistoryView()
+                  : _buildInsightsBody(auth.isLoggedIn),
             ),
           ],
         ),
@@ -263,13 +287,67 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
     );
   }
 
-  Widget _buildInsightsBody() {
+  Widget _buildGuestSyncBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AT.fill,
+          borderRadius: BorderRadius.circular(AT.rLg),
+          border: Border.all(color: AT.hairline),
+        ),
+        child: Row(
+          children: [
+            const Icon(CupertinoIcons.sparkles, color: AT.accent, size: 26),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sync Your Replay',
+                    style: AT.headline.copyWith(fontFamily: 'SF Pro', color: AT.label),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Sign in to sync your listening story and milestones across all devices.',
+                    style: AT.footnote.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            PillButton(
+              label: 'Sign In',
+              style: PillStyle.tinted,
+              compact: true,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => WelcomeScreen(
+                      onFinished: () {
+                        Navigator.of(context).pop();
+                        _fetchInsights();
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInsightsBody(bool isLoggedIn) {
     if (_loading) {
       return const Center(
         child: CupertinoActivityIndicator(radius: 14, color: AT.label2),
       );
     }
-    if (_error != null) return _buildErrorState();
+    if (_error != null && _insightsData == null) return _buildErrorState();
     if ((_insightsData?['totalPlays'] as int? ?? 0) == 0) {
       return _buildEmptyState();
     }
@@ -309,6 +387,7 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
           padding: const EdgeInsets.only(top: 6, bottom: 48),
           sliver: SliverList.list(
             children: [
+              if (!isLoggedIn) _buildGuestSyncBanner(),
               if (personality != null)
                 PersonalityCard(musicPersonality: personality),
               SummaryCards(
@@ -338,54 +417,12 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
                 genres: topGenres,
                 languages: topLanguages,
               ),
-              AchievementsCard(achievements: _achievements),
+              if (_achievements.isNotEmpty)
+                AchievementsCard(achievements: _achievements),
             ],
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildAuthPrompt() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const IconTile(
-              CupertinoIcons.sparkles,
-              color: AT.accent,
-              size: 56,
-            ),
-            const SizedBox(height: 16),
-            const Text('Sign In for Replay', style: AT.title2),
-            const SizedBox(height: 8),
-            Text(
-              'Track your top artists, songs, listening rhythm, and unlocked milestones across devices.',
-              style: AT.subhead.copyWith(color: AT.label2),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 22),
-            PillButton(
-              label: 'Sign In',
-              icon: CupertinoIcons.person_crop_circle,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => WelcomeScreen(
-                      onFinished: () {
-                        Navigator.of(context).pop();
-                        _fetchInsights();
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -402,11 +439,11 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
               size: 56,
             ),
             const SizedBox(height: 16),
-            const Text('Nothing Recorded Yet', style: AT.title2),
+            Text('Nothing Recorded Yet', style: AT.title2.copyWith(fontFamily: 'SF Pro')),
             const SizedBox(height: 8),
             Text(
               'Play a few songs to start building your Replay profile and daily activity.',
-              style: AT.subhead.copyWith(color: AT.label2),
+              style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
               textAlign: TextAlign.center,
             ),
           ],
@@ -430,7 +467,7 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
             const SizedBox(height: 12),
             Text(
               _error ?? 'Something went wrong.',
-              style: AT.subhead.copyWith(color: AT.label2),
+              style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),

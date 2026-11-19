@@ -1,23 +1,36 @@
 // lib/design_system/widgets/artwork_mesh_background.dart
 //
-// ArtworkMeshBackground — Apple Music style fluid artwork mesh (Flutter port).
+// ArtworkMeshBackground — Apple Music style liquid colour field (Flutter).
 //
-// How it stays smooth AND cheap (same architecture as the web version):
-//  1. Colour grading + blur are baked ONCE per cover into small soft-edged
-//     "blob" tiles (3 crops × 128px). No blur / colour filter runs per frame.
-//  2. The scene is painted into a TINY canvas (~128–190px long side) and the
-//     compositor bitmap-scales it up (Transform.scale + filterQuality). That
-//     bilinear upscale gives the liquid softness for free.
-//  3. Motion is real spring physics (semi-implicit Euler, sub-stepped,
-//     dt-clamped): every blob chases a wandering waypoint with under-damped
-//     springs, so it accelerates, decelerates and overshoots like liquid.
-//  4. Zero widget rebuilds while animating: a Ticker drives a repaint-only
-//     Listenable. Props like intensity can be fed through a ValueListenable.
-//  5. The ticker fully STOPS (no CPU/GPU) when the app is backgrounded, when
-//     paused and eased to rest, or when reduced-motion is on. Offscreen
-//     routes are muted automatically by TickerMode.
-//  6. Adaptive governor: if real frame intervals slip it lowers resolution and
-//     then fps by itself. [lowPower] caps to 30 fps (wire it to battery_plus).
+// WHAT CHANGED vs the previous version
+//  • No more image "crop tiles". The old version painted blurred pieces of the
+//    cover, which looked blotchy and showed artwork detail. Now each cover is
+//    reduced ONCE to a graded 6-colour palette (Apple-style: rich, never
+//    neon, never too bright for white text) and the scene is drawn with big
+//    soft elliptical colour blobs. Result: smooth, premium, abstract flow.
+//  • Liquid motion: every blob drifts on layered sine orbits, breathes,
+//    stretches like a droplet (area-preserving squash/stretch) and rotates.
+//    The whole field also swings slowly around the centre.
+//  • Liquid TRANSITIONS: when the song changes, colours do not cross-fade.
+//    A colour wave sweeps diagonally across the screen (each blob morphs
+//    slightly after its neighbour) while the field "kicks": blobs speed up,
+//    swell and swirl, then settle back. Interrupting a transition mid-way
+//    morphs from the colours currently on screen (no pops).
+//
+// WHY IT COSTS ALMOST NO BATTERY
+//  1. Cover is decoded at 64px wide and analysed once (≈4k pixels). Cached
+//     per cover (LRU) → reopening the player is instant, zero work.
+//  2. Scene is painted into a TINY canvas (~110–160px long side) and scaled
+//     up by the compositor (bilinear = free "blur"). No blur / filter / shader
+//     compile / saveLayer per frame. One static gradient Paint, 9 draws.
+//  3. 30 fps cap (slow liquid motion looks identical to 60), auto step-down
+//     to 24 / 20 fps if frames slip. lowPower caps at 24.
+//  4. Zero widget rebuilds while animating (Ticker → repaint-only notifier).
+//  5. Ticker FULLY STOPS (0 CPU/GPU) when app is backgrounded, when paused and
+//     eased to rest, with reduced-motion, and on offscreen routes.
+//  6. Optional dither layer is OFF by default (it is a full-res layer).
+//
+// Public API is unchanged — drop-in replacement.
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -44,9 +57,10 @@ class ArtworkMeshBackground extends StatefulWidget {
     this.speed = 1,
     this.intensity = 0,
     this.intensityListenable,
-    this.interactive = true,
-    this.dither = true,
+    this.interactive = false,
+    this.dither = false,
     this.lowPower = false,
+    this.maxFps = 30,
     this.mediaUrlResolver,
     this.imageProviderBuilder,
     this.fallbackAsset = 'assets/images/z_logo.png',
@@ -68,25 +82,28 @@ class ArtworkMeshBackground extends StatefulWidget {
   /// Live energy 0..1 (audio level / beat / loudness).
   final double intensity;
 
-  /// Drive intensity at 60 Hz from an audio analyser WITHOUT rebuilding.
+  /// Drive intensity from an audio analyser WITHOUT rebuilding.
   /// Takes precedence over [intensity].
   final ValueListenable<double>? intensityListenable;
 
-  /// Subtle pointer / touch parallax (listens to global pointer events, so it
-  /// works even when this widget sits underneath your content).
+  /// Subtle pointer / touch parallax. Off by default (saves wake-ups).
   final bool interactive;
 
-  /// Tiny static noise layer that removes gradient banding on dark colours.
+  /// Static noise layer that removes banding on dark colours. Full-resolution
+  /// layer → OFF by default to keep GPU use minimal.
   final bool dither;
 
-  /// Caps to 30 fps and trims resolution. Feed from battery_plus if you like.
+  /// Caps to 24 fps and trims resolution. Feed from battery_plus if you like.
   final bool lowPower;
 
-  /// Maps a raw media path to a full URL (the web app's `getMediaUrl`).
+  /// Frame-rate ceiling (default 30). Raise to 60 only if you really want it.
+  final double maxFps;
+
+  /// Maps a raw media path to a full URL.
   final String Function(String raw)? mediaUrlResolver;
 
-  /// Custom ImageProvider for a resolved source (e.g. CachedNetworkImageProvider).
-  /// Defaults to [NetworkImage].
+  /// Custom ImageProvider for a resolved source. Defaults to
+  /// [CachedNetworkImageProvider] for http(s), else [NetworkImage].
   final ImageProvider Function(String src)? imageProviderBuilder;
 
   /// Asset used when there is no cover or it fails to load.
@@ -94,12 +111,10 @@ class ArtworkMeshBackground extends StatefulWidget {
 
   final Color? backgroundColor;
 
-  /// Optional explicit color palette (e.g. strawberry rose + white) used instead
-  /// of decoding a cover image. Generates a soft fluid tile baked with the same
-  /// spring-physics multi-directional mesh engine.
+  /// Optional explicit palette used instead of decoding a cover image.
   final List<Color>? palette;
 
-  /// Multiplier (0..1) for the bottom readability scrim overlay.
+  /// Multiplier (0..1) for the readability scrim.
   final double scrimOpacity;
 
   @override
@@ -107,49 +122,217 @@ class ArtworkMeshBackground extends StatefulWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tuning constants (identical to the web version)
+// Tuning constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _NodeCfg {
-  const _NodeCfg({
+/// Palette size (index 0 is the cover's overall mood colour).
+const int _kColors = 6;
+
+/// Cover is decoded at this width for analysis (tiny → fast, low memory).
+const int _sampleWidth = 64;
+
+/// Colour morph duration on song change (seconds).
+const double _fadeSeconds = 1.9;
+
+/// How far the diagonal colour wave is spread (0 = all blobs change together).
+const double _stagger = 0.8;
+
+/// Lightness window for graded colours. Keeps white UI text readable while
+/// staying rich. Raise [_maxL] for brighter backgrounds, lower for moodier.
+const double _minL = 0.16;
+const double _maxL = 0.54;
+
+const List<Color> _fallbackColors = [
+  Color(0xFFB4123A),
+  Color(0xFFE11D48),
+  Color(0xFFFF4D79),
+  Color(0xFF7A0F2B),
+  Color(0xFFFFB3C6),
+  Color(0xFF4A0A1C),
+];
+
+class _Blob {
+  const _Blob({
     required this.ax,
     required this.ay,
-    required this.rx,
-    required this.ry,
-    required this.size,
-    required this.osc,
-    required this.alpha,
-    required this.spin,
-    required this.v,
-    required this.k,
-    required this.z,
-    required this.h0,
-    required this.h1,
+    required this.r,
+    required this.ox,
+    required this.oy,
     required this.w1,
     required this.w2,
+    required this.w3,
     required this.ph,
+    required this.stretch,
+    required this.spin,
+    required this.alpha,
+    required this.ci,
     required this.depth,
   });
 
-  final double ax, ay; // anchor (0..1)
-  final double rx, ry; // wander radius around anchor
-  final double size, osc; // size (× longest canvas side) and random variation
-  final double alpha;
-  final double spin; // rad/s (signed)
-  final int v; // which artwork crop layer
-  final double k, z; // spring stiffness / damping ratio (<1 = overshoot)
-  final double h0, h1; // seconds between new waypoints
-  final double w1, w2; // idle swirl frequencies
+  final double ax, ay; // anchor (0..1 of canvas)
+  final double r; // radius × longest canvas side
+  final double ox, oy; // orbit amplitude (normalised)
+  final double w1, w2, w3; // orbit / morph angular frequencies (rad/s)
   final double ph; // phase
+  final double stretch; // droplet squash/stretch amount
+  final double spin; // rotation speed (rad/s, signed)
+  final double alpha; // blob opacity
+  final int ci; // palette colour index
   final double depth; // pointer parallax depth
+
+  /// Diagonal colour-wave order (top-left first, bottom-right last).
+  double get delay => ((ax + ay) / 2).clamp(0.0, 1.0);
 }
 
-const List<_NodeCfg> _nodes = [
-  _NodeCfg(ax: 0.70, ay: 0.28, rx: 0.22, ry: 0.20, size: 2.1, osc: 0.16, alpha: 0.92, spin: 0.26, v: 0, k: 2.0, z: 0.74, h0: 5, h1: 9, w1: 0.21, w2: 0.17, ph: 0.0, depth: 1.0),
-  _NodeCfg(ax: 0.30, ay: 0.72, rx: 0.24, ry: 0.20, size: 2.3, osc: 0.16, alpha: 0.88, spin: -0.30, v: 1, k: 2.4, z: 0.80, h0: 6, h1: 10, w1: 0.18, w2: 0.23, ph: 1.8, depth: 0.7),
-  _NodeCfg(ax: 0.26, ay: 0.26, rx: 0.20, ry: 0.22, size: 1.9, osc: 0.18, alpha: 0.80, spin: 0.34, v: 2, k: 2.8, z: 0.70, h0: 4, h1: 8, w1: 0.26, w2: 0.19, ph: 3.2, depth: 1.2),
-  _NodeCfg(ax: 0.76, ay: 0.74, rx: 0.20, ry: 0.20, size: 2.0, osc: 0.16, alpha: 0.82, spin: -0.36, v: 1, k: 2.2, z: 0.78, h0: 5, h1: 9, w1: 0.17, w2: 0.24, ph: 4.5, depth: 0.5),
-  _NodeCfg(ax: 0.50, ay: 0.50, rx: 0.24, ry: 0.24, size: 2.6, osc: 0.14, alpha: 0.70, spin: 0.18, v: 0, k: 1.6, z: 0.85, h0: 7, h1: 12, w1: 0.14, w2: 0.16, ph: 5.8, depth: 0.3),
+// Corners, edge midpoints and centre → colour streams in from every side.
+const List<_Blob> _nodes = [
+  // corners
+  _Blob(
+    ax: 0.10,
+    ay: 0.10,
+    r: 0.62,
+    ox: 0.22,
+    oy: 0.16,
+    w1: 0.31,
+    w2: 0.27,
+    w3: 0.19,
+    ph: 0.0,
+    stretch: 0.22,
+    spin: 0.10,
+    alpha: 0.95,
+    ci: 1,
+    depth: 1.0,
+  ),
+  _Blob(
+    ax: 0.92,
+    ay: 0.14,
+    r: 0.58,
+    ox: 0.20,
+    oy: 0.18,
+    w1: 0.26,
+    w2: 0.34,
+    w3: 0.23,
+    ph: 1.1,
+    stretch: 0.25,
+    spin: -0.12,
+    alpha: 0.92,
+    ci: 2,
+    depth: 0.8,
+  ),
+  _Blob(
+    ax: 0.10,
+    ay: 0.88,
+    r: 0.64,
+    ox: 0.22,
+    oy: 0.16,
+    w1: 0.29,
+    w2: 0.24,
+    w3: 0.21,
+    ph: 2.3,
+    stretch: 0.20,
+    spin: -0.09,
+    alpha: 0.92,
+    ci: 3,
+    depth: 0.9,
+  ),
+  _Blob(
+    ax: 0.90,
+    ay: 0.90,
+    r: 0.60,
+    ox: 0.20,
+    oy: 0.18,
+    w1: 0.24,
+    w2: 0.30,
+    w3: 0.17,
+    ph: 3.4,
+    stretch: 0.26,
+    spin: 0.13,
+    alpha: 0.90,
+    ci: 4,
+    depth: 0.6,
+  ),
+  // centre (mood colour, biggest)
+  _Blob(
+    ax: 0.50,
+    ay: 0.50,
+    r: 0.70,
+    ox: 0.26,
+    oy: 0.22,
+    w1: 0.21,
+    w2: 0.25,
+    w3: 0.15,
+    ph: 4.6,
+    stretch: 0.30,
+    spin: 0.07,
+    alpha: 0.85,
+    ci: 0,
+    depth: 0.3,
+  ),
+  // edge midpoints
+  _Blob(
+    ax: 0.50,
+    ay: 0.02,
+    r: 0.50,
+    ox: 0.30,
+    oy: 0.10,
+    w1: 0.36,
+    w2: 0.28,
+    w3: 0.24,
+    ph: 5.6,
+    stretch: 0.30,
+    spin: -0.15,
+    alpha: 0.80,
+    ci: 5,
+    depth: 1.2,
+  ),
+  _Blob(
+    ax: 0.50,
+    ay: 0.98,
+    r: 0.52,
+    ox: 0.30,
+    oy: 0.10,
+    w1: 0.33,
+    w2: 0.27,
+    w3: 0.26,
+    ph: 0.7,
+    stretch: 0.28,
+    spin: 0.14,
+    alpha: 0.80,
+    ci: 2,
+    depth: 0.5,
+  ),
+  _Blob(
+    ax: 0.00,
+    ay: 0.50,
+    r: 0.48,
+    ox: 0.12,
+    oy: 0.30,
+    w1: 0.27,
+    w2: 0.31,
+    w3: 0.22,
+    ph: 1.9,
+    stretch: 0.30,
+    spin: -0.10,
+    alpha: 0.78,
+    ci: 3,
+    depth: 0.7,
+  ),
+  _Blob(
+    ax: 1.00,
+    ay: 0.50,
+    r: 0.48,
+    ox: 0.12,
+    oy: 0.30,
+    w1: 0.30,
+    w2: 0.26,
+    w3: 0.20,
+    ph: 2.9,
+    stretch: 0.30,
+    spin: 0.12,
+    alpha: 0.78,
+    ci: 1,
+    depth: 0.7,
+  ),
 ];
 
 /// Quality ladder used by the adaptive governor.
@@ -160,242 +343,139 @@ class _Level {
 }
 
 const List<_Level> _levels = [
-  _Level(60, 1.0),
-  _Level(60, 0.72),
-  _Level(30, 0.6),
-];
-
-// Tile baking constants
-const int _sample = 32; // colour sampling resolution (this is what gives the blur)
-const int _tile = 128; // final tile resolution
-const double _sat = 1.9;
-const double _con = 1.08;
-const double _bri = 1.05;
-
-class _Crop {
-  const _Crop(this.cx, this.cy, this.z);
-  final double cx, cy, z;
-}
-
-const List<_Crop> _crops = [
-  _Crop(0.5, 0.5, 1.0), // whole artwork
-  _Crop(0.5, 0.5, 0.55), // zoomed centre — different colour mix
-  _Crop(0.3, 0.7, 0.6), // off-centre detail
+  _Level(30, 1.0),
+  _Level(24, 0.8),
+  _Level(20, 0.65),
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tile baking (runs once per cover)
+// Palette extraction (runs once per cover)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Three baked blob layers + an average colour. Reference counted so images
-/// are disposed as soon as neither the cache nor a widget uses them.
-class _Tile {
-  _Tile(this.layers, this.avg);
+/// Graded colours for one cover: [colors] (length [_kColors]) + a dark [base].
+class _Palette {
+  _Palette(this.colors, this.base);
 
-  final List<ui.Image> layers;
-  final Color avg;
-  int _refs = 1; // the cache's reference
+  final List<Color> colors;
+  final Color base;
 
-  void retain() => _refs++;
-
-  void release() {
-    if (--_refs == 0) {
-      for (final l in layers) {
-        l.dispose();
-      }
-    }
-  }
-}
-
-Future<ui.Image> _renderImage(
-  ui.Image src,
-  Rect srcRect,
-  int size, {
-  Color? backdrop,
-}) async {
-  final recorder = ui.PictureRecorder();
-  final dst = Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
-  final canvas = Canvas(recorder, dst);
-  if (backdrop != null) {
-    canvas.drawRect(dst, Paint()..color = backdrop);
-  }
-  canvas.drawImageRect(
-    src,
-    srcRect,
-    dst,
-    Paint()
-      ..filterQuality = FilterQuality.high
-      ..isAntiAlias = true,
-  );
-  final picture = recorder.endRecording();
-  final image = await picture.toImage(size, size);
-  picture.dispose();
-  return image;
-}
-
-Rect _full(ui.Image i) =>
-    Rect.fromLTWH(0, 0, i.width.toDouble(), i.height.toDouble());
-
-Future<ui.Image> _fromPixels(Uint8List pixels, int w, int h) {
-  final c = Completer<ui.Image>();
-  ui.decodeImageFromPixels(pixels, w, h, ui.PixelFormat.rgba8888, c.complete);
-  return c.future;
-}
-
-/// Bake one crop: downsample → vibrancy-aware grade → smooth upscale → soft
-/// round alpha mask.
-Future<({ui.Image tile, Color avg})> _makeLayer(ui.Image img, _Crop crop) async {
-  final iw = img.width.toDouble(), ih = img.height.toDouble();
-  final side = math.max(2.0, math.min(iw, ih) * crop.z);
-  final sx = (crop.cx * iw - side / 2).clamp(0.0, math.max(0.0, iw - side));
-  final sy = (crop.cy * ih - side / 2).clamp(0.0, math.max(0.0, ih - side));
-  final src = Rect.fromLTWH(sx.toDouble(), sy.toDouble(), side, side);
-
-  // two-step downsample for a clean average
-  final mid =
-      await _renderImage(img, src, _sample * 4, backdrop: AppColors.bg);
-  final small = await _renderImage(mid, _full(mid), _sample);
-  mid.dispose();
-
-  var graded = small;
-  var avg = AppColors.bg;
-  try {
-    final bd = await small.toByteData(format: ui.ImageByteFormat.rawRgba);
-    if (bd != null) {
-      final d = bd.buffer.asUint8List(bd.offsetInBytes, bd.lengthInBytes);
-      double ar = 0, ag = 0, ab = 0;
-      var n = 0;
-      for (var i = 0; i < d.length; i += 4) {
-        final r = d[i].toDouble(), g = d[i + 1].toDouble(), b = d[i + 2].toDouble();
-        ar += r;
-        ag += g;
-        ab += b;
-        n++;
-        final mx = math.max(r, math.max(g, b));
-        final mn = math.min(r, math.min(g, b));
-        final sat = mx > 0 ? (mx - mn) / mx : 0.0;
-        // already-vivid colours get less boost → no clipping, muted art is lifted
-        final boost = 1 + (_sat - 1) * (1 - sat * 0.55);
-        final l = 0.299 * r + 0.587 * g + 0.114 * b;
-        double grade(double c) =>
-            (((l + (c - l) * boost - 128) * _con + 128) * _bri).clamp(0.0, 255.0);
-        d[i] = grade(r).round();
-        d[i + 1] = grade(g).round();
-        d[i + 2] = grade(b).round();
-        d[i + 3] = 255;
-      }
-      graded = await _fromPixels(d, _sample, _sample);
-      small.dispose();
-      avg = Color.fromARGB(
-        255,
-        (ar / n * 0.42).toInt(),
-        (ag / n * 0.42).toInt(),
-        (ab / n * 0.42).toInt(),
+  /// Builds a palette from arbitrary colours (pads with tonal variants).
+  factory _Palette.fromColors(List<Color> src, {Color? avg}) {
+    final list = <Color>[...src];
+    if (list.isEmpty) list.addAll(_fallbackColors);
+    var i = 0;
+    while (list.length < _kColors) {
+      final h = HSLColor.fromColor(list[i % list.length]);
+      list.add(
+        h
+            .withHue((h.hue + 18.0 * (i + 1)) % 360)
+            .withLightness(
+              (h.lightness + (i.isEven ? 0.10 : -0.08)).clamp(0.12, 0.60),
+            )
+            .toColor(),
       );
+      i++;
     }
-  } catch (_) {
-    // Pixels unreadable (e.g. some web renderers): keep the ungraded sample.
+    final ref = HSLColor.fromColor(avg ?? list.first);
+    final base = ref
+        .withLightness((ref.lightness * 0.55).clamp(0.05, 0.26))
+        .toColor();
+    return _Palette(list.sublist(0, _kColors), base);
+  }
+}
+
+/// Apple-style grade: lift muted art a little, keep neutrals neutral, keep
+/// lightness inside a window so white text always reads.
+Color _grade(Color c) {
+  final h = HSLColor.fromColor(c);
+  final s = h.saturation < 0.08
+      ? h.saturation
+      : (h.saturation * 1.25 + 0.04).clamp(0.0, 0.92);
+  final l = h.lightness.clamp(_minL, _maxL);
+  return h.withSaturation(s).withLightness(l).toColor();
+}
+
+double _dist(Color a, Color b) {
+  final dr = (a.r - b.r) * 255, dg = (a.g - b.g) * 255, db = (a.b - b.b) * 255;
+  return math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+class _Bucket {
+  double w = 0, r = 0, g = 0, b = 0;
+}
+
+Future<_Palette> _extractPalette(ui.Image img) async {
+  final bd = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+  if (bd == null) return _Palette.fromColors(_fallbackColors);
+  final d = bd.buffer.asUint8List(bd.offsetInBytes, bd.lengthInBytes);
+
+  final buckets = <int, _Bucket>{};
+  double tw = 0, tr = 0, tg = 0, tb = 0;
+
+  for (var i = 0; i + 3 < d.length; i += 4) {
+    if (d[i + 3] < 128) continue;
+    final r = d[i].toDouble(), g = d[i + 1].toDouble(), b = d[i + 2].toDouble();
+    final mx = math.max(r, math.max(g, b));
+    final mn = math.min(r, math.min(g, b));
+    final s = mx > 0 ? (mx - mn) / mx : 0.0;
+    final l = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+    // population-weighted, with a mild preference for vivid colours and a
+    // penalty for pure black / pure white (letterboxing, text, borders).
+    var w = 0.5 + s * s * 1.5;
+    if (l < 0.08) {
+      w *= 0.25;
+    } else if (l > 0.95) {
+      w *= 0.4;
+    }
+
+    tw += w;
+    tr += r * w;
+    tg += g * w;
+    tb += b * w;
+
+    final key = ((d[i] >> 4) << 8) | ((d[i + 1] >> 4) << 4) | (d[i + 2] >> 4);
+    final bk = buckets.putIfAbsent(key, _Bucket.new);
+    bk.w += w;
+    bk.r += r * w;
+    bk.g += g * w;
+    bk.b += b * w;
   }
 
-  // smooth upscale (32 → 64 → 128)
-  final up1 = await _renderImage(graded, _full(graded), _tile ~/ 2);
-  graded.dispose();
-  final up2 = await _renderImage(up1, _full(up1), _tile);
-  up1.dispose();
+  if (tw <= 0) return _Palette.fromColors(_fallbackColors);
 
-  // soft circular alpha mask → blobs blend with no hard edges
-  final rect = Rect.fromLTWH(0, 0, _tile.toDouble(), _tile.toDouble());
-  final recorder = ui.PictureRecorder();
-  final canvas = Canvas(recorder, rect);
-  canvas.saveLayer(rect, Paint());
-  canvas.drawImage(up2, Offset.zero, Paint()..filterQuality = FilterQuality.high);
-  final shader = const RadialGradient(
-    radius: 0.5,
-    colors: [
-      Color(0xFF000000),
-      Color(0xEB000000), // 0.92
-      Color(0x59000000), // 0.35
-      Color(0x00000000),
-    ],
-    stops: [0, 0.42, 0.75, 1],
-  ).createShader(rect);
-  canvas.drawRect(
-    rect,
-    Paint()
-      ..shader = shader
-      ..blendMode = BlendMode.dstIn,
+  final avg = Color.fromARGB(
+    255,
+    (tr / tw).round(),
+    (tg / tw).round(),
+    (tb / tw).round(),
   );
-  canvas.restore();
-  final picture = recorder.endRecording();
-  final tile = await picture.toImage(_tile, _tile);
-  picture.dispose();
-  up2.dispose();
 
-  return (tile: tile, avg: avg);
-}
+  final sorted = (buckets.values.toList()..sort((a, b) => b.w.compareTo(a.w)))
+      .take(48)
+      .toList();
 
-Future<ui.Image> _buildPaletteSourceImage(List<Color> palette) async {
-  const int size = _tile; // 128px high-vibrancy mesh palette
-  final colors = palette.isNotEmpty
-      ? palette
-      : const [
-          Color(0xFFE11D48),
-          Color(0xFFFF4D79),
-          Color(0xFFFFFFFF),
-          Color(0xFFFFDCE5),
-        ];
-  final base = colors.first;
-  final recorder = ui.PictureRecorder();
-  final rect = Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
-  final canvas = Canvas(recorder, rect);
-
-  canvas.drawRect(rect, Paint()..color = base);
-
-  // Paint rich overlapping multi-directional radial gradients so crops
-  // sample distinct contrasting waves (e.g. strawberry rose, pink, white).
-  final offsets = <({Offset center, double radius, double stop})>[
-    (center: const Offset(0.20, 0.22), radius: 0.75, stop: 0.85),
-    (center: const Offset(0.82, 0.18), radius: 0.72, stop: 0.90),
-    (center: const Offset(0.50, 0.50), radius: 0.65, stop: 0.80),
-    (center: const Offset(0.18, 0.82), radius: 0.78, stop: 0.88),
-    (center: const Offset(0.84, 0.78), radius: 0.70, stop: 0.85),
-    (center: const Offset(0.48, 0.14), radius: 0.60, stop: 0.75),
-    (center: const Offset(0.52, 0.86), radius: 0.65, stop: 0.80),
-  ];
-
-  for (var i = 0; i < offsets.length; i++) {
-    final spec = offsets[i];
-    final c = colors[i % colors.length];
-    final center = Offset(spec.center.dx * size, spec.center.dy * size);
-    final radius = size * spec.radius;
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..shader = ui.Gradient.radial(
-          center,
-          radius,
-          [c, c.withValues(alpha: 0.0)],
-          [0.0, spec.stop],
-        ),
-    );
+  // index 0 = overall mood colour (drives the biggest centre blob)
+  final picked = <Color>[_grade(avg)];
+  final used = <_Bucket>{};
+  for (final thr in const [56.0, 36.0, 20.0]) {
+    for (final b in sorted) {
+      if (picked.length >= _kColors) break;
+      if (used.contains(b)) continue;
+      final c = Color.fromARGB(
+        255,
+        (b.r / b.w).round(),
+        (b.g / b.w).round(),
+        (b.b / b.w).round(),
+      );
+      final g = _grade(c);
+      if (picked.every((p) => _dist(p, g) >= thr * 0.9)) {
+        picked.add(g);
+        used.add(b);
+      }
+    }
   }
-
-  final picture = recorder.endRecording();
-  final image = await picture.toImage(size, size);
-  picture.dispose();
-  return image;
-}
-
-Future<_Tile> _bake(ui.Image img) async {
-  final layers = <ui.Image>[];
-  var avg = AppColors.bg;
-  for (var i = 0; i < _crops.length; i++) {
-    final r = await _makeLayer(img, _crops[i]);
-    layers.add(r.tile);
-    if (i == 0) avg = r.avg;
-  }
-  return _Tile(layers, avg);
+  return _Palette.fromColors(picked, avg: avg);
 }
 
 Future<ui.Image> _resolveImage(ImageProvider provider) {
@@ -416,19 +496,19 @@ Future<ui.Image> _resolveImage(ImageProvider provider) {
   return completer.future.timeout(const Duration(seconds: 15));
 }
 
-/// Small LRU of baked tiles (reopening a player is instant).
-abstract final class _TileCache {
-  static const int _max = 6;
-  static final Map<String, _Tile> _cache = {};
-  static final Map<String, Future<_Tile>> _pending = {};
+/// Small LRU of extracted palettes (reopening a player is instant).
+abstract final class _PaletteCache {
+  static const int _max = 16;
+  static final Map<String, _Palette> _cache = {};
+  static final Map<String, Future<_Palette>> _pending = {};
 
-  static _Tile? peek(String key) {
-    final t = _cache.remove(key);
-    if (t != null) _cache[key] = t; // mark as most recently used
-    return t;
+  static _Palette? peek(String key) {
+    final p = _cache.remove(key);
+    if (p != null) _cache[key] = p; // mark most recently used
+    return p;
   }
 
-  static Future<_Tile> get(String key, ImageProvider Function() provider) {
+  static Future<_Palette> get(String key, ImageProvider Function() provider) {
     final hit = peek(key);
     if (hit != null) return Future.value(hit);
     return _pending[key] ??= _load(key, provider()).whenComplete(() {
@@ -436,37 +516,26 @@ abstract final class _TileCache {
     });
   }
 
-  static Future<_Tile> getPalette(String key, List<Color> palette) {
+  static _Palette fromColors(String key, List<Color> colors) {
     final hit = peek(key);
-    if (hit != null) return Future.value(hit);
-    return _pending[key] ??= _loadPalette(key, palette).whenComplete(() {
-      _pending.remove(key);
-    });
+    if (hit != null) return hit;
+    final p = _Palette.fromColors(colors);
+    _store(key, p);
+    return p;
   }
 
-  static Future<_Tile> _loadPalette(String key, List<Color> palette) async {
-    final img = await _buildPaletteSourceImage(palette);
-    try {
-      final tile = await _bake(img);
-      _cache[key] = tile;
-      if (_cache.length > _max) {
-        _cache.remove(_cache.keys.first)!.release();
-      }
-      return tile;
-    } finally {
-      img.dispose();
-    }
+  static void _store(String key, _Palette p) {
+    _cache[key] = p;
+    if (_cache.length > _max) _cache.remove(_cache.keys.first);
   }
 
-  static Future<_Tile> _load(String key, ImageProvider provider) async {
-    final img = await _resolveImage(provider);
+  static Future<_Palette> _load(String key, ImageProvider provider) async {
+    // Decode tiny: saves memory + CPU, and 64px is plenty for colour analysis.
+    final img = await _resolveImage(ResizeImage(provider, width: _sampleWidth));
     try {
-      final tile = await _bake(img);
-      _cache[key] = tile;
-      if (_cache.length > _max) {
-        _cache.remove(_cache.keys.first)!.release();
-      }
-      return tile;
+      final p = await _extractPalette(img);
+      _store(key, p);
+      return p;
     } finally {
       img.dispose();
     }
@@ -477,164 +546,217 @@ abstract final class _TileCache {
 // Simulation (pure state, repaint-only notifications)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _Node {
-  _Node(_NodeCfg c)
-      : x = c.ax,
-        y = c.ay,
-        tx = c.ax,
-        ty = c.ay,
-        s = c.size,
-        ts = c.size,
-        r = c.ph,
-        rv = c.spin,
-        rt = c.spin,
-        next = 0;
-
-  double x, y, vx = 0, vy = 0, tx, ty;
-  double s, sv = 0, ts;
-  double r, rv, rt;
-  double next;
-}
-
 class _MeshEngine extends ChangeNotifier {
-  _MeshEngine({required this.ts}) {
-    for (var i = 0; i < nodes.length; i++) {
-      nodes[i].next = _rand.nextDouble() * _nodes[i].h0;
-      retarget(i);
-    }
-  }
-
-  final math.Random _rand = math.Random(0x9e3779b1);
-  final List<_Node> nodes = [for (final c in _nodes) _Node(c)];
+  _MeshEngine(Color bg)
+    : from = List<Color>.filled(_nodes.length, bg),
+      to = List<Color>.filled(_nodes.length, bg),
+      shown = List<Color>.filled(_nodes.length, bg),
+      fromBase = bg,
+      toBase = bg,
+      shownBase = bg;
 
   double t = 0; // simulation time
-  double ts; // eased time-scale (pause / resume)
+  double ts = 1; // eased time-scale (pause / resume)
   double energy = 0; // eased intensity
   double px = 0, py = 0, ptx = 0, pty = 0; // eased pointer
-  double fade = 1; // crossfade progress
+  double fade = 1; // colour morph progress
+  double kick = 0; // transition surge (1 → 0)
 
-  _Tile? cur;
-  _Tile? prev;
+  _Palette? palette;
+  List<Color> from, to, shown;
+  Color fromBase, toBase, shownBase;
 
-  void retarget(int i) {
-    final c = _nodes[i], n = nodes[i];
-    double sym() => _rand.nextDouble() * 2 - 1;
-    n.tx = c.ax + sym() * c.rx * 1.35;
-    n.ty = c.ay + sym() * c.ry * 1.35;
-    n.ts = c.size * (1 + sym() * c.osc);
-    n.rt = c.spin * (0.55 + _rand.nextDouble() * 0.9);
-    n.next = t + (c.h0 + _rand.nextDouble() * (c.h1 - c.h0)) * 0.65;
+  List<Color> _blobColors(_Palette p) => [
+    for (final b in _nodes) p.colors[b.ci % p.colors.length],
+  ];
+
+  void setPalette(_Palette p, {bool instant = false}) {
+    palette = p;
+    if (instant) {
+      from = _blobColors(p);
+      to = _blobColors(p);
+      fromBase = toBase = p.base;
+      fade = 1;
+      kick = 0;
+    } else {
+      // morph from whatever is on screen right now → no pop if interrupted
+      from = List<Color>.of(shown);
+      fromBase = shownBase;
+      to = _blobColors(p);
+      toBase = p.base;
+      fade = 0;
+      kick = 1;
+    }
+    updateShown();
   }
 
-  /// Semi-implicit Euler spring step (sub-stepped by the caller for stability).
-  void step(double h) {
-    for (var i = 0; i < nodes.length; i++) {
-      final c = _nodes[i], n = nodes[i];
-      final k = c.k * (1 + energy * 1.2);
-      final d = 2 * c.z * math.sqrt(k);
-      n.vx += (k * (n.tx - n.x) - d * n.vx) * h;
-      n.x += n.vx * h;
-      n.vy += (k * (n.ty - n.y) - d * n.vy) * h;
-      n.y += n.vy * h;
-      const ks = 1.3;
-      final ds = 2 * 0.9 * math.sqrt(ks);
-      n.sv += (ks * (n.ts - n.s) - ds * n.sv) * h;
-      n.s += n.sv * h;
-      n.rv += (n.rt - n.rv) * (1 - math.exp(-h * 1.5));
-      n.r += n.rv * h;
+  /// Diagonal colour wave: each blob morphs slightly after its neighbour.
+  void updateShown() {
+    final f = fade;
+    for (var i = 0; i < _nodes.length; i++) {
+      final local = (f * (1 + _stagger) - _nodes[i].delay * _stagger).clamp(
+        0.0,
+        1.0,
+      );
+      final k = local * local * (3 - 2 * local);
+      shown[i] = Color.lerp(from[i], to[i], k)!;
     }
+    final bk = f * f * (3 - 2 * f);
+    shownBase = Color.lerp(fromBase, toBase, bk)!;
+  }
+
+  void finishFade() {
+    fade = 1;
+    kick = 0;
+    updateShown();
   }
 
   void ping() => notifyListeners();
-
-  void releaseTiles() {
-    cur?.release();
-    prev?.release();
-    cur = prev = null;
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Painter
+// Painter (blobs + scrim, all inside the tiny canvas)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _MeshPainter extends CustomPainter {
-  _MeshPainter(this.engine, this.bg, this.palette) : super(repaint: engine);
+  _MeshPainter(this.engine, this.bg, this.scrim) : super(repaint: engine);
 
   final _MeshEngine engine;
   final Color bg;
-  final List<Color>? palette;
+  final double scrim;
 
   static final Paint _fill = Paint();
-  static final Paint _img = Paint()..filterQuality = FilterQuality.low;
-  static final Rect _tileRect =
-      Rect.fromLTWH(0, 0, _tile.toDouble(), _tile.toDouble());
+
+  /// One static soft-falloff gradient in unit space. Each blob is this circle
+  /// transformed (translate / rotate / non-uniform scale) and tinted with a
+  /// colour filter, so there are no per-frame shader allocations.
+  static final Paint _blob = Paint()
+    ..shader = ui.Gradient.radial(
+      Offset.zero,
+      1,
+      const [
+        Color(0xFFFFFFFF),
+        Color(0xB8FFFFFF),
+        Color(0x40FFFFFF),
+        Color(0x00FFFFFF),
+      ],
+      const [0.0, 0.35, 0.7, 1.0],
+    );
+
+  Paint? _scrimPaint;
+  Size _scrimSize = Size.zero;
 
   @override
   void paint(Canvas canvas, Size size) {
     final e = engine;
+    final w = size.width, h = size.height, m = math.max(w, h);
+    final cx = w / 2, cy = h / 2;
+    final t = e.t;
 
-    // 1. Canvas base: vibrant song average or extracted background color
-    _fill.color = e.cur?.avg ?? bg;
+    // 1. Base
+    _fill.color = e.shownBase;
     canvas.drawRect(Offset.zero & size, _fill);
 
-    // 2. Liquid artwork mesh: smoothstep crossfade of baked artwork tiles (v1-v4 authentic physics)
-    final f = e.fade;
-    final smoothA = f * f * (3 - 2 * f);
-    if (e.prev != null && f < 1) _scene(canvas, size, e.prev!, 1);
-    if (e.cur != null) _scene(canvas, size, e.cur!, smoothA);
-  }
+    // 2. Liquid field. Slow global swing + a bigger swirl during transitions.
+    final swirl = 0.10 * math.sin(t * 0.09) + e.kick * 0.45 * math.sin(t * 0.9);
+    final cs = math.cos(swirl), sn = math.sin(swirl);
+    final amp = 1 + e.energy * 0.5 + e.kick * 0.5;
 
-  void _scene(Canvas canvas, Size size, _Tile tile, double a) {
-    final e = engine;
-    final w = size.width, h = size.height, m = math.max(w, h);
     for (var i = 0; i < _nodes.length; i++) {
-      final c = _nodes[i], n = e.nodes[i];
-      final alpha = (a * c.alpha).clamp(0.0, 1.0);
-      if (alpha < 0.003) continue;
+      final c = _nodes[i];
 
-      final sx = math.sin(e.t * c.w1 + c.ph) * 0.035;
-      final sy = math.cos(e.t * c.w2 + c.ph * 1.3) * 0.035;
-      final x = (n.x + sx + e.px * c.depth * 0.05) * w;
-      final y = (n.y + sy + e.py * c.depth * 0.05) * h;
-      final sz = m * n.s * (1 + e.energy * 0.08 * math.sin(e.t * 1.7 + c.ph));
+      // layered orbits → organic, non-repeating path
+      final nx =
+          c.ax +
+          c.ox *
+              amp *
+              (math.sin(t * c.w1 + c.ph) +
+                  0.35 * math.sin(t * c.w3 * 1.7 + c.ph * 2.1));
+      final ny =
+          c.ay +
+          c.oy *
+              amp *
+              (math.cos(t * c.w2 + c.ph * 1.3) +
+                  0.35 * math.cos(t * c.w3 * 1.3 + c.ph * 0.7));
 
-      _img.color = Color.fromRGBO(255, 255, 255, alpha);
+      var x = nx * w + e.px * c.depth * w * 0.05;
+      var y = ny * h + e.py * c.depth * h * 0.05;
+      final dx = x - cx, dy = y - cy;
+      x = cx + dx * cs - dy * sn;
+      y = cy + dx * sn + dy * cs;
+
+      // breathing + audio swell + transition swell
+      final breathe =
+          1 +
+          0.08 * math.sin(t * 0.4 + c.ph) +
+          e.energy * 0.10 * math.sin(t * 1.7 + c.ph) +
+          e.kick * 0.14;
+      final rad = m * c.r * breathe;
+
+      // droplet morph: area-preserving squash/stretch
+      final k = 1 + c.stretch * math.sin(t * c.w3 + c.ph * 3);
+
+      _blob.colorFilter = ColorFilter.mode(
+        e.shown[i].withValues(alpha: c.alpha),
+        BlendMode.srcIn,
+      );
+
       canvas.save();
       canvas.translate(x, y);
-      canvas.rotate(n.r);
-      canvas.drawImageRect(
-        tile.layers[c.v],
-        _tileRect,
-        Rect.fromLTWH(-sz / 2, -sz / 2, sz, sz),
-        _img,
-      );
+      canvas.rotate(c.ph + c.spin * t);
+      canvas.scale(rad * k, rad / k);
+      canvas.drawCircle(Offset.zero, 1, _blob);
       canvas.restore();
+    }
+
+    // 3. Readability scrim (tiny resolution → no full-res layer)
+    if (scrim > 0) {
+      if (_scrimPaint == null || _scrimSize != size) {
+        _scrimSize = size;
+        _scrimPaint = Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withValues(alpha: 0.06 * scrim),
+              Colors.black.withValues(alpha: 0.16 * scrim),
+              Colors.black.withValues(alpha: 0.36 * scrim),
+            ],
+            stops: const [0, 0.55, 1],
+          ).createShader(Offset.zero & size);
+      }
+      canvas.drawRect(Offset.zero & size, _scrimPaint!);
     }
   }
 
   @override
   bool shouldRepaint(_MeshPainter old) =>
-      old.engine != engine || old.bg != bg || old.palette != palette;
+      old.engine != engine || old.bg != bg || old.scrim != scrim;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Static dither layer
+// Optional static dither layer (off by default)
 // ─────────────────────────────────────────────────────────────────────────────
+
+Future<ui.Image> _fromPixels(Uint8List pixels, int w, int h) {
+  final c = Completer<ui.Image>();
+  ui.decodeImageFromPixels(pixels, w, h, ui.PixelFormat.rgba8888, c.complete);
+  return c.future;
+}
 
 Future<ui.Image>? _noiseFuture;
 
 Future<ui.Image> _noise() => _noiseFuture ??= () {
-      const s = 96;
-      final rnd = math.Random(7);
-      final px = Uint8List(s * s * 4);
-      for (var i = 0; i < px.length; i += 4) {
-        final v = rnd.nextInt(256);
-        px[i] = px[i + 1] = px[i + 2] = v;
-        px[i + 3] = 255;
-      }
-      return _fromPixels(px, s, s);
-    }();
+  const s = 96;
+  final rnd = math.Random(7);
+  final px = Uint8List(s * s * 4);
+  for (var i = 0; i < px.length; i += 4) {
+    final v = rnd.nextInt(256);
+    px[i] = px[i + 1] = px[i + 2] = v;
+    px[i + 3] = 255;
+  }
+  return _fromPixels(px, s, s);
+}();
 
 class _DitherLayer extends StatefulWidget {
   const _DitherLayer();
@@ -659,10 +781,7 @@ class _DitherLayerState extends State<_DitherLayer> {
     final img = _image;
     if (img == null) return const SizedBox.shrink();
     return RepaintBoundary(
-      child: CustomPaint(
-        size: Size.infinite,
-        painter: _NoisePainter(img),
-      ),
+      child: CustomPaint(size: Size.infinite, painter: _NoisePainter(img)),
     );
   }
 }
@@ -696,7 +815,7 @@ class _NoisePainter extends CustomPainter {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final _MeshEngine _engine;
   late final Ticker _ticker = createTicker(_onTick);
 
@@ -715,26 +834,44 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
   @override
   void initState() {
     super.initState();
-    _engine = _MeshEngine(ts: 1);
+    _engine = _MeshEngine(widget.backgroundColor ?? AppColors.bg);
+    if (widget.palette != null && widget.palette!.isNotEmpty) {
+      final pal = _Palette.fromColors(widget.palette!);
+      _engine.setPalette(pal, instant: true);
+    }
     WidgetsBinding.instance.addObserver(this);
     final ls = WidgetsBinding.instance.lifecycleState;
     _appActive = ls == null || ls == AppLifecycleState.resumed;
-    GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
+    if (widget.interactive) {
+      GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
+    }
     widget.intensityListenable?.addListener(_wake);
     _loadCover();
-    _wake();
   }
+
+  bool _isCurrentRoute = true;
+  bool _tickerModeEnabled = true;
+
+  bool get _canAnimate =>
+      mounted &&
+      !widget.paused &&
+      !_reduce &&
+      _appActive &&
+      _isCurrentRoute &&
+      _tickerModeEnabled;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
+    _tickerModeEnabled = TickerMode.valuesOf(context).enabled;
     final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (reduce != _reduce) {
       _reduce = reduce;
-      _wake();
     }
-    final tickerEnabled = TickerMode.valuesOf(context).enabled;
-    if (tickerEnabled && !_ticker.isActive) {
+    if (!_canAnimate) {
+      _halt();
+    } else if (!_ticker.isActive) {
       _wake();
     }
   }
@@ -746,9 +883,31 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
       old.intensityListenable?.removeListener(_wake);
       widget.intensityListenable?.addListener(_wake);
     }
+    if (old.interactive != widget.interactive) {
+      final router = GestureBinding.instance.pointerRouter;
+      if (widget.interactive) {
+        router.addGlobalRoute(_onPointer);
+      } else {
+        router.removeGlobalRoute(_onPointer);
+      }
+    }
+    if (widget.palette != null &&
+        widget.palette!.isNotEmpty &&
+        old.palette != widget.palette &&
+        _engine.palette == null) {
+      _apply(
+        _PaletteCache.fromColors(_paletteKey(widget.palette!), widget.palette!),
+        instant: false,
+      );
+    }
     if (_sourceKey(old) != _sourceKey(widget)) _loadCover();
-    // paused / speed / intensity / lowPower changes: make sure the loop runs
-    _wake();
+    if (widget.paused) {
+      _engine.ts = 0;
+      _engine.kick = 0;
+      _halt();
+    } else {
+      _wake();
+    }
   }
 
   @override
@@ -768,14 +927,16 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
     widget.intensityListenable?.removeListener(_wake);
     _loadToken++; // cancel in-flight loads
     _ticker.dispose();
-    _engine.releaseTiles();
     _engine.dispose();
     super.dispose();
   }
 
-  // ── cover loading + crossfade ──
+  // ── cover loading ──
 
   String get _fallbackKey => 'asset:${widget.fallbackAsset}';
+
+  String _paletteKey(List<Color> p) =>
+      'palette:${p.map((c) => c.toARGB32().toRadixString(16).padLeft(8, '0')).join('_')}';
 
   String _sourceKey(ArtworkMeshBackground w) {
     final raw = (w.coverUrl != null && w.coverUrl!.isNotEmpty)
@@ -785,17 +946,18 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
       return w.mediaUrlResolver?.call(raw) ?? raw;
     }
     if (w.palette != null && w.palette!.isNotEmpty) {
-      final sig = w.palette!
-          .map((c) => c.toARGB32().toRadixString(16).padLeft(8, '0'))
-          .join('_');
-      return 'palette:$sig';
+      return _paletteKey(w.palette!);
     }
     return 'asset:${w.fallbackAsset}';
   }
 
   ImageProvider _providerFor(String key) {
-    if (key.startsWith('asset:')) return AssetImage(key.substring(6));
-    if (widget.imageProviderBuilder != null) return widget.imageProviderBuilder!(key);
+    if (key.startsWith('asset:')) {
+      return AssetImage(key.substring(6));
+    }
+    if (widget.imageProviderBuilder != null) {
+      return widget.imageProviderBuilder!(key);
+    }
     if (key.startsWith('http://') || key.startsWith('https://')) {
       return CachedNetworkImageProvider(key);
     }
@@ -806,63 +968,76 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
     final token = ++_loadToken;
     final key = _sourceKey(widget);
 
-    final cached = _TileCache.peek(key);
+    // Immediate palette seeding: frame 0 has rich colors even before network completes!
+    if (widget.palette != null && widget.palette!.isNotEmpty) {
+      _apply(
+        _PaletteCache.fromColors(_paletteKey(widget.palette!), widget.palette!),
+        instant: _engine.palette == null,
+      );
+    }
+
+    final cached = _PaletteCache.peek(key);
     if (cached != null) {
-      // remount (reopen) → mesh is there on the first frame
-      _applyTile(cached, instant: _engine.cur == null);
+      // remount (reopen) → colours are there on the first frame
+      _apply(cached, instant: _engine.palette == null);
+      return;
+    }
+
+    // explicit palette → no image work at all
+    if (key.startsWith('palette:') && widget.palette != null) {
+      _apply(
+        _PaletteCache.fromColors(key, widget.palette!),
+        instant: _engine.palette == null,
+      );
       return;
     }
 
     try {
-      final tile = key.startsWith('palette:') && widget.palette != null
-          ? await _TileCache.getPalette(key, widget.palette!)
-          : await _TileCache.get(key, () => _providerFor(key));
-      if (token == _loadToken) _applyTile(tile);
+      final p = await _PaletteCache.get(key, () => _providerFor(key));
+      if (token == _loadToken) _apply(p);
     } catch (e) {
-      if (kDebugMode) debugPrint('[ArtworkMeshBackground] Failed to load cover $key: $e');
+      if (kDebugMode) {
+        debugPrint('[ArtworkMeshBackground] Failed to load cover $key: $e');
+      }
+      if (token != _loadToken) return;
+
       if (widget.palette != null && widget.palette!.isNotEmpty) {
+        _apply(
+          _PaletteCache.fromColors(
+            _paletteKey(widget.palette!),
+            widget.palette!,
+          ),
+        );
+        return;
+      }
+      if (key != _fallbackKey) {
         try {
-          final paletteSig = widget.palette!
-              .map((c) => c.toARGB32().toRadixString(16).padLeft(8, '0'))
-              .join('_');
-          final paletteTile = await _TileCache.getPalette('palette:$paletteSig', widget.palette!);
-          if (token == _loadToken) {
-            _applyTile(paletteTile);
-            return;
-          }
+          final fb = await _PaletteCache.get(
+            _fallbackKey,
+            () => AssetImage(widget.fallbackAsset),
+          );
+          if (token == _loadToken) _apply(fb);
+          return;
         } catch (_) {}
       }
-      if (key == _fallbackKey || token != _loadToken) return;
-      try {
-        final fb = await _TileCache.get(
-          _fallbackKey,
-          () => AssetImage(widget.fallbackAsset),
-        );
-        if (token == _loadToken) _applyTile(fb);
-      } catch (_) {/* nothing more to try */}
+      if (token == _loadToken) {
+        _apply(_PaletteCache.fromColors('palette:default', _fallbackColors));
+      }
     }
   }
 
-  void _applyTile(_Tile tile, {bool instant = false}) {
-    if (!mounted || identical(_engine.cur, tile)) return;
-    tile.retain();
-    final old = _engine.cur;
-    _engine.prev?.release();
-    if (instant) {
-      old?.release();
-      _engine.prev = null;
-    } else {
-      _engine.prev = old;
-    }
-    _engine.cur = tile;
-    _engine.fade = instant ? 1 : 0;
+  void _apply(_Palette p, {bool instant = false}) {
+    if (!mounted || identical(_engine.palette, p)) return;
+    _engine.setPalette(p, instant: instant);
     _wake();
   }
 
-  // ── pointer parallax ──
+  // ── pointer parallax (only registered when interactive) ──
 
   void _onPointer(PointerEvent e) {
-    if (!widget.interactive || _reduce || widget.paused || !_appActive) return;
+    if (!mounted || !widget.interactive || _reduce || widget.paused || !_appActive) {
+      return;
+    }
     if (e is! PointerMoveEvent && e is! PointerHoverEvent) return;
     final ms = e.timeStamp.inMilliseconds;
     if (ms - _lastPointerMs < 50) return; // throttle sampling
@@ -882,8 +1057,9 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
       (widget.intensityListenable?.value ?? widget.intensity).clamp(0.0, 1.0);
 
   double get _frameMs {
-    final fps = _levels[_level].fps;
-    return 1000 / (widget.lowPower ? math.min(30.0, fps) : fps);
+    var fps = math.min(_levels[_level].fps, widget.maxFps);
+    if (widget.lowPower) fps = math.min(24.0, fps);
+    return 1000 / fps;
   }
 
   bool get _settled {
@@ -892,6 +1068,7 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
     return target == 0 &&
         e.ts == 0 &&
         e.fade >= 1 &&
+        e.kick == 0 &&
         (e.energy - _readIntensity()).abs() < 0.002 &&
         (e.px - e.ptx).abs() < 0.002 &&
         (e.py - e.pty).abs() < 0.002;
@@ -903,15 +1080,17 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
 
   void _wake() {
     if (!mounted) return;
-    if (!_appActive) {
-      // Not running: show a stable, fully crossfaded frame.
+    if (!_canAnimate) {
       final e = _engine;
-      if (e.cur != null && (e.fade < 1 || e.prev != null)) {
-        e.fade = 1;
-        e.prev?.release();
-        e.prev = null;
-        e.ping();
+      if (widget.paused) {
+        e.ts = 0;
+        e.kick = 0;
       }
+      if (e.fade < 1 || e.kick > 0) {
+        e.finishFade();
+      }
+      e.ping();
+      _halt();
       return;
     }
     if (_ticker.isActive) return;
@@ -939,7 +1118,7 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
     if (elapsedMs < 250) {
       _gSum += elapsedMs;
       _gN++;
-      if (_gN >= 90) {
+      if (_gN >= 60) {
         final avg = _gSum / _gN;
         _gSum = 0;
         _gN = 0;
@@ -959,39 +1138,33 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
     e.px += (e.ptx - e.px) * pk;
     e.py += (e.pty - e.py) * pk;
 
-    // advance simulation
-    final simDt = dt * widget.speed * e.ts * (1 + e.energy * 0.6);
-    if (simDt > 0) {
-      e.t += simDt;
-      for (var i = 0; i < e.nodes.length; i++) {
-        if (e.t >= e.nodes[i].next) e.retarget(i);
-      }
-      final n = math.max(1, (simDt / (1 / 90)).ceil());
-      final h = simDt / n;
-      for (var i = 0; i < n; i++) {
-        e.step(h);
-      }
+    // transition surge decays smoothly
+    if (e.kick > 0) {
+      e.kick *= math.exp(-dt * 0.9);
+      if (e.kick < 0.002) e.kick = 0;
     }
 
-    // crossfade
+    // advance time (surge makes the flow speed up during song changes)
+    final simDt =
+        dt * widget.speed * e.ts * (1 + e.energy * 0.6 + e.kick * 1.8);
+    if (simDt > 0) e.t += simDt;
+
+    // colour morph (diagonal wave)
     if (e.fade < 1) {
-      e.fade = math.min(1, e.fade + dt / 0.9);
-      if (e.fade >= 1) {
-        e.prev?.release();
-        e.prev = null;
-      }
+      e.fade = math.min(1, e.fade + dt / _fadeSeconds);
+      e.updateShown();
     }
 
     e.ping();
 
-    if (_settled || !_appActive) _ticker.stop(); // sleeps at zero cost
+    if (_settled || !_canAnimate) _halt(); // sleeps at zero cost
   }
 
   // ── build ──
 
   Size _canvasFor(Size box, bool mobile) {
     final res = _levels[_level].res * (widget.lowPower ? 0.85 : 1);
-    final long = (mobile ? 128.0 : 190.0) * res;
+    final long = (mobile ? 112.0 : 160.0) * res;
     final k = math.max(box.width, box.height) / long;
     return Size(
       math.max(16, (box.width / k).roundToDouble()),
@@ -1035,7 +1208,11 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
                             size: cs,
                             child: CustomPaint(
                               size: cs,
-                              painter: _MeshPainter(_engine, bg, widget.palette),
+                              painter: _MeshPainter(
+                                _engine,
+                                bg,
+                                widget.scrimOpacity,
+                              ),
                             ),
                           ),
                         ),
@@ -1043,24 +1220,6 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
                     );
                   },
                 ),
-
-                // Readability scrim
-                if (widget.scrimOpacity > 0)
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.10 * widget.scrimOpacity),
-                          Colors.black.withValues(alpha: 0.20 * widget.scrimOpacity),
-                          bg.withValues(alpha: (0.40 * widget.scrimOpacity).clamp(0.0, 1.0)),
-                        ],
-                        stops: const [0, 0.6, 1],
-                      ),
-                    ),
-                  ),
-
                 if (widget.dither) const _DitherLayer(),
               ],
             ),
@@ -1070,4 +1229,3 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
     );
   }
 }
-

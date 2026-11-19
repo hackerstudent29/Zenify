@@ -110,9 +110,11 @@ class PoTokenGenerator(private val context: Context) : TokenProvider {
             view.loadUrl("https://www.youtube.com/embed/$videoId")
 
             cont.invokeOnCancellation {
-                try {
-                    view.stopLoading()
-                } catch (_: Throwable) {}
+                view.post {
+                    try {
+                        view.stopLoading()
+                    } catch (_: Throwable) {}
+                }
             }
         } catch (e: Throwable) {
             Log.w(TAG, "WebView initialization failed: ${e.message}")

@@ -24,6 +24,7 @@ import '../../services/player_state.dart';
 import '../details/artist_screen.dart';
 import '../details/album_screen.dart';
 import '../details/artist_popup.dart';
+import '../details/category_screen.dart';
 import '../../models/artist_ref.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../services/country_service.dart';
@@ -604,7 +605,7 @@ class _HeroState extends State<_Hero> {
     final items = widget.items;
     final w = MediaQuery.sizeOf(context).width;
     final art = w * 0.88 - 16;
-    const headH = 74.0;
+    const headH = 82.0;
 
     return SizedBox(
       height: headH + 12 + art + 26,
@@ -2328,7 +2329,28 @@ class _MarqueeRowState extends State<_MarqueeRow>
     _ticker.start();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    final enabled = TickerMode.valuesOf(context).enabled;
+    if (!isCurrent || !enabled) {
+      if (_ticker.isActive) _ticker.stop();
+    } else {
+      if (!_ticker.isActive) {
+        _last = Duration.zero;
+        _ticker.start();
+      }
+    }
+  }
+
   void _tick(Duration t) {
+    final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    final enabled = TickerMode.valuesOf(context).enabled;
+    if (!isCurrent || !enabled) {
+      _ticker.stop();
+      return;
+    }
     final dt = (t - _last).inMicroseconds / 1e6;
     _last = t;
     if (dt <= 0 || dt > 0.1 || !_sc.hasClients) return;
@@ -3322,9 +3344,16 @@ class _HomeScreenState extends State<HomeScreen> {
       final q = userLang.isNotEmpty
           ? '$userLang ${g.name} hits'
           : '${g.name} hits';
-      InnerTubeService.instance.search(q).then((tracks) {
-        if (tracks.isNotEmpty) play(tracks, 0);
-      });
+      Navigator.push(
+        context,
+        ZenPageRoute(
+          builder: (_) => CategoryScreen(
+            title: g.name,
+            query: q,
+            colors: [g.color],
+          ),
+        ),
+      );
     }
 
     final artistCount = math.min(_chartArtists.length, 10);
@@ -3546,11 +3575,22 @@ class _HomeScreenState extends State<HomeScreen> {
                             _SecHeader(
                               title: '${_moods[_mood]} Spotlight',
                               overline: 'Curated for this moment',
-                              onMore: () => _openSection(
-                                title: '${_moods[_mood]} Spotlight',
-                                overline: 'Curated for this moment',
-                                entries: _trackEntries(_moodTracks),
-                              ),
+                              onMore: () {
+                                final mood = _moods[_mood];
+                                final userLang = _effectivePrimaryLanguage;
+                                final country = CountryService.instance.currentCountry;
+                                final langPrefix = userLang.isNotEmpty ? '$userLang ' : '${country.name} ';
+                                Navigator.push(
+                                  context,
+                                  ZenPageRoute(
+                                    builder: (_) => CategoryScreen(
+                                      title: '$mood Spotlight',
+                                      query: '$langPrefix$mood hits',
+                                      initialTracks: _moodTracks.isNotEmpty ? _moodTracks : null,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                             if (_loadingMood)
                               const Padding(
@@ -3583,10 +3623,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             _SecHeader(
                               title: _timeOfDayMoodLabel,
                               overline: _timeOfDayGreeting,
-                              onMore: () => _openSection(
-                                title: _timeOfDayMoodLabel,
-                                overline: _timeOfDayGreeting,
-                                entries: _trackEntries(_timeOfDayTracks),
+                              onMore: () => Navigator.push(
+                                context,
+                                ZenPageRoute(
+                                  builder: (_) => CategoryScreen(
+                                    title: _timeOfDayMoodLabel,
+                                    initialTracks: _timeOfDayTracks,
+                                  ),
+                                ),
                               ),
                             ),
                             _Shelf(

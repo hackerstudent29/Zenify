@@ -71,15 +71,12 @@ class _IdentitySheet extends StatefulWidget {
 class _IdentitySheetState extends State<_IdentitySheet> {
   late final TextEditingController _name;
   late final TextEditingController _username;
-  late final TextEditingController _age;
-  String? _gender;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     final auth = context.read<AuthState>();
-    final saved = UserPreferencesService.instance.current;
     final resolved = UserPreferencesService.resolveDisplayName(
       accountName: auth.user?.name,
       displayName: auth.user?.displayName,
@@ -89,32 +86,20 @@ class _IdentitySheetState extends State<_IdentitySheet> {
     _username = TextEditingController(
       text: auth.user?.username == 'guest' ? '' : (auth.user?.username ?? ''),
     );
-    _age = TextEditingController(text: saved?.age != null ? '${saved!.age}' : '');
-    _gender = saved?.gender;
   }
 
   @override
   void dispose() {
     _name.dispose();
     _username.dispose();
-    _age.dispose();
     super.dispose();
   }
 
-  /// null = empty, -1 = invalid.
-  int? get _parsedAge {
-    final raw = _age.text.trim();
-    if (raw.isEmpty) return null;
-    final v = int.tryParse(raw);
-    return (v == null || v < 13 || v > 100) ? -1 : v;
-  }
-
-  bool get _canSave => _name.text.trim().isNotEmpty && _parsedAge != -1;
+  bool get _canSave => _name.text.trim().isNotEmpty;
 
   Future<void> _save() async {
     final name = _name.text.trim();
     final username = _username.text.trim();
-    final age = _parsedAge;
     final auth = context.read<AuthState>();
 
     setState(() => _saving = true);
@@ -122,10 +107,6 @@ class _IdentitySheetState extends State<_IdentitySheet> {
     await UserPreferencesService.instance.save(
       base.copyWith(
         displayName: name,
-        age: age,
-        clearAge: age == null,
-        gender: _gender,
-        clearGender: _gender == null,
         completed: base.completed || base.languages.isNotEmpty,
       ),
     );
@@ -175,7 +156,7 @@ class _IdentitySheetState extends State<_IdentitySheet> {
       actionEnabled: _canSave,
       actionLoading: _saving,
       onAction: _save,
-      heightFactor: 0.74,
+      heightFactor: 0.48,
       body: ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const BouncingScrollPhysics(),
@@ -184,38 +165,20 @@ class _IdentitySheetState extends State<_IdentitySheet> {
           Center(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 20),
-              child: Avatar(name: _name.text.trim().isEmpty ? 'Listener' : _name.text.trim(), size: 84),
+              child: Avatar(
+                name: _name.text.trim().isEmpty ? 'Listener' : _name.text.trim(),
+                size: 84,
+              ),
             ),
           ),
           AMSection(
-            footer: 'Age must be between 13 and 100.',
             children: [
-              _field(hint: 'Name', controller: _name, caps: TextCapitalization.words),
-              _field(hint: 'Username', controller: _username),
               _field(
-                hint: 'Age',
-                controller: _age,
-                keyboardType: TextInputType.number,
-                formatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(3)],
+                hint: 'Name',
+                controller: _name,
+                caps: TextCapitalization.words,
               ),
-            ],
-          ),
-          AMSection(
-            header: 'Gender',
-            bare: true,
-            children: [
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final g in UserPreferencesService.genderOptions)
-                    AMChip(
-                      label: g,
-                      selected: _gender == g,
-                      onTap: () => setState(() => _gender = _gender == g ? null : g),
-                    ),
-                ],
-              ),
+              _field(hint: 'Username', controller: _username),
             ],
           ),
         ],
@@ -488,8 +451,16 @@ class _ArtistsSheetState extends State<_ArtistsSheet> {
             controller: _searchCtrl,
             onChanged: _onQuery,
             placeholder: 'Search artists',
-            style: const TextStyle(color: AM.label, fontSize: 17),
-            placeholderStyle: const TextStyle(color: AM.label3, fontSize: 17),
+            style: const TextStyle(
+              fontFamily: 'SF Pro',
+              color: AM.label,
+              fontSize: 17,
+            ),
+            placeholderStyle: const TextStyle(
+              fontFamily: 'SF Pro',
+              color: AM.label3,
+              fontSize: 17,
+            ),
             backgroundColor: AM.card,
           ),
           const SizedBox(height: 16),
@@ -585,6 +556,7 @@ class _ArtistTile extends StatelessWidget {
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
+              fontFamily: 'SF Pro',
               color: selected ? AM.label : AM.label2,
               fontSize: 12,
               fontWeight: selected ? FontWeight.w600 : FontWeight.w500,

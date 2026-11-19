@@ -9,6 +9,8 @@ import '../../design_system/apple/apple_music_kit.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/auth_state.dart';
 import '../../services/cache_service.dart';
+import '../../services/dock_visibility.dart';
+import '../../services/download_service.dart';
 import '../../services/glass_engine.dart';
 import '../../services/settings_service.dart';
 import '../../services/update_service.dart';
@@ -31,12 +33,6 @@ String _qualityLabel(String code) => switch (code) {
   _ => code,
 };
 
-String _scriptLabel(String code) => switch (code) {
-  'tanglish' => 'Tanglish',
-  'hinglish' => 'Hinglish',
-  _ => 'Original',
-};
-
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -44,7 +40,10 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
+  @override
+  bool get hideMiniPlayerWhileActive => true;
+
   int _versionTaps = 0;
   String _version = 'v1.0.9 (Build 13)';
 
@@ -75,15 +74,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
       UpdateService.instance.showUpdateSheet(context, info);
       return;
     }
-    showAMInfo(
-      context,
+    await ZenDropdown.show(
+      context: context,
       title: 'Up to Date',
       subtitle: 'Zenify release channel',
-      rows: {
-        'Current Build': _version,
-        'Channel': 'Production',
-        'Status': 'Latest installed',
-      },
+      items: [
+        ZenDropdownItem(
+          title: 'Current Build',
+          subtitle: _version,
+          icon: CupertinoIcons.checkmark_seal_fill,
+        ),
+        const ZenDropdownItem(
+          title: 'Channel',
+          subtitle: 'Production Stable',
+          icon: CupertinoIcons.sparkles,
+        ),
+        const ZenDropdownItem(
+          title: 'Status',
+          subtitle: 'Latest version installed',
+          icon: CupertinoIcons.checkmark_alt,
+        ),
+      ],
     );
   }
 
@@ -92,35 +103,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_versionTaps >= 7) {
       _versionTaps = 0;
       HapticFeedback.heavyImpact();
-      showAMInfo(
-        context,
+      ZenDropdown.show(
+        context: context,
         title: 'Diagnostics',
         subtitle: 'Audio & cache engine',
-        rows: {
-          'Engine': 'Media3 / ExoPlayer',
-          'Pipeline': 'StudioFX 8D & EQ',
-          'Cache Cap':
-              '${SettingsState.instance.maxCacheGb.toStringAsFixed(2)} GB',
-          'Glass': GlassEngine.instance.presetName,
-        },
+        items: [
+          const ZenDropdownItem(
+            title: 'Engine',
+            subtitle: 'Media3 / ExoPlayer',
+            icon: CupertinoIcons.gear,
+          ),
+          const ZenDropdownItem(
+            title: 'Pipeline',
+            subtitle: 'StudioFX 8D & EQ',
+            icon: CupertinoIcons.waveform,
+          ),
+          ZenDropdownItem(
+            title: 'Cache Cap',
+            subtitle:
+                '${SettingsState.instance.maxCacheGb.toStringAsFixed(2)} GB',
+            icon: CupertinoIcons.archivebox,
+          ),
+          ZenDropdownItem(
+            title: 'Glass Style',
+            subtitle: GlassEngine.instance.presetName,
+            icon: CupertinoIcons.circle_grid_hex,
+          ),
+        ],
       );
     } else {
       AM.tick();
     }
-  }
-
-  Future<void> _pickScript(SettingsState s) async {
-    final v = await showAMOptions<String>(
-      context,
-      title: 'Lyrics Script',
-      options: const [
-        ('original', 'Original'),
-        ('tanglish', 'Tanglish'),
-        ('hinglish', 'Hinglish'),
-      ],
-      current: s.lyricsDefaultScript,
-    );
-    if (v != null) s.setLyricsDefaultScript(v);
   }
 
   Future<void> _pickAudioQuality(SettingsState s) async {
@@ -147,22 +160,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _confirmClearHistory(SettingsState s) async {
+  void _showStorageManagement(BuildContext context) {
+    final downloads = DownloadService.instance;
+    ZenDropdown.show(
+      context: context,
+      title: 'Storage Management',
+      subtitle: 'Offline tracks and streaming cache usage',
+      items: [
+        ZenDropdownItem(
+          title: 'Downloaded Songs',
+          subtitle:
+              '${downloads.downloadedCount} ${downloads.downloadedCount == 1 ? 'song' : 'songs'} (${downloads.formattedTotalSize})',
+          icon: CupertinoIcons.arrow_down_circle,
+        ),
+        const ZenDropdownItem(
+          title: 'Streaming & Artwork Cache',
+          subtitle: 'Temporary audio, lyrics and artwork files',
+          icon: CupertinoIcons.archivebox,
+        ),
+        ZenDropdownItem(
+          title: 'Clear Temporary Cache',
+          subtitle: 'Keeps downloaded songs and playlists safe',
+          icon: CupertinoIcons.trash,
+          isDestructive: true,
+          onTap: () async {
+            await _confirmClearCache();
+          },
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmClearCache() async {
     final ok = await ZenDropdown.showConfirmSheet(
       context: context,
-      title: 'Clear Listening History',
+      title: 'Clear Cache',
       message:
-          'This permanently resets your listening events, stats and Replay history on all devices.',
-      confirmLabel: 'Clear History',
+          'This clears temporary streaming cache, cached artwork, and cached lyrics. Your downloaded offline music, playlists, and account data will not be affected.',
+      confirmLabel: 'Clear Cache',
       isDestructive: true,
       icon: CupertinoIcons.trash,
     );
     if (ok && mounted) {
-      final done = await s.clearListeningHistory();
+      await CacheService.clearAllMediaAndArtworkCache();
       if (mounted) {
         appleToast(
           context,
-          done ? 'Listening history cleared' : 'Could not clear history',
+          'Cache cleared',
+          icon: CupertinoIcons.checkmark_circle_fill,
         );
       }
     }
@@ -182,7 +227,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return AMPage(
       title: 'Settings',
       children: [
-        // Account
+        // 1. Account
         AMSection(
           children: [
             AMRow(
@@ -197,6 +242,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : const Text(
                       'Sign In',
                       style: TextStyle(
+                        fontFamily: 'SF Pro',
                         color: AM.rose,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -218,7 +264,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
         ),
 
-        // Audio
+        // 2. Audio
         AMSection(
           header: 'Audio',
           footer:
@@ -231,7 +277,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _pickAudioQuality(s),
             ),
             AMRow(
-              title: 'Studio FX & Spatial',
+              title: 'Studio FX & Spatial Audio',
               subtitle: '8D rotation, parametric EQ and reverb',
               chevron: true,
               onTap: () => showStudioFxSheet(context),
@@ -241,16 +287,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: s.normalizeVolume,
               onChanged: s.setNormalizeVolume,
             ),
-            AMSwitchRow(
-              title: 'Mono Audio',
-              subtitle: 'Combine left and right channels',
-              value: s.monoAudio,
-              onChanged: s.setMonoAudio,
-            ),
           ],
         ),
 
-        // Playback
+        // 3. Playback
         AMSection(
           header: 'Playback',
           children: [
@@ -277,37 +317,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: s.setAutoplaySimilar,
             ),
             AMSwitchRow(
-              title: 'Pause on Disconnect',
-              subtitle: 'Pause when headphones unplug',
-              value: s.pauseOnDisconnect,
-              onChanged: s.setPauseOnDisconnect,
-            ),
-            AMSwitchRow(
-              title: 'Resume Where I Left Off',
-              subtitle: 'Restore the queue on launch',
-              value: s.resumeWhereLeftOff,
-              onChanged: s.setResumeWhereLeftOff,
-            ),
-            AMSwitchRow(
               title: 'Explicit Content Filter',
               value: s.explicitFilter,
               onChanged: s.setExplicitFilter,
             ),
-            AMRow(
-              title: 'Lyrics Script',
-              value: _scriptLabel(s.lyricsDefaultScript),
-              chevron: true,
-              onTap: () => _pickScript(s),
-            ),
           ],
         ),
 
-        // Appearance
+        // 4. Appearance
         AMSection(
           header: 'Appearance',
           children: [
             AMRow(
-              title: 'Glass Style',
+              title: 'Glass Customizer',
               subtitle: 'Material, blur, prism and motion',
               value: GlassEngine.instance.presetName,
               chevron: true,
@@ -322,27 +344,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   }),
             ),
             AMSwitchRow(
-              title: 'Album Color Glow',
-              subtitle: 'Ambient glow from the artwork',
-              value: s.dynamicAlbumColors,
-              onChanged: s.setDynamicAlbumColors,
-            ),
-            AMSwitchRow(
               title: 'Fluid Mesh Canvas',
               subtitle: 'Reactive player backdrop',
               value: s.fluidMeshBg,
               onChanged: s.setFluidMeshBg,
             ),
             AMSwitchRow(
-              title: 'Hide Details When Idle',
-              subtitle: 'Fade player controls in full screen',
-              value: s.autoHideDetails,
-              onChanged: s.setAutoHideDetails,
+              title: 'Full-Bleed Artwork Player',
+              subtitle: 'Edge-to-edge poster artwork with ambient fade',
+              value: s.fullBleedArtworkPlayer,
+              onChanged: s.setFullBleedArtworkPlayer,
             ),
           ],
         ),
 
-        // Accessibility
+        // 5. Accessibility
         AMSection(
           header: 'Accessibility',
           footer:
@@ -359,43 +375,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: s.reduceMotion,
               onChanged: s.setReduceMotion,
             ),
+            AMSwitchRow(
+              title: 'Mono Audio',
+              subtitle: 'Combine left and right channels',
+              value: s.monoAudio,
+              onChanged: s.setMonoAudio,
+            ),
           ],
         ),
 
-        // Downloads & storage
+        // 6. Downloads
         AMSection(
-          header: 'Downloads & Storage',
+          header: 'Downloads',
           footer:
-              'The streaming cache keeps recently played songs for faster playback.',
+              'The streaming cache keeps recently played songs for instant playback.',
           children: [
             AMSwitchRow(
               title: 'Download on Wi-Fi Only',
               value: s.downloadWifiOnly,
               onChanged: s.setDownloadWifiOnly,
             ),
-            AMSliderRow(
-              title: 'Streaming Cache',
-              valueLabel: '${(s.maxCacheGb * 1000).round()} MB',
-              value: s.maxCacheGb.clamp(0.05, 1.0).toDouble(),
-              min: 0.05,
-              max: 1.0,
-              divisions: 19,
-              onChanged: s.setMaxCacheGb,
+            AMRow(
+              title: 'Storage Management',
+              subtitle: 'Offline tracks and streaming cache usage',
+              chevron: true,
+              onTap: () => _showStorageManagement(context),
             ),
             AMRow(
               title: 'Clear Cache',
-              subtitle: 'Songs, lyrics and artwork. Your account is kept.',
+              subtitle: 'Temporary audio, lyrics and artwork',
               titleColor: AM.rose,
-              onTap: () async {
-                await CacheService.clearAllMediaAndArtworkCache();
-                if (!mounted) return;
-                appleToast(this.context, 'Cache cleared');
-              },
+              onTap: _confirmClearCache,
             ),
           ],
         ),
 
-        // Notifications
+        // 7. Notifications
         AMSection(
           header: 'Notifications',
           children: [
@@ -410,31 +425,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: s.notifyTogetherInvites,
               onChanged: s.setNotifyTogetherInvites,
             ),
-            AMSwitchRow(
-              title: 'Weekly Replay Summary',
-              subtitle: 'Listening highlights by email',
-              value: s.weeklySummaryEmail,
-              onChanged: s.setWeeklySummaryEmail,
-            ),
           ],
         ),
 
-        // Privacy
+        // 8. Privacy
         AMSection(
           header: 'Privacy',
+          footer:
+              'Private sessions allow listening without updating history or public status.',
           children: [
-            AMSwitchRow(
-              title: 'Personalized Experience',
-              subtitle: 'Tailors Home and Quick Picks to you',
-              value: s.personalizationEnabled,
-              onChanged: s.setPersonalizationEnabled,
-            ),
-            AMSwitchRow(
-              title: 'Save Listening History',
-              subtitle: 'Builds your Replay stats',
-              value: s.saveListeningHistory,
-              onChanged: s.setSaveListeningHistory,
-            ),
             AMSwitchRow(
               title: 'Private Session',
               subtitle: 'Listen without logging plays',
@@ -442,19 +441,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: s.setPrivateSession,
             ),
             AMSwitchRow(
-              title: 'Show Top Artists on Profile',
-              value: s.showTopArtists,
-              onChanged: s.setShowTopArtists,
-            ),
-            AMRow(
-              title: 'Clear Listening History',
-              titleColor: AM.rose,
-              onTap: () => _confirmClearHistory(s),
+              title: 'Listening History',
+              subtitle: 'Builds your Replay stats and taste profile',
+              value: s.saveListeningHistory,
+              onChanged: s.setSaveListeningHistory,
             ),
           ],
         ),
 
-        // About
+        // 9. About
         AMSection(
           header: 'About',
           children: [

@@ -27,16 +27,20 @@ abstract final class AM {
 
   static const radius = 18.0;
 
-  static const navTitle = TextStyle(color: label, fontSize: 17, fontWeight: FontWeight.w600);
-  static const rowTitle = TextStyle(color: label, fontSize: 17, fontWeight: FontWeight.w500, height: 1.2);
-  static const sub = TextStyle(color: label2, fontSize: 13, height: 1.3);
+  static const font = 'SF Pro';
+  static const fontDisplay = 'SF Pro Display';
+
+  static const navTitle = TextStyle(fontFamily: font, color: label, fontSize: 17, fontWeight: FontWeight.w600);
+  static const rowTitle = TextStyle(fontFamily: font, color: label, fontSize: 17, fontWeight: FontWeight.w500, height: 1.2);
+  static const sub = TextStyle(fontFamily: font, color: label2, fontSize: 13, height: 1.3);
   static const value = TextStyle(
+    fontFamily: font,
     color: label2,
     fontSize: 15,
     fontFeatures: [FontFeature.tabularFigures()],
   );
-  static const header = TextStyle(color: label2, fontSize: 13.5, letterSpacing: 0.3);
-  static const footer = TextStyle(color: label2, fontSize: 13, height: 1.35);
+  static const header = TextStyle(fontFamily: font, color: label2, fontSize: 13.5, letterSpacing: 0.3);
+  static const footer = TextStyle(fontFamily: font, color: label2, fontSize: 13, height: 1.35);
 
   static bool get reduceMotion => SettingsState.instance.reduceMotion;
   static Duration dur(int ms) => reduceMotion ? Duration.zero : Duration(milliseconds: ms);
@@ -627,6 +631,7 @@ class AMSegmented<T> extends StatelessWidget {
                           child: AnimatedDefaultTextStyle(
                             duration: AM.dur(200),
                             style: TextStyle(
+                              fontFamily: AM.font,
                               fontSize: 13.5,
                               fontWeight: FontWeight.w600,
                               color: o.$1 == value ? Colors.white : AM.label2,
@@ -681,6 +686,7 @@ class AMChip extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
+                  fontFamily: AM.font,
                   color: selected ? Colors.white : AM.label,
                   fontSize: 15,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
@@ -691,6 +697,7 @@ class AMChip extends StatelessWidget {
                 Text(
                   hint!,
                   style: TextStyle(
+                    fontFamily: AM.font,
                     color: selected ? Colors.white.withValues(alpha: 0.85) : AM.label3,
                     fontSize: 12,
                   ),
@@ -802,7 +809,11 @@ class _AMSheetFrameState extends State<AMSheetFrame> with HideDocksMixin {
                           onPressed: close,
                           child: Text(
                             widget.leadingLabel!,
-                            style: const TextStyle(color: AM.rose, fontSize: 17),
+                            style: const TextStyle(
+                              fontFamily: AM.font,
+                              color: AM.rose,
+                              fontSize: 17,
+                            ),
                           ),
                         ),
                       ),
@@ -827,6 +838,7 @@ class _AMSheetFrameState extends State<AMSheetFrame> with HideDocksMixin {
                               child: Text(
                                 widget.actionLabel,
                                 style: TextStyle(
+                                  fontFamily: AM.font,
                                   color: widget.actionEnabled ? AM.rose : AM.label3,
                                   fontSize: 17,
                                   fontWeight: FontWeight.w600,

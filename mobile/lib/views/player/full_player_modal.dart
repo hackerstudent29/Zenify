@@ -11,6 +11,7 @@ import '../../design_system/widgets/scrubber_slider.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/player_state.dart';
+import '../../services/settings_service.dart';
 import '../../utils/media_normalizer.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/media_navigation_sheet.dart';
@@ -82,19 +83,70 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
       return const SizedBox.shrink();
     }
 
+    final isFullBleed = context.watch<SettingsState>().fullBleedArtworkPlayer;
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
     final artSize = (screenWidth - 64).clamp(260.0, 360.0);
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: Stack(
         children: [
-          // Liquid Artwork Mesh Background
+          // Background: Full-Bleed Poster View or Liquid Artwork Mesh Background
           Positioned.fill(
-            child: ArtworkMeshBackground(
-              coverUrl: MediaNormalizer.upgradeArtworkUrl(track.coverUrl),
-              paused: !player.isPlaying,
-            ),
+            child: isFullBleed
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color(0xFF16161C),
+                              Color(0xFF2A1C22),
+                              Color(0xFF101014),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: screenHeight * 0.58,
+                        child: ShaderMask(
+                          blendMode: BlendMode.dstIn,
+                          shaderCallback: (bounds) => const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: [0.0, 0.58, 0.85, 1.0],
+                            colors: [
+                              Colors.white,
+                              Colors.white,
+                              Color(0x99FFFFFF),
+                              Colors.transparent,
+                            ],
+                          ).createShader(bounds),
+                          child: CachedNetworkImage(
+                            imageUrl: MediaNormalizer.upgradeArtworkUrl(
+                              track.coverUrl,
+                            ),
+                            fit: BoxFit.cover,
+                            alignment: Alignment.topCenter,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : ArtworkMeshBackground(
+                    coverUrl: MediaNormalizer.upgradeArtworkUrl(track.coverUrl),
+                    paused: !player.isPlaying,
+                    interactive: true,
+                    backgroundColor: const Color(0xFF121214),
+                    scrimOpacity: 0.18,
+                  ),
           ),
 
           // Main Interactive Layout
@@ -158,45 +210,46 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                   ),
                   const Spacer(),
 
-                  // Squircle Album Artwork (28 Radius) with Deep Shadow
-                  Center(
-                    child: Container(
-                      width: artSize,
-                      height: artSize,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.rArtPlayer,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.65),
-                            blurRadius: 36,
-                            offset: const Offset(0, 18),
+                  // Squircle Album Artwork (28 Radius) with Deep Shadow (hidden in Full-Bleed mode)
+                  if (!isFullBleed)
+                    Center(
+                      child: Container(
+                        width: artSize,
+                        height: artSize,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.rArtPlayer,
                           ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.rArtPlayer,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              blurRadius: 36,
+                              offset: const Offset(0, 18),
+                            ),
+                          ],
                         ),
-                        child: CachedNetworkImage(
-                          imageUrl: track.coverUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, _) =>
-                              Container(color: AppColors.surface2),
-                          errorWidget: (context, error, stackTrace) =>
-                              Container(
-                                color: AppColors.surface2,
-                                child: const Icon(
-                                  Icons.music_note,
-                                  color: AppColors.textTertiary,
-                                  size: 64,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.rArtPlayer,
+                          ),
+                          child: CachedNetworkImage(
+                            imageUrl: track.coverUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, _) =>
+                                Container(color: AppColors.surface2),
+                            errorWidget: (context, error, stackTrace) =>
+                                Container(
+                                  color: AppColors.surface2,
+                                  child: const Icon(
+                                    Icons.music_note,
+                                    color: AppColors.textTertiary,
+                                    size: 64,
+                                  ),
                                 ),
-                              ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   const Spacer(),
 
                   // Metadata Block: Title, Artist, Like Heart
@@ -292,6 +345,39 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                     positionNotifier: player.positionNotifier,
                     duration: player.duration,
                     onSeek: (pos) => player.seek(pos),
+                    middleWidget: isFullBleed
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  CupertinoIcons.waveform,
+                                  size: 11,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                ),
+                                const SizedBox(width: 4),
+                                const Text(
+                                  'Hi-Res Lossless',
+                                  style: TextStyle(
+                                    fontFamily: 'SF Pro',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : null,
                   ),
                   const SizedBox(height: 16),
 

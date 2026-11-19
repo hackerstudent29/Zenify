@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import '../../services/glass_engine.dart';
 import '../../services/settings_service.dart';
+import 'glass_surface.dart';
 import 'pressable_scale.dart';
 import '../zen.dart';
 
@@ -15,12 +16,11 @@ import '../zen.dart';
 const Color kAppleRed = Color(0xFFFA2D48);
 
 /* ====================================================================== */
-/*  AppleGlass: "Liquid Glass" surface                                     */
-/*   • LIGHT blur (the background stays readable, not frosted)             */
-/*   • saturation boost on whatever is behind the glass → "lively" colour  */
-/*   • near-clear tint + faint diagonal light gradient                     */
-/*   • specular rim + thick inner edge glow (the refracting edge)          */
-/*   • drop shadow painted ONLY outside the shape                          */
+/*  AppleGlass: "Liquid Glass" surface powered by GlassEngine & GlassSurface */
+/*   • Real-time reactive glass engine customization                       */
+/*   • Presets: Prism, Aurora, Frosted, Midnight, Rosé, Crystal, etc.       */
+/*   • Fluid motion, prism rainbow refraction, bevel depth, frost veil    */
+/*   • Specular edge sweep & drop shadow painted outside the shape         */
 /* ====================================================================== */
 class AppleGlass extends StatelessWidget {
   const AppleGlass({
@@ -29,7 +29,7 @@ class AppleGlass extends StatelessWidget {
     this.child,
     this.blur = 5,
     this.saturation = 1.7,
-    this.tint = const Color(0x0F101014),
+    this.tint,
     this.shadow = true,
     this.overrideFluidity,
     this.overrideBaseColor,
@@ -40,12 +40,12 @@ class AppleGlass extends StatelessWidget {
   final BorderRadius borderRadius;
   final Widget? child;
 
-  /// Gaussian sigma. Keep it low (3–7) so the content behind stays visible.
+  /// Gaussian sigma blur.
   final double blur;
 
-  /// 1 = untouched, >1 = more vivid colours behind the glass.
+  /// Saturation boost.
   final double saturation;
-  final Color tint;
+  final Color? tint;
   final bool shadow;
 
   /// Optional preview or local overrides
@@ -54,163 +54,50 @@ class AppleGlass extends StatelessWidget {
   final double? overrideBlur;
   final bool? overrideSpecularRim;
 
-  static final Map<double, ui.ColorFilter> _satCache = {};
-
-  static ui.ColorFilter _saturate(double s) {
-    return _satCache.putIfAbsent(s, () {
-      const r = 0.2126, g = 0.7152, b = 0.0722;
-      final i = 1 - s;
-      return ui.ColorFilter.matrix(<double>[
-        r * i + s, g * i, b * i, 0, 0, //
-        r * i, g * i + s, b * i, 0, 0, //
-        r * i, g * i, b * i + s, 0, 0, //
-        0, 0, 0, 1, 0,
-      ]);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: Listenable.merge([SettingsState.instance, GlassEngine.instance]),
       builder: (context, _) {
-        final settings = SettingsState.instance;
         final engine = GlassEngine.instance;
         final cfg = engine.config;
-        final bool isInit = settings.isInitialized;
-        final bool glassEffects = isInit ? settings.glassEffects : true;
 
-        final double baseFluidity = glassEffects ? cfg.fluidity : 0.0;
-        final double f = (overrideFluidity ?? baseFluidity).clamp(0.0, 1.0);
-        final String baseColorKey = overrideBaseColor ?? cfg.base;
-        final double rawBlur = overrideBlur ?? (glassEffects ? cfg.blur : 0.0);
-        final bool specularRim = overrideSpecularRim ?? cfg.rim;
-
-        final Color baseColor = GlassPalette.baseColor(baseColorKey);
-
-        // Opacity / tint alpha:
-        // f = 1.0: 0.10 (translucent liquid glass)
-        // f = 0.5: 0.55 (frosted)
-        // f = 0.0: 1.00 (solid matte)
-        final double effectiveAlpha = (1.0 - f * 0.90).clamp(0.08, 1.0);
-        
-        final Color? configTint = GlassPalette.tints[cfg.tint]?.color;
-        final bool isAurora = cfg.tint == 'aurora';
-
-        Color effectiveTint;
-        if (tint != const Color(0x0F101014) && baseColorKey == 'default' && cfg.tint == 'none' && f >= 0.95) {
-          effectiveTint = tint;
-        } else if (configTint != null && cfg.tint != 'none') {
-          final blended = Color.lerp(baseColor, configTint, 0.45 * cfg.tintStrength) ?? baseColor;
-          effectiveTint = blended.withValues(alpha: effectiveAlpha);
-        } else {
-          effectiveTint = baseColor.withValues(alpha: effectiveAlpha);
-        }
-
-        // Frost veil addition
-        if (cfg.frost > 0) {
-          effectiveTint = Color.lerp(effectiveTint, Colors.white, cfg.frost * 0.20)!;
-        }
-
-        // Blur sigma:
-        final double effectiveBlur = f <= 0.01
-            ? 0.0
-            : (f >= 0.95
-                ? rawBlur
-                : (rawBlur * (1.0 + (1.0 - f) * 1.8))).clamp(0.0, 35.0);
-
-        final double effectiveSaturation = ui.lerpDouble(1.0, saturation, f) ?? saturation;
-        final double rimMultiplier = (cfg.rimStrength).clamp(0.1, 1.5);
-        final double rimAlpha = specularRim ? ((ui.lerpDouble(0.12, 0.55, f) ?? 0.55) * rimMultiplier).clamp(0.05, 0.9) : 0.08;
-        final double glowWidth = specularRim ? ((ui.lerpDouble(0.0, 5.0, f) ?? 5.0) * rimMultiplier).clamp(0.0, 7.0) : 0.0;
-        final bool isSolid = f <= 0.05;
-
-        final rimPainter = _GlassRimPainter(
-          borderRadius,
-          rimAlpha: rimAlpha,
-          glowWidth: glowWidth,
-          isSolid: isSolid,
-        );
-
-        final List<Color> gradientColors;
-        if (isAurora) {
-          gradientColors = [
-            const Color(0xFFFA2D48).withValues(alpha: 0.18 * f * cfg.tintStrength),
-            const Color(0xFFBF5AF2).withValues(alpha: 0.12 * f * cfg.tintStrength),
-            const Color(0xFF38BDF8).withValues(alpha: 0.15 * f * cfg.tintStrength),
-          ];
-        } else if (configTint != null && cfg.tint != 'none') {
-          gradientColors = [
-            configTint.withValues(alpha: 0.22 * f * cfg.tintStrength),
-            configTint.withValues(alpha: 0.06 * f * cfg.tintStrength),
-            configTint.withValues(alpha: 0.18 * f * cfg.tintStrength),
-          ];
-        } else {
-          gradientColors = [
-            Colors.white.withValues(alpha: 0.10 * f),
-            Colors.white.withValues(alpha: 0.0),
-            Colors.white.withValues(alpha: 0.03 * f),
-          ];
-        }
-
-        final surfaceDecoration = BoxDecoration(
-          color: effectiveTint,
-          gradient: f > 0.05
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradientColors,
-                  stops: const [0, 0.55, 1],
-                )
-              : null,
-        );
-
-        // If blur is disabled or 0% fluid, skip BackdropFilter entirely for battery/GPU performance!
-        if (effectiveBlur <= 0.01) {
-          return RepaintBoundary(
-            child: CustomPaint(
-              painter: shadow ? _GlassShadowPainter(borderRadius) : null,
-              child: ClipRRect(
-                borderRadius: borderRadius,
-                child: CustomPaint(
-                  foregroundPainter: rimPainter,
-                  child: DecoratedBox(
-                    decoration: surfaceDecoration,
-                    child: child,
-                  ),
-                ),
-              ),
-            ),
+        GlassConfig? customConfig;
+        if (overrideFluidity != null ||
+            overrideBaseColor != null ||
+            overrideBlur != null ||
+            overrideSpecularRim != null) {
+          customConfig = cfg.copyWith(
+            fluidity: overrideFluidity,
+            base: overrideBaseColor,
+            blur: overrideBlur,
+            rim: overrideSpecularRim,
           );
         }
 
-        final filter = ui.ImageFilter.compose(
-          outer: _saturate(effectiveSaturation),
-          inner: ui.ImageFilter.blur(
-            sigmaX: effectiveBlur,
-            sigmaY: effectiveBlur,
-            tileMode: TileMode.clamp,
-          ),
+        // Default or generic dark placeholder tints are treated as un-tinted
+        // so that the full GlassEngine palette, preset, and tint take effect.
+        final bool isDefaultNeutral = tint == null ||
+            tint == const Color(0x0F101014) ||
+            tint == const Color(0x26121216) ||
+            tint == const Color(0x30121216);
+        final Color? effectiveTint = isDefaultNeutral ? null : tint;
+
+        Widget surface = GlassSurface(
+          borderRadius: borderRadius,
+          config: customConfig,
+          tintColor: effectiveTint,
+          child: child ?? const SizedBox.shrink(),
         );
 
-        return RepaintBoundary(
-          child: CustomPaint(
-            painter: shadow ? _GlassShadowPainter(borderRadius) : null,
-            child: ClipRRect(
-              borderRadius: borderRadius,
-              child: BackdropFilter(
-                filter: filter,
-                child: CustomPaint(
-                  foregroundPainter: rimPainter,
-                  child: DecoratedBox(
-                    decoration: surfaceDecoration,
-                    child: child,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
+        if (shadow) {
+          surface = CustomPaint(
+            painter: _GlassShadowPainter(borderRadius),
+            child: surface,
+          );
+        }
+
+        return surface;
       },
     );
   }
@@ -222,6 +109,7 @@ class _GlassShadowPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
     final rrect = radius.toRRect(Offset.zero & size);
     final outside = Path()
       ..fillType = PathFillType.evenOdd
@@ -246,68 +134,6 @@ class _GlassShadowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GlassShadowPainter old) => old.radius != radius;
-}
-
-class _GlassRimPainter extends CustomPainter {
-  _GlassRimPainter(
-    this.radius, {
-    this.rimAlpha = 0.55,
-    this.glowWidth = 5.0,
-    this.isSolid = false,
-  });
-  final BorderRadius radius;
-  final double rimAlpha;
-  final double glowWidth;
-  final bool isSolid;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final full = radius.toRRect(rect);
-    final shader = LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        Colors.white.withValues(alpha: rimAlpha),
-        Colors.white.withValues(alpha: (rimAlpha * 0.11).clamp(0.02, 0.15)),
-        Colors.white.withValues(alpha: (rimAlpha * 0.11).clamp(0.02, 0.15)),
-        Colors.white.withValues(alpha: (rimAlpha * 0.55).clamp(0.05, 0.35)),
-      ],
-      stops: const [0, 0.35, 0.65, 1],
-    ).createShader(rect);
-
-    // thick, soft inner edge glow: this is what sells the "glass thickness"
-    if (glowWidth > 0.5) {
-      canvas.save();
-      canvas.clipRRect(full);
-      canvas.drawRRect(
-        full.deflate(1),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = glowWidth
-          ..shader = shader
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5)
-          ..color = Colors.white.withValues(alpha: (rimAlpha * 0.8).clamp(0.1, 0.5)),
-      );
-      canvas.restore();
-    }
-
-    // crisp specular rim
-    canvas.drawRRect(
-      full.deflate(0.5),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = isSolid ? 0.8 : 1.0
-        ..shader = shader,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _GlassRimPainter old) =>
-      old.radius != radius ||
-      old.rimAlpha != rimAlpha ||
-      old.glowWidth != glowWidth ||
-      old.isSolid != isSolid;
 }
 
 /* ====================================================================== */

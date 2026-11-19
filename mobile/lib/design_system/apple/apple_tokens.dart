@@ -5,7 +5,7 @@ import 'package:flutter/physics.dart';
 /// Android has no SF Pro. Bundle `Inter` (or similar) and set fontFamily in
 /// [AT.font] if you want a closer feel. Null = system default (Roboto).
 abstract final class AT {
-  static const String? font = null;
+  static const String font = 'SF Pro';
 
   // ── Color ──────────────────────────────────────────────────────────
   static const Color bg = Color(0xFF000000);

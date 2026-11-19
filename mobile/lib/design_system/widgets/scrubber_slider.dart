@@ -12,6 +12,7 @@ class ScrubberSlider extends StatefulWidget {
     required this.onSeek,
     this.activeColor,
     this.trackColor,
+    this.middleWidget,
   });
 
   final ValueNotifier<Duration> positionNotifier;
@@ -19,6 +20,7 @@ class ScrubberSlider extends StatefulWidget {
   final ValueChanged<Duration> onSeek;
   final Color? activeColor;
   final Color? trackColor;
+  final Widget? middleWidget;
 
   @override
   State<ScrubberSlider> createState() => _ScrubberSliderState();
@@ -167,6 +169,7 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
                     _formatTime(_isDragging ? Duration(milliseconds: _dragPositionMs.toInt()) : position),
                     style: AppTypography.timer.copyWith(color: active.withValues(alpha: 0.8)),
                   ),
+                  if (widget.middleWidget != null) widget.middleWidget!,
                   Text(
                     _formatRemaining(
                       _isDragging ? Duration(milliseconds: _dragPositionMs.toInt()) : position,
