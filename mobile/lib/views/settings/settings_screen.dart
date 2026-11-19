@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../design_system/apple/apple_kit.dart' show appleToast, Avatar;
 import '../../design_system/apple/apple_music_kit.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/auth_state.dart';
 import '../../services/cache_service.dart';
 import '../../services/glass_engine.dart';
@@ -103,29 +104,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (v != null) s.setLyricsDefaultScript(v);
   }
 
-  void _confirmClearHistory(SettingsState s) {
-    showCupertinoDialog<void>(
+  Future<void> _pickAudioQuality(SettingsState s) async {
+    await ZenDropdown.show(
       context: context,
-      useRootNavigator: true,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Clear Listening History?'),
-        content: const Text(
-          'This permanently resets your listening events, stats and Replay history on all devices.',
-        ),
-        actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              final ok = await s.clearListeningHistory();
-              if (mounted) appleToast(context, ok ? 'Listening history cleared' : 'Could not clear history');
+      title: 'Audio Quality',
+      subtitle: 'Streaming & download fidelity',
+      items: [
+        for (final q in _qualities)
+          ZenDropdownItem(
+            title: q.$2,
+            subtitle: q.$3,
+            icon: s.wifiQuality == q.$1
+                ? CupertinoIcons.checkmark_alt
+                : CupertinoIcons.waveform,
+            isSelected: s.wifiQuality == q.$1,
+            onTap: () {
+              s.setWifiQuality(q.$1);
+              s.setCellularQuality(q.$1);
+              s.setDownloadQuality(q.$1);
             },
-            child: const Text('Clear'),
           ),
-        ],
-      ),
+      ],
     );
+  }
+
+  Future<void> _confirmClearHistory(SettingsState s) async {
+    final ok = await ZenDropdown.showConfirmSheet(
+      context: context,
+      title: 'Clear Listening History',
+      message:
+          'This permanently resets your listening events, stats and Replay history on all devices.',
+      confirmLabel: 'Clear History',
+      isDestructive: true,
+      icon: CupertinoIcons.trash,
+    );
+    if (ok && mounted) {
+      final done = await s.clearListeningHistory();
+      if (mounted) {
+        appleToast(
+          context,
+          done ? 'Listening history cleared' : 'Could not clear history',
+        );
+      }
+    }
   }
 
   @override
@@ -174,9 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Audio Quality',
               value: _qualityLabel(s.wifiQuality),
               chevron: true,
-              onTap: () => Navigator.of(context).push(
-                CupertinoPageRoute<void>(builder: (_) => const _AudioQualityPage()),
-              ),
+              onTap: () => _pickAudioQuality(s),
             ),
             AMRow(
               title: 'Studio FX & Spatial',

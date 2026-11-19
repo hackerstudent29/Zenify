@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../design_system/apple/apple_kit.dart' show appleToast, Avatar;
 import '../../design_system/apple/apple_music_kit.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/auth_state.dart';
 import '../../services/country_service.dart';
 import '../../services/innertube_service.dart';
@@ -225,60 +226,31 @@ class _IdentitySheetState extends State<_IdentitySheet> {
 
 // ───────────────────────── 2. Region ─────────────────────────
 
-Future<void> showRegionPickerSheet(BuildContext context) =>
-    showAMSheet<void>(context, (_) => const _RegionSheet());
-
-class _RegionSheet extends StatefulWidget {
-  const _RegionSheet();
-
-  @override
-  State<_RegionSheet> createState() => _RegionSheetState();
-}
-
-class _RegionSheetState extends State<_RegionSheet> {
-  late CountryInfo _selected = CountryService.instance.currentCountry;
-  bool _saving = false;
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    await UserPreferencesService.instance.save(
-      _basePrefs().copyWith(countryCode: _selected.code, countryName: _selected.name),
-    );
-    if (mounted) _done(context, 'Region set to ${_selected.name}', icon: CupertinoIcons.globe);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AMSheetFrame(
-      title: 'Music Region',
-      leadingLabel: 'Cancel',
-      actionLabel: 'Apply',
-      actionLoading: _saving,
-      onAction: _save,
-      body: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-        children: [
-          AMSection(
-            footer: 'Sets charts, new releases and regional discovery.',
-            children: [
-              for (final c in CountryService.supportedCountries)
-                AMRow(
-                  leading: Text(c.flag, style: const TextStyle(fontSize: 22)),
-                  title: c.name,
-                  trailing: AnimatedOpacity(
-                    opacity: c.code == _selected.code ? 1 : 0,
-                    duration: AM.dur(180),
-                    child: const Icon(CupertinoIcons.checkmark_alt, size: 20, color: AM.rose),
-                  ),
-                  onTap: () => setState(() => _selected = c),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+Future<void> showRegionPickerSheet(BuildContext context) async {
+  final current = CountryService.instance.currentCountry;
+  await ZenDropdown.show(
+    context: context,
+    title: 'Music Region',
+    subtitle: 'Sets charts, new releases and regional discovery.',
+    items: [
+      for (final c in CountryService.supportedCountries)
+        ZenDropdownItem(
+          title: '${c.flag}  ${c.name}',
+          icon: c.code == current.code
+              ? CupertinoIcons.checkmark_alt
+              : CupertinoIcons.globe,
+          isSelected: c.code == current.code,
+          onTap: () async {
+            await UserPreferencesService.instance.save(
+              _basePrefs().copyWith(countryCode: c.code, countryName: c.name),
+            );
+            if (context.mounted) {
+              appleToast(context, 'Region set to ${c.name}', icon: CupertinoIcons.globe);
+            }
+          },
+        ),
+    ],
+  );
 }
 
 // ───────────────────────── 3. Languages ─────────────────────────

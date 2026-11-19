@@ -358,6 +358,7 @@ class GlassEngine extends ChangeNotifier {
 
   void _set(GlassConfig c) {
     _config = c;
+    _mirrorLegacy();
     notifyListeners();
     _flushTimer?.cancel();
     _flushTimer = Timer(const Duration(milliseconds: 280), _flush);
@@ -374,22 +375,11 @@ class GlassEngine extends ChangeNotifier {
   void _mirrorLegacy() {
     try {
       final s = SettingsState.instance;
-      s.setGlassStyle(const {
-            'liquid': 'fluid',
-            'frosted': 'frosted',
-            'grey': 'grey',
-            'black': 'black',
-          }[_config.preset] ??
-          'fluid');
+      s.setGlassStyle(_config.preset);
       s.setGlassFluidity(_config.fluidity);
-      s.setGlassBlur(_config.blur.clamp(0, 20).toDouble());
+      s.setGlassBlur(_config.blur.clamp(0, 25).toDouble());
       s.setGlassSpecularRim(_config.rim);
-      s.setGlassBaseColor(const {
-            'black': 'black',
-            'grey': 'grey',
-            'crimson': 'crimson',
-          }[_config.base] ??
-          'default');
+      s.setGlassBaseColor(_config.base);
     } catch (_) {}
   }
 
