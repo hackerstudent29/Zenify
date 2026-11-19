@@ -2016,9 +2016,11 @@ class _ControlsLayout extends SingleChildLayoutDelegate {
   @override
   Offset getPositionForChild(Size size, Size childSize) {
     final d = dock.value.clamp(0.0, 1.0).toDouble();
-    final yArt = artBottom;
-    final yDocked = size.height - bottomInset - childSize.height;
-    return Offset(0, lerpDouble(yArt, yDocked, d)!);
+    // Move title, artist, seekbar, and transport buttons to the bottom of the screen,
+    // providing generous breathing room below the artwork image in art mode.
+    final yBottom = size.height - bottomInset - childSize.height;
+    final yArt = math.max(artBottom + 20, yBottom);
+    return Offset(0, lerpDouble(yArt, yBottom, d)!);
   }
 
   @override
