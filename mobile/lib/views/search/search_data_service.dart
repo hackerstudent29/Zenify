@@ -480,7 +480,25 @@ class SearchDataService {
     SearchTopResult? topRes;
     final qLower = q.toLowerCase();
 
-    // Artists
+    // 1. Tracks first: prioritize song results for queries
+    if (cloud['tracks'] is List) {
+      for (final t in (cloud['tracks'] as List)) {
+        if (t is! Map) continue;
+        final track = Track.fromJson(
+          Map<String, dynamic>.from(t),
+          baseUrl: ApiService.liveCloudUrl,
+        );
+        if (track.title.isNotEmpty) {
+          final songItem = _trackToSearchSongItem(track);
+          items.add(songItem);
+          if (topRes == null && track.title.toLowerCase() == qLower) {
+            topRes = SearchTopResult(item: songItem);
+          }
+        }
+      }
+    }
+
+    // 2. Artists: only set topRes on strict exact match if no song has matched yet
     if (cloud['artists'] is List) {
       for (final a in (cloud['artists'] as List)) {
         if (a is! Map) continue;
@@ -501,28 +519,8 @@ class SearchDataService {
           isVerified: true,
         );
         items.add(artistItem);
-        if (topRes == null &&
-            (aName.toLowerCase() == qLower ||
-                aName.toLowerCase().startsWith(qLower))) {
+        if (topRes == null && aName.toLowerCase() == qLower) {
           topRes = SearchTopResult(item: artistItem);
-        }
-      }
-    }
-
-    // Tracks
-    if (cloud['tracks'] is List) {
-      for (final t in (cloud['tracks'] as List)) {
-        if (t is! Map) continue;
-        final track = Track.fromJson(
-          Map<String, dynamic>.from(t),
-          baseUrl: ApiService.liveCloudUrl,
-        );
-        if (track.title.isNotEmpty) {
-          final songItem = _trackToSearchSongItem(track);
-          items.add(songItem);
-          if (topRes == null && track.title.toLowerCase() == qLower) {
-            topRes = SearchTopResult(item: songItem);
-          }
         }
       }
     }

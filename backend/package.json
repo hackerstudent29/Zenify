@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "1.1.12",
+  "version": "1.1.15",
   "description": "Zenify Backend API — Fastify 5, TypeScript, Prisma, Redis, 320kbps audio resolver, multilingual lyrics orchestrator, and real-time Room Together WebSocket engine.",
   "homepage": "https://listenzenify.vercel.app",
   "repository": {

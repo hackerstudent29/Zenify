@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "1.1.12",
+  "version": "1.1.15",
   "description": "Zenify Web PWA — Free, ad-free music streaming player with sub-second synced lyrics, Studio FX 3-band EQ, 8D spatial audio, local playback, and Room Together.",
   "homepage": "https://listenzenify.vercel.app",
   "repository": {

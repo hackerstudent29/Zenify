@@ -2,5 +2,5 @@
   <rect width="144" height="26" rx="13" fill="#18181B" stroke="rgba(255,255,255,0.12)"/>
   <rect x="68" y="2" width="74" height="22" rx="11" fill="#FF375F"/>
   <text x="16" y="17" fill="#A1A1AA" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif" font-size="10.5" font-weight="600">release</text>
-  <text x="79" y="17" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif" font-size="10.5" font-weight="800">v1.1.12</text>
+  <text x="79" y="17" fill="#000000" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif" font-size="10.5" font-weight="800">v1.1.15</text>
 </svg>
