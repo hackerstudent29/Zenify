@@ -13,6 +13,7 @@ import '../services/dock_visibility.dart';
 import '../services/player_state.dart';
 import '../services/room_deep_links.dart';
 import '../services/search_nav.dart';
+import '../services/update_service.dart';
 import '../utils/media_normalizer.dart';
 import 'details/album_screen.dart';
 import 'details/artist_screen.dart';
@@ -155,6 +156,16 @@ class _ShellScreenState extends State<ShellScreen>
     RoomDeepLinks.instance.addListener(_onRoomDeepLink);
     RoomDeepLinks.instance.start().then((_) {
       if (mounted) _onRoomDeepLink();
+    });
+    // Automatic background update verification: prompts older version users with the changelog sheet
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      final info = await UpdateService.instance.checkForUpdate(silent: true);
+      if (!mounted) return;
+      if (info != null && info.hasUpdate && !UpdateService.instance.hasDismissedPrompt) {
+        UpdateService.instance.showUpdateSheet(context, info);
+      }
     });
   }
 
