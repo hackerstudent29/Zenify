@@ -31,9 +31,9 @@ export default function DownloadPage() {
 
   // Fallback download URLs
   const apkDownloadUrl = "/downloads/zenify.apk";
-  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.0.12";
-  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.12/zenify-v1.0.12.apk";
-  const universalApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.0.12/zenify-v1.0.12-universal.apk";
+  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.1.16";
+  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.16/zenify-v1.1.16.apk";
+  const universalApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.16/zenify-v1.1.16-universal.apk";
   const absoluteDownloadUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/downloads/zenify.apk`
     : "https://listenzenify.vercel.app/downloads/zenify.apk";
@@ -54,8 +54,8 @@ export default function DownloadPage() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen w-full bg-[#030303] pt-24 sm:pt-28 md:pt-32 pb-40 font-sans text-[#F2F2F3] selection:bg-white/15">
         <SEO
-          title="Download Zenify APK (v1.0.12) – Ad-Free Music for Android, iOS & Desktop"
-          description="Download the Zenify v1.0.12 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, YouTube video streaming, Room Together, synchronized lyrics, and Studio FX."
+          title="Download Zenify APK (v1.1.16) – Ad-Free Music for Android, iOS & Desktop"
+          description="Download the Zenify v1.1.16 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, YouTube video streaming, Room Together, synchronized lyrics, and Studio FX."
           keywords={[
             "download zenify apk",
             "zenify android app",
@@ -69,7 +69,7 @@ export default function DownloadPage() {
             "@type": "MobileApplication",
             name: "Zenify Music Player",
             operatingSystem: "Android 8.0+",
-            softwareVersion: "1.0.12",
+            softwareVersion: "1.1.16",
             applicationCategory: "MultimediaApplication",
             applicationSubCategory: "Music & Audio",
             downloadUrl: "https://listenzenify.vercel.app/downloads/zenify.apk",
@@ -91,7 +91,7 @@ export default function DownloadPage() {
           <motion.div variants={rise} className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/20 text-brand text-[11px] font-bold uppercase tracking-wider">
               <Sparkles size={13} className="text-brand" />
-              <span>Mobile Release v1.0.12 Available</span>
+              <span>Mobile Release v1.1.16 Available</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-sans uppercase tracking-tight text-white leading-tight">
@@ -134,7 +134,7 @@ export default function DownloadPage() {
                     className="h-12 px-6 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-brand text-xs font-bold uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer shadow-lg hover:border-brand/40"
                   >
                     <Download size={18} className="text-brand shrink-0" />
-                    <span>Download APK (15.2 MB)</span>
+                    <span>Download APK (15.5 MB)</span>
                   </a>
 
                   <a
@@ -162,11 +162,11 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-zinc-400">
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Version</span>
-                    <span className="text-white font-medium">v1.0.12 (Build 16)</span>
+                    <span className="text-white font-medium">v1.1.16 (Build 2029)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Package Size</span>
-                    <span className="text-white font-medium">15.2 MB (ARM64)</span>
+                    <span className="text-white font-medium">15.5 MB (ARM64)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Compatibility</span>

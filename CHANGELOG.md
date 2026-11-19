@@ -2,6 +2,21 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.1.16] - 2026-11-19
+
+### What's New
+- **Unified Liquid Glass Dropdown Sheets**:
+  - Replaced fragmented option dialogs and custom action sheets with a unified, Apple Music styled liquid-glass `ZenDropdown` sheet component across all pages.
+  - Standardized Audio Quality selection, confirmation modals (Clear History, Sign Out, Delete Account), and Region Picker.
+- **Instant First-Click Search Results**:
+  - Eliminated the double-tap requirement on search submission. Searching now navigates directly to results on the first click without getting trapped in the live suggestions overlay.
+- **Weighted Relevance & Popularity Search Ranking**:
+  - Refined the YouTube Music ranking algorithm to prioritize famous, popular, and most-streamed tracks.
+  - Demoted random artist profiles on generic and song title queries, requiring strict exact matching before presenting an artist hero card.
+  - Added server rank priors, official audio bonuses, and duration validation to favor genuine studio tracks over fan covers and short clips.
+- **Automatic In-App Update Notice & Changelog**:
+  - Older version users are now automatically prompted on app startup with an interactive release sheet showcasing the latest features, fixes, and 1-tap APK update trigger.
+
 ## [1.1.15] - 2026-11-19
 
 ### What's New

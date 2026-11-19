@@ -1,28 +1,29 @@
 {
-  "version": 2026,
+  "version": 2029,
   "streamMode": "device",
   "minAppVersion": "1.0.12",
-  "latestAppVersion": "1.1.13",
+  "latestAppVersion": "1.1.16",
   "isForceUpdate": false,
-  "releaseDate": "November 16, 2026",
-  "releaseTime": "07:45 PM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.13/zenify-v1.1.13.apk",
+  "releaseDate": "November 19, 2026",
+  "releaseTime": "10:45 AM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.16/zenify-v1.1.16.apk",
   "features": [
-    "Pure YouTube Music Search: Entire search catalog migrated directly to YouTube Music with zero JioSaavn dependencies",
-    "Debounced Live Search: Restored early version debounced search flow so typing directly streams and ranks results in real time",
-    "Fluid Album Artmesh: Restored live song cover artwork morphing and color grading in fullview player",
-    "Ultra-Compressed Release: Split-per-ABI ARM64 release package under 15.3MB"
+    "Unified Liquid Glass Dropdown Sheets: Migrated all dropdown pickers, action sheets, region selection, and confirmation modals to a unified ZenDropdown liquid glass component",
+    "Instant First-Click Search Results: Submitting a search now immediately loads and renders results on the very first tap with zero delays or suggestion traps",
+    "Smart Relevance & Popularity Search Ranking: Prioritizes famous, most-streamed tracks, official audio studio recordings, and exact keyword matches while preventing random artist profiles from dominating search results",
+    "Automatic Update Notification: Older version users are now automatically notified on app startup with a full interactive changelog and 1-tap in-app APK installer"
   ],
   "fixes": [
-    "Fixed search queries failing and empty results state",
-    "Fixed missing album artmesh background on fullview player",
-    "Fixed invalid package installation errors on Android 14"
+    "Fixed search results requiring a second click to display",
+    "Fixed search queries mistakenly defaulting to random artist profiles over songs",
+    "Fixed fragmented sheets by replacing legacy Cupertino and custom dialogs with unified ZenDropdown",
+    "Fixed all static analysis warnings across search, settings, and profile modules"
   ],
   "improvements": [
-    "Native YouTube Music InnerTube speed optimizations",
-    "Ultra-compact APK download size (15.28 MB)",
-    "Instant search suggestions and multi-shelf Apple Music layout"
+    "Optimized search ranker server prior weighting and duration scoring",
+    "Refined SF Pro typography hierarchy across all lyrics and sheet titles",
+    "Ultra-compact release APK with instant install and zero ad overhead"
   ],
-  "releaseNotes": "• Pure YouTube Music search with live debounced suggestions\n• Restored fluid album artmesh background on fullview player\n• Ultra-compressed 15.28MB release APK with instant install",
-  "message": "Update to v1.1.13 for pure YouTube Music live search and fluid album artmesh"
+  "releaseNotes": "• Unified liquid glass sheets across Settings, Profile, and Apple Music options\n• Instant first-click search results with no suggestions trap\n• Weighted YouTube Music search ranking prioritizing popular tracks over random artists\n• Automatic background update notifications with changelog",
+  "message": "Update to v1.1.16 for unified liquid glass sheets, instant search results, and enhanced song ranking"
 }
