@@ -2,6 +2,26 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.1.15] - 2026-11-19
+
+### What's New
+- **Real-Time Reactive Glass Customizer**:
+  - `GlassEngine` pipeline completely wired to `AppleGlass` across the entire application: adjustments to fluidity, blur, depth, frost, base palettes (Midnight, Wine, Obsidian, Graphite, Default), and specular rim apply instantaneously in real-time.
+  - Custom fluid gradients and tinted glass surfaces (Rose, Ocean, Violet, Emerald, Amber, and drifting Aurora) immediately reflect on `AppleDock`, MiniPlayer (`PlayerShell`), and Dynamic Island header buttons without requiring an app restart.
+  - Eliminated legacy debouncing lag, ensuring synchronous state propagation between `GlassEngine` and `SettingsState`.
+- **Intelligent Navbar Dock & Subpage Restoration**:
+  - Restored reliable navbar dock visibility upon navigating back from Settings, Glass Customizer, Profile, or subpages.
+  - Fixed dock collapse lockup by resetting `_depth` on root pop and automatically animating `_dockController` back to rest (`1.0`) with Apple-inspired fluid easing.
+  - Hardened `DockVisibility` lease lifecycle: tokens now automatically release during reverse route exit animations to prevent stranded dock states.
+- **Apple Music Fullview Player & Immersive Lyrics Polish**:
+  - Minimal, high-contrast Apple Music text glow with subtle drop shadows replacing heavy blurred bloom on active lyric lines.
+  - Progressive depth-of-field blur on upcoming lyrics.
+  - Immersive lyrics mode with 30px frosted background blur on bottom transport controls, seamlessly gliding away after 3 seconds of inactivity and restoring on screen touch.
+  - Vertically lifted Scrubber slider and transport buttons with centered, balanced 30px spacing.
+  - High-accuracy multi-source lyric engine with duration validation, LRCLIB candidate scoring, and official YouTube InnerTube extraction.
+- **Ultra-Lean Release Packaging**:
+  - Strict release split-per-ABI packaging (`app-arm64-v8a-release.apk` at 15.5 MB), meeting the performance and size budget.
+
 ## [1.1.12] - 2026-11-16
 
 ### What's New

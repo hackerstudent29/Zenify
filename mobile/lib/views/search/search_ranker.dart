@@ -259,7 +259,20 @@ class SearchIntentDetector {
     final entityText = remainingTokens.join(' ').trim();
     final effectiveEntity = entityText.isNotEmpty ? entityText : normalized;
 
+    // First check if there is a strong matching song title
+    final hasStrongSongMatch = rawItems.any(
+      (it) =>
+          it is SearchSongItem &&
+          _computeTextScore(
+                normalized,
+                QueryPreprocessor.normalize(it.title),
+              ) >=
+              0.80,
+    );
+
     // Check if effectiveEntity matches any artist in rawItems
+    // STRICT: Only match artist intent if the query strictly matches the artist name
+    // (exact match or >= 0.95) AND there isn't a stronger song match.
     bool artistIntent = false;
     String? matchedArtistBrowseId;
     String? matchedArtistName;
@@ -268,7 +281,8 @@ class SearchIntentDetector {
     for (final artist in artistCandidates) {
       final artistNorm = QueryPreprocessor.normalize(artist.name);
       final score = _computeTextScore(effectiveEntity, artistNorm);
-      if (score >= SearchRankingConfig.kArtistIntentThreshold) {
+      final isExact = effectiveEntity == artistNorm;
+      if (isExact || (score >= 0.95 && !hasStrongSongMatch)) {
         artistIntent = true;
         matchedArtistBrowseId = artist.browseId;
         matchedArtistName = artist.name;
@@ -278,26 +292,20 @@ class SearchIntentDetector {
 
     // Determine layout mode
     SearchLayoutMode mode;
-    if (artistIntent && intentType == null && modifiers.isEmpty) {
-      // 1. Exact artist query (e.g. "anirudh")
+    if (intentType == SearchItemType.album ||
+        intentType == SearchItemType.playlist) {
+      // 1. Explicit album or playlist query
+      mode = SearchLayoutMode.albumOrPlaylist;
+    } else if (hasStrongSongMatch && !artistIntent) {
+      // 2. Song title query takes precedence over loose artist match
+      mode = SearchLayoutMode.songTitle;
+    } else if (artistIntent && intentType == null && modifiers.isEmpty) {
+      // 3. Exact artist query (e.g. "anirudh", "arijit singh")
       mode = SearchLayoutMode.exactArtist;
     } else if (artistIntent && intentType != null) {
-      // 2. Artist + type query (e.g. "anirudh songs", "anirudh albums")
+      // 4. Artist + type query (e.g. "anirudh songs", "anirudh albums")
       mode = SearchLayoutMode.artistType;
-    } else if (intentType == SearchItemType.album ||
-        intentType == SearchItemType.playlist) {
-      // 4. Album or playlist explicit query
-      mode = SearchLayoutMode.albumOrPlaylist;
-    } else if (rawItems.any(
-      (it) =>
-          it is SearchSongItem &&
-          _computeTextScore(
-                normalized,
-                QueryPreprocessor.normalize(it.title),
-              ) >=
-              0.85,
-    )) {
-      // 3. Song title query (e.g. "kaavaalaa")
+    } else if (hasStrongSongMatch) {
       mode = SearchLayoutMode.songTitle;
     } else if (rawItems.any(
       (it) =>
@@ -445,8 +453,9 @@ class SearchRanker {
         topResult = _createTopResultFromItem(best);
       }
     } else if (topResult != null && scoredItems.isNotEmpty) {
-      // If we have an exact artist intent, make sure Top Result reflects the artist profile
-      if (intent.artistIntent && topResult.type != SearchItemType.artist) {
+      // Only if the user explicitly searched for an artist (exactArtist layout), ensure Top Result is the artist
+      if (intent.layoutMode == SearchLayoutMode.exactArtist &&
+          topResult.type != SearchItemType.artist) {
         final artistItem = scoredItems
             .whereType<SearchArtistItem>()
             .firstOrNull;

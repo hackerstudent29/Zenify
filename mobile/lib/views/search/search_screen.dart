@@ -772,6 +772,9 @@ class _SearchScreenState extends State<SearchScreen>
     _debounceTimer?.cancel();
     _suggestId++;
     _focusNode.unfocus();
+    if (SearchNav.phase.value != SearchPhase.bar) {
+      SearchNav.phase.value = SearchPhase.bar;
+    }
     _lastTyped = clean;
     if (_textCtrl.text.trim() != clean) {
       _textCtrl.value = TextEditingValue(
@@ -1194,7 +1197,11 @@ class _SearchScreenState extends State<SearchScreen>
         typing && _liveSuggestions.isNotEmpty && _searchResults.isEmpty;
 
     final _SearchViewPhase phase;
-    if (typing && !hasQuery) {
+    if (_submittedQuery.isNotEmpty) {
+      phase = (_isLoading && _searchResults.isEmpty)
+          ? _SearchViewPhase.loading
+          : _SearchViewPhase.results;
+    } else if (typing && !hasQuery) {
       phase = _SearchViewPhase.recents;
     } else if (category != null) {
       phase = _SearchViewPhase.category;
@@ -2504,20 +2511,25 @@ class _SearchScreenState extends State<SearchScreen>
     }
     final w = switch (item) {
       SearchArtistItem _ => switch (m) {
-        SearchLayoutMode.exactArtist || SearchLayoutMode.artistType => 1.05,
-        SearchLayoutMode.songTitle => 0.85,
-        SearchLayoutMode.albumOrPlaylist => 0.88,
-        _ => 0.97,
+        SearchLayoutMode.exactArtist => 1.05,
+        SearchLayoutMode.artistType => 0.95,
+        SearchLayoutMode.songTitle => 0.50,
+        SearchLayoutMode.albumOrPlaylist => 0.55,
+        _ => 0.65, // Generic search: demote artists so songs/albums are preferred
       },
       SearchSongItem _ =>
-        m == SearchLayoutMode.songTitle ? 1.04 : (artistMode ? 0.9 : 1.0),
-      SearchAlbumItem _ => m == SearchLayoutMode.albumOrPlaylist ? 1.04 : 0.97,
+        m == SearchLayoutMode.songTitle ? 1.15 : (artistMode ? 0.92 : 1.08),
+      SearchAlbumItem _ => m == SearchLayoutMode.albumOrPlaylist ? 1.12 : 1.02,
       SearchPlaylistItem _ =>
-        m == SearchLayoutMode.albumOrPlaylist ? 0.98 : 0.85,
-      SearchVideoItem _ => 0.9,
-      _ => 0.8,
+        m == SearchLayoutMode.albumOrPlaylist ? 1.00 : 0.85,
+      SearchVideoItem _ => 0.90,
+      _ => 0.80,
     };
-    return s * w; // not clamped, so ties between types still resolve by weight
+    // Prioritize popular, streamed, and top server ranked tracks
+    final serverBonus = (1.0 / (1.0 + (item.rawRank < 0 ? 10 : item.rawRank))) * 0.08;
+    final officialBonus = (item is SearchSongItem && item.isOfficialAudio) ? 0.04 : 0.0;
+    final durationBonus = (item is SearchSongItem && item.durationSeconds >= 60) ? 0.02 : 0.0;
+    return (s * w) + serverBonus + officialBonus + durationBonus;
   }
 
   List<_TopCand> _rankTopResults(SearchResult r, List<String> queries) {
@@ -2540,7 +2552,11 @@ class _SearchScreenState extends State<SearchScreen>
       final k = keyOf(item);
       if (cands.containsKey(k)) return;
       var score = _scoreItem(item, queries, mode);
-      if (k == serviceKey && score >= 0.5) score += 0.03;
+      if (k == serviceKey && score >= 0.5) {
+        if (item is! SearchArtistItem || mode == SearchLayoutMode.exactArtist) {
+          score += 0.03;
+        }
+      }
       cands[k] = _TopCand(item, score);
     }
 
@@ -2559,7 +2575,11 @@ class _SearchScreenState extends State<SearchScreen>
     }
 
     if (sorted.first.score < 0.35) {
-      // Nothing matched convincingly: fall back to the service's pick.
+      // Nothing matched convincingly: prefer songs unless exact artist was requested
+      if (serviceTop != null && (serviceTop is! SearchArtistItem || mode == SearchLayoutMode.exactArtist)) {
+        return [_TopCand(serviceTop, 1.0)];
+      }
+      if (r.songs.isNotEmpty) return [_TopCand(r.songs.first, 1.0)];
       if (serviceTop != null) return [_TopCand(serviceTop, 1.0)];
       return const [];
     }
