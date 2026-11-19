@@ -143,6 +143,11 @@ mixin HideDocksMixin<T extends StatefulWidget> on State<T> {
       DockVisibility.release(_dockToken);
       return;
     }
+    final modal = ModalRoute.of(context);
+    if (modal != null && (modal.animation?.status == AnimationStatus.reverse || !modal.isActive)) {
+      DockVisibility.release(_dockToken);
+      return;
+    }
     DockVisibility.acquire(
       hideNav: true,
       hideMini: hideMiniPlayerWhileActive,

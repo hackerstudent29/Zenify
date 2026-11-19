@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/settings_service.dart';
 import '../widgets/glass_surface.dart';
+import '../widgets/zen_dropdown.dart';
 
 // ═════════════════════════════════════════════════════════════════════════════
 // TOKENS
@@ -871,44 +872,32 @@ Future<void> showAMInfo(
   );
 }
 
-/// Native-feeling action sheet for choosing one value.
+/// Unified liquid-glass dropdown sheet for choosing one value across all pages.
 Future<T?> showAMOptions<T>(
   BuildContext context, {
   required String title,
   String? message,
   required List<(T, String)> options,
   required T current,
-}) {
-  AM.impact();
-  return showCupertinoModalPopup<T>(
+}) async {
+  T? selected;
+  await ZenDropdown.show(
     context: context,
-    builder: (ctx) => CupertinoTheme(
-      data: const CupertinoThemeData(brightness: Brightness.dark, primaryColor: AM.rose),
-      child: CupertinoActionSheet(
-        title: Text(title),
-        message: message == null ? null : Text(message),
-        actions: [
-          for (final o in options)
-            CupertinoActionSheetAction(
-              isDefaultAction: o.$1 == current,
-              onPressed: () => Navigator.of(ctx).pop(o.$1),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(o.$2, style: const TextStyle(color: AM.rose)),
-                  if (o.$1 == current) ...[
-                    const SizedBox(width: 8),
-                    const Icon(CupertinoIcons.checkmark_alt, size: 18, color: AM.rose),
-                  ],
-                ],
-              ),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel', style: TextStyle(color: AM.rose)),
+    title: title,
+    subtitle: message,
+    items: [
+      for (final o in options)
+        ZenDropdownItem(
+          title: o.$2,
+          icon: o.$1 == current
+              ? CupertinoIcons.checkmark_alt
+              : CupertinoIcons.circle,
+          isSelected: o.$1 == current,
+          onTap: () {
+            selected = o.$1;
+          },
         ),
-      ),
-    ),
+    ],
   );
+  return selected;
 }

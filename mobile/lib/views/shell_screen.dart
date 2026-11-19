@@ -73,6 +73,9 @@ class _TabRouteObserver extends NavigatorObserver {
     super.didPop(route, previousRoute);
     if (previousRoute != null) {
       _depth = math.max(0, _depth - 1);
+      if (previousRoute.isFirst) {
+        _depth = 0;
+      }
       onDepthChanged(_depth);
     }
   }
@@ -81,11 +84,15 @@ class _TabRouteObserver extends NavigatorObserver {
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didRemove(route, previousRoute);
     _depth = math.max(0, _depth - 1);
+    if (previousRoute?.isFirst == true) {
+      _depth = 0;
+    }
     onDepthChanged(_depth);
   }
 }
 
-class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStateMixin {
+class _ShellScreenState extends State<ShellScreen>
+    with SingleTickerProviderStateMixin {
   // Floating dock geometry (Apple Music: 54pt glass pill + round search).
   static const double _navHeight = 54;
   static const double _navMargin = 8; // minimal bottom gap above gesture pill
@@ -97,7 +104,8 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
   final List<int> _tabDepths = [0, 0, 0, 0];
   final List<int> _tabHistory = [];
   DateTime? _lastBackPress;
-  final GlobalKey<PlayerShellState> _playerShellKey = GlobalKey<PlayerShellState>();
+  final GlobalKey<PlayerShellState> _playerShellKey =
+      GlobalKey<PlayerShellState>();
 
   final List<GlobalKey<NavigatorState>> _navKeys = [
     GlobalKey<NavigatorState>(),
@@ -170,9 +178,17 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     // Keep bottom navigation dock persistent across all pages and tabs.
     if (depth == 0) {
       DockVisibility.reset();
-    }
-    if (_dockController.value != 1.0) {
-      _dockController.value = 1.0;
+      _dockController.stop();
+      _dockController.animateTo(
+        1.0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+      if (mounted) setState(() {});
+    } else {
+      if (_dockController.value != 1.0) {
+        _dockController.value = 1.0;
+      }
     }
   }
 
@@ -180,10 +196,8 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     return Navigator(
       key: _navKeys[index],
       observers: [_TabRouteObserver((d) => _onTabDepthChanged(index, d))],
-      onGenerateRoute: (settings) => ZenPageRoute(
-        builder: (_) => root,
-        settings: settings,
-      ),
+      onGenerateRoute: (settings) =>
+          ZenPageRoute(builder: (_) => root, settings: settings),
     );
   }
 
@@ -235,6 +249,18 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     final currentNav = _navKeys[_currentIndex].currentState;
     if (currentNav != null && currentNav.canPop()) {
       currentNav.maybePop();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && (currentNav.canPop() == false)) {
+          DockVisibility.reset();
+          _dockController.stop();
+          _dockController.animateTo(
+            1.0,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+          );
+          setState(() {});
+        }
+      });
       return;
     }
 
@@ -254,7 +280,8 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
 
     // 3. User is already on the Home page at root: double-back-to-exit guard.
     final now = DateTime.now();
-    if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+    if (_lastBackPress == null ||
+        now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
       ZenHaptics.light();
 
@@ -274,7 +301,11 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(CupertinoIcons.arrow_uturn_left, size: 14, color: Color(0xFFE11D48)),
+              Icon(
+                CupertinoIcons.arrow_uturn_left,
+                size: 14,
+                color: Color(0xFFE11D48),
+              ),
               SizedBox(width: 8),
               Text(
                 'Press back again to exit the app.',
@@ -293,7 +324,10 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
           elevation: 6,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: Colors.white.withValues(alpha: 0.12), width: 0.8),
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: 0.12),
+              width: 0.8,
+            ),
           ),
           margin: EdgeInsets.fromLTRB(28, 0, 28, bottomMargin),
         ),
@@ -316,19 +350,24 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     final Track? t = trackOrArtist is Track ? trackOrArtist : null;
     final String raw = t != null
         ? (t.artistNames.isNotEmpty ? t.artistNames.first : t.artist)
-        : (trackOrArtist is String ? trackOrArtist : trackOrArtist?.artist?.toString() ?? '');
+        : (trackOrArtist is String
+              ? trackOrArtist
+              : trackOrArtist?.artist?.toString() ?? '');
     final clean = MediaNormalizer.cleanArtistName(raw);
     final split = MediaNormalizer.splitArtistNames(clean);
     final artist = split.isNotEmpty ? split.first : clean;
-    final String? browseId = (t != null && t.artists.isNotEmpty && t.artists.first.id.isNotEmpty)
+    final String? browseId =
+        (t != null && t.artists.isNotEmpty && t.artists.first.id.isNotEmpty)
         ? t.artists.first.id
         : null;
     if (artist.isNotEmpty && artist != 'Unknown Artist') {
-      _openInActiveTab(ArtistScreen(
-        artistName: artist,
-        browseId: browseId,
-        imageUrl: t?.coverUrl,
-      ));
+      _openInActiveTab(
+        ArtistScreen(
+          artistName: artist,
+          browseId: browseId,
+          imageUrl: t?.coverUrl,
+        ),
+      );
     }
   }
 
@@ -338,7 +377,9 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     final dynamic rawArtist;
     final String? cover;
     if (t != null) {
-      rawTitle = (t.album.isNotEmpty && t.album != 'Single') ? t.album : t.title;
+      rawTitle = (t.album.isNotEmpty && t.album != 'Single')
+          ? t.album
+          : t.title;
       rawArtist = t.artist;
       cover = t.coverUrl;
     } else {
@@ -356,24 +397,28 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
     String? albumBrowseId = t?.albumBrowseId;
     if (albumBrowseId != null &&
         (albumBrowseId.startsWith('VLPL') ||
-         albumBrowseId.startsWith('PL') ||
-         albumBrowseId.startsWith('RD'))) {
+            albumBrowseId.startsWith('PL') ||
+            albumBrowseId.startsWith('RD'))) {
       albumBrowseId = null;
     }
 
-    _openInActiveTab(AlbumScreen(
-      albumTitle: title,
-      artistName: artist,
-      coverUrl: cover,
-      browseId: albumBrowseId,
-      initialTracks: t != null ? [t] : null,
-    ));
+    _openInActiveTab(
+      AlbumScreen(
+        albumTitle: title,
+        artistName: artist,
+        coverUrl: cover,
+        browseId: albumBrowseId,
+        initialTracks: t != null ? [t] : null,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
-    final hasTrack = context.select<PlayerState, bool>((p) => p.currentTrack != null);
+    final hasTrack = context.select<PlayerState, bool>(
+      (p) => p.currentTrack != null,
+    );
 
     return ShellNavigationScope(
       openInActiveTab: _openInActiveTab,
@@ -390,171 +435,188 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
           _handleBack();
         },
         child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        extendBody: true,
-        backgroundColor: Zen.bg,
-        body: ValueListenableBuilder<bool>(
-          valueListenable: DockVisibility.hideNavDockNotifier,
-          builder: (context, hideDocks, _) {
-            return AnimatedBuilder(
-              animation: _dockController,
-              builder: (context, _) {
-                final dockProgress = hasTrack ? _dockController.value : 1.0;
-                // Interpolate mini player bottom:
-                // At dockProgress == 1.0 (resting): _navHeight + _navMargin + _miniGap
-                // At dockProgress == 0.0 (three-dock): _navMargin (flush with left and right docks)
-                final miniBottom = ui.lerpDouble(
-                  _navMargin,
-                  _navHeight + _navMargin + _miniGap,
-                  dockProgress,
-                )!;
+          resizeToAvoidBottomInset: false,
+          extendBody: true,
+          backgroundColor: Zen.bg,
+          body: ValueListenableBuilder<bool>(
+            valueListenable: DockVisibility.hideNavDockNotifier,
+            builder: (context, hideDocks, _) {
+              return AnimatedBuilder(
+                animation: _dockController,
+                builder: (context, _) {
+                  final dockProgress = hasTrack ? _dockController.value : 1.0;
+                  // Interpolate mini player bottom:
+                  // At dockProgress == 1.0 (resting): _navHeight + _navMargin + _miniGap
+                  // At dockProgress == 0.0 (three-dock): _navMargin (flush with left and right docks)
+                  final miniBottom = ui.lerpDouble(
+                    _navMargin,
+                    _navHeight + _navMargin + _miniGap,
+                    dockProgress,
+                  )!;
 
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // 1. Tab views with intelligent scroll awareness & persistent nested Navigators.
-                    Positioned.fill(
-                      child: NotificationListener<ScrollNotification>(
-                        onNotification: (notification) {
-                          // Ignore horizontal lists (albums, artists, pills, shelves, filter tabs)
-                          if (notification.metrics.axis != Axis.vertical) return false;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // 1. Tab views with intelligent scroll awareness & persistent nested Navigators.
+                      Positioned.fill(
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: (notification) {
+                            // Ignore horizontal lists (albums, artists, pills, shelves, filter tabs)
+                            if (notification.metrics.axis != Axis.vertical) {
+                              return false;
+                            }
 
-                          final player = _playerShellKey.currentState;
-                          if (player != null && player.isOpen) return false;
+                            final player = _playerShellKey.currentState;
+                            if (player != null && player.isOpen) return false;
 
-                          // Always restore dock near the top of the page
-                          if (notification.metrics.pixels <= 15) {
-                            if (_dockController.value < 1.0 && !_dockController.isAnimating) {
-                              _dockController.animateTo(
-                                1.0,
-                                duration: const Duration(milliseconds: 240),
-                                curve: Curves.easeOutCubic,
-                              );
+                            // Always restore dock near the top of the page
+                            if (notification.metrics.pixels <= 15) {
+                              if (_dockController.value < 1.0 &&
+                                  !_dockController.isAnimating) {
+                                _dockController.animateTo(
+                                  1.0,
+                                  duration: const Duration(milliseconds: 240),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              }
+                              return false;
+                            }
+
+                            if (notification is ScrollUpdateNotification) {
+                              final delta = notification.scrollDelta ?? 0.0;
+                              if (delta > 1.5 &&
+                                  notification.metrics.pixels > 20) {
+                                // User is scrolling down: immediately morph into three-dock island layout
+                                if (_dockController.value > 0.0 &&
+                                    !_dockController.isAnimating) {
+                                  _dockController.animateTo(
+                                    0.0,
+                                    duration: const Duration(milliseconds: 240),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                }
+                              } else if (delta < -3.0) {
+                                // User scrolls up: restore to resting dock + floating mini player
+                                if (_dockController.value < 1.0 &&
+                                    !_dockController.isAnimating) {
+                                  _dockController.animateTo(
+                                    1.0,
+                                    duration: const Duration(milliseconds: 240),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                }
+                              }
+                            } else if (notification is UserScrollNotification) {
+                              if (notification.direction ==
+                                      ScrollDirection.reverse &&
+                                  notification.metrics.pixels > 20) {
+                                if (_dockController.value > 0.0 &&
+                                    !_dockController.isAnimating) {
+                                  _dockController.animateTo(
+                                    0.0,
+                                    duration: const Duration(milliseconds: 240),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                }
+                              } else if (notification.direction ==
+                                  ScrollDirection.forward) {
+                                if (_dockController.value < 1.0 &&
+                                    !_dockController.isAnimating) {
+                                  _dockController.animateTo(
+                                    1.0,
+                                    duration: const Duration(milliseconds: 240),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                                }
+                              }
                             }
                             return false;
-                          }
-
-                          if (notification is ScrollUpdateNotification) {
-                            final delta = notification.scrollDelta ?? 0.0;
-                            if (delta > 1.5 && notification.metrics.pixels > 20) {
-                              // User is scrolling down: immediately morph into three-dock island layout
-                              if (_dockController.value > 0.0 && !_dockController.isAnimating) {
-                                _dockController.animateTo(
-                                  0.0,
-                                  duration: const Duration(milliseconds: 240),
-                                  curve: Curves.easeOutCubic,
-                                );
-                              }
-                            } else if (delta < -3.0) {
-                              // User scrolls up: restore to resting dock + floating mini player
-                              if (_dockController.value < 1.0 && !_dockController.isAnimating) {
-                                _dockController.animateTo(
-                                  1.0,
-                                  duration: const Duration(milliseconds: 240),
-                                  curve: Curves.easeOutCubic,
-                                );
-                              }
-                            }
-                          } else if (notification is UserScrollNotification) {
-                            if (notification.direction == ScrollDirection.reverse &&
-                                notification.metrics.pixels > 20) {
-                              if (_dockController.value > 0.0 && !_dockController.isAnimating) {
-                                _dockController.animateTo(
-                                  0.0,
-                                  duration: const Duration(milliseconds: 240),
-                                  curve: Curves.easeOutCubic,
-                                );
-                              }
-                            } else if (notification.direction == ScrollDirection.forward) {
-                              if (_dockController.value < 1.0 && !_dockController.isAnimating) {
-                                _dockController.animateTo(
-                                  1.0,
-                                  duration: const Duration(milliseconds: 240),
-                                  curve: Curves.easeOutCubic,
-                                );
-                              }
-                            }
-                          }
-                          return false;
-                        },
-                        child: ValueListenableBuilder<bool>(
-                          valueListenable: PlayerShell.isPlayerOpenNotifier,
-                          builder: (_, isPlayerOpen, child) => IgnorePointer(
-                            ignoring: isPlayerOpen,
-                            child: child!,
-                          ),
-                          child: _AnimatedTabStack(
-                            index: _currentIndex,
-                            children: _tabNavigators,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // 2. Apple Music style glass dock (morphs between full tabs and squircle explore + search buttons).
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: safeBottom + _navMargin,
-                      child: AnimatedSlide(
-                        offset: hideDocks ? const Offset(0, 2.0) : Offset.zero,
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeInOutCubic,
-                        child: AnimatedOpacity(
-                          opacity: hideDocks ? 0.0 : 1.0,
-                          duration: const Duration(milliseconds: 200),
+                          },
                           child: ValueListenableBuilder<bool>(
                             valueListenable: PlayerShell.isPlayerOpenNotifier,
                             builder: (_, isPlayerOpen, child) => IgnorePointer(
-                              ignoring: hideDocks || isPlayerOpen,
+                              ignoring: isPlayerOpen,
                               child: child!,
                             ),
-                            child: ValueListenableBuilder<SearchPhase>(
-                              valueListenable: SearchNav.phase,
-                              builder: (_, phase, _) => AppleDock(
-                                height: _navHeight,
-                                index: _currentIndex,
-                                searchExpanded: phase == SearchPhase.bar,
-                                dockProgress: dockProgress,
-                                onSelect: _onDockSelect,
-                                onBack: _onSearchBack,
-                                onSearchTap: () => SearchNav.phase.value = SearchPhase.typing,
-                                onRestoreDockTap: () {
-                                  _dockController.animateTo(
-                                    1.0,
-                                    duration: const Duration(milliseconds: 280),
-                                    curve: Curves.easeOutCubic,
-                                  );
-                                },
+                            child: _AnimatedTabStack(
+                              index: _currentIndex,
+                              children: _tabNavigators,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // 2. Apple Music style glass dock (morphs between full tabs and squircle explore + search buttons).
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: safeBottom + _navMargin,
+                        child: AnimatedSlide(
+                          offset: hideDocks
+                              ? const Offset(0, 2.0)
+                              : Offset.zero,
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeInOutCubic,
+                          child: AnimatedOpacity(
+                            opacity: hideDocks ? 0.0 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: ValueListenableBuilder<bool>(
+                              valueListenable: PlayerShell.isPlayerOpenNotifier,
+                              builder: (_, isPlayerOpen, child) =>
+                                  IgnorePointer(
+                                    ignoring: hideDocks || isPlayerOpen,
+                                    child: child!,
+                                  ),
+                              child: ValueListenableBuilder<SearchPhase>(
+                                valueListenable: SearchNav.phase,
+                                builder: (_, phase, _) => AppleDock(
+                                  height: _navHeight,
+                                  index: _currentIndex,
+                                  searchExpanded: phase == SearchPhase.bar,
+                                  dockProgress: dockProgress,
+                                  onSelect: _onDockSelect,
+                                  onBack: _onSearchBack,
+                                  onSearchTap: () => SearchNav.phase.value =
+                                      SearchPhase.typing,
+                                  onRestoreDockTap: () {
+                                    _dockController.animateTo(
+                                      1.0,
+                                      duration: const Duration(
+                                        milliseconds: 280,
+                                      ),
+                                      curve: Curves.easeOutCubic,
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
 
-                    // 3. Morphing PlayerShell (mini player pill morphs into center island).
-                    Positioned.fill(
-                      child: ValueListenableBuilder<bool>(
-                        valueListenable: DockVisibility.hideMiniPlayerNotifier,
-                        builder: (_, hideMini, _) => PlayerShell(
-                          key: _playerShellKey,
-                          hideMini: hideMini,
-                          dockProgress: dockProgress,
-                          miniBottomOffset: miniBottom,
-                          onGoToArtist: _goToArtist,
-                          onGoToAlbum: _goToAlbum,
+                      // 3. Morphing PlayerShell (mini player pill morphs into center island).
+                      Positioned.fill(
+                        child: ValueListenableBuilder<bool>(
+                          valueListenable:
+                              DockVisibility.hideMiniPlayerNotifier,
+                          builder: (_, hideMini, _) => PlayerShell(
+                            key: _playerShellKey,
+                            hideMini: hideMini,
+                            dockProgress: dockProgress,
+                            miniBottomOffset: miniBottom,
+                            onGoToArtist: _goToArtist,
+                            onGoToAlbum: _goToAlbum,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
+                    ],
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
-    ),
     );
   }
 }
@@ -562,10 +624,7 @@ class _ShellScreenState extends State<ShellScreen> with SingleTickerProviderStat
 /// Keeps state and scroll position of all tabs while smoothly animating
 /// tab switches with an Apple-style subtle direction-aware fluid spring and fade.
 class _AnimatedTabStack extends StatefulWidget {
-  const _AnimatedTabStack({
-    required this.index,
-    required this.children,
-  });
+  const _AnimatedTabStack({required this.index, required this.children});
 
   final int index;
   final List<Widget> children;
@@ -574,7 +633,8 @@ class _AnimatedTabStack extends StatefulWidget {
   State<_AnimatedTabStack> createState() => _AnimatedTabStackState();
 }
 
-class _AnimatedTabStackState extends State<_AnimatedTabStack> with SingleTickerProviderStateMixin {
+class _AnimatedTabStackState extends State<_AnimatedTabStack>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   int _prevIndex = 0;
 

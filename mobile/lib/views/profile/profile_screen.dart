@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../design_system/apple/apple_kit.dart' show Avatar;
 import '../../design_system/apple/apple_music_kit.dart';
+import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/auth_state.dart';
@@ -217,32 +218,24 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  void _confirm(
+  Future<void> _confirm(
     BuildContext context, {
     required String title,
     required String message,
     required String action,
     required FutureOr<void> Function() onConfirm,
-  }) {
-    showCupertinoDialog<void>(
+  }) async {
+    final ok = await ZenDropdown.showConfirmSheet(
       context: context,
-      useRootNavigator: true,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onConfirm();
-            },
-            child: Text(action),
-          ),
-        ],
-      ),
+      title: title,
+      message: message,
+      confirmLabel: action,
+      isDestructive: true,
+      icon: CupertinoIcons.exclamationmark_triangle,
     );
+    if (ok) {
+      await onConfirm();
+    }
   }
 
   Future<void> _showSessions(BuildContext context) async {

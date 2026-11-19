@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
+import '../../services/glass_engine.dart';
 import '../../services/settings_service.dart';
 import 'pressable_scale.dart';
 import '../zen.dart';
@@ -71,42 +72,57 @@ class AppleGlass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: SettingsState.instance,
+      listenable: Listenable.merge([SettingsState.instance, GlassEngine.instance]),
       builder: (context, _) {
         final settings = SettingsState.instance;
+        final engine = GlassEngine.instance;
+        final cfg = engine.config;
         final bool isInit = settings.isInitialized;
+        final bool glassEffects = isInit ? settings.glassEffects : true;
 
-        final double f = (overrideFluidity ?? (isInit ? settings.glassFluidity : 1.0)).clamp(0.0, 1.0);
-        final String baseColorKey = overrideBaseColor ?? (isInit ? settings.glassBaseColor : 'default');
-        final double rawBlur = overrideBlur ?? (isInit ? settings.glassBlur : blur);
-        final bool specularRim = overrideSpecularRim ?? (isInit ? settings.glassSpecularRim : true);
+        final double baseFluidity = glassEffects ? cfg.fluidity : 0.0;
+        final double f = (overrideFluidity ?? baseFluidity).clamp(0.0, 1.0);
+        final String baseColorKey = overrideBaseColor ?? cfg.base;
+        final double rawBlur = overrideBlur ?? (glassEffects ? cfg.blur : 0.0);
+        final bool specularRim = overrideSpecularRim ?? cfg.rim;
 
-        final Color baseColor = switch (baseColorKey) {
-          'black' => const Color(0xFF0C0C0E),
-          'grey' => const Color(0xFF222226),
-          'crimson' => const Color(0xFF1E0A12),
-          _ => const Color(0xFF121216),
-        };
+        final Color baseColor = GlassPalette.baseColor(baseColorKey);
 
         // Opacity / tint alpha:
         // f = 1.0: 0.10 (translucent liquid glass)
         // f = 0.5: 0.55 (frosted)
         // f = 0.0: 1.00 (solid matte)
         final double effectiveAlpha = (1.0 - f * 0.90).clamp(0.08, 1.0);
-        final Color effectiveTint = (tint != const Color(0x0F101014) && baseColorKey == 'default' && f >= 0.95)
-            ? tint
-            : baseColor.withValues(alpha: effectiveAlpha);
+        
+        final Color? configTint = GlassPalette.tints[cfg.tint]?.color;
+        final bool isAurora = cfg.tint == 'aurora';
+
+        Color effectiveTint;
+        if (tint != const Color(0x0F101014) && baseColorKey == 'default' && cfg.tint == 'none' && f >= 0.95) {
+          effectiveTint = tint;
+        } else if (configTint != null && cfg.tint != 'none') {
+          final blended = Color.lerp(baseColor, configTint, 0.45 * cfg.tintStrength) ?? baseColor;
+          effectiveTint = blended.withValues(alpha: effectiveAlpha);
+        } else {
+          effectiveTint = baseColor.withValues(alpha: effectiveAlpha);
+        }
+
+        // Frost veil addition
+        if (cfg.frost > 0) {
+          effectiveTint = Color.lerp(effectiveTint, Colors.white, cfg.frost * 0.20)!;
+        }
 
         // Blur sigma:
         final double effectiveBlur = f <= 0.01
             ? 0.0
             : (f >= 0.95
                 ? rawBlur
-                : (rawBlur * (1.0 + (1.0 - f) * 1.8))).clamp(0.0, 25.0);
+                : (rawBlur * (1.0 + (1.0 - f) * 1.8))).clamp(0.0, 35.0);
 
         final double effectiveSaturation = ui.lerpDouble(1.0, saturation, f) ?? saturation;
-        final double rimAlpha = specularRim ? (ui.lerpDouble(0.12, 0.55, f) ?? 0.55) : 0.12;
-        final double glowWidth = specularRim ? (ui.lerpDouble(0.0, 5.0, f) ?? 5.0) : 0.0;
+        final double rimMultiplier = (cfg.rimStrength).clamp(0.1, 1.5);
+        final double rimAlpha = specularRim ? ((ui.lerpDouble(0.12, 0.55, f) ?? 0.55) * rimMultiplier).clamp(0.05, 0.9) : 0.08;
+        final double glowWidth = specularRim ? ((ui.lerpDouble(0.0, 5.0, f) ?? 5.0) * rimMultiplier).clamp(0.0, 7.0) : 0.0;
         final bool isSolid = f <= 0.05;
 
         final rimPainter = _GlassRimPainter(
@@ -116,17 +132,34 @@ class AppleGlass extends StatelessWidget {
           isSolid: isSolid,
         );
 
+        final List<Color> gradientColors;
+        if (isAurora) {
+          gradientColors = [
+            const Color(0xFFFA2D48).withValues(alpha: 0.18 * f * cfg.tintStrength),
+            const Color(0xFFBF5AF2).withValues(alpha: 0.12 * f * cfg.tintStrength),
+            const Color(0xFF38BDF8).withValues(alpha: 0.15 * f * cfg.tintStrength),
+          ];
+        } else if (configTint != null && cfg.tint != 'none') {
+          gradientColors = [
+            configTint.withValues(alpha: 0.22 * f * cfg.tintStrength),
+            configTint.withValues(alpha: 0.06 * f * cfg.tintStrength),
+            configTint.withValues(alpha: 0.18 * f * cfg.tintStrength),
+          ];
+        } else {
+          gradientColors = [
+            Colors.white.withValues(alpha: 0.10 * f),
+            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withValues(alpha: 0.03 * f),
+          ];
+        }
+
         final surfaceDecoration = BoxDecoration(
           color: effectiveTint,
           gradient: f > 0.05
               ? LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.10 * f),
-                    Colors.white.withValues(alpha: 0.0),
-                    Colors.white.withValues(alpha: 0.03 * f),
-                  ],
+                  colors: gradientColors,
                   stops: const [0, 0.55, 1],
                 )
               : null,
