@@ -15,6 +15,7 @@ import '../../services/country_service.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/settings_service.dart';
 import '../../services/user_preferences_service.dart';
+import '../auth/onboarding_sheet.dart';
 import '../auth/welcome_screen.dart';
 import '../insights/insights_screen.dart';
 import '../room_together/room_together_screen.dart';
@@ -159,6 +160,12 @@ class _ProfileScreenState extends State<ProfileScreen> with HideDocksMixin {
                   ),
                   chevron: true,
                   onTap: () => showArtistsPickerSheet(context),
+                ),
+                AMRow(
+                  title: 'Guided Setup',
+                  subtitle: 'Re-run taste onboarding anytime',
+                  chevron: true,
+                  onTap: () => OnboardingSheet.show(context, isEditing: true),
                 ),
               ],
             ),

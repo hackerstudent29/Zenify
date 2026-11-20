@@ -262,7 +262,7 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Karthik'), findsOneWidget);
 
-    // 3. InsightsScreen (guest state prompt)
+    // 3. InsightsScreen (guest state with empty local history)
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -273,8 +273,8 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Replay'), findsOneWidget);
-    expect(find.text('Sign In for Replay'), findsOneWidget);
+    expect(find.text('Replay'), findsWidgets);
+    expect(find.text('Nothing Recorded Yet'), findsOneWidget);
   });
 
   testWidgets(

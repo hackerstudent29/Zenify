@@ -90,10 +90,38 @@ const double _kMiniFadeSpan = 0.22;
 /// them down.
 const double _kRowGap = 56.0;
 
-/// Where the full-bleed cover starts: just below the status bar. The strip
-/// above it is filled with the cover's own top colours ([BleedFill]), so the
-/// clock / battery / notifications are always readable.
-double _bleedTop(EdgeInsets safe) => math.max(safe.top, 24.0) + 4.0;
+// Fixed heights of the open-sheet blocks (shared by the layout AND by the
+// full-bleed artwork placement, so the cover always sits right above the title).
+const double _kSeekH = 52.0;
+const double _kTransportH = 90.0; // height of the play / pause button box
+const double _kMetaH = 62.0; // title + artist row (incl. its bottom padding)
+const double _kMetaGap = 10.0; // gap between the title row and the seekbar
+
+/// Distance from the screen bottom to the bottom of the seekbar / transport
+/// block (= top of the last row + _kRowGap).
+double _blockBottomInset(EdgeInsets safe) => 44.0 + 16 + safe.bottom + _kRowGap;
+
+/// Where the full-bleed cover sits: centred in the free space between the
+/// status bar and the title, ending just BELOW the top of the title row (the
+/// feathered bottom edge is transparent there, so the visible artwork ends
+/// slightly above the song name). The cover is baked with blurred / feathered
+/// edges, so this square has no visible border.
+Rect _bleedRect(Size size, EdgeInsets safe) {
+  final dockedBlockH = _kSeekH + _kRowGap + _kTransportH;
+  final titleTop =
+      size.height -
+      _blockBottomInset(safe) -
+      dockedBlockH -
+      _kMetaGap -
+      _kMetaH;
+  final bottom = titleTop + 14;
+  final topLimit = math.max(safe.top, 24.0) + 8;
+  final side = math
+      .min(size.width, bottom - topLimit)
+      .clamp(180.0, size.width)
+      .toDouble();
+  return Rect.fromLTWH((size.width - side) / 2, bottom - side, side, side);
+}
 
 enum _Axis { none, x, y }
 
@@ -116,6 +144,10 @@ enum _Panel { art, lyrics, queue }
 ///    moved/scaled with a matrix between mini → big → header. When docked it
 ///    rides the header, so closing the sheet from lyrics mode is the exact
 ///    mirror of opening it.
+///
+/// Full bleed: the blurred backdrop of the current cover fills the whole sheet
+/// in EVERY panel (artwork / lyrics / queue) and cross-fades on every song
+/// change (manual skip, auto next, queue jump).
 class PlayerShell extends StatefulWidget {
   static final ValueNotifier<bool> isPlayerOpenNotifier = ValueNotifier<bool>(
     false,
@@ -204,11 +236,21 @@ class PlayerShellState extends State<PlayerShell>
 
   String? _trackKey;
   String? _shownCover;
+
+  // ── full bleed state ──
+  /// Bake of the CURRENT cover only (null while it is baking / for a new
+  /// cover), so an old cover's artwork can never draw over a new one.
   BleedArtwork? _bleedArt;
-  // last known fill colours: kept while a new cover is baking so the backdrop
-  // never flashes, then cross-faded by BleedFill
-  List<Color>? _fillBands;
-  List<Color>? _fillTop;
+
+  /// Last bake that was ready. Kept while the next cover bakes, so the
+  /// backdrop never flashes, then cross-faded by [BleedBackdrop].
+  BleedArtwork? _backdropArt;
+  String _bleedUrl = ''; // upgraded cover url of the current track
+  String? _bakingUrl; // bake currently running for this url
+  bool _bakeFailed = false; // bake failed for the current track
+  bool _fullBleed = false;
+  bool _paletteReady = false;
+
   List<Color> _palette = [
     AppColors.accent,
     AppColors.brandMaroon,
@@ -277,8 +319,37 @@ class PlayerShellState extends State<PlayerShell>
 
   void _applyBleed(BleedArtwork art) {
     _bleedArt = art;
-    _fillBands = art.bands;
-    _fillTop = art.topBands;
+    _backdropArt = art;
+    _bakeFailed = false;
+  }
+
+  /// Makes sure the current cover is baked (only when full bleed is on).
+  /// Safe to call from build(): it never calls setState synchronously.
+  void _ensureBleed() {
+    if (!_fullBleed || _bleedUrl.isEmpty || _bakeFailed) return;
+    if (_bleedArt?.key == _bleedUrl || _bakingUrl == _bleedUrl) return;
+
+    final cached = BleedArtworkService.instance.peek(_bleedUrl);
+    if (cached != null) {
+      _applyBleed(cached); // ready on frame 1, no flash
+      return;
+    }
+
+    final url = _bleedUrl;
+    _bakingUrl = url;
+    BleedArtworkService.instance
+        .load(url, CachedNetworkImageProvider(url))
+        .then((art) {
+          if (_bakingUrl == url) _bakingUrl = null;
+          if (!mounted || _bleedUrl != url) return;
+          setState(() {
+            if (art != null) {
+              _applyBleed(art);
+            } else {
+              _bakeFailed = true; // palette gradient takes over
+            }
+          });
+        });
   }
 
   void _syncTrack(dynamic track) {
@@ -291,19 +362,12 @@ class PlayerShellState extends State<PlayerShell>
       _shownCover = url;
     }
 
-    // Bleed bake for the new cover: use the cached one on frame 1, otherwise
-    // drop the OLD baked image so it never draws over the new cover.
-    final cleanUrl = MediaNormalizer.upgradeArtworkUrl(url);
-    if (cleanUrl.isEmpty) {
-      _bleedArt = null;
-    } else {
-      final cached = BleedArtworkService.instance.peek(cleanUrl);
-      if (cached != null) {
-        _applyBleed(cached);
-      } else if (_bleedArt?.key != cleanUrl) {
-        _bleedArt = null;
-      }
-    }
+    // New cover: never draw the OLD cover's baked artwork over it. The
+    // backdrop keeps the previous bake until the new one is ready and then
+    // cross-fades (see _ensureBleed / BleedBackdrop).
+    _bleedUrl = MediaNormalizer.upgradeArtworkUrl(url);
+    _bakeFailed = false;
+    if (_bleedArt?.key != _bleedUrl) _bleedArt = null;
 
     // Follow the user's active player mode (e.g. lyrics mode) for the next song too
     if (_open && _preferredMode == _Panel.lyrics && _panel != _Panel.lyrics) {
@@ -313,17 +377,6 @@ class PlayerShellState extends State<PlayerShell>
     }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-
-      // start baking right away (in parallel with precache / palette)
-      if (cleanUrl.isNotEmpty && _bleedArt?.key != cleanUrl) {
-        BleedArtworkService.instance
-            .load(cleanUrl, CachedNetworkImageProvider(cleanUrl))
-            .then((art) {
-              if (mounted && _trackKey == key && art != null) {
-                setState(() => _applyBleed(art));
-              }
-            });
-      }
 
       context.read<QueueState>().syncCurrent(track);
       if (url.isNotEmpty) {
@@ -337,25 +390,24 @@ class PlayerShellState extends State<PlayerShell>
       }
       final p = await extractPalette(url);
       if (mounted && p != null && _trackKey == key) {
-        setState(() => _palette = p);
+        setState(() {
+          _palette = p;
+          _paletteReady = true;
+        });
       }
     });
   }
 
-  List<Color> _fallbackBands() {
-    if (_palette.isEmpty) {
-      return const [
-        Color(0xFF2A2A30),
-        Color(0xFF24242A),
-        Color(0xFF1E1E24),
-        Color(0xFF1A1A20),
-        Color(0xFF141418),
-      ];
+  /// Used only while no baked backdrop exists (very first frame / failed bake).
+  List<Color> _fallbackColors() {
+    if (!_paletteReady || _palette.isEmpty) {
+      return const [Color(0xFF2A2A30), Color(0xFF1C1C22), Color(0xFF121216)];
     }
-    return [
-      for (var i = 0; i < kBleedBands; i++)
-        Color.lerp(_palette[i % _palette.length], Colors.black, 0.40)!,
+    final c = [
+      for (final p in _palette.take(3)) Color.lerp(p, Colors.black, 0.45)!,
     ];
+    if (c.length < 2) c.add(const Color(0xFF121216));
+    return c;
   }
 
   void _syncPlaying(bool playing) {
@@ -787,12 +839,19 @@ class PlayerShellState extends State<PlayerShell>
     _playing = context.select<PlayerState, bool>((p) => p.isPlaying);
     _isVideo = context.select<PlayerState, bool>((p) => p.isCurrentVideo);
     _duration = context.select<PlayerState, dynamic>((p) => p.duration);
-    final isFullBleed = context.select<SettingsState, bool>(
-      (s) => s.fullBleedArtworkPlayer,
-    );
+    bool isFullBleed = false;
+    try {
+      isFullBleed = context.select<SettingsState, bool>(
+        (s) => s.fullBleedArtworkPlayer,
+      );
+    } catch (_) {
+      isFullBleed = SettingsState.instance.fullBleedArtworkPlayer;
+    }
     final player = context.read<PlayerState>();
 
+    _fullBleed = isFullBleed;
     _syncTrack(track);
+    _ensureBleed();
     _syncPlaying(_playing);
 
     final mq = MediaQuery.of(context);
@@ -1056,15 +1115,18 @@ class PlayerShellState extends State<PlayerShell>
       currentMiniArt,
     );
     final big = _bigOrFallback(size, safe);
-    // full bleed: starts just below the status bar (the strip above is filled
-    // with the cover's top colours by BleedFill)
-    final bleed = Rect.fromLTWH(0.0, _bleedTop(safe), size.width, size.width);
+    // full bleed: centred just above the song name, edges blurred + feathered
+    final bleed = _bleedRect(size, safe);
     final targetBig = isFullBleed ? bleed : big;
     final docked = Rect.fromLTWH(24, safe.top + 29, 56, 56);
-    final side = math.max(
-      big.width,
-      isFullBleed ? size.width : big.width,
-    ); // laid out ONCE at this size
+    final side = targetBig.width; // laid out ONCE at this size
+
+    final media = _TrackMediaView(
+      player: player,
+      coverUrl: url,
+      isVideo: _isVideo,
+      videoFit: BoxFit.contain,
+    );
 
     final cover = RepaintBoundary(
       child: SizedBox(
@@ -1089,19 +1151,16 @@ class PlayerShellState extends State<PlayerShell>
           },
           child: SizedBox.expand(
             key: currentKey,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                _TrackMediaView(
-                  player: player,
-                  coverUrl: url,
-                  isVideo: _isVideo,
-                  videoFit: BoxFit.contain,
-                ),
-                if (isFullBleed && _bleedArt != null)
-                  BleedArtworkImage(art: _bleedArt!, dock: _dock),
-              ],
-            ),
+            child: isFullBleed
+                ? BleedArtworkImage(
+                    // video keeps its plain frame; everything else gets the
+                    // feathered artwork once its bake is ready
+                    art: _isVideo ? null : _bleedArt,
+                    plain: media,
+                    dock: _dock,
+                    sheet: _sheet,
+                  )
+                : media,
           ),
         ),
       ),
@@ -1151,20 +1210,14 @@ class PlayerShellState extends State<PlayerShell>
           final cy = lerpDouble(bigCy, dockCy, d)!;
           final rw = lerpDouble(bigW, dockW, d)!;
 
-          final radius = isFullBleed
-              ? lerpDouble(
-                  lerpDouble(_kRadiusMini, 0.0, t)!,
-                  _kRadiusDocked,
-                  d,
-                )!
-              : lerpDouble(
-                  _kRadiusMini,
-                  lerpDouble(_kRadiusBig, _kRadiusDocked, d)!,
-                  t,
-                )!;
+          final radius = lerpDouble(
+            _kRadiusMini,
+            lerpDouble(_kRadiusBig, _kRadiusDocked, d)!,
+            t,
+          )!;
 
-          // Full bleed never shrinks on pause / press: that would uncover the
-          // fill at the sides of the cover.
+          // Full bleed never shrinks on pause / press: the feathered cover
+          // would otherwise visibly change size.
           final pauseValue = isFullBleed ? 1.0 : _pause.value;
           final pressValue = isFullBleed ? 1.0 : _press.value;
           final pauseScale = (1 - (1 - pauseValue) * (1 - d) * t) * pressValue;
@@ -1175,10 +1228,11 @@ class PlayerShellState extends State<PlayerShell>
           final m = Matrix4.diagonal3Values(scale, scale, 1)
             ..setTranslationRaw(cx + dx - w / 2, cy - w / 2, 0);
           final r = radius / scale; // keep visual radius constant
+          // The feathered full-bleed cover has no edge to cast a shadow from;
+          // only the small docked cover keeps one.
           final shadowA = isFullBleed
               ? (lerpDouble(0.0, 0.35, d)! * t)
               : (lerpDouble(0.28, 0.45, t)! * (1 - 0.5 * d));
-          final dissolveFactor = isFullBleed ? (1.0 - d).clamp(0.0, 1.0) : 0.0;
 
           return Stack(
             clipBehavior: Clip.none,
@@ -1253,56 +1307,7 @@ class PlayerShellState extends State<PlayerShell>
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(r),
-                                  child:
-                                      isFullBleed &&
-                                          dissolveFactor > 0.01 &&
-                                          _bleedArt == null
-                                      ? ShaderMask(
-                                          blendMode: BlendMode.dstIn,
-                                          shaderCallback: (Rect bounds) {
-                                            final fadeStart = lerpDouble(
-                                              1.0,
-                                              0.35,
-                                              dissolveFactor,
-                                            )!;
-                                            final midAlpha = lerpDouble(
-                                              1.0,
-                                              0.60,
-                                              dissolveFactor,
-                                            )!;
-                                            final endAlpha = lerpDouble(
-                                              1.0,
-                                              0.0,
-                                              dissolveFactor,
-                                            )!;
-                                            return LinearGradient(
-                                              begin: Alignment.topCenter,
-                                              end: Alignment.bottomCenter,
-                                              stops: [
-                                                0.0,
-                                                fadeStart,
-                                                0.70,
-                                                0.88,
-                                                1.0,
-                                              ],
-                                              colors: [
-                                                Colors.white,
-                                                Colors.white,
-                                                Colors.white.withValues(
-                                                  alpha: midAlpha,
-                                                ),
-                                                Colors.white.withValues(
-                                                  alpha: endAlpha * 0.20,
-                                                ),
-                                                Colors.white.withValues(
-                                                  alpha: endAlpha,
-                                                ),
-                                              ],
-                                            ).createShader(bounds);
-                                          },
-                                          child: child,
-                                        )
-                                      : child,
+                                  child: child,
                                 ),
                               ),
                             ],
@@ -1339,22 +1344,18 @@ class PlayerShellState extends State<PlayerShell>
       child: _sheetColumn(player, track, safe, size, isFullBleed),
     );
 
-    // where the full-bleed cover sits: BleedFill needs it to paint the status
-    // bar strip above it and to start the deepening right under it
-    final bleedTop = _bleedTop(safe);
-    final bleedBottom = bleedTop + size.width;
-
     return Positioned(
       left: 0.0,
       right: 0.0,
       top: 0.0,
       bottom: 0.0,
       child: AnimatedBuilder(
-        animation: Listenable.merge([_sheet, _dock]),
+        // only the sheet progress changes the shell; panel / dock changes
+        // arrive through setState
+        animation: _sheet,
         child: column,
         builder: (context, child) {
           final t = _sheet.value.clamp(0.0, 1.0);
-          final d = _dock.value.clamp(0.0, 1.0);
           if (!_open && t <= 0.001) return const SizedBox.shrink();
           final isSheetActive = _open || t > 0.05;
           final radius = math.min(1.0, (1 - t) * _travel / 140) * 32;
@@ -1363,14 +1364,10 @@ class PlayerShellState extends State<PlayerShell>
           );
           final bgOpacity = Curves.easeInOut.transform(t);
 
-          // The fluid mesh runs in normal mode and in lyrics / queue mode
-          // (also in bleed mode once the cover docks). It only pauses while
-          // the full-bleed cover fully hides it.
-          final meshVisible = !isFullBleed || d > 0.02;
-          final meshRunning = isSheetActive && player.isPlaying && meshVisible;
-
-          final fillBands = _fillBands ?? _fallbackBands();
-          final fillTop = _fillTop ?? fillBands;
+          // The animated mesh is only used without full bleed. With full
+          // bleed the baked backdrop replaces it in EVERY panel (and it is
+          // far cheaper: one static image instead of a running shader).
+          final meshRunning = isSheetActive && player.isPlaying && !isFullBleed;
 
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -1387,20 +1384,19 @@ class PlayerShellState extends State<PlayerShell>
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // 1. Base layer: fully blurred, fluid artwork mesh.
-                    //    Normal mode, lyrics, queue (normal AND bleed).
-                    Positioned(
-                      left: -40.0,
-                      right: -40.0,
-                      top: -60.0,
-                      bottom: -80.0,
-                      child: Opacity(
-                        opacity: bgOpacity,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Container(color: const Color(0xFF121214)),
-                            if (meshVisible)
+                    // 1a. Normal mode: fully blurred, fluid artwork mesh.
+                    if (!isFullBleed)
+                      Positioned(
+                        left: -40.0,
+                        right: -40.0,
+                        top: -60.0,
+                        bottom: -80.0,
+                        child: Opacity(
+                          opacity: bgOpacity,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Container(color: const Color(0xFF121214)),
                               RepaintBoundary(
                                 child: TickerMode(
                                   enabled: meshRunning,
@@ -1420,43 +1416,48 @@ class PlayerShellState extends State<PlayerShell>
                                     speed: player.isPlaying ? 1.0 : 0.35,
                                     interactive: true,
                                     backgroundColor: const Color(0xFF121214),
-                                    scrimOpacity: isFullBleed ? 0.20 : 0.18,
+                                    scrimOpacity: 0.18,
                                   ),
                                 ),
                               ),
-                            IgnorePointer(
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeOutCubic,
-                                color: Colors.black.withValues(
-                                  alpha: _panel == _Panel.lyrics
-                                      ? 0.0
-                                      : (_docked ? 0.26 : 0),
-                                ),
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
 
-                    // 2. Apple Music full bleed: seamless fill above (status
-                    //    bar) and below the artwork. Laid out in the sheet's
-                    //    own coordinates so it lines up with the cover exactly.
+                    // 1b. Full bleed: the blurred cover fills the WHOLE screen
+                    //     in the artwork view, lyrics and queue, and follows
+                    //     every song change.
                     if (isFullBleed)
                       Positioned.fill(
                         child: IgnorePointer(
-                          child: Opacity(
-                            opacity: ((1.0 - d) * bgOpacity).clamp(0.0, 1.0),
-                            child: BleedFill(
-                              bands: fillBands,
-                              topBands: fillTop,
-                              artTop: bleedTop,
-                              artBottom: bleedBottom,
+                          child: ColoredBox(
+                            color: const Color(0xFF121214),
+                            child: Opacity(
+                              opacity: bgOpacity,
+                              child: BleedBackdrop(
+                                art: _bakeFailed ? null : _backdropArt,
+                                fallback: _fallbackColors(),
+                              ),
                             ),
                           ),
                         ),
                       ),
+
+                    // 2. extra dimming for lyrics / queue readability
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                          color: Colors.black.withValues(
+                            alpha: _panel == _Panel.lyrics
+                                ? 0.0
+                                : (_docked ? 0.26 : 0),
+                          ),
+                        ),
+                      ),
+                    ),
 
                     Opacity(
                       opacity: contentOpacity,
@@ -1657,12 +1658,16 @@ class PlayerShellState extends State<PlayerShell>
         final h = _chrome.value.clamp(0.0, 1.0).toDouble();
         final f = 1 - h;
         final sigma = h * 10;
-        final filter = sigma < 0.05
-            ? ImageFilter.matrix(Matrix4.identity().storage)
-            : ImageFilter.blur(
-                sigmaX: sigma,
-                sigmaY: sigma,
-                tileMode: TileMode.decal,
+        // no ImageFiltered layer at all while the controls are visible
+        final Widget content = sigma < 0.05
+            ? c!
+            : ImageFiltered(
+                imageFilter: ImageFilter.blur(
+                  sigmaX: sigma,
+                  sigmaY: sigma,
+                  tileMode: TileMode.decal,
+                ),
+                child: c,
               );
         return IgnorePointer(
           ignoring: h > 0.35,
@@ -1670,7 +1675,7 @@ class PlayerShellState extends State<PlayerShell>
             opacity: f,
             child: Transform.translate(
               offset: Offset(0, h * 26),
-              child: ImageFiltered(imageFilter: filter, child: c),
+              child: content,
             ),
           ),
         );
@@ -1709,10 +1714,12 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Progressive blur behind the bottom controls (lyrics mode only). Blur is
-  /// strongest at the bottom edge and fades to nothing towards the top, so
-  /// there is no hard edge where the blur begins.
-  Widget _bottomBlur(double height, bool on) {
+  /// Soft shade behind the bottom controls (lyrics mode only).
+  ///
+  /// Full bleed: the backdrop is already blurred, so a plain gradient is
+  /// enough (and costs nothing). Normal mode keeps the progressive backdrop
+  /// blur (strongest at the bottom edge, fading to nothing towards the top).
+  Widget _bottomBlur(double height, bool on, bool light) {
     return Positioned(
       left: 0,
       right: 0,
@@ -1725,27 +1732,41 @@ class PlayerShellState extends State<PlayerShell>
           curve: Curves.easeOutCubic,
           child: _chromeFade(
             child: RepaintBoundary(
-              child: ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: (r) => const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black, Colors.black],
-                  stops: [0.0, 0.55, 1.0],
-                ).createShader(r),
-                child: ClipRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(
-                      sigmaX: 26,
-                      sigmaY: 26,
-                      tileMode: TileMode.mirror,
+              child: light
+                  ? const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0x00000000), Color(0x73000000)],
+                        ),
+                      ),
+                    )
+                  : ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (r) => const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black,
+                          Colors.black,
+                        ],
+                        stops: [0.0, 0.55, 1.0],
+                      ).createShader(r),
+                      child: ClipRect(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(
+                            sigmaX: 26,
+                            sigmaY: 26,
+                            tileMode: TileMode.mirror,
+                          ),
+                          child: ColoredBox(
+                            color: Colors.black.withValues(alpha: 0.30),
+                          ),
+                        ),
+                      ),
                     ),
-                    child: ColoredBox(
-                      color: Colors.black.withValues(alpha: 0.30),
-                    ),
-                  ),
-                ),
-              ),
             ),
           ),
         ),
@@ -1765,7 +1786,6 @@ class PlayerShellState extends State<PlayerShell>
 
     // The last row (Studio FX · Lyrics · Queue) is never moved: it keeps the
     // exact same bottom padding as before.
-    final toolsH = 44.0 + 16 + safe.bottom;
     final blurH = 300.0 + safe.bottom;
 
     // Vertical rhythm (bottom → top), anchored above the last row:
@@ -1781,11 +1801,10 @@ class PlayerShellState extends State<PlayerShell>
     //
     // The block is identical in art AND lyrics mode, so nothing below the
     // title ever moves when the panel changes.
-    const gMeta = 10.0;
-    const seekH = 52.0;
-    const transportH = 90.0; // height of the play / pause button box
-    final blockBottomInset = toolsH + _kRowGap;
-    final dockedBlockH = seekH + _kRowGap + transportH;
+    const gMeta = _kMetaGap;
+    const transportH = _kTransportH;
+    final blockBottomInset = _blockBottomInset(safe);
+    const dockedBlockH = _kSeekH + _kRowGap + _kTransportH;
     final queueReserve = blockBottomInset + dockedBlockH + 8;
 
     // lyrics finish fading just above the seekbar
@@ -1997,7 +2016,7 @@ class PlayerShellState extends State<PlayerShell>
       fit: StackFit.expand,
       children: [
         Column(children: [grabber, compactHeader, middleRegion]),
-        _bottomBlur(blurH, isLyrics),
+        _bottomBlur(blurH, isLyrics, isFullBleed),
         meta,
         controls,
         tools,

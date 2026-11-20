@@ -2824,24 +2824,30 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadAllHomeData(refresh: true);
   }
 
-  String get _effectivePrimaryLanguage {
-    final hist = ListeningHistoryService.instance.primaryLanguage;
-    if (hist.isNotEmpty) return hist;
-    return UserPreferencesService.instance.current?.primaryLanguage ?? '';
-  }
+  List<String> get _effectiveLanguages =>
+      UserPreferencesService.instance.effectiveLanguages;
+
+  String get _effectivePrimaryLanguage =>
+      UserPreferencesService.instance.primaryEffectiveLanguage;
+
+  List<String> get _effectiveGenres =>
+      UserPreferencesService.instance.effectiveGenres;
+
+  List<String> get _effectiveArtists =>
+      UserPreferencesService.instance.effectiveArtists;
 
   void _onHistoryChanged() {
     if (mounted) {
       setState(() {
-        final onboard = UserPreferencesService.instance.current;
         _recentHistory = ListeningHistoryService.instance.getRecentTracks();
         _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
+        final userArtists = _effectiveArtists;
         final fav =
             ListeningHistoryService.instance.getFavoriteArtist() ??
-            onboard?.primaryArtist;
+            (userArtists.isNotEmpty ? userArtists.first : null);
         final secondFav =
             ListeningHistoryService.instance.getSecondFavoriteArtist() ??
-            onboard?.secondaryArtist;
+            (userArtists.length > 1 ? userArtists[1] : null);
         if (fav != _favoriteArtist) {
           _favoriteArtist = fav;
           if (fav != null) _loadFavoriteArtistTracks(fav);
@@ -2873,73 +2879,116 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final country = CountryService.instance.currentCountry;
+      final userLangs = _effectiveLanguages;
+      final userGenres = _effectiveGenres;
+      final userArtists = _effectiveArtists;
+      final primaryLang = _effectivePrimaryLanguage;
+      final primaryGenre = userGenres.isNotEmpty ? userGenres.first : '';
 
       // 1. Load User Listening Telemetry (with saved onboarding tastes as Day-1 seed)
-      final onboard = UserPreferencesService.instance.current;
       _recentHistory = ListeningHistoryService.instance.getRecentTracks();
       _rediscover = ListeningHistoryService.instance.getRediscoverTracks();
       _favoriteArtist =
           ListeningHistoryService.instance.getFavoriteArtist() ??
-          onboard?.primaryArtist;
+          (userArtists.isNotEmpty ? userArtists.first : null);
       _secondFavoriteArtist =
           ListeningHistoryService.instance.getSecondFavoriteArtist() ??
-          onboard?.secondaryArtist;
-      final userLang = _effectivePrimaryLanguage;
+          (userArtists.length > 1 ? userArtists[1] : null);
 
-      // 2. Time-of-Day Context & Greeting
-      final timeCtx = ListeningHistoryService.getTimeOfDayContext(userLang);
+      // 2. Time-of-Day Context & Greeting (personalized to user's language & mood)
+      final timeCtx = ListeningHistoryService.getTimeOfDayContext(primaryLang);
       _timeOfDayGreeting = timeCtx.greeting;
-      _timeOfDayMoodLabel = timeCtx.moodLabel;
+      _timeOfDayMoodLabel = primaryGenre.isNotEmpty && primaryLang.isNotEmpty
+          ? '$primaryLang $primaryGenre • ${timeCtx.greeting}'
+          : timeCtx.moodLabel;
 
-      // 3. Time-of-day shelf query
-      InnerTubeService.instance
-          .search(timeCtx.defaultSearchTerm)
-          .then((tracks) {
-            if (mounted && tracks.isNotEmpty) {
-              setState(() => _timeOfDayTracks = tracks.take(12).toList());
-            }
-          })
-          .catchError((_) {});
+      // 3. Time-of-day shelf query (combines language + genre + time of day)
+      final timeQuery = primaryLang.isNotEmpty
+          ? '$primaryLang ${primaryGenre.isNotEmpty ? primaryGenre : "acoustic"} morning hits'
+          : (primaryGenre.isNotEmpty
+              ? '$primaryGenre ${timeCtx.defaultSearchTerm}'
+              : timeCtx.defaultSearchTerm);
 
-      // 4. Personalized Quick Picks based on user's top artist / last track
-      if (_favoriteArtist != null && _favoriteArtist!.isNotEmpty) {
-        InnerTubeService.instance
-            .search('${_favoriteArtist!} radio')
-            .then((tracks) {
-              if (mounted && tracks.isNotEmpty) {
-                setState(() {
-                  _quickPicks = tracks.take(12).toList();
-                  _loading = false;
-                });
-              }
-            })
-            .catchError((_) {});
-      } else if (_recentHistory.isNotEmpty) {
-        InnerTubeService.instance
-            .fetchRelated(_recentHistory.first)
-            .then((tracks) {
-              if (mounted && tracks.isNotEmpty) {
-                setState(() {
-                  _quickPicks = tracks.take(12).toList();
-                  _loading = false;
-                });
-              }
-            })
-            .catchError((_) {});
-      } else {
-        // Zero history: fetch real live home feed
-        InnerTubeService.instance
-            .getHomeFeed(countryCode: country.code)
-            .then((tracks) {
-              if (mounted && tracks.isNotEmpty && _quickPicks.isEmpty) {
-                setState(() {
-                  _quickPicks = tracks.take(12).toList();
-                  _loading = false;
-                });
-              }
-            })
-            .catchError((_) {});
+      InnerTubeService.instance.search(timeQuery).then((tracks) {
+        if (mounted && tracks.isNotEmpty) {
+          setState(() => _timeOfDayTracks = tracks.take(12).toList());
+        }
+      }).catchError((_) {});
+
+      // 4. Truly Personalized Quick Picks:
+      // Blends: 1. Related to recent listening, 2. User's top artists, 3. User's chosen language & genre hits!
+      final quickFutures = <Future<List<Track>>>[];
+      if (_recentHistory.isNotEmpty) {
+        quickFutures.add(
+          InnerTubeService.instance
+              .fetchRelated(_recentHistory.first)
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+              .catchError((_) => <Track>[]),
+        );
       }
+      if (_favoriteArtist != null && _favoriteArtist!.isNotEmpty) {
+        quickFutures.add(
+          InnerTubeService.instance
+              .search('${_favoriteArtist!} radio')
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+              .catchError((_) => <Track>[]),
+        );
+      }
+      if (_secondFavoriteArtist != null && _secondFavoriteArtist!.isNotEmpty) {
+        quickFutures.add(
+          InnerTubeService.instance
+              .search('${_secondFavoriteArtist!} hits')
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+              .catchError((_) => <Track>[]),
+        );
+      }
+      if (primaryLang.isNotEmpty) {
+        final q = primaryGenre.isNotEmpty
+            ? '$primaryLang $primaryGenre top hits'
+            : '$primaryLang trending hits';
+        quickFutures.add(
+          InnerTubeService.instance
+              .search(q)
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+              .catchError((_) => <Track>[]),
+        );
+      }
+      if (quickFutures.isEmpty) {
+        quickFutures.add(
+          InnerTubeService.instance
+              .getHomeFeed(countryCode: country.code)
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+              .catchError((_) => <Track>[]),
+        );
+      }
+
+      Future.wait(quickFutures).then((lists) {
+        if (!mounted) return;
+        final seen = <String>{};
+        final combined = <Track>[];
+        var maxLen = 0;
+        for (final l in lists) {
+          if (l.length > maxLen) maxLen = l.length;
+        }
+        // Interleave lists round-robin for maximum variety
+        for (var r = 0; r < maxLen && combined.length < 16; r++) {
+          for (final l in lists) {
+            if (r < l.length) {
+              final t = l[r];
+              if (seen.add(t.id)) {
+                combined.add(t);
+                if (combined.length >= 16) break;
+              }
+            }
+          }
+        }
+        if (combined.isNotEmpty) {
+          setState(() {
+            _quickPicks = combined;
+            _loading = false;
+          });
+        }
+      }).catchError((_) {});
 
       // 5. #1 Favorite Artist Spotlight
       if (_favoriteArtist != null && _favoriteArtist!.isNotEmpty) {
@@ -2951,50 +3000,176 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadSecondFavoriteArtistTracks(_secondFavoriteArtist!);
       }
 
-      // 7. New Releases (filtered by user's dominant language)
-      if (userLang.isNotEmpty) {
-        InnerTubeService.instance
-            .search('latest $userLang songs')
-            .then((tracks) {
-              if (mounted && tracks.isNotEmpty) {
-                setState(() {
-                  _newReleases = tracks.take(9).toList();
-                  _loading = false;
-                });
-              }
-            })
-            .catchError((_) {});
-      } else {
+      // 7. Multi-language New Releases
+      final releaseFutures = <Future<List<Track>>>[];
+      for (final l in userLangs.take(2)) {
+        releaseFutures.add(
+          InnerTubeService.instance
+              .search('latest $l songs 2026')
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+              .catchError((_) => <Track>[]),
+        );
+      }
+      if (_favoriteArtist != null && _favoriteArtist!.isNotEmpty) {
+        releaseFutures.add(
+          InnerTubeService.instance
+              .search('new song ${_favoriteArtist!}')
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+              .catchError((_) => <Track>[]),
+        );
+      }
+      releaseFutures.add(
         InnerTubeService.instance
             .getNewReleases(countryCode: country.code)
-            .then((tracks) {
-              if (mounted && tracks.isNotEmpty) {
-                setState(() {
-                  _newReleases = tracks.take(9).toList();
-                  _loading = false;
-                });
-              }
-            })
-            .catchError((_) {});
+            .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+            .catchError((_) => <Track>[]),
+      );
+
+      Future.wait(releaseFutures).then((lists) {
+        if (!mounted) return;
+        final seen = <String>{};
+        final combined = <Track>[];
+        for (final l in lists) {
+          for (final t in l) {
+            if (seen.add(t.id)) {
+              combined.add(t);
+              if (combined.length >= 12) break;
+            }
+          }
+          if (combined.length >= 12) break;
+        }
+        if (combined.isNotEmpty) {
+          setState(() {
+            _newReleases = combined;
+            _loading = false;
+          });
+        }
+      }).catchError((_) {});
+
+      // 8. Regional Charts & Personalized Artists
+      final chartsFutures = <Future>[
+        InnerTubeService.instance
+            .getCharts(countryCode: country.code)
+            .timeout(
+              const Duration(seconds: 5),
+              onTimeout: () => (
+                tracks: <Track>[],
+                artists: <({String image, String name, String subs})>[],
+              ),
+            )
+            .catchError((_) => (
+                  tracks: <Track>[],
+                  artists: <({String image, String name, String subs})>[],
+                )),
+      ];
+      if (primaryLang.isNotEmpty) {
+        chartsFutures.add(
+          InnerTubeService.instance
+              .search('top $primaryLang songs charts')
+              .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+              .catchError((_) => <Track>[]),
+        );
       }
 
-      // 8. Regional Charts & Chart Artists
-      InnerTubeService.instance
-          .getCharts(countryCode: country.code)
-          .then((data) {
-            if (mounted) {
-              setState(() {
-                if (data.tracks.isNotEmpty) {
-                  _chartTracks = data.tracks.take(12).toList();
-                }
-                if (data.artists.isNotEmpty) {
-                  _chartArtists = data.artists.take(10).toList();
-                }
-                _loading = false;
-              });
+      Future.wait(chartsFutures).then((results) {
+        if (!mounted) return;
+        final chartData = results[0] as ({
+          List<({String image, String name, String subs})> artists,
+          List<Track> tracks,
+        });
+        final langChartTracks =
+            results.length > 1 ? (results[1] as List<Track>) : <Track>[];
+
+        // Interleave language chart songs with national chart songs
+        final seen = <String>{};
+        final combinedChartTracks = <Track>[];
+        for (final t in langChartTracks.take(8)) {
+          if (seen.add(t.id)) combinedChartTracks.add(t);
+        }
+        for (final t in chartData.tracks) {
+          if (seen.add(t.id)) combinedChartTracks.add(t);
+        }
+
+        // Build Personalized Artists shelf:
+        // 1. History top played artists
+        // 2. Favorite artists chosen by user
+        // 3. Curated artists for user's selected languages
+        // 4. Regional chart artists
+        final personalizedArtists =
+            <({String image, String name, String subs})>[];
+        final seenArtists = <String>{};
+
+        // From listening history
+        final topHistory =
+            ListeningHistoryService.instance.getTopArtists(limit: 6);
+        for (final h in topHistory) {
+          final name = h.name.trim();
+          final lower = name.toLowerCase();
+          if (name.isNotEmpty &&
+              lower != 'unknown artist' &&
+              seenArtists.add(lower)) {
+            personalizedArtists.add((
+              name: name,
+              subs: '${h.plays} plays • Top Artist',
+              image: '',
+            ));
+          }
+        }
+
+        // From user favorite artists
+        final prefs = UserPreferencesService.instance.currentPrefs;
+        for (final fa in prefs.favoriteArtists) {
+          final lower = fa.name.trim().toLowerCase();
+          if (lower.isNotEmpty && seenArtists.add(lower)) {
+            personalizedArtists.add((
+              name: fa.name,
+              subs: 'Favorite Artist',
+              image: fa.image,
+            ));
+          }
+        }
+
+        // From curated language artists
+        if (userLangs.isNotEmpty) {
+          final curated =
+              UserPreferencesService.curatedArtistsForLanguages(userLangs);
+          for (final name in curated.take(5)) {
+            final lower = name.trim().toLowerCase();
+            if (lower.isNotEmpty && seenArtists.add(lower)) {
+              personalizedArtists.add((
+                name: name,
+                subs: 'Top Artist • ${userLangs.first}',
+                image: '',
+              ));
             }
-          })
-          .catchError((_) {});
+          }
+        }
+
+        // Fill with chart artists
+        for (final a in chartData.artists) {
+          final lower = a.name.trim().toLowerCase();
+          if (lower.isNotEmpty && seenArtists.add(lower)) {
+            personalizedArtists.add((
+              name: a.name,
+              subs: a.subs.isNotEmpty
+                  ? a.subs
+                  : 'Top Artist • ${country.name}',
+              image: a.image,
+            ));
+          }
+          if (personalizedArtists.length >= 14) break;
+        }
+
+        setState(() {
+          if (combinedChartTracks.isNotEmpty) {
+            _chartTracks = combinedChartTracks.take(16).toList();
+          }
+          if (personalizedArtists.isNotEmpty) {
+            _chartArtists = personalizedArtists;
+          }
+          _loading = false;
+        });
+      }).catchError((_) {});
 
       // Fallback guard: ensure loading spinner is dismissed after 3s
       Future.delayed(const Duration(milliseconds: 3000), () {
@@ -3044,9 +3219,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     final mood = _moods[index];
-    final userLang = _effectivePrimaryLanguage;
+    final primaryLang = _effectivePrimaryLanguage;
     final country = CountryService.instance.currentCountry;
-    final langPrefix = userLang.isNotEmpty ? '$userLang ' : '${country.name} ';
+    final langPrefix = primaryLang.isNotEmpty ? '$primaryLang ' : '${country.name} ';
     final query = '$langPrefix$mood hits';
 
     InnerTubeService.instance
@@ -3069,9 +3244,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void _playMix(String mixType) {
     HapticFeedback.mediumImpact();
     setState(() => _activeMix = mixType);
-    final userLang = _effectivePrimaryLanguage;
+    final userGenres = _effectiveGenres;
+    final primaryLang = _effectivePrimaryLanguage;
+    final primaryGenre = userGenres.isNotEmpty ? userGenres.first : '';
     final country = CountryService.instance.currentCountry;
-    final langPrefix = userLang.isNotEmpty ? '$userLang ' : '${country.name} ';
+    final langPrefix = primaryLang.isNotEmpty ? '$primaryLang ' : '${country.name} ';
 
     switch (mixType) {
       case 'supermix':
@@ -3086,7 +3263,9 @@ class _HomeScreenState extends State<HomeScreen> {
           play(pool, 0);
         } else {
           InnerTubeService.instance
-              .search('${langPrefix}top hits supermix')
+              .search(
+                '$langPrefix${primaryGenre.isNotEmpty ? "$primaryGenre " : ""}top hits supermix',
+              )
               .then((tracks) {
                 if (tracks.isNotEmpty) play(tracks, 0);
               });
@@ -3094,27 +3273,30 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
 
       case 'discover':
-        InnerTubeService.instance
-            .search('${langPrefix}fresh discoveries indie tracks')
-            .then((tracks) {
-              if (tracks.isNotEmpty) play(tracks, 0);
-            });
+        final q = primaryLang.isNotEmpty
+            ? '$primaryLang ${primaryGenre.isNotEmpty ? primaryGenre : "indie"} fresh discoveries'
+            : '${langPrefix}fresh discoveries indie tracks';
+        InnerTubeService.instance.search(q).then((tracks) {
+          if (tracks.isNotEmpty) play(tracks, 0);
+        });
         break;
 
       case 'chill':
-        InnerTubeService.instance
-            .search('${langPrefix}chill acoustic melodies')
-            .then((tracks) {
-              if (tracks.isNotEmpty) play(tracks, 0);
-            });
+        final q = primaryLang.isNotEmpty
+            ? '$primaryLang chill acoustic melodies $primaryGenre'
+            : '${langPrefix}chill acoustic melodies';
+        InnerTubeService.instance.search(q).then((tracks) {
+          if (tracks.isNotEmpty) play(tracks, 0);
+        });
         break;
 
       case 'energy':
-        InnerTubeService.instance
-            .search('${langPrefix}workout high energy dance hits')
-            .then((tracks) {
-              if (tracks.isNotEmpty) play(tracks, 0);
-            });
+        final q = primaryLang.isNotEmpty
+            ? '$primaryLang workout high energy hits $primaryGenre'
+            : '${langPrefix}workout high energy dance hits';
+        InnerTubeService.instance.search(q).then((tracks) {
+          if (tracks.isNotEmpty) play(tracks, 0);
+        });
         break;
     }
   }
@@ -3736,10 +3918,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             _SecHeader(
                               title: 'Top Artists for You',
-                              overline: 'Trending in ${country.name}',
+                              overline: (_effectiveArtists.isNotEmpty ||
+                                      ListeningHistoryService.instance.hasHistory)
+                                  ? 'Based on your favorites & taste'
+                                  : 'Trending in ${country.name}',
                               onMore: () => _openSection(
                                 title: 'Top Artists for You',
-                                overline: 'Trending in ${country.name}',
+                                overline: (_effectiveArtists.isNotEmpty ||
+                                        ListeningHistoryService
+                                            .instance.hasHistory)
+                                    ? 'Based on your favorites & taste'
+                                    : 'Trending in ${country.name}',
                                 entries: [
                                   for (final a in _chartArtists.take(10))
                                     _ListEntry(
@@ -3985,10 +4174,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             _SecHeader(
                               title: 'Top Hits in ${country.name}',
-                              overline: '${country.flag} Regional Charts',
+                              overline: _effectivePrimaryLanguage.isNotEmpty
+                                  ? '${country.flag} ${_effectivePrimaryLanguage.toUpperCase()} & Regional Charts'
+                                  : '${country.flag} Regional Charts',
                               onMore: () => _openSection(
                                 title: 'Top Hits in ${country.name}',
-                                overline: 'Regional Charts',
+                                overline: _effectivePrimaryLanguage.isNotEmpty
+                                    ? '${country.flag} ${_effectivePrimaryLanguage.toUpperCase()} & Regional Charts'
+                                    : 'Regional Charts',
                                 entries: _trackEntries(charts),
                               ),
                             ),

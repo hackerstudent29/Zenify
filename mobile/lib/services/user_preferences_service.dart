@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'country_service.dart';
+import 'listening_history_service.dart';
 
 /// Immutable artist selection saved during onboarding or edited from settings.
 class OnboardingArtist {
@@ -156,6 +157,54 @@ class UserPreferencesService {
   OnboardingPrefs? get current => prefsNotifier.value;
   OnboardingPrefs get currentPrefs => prefsNotifier.value ?? const OnboardingPrefs();
   bool get hasCompleted => prefsNotifier.value?.completed == true;
+
+  /// Resolves the unified list of user languages combining preferences and listening history.
+  List<String> get effectiveLanguages {
+    final prefsLangs = currentPrefs.languages;
+    final histLangs = ListeningHistoryService.instance.detectedLanguages;
+    final seen = <String>{};
+    final result = <String>[];
+    for (final l in [...prefsLangs, ...histLangs]) {
+      final clean = l.trim();
+      final lower = clean.toLowerCase();
+      if (clean.isNotEmpty && seen.add(lower)) {
+        result.add(clean);
+      }
+    }
+    return result;
+  }
+
+  /// Primary effective language for queries and titles.
+  String get primaryEffectiveLanguage {
+    final langs = effectiveLanguages;
+    return langs.isNotEmpty ? langs.first : '';
+  }
+
+  /// Resolves unified list of favorite artists combining preferences and listening history.
+  List<String> get effectiveArtists {
+    final prefArtists = currentPrefs.favoriteArtists.map((a) => a.name);
+    final histArtists = ListeningHistoryService.instance.topListenedArtistNames;
+    final seen = <String>{};
+    final result = <String>[];
+    for (final a in [...prefArtists, ...histArtists]) {
+      final clean = a.trim();
+      final lower = clean.toLowerCase();
+      if (clean.isNotEmpty && lower != 'unknown artist' && seen.add(lower)) {
+        result.add(clean);
+      }
+    }
+    return result;
+  }
+
+  /// Resolves user genres.
+  List<String> get effectiveGenres {
+    return currentPrefs.genres;
+  }
+
+  /// Primary effective genre.
+  String get primaryEffectiveGenre {
+    return currentPrefs.genres.isNotEmpty ? currentPrefs.genres.first : '';
+  }
 
   static const List<String> genderOptions = [
     'Male',

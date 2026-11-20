@@ -523,19 +523,32 @@ class ListeningHistoryService {
 
   /// Returns the user's primary/dominant listening language (e.g. 'tamil', 'hindi', 'telugu', etc.).
   String get primaryLanguage {
-    if (_history.isEmpty) return '';
+    final langs = detectedLanguages;
+    return langs.isNotEmpty ? langs.first : '';
+  }
+
+  /// Returns all detected listening languages ordered by frequency descending.
+  List<String> get detectedLanguages {
+    if (_history.isEmpty) return const [];
     final langCounts = <String, int>{};
     for (final t in _history) {
       final lang = t.language.isNotEmpty
           ? t.language
           : Track.detectLanguage(t.title, t.artist, t.album);
       if (lang != null && lang.isNotEmpty) {
-        langCounts[lang] = (langCounts[lang] ?? 0) + 1;
+        final clean = lang.trim();
+        langCounts[clean] = (langCounts[clean] ?? 0) + 1;
       }
     }
-    if (langCounts.isEmpty) return '';
-    final top = langCounts.entries.reduce((a, b) => a.value > b.value ? a : b);
-    return top.key;
+    if (langCounts.isEmpty) return const [];
+    final sorted = langCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sorted.map((e) => e.key).toList();
+  }
+
+  /// Returns artist names for user's most played artists in history.
+  List<String> get topListenedArtistNames {
+    return getTopArtists(limit: 15).map((a) => a.name).toList();
   }
 
   /// Returns user's top played artists ordered by play count descending.
