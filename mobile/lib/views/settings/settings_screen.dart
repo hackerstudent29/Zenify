@@ -9,6 +9,7 @@ import '../../design_system/apple/apple_music_kit.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../services/auth_state.dart';
 import '../../services/cache_service.dart';
+import '../../services/country_service.dart';
 import '../../services/dock_visibility.dart';
 import '../../services/download_service.dart';
 import '../../services/glass_engine.dart';
@@ -17,6 +18,7 @@ import '../../services/update_service.dart';
 import '../../services/user_preferences_service.dart';
 import '../auth/welcome_screen.dart';
 import '../player/studio_fx_sheet.dart';
+import '../profile/profile_edit_sheets.dart';
 import '../profile/profile_screen.dart';
 import 'glass_customizer_screen.dart';
 
@@ -358,7 +360,57 @@ class _SettingsScreenState extends State<SettingsScreen> with HideDocksMixin {
           ],
         ),
 
-        // 5. Accessibility
+        // 5. Music Preferences & Taste
+        ValueListenableBuilder<CountryInfo>(
+          valueListenable: CountryService.instance.countryNotifier,
+          builder: (context, country, _) {
+            return ValueListenableBuilder<OnboardingPrefs?>(
+              valueListenable: UserPreferencesService.instance.prefsNotifier,
+              builder: (context, prefs, _) {
+                final langs = prefs?.languages ?? const [];
+                final genres = prefs?.genres ?? const [];
+                final artists = prefs?.favoriteArtists ?? const [];
+                return AMSection(
+                  header: 'Music Preferences & Taste',
+                  footer:
+                      'Personalizes your Home and Explore feeds across countries, languages, genres, and favorite artists.',
+                  children: [
+                    AMRow(
+                      title: 'Country / Region',
+                      value: '${country.flag}  ${country.name}',
+                      chevron: true,
+                      onTap: () => showRegionPickerSheet(context),
+                    ),
+                    AMRow(
+                      title: 'Languages',
+                      value: langs.isNotEmpty ? langs.join(', ') : 'All',
+                      chevron: true,
+                      onTap: () => showLanguagesPickerSheet(context),
+                    ),
+                    AMRow(
+                      title: 'Genres & Vibes',
+                      value: genres.isNotEmpty
+                          ? genres.take(3).join(', ')
+                          : 'All',
+                      chevron: true,
+                      onTap: () => showGenresPickerSheet(context),
+                    ),
+                    AMRow(
+                      title: 'Favorite Artists',
+                      value: artists.isNotEmpty
+                          ? '${artists.length} selected'
+                          : 'None',
+                      chevron: true,
+                      onTap: () => showArtistsPickerSheet(context),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+
+        // 6. Accessibility
         AMSection(
           header: 'Accessibility',
           footer:

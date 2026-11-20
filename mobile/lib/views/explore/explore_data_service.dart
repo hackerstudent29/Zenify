@@ -7,6 +7,7 @@ import '../../models/track.dart';
 import '../../services/api_service.dart';
 import '../../services/country_service.dart';
 import '../../services/innertube_service.dart';
+import '../../services/listening_history_service.dart';
 import '../../services/user_preferences_service.dart';
 
 class ExploreCountry {
@@ -368,15 +369,21 @@ class ExploreDataService {
     return (now.difference(firstMonday).inDays / 7).ceil();
   }
 
-  /// Fetches live realtime explore content for [country] via InnerTube.
-  /// Content refreshes on a weekly boundary or when [forceRefresh] is true.
+  /// Fetches live realtime explore content for [country] via InnerTube,
+  /// deeply personalized by user's selected languages, genres, favorite artists,
+  /// and listening history.
   Future<ExplorePageData> getExploreDataForCountry(
     ExploreCountry country, {
     bool forceRefresh = false,
   }) async {
     final weekNum = _currentWeekNumber();
     final now = DateTime.now();
-    final cacheKey = '${country.code}_${now.year}_w$weekNum';
+
+    final userLangs = UserPreferencesService.instance.effectiveLanguages;
+    final userGenres = UserPreferencesService.instance.effectiveGenres;
+    final langsKey = userLangs.take(3).join('-');
+    final genresKey = userGenres.take(3).join('-');
+    final cacheKey = '${country.code}_${langsKey}_${genresKey}_${now.year}_w$weekNum';
 
     if (!forceRefresh && _exploreCache.containsKey(cacheKey)) {
       return _exploreCache[cacheKey]!;
@@ -387,57 +394,121 @@ class ExploreDataService {
     List<ExploreArtistItem> topArtists = [];
     List<ExploreReleaseItem> newReleases = [];
 
-    // 1. Fetch Live InnerTube Charts (Top Songs & Famous Artists of the Week)
-    try {
-      final chartsRes = await InnerTubeService.instance
-          .getCharts(countryCode: glCode)
-          .timeout(const Duration(seconds: 5),
-              onTimeout: () => (
-                    tracks: <Track>[],
-                    artists: <({String image, String name, String subs})>[],
-                  ));
+    // 1. Fetch Live InnerTube Charts (Top Songs & Artists) + Language-Specific Trending
+    // 1a. Country National Charts
+    final chartsFuture = InnerTubeService.instance
+        .getCharts(countryCode: glCode)
+        .timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => (
+            tracks: <Track>[],
+            artists: <({String image, String name, String subs})>[],
+          ),
+        )
+        .catchError((_) => (
+              tracks: <Track>[],
+              artists: <({String image, String name, String subs})>[],
+            ));
 
-      if (chartsRes.tracks.isNotEmpty) {
-        chartTracks = chartsRes.tracks;
+    // 1b. Language-Specific Top Songs (for up to 2 preferred languages)
+    final langSongsFutures = <Future<List<Track>>>[];
+    for (final lang in userLangs.take(2)) {
+      langSongsFutures.add(
+        InnerTubeService.instance
+            .search('top $lang songs 2026')
+            .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+            .catchError((_) => <Track>[]),
+      );
+    }
+
+    // 1c. Preferred Genre Trending (if set)
+    Future<List<Track>>? genreFuture;
+    if (userGenres.isNotEmpty) {
+      final q = userLangs.isNotEmpty
+          ? '${userLangs.first} ${userGenres.first} hits'
+          : '${userGenres.first} top hits';
+      genreFuture = InnerTubeService.instance
+          .search(q)
+          .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+          .catchError((_) => <Track>[]);
+    }
+
+    // 1d. Live Country New Releases
+    final releasesFuture = InnerTubeService.instance
+        .getNewReleases(countryCode: glCode)
+        .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[])
+        .catchError((_) => <Track>[]);
+
+    // Await core
+    final chartsRes = await chartsFuture;
+    final freshReleases = await releasesFuture;
+    final langSongsLists = await Future.wait(langSongsFutures);
+    final genreSongs = genreFuture != null ? await genreFuture : <Track>[];
+
+    // Combine chart tracks and language-specific tracks with interleaving
+    final rawChartTracks = chartsRes.tracks;
+    if (chartsRes.artists.isNotEmpty) {
+      topArtists = chartsRes.artists.map((a) {
+        return ExploreArtistItem(
+          name: a.name,
+          photo: a.image,
+          subs: a.subs.isNotEmpty ? a.subs : 'Top Artist • ${country.name}',
+        );
+      }).toList();
+    }
+
+    // Interleave language tracks first (if present), then national charts
+    final seenTrackIds = <String>{};
+    final combinedTracks = <Track>[];
+
+    // Insert user's preferred language tracks
+    for (final langList in langSongsLists) {
+      for (final t in langList.take(15)) {
+        if (seenTrackIds.add(t.id)) {
+          combinedTracks.add(t);
+        }
       }
-      if (chartsRes.artists.isNotEmpty) {
-        topArtists = chartsRes.artists.map((a) {
-          return ExploreArtistItem(
-            name: a.name,
-            photo: a.image,
-            subs: a.subs.isNotEmpty ? a.subs : 'Top Artist • ${country.name}',
-          );
-        }).toList();
+    }
+
+    // Insert genre tracks
+    for (final t in genreSongs.take(10)) {
+      if (seenTrackIds.add(t.id)) {
+        combinedTracks.add(t);
       }
-    } catch (_) {}
+    }
 
-    // 2. Fetch Live InnerTube New Releases for country
-    List<Track> freshReleases = [];
-    try {
-      freshReleases = await InnerTubeService.instance
-          .getNewReleases(countryCode: glCode)
-          .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
-    } catch (_) {}
+    // Interleave national chart tracks
+    for (final t in rawChartTracks) {
+      if (seenTrackIds.add(t.id)) {
+        combinedTracks.add(t);
+      }
+    }
 
-    // 3. Fallback to regional search if charts endpoint was blocked or empty
+    chartTracks = combinedTracks.isNotEmpty ? combinedTracks : rawChartTracks;
+
+    // 2. Fallback to regional search if everything was empty
     if (chartTracks.isEmpty) {
       try {
+        final query = userLangs.isNotEmpty
+            ? '${userLangs.first} top hits ${country.name}'
+            : country.query;
         final searchTracks = await InnerTubeService.instance
-            .search(country.query)
+            .search(query)
             .timeout(const Duration(seconds: 4), onTimeout: () => <Track>[]);
         if (searchTracks.isNotEmpty) {
           chartTracks = searchTracks;
         } else {
-          final cloudTracks = await ApiService.search(country.query)
+          final cloudTracks = await ApiService.search(query)
               .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
-          chartTracks = cloudTracks.isNotEmpty ? cloudTracks : CatalogDataSource.allTracks;
+          chartTracks =
+              cloudTracks.isNotEmpty ? cloudTracks : CatalogDataSource.allTracks;
         }
       } catch (_) {
         chartTracks = CatalogDataSource.allTracks;
       }
     }
 
-    // 4. Group / Derive New Releases
+    // 3. Group / Derive New Releases
     final releasePool = freshReleases.isNotEmpty ? freshReleases : chartTracks;
     final seenAlbums = <String>{};
     for (final t in releasePool) {
@@ -458,109 +529,163 @@ class ExploreDataService {
       if (newReleases.length >= 14) break;
     }
 
-    // 5. Ensure Top Artists Shelf has rich items
-    if (topArtists.isEmpty || topArtists.length < 6) {
-      final seenNames = <String>{for (final a in topArtists) a.name.toLowerCase()};
-      
-      // Inject user favorite artists matching country or general favorites
-      final prefs = UserPreferencesService.instance.currentPrefs;
-      for (final fa in prefs.favoriteArtists) {
-        final lower = fa.name.trim().toLowerCase();
-        if (lower.isNotEmpty && seenNames.add(lower)) {
-          topArtists.add(ExploreArtistItem(
-            name: fa.name,
-            browseId: fa.id.isNotEmpty ? fa.id : null,
-            photo: fa.image,
-            subs: 'Favorite Artist',
-          ));
-        }
-      }
+    // 4. Build Personalized Top Artists Shelf (Favorite & Listened Artists first!)
+    final personalizedArtists = <ExploreArtistItem>[];
+    final seenArtistNames = <String>{};
 
-      // Add artists extracted from top chart tracks
-      for (final t in chartTracks) {
-        final resolved = t.resolvedArtists;
-        final name = resolved.isNotEmpty ? resolved.first.name : t.artist;
-        final lower = name.trim().toLowerCase();
-        if (lower.isEmpty || lower == 'unknown artist' || !seenNames.add(lower)) {
-          continue;
-        }
-        topArtists.add(
-          ExploreArtistItem(
-            name: name,
-            browseId: resolved.isNotEmpty ? resolved.first.id : null,
-            photo: t.coverUrl,
-            subs: 'Top Artist • ${country.name}',
-          ),
-        );
-        if (topArtists.length >= 14) break;
+    // 4a. User's top listened artists from history (with real plays)
+    final historyTop = ListeningHistoryService.instance.getTopArtists(limit: 6);
+    for (final h in historyTop) {
+      final name = h.name.trim();
+      final lower = name.toLowerCase();
+      if (name.isNotEmpty && lower != 'unknown artist' && seenArtistNames.add(lower)) {
+        personalizedArtists.add(ExploreArtistItem(
+          name: name,
+          photo: '',
+          subs: '${h.plays} plays • Top Artist',
+        ));
       }
     }
 
-    // 6. Curated Playlists for this country
+    // 4b. User's chosen favorite artists from preferences
+    final prefs = UserPreferencesService.instance.currentPrefs;
+    for (final fa in prefs.favoriteArtists) {
+      final lower = fa.name.trim().toLowerCase();
+      if (lower.isNotEmpty && seenArtistNames.add(lower)) {
+        personalizedArtists.add(ExploreArtistItem(
+          name: fa.name,
+          browseId: fa.id.isNotEmpty ? fa.id : null,
+          photo: fa.image,
+          subs: 'Favorite Artist',
+        ));
+      }
+    }
+
+    // 4c. Curated artists for user's selected languages
+    if (userLangs.isNotEmpty) {
+      final curated = UserPreferencesService.curatedArtistsForLanguages(userLangs);
+      for (final name in curated.take(4)) {
+        final lower = name.trim().toLowerCase();
+        if (lower.isNotEmpty && seenArtistNames.add(lower)) {
+          personalizedArtists.add(ExploreArtistItem(
+            name: name,
+            photo: '',
+            subs: 'Top Artist • ${userLangs.first}',
+          ));
+        }
+      }
+    }
+
+    // 4d. Regional chart artists (from InnerTube charts)
+    for (final a in topArtists) {
+      final lower = a.name.trim().toLowerCase();
+      if (lower.isNotEmpty && seenArtistNames.add(lower)) {
+        personalizedArtists.add(a);
+      }
+      if (personalizedArtists.length >= 14) break;
+    }
+
+    topArtists = personalizedArtists.isNotEmpty ? personalizedArtists : topArtists;
+
+    // 5. Curated Playlists tailored to user's languages, genres, and country
     String coverAt(int idx, String fallback) {
       if (chartTracks.isEmpty) return fallback;
       final t = chartTracks[(idx * 4) % chartTracks.length];
       return t.coverUrl.isNotEmpty ? t.coverUrl : fallback;
     }
 
-    final playlists = <ExplorePlaylistItem>[
+    final playlists = <ExplorePlaylistItem>[];
+
+    // Priority 1: User's primary language playlists (if selected)
+    if (userLangs.isNotEmpty) {
+      final pLang = userLangs.first;
+      playlists.add(
+        ExplorePlaylistItem(
+          title: '$pLang Top 50',
+          description: 'Most streamed $pLang tracks this week',
+          coverUrl: coverAt(0, 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600'),
+          trackCount: 50,
+          searchQuery: '$pLang top 50 hits official',
+        ),
+      );
+      playlists.add(
+        ExplorePlaylistItem(
+          title: '$pLang Viral Weekly',
+          description: 'Trending and breakout $pLang hits',
+          coverUrl: coverAt(1, 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600'),
+          trackCount: 40,
+          searchQuery: '$pLang viral hits charts',
+        ),
+      );
+    }
+
+    // Priority 2: Secondary language or primary genre
+    if (userLangs.length > 1) {
+      final sLang = userLangs[1];
+      playlists.add(
+        ExplorePlaylistItem(
+          title: '$sLang Essentials',
+          description: 'The defining tracks and hits in $sLang',
+          coverUrl: coverAt(2, 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600'),
+          trackCount: 45,
+          searchQuery: '$sLang top hits official playlist',
+        ),
+      );
+    } else if (userGenres.isNotEmpty) {
+      final pGenre = userGenres.first;
+      playlists.add(
+        ExplorePlaylistItem(
+          title: '$pGenre Essentials',
+          description: 'Curated $pGenre classics and modern hits',
+          coverUrl: coverAt(2, 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600'),
+          trackCount: 45,
+          searchQuery: '$pGenre top hits official playlist',
+        ),
+      );
+    }
+
+    // Priority 3: Country Top 50 & Mood stations
+    playlists.add(
       ExplorePlaylistItem(
         title: '${country.name} Top 50',
         description: 'Most streamed tracks this week in ${country.name}',
-        coverUrl: coverAt(0, 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600'),
+        coverUrl: coverAt(3, 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600'),
         trackCount: 50,
         searchQuery: '${country.name} top 50 hits official',
       ),
-      ExplorePlaylistItem(
-        title: '${country.name} Viral Weekly',
-        description: 'Fastest rising viral songs and chart breakers',
-        coverUrl: coverAt(1, 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600'),
-        trackCount: 40,
-        searchQuery: '${country.name} viral hits charts',
-      ),
-      ExplorePlaylistItem(
-        title: 'Today\'s Biggest Hits',
-        description: 'Chart-toppers across pop, rap and international charts',
-        coverUrl: coverAt(2, 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600'),
-        trackCount: 35,
-        searchQuery: 'todays top hits official playlist',
-      ),
+    );
+    playlists.add(
       ExplorePlaylistItem(
         title: 'Late Night Chill',
         description: 'Mellow acoustic, lo-fi and ambient sessions',
-        coverUrl: coverAt(3, 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600'),
+        coverUrl: coverAt(4, 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600'),
         trackCount: 40,
         searchQuery: 'chill acoustic songs relax',
       ),
+    );
+    playlists.add(
       ExplorePlaylistItem(
         title: 'Workout Energy',
         description: 'High-tempo cardio and gym motivation beats',
-        coverUrl: coverAt(4, 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600'),
+        coverUrl: coverAt(5, 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600'),
         trackCount: 45,
         searchQuery: 'workout motivation songs gym',
       ),
-      ExplorePlaylistItem(
-        title: 'Deep Focus & Flow',
-        description: 'Instrumentals and beats for intense concentration',
-        coverUrl: coverAt(5, 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=600'),
-        trackCount: 50,
-        searchQuery: 'deep focus study instrumental beats',
-      ),
-    ];
+    );
 
-    // 7. Select Top 6 Featured Spotlight Tracks
+    // 6. Select Top 8 Featured Spotlight Tracks
     final seenFeatured = <String>{};
     final featured = <Track>[];
     for (final t in chartTracks) {
       final key = t.artist.toLowerCase();
       if (key.isEmpty || !seenFeatured.add(key)) continue;
       featured.add(t);
-      if (featured.length >= 6) break;
+      if (featured.length >= 8) break;
     }
 
     final pageData = ExplorePageData(
       country: country,
-      featured: featured.isNotEmpty ? featured : chartTracks.take(6).toList(),
+      featured: featured.isNotEmpty ? featured : chartTracks.take(8).toList(),
       weeklyTopSongs: chartTracks,
       topArtists: topArtists,
       newReleases: newReleases,

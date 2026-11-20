@@ -21,6 +21,8 @@ import '../../design_system/zen.dart';
 import '../../models/playback_context.dart';
 import '../../models/track.dart';
 import '../../services/library_store.dart';
+import '../../services/country_service.dart';
+import '../../services/listening_history_service.dart';
 import '../../services/player_state.dart';
 import '../../services/user_preferences_service.dart';
 import '../../utils/media_normalizer.dart';
@@ -1646,6 +1648,19 @@ class _ExploreScreenState extends State<ExploreScreen>
       _loadData();
     });
     CatalogDataSource.tracksNotifier.addListener(_onCatalogUpdated);
+    CountryService.instance.countryNotifier.addListener(_onPrefsChanged);
+    UserPreferencesService.instance.prefsNotifier.addListener(_onPrefsChanged);
+    ListeningHistoryService.instance.historyNotifier.addListener(_onPrefsChanged);
+  }
+
+  void _onPrefsChanged() {
+    if (!mounted) return;
+    _dataService.clearCache();
+    final c = _dataService.currentCountry;
+    if (c.code != _country.code) {
+      setState(() => _country = c);
+    }
+    _loadData(force: true);
   }
 
   void _onCatalogUpdated() {
@@ -1660,6 +1675,9 @@ class _ExploreScreenState extends State<ExploreScreen>
   void dispose() {
     _scroll.dispose();
     CatalogDataSource.tracksNotifier.removeListener(_onCatalogUpdated);
+    CountryService.instance.countryNotifier.removeListener(_onPrefsChanged);
+    UserPreferencesService.instance.prefsNotifier.removeListener(_onPrefsChanged);
+    ListeningHistoryService.instance.historyNotifier.removeListener(_onPrefsChanged);
     super.dispose();
   }
 
