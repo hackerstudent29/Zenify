@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -255,6 +256,7 @@ class _CategoryScreenState extends State<CategoryScreen>
   bool _loading = true;
   bool _expanded = false;
   int _loadToken = 0;
+  Timer? _revealTimer;
 
   late final Color _seedColor = _computeSeed();
 
@@ -298,9 +300,14 @@ class _CategoryScreenState extends State<CategoryScreen>
   }
 
   void _revealList({Duration delay = Duration.zero}) {
-    Future.delayed(delay, () {
+    _revealTimer?.cancel();
+    if (delay == Duration.zero) {
       if (mounted) _listIn.forward(from: 0);
-    });
+    } else {
+      _revealTimer = Timer(delay, () {
+        if (mounted) _listIn.forward(from: 0);
+      });
+    }
   }
 
   Future<void> _load() async {
@@ -324,6 +331,7 @@ class _CategoryScreenState extends State<CategoryScreen>
 
   @override
   void dispose() {
+    _revealTimer?.cancel();
     _scroll.removeListener(_onScroll);
     _entrance.dispose();
     _breathing.dispose();
@@ -638,8 +646,8 @@ class _CategoryScreenState extends State<CategoryScreen>
     final label = widget.heroLabel ?? widget.title;
     final chars = label.characters.toList();
 
-    return SizedBox(
-      height: heroHeight,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: heroHeight),
       child: ValueListenableBuilder<double>(
         valueListenable: _offset,
         builder: (context, offset, _) {

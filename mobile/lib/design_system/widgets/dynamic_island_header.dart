@@ -1026,6 +1026,7 @@ class _HeaderMarqueeState extends State<_HeaderMarquee> {
   final GlobalKey _childKey = GlobalKey();
   int _run = 0;
   bool _needsScroll = false;
+  Timer? _waitTimer;
 
   bool _alive(int id) => mounted && id == _run;
 
@@ -1039,6 +1040,7 @@ class _HeaderMarqueeState extends State<_HeaderMarquee> {
   void didUpdateWidget(covariant _HeaderMarquee old) {
     super.didUpdateWidget(old);
     if (old.resetKey != widget.resetKey) {
+      _waitTimer?.cancel();
       if (_ctrl.hasClients) _ctrl.jumpTo(0);
       _needsScroll = false;
       _start();
@@ -1048,14 +1050,24 @@ class _HeaderMarqueeState extends State<_HeaderMarquee> {
   @override
   void dispose() {
     _run++;
+    _waitTimer?.cancel();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _sleep(Duration duration, int id) {
+    final completer = Completer<void>();
+    _waitTimer?.cancel();
+    _waitTimer = Timer(duration, () {
+      if (!completer.isCompleted) completer.complete();
+    });
+    return completer.future;
   }
 
   Future<void> _start() async {
     final id = ++_run;
     while (_alive(id)) {
-      await Future<void>.delayed(_HeaderMarquee.interval);
+      await _sleep(_HeaderMarquee.interval, id);
       if (!_alive(id) || !_ctrl.hasClients) continue;
       try {
         final renderBox = _childKey.currentContext?.findRenderObject() as RenderBox?;
@@ -1065,7 +1077,7 @@ class _HeaderMarqueeState extends State<_HeaderMarquee> {
 
         if (!_needsScroll) {
           if (mounted) setState(() => _needsScroll = true);
-          await Future<void>.delayed(const Duration(milliseconds: 100));
+          await _sleep(const Duration(milliseconds: 100), id);
           if (!_alive(id) || !_ctrl.hasClients) continue;
         }
 
