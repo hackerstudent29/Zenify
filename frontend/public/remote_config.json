@@ -1,29 +1,29 @@
 {
-  "version": 2030,
+  "version": 2031,
   "streamMode": "device",
   "minAppVersion": "1.0.12",
-  "latestAppVersion": "1.1.17",
+  "latestAppVersion": "1.1.18",
   "isForceUpdate": false,
-  "releaseDate": "November 19, 2026",
-  "releaseTime": "10:30 PM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.17/zenify-v1.1.17.apk",
+  "releaseDate": "November 20, 2026",
+  "releaseTime": "05:15 PM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.18/zenify-v1.1.18.apk",
   "features": [
-    "System-Wide Real Glass Customizer: All presets (Liquid, Prism, Aurora, Frosted, Midnight, Rosé, Crystal), fluid motion shaders, rainbow prism dispersion, depth highlights, and frost veils now apply universally in real time to the MiniPlayer, bottom dock, and Dynamic Island",
-    "Full-Bleed Artwork Player & Bottom Color Expansion: Dynamic fullview layout displaying the full song cover directly above the seekbar and expanding the extracted vibrant artwork palette smoothly to the bottom of the screen with optional settings toggle",
-    "Pure YouTube InnerTube Audio & Synced Timestamp Lyrics: Optimized direct streaming pipeline for high-fidelity full tracks with sub-second word-by-word timestamp synchronization matching YouTube releases",
-    "Smart Battery & Performance Conservation: Dynamic animations, background artwork meshes, and liquid motion tickers automatically pause when leaving the screen or backgrounding the player, preventing battery drain"
+    "Deeply Personalized Home & Explore Feeds: Feeds dynamically adapt to selected Country/Region, multi-language preferences, favorite genres, top artists, and real-time listening history telemetry",
+    "Multi-Language Music Fusion: Seamlessly blends regional charts and new releases across all user languages (Tamil, Telugu, Hindi, English, Punjabi) alongside national top hits",
+    "Intelligent Quick Picks & Mood Shelves: Time-of-day contextual shelf and Quick Picks interleave tracks from listening history seeds, top artists, and language hits",
+    "Personalized Mixes & Tailored Playlists: Supermix, Discover, Chill, and Energy mixes dynamically curate their song selections to match your unique tastes"
   ],
   "fixes": [
-    "Fixed glass customizer presets and tints failing to apply to MiniPlayer, Navbar dock, and Dynamic Island buttons",
-    "Fixed ArtworkMeshBackground multiple tickers crash by upgrading to TickerProviderStateMixin",
-    "Fixed missing bracket and undefined heroHeight syntax error in category details view",
-    "Resolved all static analyzer warnings and lint issues across search, album, and player screens"
+    "Fixed Explore and Home feeds displaying generic Bollywood pop for users with regional language preferences",
+    "Fixed Explore screen caching to dynamically invalidate when region, language, or genre preferences change",
+    "Fixed guest state insights in offline mode with complete listening history stats",
+    "Resolved onboarding preferences test assertions and verified zero analyzer issues"
   ],
   "improvements": [
-    "Enhanced listening history tracker and insights payload validation for robust playback analytics",
-    "Streamlined ExoPlayer audio seekbar clearance and responsive docked layouts",
-    "Ultra-lean ARM64 and universal release APKs with instant installation"
+    "Unified language, artist, and genre pickers in Settings and Profile with live reactive listeners",
+    "Restored 4-step Guided Setup sheet in Profile screen",
+    "Optimized network caching and memory footprint for personalized shelf queries"
   ],
-  "releaseNotes": "• Real-time glass customizer presets & motion applied universally to MiniPlayer, dock & Dynamic Island\n• Full-bleed artwork mode with extracted color expanding beneath the seekbar\n• Pure YouTube InnerTube direct streaming & synced lyrics\n• Intelligent battery saver: automatic rendering pauses when off-screen",
-  "message": "Update to v1.1.17 for system-wide liquid glass customization, full-bleed artwork mode, and battery optimization"
+  "releaseNotes": "• Deeply personalized Home & Explore feeds powered by country, languages, genres, favorite artists & listening history\n• Multi-language music fusion across trending charts and new releases\n• Dynamic Quick Picks and time-of-day contextual shelves\n• Instant reactive preference updates from Settings & Profile",
+  "message": "Update to v1.1.18 for deeply personalized Home & Explore feeds, multi-language music fusion, and enhanced taste controls"
 }

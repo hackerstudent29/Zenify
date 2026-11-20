@@ -29,7 +29,7 @@
   <p align="center">
     <span style="color: rgba(255,255,255,0.25); font-family: monospace; font-size: 16px;">+</span>
     &nbsp;&nbsp;
-    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.17/zenify-v1.1.17.apk">
+    <a href="https://github.com/hackerstudent29/Zenify/releases/download/v1.1.18/zenify-v1.1.18.apk">
       <img src="assets/buttons/btn_download_android.svg" alt="Download for Android" height="46" />
     </a>
     &nbsp;&nbsp;
@@ -52,7 +52,7 @@
 
   <!-- Signature Rose Spec Capsules -->
   <p align="center">
-    <img src="assets/badges/badge_release.svg" alt="Release v1.1.17" height="26" />
+    <img src="assets/badges/badge_release.svg" alt="Release v1.1.18" height="26" />
     &nbsp;
     <img src="assets/badges/badge_audio.svg" alt="320kbps Audio" height="26" />
     &nbsp;

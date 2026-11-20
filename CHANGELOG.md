@@ -2,6 +2,23 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.1.18] - 2026-11-20
+
+### What's New
+- **Deeply Personalized Home & Explore Feeds**:
+  - Home and Explore feeds now dynamically adapt to the user's selected **Country/Region**, **Selected Languages** (with multi-language fusion), **Selected Genres**, **Favorite Artists**, and real-time **Listening History Telemetry**.
+  - **Dynamic Time-of-Day Context**: Morning, afternoon, and evening queries blend the user's primary language and preferred genre into the mood shelf.
+  - **Smart Quick Picks**: Parallel interleaving of tracks from recent listening seeds, favorite artists, and high-energy hits in selected languages/genres into a rich 16-track personalized shelf.
+  - **Personalized Top Artists Shelf**: Shows user's top played artists with real play counts, favorite artists, and curated language stars with dynamic overline `"Based on your favorites & taste"`.
+  - **Multi-Lingual Regional Releases & Charts**: Concurrently queries fresh drops and charts across all selected languages (e.g. Tamil, Telugu, Hindi, English, Punjabi) and blends them with national charts so users are never served generic national pop alone.
+  - **Personalized Mixes**: Supermix, Discover, Chill, and Energy auto-tune their queries to user's languages and genres.
+  - **Dynamic Explore Cache**: Explore cache keys incorporate country code + hash of languages + hash of genres + week number. Any change in Settings or Profile immediately invalidates the cache and reloads the view.
+- **Settings & Profile Music Taste Controls**:
+  - Dedicated "Music Preferences & Taste" section in Settings with live reactive sheets for Region, Languages, Genres, and Favorite Artists.
+  - Restored the 4-step Guided Setup modal (`OnboardingSheet.show(context, isEditing: true)`).
+- **Offline Local Replay & Guest Insights**:
+  - Guest users without account sign-in can now view local replay statistics, total listening time, and streaks directly from `ListeningHistoryService`.
+
 ## [1.1.17] - 2026-11-19
 
 ### What's New

@@ -821,6 +821,7 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
 
   bool _appActive = true;
   bool _reduce = false;
+  bool _hasPointerRoute = false;
   int _level = 0;
   int _loadToken = 0;
 
@@ -844,9 +845,11 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
     _appActive = ls == null || ls == AppLifecycleState.resumed;
     if (widget.interactive) {
       GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
+      _hasPointerRoute = true;
     }
     widget.intensityListenable?.addListener(_wake);
     _loadCover();
+    _wake();
   }
 
   bool _isCurrentRoute = true;
@@ -885,10 +888,12 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
     }
     if (old.interactive != widget.interactive) {
       final router = GestureBinding.instance.pointerRouter;
-      if (widget.interactive) {
+      if (widget.interactive && !_hasPointerRoute) {
         router.addGlobalRoute(_onPointer);
-      } else {
+        _hasPointerRoute = true;
+      } else if (!widget.interactive && _hasPointerRoute) {
         router.removeGlobalRoute(_onPointer);
+        _hasPointerRoute = false;
       }
     }
     if (widget.palette != null &&
@@ -923,7 +928,10 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    GestureBinding.instance.pointerRouter.removeGlobalRoute(_onPointer);
+    if (_hasPointerRoute) {
+      GestureBinding.instance.pointerRouter.removeGlobalRoute(_onPointer);
+      _hasPointerRoute = false;
+    }
     widget.intensityListenable?.removeListener(_wake);
     _loadToken++; // cancel in-flight loads
     _ticker.dispose();
@@ -1035,7 +1043,11 @@ class _ArtworkMeshBackgroundState extends State<ArtworkMeshBackground>
   // ── pointer parallax (only registered when interactive) ──
 
   void _onPointer(PointerEvent e) {
-    if (!mounted || !widget.interactive || _reduce || widget.paused || !_appActive) {
+    if (!mounted ||
+        !widget.interactive ||
+        _reduce ||
+        widget.paused ||
+        !_appActive) {
       return;
     }
     if (e is! PointerMoveEvent && e is! PointerHoverEvent) return;
