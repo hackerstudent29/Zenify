@@ -4,19 +4,19 @@ import React, { useState } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import { SEO } from "@/components/shared/SEO";
 import { PageHeader, Section, stagger, rise } from "@/components/shared/PageChrome";
-import { 
-  Download, 
-  Smartphone, 
-  QrCode, 
-  ShieldCheck, 
-  CheckCircle2, 
-  Sparkles, 
-  Headphones, 
-  Music, 
-  Radio, 
-  Sliders, 
-  Mic2, 
-  HardDrive, 
+import {
+  Download,
+  Smartphone,
+  QrCode,
+  ShieldCheck,
+  CheckCircle2,
+  Sparkles,
+  Headphones,
+  Music,
+  Radio,
+  Sliders,
+  Mic2,
+  HardDrive,
   ExternalLink,
   Apple,
   Monitor,
@@ -34,7 +34,7 @@ export default function DownloadPage() {
   const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.1.18";
   const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.18/zenify-v1.1.18.apk";
   const universalApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.18/zenify-v1.1.18-universal.apk";
-  const absoluteDownloadUrl = typeof window !== "undefined" 
+  const absoluteDownloadUrl = typeof window !== "undefined"
     ? `${window.location.origin}/downloads/zenify.apk`
     : "https://listenzenify.vercel.app/downloads/zenify.apk";
 
@@ -223,11 +223,10 @@ export default function DownloadPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("android")}
-                className={`h-9 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === "android"
-                    ? "bg-brand text-white shadow-md shadow-brand/20"
-                    : "bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/5"
-                }`}
+                className={`h-9 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${activeTab === "android"
+                  ? "bg-brand text-white shadow-md shadow-brand/20"
+                  : "bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/5"
+                  }`}
               >
                 <Smartphone size={14} />
                 <span>Android (APK)</span>
@@ -236,11 +235,10 @@ export default function DownloadPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("ios")}
-                className={`h-9 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === "ios"
-                    ? "bg-brand text-white shadow-md shadow-brand/20"
-                    : "bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/5"
-                }`}
+                className={`h-9 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${activeTab === "ios"
+                  ? "bg-brand text-white shadow-md shadow-brand/20"
+                  : "bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/5"
+                  }`}
               >
                 <Apple size={14} />
                 <span>iPhone / iPad (PWA)</span>
@@ -249,11 +247,10 @@ export default function DownloadPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("desktop")}
-                className={`h-9 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === "desktop"
-                    ? "bg-brand text-white shadow-md shadow-brand/20"
-                    : "bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/5"
-                }`}
+                className={`h-9 px-4 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${activeTab === "desktop"
+                  ? "bg-brand text-white shadow-md shadow-brand/20"
+                  : "bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/5"
+                  }`}
               >
                 <Monitor size={14} />
                 <span>Desktop App</span>
