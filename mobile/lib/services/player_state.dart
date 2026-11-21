@@ -96,6 +96,7 @@ class PlayerState extends ChangeNotifier
   List<Track> _originalQueue = [];
   final List<Track> _history = [];
   int _currentIndex = 0;
+  int _consecutivePlayNextCount = 0;
   int? _autoplayStartIndex;
   bool _collectionLocked = false;
   bool get isCollectionLocked => _collectionLocked;
@@ -464,6 +465,7 @@ class PlayerState extends ChangeNotifier
 
     _originalQueue = List.of(tracks);
     _queue = List.of(tracks);
+    _consecutivePlayNextCount = 0;
     _currentIndex = startIndex.clamp(0, _queue.length - 1);
     await _startCurrent();
   }
@@ -513,6 +515,51 @@ class PlayerState extends ChangeNotifier
       IslandNotification(
         id: 'play_next_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
         title: 'Playing Next',
+        body: IslandNotification.artistOrTitle(
+          artist: track.artist,
+          title: track.title,
+        ),
+        leading: IslandNotification.trackThumb(
+          track.coverUrl,
+          fallbackIcon: CupertinoIcons.arrow_turn_right_up,
+          iconColor: const Color(0xFFE11D48),
+        ),
+      ),
+    );
+    notifyListeners();
+  }
+
+  /// Sequential "Play Next" queueing (FIFO for Up Next):
+  /// 1st swiped song -> inserted as the very next song (#1 Up Next).
+  /// 2nd swiped song -> inserted directly after the 1st (#2 Up Next).
+  /// 3rd swiped song -> inserted directly after the 2nd (#3 Up Next), etc.
+  void enqueuePlayNextSequential(Track track) {
+    if (_queue.isEmpty) {
+      setQueue([track]);
+      _consecutivePlayNextCount = 1;
+      return;
+    }
+    final insertIndex = (_currentIndex + 1 + _consecutivePlayNextCount).clamp(0, _queue.length);
+    _queue.insert(insertIndex, track);
+    _consecutivePlayNextCount++;
+
+    final cur = _queue[_currentIndex];
+    final oi = _originalQueue.indexWhere((t) => t.id == cur.id);
+    final origInsertIndex = oi >= 0
+        ? (oi + _consecutivePlayNextCount).clamp(0, _originalQueue.length)
+        : _originalQueue.length;
+    _originalQueue.insert(origInsertIndex, track);
+
+    _queueState?.addToQueue(track);
+
+    HapticFeedback.lightImpact();
+    final queueTitle = _consecutivePlayNextCount == 1
+        ? 'Playing Next'
+        : 'Queued (#$_consecutivePlayNextCount in Up Next)';
+    IslandNotifier.instance.show(
+      IslandNotification(
+        id: 'play_next_${track.id}_${DateTime.now().millisecondsSinceEpoch}',
+        title: queueTitle,
         body: IslandNotification.artistOrTitle(
           artist: track.artist,
           title: track.title,
@@ -659,6 +706,9 @@ class PlayerState extends ChangeNotifier
 
   Future<void> _startCurrent({int? startMs, String source = 'manual'}) async {
     if (_queue.isEmpty) return;
+    if (_consecutivePlayNextCount > 0) {
+      _consecutivePlayNextCount--;
+    }
     _currentIndex = _currentIndex.clamp(0, _queue.length - 1);
     final track = _queue[_currentIndex];
     final token = ++_playToken;
@@ -866,7 +916,12 @@ class PlayerState extends ChangeNotifier
         if (streams != null && streams.audioUrl.isNotEmpty) {
           await _audioPlayer.playUrl(
             url: streams.audioUrl,
+            mediaId: videoId,
             videoUrl: streams.videoUrl,
+            headers: const {
+              'User-Agent':
+                  'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip',
+            },
             title: track.title,
             artist: track.artist,
             artworkUrl: track.coverUrl,
@@ -888,6 +943,11 @@ class PlayerState extends ChangeNotifier
       if (resolved != null && resolved.url.isNotEmpty) {
         await _audioPlayer.playUrl(
           url: resolved.url,
+          mediaId: videoId,
+          headers: const {
+            'User-Agent':
+                'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip',
+          },
           title: track.title,
           artist: track.artist,
           artworkUrl: track.coverUrl,

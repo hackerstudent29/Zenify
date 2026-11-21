@@ -13,6 +13,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/widgets/equalizer_bars.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
@@ -194,7 +195,7 @@ class _SnapPhysics extends ScrollPhysics {
 /*  Small widgets                                                       */
 /* ------------------------------------------------------------------ */
 class _Img extends StatelessWidget {
-  const _Img(this.url, {this.radius = 10});
+  const _Img(this.url, {this.radius = 6.0});
   final String url;
   final double radius;
 
@@ -219,69 +220,7 @@ class _Img extends StatelessWidget {
   );
 }
 
-class _Eq extends StatefulWidget {
-  const _Eq({required this.playing});
-  final bool playing;
-
-  @override
-  State<_Eq> createState() => _EqState();
-}
-
-class _EqState extends State<_Eq> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1100),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.playing) _c.repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant _Eq old) {
-    super.didUpdateWidget(old);
-    if (widget.playing && !_c.isAnimating) _c.repeat();
-    if (!widget.playing) _c.stop();
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _c,
-    builder: (context, child) => Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: List.generate(4, (i) {
-        final v = widget.playing
-            ? 0.3 +
-                  0.7 *
-                      (0.5 +
-                          0.5 *
-                              math.sin(
-                                _c.value * 2 * math.pi * (1 + i * 0.35) +
-                                    i * 1.3,
-                              ))
-            : 0.28;
-        return Container(
-          width: 3,
-          height: 13 * v,
-          margin: const EdgeInsets.only(right: 2),
-          decoration: BoxDecoration(
-            color: AppColors.accent,
-            borderRadius: BorderRadius.circular(1.5),
-          ),
-        );
-      }),
-    ),
-  );
-}
+typedef _Eq = EqualizerBars;
 
 class _SecHeader extends StatelessWidget {
   const _SecHeader(this.title);
@@ -1504,20 +1443,60 @@ class _AlbumScreenState extends State<AlbumScreen>
                                     milliseconds: 30 * math.min(i, 8),
                                   ),
                                   rise: 14,
-                                  child: _TrackRow(
-                                    index: i,
-                                    track: _tracks[i],
-                                    showArtist: !_tracks[i].artist
-                                        .toLowerCase()
-                                        .contains(lower),
-                                    current:
-                                        player.currentTrack?.id ==
-                                        _tracks[i].id,
-                                    playing:
-                                        player.currentTrack?.id ==
-                                            _tracks[i].id &&
-                                        player.isPlaying,
-                                    onTap: () => _play(i),
+                                  child: Dismissible(
+                                    key: ValueKey(
+                                      'album_trk_${_tracks[i].id}_$i',
+                                    ),
+                                    direction: DismissDirection.startToEnd,
+                                    background: Container(
+                                      alignment: Alignment.centerLeft,
+                                      padding: const EdgeInsets.only(left: 20),
+                                      color: const Color(0xFF007AFF),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            CupertinoIcons.text_badge_plus,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'Play Next',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    confirmDismiss: (direction) async {
+                                      if (direction ==
+                                          DismissDirection.startToEnd) {
+                                        player.enqueuePlayNextSequential(
+                                          _tracks[i],
+                                        );
+                                        return false;
+                                      }
+                                      return false;
+                                    },
+                                    child: _TrackRow(
+                                      index: i,
+                                      track: _tracks[i],
+                                      showArtist: !_tracks[i].artist
+                                          .toLowerCase()
+                                          .contains(lower),
+                                      current:
+                                          player.currentTrack?.id ==
+                                          _tracks[i].id,
+                                      playing:
+                                          player.currentTrack?.id ==
+                                              _tracks[i].id &&
+                                          player.isPlaying,
+                                      onTap: () => _play(i),
+                                    ),
                                   ),
                                 ),
                               _Reveal(
@@ -2008,71 +1987,77 @@ class _ReleaseShelf extends StatelessWidget {
   final String? label;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 214,
-    child: ListView.builder(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      physics: const _SnapPhysics(
-        parent: BouncingScrollPhysics(),
-        itemExtent: 164,
-      ),
-      itemExtent: 164,
-      itemCount: items.length,
-      itemBuilder: (_, i) {
-        final r = items[i];
-        return Padding(
-          padding: const EdgeInsets.only(right: 14),
-          child: _Press(
-            onTap: () => onTap(r),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.28),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+  Widget build(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    final ext = (w - 20) / 2.18;
+    final cw = ext - 14;
+    return SizedBox(
+      height: cw + 60,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        physics: _SnapPhysics(
+          parent: const BouncingScrollPhysics(),
+          itemExtent: ext,
+        ),
+        itemExtent: ext,
+        itemCount: items.length,
+        itemBuilder: (_, i) {
+          final r = items[i];
+          return Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: _Press(
+              onTap: () => onTap(r),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.28),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: _Img(r.cover, radius: 6.0),
                     ),
-                    child: _Img(r.cover),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  r.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.15,
+                  const SizedBox(height: 8),
+                  Text(
+                    r.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.15,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  showArtist
-                      ? r.artist
-                      : (r.count < 3 ? 'Single' : (label ?? 'Album')),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
+                  const SizedBox(height: 2),
+                  Text(
+                    showArtist
+                        ? r.artist
+                        : (r.count < 3 ? 'Single' : (label ?? 'Album')),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12.5,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    ),
-  );
+          );
+        },
+      ),
+    );
+  }
 }

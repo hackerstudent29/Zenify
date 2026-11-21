@@ -22,6 +22,8 @@ import 'services/settings_service.dart';
 import 'services/cache_migration.dart';
 import 'services/library_store.dart';
 import 'services/zenify_audio_handler.dart';
+import 'atlas/atlas.dart';
+import 'services/zenify_atlas_source.dart';
 import 'views/auth/welcome_screen.dart';
 import 'views/shell_screen.dart';
 import 'views/splash/zenify_splash_screen.dart';
@@ -59,6 +61,7 @@ void main() async {
   playerState.attachQueue(queueState);
   await LibraryStore.instance.ensureLoaded();
   unawaited(DownloadService.instance.init());
+  AtlasMusicSource.instance = ZenifyAtlasSource(playerState);
 
   // Initialize background media notifications and lock screen controls
   try {

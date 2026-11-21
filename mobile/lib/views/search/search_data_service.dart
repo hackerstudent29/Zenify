@@ -25,6 +25,7 @@ class SearchDataService {
       ValueNotifier<List<String>>([]);
 
   final SearchTrie _trie = SearchTrie();
+  final SearchRawProviderCache _rawProviderCache = SearchRawProviderCache();
   final SearchLruCache _lruCache = SearchLruCache();
 
   bool _initializedRecents = false;
@@ -150,7 +151,10 @@ class SearchDataService {
     final q = query.trim();
     final country = CountryService.instance.currentCode;
     final userLanguages = UserPreferencesService.instance.currentPrefs.languages;
+    final favArtists = UserPreferencesService.instance.currentPrefs.favoriteArtists;
+    final favArtistNames = favArtists.map((a) => a.name).where((n) => n.isNotEmpty).toList();
     final language = userLanguages.isNotEmpty ? userLanguages.first.toLowerCase() : 'en';
+    final profileHash = '${userLanguages.join(',')}:${favArtistNames.join(',')}';
 
     if (q.isEmpty) {
       return SearchResult(
@@ -163,13 +167,14 @@ class SearchDataService {
       );
     }
 
-    // 1. Check LRU Cache
+    // 1. Check Layer B: Personalized Ranked LRU Cache
     final cacheKey = SearchLruCache.buildKey(
       query: q,
       filter: filter,
       source: SearchSource.youtube,
       country: country,
       language: language,
+      profileHash: profileHash,
     );
 
     if (!forceRefresh) {
@@ -181,54 +186,34 @@ class SearchDataService {
     SearchTopResult? topResult;
     String? didYouMean;
     String? continuation;
+    final latencies = <String, int>{};
 
-    // ── HIGH-SPEED PARALLEL YOUTUBE MUSIC SEARCH PIPELINE (< 2s) ──────────────
-    try {
-      if (filter == SearchFilter.all) {
-        // Parallel fetch: All query (top result card + albums/artists/playlists/videos carousels)
-        // AND Songs-filtered query (fetches 25-30 songs directly)
-        final futureGeneral = InnerTubeService.instance
-            .post(
-              'search',
-              {'query': q},
-              countryCode: country,
-              ttl: SearchRankingConfig.kLruCacheTtl,
-              forceRefresh: forceRefresh,
-            )
-            .timeout(const Duration(milliseconds: 2800));
+    // Helper: Stream retrieval with Layer A Raw Provider Cache & independent timeout
+    Future<ParsedSearchPayload> fetchStream({
+      required String streamName,
+      Map<String, dynamic> body = const {},
+    }) async {
+      final rawKey = SearchRawProviderCache.buildKey(
+        query: q,
+        stream: streamName,
+        country: country,
+        language: language,
+      );
 
-        final futureSongs = InnerTubeService.instance
-            .post(
-              'search',
-              {'query': q, 'params': SearchFilter.songs.params},
-              countryCode: country,
-              ttl: SearchRankingConfig.kLruCacheTtl,
-              forceRefresh: forceRefresh,
-            )
-            .timeout(const Duration(milliseconds: 2800));
-
-        final responses = await Future.wait([
-          futureGeneral.catchError((_) => <String, dynamic>{}),
-          futureSongs.catchError((_) => <String, dynamic>{}),
-        ]);
-
-        final parsedGeneral = SearchParser.parse(responses[0], query: q);
-        final parsedSongs = SearchParser.parse(responses[1], query: q);
-
-        topResult = parsedGeneral.topResult ?? parsedSongs.topResult;
-        didYouMean = parsedGeneral.didYouMean ?? parsedSongs.didYouMean;
-        continuation = parsedGeneral.continuation ?? parsedSongs.continuation;
-
-        candidateItems = [
-          ...parsedGeneral.items,
-          ...parsedSongs.items,
-        ];
-      } else {
-        final body = <String, dynamic>{'query': q};
-        if (filter.params != null) {
-          body['params'] = filter.params;
+      if (!forceRefresh) {
+        final cachedRaw = _rawProviderCache.get(rawKey);
+        if (cachedRaw != null) {
+          return SearchParser.parse(
+            cachedRaw,
+            query: q,
+            sourceStream: streamName,
+          );
         }
-        final rawJson = await InnerTubeService.instance
+      }
+
+      final sw = Stopwatch()..start();
+      try {
+        final raw = await InnerTubeService.instance
             .post(
               'search',
               body,
@@ -236,13 +221,150 @@ class SearchDataService {
               ttl: SearchRankingConfig.kLruCacheTtl,
               forceRefresh: forceRefresh,
             )
-            .timeout(const Duration(milliseconds: 2800));
+            .timeout(const Duration(milliseconds: 3200));
+        sw.stop();
+        latencies[streamName] = sw.elapsedMilliseconds;
+        _rawProviderCache.put(rawKey, raw);
+        return SearchParser.parse(
+          raw,
+          query: q,
+          sourceStream: streamName,
+        );
+      } catch (e) {
+        sw.stop();
+        latencies[streamName] = sw.elapsedMilliseconds;
+        return const ParsedSearchPayload();
+      }
+    }
 
-        final parsed = SearchParser.parse(rawJson, query: q);
-        candidateItems = parsed.items;
+    // ── ADAPTIVE MULTI-QUERY YOUTUBE MUSIC SEARCH PIPELINE ───────────────────
+    try {
+      if (filter == SearchFilter.all) {
+        final prelim = SearchIntentDetector.detectPreliminaryIntent(q);
+        final futures = <Future<ParsedSearchPayload>>[];
+
+        // A. General Search overview stream is always retrieved
+        futures.add(fetchStream(streamName: 'general', body: {'query': q}));
+
+        // B. Intent-adaptive category streams
+        if (prelim == SearchItemType.album) {
+          futures.add(fetchStream(
+            streamName: 'albums',
+            body: {'query': q, 'params': SearchFilter.albums.params},
+          ));
+          futures.add(fetchStream(
+            streamName: 'songs',
+            body: {'query': q, 'params': SearchFilter.songs.params},
+          ));
+        } else if (prelim == SearchItemType.artist) {
+          futures.add(fetchStream(
+            streamName: 'artists',
+            body: {'query': q, 'params': SearchFilter.artists.params},
+          ));
+          futures.add(fetchStream(
+            streamName: 'songs',
+            body: {'query': q, 'params': SearchFilter.songs.params},
+          ));
+        } else if (prelim == SearchItemType.playlist) {
+          futures.add(fetchStream(
+            streamName: 'playlists',
+            body: {'query': q, 'params': SearchFilter.featuredPlaylists.params},
+          ));
+          futures.add(fetchStream(
+            streamName: 'songs',
+            body: {'query': q, 'params': SearchFilter.songs.params},
+          ));
+        } else if (prelim == SearchItemType.video) {
+          futures.add(fetchStream(
+            streamName: 'videos',
+            body: {'query': q, 'params': SearchFilter.videos.params},
+          ));
+          futures.add(fetchStream(
+            streamName: 'songs',
+            body: {'query': q, 'params': SearchFilter.songs.params},
+          ));
+        } else {
+          // Standard / Song Search default: General + Songs filter
+          futures.add(fetchStream(
+            streamName: 'songs',
+            body: {'query': q, 'params': SearchFilter.songs.params},
+          ));
+        }
+
+        // C. Concurrent Native Search Summary (Android): resolves in ~700ms with 100% parity
+        if (InnerTubeService.instance.isNativeAvailable) {
+          futures.add(() async {
+            final sw = Stopwatch()..start();
+            try {
+              final nativeData = await InnerTubeService.instance
+                  .searchSummaryNative(q)
+                  .timeout(const Duration(milliseconds: 3200), onTimeout: () => null);
+              sw.stop();
+              latencies['native'] = sw.elapsedMilliseconds;
+              if (nativeData != null && nativeData['summaries'] is List) {
+                return SearchParser.parseNativeSummaries(
+                  nativeData['summaries'] as List,
+                  query: q,
+                );
+              }
+            } catch (_) {
+              sw.stop();
+            }
+            return const ParsedSearchPayload();
+          }());
+        }
+
+        final parsedResults = await Future.wait(futures);
+        for (final res in parsedResults) {
+          topResult ??= res.topResult;
+          didYouMean ??= res.didYouMean;
+          continuation ??= res.continuation;
+          candidateItems.addAll(res.items);
+        }
+      } else {
+        final body = <String, dynamic>{'query': q};
+        if (filter.params != null) {
+          body['params'] = filter.params;
+        }
+
+        final httpFuture = fetchStream(streamName: filter.name, body: body);
+        Future<List<SearchItem>>? nativeFilterFuture;
+        if (InnerTubeService.instance.isNativeAvailable) {
+          if (filter == SearchFilter.songs) {
+            nativeFilterFuture = InnerTubeService.instance
+                .searchSongsNative(q)
+                .timeout(const Duration(milliseconds: 2800), onTimeout: () => <Track>[])
+                .then<List<SearchItem>>((tracks) => tracks.map(_trackToSearchSongItem).toList())
+                .catchError((_) => <SearchItem>[]);
+          } else if (filter == SearchFilter.albums) {
+            nativeFilterFuture = InnerTubeService.instance
+                .searchAlbumsNative(q)
+                .timeout(const Duration(milliseconds: 2800), onTimeout: () => <Map<String, dynamic>>[])
+                .then((albums) => albums.map((a) => SearchParser.parseNativeItem(a, rawRank: 0)).whereType<SearchItem>().toList())
+                .catchError((_) => <SearchItem>[]);
+          } else if (filter == SearchFilter.artists) {
+            nativeFilterFuture = InnerTubeService.instance
+                .searchArtistsNative(q)
+                .timeout(const Duration(milliseconds: 2800), onTimeout: () => <Map<String, dynamic>>[])
+                .then((artists) => artists.map((a) => SearchParser.parseNativeItem(a, rawRank: 0)).whereType<SearchItem>().toList())
+                .catchError((_) => <SearchItem>[]);
+          }
+        }
+
+        final parsed = await httpFuture;
+        candidateItems = List<SearchItem>.from(parsed.items);
         topResult = parsed.topResult;
         didYouMean = parsed.didYouMean;
         continuation = parsed.continuation;
+
+        if (nativeFilterFuture != null) {
+          final nativeItems = await nativeFilterFuture;
+          if (candidateItems.isEmpty) {
+            candidateItems = nativeItems;
+          } else {
+            candidateItems.addAll(nativeItems);
+          }
+        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -359,15 +481,17 @@ class SearchDataService {
     // 5. Detect Intent from query terms and candidate entities
     final intent = SearchIntentDetector.detectIntent(q, candidateItems);
 
-    // 6. Rank, Deduplicate, and Structure Shelves
+    // 6. Rank, Deduplicate, Fuse Streams (RRF), and Structure Shelves
     final rankedResult = SearchRanker.rank(
       items: candidateItems,
       intent: intent,
       countryCode: country,
       preferredLanguages: userLanguages,
+      favoriteArtists: favArtistNames,
       initialTopResult: topResult,
       didYouMean: didYouMean,
       continuation: continuation,
+      streamLatenciesMs: latencies,
     );
     if (kDebugMode) {
       debugPrint(
@@ -375,7 +499,7 @@ class SearchDataService {
       );
     }
 
-    // 7. Store in LRU Cache
+    // 7. Store in Layer B: Personalized Ranked LRU Cache
     _lruCache.put(cacheKey, rankedResult);
 
     // 8. Prefetch top 5 song thumbnails in background for instant image loading

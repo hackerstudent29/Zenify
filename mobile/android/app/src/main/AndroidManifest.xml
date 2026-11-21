@@ -34,6 +34,10 @@
         android:enableOnBackInvokedCallback="true"
         android:allowBackup="false"
         android:usesCleartextTraffic="true">
+        <!-- Disable experimental Impeller on Android to prevent CanAcceptOpacity validation breaks and pipeline stalls -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

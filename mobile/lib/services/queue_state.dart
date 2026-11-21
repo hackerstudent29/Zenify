@@ -32,6 +32,8 @@ class QueueEntry {
   final bool isAutoplay;
   final bool isManualPin;
 
+  bool get addedByUser => isManualPin;
+
   String get id => track.id;
   String get title => track.title;
   String get artist => track.artist;

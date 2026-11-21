@@ -158,10 +158,11 @@ class UserPreferencesService {
   OnboardingPrefs get currentPrefs => prefsNotifier.value ?? const OnboardingPrefs();
   bool get hasCompleted => prefsNotifier.value?.completed == true;
 
-  /// Resolves the unified list of user languages combining preferences and listening history.
+  /// Resolves the unified list of user languages combining preferences and qualified listening history.
+  /// Strictly prevents 1-song or isolated plays from corrupting recommendations.
   List<String> get effectiveLanguages {
     final prefsLangs = currentPrefs.languages;
-    final histLangs = ListeningHistoryService.instance.detectedLanguages;
+    final histLangs = ListeningHistoryService.instance.qualifiedListenedLanguages;
     final seen = <String>{};
     final result = <String>[];
     for (final l in [...prefsLangs, ...histLangs]) {

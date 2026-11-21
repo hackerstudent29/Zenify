@@ -1,29 +1,27 @@
 {
-  "version": 2031,
+  "version": 2032,
   "streamMode": "device",
   "minAppVersion": "1.0.12",
-  "latestAppVersion": "1.1.18",
+  "latestAppVersion": "1.1.19",
   "isForceUpdate": false,
-  "releaseDate": "November 20, 2026",
-  "releaseTime": "05:15 PM IST",
-  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.18/zenify-v1.1.18.apk",
+  "releaseDate": "November 21, 2026",
+  "releaseTime": "08:35 PM IST",
+  "updateUrl": "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.19/zenify-v1.1.19.apk",
   "features": [
-    "Deeply Personalized Home & Explore Feeds: Feeds dynamically adapt to selected Country/Region, multi-language preferences, favorite genres, top artists, and real-time listening history telemetry",
-    "Multi-Language Music Fusion: Seamlessly blends regional charts and new releases across all user languages (Tamil, Telugu, Hindi, English, Punjabi) alongside national top hits",
-    "Intelligent Quick Picks & Mood Shelves: Time-of-day contextual shelf and Quick Picks interleave tracks from listening history seeds, top artists, and language hits",
-    "Personalized Mixes & Tailored Playlists: Supermix, Discover, Chill, and Energy mixes dynamically curate their song selections to match your unique tastes"
+    "Interactive Sound Atlas: Explore regional and global music cultures via 3D interactive globe, curated city and country charts, and Sound Passport",
+    "Apple Music Styled Sound Atlas UI: Integrated fluid iOS navigation, zero-delay single tap globe interactions, and rich musical identity badges",
+    "Optimized Search & Personalization Engine: Multi-factor ranking, category-specific retrieval, and unified listening insights"
   ],
   "fixes": [
-    "Fixed Explore and Home feeds displaying generic Bollywood pop for users with regional language preferences",
-    "Fixed Explore screen caching to dynamically invalidate when region, language, or genre preferences change",
-    "Fixed guest state insights in offline mode with complete listening history stats",
-    "Resolved onboarding preferences test assertions and verified zero analyzer issues"
+    "Fixed Flutter Impeller SetInheritedOpacity validation breaks and GPU frame drops on Android 14 / ColorOS",
+    "Optimized mini-player render tree with zero-overhead offstage visibility and album art rendering",
+    "Fixed language server analyzer diagnostics, record types, and updated deprecated Flutter members",
+    "Cleaned and organized project structure"
   ],
   "improvements": [
-    "Unified language, artist, and genre pickers in Settings and Profile with live reactive listeners",
-    "Restored 4-step Guided Setup sheet in Profile screen",
-    "Optimized network caching and memory footprint for personalized shelf queries"
+    "Compressed release build size with ProGuard and ABI-split optimization",
+    "Enhanced memory management and battery efficiency"
   ],
-  "releaseNotes": "• Deeply personalized Home & Explore feeds powered by country, languages, genres, favorite artists & listening history\n• Multi-language music fusion across trending charts and new releases\n• Dynamic Quick Picks and time-of-day contextual shelves\n• Instant reactive preference updates from Settings & Profile",
-  "message": "Update to v1.1.18 for deeply personalized Home & Explore feeds, multi-language music fusion, and enhanced taste controls"
+  "releaseNotes": "• Interactive Sound Atlas: 3D globe, city & country charts, musical journeys & battles\n• Sound Passport with stamped cities and milestones\n• Compressed APK release with ultra-fast startup",
+  "message": "Update to v1.1.19 for the brand new Interactive Sound Atlas, Sound Passport, and optimized audio performance"
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +10,6 @@ import 'package:provider/provider.dart';
 import '../../design_system/apple/apple_tokens.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/widgets/apple_glass.dart';
-import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/spring_kit.dart';
 import '../../services/auth_state.dart';
@@ -33,17 +33,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     with TickerProviderStateMixin, HideDocksMixin {
   @override
   bool get hideMiniPlayerWhileActive => true;
-
-  /// Strawberry Rose + Blush Pink + Pure White wave palette for the free-flowing
-  /// ArtworkMeshBackground behind the transparent ZENIFY logo.
-  static const List<Color> _roseWhitePalette = [
-    Color(0xFFE11D48), // Strawberry Rose
-    Color(0xFFFF4D79), // Bright Strawberry Pink
-    Color(0xFFFFFFFF), // Luminous White wave
-    Color(0xFFFFDCE5), // Rose Pearl White blend
-    Color(0xFFFB7185), // Warm Pastel Rose
-    Color(0xFF881337), // Deep Berry undertone
-  ];
 
   bool _isGoogleLoading = false;
   bool _isGuestLoading = false;
@@ -263,8 +252,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Free-flowing Strawberry Rose & White ArtMesh background (same liquid
-          // physics engine as Full-Screen Player) with smooth bloom intro animation.
+          // 1. Free-flowing Strawberry Rose & mixed rose fluid backdrop (our liquid
+          // flowing backdrop style) with smooth bloom intro animation.
           AnimatedBuilder(
             animation: _bgIntroCtrl,
             builder: (context, child) {
@@ -277,15 +266,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                 ),
               );
             },
-            child: const ArtworkMeshBackground(
-              palette: _roseWhitePalette,
-              speed: 1.55,
-              intensity: 0.45,
-              interactive: true,
-              dither: true,
-              scrimOpacity: 0.08,
-              backgroundColor: Color(0xFF1F0610),
-            ),
+            child: const RoseFlowingBackdrop(),
           ),
 
           // Gentle lower-edge contrast gradient so CTA controls pop effortlessly
@@ -755,4 +736,136 @@ class _GlassCircleIconButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Liquid flowing rose and mixed rose backdrop inspired by our fluid
+/// artwork color wash. Multiple organic radial color blobs orbit with harmonic
+/// wave physics and melt through a heavy GPU gaussian blur layer.
+class RoseFlowingBackdrop extends StatefulWidget {
+  const RoseFlowingBackdrop({super.key});
+
+  @override
+  State<RoseFlowingBackdrop> createState() => _RoseFlowingBackdropState();
+}
+
+class _RoseFlowingBackdropState extends State<RoseFlowingBackdrop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _flow = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 24),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _flow.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Base deep velvet rose background
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF140209),
+                  Color(0xFF1F040E),
+                  Color(0xFF100107),
+                ],
+              ),
+            ),
+          ),
+
+          // Flowing liquid blobs with heavy GPU Gaussian blur
+          ImageFiltered(
+            imageFilter: ui.ImageFilter.blur(
+              sigmaX: 58,
+              sigmaY: 58,
+              tileMode: TileMode.mirror,
+            ),
+            child: CustomPaint(
+              painter: _RoseFlowPainter(_flow),
+              size: Size.infinite,
+            ),
+          ),
+
+          // Gentle scrim vignette for contrast and punchy text legibility
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.12),
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.28),
+                  Colors.black.withValues(alpha: 0.58),
+                ],
+                stops: const [0.0, 0.35, 0.70, 1.0],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoseFlowPainter extends CustomPainter {
+  _RoseFlowPainter(this.animation) : super(repaint: animation);
+
+  final Animation<double> animation;
+
+  // Blob definition: (scale, phase, driftAmpX, driftAmpY, speedMultiplier, rotationDir, Color, opacity)
+  static const _blobs = <(double, double, double, double, double, double, Color, double)>[
+    // Blob 1: Vibrant Strawberry Rose core (large upper-center anchor)
+    (1.45, 0.0, 0.20, 0.16, 1.0, 1.0, Color(0xFFE11D48), 0.88),
+    // Blob 2: Deep Crimson Wine Berry (rich depth in lower region)
+    (1.70, 2.1, 0.26, 0.22, 1.5, -1.0, Color(0xFF881337), 0.75),
+    // Blob 3: Radiant Rose Pink (bright highlights middle-left to top-center)
+    (1.30, 4.2, 0.22, 0.28, 2.0, 1.0, Color(0xFFFF2D55), 0.70),
+    // Blob 4: Warm Coral Rose (glowing warmth around center-right)
+    (1.20, 1.3, 0.24, 0.18, 1.2, -1.0, Color(0xFFFB7185), 0.60),
+    // Blob 5: Electric Magenta Rose (vibrant saturation in lower-left)
+    (1.35, 3.4, 0.18, 0.24, 1.8, 1.0, Color(0xFFD81B60), 0.65),
+    // Blob 6: Luminous Pearl Rose Glow (soft bloom near brand mark)
+    (1.05, 5.1, 0.15, 0.14, 0.8, 1.0, Color(0xFFFF8EA3), 0.45),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final t = animation.value;
+    final a = t * 2 * math.pi;
+    final side = size.longestSide;
+
+    for (final (scale, phase, ax, ay, speed, dir, color, op) in _blobs) {
+      final dx = math.cos(a * speed * dir + phase) * size.width * ax;
+      final dy = math.sin(a * speed * dir * 0.85 + phase * 1.6) * size.height * ay;
+      final center = Offset(size.width / 2 + dx, size.height / 2 + dy);
+      final radius = (side * 0.42) * scale;
+
+      final paint = Paint()
+        ..shader = ui.Gradient.radial(
+          center,
+          radius,
+          [
+            color.withValues(alpha: op),
+            color.withValues(alpha: op * 0.45),
+            color.withValues(alpha: 0.0),
+          ],
+          const [0.0, 0.58, 1.0],
+        );
+
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RoseFlowPainter oldDelegate) => true;
 }

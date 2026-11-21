@@ -95,7 +95,8 @@ object YtDataSource {
                 val isVideoUri = uri.host == "video"
                 val wantVideo = isVideoUri || uri.getQueryParameter("v") == "1"
                 val videoId = uri.lastPathSegment ?: uri.host ?: error("Invalid zenify URI: $uri")
-                val resolved = runBlocking { YtEngine.resolve(videoId, wantVideo = wantVideo) }
+                val qualityParam = uri.getQueryParameter("q") ?: YtEngine.currentQuality
+                val resolved = runBlocking { YtEngine.resolve(videoId, wantVideo = wantVideo, quality = qualityParam) }
                 onResolved?.invoke(videoId, resolved)
                 val targetUrl = if (isVideoUri && !resolved.videoUrl.isNullOrBlank()) {
                     resolved.videoUrl
@@ -116,13 +117,14 @@ object YtDataSource {
                     .build()
             } else if (uri.host?.contains("googlevideo.com") == true) {
                 val active = com.zenify.mobile.audio.ZenAudioPlugin.activeHeaders
-                if (active.isNotEmpty()) {
-                    dataSpec.buildUpon()
-                        .setHttpRequestHeaders(active)
-                        .build()
+                val headers = if (active.isNotEmpty()) {
+                    active
                 } else {
-                    dataSpec
+                    StreamHeaders.forClient("ANDROID")
                 }
+                dataSpec.buildUpon()
+                    .setHttpRequestHeaders(headers)
+                    .build()
             } else {
                 dataSpec
             }

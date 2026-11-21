@@ -63,11 +63,9 @@ void main() {
                 Positioned.fill(
                   child: PlayerShell(
                     key: shellKey,
-                    lyricsBuilder: (_) => const SizedBox.expand(
-                      child: ColoredBox(
-                        key: ValueKey('mock_lyrics_body'),
-                        color: Colors.transparent,
-                      ),
+                    lyricsBuilder: (_) => ListView(
+                      key: const ValueKey('mock_lyrics_body'),
+                      children: const [SizedBox(height: 1200)],
                     ),
                   ),
                 ),
@@ -90,7 +88,7 @@ void main() {
     expect(find.byIcon(CupertinoIcons.list_bullet), findsOneWidget);
 
     // Tap Lyrics button -> opens lyrics dim boundary, moves cover, keeps all buttons & artist visible
-    await tester.tap(find.byIcon(CupertinoIcons.quote_bubble));
+    await tester.tap(find.byIcon(CupertinoIcons.quote_bubble), warnIfMissed: false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 450));
 
@@ -106,8 +104,10 @@ void main() {
     expect(find.byIcon(CupertinoIcons.quote_bubble_fill), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.list_bullet), findsOneWidget);
 
-    // Wait > 3 seconds without interaction -> bottom controls (seekbar, transport, buttons) hide cleanly
-    await tester.pump(const Duration(milliseconds: 3100));
+    // Drag lyrics up from its upper region (clear of bottom controls) -> bottom controls hide cleanly
+    final lyricsTopLeft = tester.getTopLeft(find.byKey(const ValueKey('mock_lyrics_body')));
+    await tester.dragFrom(lyricsTopLeft + const Offset(100, 60), const Offset(0, -80));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
     final lyricsIconRender = tester.renderObject(
@@ -121,10 +121,10 @@ void main() {
           ),
         ).any((w) => w.ignoring), isTrue);
 
-    // Touching screen wakes all controls back up
-    await tester.tap(find.byKey(const ValueKey('mock_lyrics_body')));
+    // Dragging down shows all controls back up
+    await tester.dragFrom(lyricsTopLeft + const Offset(100, 60), const Offset(0, 80));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(
       tester.widgetList<IgnorePointer>(

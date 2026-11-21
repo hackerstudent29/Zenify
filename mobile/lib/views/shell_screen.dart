@@ -17,12 +17,11 @@ import '../services/update_service.dart';
 import '../utils/media_normalizer.dart';
 import 'details/album_screen.dart';
 import 'details/artist_screen.dart';
-import 'explore/explore_screen.dart';
+import '../atlas/atlas.dart';
 import 'home/home_screen.dart';
 import 'library/library_screen.dart';
 import 'player/player_shell.dart';
 import 'search/search_screen.dart';
-import 'profile/profile_screen.dart';
 import 'room_together/room_together_screen.dart';
 
 /// AppShell: 4 tabs, an Apple Music style liquid-glass dock (slide-to-switch lens +
@@ -117,30 +116,52 @@ class _ShellScreenState extends State<ShellScreen>
 
   late final List<Widget> _tabNavigators = [
     _buildTabNav(0, const HomeScreen()),
-    _buildTabNav(
-      1,
-      ExploreScreen(
-        onOpenProfile: () => _openInActiveTab(const ProfileScreen()),
-        onOpenTogether: () => _openInActiveTab(const RoomTogetherScreen()),
-      ),
-    ),
+    _buildTabNav(1, const AtlasScreen()),
     _buildTabNav(2, const LibraryScreen()),
     _buildTabNav(3, SearchScreen(onBack: _onSearchBack)),
   ];
 
   void _onDockSelect(int i) {
     if (i == 3) {
-      if (_currentIndex != 3) _prevIndex = _currentIndex;
-      if (SearchNav.phase.value == SearchPhase.off) {
-        SearchNav.phase.value = SearchPhase.bar; // circle → wide bar
+      if (_currentIndex != 3) {
+        _prevIndex = _currentIndex;
+        // Coming to search from another page: reset search stack to default page
+        if (_navKeys[3].currentState?.canPop() ?? false) {
+          _navKeys[3].currentState?.popUntil((r) => r.isFirst);
+        }
+        SearchNav.phase.value = SearchPhase.off;
+        _select(3);
+      } else {
+        // User is ALREADY on the Search tab:
+        // 1. If deep in a pushed subpage (artist, album, etc.), pop back to default landing page
+        if (_navKeys[3].currentState?.canPop() ?? false) {
+          _navKeys[3].currentState?.popUntil((r) => r.isFirst);
+          SearchNav.phase.value = SearchPhase.off;
+          ZenHaptics.light();
+          return;
+        }
+        // 2. Toggle between typing search mode and default landing page
+        if (SearchNav.phase.value == SearchPhase.typing) {
+          SearchNav.phase.value = SearchPhase.off;
+        } else {
+          SearchNav.phase.value = SearchPhase.typing;
+        }
+        ZenHaptics.light();
       }
     } else {
+      // Switching to other tabs: reset search stack so returning later shows default page
+      if (_currentIndex == 3 || (_navKeys[3].currentState?.canPop() ?? false)) {
+        _navKeys[3].currentState?.popUntil((r) => r.isFirst);
+      }
       SearchNav.phase.value = SearchPhase.off;
+      _select(i);
     }
-    _select(i);
   }
 
   void _onSearchBack() {
+    if (_navKeys[3].currentState?.canPop() ?? false) {
+      _navKeys[3].currentState?.popUntil((r) => r.isFirst);
+    }
     SearchNav.phase.value = SearchPhase.off;
     _select(_prevIndex);
   }
@@ -163,7 +184,9 @@ class _ShellScreenState extends State<ShellScreen>
       if (!mounted) return;
       final info = await UpdateService.instance.checkForUpdate(silent: true);
       if (!mounted) return;
-      if (info != null && info.hasUpdate && !UpdateService.instance.hasDismissedPrompt) {
+      if (info != null &&
+          info.hasUpdate &&
+          !UpdateService.instance.hasDismissedPrompt) {
         UpdateService.instance.showUpdateSheet(context, info);
       }
     });
@@ -228,11 +251,26 @@ class _ShellScreenState extends State<ShellScreen>
       if (_navKeys[index].currentState?.canPop() ?? false) {
         _navKeys[index].currentState?.popUntil((r) => r.isFirst);
       }
+      if (index == 3) {
+        SearchNav.phase.value = SearchPhase.off;
+      }
       DockVisibility.reset();
       if (_dockController.value != 1.0) {
         _dockController.value = 1.0;
       }
       return;
+    }
+    // If leaving search tab to another tab, reset search navigator to default
+    if (_currentIndex == 3 && (_navKeys[3].currentState?.canPop() ?? false)) {
+      _navKeys[3].currentState?.popUntil((r) => r.isFirst);
+      SearchNav.phase.value = SearchPhase.off;
+    }
+    // If switching to search tab, ensure it is at default root page
+    if (index == 3) {
+      if (_navKeys[3].currentState?.canPop() ?? false) {
+        _navKeys[3].currentState?.popUntil((r) => r.isFirst);
+      }
+      SearchNav.phase.value = SearchPhase.off;
     }
     FocusManager.instance.primaryFocus?.unfocus();
     _tabHistory.remove(_currentIndex);
@@ -275,9 +313,9 @@ class _ShellScreenState extends State<ShellScreen>
       return;
     }
 
-    // If on search tab and search bar/input is open, return to category shelves.
-    if (_currentIndex == 1 && SearchNav.phase.value == SearchPhase.bar) {
-      _onSearchBack();
+    // If on search tab and typing search is active, dismiss it back to default page.
+    if (_currentIndex == 3 && SearchNav.phase.value == SearchPhase.typing) {
+      SearchNav.phase.value = SearchPhase.off;
       return;
     }
 
@@ -567,40 +605,50 @@ class _ShellScreenState extends State<ShellScreen>
                         bottom: safeBottom + _navMargin,
                         child: AnimatedSlide(
                           offset: hideDocks
-                              ? const Offset(0, 2.0)
+                              ? const Offset(0, 3.0)
                               : Offset.zero,
                           duration: const Duration(milliseconds: 260),
                           curve: Curves.easeInOutCubic,
                           child: AnimatedOpacity(
                             opacity: hideDocks ? 0.0 : 1.0,
                             duration: const Duration(milliseconds: 200),
-                            child: ValueListenableBuilder<bool>(
-                              valueListenable: PlayerShell.isPlayerOpenNotifier,
-                              builder: (_, isPlayerOpen, child) =>
-                                  IgnorePointer(
-                                    ignoring: hideDocks || isPlayerOpen,
-                                    child: child!,
+                            child: RepaintBoundary(
+                              child: ValueListenableBuilder<bool>(
+                                valueListenable:
+                                    PlayerShell.isPlayerOpenNotifier,
+                                builder: (_, isPlayerOpen, child) =>
+                                    IgnorePointer(
+                                      ignoring: hideDocks || isPlayerOpen,
+                                      child: child!,
+                                    ),
+                                child: ValueListenableBuilder<SearchPhase>(
+                                  valueListenable: SearchNav.phase,
+                                  builder: (_, phase, _) => AppleDock(
+                                    height: _navHeight,
+                                    index: _currentIndex,
+                                    searchExpanded: false,
+                                    dockProgress: dockProgress,
+                                    onSelect: _onDockSelect,
+                                    onBack: _onSearchBack,
+                                    onSearchTap: () {
+                                      if (SearchNav.phase.value ==
+                                          SearchPhase.typing) {
+                                        SearchNav.phase.value = SearchPhase.off;
+                                      } else {
+                                        SearchNav.phase.value =
+                                            SearchPhase.typing;
+                                      }
+                                    },
+                                    onRestoreDockTap: () {
+                                      _dockController.animateTo(
+                                        1.0,
+                                        duration: const Duration(
+                                          milliseconds: 280,
+                                        ),
+                                        curve: Curves.easeOutCubic,
+                                      );
+                                    },
                                   ),
-                              child: ValueListenableBuilder<SearchPhase>(
-                                valueListenable: SearchNav.phase,
-                                builder: (_, phase, _) => AppleDock(
-                                  height: _navHeight,
-                                  index: _currentIndex,
-                                  searchExpanded: phase == SearchPhase.bar,
-                                  dockProgress: dockProgress,
-                                  onSelect: _onDockSelect,
-                                  onBack: _onSearchBack,
-                                  onSearchTap: () => SearchNav.phase.value =
-                                      SearchPhase.typing,
-                                  onRestoreDockTap: () {
-                                    _dockController.animateTo(
-                                      1.0,
-                                      duration: const Duration(
-                                        milliseconds: 280,
-                                      ),
-                                      curve: Curves.easeOutCubic,
-                                    );
-                                  },
                                 ),
                               ),
                             ),
@@ -689,16 +737,19 @@ class _AnimatedTabStackState extends State<_AnimatedTabStack>
         final t = Curves.easeOutCubic.transform(_controller.value);
         final double slideOffset = (1.0 - t) * 0.025 * slideSign;
 
-        return Opacity(
-          opacity: t.clamp(0.0, 1.0),
-          child: FractionalTranslation(
-            translation: Offset(slideOffset, 0),
-            child: Transform.scale(
-              scale: 0.992 + 0.008 * t,
-              alignment: Alignment.center,
-              child: child,
-            ),
+        final double opacity = t.clamp(0.0, 1.0);
+        final Widget childWidget = FractionalTranslation(
+          translation: Offset(slideOffset, 0),
+          child: Transform.scale(
+            scale: 0.992 + 0.008 * t,
+            alignment: Alignment.center,
+            child: child,
           ),
+        );
+        if (opacity >= 0.999) return childWidget;
+        return Opacity(
+          opacity: opacity,
+          child: childWidget,
         );
       },
       child: IndexedStack(

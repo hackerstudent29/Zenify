@@ -54,13 +54,32 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   @override
   void initState() {
     super.initState();
+    ListeningHistoryService.instance.historyNotifier.addListener(_onHistoryUpdated);
     _fetchInsights();
   }
 
-  Future<void> _fetchInsights() async {
+  @override
+  void dispose() {
+    ListeningHistoryService.instance.historyNotifier.removeListener(_onHistoryUpdated);
+    super.dispose();
+  }
+
+  void _onHistoryUpdated() {
+    if (!mounted) return;
+    final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
+    setState(() {
+      _insightsData = localData;
+      _loading = false;
+      _error = null;
+    });
+  }
+
+  Future<void> _fetchInsights({bool silent = false}) async {
     final auth = context.read<AuthState>();
     if (!auth.isLoggedIn) {
-      final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
+      final localData = ListeningHistoryService.instance.getLocalInsights(
+        range: _selectedRange,
+      );
       if (mounted) {
         setState(() {
           _loading = false;
@@ -71,7 +90,7 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
       return;
     }
 
-    if (mounted) {
+    if (mounted && !silent && _insightsData == null) {
       setState(() {
         _loading = true;
         _error = null;
@@ -81,7 +100,9 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
     try {
       final token = await AuthService.instance.getAccessToken();
       if (token == null) {
-        final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
+        final localData = ListeningHistoryService.instance.getLocalInsights(
+          range: _selectedRange,
+        );
         if (!mounted) return;
         setState(() {
           _loading = false;
@@ -95,14 +116,20 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
       unawaited(ListeningTrackerService.instance.drainJournal());
 
       final responses = await Future.wait([
-        http.get(
-          Uri.parse('${ApiService.baseUrl}/api/me/insights?range=$_selectedRange'),
-          headers: {'Authorization': 'Bearer $token'},
-        ).timeout(const Duration(seconds: 6)),
-        http.get(
-          Uri.parse('${ApiService.baseUrl}/api/me/achievements'),
-          headers: {'Authorization': 'Bearer $token'},
-        ).timeout(const Duration(seconds: 6)),
+        http
+            .get(
+              Uri.parse(
+                '${ApiService.baseUrl}/api/me/insights?range=$_selectedRange',
+              ),
+              headers: {'Authorization': 'Bearer $token'},
+            )
+            .timeout(const Duration(seconds: 6)),
+        http
+            .get(
+              Uri.parse('${ApiService.baseUrl}/api/me/achievements'),
+              headers: {'Authorization': 'Bearer $token'},
+            )
+            .timeout(const Duration(seconds: 6)),
       ]);
 
       final insightsRes = responses[0];
@@ -126,7 +153,9 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
           });
         } else {
           // Server returned 0 plays, check if local has plays
-          final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
+          final localData = ListeningHistoryService.instance.getLocalInsights(
+            range: _selectedRange,
+          );
           final localPlays = (localData['totalPlays'] as num? ?? 0).toInt();
           setState(() {
             _insightsData = localPlays > 0 ? localData : data;
@@ -136,7 +165,9 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
         }
       } else {
         // Server error: fall back to local insights
-        final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
+        final localData = ListeningHistoryService.instance.getLocalInsights(
+          range: _selectedRange,
+        );
         setState(() {
           _insightsData = localData;
           _loading = false;
@@ -144,7 +175,9 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
       }
     } catch (_) {
       if (!mounted) return;
-      final localData = ListeningHistoryService.instance.getLocalInsights(range: _selectedRange);
+      final localData = ListeningHistoryService.instance.getLocalInsights(
+        range: _selectedRange,
+      );
       setState(() {
         _insightsData = localData;
         _loading = false;
@@ -167,14 +200,16 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
   void _onPlayTrack(Map<String, dynamic> trackData) {
     final trackId = trackData['trackId']?.toString() ?? 'top_track';
     final localTrack = ListeningHistoryService.instance.findTrackById(trackId);
-    final track = localTrack ??
+    final track =
+        localTrack ??
         Track(
           id: trackId,
           title: trackData['trackTitle']?.toString() ?? 'Unknown Track',
           artist: trackData['artistName']?.toString() ?? 'Unknown Artist',
           album: trackData['trackAlbum']?.toString() ?? '',
           coverUrl: trackData['coverUrl']?.toString() ?? '',
-          durationSeconds: (trackData['trackDurationMs'] as num? ?? 210000) ~/ 1000,
+          durationSeconds:
+              (trackData['trackDurationMs'] as num? ?? 210000) ~/ 1000,
         );
 
     context.read<PlayerState>().setQueue(
@@ -242,11 +277,17 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Replay', style: AT.largeTitle.copyWith(fontFamily: 'SF Pro')),
+                  Text(
+                    'Replay',
+                    style: AT.largeTitle.copyWith(fontFamily: 'SF Pro'),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     _subtitleForState(auth.isLoggedIn),
-                    style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
+                    style: AT.subhead.copyWith(
+                      color: AT.label2,
+                      fontFamily: 'SF Pro',
+                    ),
                   ),
                 ],
               ),
@@ -307,12 +348,18 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
                 children: [
                   Text(
                     'Sync Your Replay',
-                    style: AT.headline.copyWith(fontFamily: 'SF Pro', color: AT.label),
+                    style: AT.headline.copyWith(
+                      fontFamily: 'SF Pro',
+                      color: AT.label,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'Sign in to sync your listening story and milestones across all devices.',
-                    style: AT.footnote.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
+                    style: AT.footnote.copyWith(
+                      color: AT.label2,
+                      fontFamily: 'SF Pro',
+                    ),
                   ),
                 ],
               ),
@@ -360,8 +407,10 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
     final uniqueTracks = (data['uniqueTracks'] as num? ?? 0).toInt();
     final uniqueArtists = (data['uniqueArtists'] as num? ?? 0).toInt();
     final skipRatePct = (data['skipRatePct'] as num? ?? 0).toInt();
-    final timeDeltaPct = (data['comparisons']?['time']?['deltaPct'] as num?)?.toInt();
-    final playsDeltaPct = (data['comparisons']?['plays']?['deltaPct'] as num?)?.toInt();
+    final timeDeltaPct = (data['comparisons']?['time']?['deltaPct'] as num?)
+        ?.toInt();
+    final playsDeltaPct = (data['comparisons']?['plays']?['deltaPct'] as num?)
+        ?.toInt();
 
     final heatmap = _parseHeatmap(
       data['heatmapNormalized'] ?? data['heatmapMatrix'],
@@ -413,10 +462,7 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
                 onTrackTapped: _onPlayTrack,
               ),
               DiscoveriesCard(discoveriesCount: discoveriesCount),
-              BreakdownChart(
-                genres: topGenres,
-                languages: topLanguages,
-              ),
+              BreakdownChart(genres: topGenres, languages: topLanguages),
               if (_achievements.isNotEmpty)
                 AchievementsCard(achievements: _achievements),
             ],
@@ -439,11 +485,17 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
               size: 56,
             ),
             const SizedBox(height: 16),
-            Text('Nothing Recorded Yet', style: AT.title2.copyWith(fontFamily: 'SF Pro')),
+            Text(
+              'Nothing Recorded Yet',
+              style: AT.title2.copyWith(fontFamily: 'SF Pro'),
+            ),
             const SizedBox(height: 8),
             Text(
               'Play a few songs to start building your Replay profile and daily activity.',
-              style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
+              style: AT.subhead.copyWith(
+                color: AT.label2,
+                fontFamily: 'SF Pro',
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -467,7 +519,10 @@ class _InsightsScreenState extends State<InsightsScreen> with HideDocksMixin {
             const SizedBox(height: 12),
             Text(
               _error ?? 'Something went wrong.',
-              style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
+              style: AT.subhead.copyWith(
+                color: AT.label2,
+                fontFamily: 'SF Pro',
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),

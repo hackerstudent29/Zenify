@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' show lerpDouble;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart'
@@ -20,6 +19,7 @@ import 'package:provider/provider.dart';
 import '../../data/datasources/catalog_datasource.dart';
 import '../../design_system/tokens/app_typography.dart';
 import '../../design_system/widgets/apple_glass.dart';
+import '../../design_system/widgets/equalizer_bars.dart';
 import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
@@ -394,6 +394,8 @@ class _ImportLinkBottomSheetContentState
       if (text.contains('youtube.com') ||
           text.contains('youtu.be') ||
           text.contains('spotify.com') ||
+          text.contains('jiosaavn.com') ||
+          text.contains('apple.com') ||
           text.startsWith('PL') ||
           text.startsWith('OLAK') ||
           text.startsWith('MPREb_')) {
@@ -414,14 +416,14 @@ class _ImportLinkBottomSheetContentState
     final text = _ctrl.text.trim();
     if (text.isEmpty) {
       setState(
-        () => _error = 'Please paste a valid YouTube or YouTube Music link.',
+        () => _error = 'Please paste a valid YouTube, Spotify, Apple Music, or JioSaavn link.',
       );
       return;
     }
 
     setState(() {
       _loading = true;
-      _statusText = 'Connecting to InnerTube…';
+      _statusText = 'Fetching playlist & tracks…';
       _error = null;
     });
 
@@ -535,7 +537,7 @@ class _ImportLinkBottomSheetContentState
                           Text(
                             isTargetLocked
                                 ? 'Add Link to ${widget.targetPlaylist!.name}'
-                                : 'Paste YouTube Link',
+                                : 'Import Playlist from Link',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -548,7 +550,7 @@ class _ImportLinkBottomSheetContentState
                           ),
                           const SizedBox(height: 2),
                           const Text(
-                            'Playlist, album, or song link via InnerTube',
+                            'YouTube Music, Spotify, Apple Music, or JioSaavn',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -1054,12 +1056,18 @@ Future<void> _playlistMenu(
           }
         }(),
       ],
-      if (inDetail)
+      if (inDetail) ...[
         ZenDropdownItem(
           title: 'Add Songs…',
           icon: CupertinoIcons.plus_circle,
           onTap: () => _push(c, _AddSongsPage(p), modal: true),
         ),
+        ZenDropdownItem(
+          title: 'Add from Link…',
+          icon: CupertinoIcons.link,
+          onTap: () => _importPlaylist(c, targetPlaylist: p),
+        ),
+      ],
       ZenDropdownItem(
         title: 'Add to Story',
         icon: CupertinoIcons.sparkles,
@@ -1731,6 +1739,11 @@ class _PlaylistPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _CircleBtn(
+              CupertinoIcons.link,
+              () => _importPlaylist(ctx, targetPlaylist: p),
+            ),
+            const SizedBox(width: 8),
+            _CircleBtn(
               Icons.search_rounded,
               () => _push(ctx, _AddSongsPage(p), modal: true),
             ),
@@ -1791,54 +1804,91 @@ class _PlaylistPage extends StatelessWidget {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: PressableScale(
-                scale: 0.98,
-                onTap: () => _push(ctx, _AddSongsPage(p), modal: true),
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: _fill,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _hair),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PressableScale(
+                      scale: 0.98,
+                      onTap: () => _push(ctx, _AddSongsPage(p), modal: true),
+                      child: Container(
+                        height: 50,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
-                          color: _rose.withValues(alpha: 0.18),
-                          shape: BoxShape.circle,
+                          color: _fill,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _hair),
                         ),
-                        child: const Icon(
-                          Icons.search_rounded,
-                          color: _rose,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(
-                              'Search & Add Songs',
-                              style: _t(15, w: FontWeight.w600, c: _rose),
+                            Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: _rose.withValues(alpha: 0.18),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.search_rounded,
+                                color: _rose,
+                                size: 16,
+                              ),
                             ),
-                            Text(
-                              'Search online songs to add to this playlist',
-                              style: _t(11, c: _sub),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Search Songs',
+                                style: _t(13, w: FontWeight.w600, c: Colors.white),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.add_rounded, color: _rose, size: 22),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: PressableScale(
+                      scale: 0.98,
+                      onTap: () => _importPlaylist(ctx, targetPlaylist: p),
+                      child: Container(
+                        height: 50,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: _fill,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _hair),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: _rose.withValues(alpha: 0.18),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                CupertinoIcons.link,
+                                color: _rose,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Add from Link',
+                                style: _t(13, w: FontWeight.w600, c: _rose),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1892,16 +1942,60 @@ class _PlaylistPage extends StatelessWidget {
                 final t = tracks[i];
                 return Dismissible(
                   key: ValueKey('pl-${p.id}-${t.id}'),
-                  direction: DismissDirection.endToStart,
+                  direction: DismissDirection.horizontal,
                   background: Container(
-                    color: const Color(0xFFFF3B30),
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 24),
-                    child: const Icon(
-                      Icons.remove_circle_outline_rounded,
-                      color: Colors.white,
+                    alignment: Alignment.centerLeft,
+                    padding: const EdgeInsets.only(left: 20),
+                    color: const Color(0xFF007AFF),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(CupertinoIcons.text_badge_plus, color: Colors.white, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'Play Next',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  secondaryBackground: Container(
+                    color: const Color(0xFFFF3B30),
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          'Remove',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(
+                          Icons.remove_circle_outline_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                  confirmDismiss: (direction) async {
+                    if (direction == DismissDirection.startToEnd) {
+                      final player = Provider.of<PlayerState>(c, listen: false);
+                      player.enqueuePlayNextSequential(t);
+                      return false;
+                    }
+                    return true;
+                  },
                   onDismissed: (_) {
                     HapticFeedback.mediumImpact();
                     s.removeFromPlaylist(p.id, t);
@@ -1999,6 +2093,25 @@ class _AddSongsPageState extends State<_AddSongsPage> {
       return;
     }
 
+    final isLink = query.startsWith('http') ||
+        query.contains('youtube.com') ||
+        query.contains('youtu.be') ||
+        query.contains('spotify.com') ||
+        query.contains('jiosaavn.com') ||
+        query.contains('apple.com') ||
+        query.startsWith('PL') ||
+        query.startsWith('OLAK') ||
+        query.startsWith('MPREb_');
+
+    if (isLink) {
+      _debounce?.cancel();
+      setState(() {
+        _searching = false;
+        _onlineResults = [];
+      });
+      return;
+    }
+
     _debounce?.cancel();
     _debounce = Timer(
       const Duration(milliseconds: 320),
@@ -2086,6 +2199,16 @@ class _AddSongsPageState extends State<_AddSongsPage> {
         );
       }
 
+      final isLink = q.startsWith('http') ||
+          q.contains('youtube.com') ||
+          q.contains('youtu.be') ||
+          q.contains('spotify.com') ||
+          q.contains('jiosaavn.com') ||
+          q.contains('apple.com') ||
+          q.startsWith('PL') ||
+          q.startsWith('OLAK') ||
+          q.startsWith('MPREb_');
+
       final slivers = <Widget>[
         SliverToBoxAdapter(
           child: _Search(
@@ -2094,6 +2217,58 @@ class _AddSongsPageState extends State<_AddSongsPage> {
             onChanged: _onSearchChanged,
           ),
         ),
+        if (isLink)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: PressableScale(
+                scale: 0.98,
+                onTap: () async {
+                  HapticFeedback.mediumImpact();
+                  await _importPlaylist(ctx, targetPlaylist: p);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: _rose.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: _rose.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: _rose,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(CupertinoIcons.link, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Import all songs from link',
+                              style: _t(14, w: FontWeight.w700, c: Colors.white),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'YouTube Music, Spotify, Apple Music, or JioSaavn',
+                              style: _t(11, c: _sub),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(CupertinoIcons.chevron_right, color: _rose, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
       ];
 
       if (isQueryEmpty) {
@@ -2570,6 +2745,8 @@ List<Widget> _songSlivers(
   required _Sort sort,
   required VoidCallback onSort,
   required Widget empty,
+  void Function(Track track)? onRemoveTrack,
+  String removeLabel = 'Remove',
 }) {
   if (songs.isEmpty) return [SliverToBoxAdapter(child: empty)];
   return [
@@ -2614,11 +2791,80 @@ List<Widget> _songSlivers(
     SliverList(
       delegate: SliverChildBuilderDelegate((ctx, i) {
         final t = songs[i];
-        return _SongRow(
-          track: t,
-          onTap: () => _play(ctx, songs, i),
-          onLong: () => _trackActions(ctx, t),
-          trailing: _MoreBtn(() => _trackActions(ctx, t)),
+        final canDelete = onRemoveTrack != null;
+        return Dismissible(
+          key: ValueKey('song_${t.id}_$i'),
+          direction: canDelete
+              ? DismissDirection.horizontal
+              : DismissDirection.startToEnd,
+          background: Container(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.only(left: 20),
+            color: const Color(0xFF007AFF),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(CupertinoIcons.text_badge_plus,
+                    color: Colors.white, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'Play Next',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          secondaryBackground: canDelete
+              ? Container(
+                  color: const Color(0xFFFF3B30),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        removeLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        CupertinoIcons.trash,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                )
+              : null,
+          confirmDismiss: (direction) async {
+            if (direction == DismissDirection.startToEnd) {
+              final player = Provider.of<PlayerState>(ctx, listen: false);
+              player.enqueuePlayNextSequential(t);
+              return false;
+            }
+            return true;
+          },
+          onDismissed: (_) {
+            if (onRemoveTrack != null) {
+              HapticFeedback.mediumImpact();
+              onRemoveTrack(t);
+            }
+          },
+          child: _SongRow(
+            track: t,
+            onTap: () => _play(ctx, songs, i),
+            onLong: () => _trackActions(ctx, t),
+            trailing: _MoreBtn(() => _trackActions(ctx, t)),
+          ),
         );
       }, childCount: songs.length),
     ),
@@ -2733,6 +2979,22 @@ class _LikedPageState extends State<_LikedPage> {
             sort: _sort,
             onSort: () =>
                 _sortSheet(ctx, _sort, (v) => setState(() => _sort = v)),
+            onRemoveTrack: (t) {
+              LibraryStore.instance.toggleLove(t);
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'unfav_${t.id}',
+                  title: 'Removed from Favourites',
+                  body: t.title,
+                  leading: const Icon(
+                    CupertinoIcons.star,
+                    color: Colors.white70,
+                    size: 18,
+                  ),
+                ),
+              );
+            },
+            removeLabel: 'Unlike',
             empty: _Empty(
               icon: empty ? CupertinoIcons.star : Icons.search_off_rounded,
               title: empty ? 'No Favourite Songs Yet' : 'No Results',
@@ -2861,56 +3123,7 @@ class _DownloadedPageState extends State<_DownloadedPage> {
           () => _showDownloadedOptions(ctx),
         ),
         slivers: [
-          if (!empty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _fill,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _hair),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: _rose.withValues(alpha: 0.18),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          CupertinoIcons.arrow_down_circle_fill,
-                          color: _rose,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${dl.downloadedCount} Songs Available Offline',
-                              style: _t(15, w: FontWeight.w600),
-                            ),
-                            Text(
-                              'Total Storage: ${dl.formattedTotalSize} · Strict < 5 MB per song',
-                              style: _t(12, c: _sub),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+          if (!empty)
             SliverToBoxAdapter(
               child: _Search(
                 controller: _q,
@@ -2918,7 +3131,6 @@ class _DownloadedPageState extends State<_DownloadedPage> {
                 onChanged: (_) => setState(() {}),
               ),
             ),
-          ],
           ..._downloadedSongSlivers(
             ctx,
             downloadedSongs,
@@ -2996,32 +3208,78 @@ List<Widget> _downloadedSongSlivers(
         final t = songs[i];
         return Dismissible(
           key: ValueKey('dl_${s.id}'),
-          direction: DismissDirection.endToStart,
+          direction: DismissDirection.horizontal,
           background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 24),
-            color: Colors.red.withValues(alpha: 0.8),
-            child: const Icon(
-              CupertinoIcons.trash,
-              color: Colors.white,
-              size: 22,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.only(left: 20),
+            color: const Color(0xFF007AFF),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(CupertinoIcons.text_badge_plus,
+                    color: Colors.white, size: 22),
+                SizedBox(width: 8),
+                Text(
+                  'Play Next',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
             ),
           ),
-          onDismissed: (_) async {
-            HapticFeedback.mediumImpact();
-            await DownloadService.instance.deleteDownload(s.id);
-            IslandNotifier.instance.show(
-              IslandNotification(
-                id: 'dismiss_dl_${s.id}',
-                title: 'Removed from Downloads',
-                body: t.title,
-                leading: const Icon(
-                  CupertinoIcons.trash,
-                  color: Colors.white70,
-                  size: 18,
+          secondaryBackground: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20),
+            color: const Color(0xFFFF3B30),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'Delete',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
                 ),
-              ),
-            );
+                SizedBox(width: 8),
+                Icon(
+                  CupertinoIcons.trash,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+          confirmDismiss: (direction) async {
+            if (direction == DismissDirection.startToEnd) {
+              final player = Provider.of<PlayerState>(ctx, listen: false);
+              player.enqueuePlayNextSequential(t);
+              return false; // Keep in downloaded list
+            }
+            return true;
+          },
+          onDismissed: (direction) async {
+            if (direction == DismissDirection.endToStart) {
+              HapticFeedback.mediumImpact();
+              await DownloadService.instance.deleteDownload(s.id);
+              IslandNotifier.instance.show(
+                IslandNotification(
+                  id: 'dismiss_dl_${s.id}',
+                  title: 'Removed from Downloads',
+                  body: t.title,
+                  leading: const Icon(
+                    CupertinoIcons.trash,
+                    color: Colors.white70,
+                    size: 18,
+                  ),
+                ),
+              );
+            }
           },
           child: _DownloadedSongRow(
             downloadedSong: s,
@@ -3081,8 +3339,13 @@ class _DownloadedSongRow extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(6),
                           child: Container(
-                            color: Colors.black.withValues(alpha: 0.45),
-                            child: _EqBars(playing: s.playing),
+                            color: Colors.black.withValues(alpha: 0.50),
+                            alignment: Alignment.center,
+                            child: _EqBars(
+                              playing: s.playing,
+                              size: 14,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                     ],
@@ -3267,8 +3530,13 @@ class _SongRow extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(6),
                           child: Container(
-                            color: Colors.black.withValues(alpha: 0.45),
-                            child: _EqBars(playing: s.playing),
+                            color: Colors.black.withValues(alpha: 0.50),
+                            alignment: Alignment.center,
+                            child: _EqBars(
+                              playing: s.playing,
+                              size: 14,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                     ],
@@ -3478,7 +3746,7 @@ class _Empty extends StatelessWidget {
  *  Images
  * ═══════════════════════════════════════════════════════════════════ */
 class _Frame extends StatelessWidget {
-  const _Frame({required this.child, this.radius = 10});
+  const _Frame({required this.child, this.radius = 6.0});
   final Widget child;
   final double radius;
 
@@ -3510,7 +3778,7 @@ class _LikedCover extends StatelessWidget {
 }
 
 class _Cover extends StatelessWidget {
-  const _Cover(this.url, {this.radius = 10});
+  const _Cover(this.url, {this.radius = 6.0});
   final String url;
   final double radius;
 
@@ -3638,77 +3906,4 @@ class _Collage extends StatelessWidget {
 /* ═══════════════════════════════════════════════════════════════════
  *  Now-playing equalizer
  * ═══════════════════════════════════════════════════════════════════ */
-class _EqBars extends StatefulWidget {
-  const _EqBars({required this.playing});
-  final bool playing;
-
-  @override
-  State<_EqBars> createState() => _EqBarsState();
-}
-
-class _EqBarsState extends State<_EqBars> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.playing) _c.repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant _EqBars old) {
-    super.didUpdateWidget(old);
-    if (widget.playing && !_c.isAnimating) {
-      _c.repeat();
-    } else if (!widget.playing) {
-      _c.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) =>
-      CustomPaint(painter: _EqPainter(_c, widget.playing));
-}
-
-class _EqPainter extends CustomPainter {
-  _EqPainter(this.anim, this.playing) : super(repaint: anim);
-  final Animation<double> anim;
-  final bool playing;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white;
-    const barW = 3.0, gap = 3.0;
-    const total = 4 * barW + 3 * gap;
-    final left = (size.width - total) / 2;
-    for (var i = 0; i < 4; i++) {
-      final h = playing
-          ? lerpDouble(
-              5,
-              18,
-              0.5 + 0.5 * math.sin((anim.value + i * 0.25) * math.pi * 2),
-            )!
-          : 5.0;
-      final x = left + i * (barW + gap);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, (size.height - h) / 2, barW, h),
-          const Radius.circular(1.5),
-        ),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _EqPainter old) => old.playing != playing;
-}
+typedef _EqBars = EqualizerBars;

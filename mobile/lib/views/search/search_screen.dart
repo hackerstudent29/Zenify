@@ -590,7 +590,7 @@ class _SearchScreenState extends State<SearchScreen>
       if (SearchNav.phase.value == SearchPhase.typing &&
           _textCtrl.text.trim().isEmpty &&
           _submittedQuery.isEmpty) {
-        SearchNav.phase.value = SearchPhase.bar;
+        SearchNav.phase.value = SearchPhase.off;
       }
     }
     if (mounted) setState(() {});
@@ -607,6 +607,9 @@ class _SearchScreenState extends State<SearchScreen>
       _focusNode.unfocus();
       if (_submittedQuery.isNotEmpty || _textCtrl.text.isNotEmpty) {
         _clearSearch();
+      }
+      if (_activeCategory != null) {
+        _closeCategory();
       }
     }
     setState(() {});
@@ -711,8 +714,8 @@ class _SearchScreenState extends State<SearchScreen>
       setState(() => _isLoading = true);
     }
 
-    // Safety failsafe: never allow _isLoading to remain true for more than 4 seconds
-    Timer(const Duration(seconds: 4), () {
+    // Safety failsafe: never allow _isLoading to remain true for more than 12 seconds
+    Timer(const Duration(seconds: 12), () {
       if (mounted && _isLoading && id == _searchRequestId) {
         setState(() => _isLoading = false);
       }
@@ -722,11 +725,11 @@ class _SearchScreenState extends State<SearchScreen>
       final results = await _dataService
           .search(query: query, filter: filter)
           .timeout(
-            const Duration(milliseconds: 3200),
+            const Duration(seconds: 12),
             onTimeout: () => _dataService.getFallbackResult(query, filter),
           );
       if (!mounted) return;
-      if (id == _searchRequestId || _wantedKey == key) {
+      if (id == _searchRequestId || _wantedKey == key || _submittedQuery == query || _lastTyped == query) {
         _rememberTopFor(query, results, filter);
         setState(() {
           _searchResults = results;
@@ -771,8 +774,8 @@ class _SearchScreenState extends State<SearchScreen>
     _debounceTimer?.cancel();
     _suggestId++;
     _focusNode.unfocus();
-    if (SearchNav.phase.value != SearchPhase.bar) {
-      SearchNav.phase.value = SearchPhase.bar;
+    if (SearchNav.phase.value == SearchPhase.typing) {
+      SearchNav.phase.value = SearchPhase.off;
     }
     _lastTyped = clean;
     if (_textCtrl.text.trim() != clean) {
@@ -863,7 +866,7 @@ class _SearchScreenState extends State<SearchScreen>
   void _cancelSearch() {
     _suggestTimer?.cancel();
     _focusNode.unfocus();
-    SearchNav.phase.value = SearchPhase.bar;
+    SearchNav.phase.value = SearchPhase.off;
     _clearSearch();
   }
 
@@ -1514,16 +1517,19 @@ class _SearchScreenState extends State<SearchScreen>
   }
 
   Widget _albumsCarousel(List<SearchAlbumItem> albums, {VoidCallback? seeAll}) {
+    final w = MediaQuery.sizeOf(context).width;
+    final ext = (w - 20) / 2.18;
+    final cw = ext - 14;
     return _carousel(
       title: 'Albums',
-      height: 256,
-      extent: 170,
+      height: cw + 64,
+      extent: cw,
       count: albums.length,
       onSeeAll: seeAll,
       item: (i) {
         final a = albums[i];
         return MediaCard(
-          width: 170.0,
+          width: cw,
           twoLineTitle: true,
           title: a.title,
           subtitle: _albumSub(a),
@@ -1538,16 +1544,19 @@ class _SearchScreenState extends State<SearchScreen>
     List<SearchPlaylistItem> playlists, {
     VoidCallback? seeAll,
   }) {
+    final w = MediaQuery.sizeOf(context).width;
+    final ext = (w - 20) / 2.18;
+    final cw = ext - 14;
     return _carousel(
       title: 'Playlists',
-      height: 256,
-      extent: 170,
+      height: cw + 64,
+      extent: cw,
       count: playlists.length,
       onSeeAll: seeAll,
       item: (i) {
         final p = playlists[i];
         return MediaCard(
-          width: 170.0,
+          width: cw,
           twoLineTitle: true,
           title: p.title,
           subtitle: _playlistSub(p),
@@ -2459,7 +2468,8 @@ class _SearchScreenState extends State<SearchScreen>
         SearchLayoutMode.artistType => 0.95,
         SearchLayoutMode.songTitle => 0.50,
         SearchLayoutMode.albumOrPlaylist => 0.55,
-        _ => 0.65, // Generic search: demote artists so songs/albums are preferred
+        _ =>
+          0.65, // Generic search: demote artists so songs/albums are preferred
       },
       SearchSongItem _ =>
         m == SearchLayoutMode.songTitle ? 1.15 : (artistMode ? 0.92 : 1.08),
@@ -2470,9 +2480,14 @@ class _SearchScreenState extends State<SearchScreen>
       _ => 0.80,
     };
     // Prioritize popular, streamed, and top server ranked tracks
-    final serverBonus = (1.0 / (1.0 + (item.rawRank < 0 ? 10 : item.rawRank))) * 0.08;
-    final officialBonus = (item is SearchSongItem && item.isOfficialAudio) ? 0.04 : 0.0;
-    final durationBonus = (item is SearchSongItem && item.durationSeconds >= 60) ? 0.02 : 0.0;
+    final serverBonus =
+        (1.0 / (1.0 + (item.rawRank < 0 ? 10 : item.rawRank))) * 0.08;
+    final officialBonus = (item is SearchSongItem && item.isOfficialAudio)
+        ? 0.04
+        : 0.0;
+    final durationBonus = (item is SearchSongItem && item.durationSeconds >= 60)
+        ? 0.02
+        : 0.0;
     return (s * w) + serverBonus + officialBonus + durationBonus;
   }
 
@@ -2520,7 +2535,9 @@ class _SearchScreenState extends State<SearchScreen>
 
     if (sorted.first.score < 0.35) {
       // Nothing matched convincingly: prefer songs unless exact artist was requested
-      if (serviceTop != null && (serviceTop is! SearchArtistItem || mode == SearchLayoutMode.exactArtist)) {
+      if (serviceTop != null &&
+          (serviceTop is! SearchArtistItem ||
+              mode == SearchLayoutMode.exactArtist)) {
         return [_TopCand(serviceTop, 1.0)];
       }
       if (r.songs.isNotEmpty) return [_TopCand(r.songs.first, 1.0)];
@@ -2746,7 +2763,7 @@ class _SearchScreenState extends State<SearchScreen>
   Widget _albumHero(SearchAlbumItem a) {
     final store = LibraryStore.instance;
     return _heroLayout(
-      art: _Artwork(url: _hiResUrl(a), title: a.title, size: 128, radius: 12),
+      art: _Artwork(url: _hiResUrl(a), title: a.title, size: 128, radius: 6.0),
       title: a.title,
       subtitle: _typeSub(a),
       onTap: () => _handleItemTap(a),
@@ -2797,7 +2814,7 @@ class _SearchScreenState extends State<SearchScreen>
 
   Widget _playlistHero(SearchPlaylistItem p) {
     return _heroLayout(
-      art: _Artwork(url: _hiResUrl(p), title: p.title, size: 128, radius: 12),
+      art: _Artwork(url: _hiResUrl(p), title: p.title, size: 128, radius: 6.0),
       title: p.title,
       subtitle: _typeSub(p),
       onTap: () => _handleItemTap(p),
@@ -3128,7 +3145,7 @@ class _SearchScreenState extends State<SearchScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _VideoThumb(video: v, imageUrl: _hiResUrl(v), radius: 14),
+                    _VideoThumb(video: v, imageUrl: _hiResUrl(v), radius: 6.0),
                     const SizedBox(height: 10),
                     Text(
                       v.title,
@@ -3205,7 +3222,7 @@ class _Artwork extends StatelessWidget {
     required this.url,
     required this.title,
     required this.size,
-    this.radius = 10,
+    this.radius = 6.0,
     this.circle = false,
     this.active = false,
     this.playing = false,
@@ -3243,8 +3260,8 @@ class _Artwork extends StatelessWidget {
                 color: Colors.black.withValues(alpha: 0.46),
                 child: Center(
                   child: EqualizerBars(
-                    color: AppColors.accent,
-                    size: size > 70 ? 22 : 16,
+                    color: Colors.white,
+                    size: size > 70 ? 30 : 16,
                     isPlaying: playing,
                   ),
                 ),
@@ -3536,8 +3553,8 @@ class _VideoThumb extends StatelessWidget {
                     color: Colors.black.withValues(alpha: 0.45),
                     child: Center(
                       child: EqualizerBars(
-                        color: AppColors.accent,
-                        size: small ? 14 : 22,
+                        color: Colors.white,
+                        size: small ? 16 : 30,
                         isPlaying: active.playing,
                       ),
                     ),
@@ -4040,12 +4057,12 @@ class _BrowseCategoryTile extends StatelessWidget {
         scale: 0.96,
         onTap: onTap,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(6.0),
           child: Stack(
             fit: StackFit.expand,
             children: [
               _CategoryArt(spec: spec, index: index, covers: covers),
-              _border(18),
+              _border(6.0),
               _title(),
             ],
           ),
@@ -4053,7 +4070,7 @@ class _BrowseCategoryTile extends StatelessWidget {
       );
     }
 
-    const radius = 10.0;
+    const radius = 6.0;
     final base = spec.colors[0];
     final cover = covers.isEmpty ? '' : covers[(index * 5 + 2) % covers.length];
 

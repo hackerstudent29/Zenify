@@ -430,12 +430,13 @@ void main() {
         countryCode: 'IN',
       );
 
-      final allRemaining = [
-        if (result.topResult != null) result.topResult!.item,
-        ...result.songs,
-      ];
-      expect(allRemaining.length, equals(1));
-      expect((allRemaining.first as SearchSongItem).musicVideoType, equals('ATV'));
+      final allUniqueRemaining = {
+        if (result.topResult != null) result.topResult!.item.id,
+        ...result.songs.map((s) => s.id),
+      };
+      expect(allUniqueRemaining.length, equals(1));
+      expect(result.songs.length, equals(1));
+      expect(result.songs.first.musicVideoType, equals('ATV'));
     });
 
     test('stable sort determinism: same input gives exact identical order and scores', () {
@@ -671,6 +672,151 @@ void main() {
         initialTopResult: payload.topResult,
       );
       expect(res.isEmpty, isFalse);
+    });
+  });
+
+  group('9. Parity, RRF, Two-Layer Caching, and Non-Destructive Phonetics', () {
+    test('non-destructive phonetics: preserves international names without destructive replacements', () {
+      // Zhavia should NOT become lavia (zh -> l was removed)
+      final zhaviaKey = QueryPreprocessor.phoneticKey('Zhavia');
+      final laviaKey = QueryPreprocessor.phoneticKey('Lavia');
+      expect(zhaviaKey, isNot(equals(laviaKey)));
+
+      // David Guetta should NOT become Dawid (v -> w was removed)
+      final davidKey = QueryPreprocessor.phoneticKey('David');
+      final dawidKey = QueryPreprocessor.phoneticKey('Dawid');
+      expect(davidKey, isNot(equals(dawidKey)));
+
+      // Vance Joy should NOT become Wance (v -> w was removed)
+      final vanceKey = QueryPreprocessor.phoneticKey('Vance');
+      final wanceKey = QueryPreprocessor.phoneticKey('Wance');
+      expect(vanceKey, isNot(equals(wanceKey)));
+
+      // The Weeknd: vowel collapses ee -> i and duplicate letters
+      final weekndKey = QueryPreprocessor.phoneticKey('The Weeknd');
+      expect(weekndKey, contains('wiknd'));
+    });
+
+    test('multi-stream RRF and Provider Rank preservation', () {
+      final highRankItem = SearchSongItem(
+        id: 'stream-high',
+        title: 'Song Alpha',
+        subtitle: 'Artist Name',
+        thumbnailUrl: 'https://example.com/1.jpg',
+        thumbnailUrlHiRes: 'https://example.com/1_hi.jpg',
+        providerRank: 0, // Top ranked by InnerTube provider
+        sourceStream: 'general',
+      );
+
+      final lowRankItem = SearchSongItem(
+        id: 'stream-low',
+        title: 'Song Beta',
+        subtitle: 'Artist Name',
+        thumbnailUrl: 'https://example.com/2.jpg',
+        thumbnailUrlHiRes: 'https://example.com/2_hi.jpg',
+        providerRank: 15, // Ranked 15th by provider
+        sourceStream: 'general',
+      );
+
+      final intent = SearchIntentDetector.detectIntent('song', [highRankItem, lowRankItem]);
+      final result = SearchRanker.rank(
+        items: [lowRankItem, highRankItem],
+        intent: intent,
+        countryCode: 'US',
+      );
+
+      // Higher provider rank wins
+      expect(result.songs.first.id, equals('stream-high'));
+      // Diagnostics must be present
+      expect(result.diagnostics, isNotNull);
+      expect(
+        result.diagnostics!.candidateBreakdowns.any((c) => c.id == 'stream-high'),
+        isTrue,
+      );
+      final diag = result.diagnostics!.candidateBreakdowns.firstWhere((c) => c.id == 'stream-high');
+      expect(diag.rrfScore, greaterThan(0));
+      expect(diag.finalScore, greaterThan(0));
+    });
+
+    test('two-layer caching: Layer A raw cache vs Layer B personalized LRU cache isolation', () {
+      // 1. Layer A Raw Provider Cache
+      final rawCache = SearchRawProviderCache(capacity: 5);
+      final rawKey1 = SearchRawProviderCache.buildKey(
+        query: 'coldplay',
+        stream: 'general',
+        country: 'US',
+        language: 'en',
+      );
+      final rawKey2 = SearchRawProviderCache.buildKey(
+        query: 'coldplay',
+        stream: 'artists',
+        country: 'US',
+        language: 'en',
+      );
+
+      expect(rawCache.get(rawKey1), isNull);
+      rawCache.put(rawKey1, {'status': 'ok', 'stream': 'general'});
+      expect(rawCache.get(rawKey1), isNotNull);
+      expect(rawCache.get(rawKey2), isNull);
+
+      // 2. Layer B Personalized Cache with profileHash isolation
+      final lruCache = SearchLruCache(capacity: 10);
+      final userAKey = SearchLruCache.buildKey(
+        query: 'vibe',
+        country: 'IN',
+        language: 'en',
+        profileHash: 'ta,te:Anirudh',
+      );
+      final userBKey = SearchLruCache.buildKey(
+        query: 'vibe',
+        country: 'IN',
+        language: 'en',
+        profileHash: 'hi,pa:Arijit',
+      );
+
+      expect(userAKey, isNot(equals(userBKey)));
+      final dummyResult = SearchResult(
+        originalQuery: 'vibe',
+        intent: const SearchIntent(originalQuery: 'vibe', normalizedQuery: 'vibe', entityText: 'vibe'),
+      );
+      lruCache.put(userAKey, dummyResult);
+      expect(lruCache.get(userAKey), isNotNull);
+      expect(lruCache.get(userBKey), isNull); // User B does not get User A's personalized cache
+    });
+
+    test('cardinal rule: exact international song title match is never beaten by regional/fav artist boost', () {
+      final exactIntlSong = SearchSongItem(
+        id: 'song-blinding-lights',
+        title: 'Blinding Lights',
+        subtitle: 'The Weeknd • After Hours',
+        thumbnailUrl: 'https://example.com/bl.jpg',
+        thumbnailUrlHiRes: 'https://example.com/bl_hi.jpg',
+        artists: [const ArtistRef(id: 'weeknd', name: 'The Weeknd')],
+        providerRank: 0,
+      );
+
+      final regionalDistractor = SearchSongItem(
+        id: 'song-tamil-lights',
+        title: 'Lights Festival Tamil Song',
+        subtitle: 'Anirudh Ravichander',
+        thumbnailUrl: 'https://example.com/lights.jpg',
+        thumbnailUrlHiRes: 'https://example.com/lights_hi.jpg',
+        artists: [const ArtistRef(id: 'anirudh', name: 'Anirudh Ravichander')],
+        providerRank: 3,
+      );
+
+      final intent = SearchIntentDetector.detectIntent('blinding lights', [exactIntlSong, regionalDistractor]);
+      // User has extreme regional preference (IN, Tamil preferred, Anirudh favorite)
+      final result = SearchRanker.rank(
+        items: [regionalDistractor, exactIntlSong],
+        intent: intent,
+        countryCode: 'IN',
+        preferredLanguages: ['ta', 'te'],
+        favoriteArtists: ['Anirudh Ravichander'],
+      );
+
+      // Despite user's favorite artist being Anirudh in India, "Blinding Lights" MUST rank #1
+      expect(result.topResult?.item.id ?? result.songs.first.id, equals('song-blinding-lights'));
     });
   });
 }

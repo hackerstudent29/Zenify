@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../tokens/app_typography.dart';
@@ -111,24 +112,13 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
                       alignment: Alignment.centerLeft,
                       clipBehavior: Clip.none,
                       children: [
-                        // Clipped Apple-style background & progress bar
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: SizedBox(
-                            width: trackWidth,
-                            height: trackHeight,
-                            child: Stack(
-                              children: [
-                                Positioned.fill(child: ColoredBox(color: track)),
-                                Positioned(
-                                  left: 0,
-                                  top: 0,
-                                  bottom: 0,
-                                  width: (trackWidth * progress).clamp(0.0, trackWidth),
-                                  child: ColoredBox(color: active),
-                                ),
-                              ],
-                            ),
+                        // Smooth rounded progress bar with rounded start and head
+                        CustomPaint(
+                          size: Size(trackWidth, trackHeight),
+                          painter: _ScrubberTrackPainter(
+                            progress: progress,
+                            trackColor: track,
+                            activeColor: active,
                           ),
                         ),
 
@@ -185,4 +175,63 @@ class _ScrubberSliderState extends State<ScrubberSlider> {
       },
     );
   }
+}
+
+class _ScrubberTrackPainter extends CustomPainter {
+  const _ScrubberTrackPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.activeColor,
+  });
+
+  final double progress;
+  final Color trackColor;
+  final Color activeColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    final radius = Radius.circular(size.height / 2);
+    final trackRRect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      radius,
+    );
+
+    // 1. Draw background track with rounded caps on both ends
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    canvas.drawRRect(trackRRect, trackPaint);
+
+    // 2. Draw active progress fill with rounded start AND rounded head
+    if (progress > 0) {
+      final activeWidth = (size.width * progress).clamp(0.0, size.width);
+      if (activeWidth > 0) {
+        final activePaint = Paint()
+          ..color = activeColor
+          ..style = PaintingStyle.fill
+          ..isAntiAlias = true;
+
+        // Ensure the filling is always round at the start and head, never flat
+        final effectiveWidth = math.max(activeWidth, size.height);
+        final activeRRect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, 0, effectiveWidth, size.height),
+          radius,
+        );
+
+        canvas.save();
+        canvas.clipRRect(trackRRect);
+        canvas.drawRRect(activeRRect, activePaint);
+        canvas.restore();
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ScrubberTrackPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.trackColor != trackColor ||
+      oldDelegate.activeColor != activeColor;
 }

@@ -322,7 +322,26 @@ class GlassEngine extends ChangeNotifier {
 
   GlassConfig _config = GlassPresets.all.first.config;
   GlassConfig get config => _config;
-  String get presetName => GlassPresets.byId(_config.preset)?.name ?? 'Custom';
+  String get presetName {
+    final p = GlassPresets.byId(_config.preset);
+    if (p != null) return p.name;
+    switch (_config.preset) {
+      case 'graphite':
+        return 'Graphite';
+      case 'obsidian':
+        return 'Obsidian';
+      case 'pearl':
+        return 'Pearl';
+      case 'water':
+        return 'Water';
+      case 'custom':
+        return 'Custom';
+      default:
+        return _config.preset.isNotEmpty
+            ? '${_config.preset[0].toUpperCase()}${_config.preset.substring(1)}'
+            : 'Custom';
+    }
+  }
 
   /// Seconds since the clock started; painters repaint from this directly.
   final ValueNotifier<double> phase = ValueNotifier<double>(0);
@@ -353,6 +372,9 @@ class GlassEngine extends ChangeNotifier {
   /// Any manual tweak flips the preset to "custom".
   void update(GlassConfig Function(GlassConfig c) edit) =>
       _set(edit(_config).copyWith(preset: 'custom'));
+
+  /// Set full config directly (e.g. from LiquidGlass customizer).
+  void setConfig(GlassConfig c) => _set(c);
 
   void reset() => _set(GlassPresets.all.first.config);
 

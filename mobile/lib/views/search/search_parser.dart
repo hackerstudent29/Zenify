@@ -38,7 +38,11 @@ class SearchParser {
   static final RegExp _separatorRegex = RegExp(r'^[•·&,\-|/\\•●¦;]$');
 
   /// Main entry point: parses raw InnerTube JSON payload into a typed [ParsedSearchPayload].
-  static ParsedSearchPayload parse(Map<String, dynamic> json, {String query = ''}) {
+  static ParsedSearchPayload parse(
+    Map<String, dynamic> json, {
+    String query = '',
+    String sourceStream = 'general',
+  }) {
     SearchTopResult? topResult;
     final items = <SearchItem>[];
     String? didYouMean;
@@ -48,20 +52,38 @@ class SearchParser {
       // 1. Did You Mean / Spell Correction
       didYouMean = _extractDidYouMean(json);
 
-      // 2. Locate Tab Contents or Section List
-      final tabbed = json['contents']?['tabbedSearchResultsRenderer'];
-      final tabs = tabbed?['tabs'] as List?;
+      // 2. Locate Tab Contents or Section List across all InnerTube layout variants
       List? sectionList;
-      if (tabs != null && tabs.isNotEmpty && tabs.first is Map) {
-        final t0 = tabs.first as Map;
-        sectionList = t0['tabRenderer']?['content']?['sectionListRenderer']?['contents'] as List?;
+      final contents = json['contents'];
+      if (contents is Map) {
+        final tabbed = contents['tabbedSearchResultsRenderer'];
+        final tabs = tabbed?['tabs'] as List?;
+        if (tabs != null && tabs.isNotEmpty && tabs.first is Map) {
+          final t0 = tabs.first as Map;
+          sectionList = t0['tabRenderer']?['content']?['sectionListRenderer']?['contents'] as List?;
+        }
+        sectionList ??= contents['twoColumnSearchResultsRenderer']?['primaryContents']?['sectionListRenderer']?['contents'] as List?;
+        sectionList ??= contents['singleColumnSearchResultsRenderer']?['tabs']?[0]?['tabRenderer']?['content']?['sectionListRenderer']?['contents'] as List?;
+        sectionList ??= contents['singleColumnSearchResultsRenderer']?['contents'] as List?;
+        sectionList ??= contents['sectionListRenderer']?['contents'] as List?;
+
+        // Direct shelf containers in filtered searches without sectionList wrapper
+        if (sectionList == null && contents['musicShelfRenderer'] is Map) {
+          sectionList = [{'musicShelfRenderer': contents['musicShelfRenderer']}];
+        }
+        if (sectionList == null && contents['musicCardShelfRenderer'] is Map) {
+          sectionList = [{'musicCardShelfRenderer': contents['musicCardShelfRenderer']}];
+        }
       }
-      sectionList ??= json['contents']?['sectionListRenderer']?['contents'] as List?;
 
       // Continuation contents check (from loadMore)
       final continuationShelf = json['continuationContents']?['musicShelfContinuation'];
       if (continuationShelf is Map) {
-        final contItems = _parseMusicShelfItems(continuationShelf, rawRankOffset: 0);
+        final contItems = _parseMusicShelfItems(
+          continuationShelf,
+          rawRankOffset: 0,
+          sourceStream: sourceStream,
+        );
         items.addAll(contItems);
         continuationToken = _extractContinuationToken(continuationShelf);
         return ParsedSearchPayload(
@@ -84,7 +106,11 @@ class SearchParser {
         // A. Top Result Shelf: musicCardShelfRenderer
         final cardShelf = sMap['musicCardShelfRenderer'];
         if (cardShelf is Map && topResult == null) {
-          topResult = _parseMusicCardShelf(Map<String, dynamic>.from(cardShelf), rawRank: rawRankCounter++);
+          topResult = _parseMusicCardShelf(
+            Map<String, dynamic>.from(cardShelf),
+            rawRank: rawRankCounter++,
+            sourceStream: sourceStream,
+          );
           if (topResult != null) {
             // Also add topResult's item to the pool for comprehensive ranking
             items.add(topResult.item);
@@ -94,7 +120,11 @@ class SearchParser {
         // B. Direct musicShelfRenderer (Filtered search or individual shelf)
         final shelf = sMap['musicShelfRenderer'];
         if (shelf is Map) {
-          final shelfItems = _parseMusicShelfItems(shelf, rawRankOffset: rawRankCounter);
+          final shelfItems = _parseMusicShelfItems(
+            shelf,
+            rawRankOffset: rawRankCounter,
+            sourceStream: sourceStream,
+          );
           rawRankCounter += shelfItems.length;
           items.addAll(shelfItems);
           continuationToken ??= _extractContinuationToken(shelf);
@@ -103,7 +133,11 @@ class SearchParser {
         // C. Direct musicCarouselShelfRenderer (Albums, Artists, Playlists, Videos carousel)
         final carouselShelf = sMap['musicCarouselShelfRenderer'];
         if (carouselShelf is Map) {
-          final carouselItems = _parseCarouselShelfItems(carouselShelf, rawRankOffset: rawRankCounter);
+          final carouselItems = _parseCarouselShelfItems(
+            carouselShelf,
+            rawRankOffset: rawRankCounter,
+            sourceStream: sourceStream,
+          );
           rawRankCounter += carouselItems.length;
           items.addAll(carouselItems);
         }
@@ -129,6 +163,7 @@ class SearchParser {
                 topResult = _parseMusicCardShelf(
                   Map<String, dynamic>.from(it['musicCardShelfRenderer']),
                   rawRank: rawRankCounter++,
+                  sourceStream: sourceStream,
                 );
                 if (topResult != null) {
                   items.add(topResult.item);
@@ -140,6 +175,7 @@ class SearchParser {
                 final parsed = _parseResponsiveListItem(
                   Map<String, dynamic>.from(it['musicResponsiveListItemRenderer']),
                   rawRank: rawRankCounter++,
+                  sourceStream: sourceStream,
                 );
                 if (parsed != null) items.add(parsed);
               }
@@ -149,6 +185,7 @@ class SearchParser {
                 final parsed = _parseTwoRowItem(
                   Map<String, dynamic>.from(it['musicTwoRowItemRenderer']),
                   rawRank: rawRankCounter++,
+                  sourceStream: sourceStream,
                 );
                 if (parsed != null) items.add(parsed);
               }
@@ -156,7 +193,11 @@ class SearchParser {
               // Sub-shelf
               if (it['musicShelfRenderer'] is Map) {
                 final subShelf = it['musicShelfRenderer'] as Map;
-                final subItems = _parseMusicShelfItems(subShelf, rawRankOffset: rawRankCounter);
+                final subItems = _parseMusicShelfItems(
+                  subShelf,
+                  rawRankOffset: rawRankCounter,
+                  sourceStream: sourceStream,
+                );
                 rawRankCounter += subItems.length;
                 items.addAll(subItems);
                 continuationToken ??= _extractContinuationToken(subShelf);
@@ -165,7 +206,11 @@ class SearchParser {
               // Sub-carousel shelf (Albums, Playlists, Artists, Videos)
               if (it['musicCarouselShelfRenderer'] is Map) {
                 final subCarousel = it['musicCarouselShelfRenderer'] as Map;
-                final carouselItems = _parseCarouselShelfItems(subCarousel, rawRankOffset: rawRankCounter);
+                final carouselItems = _parseCarouselShelfItems(
+                  subCarousel,
+                  rawRankOffset: rawRankCounter,
+                  sourceStream: sourceStream,
+                );
                 rawRankCounter += carouselItems.length;
                 items.addAll(carouselItems);
               }
@@ -342,7 +387,11 @@ class SearchParser {
 
   // ─────────────────────────── Top Result Parser ─────────────────────────────
 
-  static SearchTopResult? _parseMusicCardShelf(Map<String, dynamic> card, {required int rawRank}) {
+  static SearchTopResult? _parseMusicCardShelf(
+    Map<String, dynamic> card, {
+    required int rawRank,
+    String sourceStream = 'general',
+  }) {
     try {
       final title = _extractTitleWithFallback(
         primaryRuns: card['title']?['runs'] as List?,
@@ -437,6 +486,8 @@ class SearchParser {
           subscriberCount: subscribers,
           isVerified: true,
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else if (isAlbum) {
         item = SearchAlbumItem(
@@ -450,6 +501,8 @@ class SearchParser {
           albumType: subLower.contains('single') ? 'Single' : (subLower.contains('ep') ? 'EP' : 'Album'),
           year: _extractYear(subtitle),
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else if (isPlaylist) {
         item = SearchPlaylistItem(
@@ -461,6 +514,8 @@ class SearchParser {
           browseId: browseId,
           playlistId: browseId,
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
           author: subtitle,
         );
       } else {
@@ -475,6 +530,8 @@ class SearchParser {
           browseId: browseId,
           radioPlaylistId: radioPlaylistId,
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       }
 
@@ -492,7 +549,11 @@ class SearchParser {
 
   // ─────────────────────────── Shelf Item Parser ─────────────────────────────
 
-  static List<SearchItem> _parseMusicShelfItems(Map shelf, {required int rawRankOffset}) {
+  static List<SearchItem> _parseMusicShelfItems(
+    Map shelf, {
+    required int rawRankOffset,
+    String sourceStream = 'general',
+  }) {
     final results = <SearchItem>[];
     final contents = shelf['contents'] as List?;
     if (contents == null) return results;
@@ -511,12 +572,14 @@ class SearchParser {
           Map<String, dynamic>.from(item['musicResponsiveListItemRenderer']),
           rawRank: rank++,
           shelfCategory: shelfTitle,
+          sourceStream: sourceStream,
         );
       } else if (item['musicTwoRowItemRenderer'] is Map) {
         parsed = _parseTwoRowItem(
           Map<String, dynamic>.from(item['musicTwoRowItemRenderer']),
           rawRank: rank++,
           shelfCategory: shelfTitle,
+          sourceStream: sourceStream,
         );
       }
       if (parsed != null) results.add(parsed);
@@ -526,7 +589,11 @@ class SearchParser {
 
   // ─────────────────────────── Carousel Shelf Parser ─────────────────────────
 
-  static List<SearchItem> _parseCarouselShelfItems(Map carousel, {required int rawRankOffset}) {
+  static List<SearchItem> _parseCarouselShelfItems(
+    Map carousel, {
+    required int rawRankOffset,
+    String sourceStream = 'general',
+  }) {
     final results = <SearchItem>[];
     final header = carousel['header']?['musicCarouselShelfBasicHeaderRenderer'];
     final titleRuns = header?['title']?['runs'] as List?;
@@ -546,12 +613,7 @@ class SearchParser {
           Map<String, dynamic>.from(item['musicTwoRowItemRenderer']),
           rawRank: rank++,
           shelfCategory: shelfTitle,
-        );
-      } else if (item['musicResponsiveListItemRenderer'] is Map) {
-        parsed = _parseResponsiveListItem(
-          Map<String, dynamic>.from(item['musicResponsiveListItemRenderer']),
-          rawRank: rank++,
-          shelfCategory: shelfTitle,
+          sourceStream: sourceStream,
         );
       }
       if (parsed != null) results.add(parsed);
@@ -565,6 +627,7 @@ class SearchParser {
     Map<String, dynamic> item, {
     required int rawRank,
     String shelfCategory = '',
+    String sourceStream = 'general',
   }) {
     try {
       final flexColumns = item['flexColumns'] as List?;
@@ -665,6 +728,8 @@ class SearchParser {
           subscriberCount: segments.countValue,
           isProfile: pageType == 'MUSIC_PAGE_TYPE_USER_CHANNEL',
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else if (isAlbum) {
         final albumPlaylistId = overlayNav?['watchPlaylistEndpoint']?['playlistId'] as String?;
@@ -681,6 +746,8 @@ class SearchParser {
           artists: segments.artists,
           isExplicit: isExplicit,
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else if (isPlaylist) {
         final playlistId = browseId?.removePrefix('VL') ?? '';
@@ -697,6 +764,8 @@ class SearchParser {
           isOfficial: shelfCategory.contains('featured') || (segments.authorOrCurator?.toLowerCase() == 'youtube music'),
           isCommunity: shelfCategory.contains('community'),
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else if (isPodcast || isEpisode) {
         return SearchPodcastItem(
@@ -711,6 +780,8 @@ class SearchParser {
           isEpisode: isEpisode,
           durationText: segments.durationText,
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else {
         // Song / Video Default
@@ -729,6 +800,8 @@ class SearchParser {
             durationText: segments.durationText ?? '3:30',
             views: segments.countValue ?? 0,
             rawRank: rawRank,
+            providerRank: rawRank,
+            sourceStream: sourceStream,
           );
         }
 
@@ -749,6 +822,8 @@ class SearchParser {
           isExplicit: isExplicit,
           musicVideoType: item['musicVideoType']?.toString() ?? 'ATV',
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       }
     } catch (e, stack) {
@@ -763,6 +838,7 @@ class SearchParser {
     Map<String, dynamic> item, {
     required int rawRank,
     String shelfCategory = '',
+    String sourceStream = 'general',
   }) {
     try {
       final titleRuns = item['title']?['runs'] as List?;
@@ -819,6 +895,8 @@ class SearchParser {
           subscriberText: segments.countText,
           subscriberCount: segments.countValue,
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else if (isAlbum) {
         return SearchAlbumItem(
@@ -832,6 +910,8 @@ class SearchParser {
           year: segments.year,
           artists: segments.artists,
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else if (isPlaylist) {
         return SearchPlaylistItem(
@@ -845,6 +925,8 @@ class SearchParser {
           author: segments.authorOrCurator,
           songCountText: segments.countText,
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       } else {
         // Fallback video / song
@@ -861,6 +943,8 @@ class SearchParser {
           durationSeconds: _parseDurationSeconds(segments.durationText),
           durationText: segments.durationText ?? '3:30',
           rawRank: rawRank,
+          providerRank: rawRank,
+          sourceStream: sourceStream,
         );
       }
     } catch (e) {

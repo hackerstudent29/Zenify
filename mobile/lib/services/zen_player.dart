@@ -129,6 +129,15 @@ class AudioPlayer implements FxEngine {
   Future<void> setLoudnessDb(double? db) =>
       _call('setLoudnessDb', {'loudnessDb': db});
 
+  Future<void> setAudioQuality(String quality) =>
+      _call('setAudioQuality', {'quality': quality});
+
+  static Future<void> setGlobalAudioQuality(String quality) async {
+    try {
+      await _method.invokeMethod('setAudioQuality', {'quality': quality});
+    } catch (_) {}
+  }
+
   Future<void> setNext(
     String? mediaId, {
     String? title,
@@ -156,6 +165,7 @@ class AudioPlayer implements FxEngine {
 
   Future<void> playUrl({
     required String url,
+    String? mediaId,
     String? videoUrl,
     Map<String, String>? headers,
     String? title,
@@ -167,6 +177,7 @@ class AudioPlayer implements FxEngine {
   }) =>
       _call('play', {
         'url': url,
+        'mediaId': ?mediaId,
         'videoUrl': ?videoUrl,
         'headers': ?headers,
         'title': ?title,

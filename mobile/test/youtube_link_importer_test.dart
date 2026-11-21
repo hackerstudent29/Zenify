@@ -72,5 +72,19 @@ void main() {
       final p = YouTubeLinkImporter.extractParametersForTesting('dQw4w9WgXcQ');
       expect(p.videoId, 'dQw4w9WgXcQ');
     });
+
+    test('extracts YouTube Music playlist with tracking si parameter', () {
+      final p = YouTubeLinkImporter.extractParametersForTesting(
+        'https://music.youtube.com/playlist?list=PL16Or56vcoYEYVAPNUiSp0cKVYZyu_9wF&si=abc123xyz',
+      );
+      expect(p.playlistId, 'PL16Or56vcoYEYVAPNUiSp0cKVYZyu_9wF');
+    });
+
+    test('extracts YouTube Music playlist with trailing slash before query', () {
+      final p = YouTubeLinkImporter.extractParametersForTesting(
+        'https://music.youtube.com/playlist/?list=PL16Or56vcoYEYVAPNUiSp0cKVYZyu_9wF',
+      );
+      expect(p.playlistId, 'PL16Or56vcoYEYVAPNUiSp0cKVYZyu_9wF');
+    });
   });
 }

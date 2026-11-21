@@ -1,0 +1,1712 @@
+{
+ "cities": [
+  {
+   "id": "chennai",
+   "name": "Chennai",
+   "country": "India",
+   "iso": "IN",
+   "region": "Tamil Nadu",
+   "lat": 13.0827,
+   "lng": 80.2707,
+   "tier": 1,
+   "genres": [
+    "Film music",
+    "Carnatic",
+    "Tamil pop",
+    "Kuthu"
+   ],
+   "artists": [
+    "A. R. Rahman",
+    "Anirudh Ravichander",
+    "Yuvan Shankar Raja",
+    "Sid Sriram",
+    "Ilaiyaraaja"
+   ],
+   "playlistQuery": "Top 25: Chennai"
+  },
+  {
+   "id": "mumbai",
+   "name": "Mumbai",
+   "country": "India",
+   "iso": "IN",
+   "region": "Maharashtra",
+   "lat": 19.076,
+   "lng": 72.8777,
+   "tier": 1,
+   "genres": [
+    "Bollywood",
+    "Gully rap",
+    "Film music",
+    "Indie pop"
+   ],
+   "artists": [
+    "DIVINE",
+    "Naezy",
+    "Shankar Ehsaan Loy",
+    "Amit Trivedi",
+    "Arijit Singh"
+   ],
+   "playlistQuery": "Top 25: Mumbai"
+  },
+  {
+   "id": "delhi",
+   "name": "Delhi",
+   "country": "India",
+   "iso": "IN",
+   "region": "National Capital Region",
+   "lat": 28.6139,
+   "lng": 77.209,
+   "tier": 1,
+   "genres": [
+    "Indie pop",
+    "Punjabi pop",
+    "Desi hip-hop",
+    "Classical"
+   ],
+   "artists": [
+    "Seedhe Maut",
+    "Prateek Kuhad",
+    "Raftaar",
+    "Shilpa Rao"
+   ],
+   "playlistQuery": "Top 25: Delhi"
+  },
+  {
+   "id": "bengaluru",
+   "name": "Bengaluru",
+   "country": "India",
+   "iso": "IN",
+   "region": "Karnataka",
+   "lat": 12.9716,
+   "lng": 77.5946,
+   "tier": 1,
+   "genres": [
+    "Kannada film",
+    "Indie rock",
+    "Carnatic fusion",
+    "Electronic"
+   ],
+   "artists": [
+    "Raghu Dixit",
+    "Thermal and a Quarter",
+    "Sanjith Hegde",
+    "Arjun Janya"
+   ],
+   "playlistQuery": "Top 25: Bengaluru"
+  },
+  {
+   "id": "hyderabad",
+   "name": "Hyderabad",
+   "country": "India",
+   "iso": "IN",
+   "region": "Telangana",
+   "lat": 17.385,
+   "lng": 78.4867,
+   "tier": 1,
+   "genres": [
+    "Tollywood",
+    "Deccani rap",
+    "Telugu folk",
+    "Film music"
+   ],
+   "artists": [
+    "Devi Sri Prasad",
+    "Thaman S",
+    "Roll Rida",
+    "Mangli",
+    "M. M. Keeravani"
+   ],
+   "playlistQuery": "Top 25: Hyderabad"
+  },
+  {
+   "id": "kolkata",
+   "name": "Kolkata",
+   "country": "India",
+   "iso": "IN",
+   "region": "West Bengal",
+   "lat": 22.5726,
+   "lng": 88.3639,
+   "tier": 1,
+   "genres": [
+    "Rabindra Sangeet",
+    "Bengali rock",
+    "Baul",
+    "Modern film"
+   ],
+   "artists": [
+    "Fossils",
+    "Cactus",
+    "Anupam Roy",
+    "Shreya Ghoshal",
+    "Rupam Islam"
+   ],
+   "playlistQuery": "Top 25: Kolkata"
+  },
+  {
+   "id": "kochi",
+   "name": "Kochi",
+   "country": "India",
+   "iso": "IN",
+   "region": "Kerala",
+   "lat": 9.9312,
+   "lng": 76.2673,
+   "tier": 2,
+   "genres": [
+    "Mollywood",
+    "Malayalam indie",
+    "Sopana Sangeetham",
+    "Reggae"
+   ],
+   "artists": [
+    "Sushin Shyam",
+    "Job Kurian",
+    "Masala Coffee",
+    "Shaan Rahman",
+    "Thaikkudam Bridge"
+   ],
+   "playlistQuery": "Top 25: Kochi"
+  },
+  {
+   "id": "chandigarh",
+   "name": "Chandigarh",
+   "country": "India",
+   "iso": "IN",
+   "region": "Punjab",
+   "lat": 30.7333,
+   "lng": 76.7794,
+   "tier": 1,
+   "genres": [
+    "Punjabi pop",
+    "Bhangra",
+    "Desi hip-hop",
+    "Folk"
+   ],
+   "artists": [
+    "Diljit Dosanjh",
+    "Karan Aujla",
+    "AP Dhillon",
+    "Sidhu Moose Wala",
+    "Gurdas Maan"
+   ],
+   "playlistQuery": "Top 25: Chandigarh"
+  },
+  {
+   "id": "pune",
+   "name": "Pune",
+   "country": "India",
+   "iso": "IN",
+   "region": "Maharashtra",
+   "lat": 18.5204,
+   "lng": 73.8567,
+   "tier": 2,
+   "genres": [
+    "Natya Sangeet",
+    "Marathi rock",
+    "Abhang fusion"
+   ],
+   "artists": [
+    "Ajay-Atul",
+    "Rahul Deshpande",
+    "Avadhoot Gupte",
+    "Swapnil Bandodkar"
+   ],
+   "playlistQuery": "Top 25: Pune"
+  },
+  {
+   "id": "ahmedabad",
+   "name": "Ahmedabad",
+   "country": "India",
+   "iso": "IN",
+   "region": "Gujarat",
+   "lat": 23.0225,
+   "lng": 72.5714,
+   "tier": 2,
+   "genres": [
+    "Gujarati folk",
+    "Garba",
+    "Urban Gujarati pop"
+   ],
+   "artists": [
+    "Sachin-Jigar",
+    "Aditya Gadhvi",
+    "Bhoomi Trivedi",
+    "Darshan Raval"
+   ],
+   "playlistQuery": "Top 25: Ahmedabad"
+  },
+  {
+   "id": "jaipur",
+   "name": "Jaipur",
+   "country": "India",
+   "iso": "IN",
+   "region": "Rajasthan",
+   "lat": 26.9124,
+   "lng": 75.7873,
+   "tier": 2,
+   "genres": [
+    "Rajasthani folk",
+    "Maand",
+    "Sufi fusion"
+   ],
+   "artists": [
+    "Mame Khan",
+    "Ila Arun",
+    "Rapperiya Baalam",
+    "Dapu Khan"
+   ],
+   "playlistQuery": "Top 25: Jaipur"
+  },
+  {
+   "id": "lucknow",
+   "name": "Lucknow",
+   "country": "India",
+   "iso": "IN",
+   "region": "Uttar Pradesh",
+   "lat": 26.8467,
+   "lng": 80.9462,
+   "tier": 2,
+   "genres": [
+    "Ghazal",
+    "Thumri",
+    "Awadhi folk",
+    "Qawwali"
+   ],
+   "artists": [
+    "Talat Mahmood",
+    "Anup Jalota",
+    "Malini Awasthi",
+    "Begum Akhtar"
+   ],
+   "playlistQuery": "Top 25: Lucknow"
+  },
+  {
+   "id": "goa",
+   "name": "Goa",
+   "country": "India",
+   "iso": "IN",
+   "region": "Goa",
+   "lat": 15.2993,
+   "lng": 74.124,
+   "tier": 2,
+   "genres": [
+    "Psytrance",
+    "Konkani pop",
+    "Mando",
+    "EDM"
+   ],
+   "artists": [
+    "Remo Fernandes",
+    "Lorna Cordeiro",
+    "Goa Gil"
+   ],
+   "playlistQuery": "Top 25: Goa"
+  },
+  {
+   "id": "guwahati",
+   "name": "Guwahati",
+   "country": "India",
+   "iso": "IN",
+   "region": "Assam",
+   "lat": 26.1445,
+   "lng": 91.7362,
+   "tier": 2,
+   "genres": [
+    "Bihu",
+    "Assamese rock",
+    "Folk fusion"
+   ],
+   "artists": [
+    "Zubeen Garg",
+    "Papon",
+    "Bhupen Hazarika",
+    "Joi Barua"
+   ],
+   "playlistQuery": "Top 25: Guwahati"
+  },
+  {
+   "id": "new_york",
+   "name": "New York",
+   "country": "United States",
+   "iso": "US",
+   "region": "New York",
+   "lat": 40.7128,
+   "lng": -74.006,
+   "tier": 1,
+   "genres": [
+    "East Coast hip-hop",
+    "Jazz",
+    "Punk rock",
+    "Broadway"
+   ],
+   "artists": [
+    "Jay-Z",
+    "Nas",
+    "The Strokes",
+    "Alicia Keys",
+    "Lady Gaga"
+   ],
+   "playlistQuery": "Top 25: New York"
+  },
+  {
+   "id": "los_angeles",
+   "name": "Los Angeles",
+   "country": "United States",
+   "iso": "US",
+   "region": "California",
+   "lat": 34.0522,
+   "lng": -118.2437,
+   "tier": 1,
+   "genres": [
+    "West Coast hip-hop",
+    "Pop",
+    "Rock",
+    "R&B"
+   ],
+   "artists": [
+    "Kendrick Lamar",
+    "Billie Eilish",
+    "Red Hot Chili Peppers",
+    "Dr. Dre",
+    "Doja Cat"
+   ],
+   "playlistQuery": "Top 25: Los Angeles"
+  },
+  {
+   "id": "chicago",
+   "name": "Chicago",
+   "country": "United States",
+   "iso": "US",
+   "region": "Illinois",
+   "lat": 41.8781,
+   "lng": -87.6298,
+   "tier": 1,
+   "genres": [
+    "Chicago blues",
+    "House music",
+    "Drill",
+    "Soul"
+   ],
+   "artists": [
+    "Kanye West",
+    "Chance the Rapper",
+    "Chief Keef",
+    "Common",
+    "Juice WRLD"
+   ],
+   "playlistQuery": "Top 25: Chicago"
+  },
+  {
+   "id": "atlanta",
+   "name": "Atlanta",
+   "country": "United States",
+   "iso": "US",
+   "region": "Georgia",
+   "lat": 33.749,
+   "lng": -84.388,
+   "tier": 1,
+   "genres": [
+    "Trap",
+    "Southern hip-hop",
+    "R&B"
+   ],
+   "artists": [
+    "Outkast",
+    "Future",
+    "21 Savage",
+    "Lil Baby",
+    "Usher"
+   ],
+   "playlistQuery": "Top 25: Atlanta"
+  },
+  {
+   "id": "nashville",
+   "name": "Nashville",
+   "country": "United States",
+   "iso": "US",
+   "region": "Tennessee",
+   "lat": 36.1627,
+   "lng": -86.7816,
+   "tier": 1,
+   "genres": [
+    "Country",
+    "Americana",
+    "Bluegrass",
+    "Country pop"
+   ],
+   "artists": [
+    "Taylor Swift",
+    "Dolly Parton",
+    "Chris Stapleton",
+    "Johnny Cash",
+    "Morgan Wallen"
+   ],
+   "playlistQuery": "Top 25: Nashville"
+  },
+  {
+   "id": "miami",
+   "name": "Miami",
+   "country": "United States",
+   "iso": "US",
+   "region": "Florida",
+   "lat": 25.7617,
+   "lng": -80.1918,
+   "tier": 1,
+   "genres": [
+    "Latin pop",
+    "Reggaeton",
+    "Miami bass",
+    "Dance"
+   ],
+   "artists": [
+    "Pitbull",
+    "Gloria Estefan",
+    "Rick Ross",
+    "DJ Khaled"
+   ],
+   "playlistQuery": "Top 25: Miami"
+  },
+  {
+   "id": "austin",
+   "name": "Austin",
+   "country": "United States",
+   "iso": "US",
+   "region": "Texas",
+   "lat": 30.2672,
+   "lng": -97.7431,
+   "tier": 2,
+   "genres": [
+    "Indie rock",
+    "Outlaw country",
+    "Blues rock"
+   ],
+   "artists": [
+    "Stevie Ray Vaughan",
+    "Spoon",
+    "Gary Clark Jr.",
+    "Willie Nelson"
+   ],
+   "playlistQuery": "Top 25: Austin"
+  },
+  {
+   "id": "seattle",
+   "name": "Seattle",
+   "country": "United States",
+   "iso": "US",
+   "region": "Washington",
+   "lat": 47.6062,
+   "lng": -122.3321,
+   "tier": 2,
+   "genres": [
+    "Grunge",
+    "Alternative rock",
+    "Folk indie"
+   ],
+   "artists": [
+    "Nirvana",
+    "Pearl Jam",
+    "Macklemore",
+    "Soundgarden",
+    "Fleet Foxes"
+   ],
+   "playlistQuery": "Top 25: Seattle"
+  },
+  {
+   "id": "san_francisco",
+   "name": "San Francisco",
+   "country": "United States",
+   "iso": "US",
+   "region": "California",
+   "lat": 37.7749,
+   "lng": -122.4194,
+   "tier": 2,
+   "genres": [
+    "Bay Area hip-hop",
+    "Psychedelic rock",
+    "Electronic"
+   ],
+   "artists": [
+    "Grateful Dead",
+    "E-40",
+    "Santana",
+    "Metallica"
+   ],
+   "playlistQuery": "Top 25: San Francisco"
+  },
+  {
+   "id": "new_orleans",
+   "name": "New Orleans",
+   "country": "United States",
+   "iso": "US",
+   "region": "Louisiana",
+   "lat": 29.9511,
+   "lng": -90.0715,
+   "tier": 2,
+   "genres": [
+    "Traditional Jazz",
+    "Bounce",
+    "Brass band",
+    "Zydeco"
+   ],
+   "artists": [
+    "Louis Armstrong",
+    "Lil Wayne",
+    "Trombone Shorty",
+    "Big Freedia"
+   ],
+   "playlistQuery": "Top 25: New Orleans"
+  },
+  {
+   "id": "detroit",
+   "name": "Detroit",
+   "country": "United States",
+   "iso": "US",
+   "region": "Michigan",
+   "lat": 42.3314,
+   "lng": -83.0458,
+   "tier": 2,
+   "genres": [
+    "Motown",
+    "Detroit techno",
+    "Midwest hip-hop"
+   ],
+   "artists": [
+    "Eminem",
+    "Stevie Wonder",
+    "The Temptations",
+    "Juan Atkins",
+    "J Dilla"
+   ],
+   "playlistQuery": "Top 25: Detroit"
+  },
+  {
+   "id": "memphis",
+   "name": "Memphis",
+   "country": "United States",
+   "iso": "US",
+   "region": "Tennessee",
+   "lat": 35.1495,
+   "lng": -90.049,
+   "tier": 2,
+   "genres": [
+    "Memphis blues",
+    "Southern soul",
+    "Memphis rap"
+   ],
+   "artists": [
+    "Elvis Presley",
+    "B.B. King",
+    "Three 6 Mafia",
+    "Otis Redding"
+   ],
+   "playlistQuery": "Top 25: Memphis"
+  },
+  {
+   "id": "london",
+   "name": "London",
+   "country": "United Kingdom",
+   "iso": "GB",
+   "region": "England",
+   "lat": 51.5074,
+   "lng": -0.1278,
+   "tier": 1,
+   "genres": [
+    "Grime",
+    "Britpop",
+    "Drum and bass",
+    "UK drill"
+   ],
+   "artists": [
+    "Adele",
+    "Stormzy",
+    "Dua Lipa",
+    "The Rolling Stones",
+    "Skepta"
+   ],
+   "playlistQuery": "Top 25: London"
+  },
+  {
+   "id": "manchester",
+   "name": "Manchester",
+   "country": "United Kingdom",
+   "iso": "GB",
+   "region": "England",
+   "lat": 53.4808,
+   "lng": -2.2426,
+   "tier": 1,
+   "genres": [
+    "Madchester",
+    "Post-punk",
+    "Britpop",
+    "Indie rock"
+   ],
+   "artists": [
+    "Oasis",
+    "The Smiths",
+    "Joy Division",
+    "The Stone Roses"
+   ],
+   "playlistQuery": "Top 25: Manchester"
+  },
+  {
+   "id": "birmingham",
+   "name": "Birmingham",
+   "country": "United Kingdom",
+   "iso": "GB",
+   "region": "England",
+   "lat": 52.4862,
+   "lng": -1.8904,
+   "tier": 2,
+   "genres": [
+    "Heavy metal",
+    "UK reggae",
+    "Bhangra fusion"
+   ],
+   "artists": [
+    "Black Sabbath",
+    "Judas Priest",
+    "UB40",
+    "Steel Pulse"
+   ],
+   "playlistQuery": "Top 25: Birmingham"
+  },
+  {
+   "id": "glasgow",
+   "name": "Glasgow",
+   "country": "United Kingdom",
+   "iso": "GB",
+   "region": "Scotland",
+   "lat": 55.8642,
+   "lng": -4.2518,
+   "tier": 2,
+   "genres": [
+    "Scottish indie",
+    "Post-punk",
+    "Synthpop"
+   ],
+   "artists": [
+    "Franz Ferdinand",
+    "Belle and Sebastian",
+    "CHVRCHES",
+    "Biffy Clyro"
+   ],
+   "playlistQuery": "Top 25: Glasgow"
+  },
+  {
+   "id": "paris",
+   "name": "Paris",
+   "country": "France",
+   "iso": "FR",
+   "region": "\u00cele-de-France",
+   "lat": 48.8566,
+   "lng": 2.3522,
+   "tier": 1,
+   "genres": [
+    "French touch",
+    "Chanson",
+    "French rap",
+    "Electronic"
+   ],
+   "artists": [
+    "Daft Punk",
+    "Justice",
+    "\u00c9dith Piaf",
+    "Stromae",
+    "Ninho"
+   ],
+   "playlistQuery": "Top 25: Paris"
+  },
+  {
+   "id": "berlin",
+   "name": "Berlin",
+   "country": "Germany",
+   "iso": "DE",
+   "region": "Berlin",
+   "lat": 52.52,
+   "lng": 13.405,
+   "tier": 1,
+   "genres": [
+    "Berlin techno",
+    "Minimal",
+    "Electronic",
+    "Krautrock"
+   ],
+   "artists": [
+    "Paul van Dyk",
+    "Modeselektor",
+    "Tangerine Dream",
+    "Ellen Allien"
+   ],
+   "playlistQuery": "Top 25: Berlin"
+  },
+  {
+   "id": "munich",
+   "name": "Munich",
+   "country": "Germany",
+   "iso": "DE",
+   "region": "Bavaria",
+   "lat": 48.1351,
+   "lng": 11.582,
+   "tier": 2,
+   "genres": [
+    "Euro disco",
+    "Classical",
+    "Krautrock"
+   ],
+   "artists": [
+    "Giorgio Moroder",
+    "Amon D\u00fc\u00fcl II",
+    "Richard Strauss"
+   ],
+   "playlistQuery": "Top 25: Munich"
+  },
+  {
+   "id": "amsterdam",
+   "name": "Amsterdam",
+   "country": "Netherlands",
+   "iso": "NL",
+   "region": "North Holland",
+   "lat": 52.3676,
+   "lng": 4.9041,
+   "tier": 1,
+   "genres": [
+    "Dutch EDM",
+    "Trance",
+    "Hardstyle",
+    "Nederhop"
+   ],
+   "artists": [
+    "Ti\u00ebsto",
+    "Armin van Buuren",
+    "Martin Garrix",
+    "Afrojack"
+   ],
+   "playlistQuery": "Top 25: Amsterdam"
+  },
+  {
+   "id": "rome",
+   "name": "Rome",
+   "country": "Italy",
+   "iso": "IT",
+   "region": "Lazio",
+   "lat": 41.9028,
+   "lng": 12.4964,
+   "tier": 1,
+   "genres": [
+    "Italo pop",
+    "Film score",
+    "Opera",
+    "Italian trap"
+   ],
+   "artists": [
+    "Ennio Morricone",
+    "M\u00e5neskin",
+    "Laura Pausini",
+    "Eros Ramazzotti"
+   ],
+   "playlistQuery": "Top 25: Rome"
+  },
+  {
+   "id": "madrid",
+   "name": "Madrid",
+   "country": "Spain",
+   "iso": "ES",
+   "region": "Community of Madrid",
+   "lat": 40.4168,
+   "lng": -3.7038,
+   "tier": 1,
+   "genres": [
+    "Flamenco urban",
+    "Spanish pop",
+    "Indie rock",
+    "Trap"
+   ],
+   "artists": [
+    "Rosal\u00eda",
+    "C. Tangana",
+    "Alejandro Sanz",
+    "Enrique Iglesias"
+   ],
+   "playlistQuery": "Top 25: Madrid"
+  },
+  {
+   "id": "barcelona",
+   "name": "Barcelona",
+   "country": "Spain",
+   "iso": "ES",
+   "region": "Catalonia",
+   "lat": 41.3879,
+   "lng": 2.1699,
+   "tier": 2,
+   "genres": [
+    "Rumba catalana",
+    "Catalan pop",
+    "Electronic",
+    "Urban"
+   ],
+   "artists": [
+    "Morad",
+    "Macaco",
+    "Ojos de Brujo",
+    "Bad Gyal"
+   ],
+   "playlistQuery": "Top 25: Barcelona"
+  },
+  {
+   "id": "stockholm",
+   "name": "Stockholm",
+   "country": "Sweden",
+   "iso": "SE",
+   "region": "Stockholm",
+   "lat": 59.3293,
+   "lng": 18.0686,
+   "tier": 1,
+   "genres": [
+    "Swedish pop",
+    "Melodic house",
+    "Eurodance"
+   ],
+   "artists": [
+    "ABBA",
+    "Avicii",
+    "Robyn",
+    "Swedish House Mafia",
+    "Zara Larsson"
+   ],
+   "playlistQuery": "Top 25: Stockholm"
+  },
+  {
+   "id": "dublin",
+   "name": "Dublin",
+   "country": "Ireland",
+   "iso": "IE",
+   "region": "Leinster",
+   "lat": 53.3498,
+   "lng": -6.2603,
+   "tier": 1,
+   "genres": [
+    "Celtic rock",
+    "Irish folk",
+    "Indie rock"
+   ],
+   "artists": [
+    "U2",
+    "The Cranberries",
+    "Hozier",
+    "Sin\u00e9ad O'Connor"
+   ],
+   "playlistQuery": "Top 25: Dublin"
+  },
+  {
+   "id": "vienna",
+   "name": "Vienna",
+   "country": "Austria",
+   "iso": "AT",
+   "region": "Vienna",
+   "lat": 48.2082,
+   "lng": 16.3738,
+   "tier": 2,
+   "genres": [
+    "Classical",
+    "Viennese electronic",
+    "Downtempo"
+   ],
+   "artists": [
+    "Falco",
+    "Kruder & Dorfmeister",
+    "Parov Stelar",
+    "Mozart"
+   ],
+   "playlistQuery": "Top 25: Vienna"
+  },
+  {
+   "id": "brussels",
+   "name": "Brussels",
+   "country": "Belgium",
+   "iso": "BE",
+   "region": "Brussels",
+   "lat": 50.8503,
+   "lng": 4.3517,
+   "tier": 2,
+   "genres": [
+    "New beat",
+    "Belgian pop",
+    "French rap"
+   ],
+   "artists": [
+    "Stromae",
+    "Ang\u00e8le",
+    "Damso",
+    "Jacques Brel"
+   ],
+   "playlistQuery": "Top 25: Brussels"
+  },
+  {
+   "id": "lisbon",
+   "name": "Lisbon",
+   "country": "Portugal",
+   "iso": "PT",
+   "region": "Lisboa",
+   "lat": 38.7223,
+   "lng": -9.1393,
+   "tier": 2,
+   "genres": [
+    "Fado",
+    "Kizomba",
+    "Kuduro",
+    "Lusophone pop"
+   ],
+   "artists": [
+    "Am\u00e1lia Rodrigues",
+    "Mariza",
+    "Dino d'Santiago",
+    "Buraka Som Sistema"
+   ],
+   "playlistQuery": "Top 25: Lisbon"
+  },
+  {
+   "id": "tokyo",
+   "name": "Tokyo",
+   "country": "Japan",
+   "iso": "JP",
+   "region": "Kant\u014d",
+   "lat": 35.6762,
+   "lng": 139.6503,
+   "tier": 1,
+   "genres": [
+    "City pop",
+    "J-pop",
+    "Shibuya-kei",
+    "Anime OST"
+   ],
+   "artists": [
+    "YOASOBI",
+    "Kenshi Yonezu",
+    "Hikaru Utada",
+    "RADWIMPS",
+    "Cornelius"
+   ],
+   "playlistQuery": "Top 25: Tokyo"
+  },
+  {
+   "id": "osaka",
+   "name": "Osaka",
+   "country": "Japan",
+   "iso": "JP",
+   "region": "Kansai",
+   "lat": 34.6937,
+   "lng": 135.5023,
+   "tier": 2,
+   "genres": [
+    "Kansai hip-hop",
+    "J-rock",
+    "Enka"
+   ],
+   "artists": [
+    "Creepy Nuts",
+    "Ulfuls",
+    "Boredoms",
+    "Ai Otsuka"
+   ],
+   "playlistQuery": "Top 25: Osaka"
+  },
+  {
+   "id": "seoul",
+   "name": "Seoul",
+   "country": "South Korea",
+   "iso": "KR",
+   "region": "Seoul Capital Area",
+   "lat": 37.5665,
+   "lng": 126.978,
+   "tier": 1,
+   "genres": [
+    "K-pop",
+    "K-hiphop",
+    "Korean R&B",
+    "Trot"
+   ],
+   "artists": [
+    "BTS",
+    "BLACKPINK",
+    "NewJeans",
+    "IU",
+    "Jay Park"
+   ],
+   "playlistQuery": "Top 25: Seoul"
+  },
+  {
+   "id": "busan",
+   "name": "Busan",
+   "country": "South Korea",
+   "iso": "KR",
+   "region": "Yeongnam",
+   "lat": 35.1796,
+   "lng": 129.0756,
+   "tier": 2,
+   "genres": [
+    "Korean indie",
+    "Surf rock",
+    "K-pop"
+   ],
+   "artists": [
+    "Say Sue Me",
+    "Jannabi",
+    "Hyukoh"
+   ],
+   "playlistQuery": "Top 25: Busan"
+  },
+  {
+   "id": "singapore",
+   "name": "Singapore",
+   "country": "Singapore",
+   "iso": "SG",
+   "region": "Singapore",
+   "lat": 1.3521,
+   "lng": 103.8198,
+   "tier": 1,
+   "genres": [
+    "Mandopop",
+    "English indie",
+    "Electronic pop"
+   ],
+   "artists": [
+    "JJ Lin",
+    "Stefanie Sun",
+    "Gentle Bones",
+    "Jasmine Sokko"
+   ],
+   "playlistQuery": "Top 25: Singapore"
+  },
+  {
+   "id": "sydney",
+   "name": "Sydney",
+   "country": "Australia",
+   "iso": "AU",
+   "region": "New South Wales",
+   "lat": -33.8688,
+   "lng": 151.2093,
+   "tier": 1,
+   "genres": [
+    "Aussie rock",
+    "Indie dance",
+    "Pop"
+   ],
+   "artists": [
+    "AC/DC",
+    "Flume",
+    "The Kid LAROI",
+    "Sia",
+    "Midnight Oil"
+   ],
+   "playlistQuery": "Top 25: Sydney"
+  },
+  {
+   "id": "melbourne",
+   "name": "Melbourne",
+   "country": "Australia",
+   "iso": "AU",
+   "region": "Victoria",
+   "lat": -37.8136,
+   "lng": 144.9631,
+   "tier": 1,
+   "genres": [
+    "Psychedelic rock",
+    "Indie soul",
+    "Alternative rock"
+   ],
+   "artists": [
+    "Tame Impala",
+    "King Gizzard & The Lizard Wizard",
+    "Vance Joy",
+    "Hiatus Kaiyote"
+   ],
+   "playlistQuery": "Top 25: Melbourne"
+  },
+  {
+   "id": "auckland",
+   "name": "Auckland",
+   "country": "New Zealand",
+   "iso": "NZ",
+   "region": "North Island",
+   "lat": -36.8485,
+   "lng": 174.7633,
+   "tier": 2,
+   "genres": [
+    "Polynesian hip-hop",
+    "Indie pop",
+    "Roots reggae"
+   ],
+   "artists": [
+    "Lorde",
+    "Benee",
+    "Six60",
+    "Crowded House"
+   ],
+   "playlistQuery": "Top 25: Auckland"
+  },
+  {
+   "id": "bangkok",
+   "name": "Bangkok",
+   "country": "Thailand",
+   "iso": "TH",
+   "region": "Central Thailand",
+   "lat": 13.7563,
+   "lng": 100.5018,
+   "tier": 1,
+   "genres": [
+    "T-pop",
+    "Thai rock",
+    "Luk Thung"
+   ],
+   "artists": [
+    "Bodyslam",
+    "MILLI",
+    "Three Man Down",
+    "Palmy"
+   ],
+   "playlistQuery": "Top 25: Bangkok"
+  },
+  {
+   "id": "manila",
+   "name": "Manila",
+   "country": "Philippines",
+   "iso": "PH",
+   "region": "Metro Manila",
+   "lat": 14.5995,
+   "lng": 120.9842,
+   "tier": 1,
+   "genres": [
+    "OPM",
+    "Pinoy pop",
+    "Manila sound"
+   ],
+   "artists": [
+    "SB19",
+    "Ben&Ben",
+    "Moira Dela Torre",
+    "Eraserheads"
+   ],
+   "playlistQuery": "Top 25: Manila"
+  },
+  {
+   "id": "jakarta",
+   "name": "Jakarta",
+   "country": "Indonesia",
+   "iso": "ID",
+   "region": "Java",
+   "lat": -6.2088,
+   "lng": 106.8456,
+   "tier": 1,
+   "genres": [
+    "Indo pop",
+    "Dangdut koplo",
+    "Indie folk"
+   ],
+   "artists": [
+    "Rich Brian",
+    "NIKI",
+    "Tulus",
+    "Raisa"
+   ],
+   "playlistQuery": "Top 25: Jakarta"
+  },
+  {
+   "id": "kuala_lumpur",
+   "name": "Kuala Lumpur",
+   "country": "Malaysia",
+   "iso": "MY",
+   "region": "Federal Territory",
+   "lat": 3.139,
+   "lng": 101.6869,
+   "tier": 1,
+   "genres": [
+    "Malay pop",
+    "Nasyid",
+    "Malaysian hip-hop"
+   ],
+   "artists": [
+    "Siti Nurhaliza",
+    "Joe Flizzow",
+    "Yuna",
+    "Faizal Tahir"
+   ],
+   "playlistQuery": "Top 25: Kuala Lumpur"
+  },
+  {
+   "id": "taipei",
+   "name": "Taipei",
+   "country": "Taiwan",
+   "iso": "TW",
+   "region": "Northern Taiwan",
+   "lat": 25.033,
+   "lng": 121.5654,
+   "tier": 1,
+   "genres": [
+    "Mandopop",
+    "Taiwanese rock",
+    "City pop"
+   ],
+   "artists": [
+    "Jay Chou",
+    "Jolin Tsai",
+    "Mayday",
+    "Sunset Rollercoaster"
+   ],
+   "playlistQuery": "Top 25: Taipei"
+  },
+  {
+   "id": "hong_kong",
+   "name": "Hong Kong",
+   "country": "Hong Kong",
+   "iso": "HK",
+   "region": "Hong Kong",
+   "lat": 22.3193,
+   "lng": 114.1694,
+   "tier": 1,
+   "genres": [
+    "Cantopop",
+    "Hong Kong indie",
+    "City pop"
+   ],
+   "artists": [
+    "Eason Chan",
+    "Faye Wong",
+    "Leslie Cheung",
+    "Mirror"
+   ],
+   "playlistQuery": "Top 25: Hong Kong"
+  },
+  {
+   "id": "mexico_city",
+   "name": "Mexico City",
+   "country": "Mexico",
+   "iso": "MX",
+   "region": "CDMX",
+   "lat": 19.4326,
+   "lng": -99.1332,
+   "tier": 1,
+   "genres": [
+    "Corridos tumbados",
+    "Latin rock",
+    "Regional Mexican"
+   ],
+   "artists": [
+    "Peso Pluma",
+    "Christian Nodal",
+    "Caf\u00e9 Tacvba",
+    "Luis Miguel"
+   ],
+   "playlistQuery": "Top 25: Mexico City"
+  },
+  {
+   "id": "guadalajara",
+   "name": "Guadalajara",
+   "country": "Mexico",
+   "iso": "MX",
+   "region": "Jalisco",
+   "lat": 20.6597,
+   "lng": -103.3496,
+   "tier": 2,
+   "genres": [
+    "Mariachi",
+    "Ranchera",
+    "Latin rock"
+   ],
+   "artists": [
+    "Vicente Fern\u00e1ndez",
+    "Man\u00e1",
+    "Alejandro Fern\u00e1ndez"
+   ],
+   "playlistQuery": "Top 25: Guadalajara"
+  },
+  {
+   "id": "sao_paulo",
+   "name": "S\u00e3o Paulo",
+   "country": "Brazil",
+   "iso": "BR",
+   "region": "S\u00e3o Paulo",
+   "lat": -23.5505,
+   "lng": -46.6333,
+   "tier": 1,
+   "genres": [
+    "Funk paulista",
+    "MPB",
+    "Rap nacional"
+   ],
+   "artists": [
+    "Racionais MC's",
+    "Rita Lee",
+    "MC Hariel",
+    "Criolo"
+   ],
+   "playlistQuery": "Top 25: S\u00e3o Paulo"
+  },
+  {
+   "id": "rio_de_janeiro",
+   "name": "Rio de Janeiro",
+   "country": "Brazil",
+   "iso": "BR",
+   "region": "Rio de Janeiro",
+   "lat": -22.9068,
+   "lng": -43.1729,
+   "tier": 1,
+   "genres": [
+    "Bossa nova",
+    "Funk carioca",
+    "Samba"
+   ],
+   "artists": [
+    "Tom Jobim",
+    "Anitta",
+    "Jorge Ben Jor",
+    "Ludmilla"
+   ],
+   "playlistQuery": "Top 25: Rio de Janeiro"
+  },
+  {
+   "id": "buenos_aires",
+   "name": "Buenos Aires",
+   "country": "Argentina",
+   "iso": "AR",
+   "region": "Buenos Aires",
+   "lat": -34.6037,
+   "lng": -58.3816,
+   "tier": 1,
+   "genres": [
+    "Argentine trap",
+    "Rock nacional",
+    "Tango"
+   ],
+   "artists": [
+    "Bizarrap",
+    "Duki",
+    "Soda Stereo",
+    "Astor Piazzolla"
+   ],
+   "playlistQuery": "Top 25: Buenos Aires"
+  },
+  {
+   "id": "bogota",
+   "name": "Bogot\u00e1",
+   "country": "Colombia",
+   "iso": "CO",
+   "region": "Bogot\u00e1 D.C.",
+   "lat": 4.711,
+   "lng": -74.0721,
+   "tier": 1,
+   "genres": [
+    "Cumbia",
+    "Tropipop",
+    "Latin alternative"
+   ],
+   "artists": [
+    "Shakira",
+    "Carlos Vives",
+    "Bomba Est\u00e9reo",
+    "Juanes"
+   ],
+   "playlistQuery": "Top 25: Bogot\u00e1"
+  },
+  {
+   "id": "medellin",
+   "name": "Medell\u00edn",
+   "country": "Colombia",
+   "iso": "CO",
+   "region": "Antioquia",
+   "lat": 6.2442,
+   "lng": -75.5812,
+   "tier": 1,
+   "genres": [
+    "Reggaeton",
+    "Urban latin",
+    "Vallenato"
+   ],
+   "artists": [
+    "Karol G",
+    "J Balvin",
+    "Maluma",
+    "Feid"
+   ],
+   "playlistQuery": "Top 25: Medell\u00edn"
+  },
+  {
+   "id": "santiago",
+   "name": "Santiago",
+   "country": "Chile",
+   "iso": "CL",
+   "region": "Santiago Metropolitan",
+   "lat": -33.4489,
+   "lng": -70.6693,
+   "tier": 2,
+   "genres": [
+    "Chilean trap",
+    "Nueva canci\u00f3n",
+    "Latin pop"
+   ],
+   "artists": [
+    "Mon Laferte",
+    "Los Prisioneros",
+    "Polim\u00e1 Westcoast"
+   ],
+   "playlistQuery": "Top 25: Santiago"
+  },
+  {
+   "id": "lima",
+   "name": "Lima",
+   "country": "Peru",
+   "iso": "PE",
+   "region": "Lima",
+   "lat": -12.0464,
+   "lng": -77.0428,
+   "tier": 2,
+   "genres": [
+    "Cumbia peruana",
+    "Afro-Peruvian",
+    "Criollo"
+   ],
+   "artists": [
+    "Eva Ayll\u00f3n",
+    "Los Mirlos",
+    "Susana Baca"
+   ],
+   "playlistQuery": "Top 25: Lima"
+  },
+  {
+   "id": "havana",
+   "name": "Havana",
+   "country": "Cuba",
+   "iso": "CU",
+   "region": "La Habana",
+   "lat": 23.1136,
+   "lng": -82.3666,
+   "tier": 2,
+   "genres": [
+    "Son cubano",
+    "Salsa",
+    "Timba"
+   ],
+   "artists": [
+    "Buena Vista Social Club",
+    "Celia Cruz",
+    "Gente de Zona"
+   ],
+   "playlistQuery": "Top 25: Havana"
+  },
+  {
+   "id": "lagos",
+   "name": "Lagos",
+   "country": "Nigeria",
+   "iso": "NG",
+   "region": "Lagos State",
+   "lat": 6.5244,
+   "lng": 3.3792,
+   "tier": 1,
+   "genres": [
+    "Afrobeats",
+    "Afro-fusion",
+    "Highlife",
+    "Fuji"
+   ],
+   "artists": [
+    "Burna Boy",
+    "Wizkid",
+    "Fela Kuti",
+    "Asake",
+    "Tiwa Savage"
+   ],
+   "playlistQuery": "Top 25: Lagos"
+  },
+  {
+   "id": "accra",
+   "name": "Accra",
+   "country": "Ghana",
+   "iso": "GH",
+   "region": "Greater Accra",
+   "lat": 5.6037,
+   "lng": -0.187,
+   "tier": 2,
+   "genres": [
+    "Highlife",
+    "Hiplife",
+    "Afropop"
+   ],
+   "artists": [
+    "Sarkodie",
+    "Shatta Wale",
+    "Stonebwoy",
+    "King Promise"
+   ],
+   "playlistQuery": "Top 25: Accra"
+  },
+  {
+   "id": "johannesburg",
+   "name": "Johannesburg",
+   "country": "South Africa",
+   "iso": "ZA",
+   "region": "Gauteng",
+   "lat": -26.2041,
+   "lng": 28.0473,
+   "tier": 1,
+   "genres": [
+    "Amapiano",
+    "Kwaito",
+    "South African jazz"
+   ],
+   "artists": [
+    "DJ Maphorisa",
+    "Kabza De Small",
+    "Brenda Fassie",
+    "Hugh Masekela"
+   ],
+   "playlistQuery": "Top 25: Johannesburg"
+  },
+  {
+   "id": "cape_town",
+   "name": "Cape Town",
+   "country": "South Africa",
+   "iso": "ZA",
+   "region": "Western Cape",
+   "lat": -33.9249,
+   "lng": 18.4241,
+   "tier": 2,
+   "genres": [
+    "Ghoema",
+    "Deep house",
+    "Indie folk"
+   ],
+   "artists": [
+    "GoldFish",
+    "Jeremy Loops",
+    "Abdullah Ibrahim"
+   ],
+   "playlistQuery": "Top 25: Cape Town"
+  },
+  {
+   "id": "nairobi",
+   "name": "Nairobi",
+   "country": "Kenya",
+   "iso": "KE",
+   "region": "Nairobi County",
+   "lat": -1.2921,
+   "lng": 36.8219,
+   "tier": 2,
+   "genres": [
+    "Gengetone",
+    "Benga",
+    "Afro-pop"
+   ],
+   "artists": [
+    "Sauti Sol",
+    "Nyashinski",
+    "Khaligraph Jones"
+   ],
+   "playlistQuery": "Top 25: Nairobi"
+  },
+  {
+   "id": "cairo",
+   "name": "Cairo",
+   "country": "Egypt",
+   "iso": "EG",
+   "region": "Cairo Governorate",
+   "lat": 30.0444,
+   "lng": 31.2357,
+   "tier": 1,
+   "genres": [
+    "Mahraganat",
+    "Shaabi",
+    "Classical Arabic"
+   ],
+   "artists": [
+    "Umm Kulthum",
+    "Amr Diab",
+    "Wegz",
+    "Sherine"
+   ],
+   "playlistQuery": "Top 25: Cairo"
+  },
+  {
+   "id": "dubai",
+   "name": "Dubai",
+   "country": "United Arab Emirates",
+   "iso": "AE",
+   "region": "Dubai",
+   "lat": 25.2048,
+   "lng": 55.2708,
+   "tier": 1,
+   "genres": [
+    "Khaleeji pop",
+    "Arabic EDM",
+    "Desert pop"
+   ],
+   "artists": [
+    "Hussain Al Jassmi",
+    "Balqees",
+    "Mohamed Hamaki"
+   ],
+   "playlistQuery": "Top 25: Dubai"
+  },
+  {
+   "id": "beirut",
+   "name": "Beirut",
+   "country": "Lebanon",
+   "iso": "LB",
+   "region": "Beirut",
+   "lat": 33.8938,
+   "lng": 35.5018,
+   "tier": 2,
+   "genres": [
+    "Levantine pop",
+    "Arabic indie",
+    "Dabke"
+   ],
+   "artists": [
+    "Fairuz",
+    "Mashrou' Leila",
+    "Nancy Ajram",
+    "Elissa"
+   ],
+   "playlistQuery": "Top 25: Beirut"
+  },
+  {
+   "id": "dakar",
+   "name": "Dakar",
+   "country": "Senegal",
+   "iso": "SN",
+   "region": "Dakar Region",
+   "lat": 14.7167,
+   "lng": -17.4677,
+   "tier": 2,
+   "genres": [
+    "Mbalax",
+    "Senegalese hip-hop",
+    "Afro-Cuban fusion"
+   ],
+   "artists": [
+    "Youssou N'Dour",
+    "Baaba Maal",
+    "Daara J"
+   ],
+   "playlistQuery": "Top 25: Dakar"
+  },
+  {
+   "id": "addis_ababa",
+   "name": "Addis Ababa",
+   "country": "Ethiopia",
+   "iso": "ET",
+   "region": "Addis Ababa",
+   "lat": 9.032,
+   "lng": 38.7482,
+   "tier": 2,
+   "genres": [
+    "Ethio-jazz",
+    "Tizita",
+    "Amharic pop"
+   ],
+   "artists": [
+    "Mulatu Astatke",
+    "Aster Aweke",
+    "Mahmoud Ahmed"
+   ],
+   "playlistQuery": "Top 25: Addis Ababa"
+  }
+ ]
+}

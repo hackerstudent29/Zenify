@@ -53,6 +53,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     companion object {
         @Volatile
         var activeHeaders: Map<String, String> = emptyMap()
+        @Volatile
+        var currentMediaId: String? = null
     }
 
     private lateinit var ctx: Context
@@ -68,8 +70,6 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     private var pluginScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val playGeneration = AtomicInteger(0)
     private val nextGeneration = AtomicInteger(0)
-    @Volatile
-    private var currentMediaId: String? = null
     private var lastDuration = -1L
     private var pending = PlaybackParameters(1f, 1f)
 
@@ -498,28 +498,43 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                             .setTag("video")
                             .build()
                         p.setMediaItem(item, startMs ?: 0L)
+                        p.prepare()
+                        p.playWhenReady = true
                     } else {
-                        emit(mapOf(
-                            "type" to "error",
-                            "message" to "No video stream returned by primary extractor for $mediaId",
-                            "errorCode" to -1,
-                            "is403" to false,
-                        ))
-                        return@withContext
+                        // Resilient audio fallback: No video track returned, play audio smoothly
+                        p.clearVideoSurface()
+                        emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
+                        val uri = resolveMediaUri(mediaId, false)
+                        val audioItem = MediaItem.Builder()
+                            .setMediaId(mediaId)
+                            .setCustomCacheKey(mediaId)
+                            .setUri(uri)
+                            .setMediaMetadata(metadata)
+                            .setTag("audio")
+                            .build()
+                        p.setMediaItem(audioItem, startMs ?: 0L)
+                        p.prepare()
+                        p.playWhenReady = true
                     }
-                    p.prepare()
-                    p.playWhenReady = true
                 }
             } catch (e: Throwable) {
-                Log.e("ZenAudioPlugin", "Video resolve failed for $mediaId: ${e.message}", e)
+                Log.e("ZenAudioPlugin", "Video resolve failed for $mediaId: ${e.message}; falling back to audio playback", e)
                 withContext(Dispatchers.Main) {
-                    if (gen != playGeneration.get()) return@withContext
-                    emit(mapOf(
-                        "type" to "error",
-                        "message" to (e.message ?: "video resolve error"),
-                        "errorCode" to -1,
-                        "is403" to false,
-                    ))
+                    if (gen != playGeneration.get() || player == null) return@withContext
+                    // Resilient audio fallback: video resolution encountered an issue, play audio smoothly
+                    p.clearVideoSurface()
+                    emit(mapOf("type" to "videoSize", "width" to 0, "height" to 0))
+                    val uri = resolveMediaUri(mediaId, false)
+                    val audioItem = MediaItem.Builder()
+                        .setMediaId(mediaId)
+                        .setCustomCacheKey(mediaId)
+                        .setUri(uri)
+                        .setMediaMetadata(metadata)
+                        .setTag("audio")
+                        .build()
+                    p.setMediaItem(audioItem, startMs ?: 0L)
+                    p.prepare()
+                    p.playWhenReady = true
                 }
             }
         }
@@ -528,6 +543,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     private fun playUrl(
         url: String,
         headers: Map<String, String>? = null,
+        mediaId: String? = null,
         videoUrl: String? = null,
         title: String? = null,
         artist: String? = null,
@@ -537,7 +553,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         isVideo: Boolean = false
     ) {
         playGeneration.incrementAndGet()
-        currentMediaId = null
+        currentMediaId = mediaId
         processor.setLoudnessDb(loudnessDb)
         val p = ensurePlayer()
         if (headers != null) {
@@ -720,6 +736,7 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                             playUrl(
                                 url = url,
                                 headers = headersMap,
+                                mediaId = mediaId,
                                 videoUrl = call.argument<String>("videoUrl"),
                                 title = call.argument<String>("title"),
                                 artist = call.argument<String>("artist"),
@@ -748,6 +765,12 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 }
                 "prewarm" -> {
                     YtEngine.prewarm()
+                    result.success(null)
+                }
+                "setAudioQuality" -> {
+                    val quality = call.argument<String>("quality") ?: "high"
+                    YtEngine.currentQuality = quality
+                    YtEngine.urlCache.clear()
                     result.success(null)
                 }
                 "clearAllCaches" -> {
