@@ -12,9 +12,12 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/track.dart';
+import '../utils/media_normalizer.dart';
 import 'api_service.dart';
 import 'innertube_service.dart';
 import 'lyrics_service.dart';
+import 'settings_service.dart';
+import 'stream_resolver_service.dart';
 
 class DownloadedSong {
   const DownloadedSong({
@@ -86,8 +89,15 @@ class DownloadedSong {
   );
 
   String get formattedSize {
-    if (fileSizeBytes <= 0) return '0 MB';
-    final mb = fileSizeBytes / (1024 * 1024);
+    var bytes = fileSizeBytes;
+    if (bytes <= 0 && audioPath.isNotEmpty) {
+      try {
+        final f = File(audioPath);
+        if (f.existsSync()) bytes = f.lengthSync();
+      } catch (_) {}
+    }
+    if (bytes <= 0) return '0 MB';
+    final mb = bytes / (1024 * 1024);
     return '${mb.toStringAsFixed(1)} MB';
   }
 }
@@ -106,12 +116,15 @@ class DownloadService extends ChangeNotifier {
 
   bool get isInitialized => _initialized;
   int get downloadedCount => _items.length;
-  List<DownloadedSong> get downloadedSongs => _items.values.toList()
-    ..sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
+  List<DownloadedSong> get downloadedSongs =>
+      _items.values.toList()
+        ..sort((a, b) => b.downloadedAt.compareTo(a.downloadedAt));
 
-  List<Track> get downloadedTracks => downloadedSongs.map((s) => s.toTrack()).toList();
+  List<Track> get downloadedTracks =>
+      downloadedSongs.map((s) => s.toTrack()).toList();
 
-  int get totalDownloadedBytes => _items.values.fold(0, (sum, item) => sum + item.fileSizeBytes);
+  int get totalDownloadedBytes =>
+      _items.values.fold(0, (sum, item) => sum + item.fileSizeBytes);
 
   String get formattedTotalSize {
     final bytes = totalDownloadedBytes;
@@ -123,8 +136,10 @@ class DownloadService extends ChangeNotifier {
   }
 
   bool isDownloaded(String trackId) => _items.containsKey(trackId);
-  bool isDownloading(String trackId) => _downloadingProgress.containsKey(trackId);
-  double getDownloadProgress(String trackId) => _downloadingProgress[trackId] ?? 0.0;
+  bool isDownloading(String trackId) =>
+      _downloadingProgress.containsKey(trackId);
+  double getDownloadProgress(String trackId) =>
+      _downloadingProgress[trackId] ?? 0.0;
   DownloadedSong? getDownloaded(String trackId) => _items[trackId];
 
   String? getLocalAudioPath(String trackId) {
@@ -148,7 +163,8 @@ class DownloadService extends ChangeNotifier {
       final file = File(path);
       if (!file.existsSync()) return null;
       final json = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-      final lines = (json['lines'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final lines =
+          (json['lines'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       final synced = json['synced'] == true;
       final source = json['source'] as String? ?? 'offline_download';
       final rawLrc = json['rawLrc'] as String?;
@@ -207,7 +223,9 @@ class DownloadService extends ChangeNotifier {
     }
   }
 
-  /// Downloads a single track: audio (< 5MB), cover image, and synced lyrics.
+  /// Downloads a single track at jet speed (< 5-8 seconds):
+  /// Uses direct on-device stream resolution honoring [SettingsState.downloadAudioQuality]
+  /// and high-speed HttpClient streaming I/O directly into the offline audio file.
   Future<bool> downloadTrack(Track track) async {
     if (isDownloaded(track.id) || isDownloading(track.id)) return true;
     await init();
@@ -221,59 +239,126 @@ class DownloadService extends ChangeNotifier {
     final coverFile = File('${_downloadsDir!.path}/$safeId.jpg');
     final lyricsFile = File('${_downloadsDir!.path}/$safeId.lyrics.json');
 
-    final client = http.Client();
+    HttpClient? httpClient;
     try {
-      // 1. Resolve direct audio stream
+      final dlAudioQuality = SettingsState.instance.downloadAudioQuality;
+      final dlImgQuality = SettingsState.instance.downloadImageQuality;
+
+      // 1. Resolve direct audio stream on-device
       String? streamUrl;
       Map<String, String> streamHeaders = {};
 
       final cleanVideoId = track.id.replaceFirst('yt-', '').trim();
-      final resolvedNative = await InnerTubeService.instance.getStreamUrl(cleanVideoId);
+
+      // Step A: Try Android native InnerTube channel with user's download quality
+      final resolvedNative = await InnerTubeService.instance.getStreamUrl(
+        cleanVideoId,
+        quality: dlAudioQuality,
+      );
       if (resolvedNative != null && resolvedNative.url.isNotEmpty) {
         streamUrl = resolvedNative.url;
         streamHeaders = resolvedNative.headers;
-      } else {
-        // Fallback to proxy
+      }
+
+      // Step B: Try on-device StreamResolverService (iOS client, clean direct GoogleVideo CDN)
+      if (streamUrl == null || streamUrl.isEmpty) {
+        final directStream = await StreamResolverService.instance.resolveTrack(
+          track,
+          quality: dlAudioQuality,
+        );
+        if (directStream != null && directStream.url.isNotEmpty) {
+          streamUrl = directStream.url;
+        }
+      }
+
+      // Step C: Try direct cleanVideoId on StreamResolverService
+      if (streamUrl == null || streamUrl.isEmpty) {
+        final directStream = await StreamResolverService.instance.resolveStream(
+          cleanVideoId,
+          quality: dlAudioQuality,
+        );
+        if (directStream != null && directStream.url.isNotEmpty) {
+          streamUrl = directStream.url;
+        }
+      }
+
+      // Step D: Fallback to proxy only if on-device resolution completely fails
+      if (streamUrl == null || streamUrl.isEmpty) {
         final watch = 'https://www.youtube.com/watch?v=$cleanVideoId';
-        streamUrl = '${ApiService.liveCloudUrl}/api/utils/stream-youtube?url=${Uri.encodeComponent(watch)}&trackId=yt-$cleanVideoId';
+        streamUrl =
+            '${ApiService.liveCloudUrl}/api/utils/stream-youtube?url=${Uri.encodeComponent(watch)}&trackId=yt-$cleanVideoId';
       }
 
       _downloadingProgress[track.id] = 0.15;
       notifyListeners();
 
-      // 2. Download Audio Stream
-      final request = http.Request('GET', Uri.parse(streamUrl));
+      // 2. High-speed direct streaming download via native HttpClient
+      httpClient = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 12)
+        ..idleTimeout = const Duration(seconds: 20);
+
+      final req = await httpClient.getUrl(Uri.parse(streamUrl));
       if (streamHeaders.isNotEmpty) {
-        request.headers.addAll(streamHeaders);
+        streamHeaders.forEach((k, v) => req.headers.set(k, v));
+      } else {
+        req.headers.set(
+          HttpHeaders.userAgentHeader,
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        );
+        req.headers.set(HttpHeaders.acceptHeader, '*/*');
       }
-      final response = await client.send(request);
+
+      final response = await req.close();
       if (response.statusCode >= 400) {
         throw Exception('Audio stream returned HTTP ${response.statusCode}');
       }
 
-      final contentLength = response.contentLength ?? (track.durationSeconds * 16000);
-      var receivedBytes = 0;
-      final sink = audioFile.openWrite();
+      final contentLength = response.contentLength > 0
+          ? response.contentLength
+          : (track.durationSeconds > 0
+                ? track.durationSeconds * 16000
+                : 3500000);
 
-      await for (final chunk in response.stream) {
+      var receivedBytes = 0;
+      final sink = audioFile.openWrite(mode: FileMode.writeOnly);
+
+      int lastNotifyMs = 0;
+      double lastProgress = 0.15;
+
+      await for (final chunk in response) {
         sink.add(chunk);
         receivedBytes += chunk.length;
-        if (contentLength > 0) {
-          final p = 0.15 + 0.70 * (receivedBytes / contentLength).clamp(0.0, 1.0);
-          _downloadingProgress[track.id] = p;
-          notifyListeners();
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - lastNotifyMs >= 200) {
+          final p =
+              0.15 + 0.70 * (receivedBytes / contentLength).clamp(0.0, 1.0);
+          if ((p - lastProgress) >= 0.04 || p >= 0.84) {
+            lastNotifyMs = now;
+            lastProgress = p;
+            _downloadingProgress[track.id] = p;
+            notifyListeners();
+          }
         }
       }
       await sink.flush();
       await sink.close();
+      httpClient.close();
+      httpClient = null;
 
       _downloadingProgress[track.id] = 0.88;
       notifyListeners();
 
-      // 3. Download Cover Artwork
-      if (track.coverUrl.isNotEmpty && track.coverUrl.startsWith('http')) {
+      // 3. Download Cover Artwork at selected download quality
+      final coverTargetUrl = MediaNormalizer.upgradeArtworkUrl(
+        track.coverUrl,
+        videoId: cleanVideoId,
+        qualityOverride: dlImgQuality,
+      );
+      if (coverTargetUrl.isNotEmpty && coverTargetUrl.startsWith('http')) {
         try {
-          final imgRes = await http.get(Uri.parse(track.coverUrl)).timeout(const Duration(seconds: 8));
+          final imgRes = await http
+              .get(Uri.parse(coverTargetUrl))
+              .timeout(const Duration(seconds: 6));
           if (imgRes.statusCode == 200 && imgRes.bodyBytes.isNotEmpty) {
             await coverFile.writeAsBytes(imgRes.bodyBytes);
           }
@@ -286,7 +371,9 @@ class DownloadService extends ChangeNotifier {
       // 4. Download Synced Lyrics
       String? savedLyricsPath;
       try {
-        final lyrics = await LyricsService.instance.fetchLyrics(track);
+        final lyrics = await LyricsService.instance
+            .fetchLyrics(track)
+            .timeout(const Duration(seconds: 4));
         if (lyrics != null && lyrics.lines.isNotEmpty) {
           final lyricsMap = {
             'lines': lyrics.lines,
@@ -299,9 +386,12 @@ class DownloadService extends ChangeNotifier {
         }
       } catch (_) {}
 
-      final totalSongBytes = (await audioFile.length()) +
+      final totalSongBytes =
+          (await audioFile.length()) +
           (await coverFile.exists() ? await coverFile.length() : 0) +
-          (savedLyricsPath != null && await lyricsFile.exists() ? await lyricsFile.length() : 0);
+          (savedLyricsPath != null && await lyricsFile.exists()
+              ? await lyricsFile.length()
+              : 0);
 
       final song = DownloadedSong(
         id: track.id,
@@ -326,14 +416,17 @@ class DownloadService extends ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('[DownloadService] download failed for ${track.id}: $e');
+      if (httpClient != null) {
+        try {
+          httpClient.close(force: true);
+        } catch (_) {}
+      }
       if (await audioFile.exists()) await audioFile.delete();
       if (await coverFile.exists()) await coverFile.delete();
       if (await lyricsFile.exists()) await lyricsFile.delete();
       _downloadingProgress.remove(track.id);
       notifyListeners();
       return false;
-    } finally {
-      client.close();
     }
   }
 

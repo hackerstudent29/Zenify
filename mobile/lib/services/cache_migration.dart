@@ -12,7 +12,6 @@ import 'innertube_transport.dart';
 import 'lyrics_service.dart';
 import 'stream_resolver_service.dart';
 import '../data/datasources/catalog_datasource.dart';
-import '../views/explore/explore_data_service.dart';
 
 const kCacheSchema = 4;
 
@@ -24,14 +23,16 @@ Future<void> runCacheMigration() async {
     final currentSchema = p.getInt('cache_schema') ?? 0;
     if (currentSchema >= kCacheSchema) return;
 
-    if (kDebugMode) debugPrint('[CacheMigration] Running one-time migration (schema $kCacheSchema)...');
+    if (kDebugMode)
+      debugPrint(
+        '[CacheMigration] Running one-time migration (schema $kCacheSchema)...',
+      );
 
     // 1) Dart in-memory catalog, artist, explore & InnerTube caches + visitor data
     InnerTubeTransport.instance.clearCache();
     InnerTubeService.instance.clearCache();
     ArtistService.clearCache();
     ApiService.clearCache();
-    ExploreDataService.instance.clearCache();
     CatalogDataSource.clear();
     StreamResolverService.instance.clearCache();
     await p.remove('zenify_yt_visitor_data');
@@ -78,9 +79,11 @@ Future<void> runCacheMigration() async {
     } catch (_) {}
 
     await p.setInt('cache_schema', kCacheSchema);
-    if (kDebugMode) debugPrint('[CacheMigration] Cache migration completed successfully (schema $kCacheSchema).');
+    if (kDebugMode)
+      debugPrint(
+        '[CacheMigration] Cache migration completed successfully (schema $kCacheSchema).',
+      );
   } catch (e) {
     if (kDebugMode) debugPrint('[CacheMigration] Migration error: $e');
   }
 }
-

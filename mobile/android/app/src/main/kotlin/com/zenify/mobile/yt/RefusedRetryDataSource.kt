@@ -69,6 +69,17 @@ class RefusedRetryDataSource(
         if (uri.scheme == "zenify") {
             return uri.lastPathSegment ?: uri.host
         }
+        val current = com.zenify.mobile.audio.ZenAudioPlugin.currentMediaId
+        if (!current.isNullOrBlank()) return current
+        val key = dataSpec.key
+        if (!key.isNullOrBlank()) {
+            val candidate = key.split("#")[0].trim()
+            if (candidate.isNotEmpty() && !candidate.startsWith("http")) {
+                return candidate
+            }
+        }
+        val docid = uri.getQueryParameter("docid")
+        if (!docid.isNullOrBlank()) return docid
         return null
     }
 

@@ -4,6 +4,7 @@ import '../../utils/media_normalizer.dart';
 import '../tokens/app_colors.dart';
 import '../tokens/app_spacing.dart';
 import '../tokens/app_typography.dart';
+import 'equalizer_bars.dart';
 import 'marquee_text.dart';
 import 'monogram_avatar.dart';
 import 'pressable_scale.dart';
@@ -19,6 +20,7 @@ class MediaCard extends StatelessWidget {
     this.width = 170.0,
     this.twoLineTitle = false,
     this.borderRadius,
+    this.isPlaying = false,
     this.onTap,
   });
 
@@ -29,6 +31,7 @@ class MediaCard extends StatelessWidget {
   final double width;
   final bool twoLineTitle;
   final double? borderRadius;
+  final bool isPlaying;
   final VoidCallback? onTap;
 
   @override
@@ -90,7 +93,33 @@ class MediaCard extends StatelessWidget {
                 borderRadius: isCircular
                     ? BorderRadius.circular(width / 2)
                     : BorderRadius.circular(effectiveRadius),
-                child: imageWidget,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    imageWidget,
+                    if (isPlaying)
+                      ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.44),
+                        child: Center(
+                          child: Container(
+                            width: (width * 0.36).clamp(48.0, 56.0),
+                            height: (width * 0.36).clamp(48.0, 56.0),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.52),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: EqualizerBars(
+                                isPlaying: true,
+                                size: (width * 0.20).clamp(28.0, 32.0),
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.s8),

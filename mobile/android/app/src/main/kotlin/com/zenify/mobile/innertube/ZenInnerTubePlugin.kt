@@ -55,8 +55,9 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             replyError(result, "INVALID_ARG", "videoId is required", null)
                             return@launch
                         }
+                        val quality = call.argument<String>("quality") ?: com.zenify.mobile.yt.YtEngine.currentQuality
                         try {
-                            val resolved = com.zenify.mobile.yt.YtEngine.resolve(videoId, wantVideo = false)
+                            val resolved = com.zenify.mobile.yt.YtEngine.resolve(videoId, wantVideo = false, quality = quality)
                             val map = mapOf(
                                 "url" to resolved.url,
                                 "headers" to resolved.headers,
@@ -692,8 +693,9 @@ class ZenInnerTubePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                             Log.w("ZenInnerTube", "getSong next fallback: ${e.message}")
                         }
 
+                        val quality = call.argument<String>("quality") ?: com.zenify.mobile.yt.YtEngine.currentQuality
                         try {
-                            val resolved = com.zenify.mobile.yt.YtEngine.resolve(videoId, wantVideo = false)
+                            val resolved = com.zenify.mobile.yt.YtEngine.resolve(videoId, wantVideo = false, quality = quality)
                             val songMap = mapOf(
                                 "id" to videoId,
                                 "title" to (resolved.title ?: "YouTube Track"),

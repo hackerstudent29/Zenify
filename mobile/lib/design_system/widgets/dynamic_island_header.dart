@@ -602,7 +602,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
           child: SizedBox(
             height: h,
             child: AnimatedBuilder(
-          animation: Listenable.merge([_c, _n]),
+          animation: Listenable.merge([_c, _n, LiquidGlassController.instance]),
           builder: (context, _) {
             final double nVal = _n.value.clamp(0.0, 1.0);
             final double cVal = _c.value.clamp(0.0, 1.0);
@@ -765,8 +765,12 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
         child: SizedBox(
           width: h,
           height: h,
-          child: const Center(
-            child: Icon(CupertinoIcons.chevron_back, color: Colors.white, size: 20),
+          child: Center(
+            child: Icon(
+              CupertinoIcons.chevron_back,
+              color: LiquidGlassController.instance.c.foreground,
+              size: 20,
+            ),
           ),
         ),
       ),
@@ -828,6 +832,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
   }
 
   Widget _titleContent() {
+    final fg = LiquidGlassController.instance.c.foreground;
     return Row(
       key: const ValueKey('title'),
       mainAxisSize: MainAxisSize.min,
@@ -842,11 +847,11 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
                   maxLines: 1,
                   softWrap: false,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'SF Pro Display',
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: fg,
                     letterSpacing: -0.3,
                   ),
                 ),
@@ -941,7 +946,11 @@ class DynamicIslandActionButton extends StatelessWidget {
           width: size,
           height: size,
           child: Center(
-            child: Icon(icon, color: Colors.white, size: iconSize),
+            child: Icon(
+              icon,
+              color: LiquidGlassController.instance.c.foreground,
+              size: iconSize,
+            ),
           ),
         ),
       ),

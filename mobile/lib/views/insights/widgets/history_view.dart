@@ -44,7 +44,9 @@ class _HistoryViewState extends State<HistoryView> {
     });
 
     final q = query ?? _searchCtrl.text.trim();
-    final localSessions = ListeningHistoryService.instance.getLocalSessions(query: q);
+    final localSessions = ListeningHistoryService.instance.getLocalSessions(
+      query: q,
+    );
 
     try {
       final token = await AuthService.instance.getAccessToken();
@@ -61,17 +63,18 @@ class _HistoryViewState extends State<HistoryView> {
         '${ApiService.baseUrl}/api/me/history${q.isNotEmpty ? '?search=${Uri.encodeComponent(q)}' : ''}',
       );
 
-      final res = await http.get(
-        uri,
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 6));
+      final res = await http
+          .get(uri, headers: {'Authorization': 'Bearer $token'})
+          .timeout(const Duration(seconds: 6));
 
       if (!mounted) return;
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final serverSessions = data['sessions'] as List<dynamic>? ?? [];
         setState(() {
-          _sessions = serverSessions.isNotEmpty ? serverSessions : localSessions;
+          _sessions = serverSessions.isNotEmpty
+              ? serverSessions
+              : localSessions;
           _loading = false;
         });
       } else {
@@ -94,10 +97,12 @@ class _HistoryViewState extends State<HistoryView> {
     try {
       final token = await AuthService.instance.getAccessToken();
       if (token != null && !eventId.startsWith('local_')) {
-        await http.delete(
-          Uri.parse('${ApiService.baseUrl}/api/me/history/$eventId'),
-          headers: {'Authorization': 'Bearer $token'},
-        ).timeout(const Duration(seconds: 4));
+        await http
+            .delete(
+              Uri.parse('${ApiService.baseUrl}/api/me/history/$eventId'),
+              headers: {'Authorization': 'Bearer $token'},
+            )
+            .timeout(const Duration(seconds: 4));
       }
       if (mounted) {
         appleToast(context, 'Removed from history');
@@ -113,7 +118,8 @@ class _HistoryViewState extends State<HistoryView> {
   void _replayTrack(Map<String, dynamic> event) {
     final trackId = event['trackId']?.toString() ?? 'hist_${event['eventId']}';
     final localTrack = ListeningHistoryService.instance.findTrackById(trackId);
-    final track = localTrack ??
+    final track =
+        localTrack ??
         Track(
           id: trackId,
           title: event['trackTitle']?.toString() ?? 'Unknown',
@@ -173,8 +179,15 @@ class _HistoryViewState extends State<HistoryView> {
             placeholder: 'Search songs or artists',
             backgroundColor: AT.fill,
             style: AT.body.copyWith(fontFamily: 'SF Pro'),
-            placeholderStyle: AT.body.copyWith(color: AT.label3, fontFamily: 'SF Pro'),
-            prefixIcon: const Icon(CupertinoIcons.search, color: AT.label2, size: 18),
+            placeholderStyle: AT.body.copyWith(
+              color: AT.label3,
+              fontFamily: 'SF Pro',
+            ),
+            prefixIcon: const Icon(
+              CupertinoIcons.search,
+              color: AT.label2,
+              size: 18,
+            ),
             onSubmitted: (v) => _fetchHistory(query: v.trim()),
             onChanged: (v) {
               if (v.isEmpty) _fetchHistory(query: '');
@@ -208,7 +221,10 @@ class _HistoryViewState extends State<HistoryView> {
               const SizedBox(height: 12),
               Text(
                 _error!,
-                style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
+                style: AT.subhead.copyWith(
+                  color: AT.label2,
+                  fontFamily: 'SF Pro',
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -247,7 +263,10 @@ class _HistoryViewState extends State<HistoryView> {
                 hasQuery
                     ? 'Try another song title or artist name.'
                     : 'Tracks you listen to will appear here by session.',
-                style: AT.subhead.copyWith(color: AT.label2, fontFamily: 'SF Pro'),
+                style: AT.subhead.copyWith(
+                  color: AT.label2,
+                  fontFamily: 'SF Pro',
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -261,15 +280,14 @@ class _HistoryViewState extends State<HistoryView> {
         parent: AlwaysScrollableScrollPhysics(),
       ),
       slivers: [
-        CupertinoSliverRefreshControl(
-          onRefresh: () => _fetchHistory(),
-        ),
+        CupertinoSliverRefreshControl(onRefresh: () => _fetchHistory()),
         SliverPadding(
           padding: const EdgeInsets.only(bottom: 40),
           sliver: SliverList.builder(
             itemCount: _sessions.length,
             itemBuilder: (context, idx) {
-              final session = _sessions[idx] as Map<String, dynamic>? ?? const {};
+              final session =
+                  _sessions[idx] as Map<String, dynamic>? ?? const {};
               final dateStr = session['date']?.toString() ?? '';
               final durationMs = (session['durationMs'] as num? ?? 0).toInt();
               final mins = (durationMs / 60000).round();
@@ -280,14 +298,20 @@ class _HistoryViewState extends State<HistoryView> {
                 children: events.map((raw) {
                   final event = raw as Map<String, dynamic>? ?? const {};
                   final title = event['trackTitle']?.toString() ?? 'Unknown';
-                  final artist = event['artistName']?.toString() ?? 'Unknown Artist';
+                  final artist =
+                      event['artistName']?.toString() ?? 'Unknown Artist';
                   final listenedMs = (event['listenedMs'] as num? ?? 0).toInt();
                   final eventId = event['eventId']?.toString() ?? '';
                   final isSkip = event['isSkip'] as bool? ?? false;
                   final trackId = event['trackId']?.toString() ?? '';
 
-                  final localTrack = ListeningHistoryService.instance.findTrackById(trackId);
-                  final coverUrl = (event['coverUrl']?.toString() ?? localTrack?.coverUrl ?? '').trim();
+                  final localTrack = ListeningHistoryService.instance
+                      .findTrackById(trackId);
+                  final coverUrl =
+                      (event['coverUrl']?.toString() ??
+                              localTrack?.coverUrl ??
+                              '')
+                          .trim();
 
                   Widget leadingWidget;
                   if (coverUrl.isNotEmpty) {
@@ -299,7 +323,9 @@ class _HistoryViewState extends State<HistoryView> {
                         height: 36,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => IconTile(
-                          isSkip ? CupertinoIcons.forward_fill : CupertinoIcons.music_note,
+                          isSkip
+                              ? CupertinoIcons.forward_fill
+                              : CupertinoIcons.music_note,
                           color: isSkip ? AT.label3 : AT.accent,
                           size: 32,
                         ),
@@ -307,7 +333,9 @@ class _HistoryViewState extends State<HistoryView> {
                     );
                   } else {
                     leadingWidget = IconTile(
-                      isSkip ? CupertinoIcons.forward_fill : CupertinoIcons.music_note,
+                      isSkip
+                          ? CupertinoIcons.forward_fill
+                          : CupertinoIcons.music_note,
                       color: isSkip ? AT.label3 : AT.accent,
                       size: 32,
                     );
@@ -321,7 +349,9 @@ class _HistoryViewState extends State<HistoryView> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          isSkip ? 'Skipped' : '${(listenedMs / 1000).round()}s',
+                          isSkip
+                              ? 'Skipped'
+                              : '${(listenedMs / 1000).round()}s',
                           style: AT.footnote.copyWith(
                             color: AT.label3,
                             fontFamily: 'SF Pro',

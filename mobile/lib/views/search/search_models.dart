@@ -112,6 +112,8 @@ sealed class SearchItem {
     this.isExplicit = false,
     this.rawRank = 0,
     this.finalScore = 0.0,
+    this.sourceStream = 'general',
+    this.providerRank = 0,
   });
 
   final String id;
@@ -127,6 +129,8 @@ sealed class SearchItem {
   final bool isExplicit;
   final int rawRank;
   final double finalScore;
+  final String sourceStream;
+  final int providerRank;
 
   SearchItem copyWithScore(double score);
 }
@@ -146,6 +150,8 @@ class SearchSongItem extends SearchItem {
     super.isExplicit = false,
     super.rawRank = 0,
     super.finalScore = 0.0,
+    super.sourceStream = 'general',
+    super.providerRank = 0,
     this.artists = const [],
     this.albumName,
     this.albumBrowseId,
@@ -193,6 +199,8 @@ class SearchSongItem extends SearchItem {
       isExplicit: isExplicit,
       rawRank: rawRank,
       finalScore: score,
+      sourceStream: sourceStream,
+      providerRank: providerRank,
       artists: artists,
       albumName: albumName,
       albumBrowseId: albumBrowseId,
@@ -215,6 +223,8 @@ class SearchArtistItem extends SearchItem {
     super.radioPlaylistId,
     super.rawRank = 0,
     super.finalScore = 0.0,
+    super.sourceStream = 'general',
+    super.providerRank = 0,
     this.subscriberText,
     this.subscriberCount,
     this.isVerified = false,
@@ -240,6 +250,8 @@ class SearchArtistItem extends SearchItem {
       radioPlaylistId: radioPlaylistId,
       rawRank: rawRank,
       finalScore: score,
+      sourceStream: sourceStream,
+      providerRank: providerRank,
       subscriberText: subscriberText,
       subscriberCount: subscriberCount,
       isVerified: isVerified,
@@ -261,6 +273,8 @@ class SearchAlbumItem extends SearchItem {
     super.isExplicit = false,
     super.rawRank = 0,
     super.finalScore = 0.0,
+    super.sourceStream = 'general',
+    super.providerRank = 0,
     this.albumType = 'Album', // Album, Single, EP
     this.year,
     this.artists = const [],
@@ -283,6 +297,8 @@ class SearchAlbumItem extends SearchItem {
       isExplicit: isExplicit,
       rawRank: rawRank,
       finalScore: score,
+      sourceStream: sourceStream,
+      providerRank: providerRank,
       albumType: albumType,
       year: year,
       artists: artists,
@@ -302,6 +318,8 @@ class SearchPlaylistItem extends SearchItem {
     super.playlistId,
     super.rawRank = 0,
     super.finalScore = 0.0,
+    super.sourceStream = 'general',
+    super.providerRank = 0,
     this.author,
     this.songCountText,
     this.isOfficial = false,
@@ -325,6 +343,8 @@ class SearchPlaylistItem extends SearchItem {
       playlistId: playlistId,
       rawRank: rawRank,
       finalScore: score,
+      sourceStream: sourceStream,
+      providerRank: providerRank,
       author: author,
       songCountText: songCountText,
       isOfficial: isOfficial,
@@ -345,6 +365,8 @@ class SearchVideoItem extends SearchItem {
     super.browseId,
     super.rawRank = 0,
     super.finalScore = 0.0,
+    super.sourceStream = 'general',
+    super.providerRank = 0,
     this.channel,
     this.viewCountText,
     this.durationText = '',
@@ -405,6 +427,8 @@ class SearchVideoItem extends SearchItem {
       browseId: browseId,
       rawRank: rawRank,
       finalScore: score,
+      sourceStream: sourceStream,
+      providerRank: providerRank,
       channel: channel,
       viewCountText: viewCountText,
       durationText: durationText,
@@ -424,6 +448,8 @@ class SearchPodcastItem extends SearchItem {
     super.browseId,
     super.rawRank = 0,
     super.finalScore = 0.0,
+    super.sourceStream = 'general',
+    super.providerRank = 0,
     this.host,
     this.episodeCountText,
     this.isEpisode = false,
@@ -448,6 +474,8 @@ class SearchPodcastItem extends SearchItem {
       browseId: browseId,
       rawRank: rawRank,
       finalScore: score,
+      sourceStream: sourceStream,
+      providerRank: providerRank,
       host: host,
       episodeCountText: episodeCountText,
       isEpisode: isEpisode,
@@ -477,6 +505,68 @@ class SearchTopResult {
   String get imageUrl => item.thumbnailUrlHiRes.isNotEmpty ? item.thumbnailUrlHiRes : item.thumbnailUrl;
 }
 
+/// Individual candidate breakdown for search ranking diagnostics.
+class CandidateDiagnostics {
+  const CandidateDiagnostics({
+    required this.id,
+    required this.title,
+    required this.type,
+    required this.sourceStream,
+    required this.providerRank,
+    required this.textScore,
+    required this.entityScore,
+    required this.popularityScore,
+    required this.rrfScore,
+    required this.contextScore,
+    required this.qualityScore,
+    required this.penalties,
+    required this.finalScore,
+  });
+
+  final String id;
+  final String title;
+  final SearchItemType type;
+  final String sourceStream;
+  final int providerRank;
+  final double textScore;
+  final double entityScore;
+  final double popularityScore;
+  final double rrfScore;
+  final double contextScore;
+  final double qualityScore;
+  final double penalties;
+  final double finalScore;
+}
+
+/// Comprehensive internal search request and pipeline diagnostics.
+class SearchDiagnostics {
+  const SearchDiagnostics({
+    required this.query,
+    required this.normalizedQuery,
+    required this.detectedIntent,
+    required this.country,
+    required this.requestLanguage,
+    required this.streamsQueried,
+    required this.streamLatenciesMs,
+    required this.totalCandidates,
+    required this.dedupedCandidates,
+    this.candidateBreakdowns = const [],
+    this.deduplicationDecisions = const [],
+  });
+
+  final String query;
+  final String normalizedQuery;
+  final SearchIntent detectedIntent;
+  final String country;
+  final String requestLanguage;
+  final List<String> streamsQueried;
+  final Map<String, int> streamLatenciesMs;
+  final int totalCandidates;
+  final int dedupedCandidates;
+  final List<CandidateDiagnostics> candidateBreakdowns;
+  final List<String> deduplicationDecisions;
+}
+
 /// Root search result structure returned by the search pipeline.
 class SearchResult {
   const SearchResult({
@@ -486,6 +576,7 @@ class SearchResult {
     required this.originalQuery,
     this.continuation,
     required this.intent,
+    this.diagnostics,
   });
 
   final SearchTopResult? topResult;
@@ -494,6 +585,7 @@ class SearchResult {
   final String originalQuery;
   final String? continuation;
   final SearchIntent intent;
+  final SearchDiagnostics? diagnostics;
 
   List<SearchSongItem> get songs =>
       sections[SearchItemType.song]?.whereType<SearchSongItem>().toList() ?? const [];

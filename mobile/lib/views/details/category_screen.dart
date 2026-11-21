@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
@@ -9,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../design_system/tokens/app_colors.dart';
+import '../../design_system/widgets/equalizer_bars.dart';
 import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/zen.dart';
@@ -62,6 +62,7 @@ double _interval(
   return c.transform(((t - begin) / (end - begin)).clamp(0.0, 1.0));
 }
 
+/// Spring press feedback.
 class _Press extends StatefulWidget {
   const _Press({required this.child, this.onTap, this.scale = 0.97});
   final Widget child;
@@ -101,11 +102,8 @@ class _PressState extends State<_Press> with SingleTickerProviderStateMixin {
       child: AnimatedBuilder(
         animation: _c,
         child: widget.child,
-        builder: (_, child) => Transform.scale(
-          // Clamp: spring can overshoot, never let it invert/flicker.
-          scale: _c.value.clamp(0.5, 1.15),
-          child: child,
-        ),
+        builder: (_, child) =>
+            Transform.scale(scale: _c.value.clamp(0.5, 1.15), child: child),
       ),
     );
   }
@@ -127,6 +125,7 @@ class _Img extends StatelessWidget {
   Widget build(BuildContext context) {
     final placeholder = Container(
       color: AppColors.surface2,
+      alignment: Alignment.center,
       child: Icon(
         circular ? CupertinoIcons.person_fill : Icons.music_note_rounded,
         color: AppColors.textTertiary,
@@ -151,71 +150,7 @@ class _Img extends StatelessWidget {
   }
 }
 
-class _EqBars extends StatefulWidget {
-  const _EqBars({required this.playing});
-  final bool playing;
-
-  @override
-  State<_EqBars> createState() => _EqBarsState();
-}
-
-class _EqBarsState extends State<_EqBars> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1100),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.playing) _c.repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant _EqBars old) {
-    super.didUpdateWidget(old);
-    if (widget.playing && !_c.isAnimating) _c.repeat();
-    if (!widget.playing && _c.isAnimating) _c.stop();
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) => Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(4, (i) {
-          final v = widget.playing
-              ? 0.3 +
-                    0.7 *
-                        (0.5 +
-                            0.5 *
-                                math.sin(
-                                  _c.value * 2 * math.pi * (1 + i * 0.35) +
-                                      i * 1.3,
-                                ))
-              : 0.28;
-          return Container(
-            width: 3,
-            height: 16 * v,
-            margin: const EdgeInsets.only(right: 2),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(1.5),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-}
+typedef _EqBars = EqualizerBars;
 
 // ═════════════════════════════════════════════════════════════════════════════
 // CategoryScreen
@@ -250,7 +185,7 @@ class _CategoryScreenState extends State<CategoryScreen>
   final _scroll = ScrollController();
   final _offset = ValueNotifier<double>(0);
   final _heroVisible = ValueNotifier<bool>(true);
-  double _heroBgHeight = 400.0;
+  double _heroBgHeight = 420.0;
 
   List<Track> _tracks = const [];
   bool _loading = true;
@@ -262,15 +197,11 @@ class _CategoryScreenState extends State<CategoryScreen>
 
   late final AnimationController _entrance = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1500),
+    duration: const Duration(milliseconds: 1000),
   );
-  late final AnimationController _breathing = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 3800),
-  )..repeat(reverse: true);
   late final AnimationController _listIn = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1000),
+    duration: const Duration(milliseconds: 900),
   );
 
   @override
@@ -283,7 +214,7 @@ class _CategoryScreenState extends State<CategoryScreen>
     if (init != null && init.isNotEmpty) {
       _tracks = init;
       _loading = false;
-      _revealList(delay: const Duration(milliseconds: 380));
+      _revealList(delay: const Duration(milliseconds: 320));
     } else {
       _load();
     }
@@ -293,10 +224,9 @@ class _CategoryScreenState extends State<CategoryScreen>
     if (!_scroll.hasClients) return;
     final off = _scroll.offset;
     _offset.value = off;
-    final visible = off <= _heroBgHeight;
-    if (_heroVisible.value != visible) {
-      _heroVisible.value = visible;
-    }
+    // Mesh scrolls away with the content, so pause it once fully offscreen.
+    final visible = off < _heroBgHeight;
+    if (_heroVisible.value != visible) _heroVisible.value = visible;
   }
 
   void _revealList({Duration delay = Duration.zero}) {
@@ -334,7 +264,6 @@ class _CategoryScreenState extends State<CategoryScreen>
     _revealTimer?.cancel();
     _scroll.removeListener(_onScroll);
     _entrance.dispose();
-    _breathing.dispose();
     _listIn.dispose();
     _offset.dispose();
     _heroVisible.dispose();
@@ -499,8 +428,8 @@ class _CategoryScreenState extends State<CategoryScreen>
     final mq = MediaQuery.of(context);
     final w = mq.size.width;
     final top = mq.padding.top;
-    final heroHeight = w * 0.78 + top;
-    _heroBgHeight = heroHeight + 50.0;
+    final art = (w * 0.60).clamp(190.0, 260.0);
+    _heroBgHeight = top + 56 + art + 300;
 
     final activeId = context.select<PlayerState, String?>(
       (p) => p.currentTrack?.id,
@@ -508,8 +437,8 @@ class _CategoryScreenState extends State<CategoryScreen>
     final playing = context.select<PlayerState, bool>((p) => p.isPlaying);
 
     final seed = _seedColor;
-    final light = Color.lerp(seed, Colors.white, 0.45)!;
-    final deep = Color.lerp(seed, Colors.black, 0.65)!;
+    final light = Color.lerp(seed, Colors.white, 0.35)!;
+    final deep = Color.lerp(seed, Colors.black, 0.60)!;
     final palette = widget.colors ?? [light, seed, deep, Zen.bg];
 
     final firstCover = _tracks.isNotEmpty ? _tracks.first.coverUrl : null;
@@ -523,63 +452,38 @@ class _CategoryScreenState extends State<CategoryScreen>
       backgroundColor: Zen.bg,
       body: Stack(
         children: [
-          // 1. Apple Music Living Artwork Mesh (Isolated Top Layer with Zero-Seam Gradient Dissolve)
+          // 1. Living mesh background. Scrolls WITH the content (no ghosting
+          //    behind rows) and stretches on overscroll like Apple Music.
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             height: _heroBgHeight,
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _heroVisible,
-              builder: (context, isVisible, _) {
-                return RepaintBoundary(
-                  child: TickerMode(
-                    enabled: isVisible,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ArtworkMeshBackground(
-                          coverUrl: firstCover,
-                          covers: covers.isNotEmpty ? covers : null,
-                          palette: palette,
-                          backgroundColor: Zen.bg,
-                          speed: 0.9,
-                          interactive: false,
-                          paused: !isVisible,
-                          scrimOpacity: 0.20,
-                        ),
-                        // Multi-stop liquid gradient dissolve directly into Zen.bg
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              stops: const [0.0, 0.35, 0.68, 1.0],
-                              colors: [
-                                Colors.black.withValues(alpha: 0.16),
-                                Colors.transparent,
-                                Zen.bg.withValues(alpha: 0.75),
-                                Zen.bg,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+            child: ValueListenableBuilder<double>(
+              valueListenable: _offset,
+              child: _buildMesh(firstCover, covers, palette, seed),
+              builder: (context, off, child) {
+                final h = _heroBgHeight;
+                final stretch = off < 0 ? 1 + (-off / h) : 1.0;
+                final dy = off > 0 ? -off : 0.0;
+                return Transform(
+                  alignment: Alignment.topCenter,
+                  transform: Matrix4.translationValues(0, dy, 0)
+                    ..scale(stretch, stretch, 1),
+                  child: child,
                 );
               },
             ),
           ),
 
-          // 2. Main Scroll Content
+          // 2. Scroll content
           CustomScrollView(
             controller: _scroll,
             physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics(),
             ),
             slivers: [
-              SliverToBoxAdapter(child: _buildHead(w, top, heroHeight)),
+              SliverToBoxAdapter(child: _buildHead(w, top, art)),
               if (_loading)
                 const SliverToBoxAdapter(child: _ListSkeleton())
               else if (_tracks.isEmpty)
@@ -618,7 +522,7 @@ class _CategoryScreenState extends State<CategoryScreen>
             ],
           ),
 
-          // 3. Dynamic Island Navigation Header
+          // 3. Navigation header
           Positioned(
             top: 0,
             left: 0,
@@ -629,7 +533,7 @@ class _CategoryScreenState extends State<CategoryScreen>
               showBack: true,
               showProfile: false,
               scrollController: _scroll,
-              revealOffset: top + 150.0,
+              revealOffset: top + 56 + art + 40,
               onBack: () => Navigator.maybePop(context),
               onMore: _menu,
             ),
@@ -639,202 +543,266 @@ class _CategoryScreenState extends State<CategoryScreen>
     );
   }
 
-  /// Apple Music liquid hero content (letters + subtitle + actions).
-  Widget _buildHead(double w, double top, double heroHeight) {
-    final seed = _seedColor;
+  Widget _buildMesh(
+    String? firstCover,
+    List<String> covers,
+    List<Color> palette,
+    Color seed,
+  ) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: _heroVisible,
+      builder: (context, isVisible, _) {
+        return RepaintBoundary(
+          child: TickerMode(
+            enabled: isVisible,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Solid seed base so there's never a black flash while the
+                // mesh/artwork loads.
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color.lerp(seed, Colors.black, 0.35)!, Zen.bg],
+                    ),
+                  ),
+                ),
+                ArtworkMeshBackground(
+                  coverUrl: firstCover,
+                  covers: covers.isNotEmpty ? covers : null,
+                  palette: palette,
+                  backgroundColor: Zen.bg,
+                  speed: 0.8,
+                  interactive: false,
+                  paused: !isVisible,
+                  scrimOpacity: 0.22,
+                ),
+                // Seamless dissolve into the page background.
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: const [0.0, 0.40, 0.75, 1.0],
+                      colors: [
+                        Colors.black.withValues(alpha: 0.18),
+                        Colors.transparent,
+                        Zen.bg.withValues(alpha: 0.80),
+                        Zen.bg,
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Apple Music style hero: artwork, title, curator, Play / Shuffle, blurb.
+  Widget _buildHead(double w, double top, double art) {
     final desc = widget.description;
     final label = widget.heroLabel ?? widget.title;
-    final chars = label.characters.toList();
+    final coverUrl = _tracks.isNotEmpty ? _tracks.first.coverUrl : '';
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(minHeight: heroHeight),
-      child: ValueListenableBuilder<double>(
-        valueListenable: _offset,
-        builder: (context, offset, _) {
-          final collapse = (offset / (w * 0.60)).clamp(0.0, 1.0);
-          final textOpacity = (1.0 - collapse * 1.35).clamp(0.0, 1.0);
-          final textDy = -offset.clamp(0.0, 9999.0) * 0.35;
-
-          return Transform.translate(
-            offset: Offset(0, textDy),
-            child: Opacity(
-              opacity: textOpacity,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, top + 56, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Single Category Title (Animated Per-Letter Entrance + Living Subtle Breathing)
-                    _Reveal(
-                      controller: _entrance,
-                      begin: 0.05,
-                      end: 0.65,
-                      dy: 16,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: _HeroLetters(
-                            chars: chars,
-                            entrance: _entrance,
-                            breathing: _breathing,
-                          ),
-                        ),
-                      ),
+    final content = Padding(
+      padding: EdgeInsets.fromLTRB(24, top + 56, 24, 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Artwork
+          _Reveal(
+            controller: _entrance,
+            begin: 0.0,
+            end: 0.6,
+            dy: 20,
+            child: ValueListenableBuilder<double>(
+              valueListenable: _offset,
+              builder: (context, off, child) {
+                final s = off < 0
+                    ? 1 + (-off / (art * 2)).clamp(0.0, 0.25)
+                    : 1 - (off / art * 0.15).clamp(0.0, 0.15);
+                return Transform.scale(
+                  scale: s,
+                  alignment: Alignment.bottomCenter,
+                  child: child,
+                );
+              },
+              child: Container(
+                width: art,
+                height: art,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.42),
+                      blurRadius: 36,
+                      offset: const Offset(0, 16),
                     ),
-                    const SizedBox(height: 6),
-
-                    // Subtitle
-                    _Reveal(
-                      controller: _entrance,
-                      begin: 0.20,
-                      end: 0.70,
-                      dy: 12,
-                      child: Text(
-                        widget.subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: _body(
-                          size: 15,
-                          weight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.75),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Action Buttons: Play · Shuffle · Add
-                    _Reveal(
-                      controller: _entrance,
-                      begin: 0.32,
-                      end: 0.82,
-                      dy: 18,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Row(
-                          children: [
-                            _RoundBtn(
-                              icon: CupertinoIcons.shuffle,
-                              onTap: () => _play(0, shuffle: true),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _Press(
-                                scale: 0.96,
-                                onTap: () => _play(0),
-                                child: Container(
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(
-                                      alpha: 0.96,
-                                    ),
-                                    borderRadius: BorderRadius.circular(24),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: seed.withValues(alpha: 0.35),
-                                        blurRadius: 22,
-                                        offset: const Offset(0, 8),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        CupertinoIcons.play_fill,
-                                        size: 16,
-                                        color: Colors.black,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Play',
-                                        style: _body(
-                                          size: 17,
-                                          weight: FontWeight.w700,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            _RoundBtn(
-                              icon: CupertinoIcons.add,
-                              onTap: _queueAll,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Optional Description
-                    if (desc != null && desc.trim().isNotEmpty) ...[
-                      const SizedBox(height: 18),
-                      _Reveal(
-                        controller: _entrance,
-                        begin: 0.45,
-                        end: 0.95,
-                        dy: 14,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                          ),
-                          child: AnimatedSize(
-                            duration: const Duration(milliseconds: 280),
-                            curve: Curves.easeOutCubic,
-                            alignment: Alignment.topCenter,
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () =>
-                                  setState(() => _expanded = !_expanded),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: desc,
-                                        style: _body(
-                                          size: 14.5,
-                                          color: Colors.white.withValues(
-                                            alpha: 0.68,
-                                          ),
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: _expanded
-                                            ? '  LESS'
-                                            : '  MORE',
-                                        style: _body(
-                                          size: 13,
-                                          weight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  maxLines: _expanded ? null : 2,
-                                  overflow: _expanded
-                                      ? TextOverflow.visible
-                                      : TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: coverUrl.isEmpty
+                      ? DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color.lerp(_seedColor, Colors.white, 0.3)!,
+                                Color.lerp(_seedColor, Colors.black, 0.45)!,
+                              ],
+                            ),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              CupertinoIcons.music_note_2,
+                              color: Colors.white70,
+                              size: 56,
+                            ),
+                          ),
+                        )
+                      : _Img(coverUrl, radius: 16, cacheWidth: 800),
                 ),
               ),
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 22),
+
+          // Title
+          _Reveal(
+            controller: _entrance,
+            begin: 0.12,
+            end: 0.68,
+            dy: 14,
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: _display(
+                size: 28,
+                weight: FontWeight.w700,
+                spacing: -0.6,
+              ).copyWith(height: 1.12),
+            ),
+          ),
+          const SizedBox(height: 4),
+
+          // Curator / subtitle in accent colour
+          _Reveal(
+            controller: _entrance,
+            begin: 0.20,
+            end: 0.74,
+            dy: 12,
+            child: Text(
+              widget.subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: _body(
+                size: 17,
+                weight: FontWeight.w500,
+                color: AppColors.accent,
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+
+          // Play · Shuffle
+          _Reveal(
+            controller: _entrance,
+            begin: 0.30,
+            end: 0.84,
+            dy: 16,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _PillBtn(
+                    icon: CupertinoIcons.play_fill,
+                    label: 'Play',
+                    onTap: () => _play(0),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _PillBtn(
+                    icon: CupertinoIcons.shuffle,
+                    label: 'Shuffle',
+                    onTap: () => _play(0, shuffle: true),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Description
+          if (desc != null && desc.trim().isNotEmpty) ...[
+            const SizedBox(height: 18),
+            _Reveal(
+              controller: _entrance,
+              begin: 0.42,
+              end: 0.95,
+              dy: 12,
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: desc,
+                            style: _body(
+                              size: 14.5,
+                              color: Colors.white.withValues(alpha: 0.70),
+                            ),
+                          ),
+                          TextSpan(
+                            text: _expanded ? '  LESS' : '  MORE',
+                            style: _body(
+                              size: 13,
+                              weight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      maxLines: _expanded ? null : 3,
+                      overflow: _expanded
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
+    );
+
+    // Only the opacity depends on scroll; the heavy subtree is built once.
+    return ValueListenableBuilder<double>(
+      valueListenable: _offset,
+      child: content,
+      builder: (context, off, child) {
+        final collapse = (off / (art + 60)).clamp(0.0, 1.0);
+        return Opacity(
+          opacity: (1.0 - collapse * 1.25).clamp(0.0, 1.0),
+          child: child,
+        );
+      },
     );
   }
 
@@ -851,20 +819,20 @@ class _CategoryScreenState extends State<CategoryScreen>
     }
     if (artists.length < 2) return const [];
 
-    final size = (w * 0.46).clamp(168.0, 204.0);
-    final itemExtent = size + 20.0;
+    final size = (w * 0.42).clamp(150.0, 190.0);
+    final itemExtent = size + 18.0;
 
     return [
-      const SliverToBoxAdapter(child: SizedBox(height: 36)),
+      const SliverToBoxAdapter(child: SizedBox(height: 32)),
       const SliverToBoxAdapter(
         child: Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
           child: _FeaturedTitle(),
         ),
       ),
       SliverToBoxAdapter(
         child: SizedBox(
-          height: size + 68,
+          height: size + 62,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -900,9 +868,9 @@ class _CategoryScreenState extends State<CategoryScreen>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.35),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
+                              color: Colors.black.withValues(alpha: 0.30),
+                              blurRadius: 14,
+                              offset: const Offset(0, 5),
                             ),
                           ],
                         ),
@@ -911,11 +879,11 @@ class _CategoryScreenState extends State<CategoryScreen>
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              width: 1.0,
+                              color: Colors.white.withValues(alpha: 0.10),
+                              width: 0.8,
                             ),
                           ),
-                          child: _Img(a.cover, circular: true, cacheWidth: 512),
+                          child: _Img(a.cover, circular: true, cacheWidth: 480),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -925,12 +893,12 @@ class _CategoryScreenState extends State<CategoryScreen>
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: _display(
-                          size: 16,
+                          size: 15.5,
                           weight: FontWeight.w600,
                           spacing: -0.2,
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       Text(
                         'Artist',
                         style: _body(size: 13, color: AppColors.textTertiary),
@@ -948,7 +916,7 @@ class _CategoryScreenState extends State<CategoryScreen>
 
   Widget _buildEmpty() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 60, 32, 0),
+      padding: const EdgeInsets.fromLTRB(32, 40, 32, 0),
       child: Column(
         children: [
           Text(
@@ -994,89 +962,6 @@ class _CategoryScreenState extends State<CategoryScreen>
 // Sub-components
 // ═════════════════════════════════════════════════════════════════════════════
 
-/// Per-letter hero title: each glyph rises, scales and fades in on a stagger,
-/// with a continuous subtle breathing floating loop.
-class _HeroLetters extends StatelessWidget {
-  const _HeroLetters({
-    required this.chars,
-    required this.entrance,
-    required this.breathing,
-  });
-  final List<String> chars;
-  final Animation<double> entrance;
-  final Animation<double> breathing;
-
-  @override
-  Widget build(BuildContext context) {
-    const baseStyle = TextStyle(
-      fontFamily: 'SF Pro Display',
-      fontSize: 52,
-      fontWeight: FontWeight.w800,
-      color: Colors.white,
-      letterSpacing: 0.2,
-      height: 1.05,
-    );
-    final n = chars.length.clamp(1, 64);
-
-    return AnimatedBuilder(
-      animation: Listenable.merge([entrance, breathing]),
-      builder: (context, _) {
-        final t = entrance.value;
-        final b = Curves.easeInOutSine.transform(breathing.value);
-        final floatDy = math.sin(b * math.pi) * 2.0;
-        final shadowAlpha = 0.35 + 0.20 * b;
-        final shadowBlur = 22.0 + 8.0 * b;
-
-        final style = baseStyle.copyWith(
-          shadows: [
-            Shadow(
-              color: Colors.black.withValues(alpha: shadowAlpha),
-              blurRadius: shadowBlur,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        );
-
-        return Transform.translate(
-          offset: Offset(0, floatDy),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              for (var i = 0; i < chars.length; i++)
-                Builder(
-                  builder: (_) {
-                    final start = 0.04 + 0.42 * (i / n);
-                    final v = _interval(
-                      t,
-                      start,
-                      start + 0.40,
-                      Curves.easeOutCubic,
-                    );
-                    final s =
-                        0.75 +
-                        0.25 *
-                            _interval(t, start, start + 0.46, Curves.easeOutBack);
-                    return Opacity(
-                      opacity: v.clamp(0.0, 1.0),
-                      child: Transform.translate(
-                        offset: Offset(0, (1 - v) * 24),
-                        child: Transform.scale(
-                          scale: s,
-                          child: Text(chars[i], maxLines: 1, style: style),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
 /// Fade + rise driven by a window of a shared controller.
 class _Reveal extends StatelessWidget {
   const _Reveal({
@@ -1097,6 +982,7 @@ class _Reveal extends StatelessWidget {
       child: child,
       builder: (_, c) {
         final v = _interval(controller.value, begin, end);
+        if (v >= 1) return c!;
         return Opacity(
           opacity: v,
           child: Transform.translate(offset: Offset(0, (1 - v) * dy), child: c),
@@ -1145,28 +1031,43 @@ class _FeaturedTitle extends StatelessWidget {
   );
 }
 
-class _RoundBtn extends StatelessWidget {
-  const _RoundBtn({required this.icon, required this.onTap});
+/// Apple Music style translucent action button with accent-coloured content.
+class _PillBtn extends StatelessWidget {
+  const _PillBtn({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
   final IconData icon;
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return _Press(
-      scale: 0.92,
+      scale: 0.96,
       onTap: onTap,
       child: Container(
-        width: 46,
-        height: 46,
+        height: 48,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: 0.16),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.14),
-            width: 0.8,
-          ),
+          color: Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, size: 18, color: Colors.white),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: _body(
+                size: 17,
+                weight: FontWeight.w600,
+                color: AppColors.accent,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1202,12 +1103,12 @@ class _Row extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      _Img(track.coverUrl, radius: 5),
+                      _Img(track.coverUrl, radius: 6),
                       if (current)
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(5),
+                            borderRadius: BorderRadius.circular(6),
                           ),
                           alignment: Alignment.center,
                           child: _EqBars(playing: playing),
@@ -1246,11 +1147,11 @@ class _Row extends StatelessWidget {
                   scale: 0.88,
                   onTap: onMore,
                   child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                     child: Icon(
-                      Icons.more_vert_rounded,
+                      CupertinoIcons.ellipsis,
                       color: AppColors.textSecondary,
-                      size: 22,
+                      size: 20,
                     ),
                   ),
                 ),
@@ -1295,7 +1196,7 @@ class _ListSkeletonState extends State<_ListSkeleton>
     super.dispose();
   }
 
-  Widget _bone(double w, double h, {double r = 5}) => Container(
+  Widget _bone(double w, double h, {double r = 6}) => Container(
     width: w,
     height: h,
     decoration: BoxDecoration(

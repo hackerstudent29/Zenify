@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
 import 'auth_service.dart';
+import 'stream_resolver_service.dart';
+import 'zen_player.dart';
 
 class SettingsState extends ChangeNotifier {
   SettingsState._();
@@ -20,6 +23,14 @@ class SettingsState extends ChangeNotifier {
   final Map<String, String> _syncTimestamps = {};
 
   // ==================== AUDIO SETTINGS ====================
+  // high (160kbps Opus / 320kbps Studio) | medium (128kbps AAC) | low (70kbps Opus Data Saver) | ultra_low (50kbps Opus)
+  String _audioQuality = 'high';
+  String get audioQuality => _audioQuality;
+
+  // high (1200x1200px HD) | medium (600x600px standard) | low (300x300px compact)
+  String _imageQuality = 'medium';
+  String get imageQuality => _imageQuality;
+
   // 128 | 256 | 320 (low, high, lossless)
   String _wifiQuality = 'lossless';
   String get wifiQuality => _wifiQuality;
@@ -29,6 +40,14 @@ class SettingsState extends ChangeNotifier {
 
   String _downloadQuality = 'lossless';
   String get downloadQuality => _downloadQuality;
+
+  // high | medium | low | ultra_low
+  String _downloadAudioQuality = 'high';
+  String get downloadAudioQuality => _downloadAudioQuality;
+
+  // high | medium | low
+  String _downloadImageQuality = 'high';
+  String get downloadImageQuality => _downloadImageQuality;
 
   bool _normalizeVolume = true;
   bool get normalizeVolume => _normalizeVolume;
@@ -81,7 +100,7 @@ class SettingsState extends ChangeNotifier {
   bool _fluidMeshBg = true;
   bool get fluidMeshBg => _fluidMeshBg;
 
-  bool _fullBleedArtworkPlayer = false;
+  bool _fullBleedArtworkPlayer = true;
   bool get fullBleedArtworkPlayer => _fullBleedArtworkPlayer;
 
   bool _reduceMotion = false;
@@ -190,9 +209,13 @@ class SettingsState extends ChangeNotifier {
     _prefs = await SharedPreferences.getInstance();
 
     // 1. Load local SharedPreferences immediately
+    _audioQuality = _prefs.getString('zen_audio_quality') ?? 'high';
+    _imageQuality = _prefs.getString('zen_image_quality') ?? 'medium';
     _wifiQuality = _prefs.getString('zen_wifi_quality') ?? 'lossless';
     _cellularQuality = _prefs.getString('zen_cellular_quality') ?? 'high';
     _downloadQuality = _prefs.getString('zen_download_quality') ?? 'lossless';
+    _downloadAudioQuality = _prefs.getString('zen_download_audio_quality') ?? 'high';
+    _downloadImageQuality = _prefs.getString('zen_download_image_quality') ?? 'high';
     _normalizeVolume = _prefs.getBool('zen_normalize_volume') ?? true;
     _explicitFilter = _prefs.getBool('zen_explicit_filter') ?? false;
     _monoAudio = _prefs.getBool('zen_mono_audio') ?? false;
@@ -209,7 +232,7 @@ class SettingsState extends ChangeNotifier {
     _accentColor = _prefs.getString('zen_accent_color') ?? 'crimson';
     _dynamicAlbumColors = _prefs.getBool('zen_dynamic_album_colors') ?? true;
     _fluidMeshBg = _prefs.getBool('zen_fluid_mesh_bg') ?? true;
-    _fullBleedArtworkPlayer = _prefs.getBool('zen_full_bleed_artwork_player') ?? false;
+    _fullBleedArtworkPlayer = _prefs.getBool('zen_full_bleed_artwork_player') ?? true;
     _reduceMotion = _prefs.getBool('zen_reduce_motion') ?? false;
     _themeMode = _prefs.getString('zen_theme_mode') ?? 'dark';
     _glassEffects = _prefs.getBool('zen_glass_effects') ?? true;
@@ -254,6 +277,7 @@ class SettingsState extends ChangeNotifier {
     }
 
     _isInitialized = true;
+    AudioPlayer.setGlobalAudioQuality(_audioQuality);
     notifyListeners();
 
     // 2. Fetch server settings in background and reconcile
@@ -394,6 +418,29 @@ class SettingsState extends ChangeNotifier {
 
   // ==================== SETTERS WITH OPTIMISTIC SYNC ====================
 
+  void setAudioQuality(String q) {
+    if (_audioQuality == q) return;
+    _audioQuality = q;
+    _prefs.setString('zen_audio_quality', q);
+    _wifiQuality = q;
+    _cellularQuality = q;
+    _downloadQuality = q;
+    StreamResolverService.instance.clearCache();
+    AudioPlayer.setGlobalAudioQuality(q);
+    _recordChange('audioQuality', q);
+    notifyListeners();
+  }
+
+  void setImageQuality(String q) {
+    if (_imageQuality == q) return;
+    _imageQuality = q;
+    _prefs.setString('zen_image_quality', q);
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    _recordChange('imageQuality', q);
+    notifyListeners();
+  }
+
   void setWifiQuality(String q) {
     if (_wifiQuality == q) return;
     _wifiQuality = q;
@@ -415,6 +462,22 @@ class SettingsState extends ChangeNotifier {
     _downloadQuality = q;
     _prefs.setString('zen_download_quality', q);
     _recordChange('downloadQuality', q);
+    notifyListeners();
+  }
+
+  void setDownloadAudioQuality(String q) {
+    if (_downloadAudioQuality == q) return;
+    _downloadAudioQuality = q;
+    _prefs.setString('zen_download_audio_quality', q);
+    _recordChange('downloadAudioQuality', q);
+    notifyListeners();
+  }
+
+  void setDownloadImageQuality(String q) {
+    if (_downloadImageQuality == q) return;
+    _downloadImageQuality = q;
+    _prefs.setString('zen_download_image_quality', q);
+    _recordChange('downloadImageQuality', q);
     notifyListeners();
   }
 

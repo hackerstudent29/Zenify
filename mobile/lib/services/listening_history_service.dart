@@ -312,6 +312,8 @@ class ListeningHistoryService {
     var morningPlays = 0;
     final trackMap = <String, Map<String, dynamic>>{};
     final artistMap = <String, Map<String, dynamic>>{};
+    final genreCounts = <String, int>{};
+    final langCounts = <String, int>{};
     final activeDays = <String>{};
     final heatmapMinutes = List.generate(7, (_) => List.filled(24, 0));
     final timelineMap = <String, int>{};
@@ -322,12 +324,16 @@ class ListeningHistoryService {
       if (ev['isSkip'] == true) totalSkips++;
 
       final tId = ev['trackId']?.toString() ?? '';
+      final tTitle = ev['trackTitle']?.toString() ?? '';
+      final aName = ev['artistName']?.toString() ?? '';
+      final tAlbum = ev['trackAlbum']?.toString() ?? '';
+
       if (tId.isNotEmpty) {
         final t = trackMap.putIfAbsent(tId, () => {
           'trackId': tId,
-          'trackTitle': ev['trackTitle']?.toString() ?? 'Unknown Track',
-          'trackAlbum': ev['trackAlbum']?.toString() ?? '',
-          'artistName': ev['artistName']?.toString() ?? 'Unknown Artist',
+          'trackTitle': tTitle.isNotEmpty ? tTitle : 'Unknown Track',
+          'trackAlbum': tAlbum,
+          'artistName': aName.isNotEmpty ? aName : 'Unknown Artist',
           'coverUrl': ev['coverUrl']?.toString() ?? '',
           'plays': 0,
           'listenedMs': 0,
@@ -336,7 +342,6 @@ class ListeningHistoryService {
         t['listenedMs'] = (t['listenedMs'] as int) + ms;
       }
 
-      final aName = ev['artistName']?.toString() ?? '';
       if (aName.isNotEmpty && aName != 'Unknown Artist') {
         final a = artistMap.putIfAbsent(aName, () => {
           'artistKey': aName,
@@ -346,6 +351,30 @@ class ListeningHistoryService {
         });
         a['plays'] = (a['plays'] as int) + 1;
         a['listenedMs'] = (a['listenedMs'] as int) + ms;
+      }
+
+      // Track Language detection
+      String? l = ev['language']?.toString();
+      if (l == null || l.isEmpty || l.toLowerCase() == 'unknown') {
+        final t = findTrackById(tId);
+        if (t != null && t.language.isNotEmpty) {
+          l = t.language;
+        } else {
+          l = Track.detectLanguage(tTitle, aName, tAlbum);
+        }
+      }
+      if (l != null && l.isNotEmpty && l.toLowerCase() != 'unknown') {
+        final cleanL = l[0].toUpperCase() + l.substring(1).toLowerCase();
+        langCounts[cleanL] = (langCounts[cleanL] ?? 0) + 1;
+      }
+
+      // Track Genre detection
+      String? g = ev['genre']?.toString();
+      if (g == null || g.isEmpty) {
+        g = _detectGenreFromText('$tTitle $aName $tAlbum');
+      }
+      if (g.isNotEmpty) {
+        genreCounts[g] = (genreCounts[g] ?? 0) + 1;
       }
 
       final dateStr = ev['date']?.toString() ?? '';
@@ -446,7 +475,27 @@ class ListeningHistoryService {
       });
     }
 
-    final topLang = primaryLanguage;
+    // Dynamic Breakdown Calculations
+    final sortedGenres = genreCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final rankedGenres = sortedGenres.isNotEmpty
+        ? sortedGenres.map((e) => {'genre': e.key, 'count': e.value}).toList()
+        : [
+            {'genre': 'Soundtracks & Pop', 'count': totalPlays > 0 ? totalPlays : 1},
+          ];
+
+    final sortedLangs = langCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final rankedLanguages = sortedLangs.isNotEmpty
+        ? sortedLangs.map((e) => {'language': e.key, 'count': e.value}).toList()
+        : [
+            if (primaryLanguage.isNotEmpty)
+              {'language': primaryLanguage, 'count': totalPlays > 0 ? totalPlays : 1},
+          ];
+
+    final topLang = rankedLanguages.isNotEmpty
+        ? (rankedLanguages[0]['language']?.toString() ?? primaryLanguage)
+        : primaryLanguage;
     final topArtistName = rankedArtists.isNotEmpty ? rankedArtists[0]['artistName'] : null;
 
     final personality = {
@@ -486,14 +535,64 @@ class ListeningHistoryService {
       'timeline': timelineDays,
       'discoveriesCount': max(1, artistMap.length ~/ 2),
       'musicPersonality': personality,
-      'topGenres': [
-        {'genre': 'Acoustic & Pop', 'count': totalPlays ~/ 2 + 1},
-        {'genre': 'Soundtracks', 'count': totalPlays ~/ 3 + 1},
-      ],
-      'topLanguages': [
-        if (topLang.isNotEmpty) {'language': topLang, 'count': totalPlays},
-      ],
+      'topGenres': rankedGenres,
+      'genres': rankedGenres,
+      'topLanguages': rankedLanguages,
+      'languages': rankedLanguages,
     };
+  }
+
+  static String _detectGenreFromText(String text) {
+    final lower = text.toLowerCase();
+    if (lower.contains('soundtrack') ||
+        lower.contains('ost') ||
+        lower.contains('movie') ||
+        lower.contains('film') ||
+        lower.contains('anirudh') ||
+        lower.contains('rahman') ||
+        lower.contains('yuvan') ||
+        lower.contains('harris') ||
+        lower.contains('dsp') ||
+        lower.contains('thaman') ||
+        lower.contains('santhosh') ||
+        lower.contains('ilayaraja')) {
+      return 'Soundtracks & Film';
+    }
+    if (lower.contains('hip hop') ||
+        lower.contains('rap') ||
+        lower.contains('trap') ||
+        lower.contains('drill') ||
+        lower.contains('beat')) {
+      return 'Hip-Hop & Rap';
+    }
+    if (lower.contains('edm') ||
+        lower.contains('electronic') ||
+        lower.contains('dance') ||
+        lower.contains('remix') ||
+        lower.contains('dj')) {
+      return 'Electronic & Dance';
+    }
+    if (lower.contains('acoustic') ||
+        lower.contains('unplugged') ||
+        lower.contains('melody') ||
+        lower.contains('piano') ||
+        lower.contains('lofi') ||
+        lower.contains('chill')) {
+      return 'Acoustic & Chill';
+    }
+    if (lower.contains('rock') ||
+        lower.contains('metal') ||
+        lower.contains('indie') ||
+        lower.contains('band')) {
+      return 'Rock & Indie';
+    }
+    if (lower.contains('classical') ||
+        lower.contains('carnatic') ||
+        lower.contains('devotional') ||
+        lower.contains('ghazal')) {
+      return 'Classical & Traditional';
+    }
+    return 'Pop & Melodies';
   }
 
   static String _formatDateKey(DateTime d) {
@@ -525,6 +624,42 @@ class ListeningHistoryService {
   String get primaryLanguage {
     final langs = detectedLanguages;
     return langs.isNotEmpty ? langs.first : '';
+  }
+
+  /// Raw map of detected languages and their respective play counts in history.
+  Map<String, int> get languagePlayCounts {
+    if (_history.isEmpty) return const {};
+    final langCounts = <String, int>{};
+    for (final t in _history) {
+      final lang = t.language.isNotEmpty
+          ? t.language
+          : Track.detectLanguage(t.title, t.artist, t.album);
+      if (lang != null && lang.isNotEmpty && lang.toLowerCase() != 'unknown') {
+        final clean = lang.trim();
+        langCounts[clean] = (langCounts[clean] ?? 0) + 1;
+      }
+    }
+    return langCounts;
+  }
+
+  /// Strict recommendation qualification:
+  /// A language learned purely through listening history ONLY qualifies if:
+  /// 1. The user has at least 3 completed plays in that language (never an isolated 1-song play).
+  /// 2. It represents at least 15% of the user's total listening history (or is among the top 2 languages with >= 3 plays).
+  List<String> get qualifiedListenedLanguages {
+    if (_history.isEmpty) return const [];
+    final counts = languagePlayCounts;
+    if (counts.isEmpty) return const [];
+    final total = _history.length;
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final qualified = <String>[];
+    for (final e in sorted) {
+      if (e.value >= 3 && (e.value / total >= 0.15 || qualified.length < 2)) {
+        qualified.add(e.key);
+      }
+    }
+    return qualified;
   }
 
   /// Returns all detected listening languages ordered by frequency descending.

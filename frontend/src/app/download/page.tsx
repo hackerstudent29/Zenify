@@ -31,9 +31,9 @@ export default function DownloadPage() {
 
   // Fallback download URLs
   const apkDownloadUrl = "/downloads/zenify.apk";
-  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.1.18";
-  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.18/zenify-v1.1.18.apk";
-  const universalApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.18/zenify-v1.1.18-universal.apk";
+  const githubReleaseUrl = "https://github.com/hackerstudent29/Zenify/releases/tag/v1.1.19";
+  const directApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.19/zenify-v1.1.19.apk";
+  const universalApkDownloadUrl = "https://github.com/hackerstudent29/Zenify/releases/download/v1.1.19/zenify-v1.1.19-universal.apk";
   const absoluteDownloadUrl = typeof window !== "undefined"
     ? `${window.location.origin}/downloads/zenify.apk`
     : "https://listenzenify.vercel.app/downloads/zenify.apk";
@@ -54,8 +54,8 @@ export default function DownloadPage() {
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen w-full bg-[#030303] pt-24 sm:pt-28 md:pt-32 pb-40 font-sans text-[#F2F2F3] selection:bg-white/15">
         <SEO
-          title="Download Zenify APK (v1.1.18) – Ad-Free Music for Android, iOS & Desktop"
-          description="Download the Zenify v1.1.18 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, YouTube video streaming, Room Together, synchronized lyrics, and Studio FX."
+          title="Download Zenify APK (v1.1.19) – Ad-Free Music for Android, iOS & Desktop"
+          description="Download the Zenify v1.1.19 Android APK package directly to your phone. 100% ad-free, 320kbps lossless streaming, YouTube video streaming, Room Together, synchronized lyrics, and Studio FX."
           keywords={[
             "download zenify apk",
             "zenify android app",
@@ -69,7 +69,7 @@ export default function DownloadPage() {
             "@type": "MobileApplication",
             name: "Zenify Music Player",
             operatingSystem: "Android 8.0+",
-            softwareVersion: "1.1.18",
+            softwareVersion: "1.1.19",
             applicationCategory: "MultimediaApplication",
             applicationSubCategory: "Music & Audio",
             downloadUrl: "https://listenzenify.vercel.app/downloads/zenify.apk",
@@ -91,7 +91,7 @@ export default function DownloadPage() {
           <motion.div variants={rise} className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/20 text-brand text-[11px] font-bold uppercase tracking-wider">
               <Sparkles size={13} className="text-brand" />
-              <span>Mobile Release v1.1.18 Available</span>
+              <span>Mobile Release v1.1.19 Available</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-sans uppercase tracking-tight text-white leading-tight">
@@ -162,7 +162,7 @@ export default function DownloadPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-zinc-400">
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Version</span>
-                    <span className="text-white font-medium">v1.1.18 (Build 2031)</span>
+                    <span className="text-white font-medium">v1.1.19 (Build 2032)</span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Package Size</span>

@@ -40,6 +40,9 @@ object YtEngine {
     private val excluded = ConcurrentHashMap<String, Pair<Set<String>, Long>>()
     val urlCache = StreamUrlCache()
 
+    @Volatile
+    var currentQuality: String = "high"
+
     data class Resolved(
         val url: String,
         val headers: Map<String, String>,
@@ -167,8 +170,10 @@ object YtEngine {
         videoId: String,
         force: Boolean = false,
         wantVideo: Boolean = false,
+        quality: String = currentQuality,
     ): Resolved {
-        val cacheKey = if (wantVideo) "$videoId#video" else videoId
+        val effectiveQuality = if (quality.isNotBlank()) quality else currentQuality
+        val cacheKey = if (wantVideo) "$videoId#video#$effectiveQuality" else "$videoId#$effectiveQuality"
         if (!force) {
             urlCache[cacheKey]?.let { cached ->
                 if (!wantVideo || !cached.videoUrl.isNullOrBlank()) {
@@ -177,7 +182,7 @@ object YtEngine {
             }
         }
         val d = inflight.getOrPut(cacheKey) {
-            scope.async { doResolve(videoId, wantVideo = wantVideo, cacheKey = cacheKey) }
+            scope.async { doResolve(videoId, wantVideo = wantVideo, cacheKey = cacheKey, quality = effectiveQuality) }
         }
         return try {
             d.await()
@@ -190,18 +195,39 @@ object YtEngine {
         videoId: String,
         wantVideo: Boolean = false,
         cacheKey: String = videoId,
+        quality: String = "high",
     ): Resolved = withTimeout(RESOLVE_TIMEOUT_MS) {
         val gen = urlCache.generation(cacheKey)
         val ex = excludedClients(videoId)
 
+        val targetAudioQuality = if (quality == "low" || quality == "ultra_low") {
+            AudioQuality.LOW
+        } else {
+            AudioQuality.HIGH
+        }
+
         val stream = try {
-            extract(videoId, ex, AudioQuality.HIGH, wantVideo = wantVideo)
+            extract(videoId, ex, targetAudioQuality, wantVideo = wantVideo)
         } catch (e: StreamResolveException) {
-            if (ex.isEmpty() || e.reason != StreamResolveException.Reason.NO_PLAYABLE_STREAM) {
-                throw e
+            if (wantVideo) {
+                // Video extraction failed; retry without exclusions, and if still unavailable, fall back cleanly to audio
+                try {
+                    extract(videoId, emptySet(), AudioQuality.LOW, wantVideo = true)
+                } catch (e2: StreamResolveException) {
+                    Log.w(TAG, "Video extraction unavailable for $videoId: ${e2.message}; falling back to audio stream")
+                    try {
+                        extract(videoId, ex, targetAudioQuality, wantVideo = false)
+                    } catch (e3: StreamResolveException) {
+                        extract(videoId, emptySet(), AudioQuality.LOW, wantVideo = false)
+                    }
+                }
+            } else {
+                if (ex.isEmpty() || e.reason != StreamResolveException.Reason.NO_PLAYABLE_STREAM) {
+                    throw e
+                }
+                // Retry with exclusions cleared and lower quality
+                extract(videoId, emptySet(), AudioQuality.LOW, wantVideo = false)
             }
-            // Retry with exclusions cleared and lower quality
-            extract(videoId, emptySet(), AudioQuality.LOW, wantVideo = wantVideo)
         }
 
         check(stream.sabrBootstrap == null) { "SABR-only stream; not supported by this player yet" }
@@ -222,7 +248,7 @@ object YtEngine {
         ).withStreamCapabilities(
             allowHls = false,
             allowSabr = false,
-            allowBoundedRange = false,
+            allowBoundedRange = true, // Must allow bounded range: YouTube video streams require byte range requests
         )
         return getExtractor().extract(
             videoId = id,

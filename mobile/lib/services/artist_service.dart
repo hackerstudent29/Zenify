@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/track.dart';
 import '../utils/media_normalizer.dart';
 import 'innertube_service.dart';
+import 'user_preferences_service.dart';
 
 typedef YTArtistCard = ({String name, String? browseId, String? audience, String? thumb});
 
@@ -120,10 +121,66 @@ class ArtistService {
 
   static final Map<String, ({ArtistProfile profile, DateTime expires})> _cache = {};
   static final Map<String, Future<ArtistProfile?>> _inFlight = {};
+  static final Map<String, String> _avatarCache = {};
+  static final Map<String, Future<String>> _inFlightAvatars = {};
 
   static void clearCache() {
     _cache.clear();
     _inFlight.clear();
+    _avatarCache.clear();
+    _inFlightAvatars.clear();
+  }
+
+  static String? getCachedAvatar(String artistName) {
+    final key = artistName.trim().toLowerCase();
+    return _avatarCache[key];
+  }
+
+  static void cacheAvatar(String artistName, String avatarUrl) {
+    final key = artistName.trim().toLowerCase();
+    if (key.isEmpty || avatarUrl.isEmpty) return;
+    _avatarCache[key] = avatarUrl;
+  }
+
+  static Future<String> resolveArtistAvatar(String artistName) async {
+    final clean = artistName.trim();
+    final key = clean.toLowerCase();
+    if (key.isEmpty || key == 'unknown artist') return '';
+    if (_avatarCache.containsKey(key) && _avatarCache[key]!.isNotEmpty) {
+      return _avatarCache[key]!;
+    }
+
+    if (_inFlightAvatars.containsKey(key)) {
+      return _inFlightAvatars[key]!;
+    }
+
+    // 1. Check user favorite artists from preferences
+    for (final fa in UserPreferencesService.instance.currentPrefs.favoriteArtists) {
+      if (fa.name.trim().toLowerCase() == key && fa.image.isNotEmpty) {
+        _avatarCache[key] = fa.image;
+        return fa.image;
+      }
+    }
+
+    // 2. Fetch authentic artist profile / avatar from InnerTube
+    final future = () async {
+      try {
+        final hit = await InnerTubeService.instance.searchArtist(clean);
+        if (hit != null && hit.thumb != null && hit.thumb!.isNotEmpty) {
+          final upgraded = MediaNormalizer.upgradeArtworkUrl(hit.thumb!, isArtistAvatar: true);
+          _avatarCache[key] = upgraded;
+          return upgraded;
+        }
+      } catch (_) {}
+      return '';
+    }();
+
+    _inFlightAvatars[key] = future;
+    try {
+      return await future;
+    } finally {
+      _inFlightAvatars.remove(key);
+    }
   }
 
   /// Synchronous 0ms cache lookup for immediate rendering on navigation.
@@ -212,6 +269,9 @@ class ArtistService {
         coverUrl = rawBanner != null && rawBanner.isNotEmpty
             ? MediaNormalizer.upgradeBannerUrl(rawBanner)
             : imageUrl;
+        if (imageUrl.isNotEmpty) {
+          cacheAvatar(name, imageUrl);
+        }
 
         bio = (ytChannel['bio'] as String?)?.trim() ?? '';
         final subs = (ytChannel['subscriberCount'] as String?)?.trim();

@@ -5,6 +5,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/track.dart';
 import '../utils/media_normalizer.dart';
 import 'innertube_service.dart';
+import 'settings_service.dart';
 
 class ResolvedStream {
   ResolvedStream({
@@ -19,7 +20,8 @@ class ResolvedStream {
   final DateTime expiresAt;
   final int bitrate;
 
-  bool get isFresh => DateTime.now().isBefore(expiresAt.subtract(const Duration(minutes: 10)));
+  bool get isFresh =>
+      DateTime.now().isBefore(expiresAt.subtract(const Duration(minutes: 10)));
 }
 
 /// On-Device Direct Stream Resolver for Zenify.
@@ -35,26 +37,35 @@ class StreamResolverService {
   final Map<String, Future<ResolvedStream?>> _inflight = {};
 
   /// Resolves direct audio stream for a track, either by video ID or by direct on-device search.
-  Future<ResolvedStream?> resolveTrack(Track track) async {
+  Future<ResolvedStream?> resolveTrack(Track track, {String? quality}) async {
     // 1. Direct YouTube video ID (yt-XXXXX or 11 chars)
     var videoId = track.id.replaceFirst('yt-', '').trim();
-    if (videoId.length == 11 && !videoId.contains(' ') && !videoId.startsWith('http')) {
-      final direct = await resolveStream(videoId);
+    if (videoId.length == 11 &&
+        !videoId.contains(' ') &&
+        !videoId.startsWith('http')) {
+      final direct = await resolveStream(videoId, quality: quality);
       if (direct != null && direct.url.isNotEmpty) return direct;
     }
 
     // 2. Search on-device directly via YouTube Music InnerTube for this track title & artist
     try {
       final cleanTitle = MediaNormalizer.cleanCompactTitle(track.title);
-      final cleanArtist = MediaNormalizer.stripIdNoise(MediaNormalizer.formatArtists(track.artist));
-      final String q = (cleanArtist.isNotEmpty && cleanArtist != 'Unknown Artist')
+      final cleanArtist = MediaNormalizer.stripIdNoise(
+        MediaNormalizer.formatArtists(track.artist),
+      );
+      final String q =
+          (cleanArtist.isNotEmpty && cleanArtist != 'Unknown Artist')
           ? '$cleanTitle $cleanArtist'.trim()
           : cleanTitle;
 
       // Prefer YouTube Music song filter first (pure official music tracks, no videos/trailers)
-      List<Track> songs = await InnerTubeService.instance.searchSongsNative(q).timeout(const Duration(seconds: 8));
+      List<Track> songs = await InnerTubeService.instance
+          .searchSongsNative(q)
+          .timeout(const Duration(seconds: 8));
       if (songs.isEmpty) {
-        songs = await InnerTubeService.instance.search(q).timeout(const Duration(seconds: 8));
+        songs = await InnerTubeService.instance
+            .search(q)
+            .timeout(const Duration(seconds: 8));
       }
       if (songs.isNotEmpty) {
         final lowerTarget = cleanTitle.toLowerCase();
@@ -63,21 +74,27 @@ class StreamResolverService {
           (s) {
             final st = MediaNormalizer.cleanCompactTitle(s.title).toLowerCase();
             final sa = s.artist.toLowerCase();
-            final titleMatches = st == lowerTarget || st.contains(lowerTarget) || lowerTarget.contains(st);
-            final artistMatches = lowerArtist.isEmpty || lowerArtist == 'unknown artist' || sa.contains(lowerArtist) || lowerArtist.contains(sa);
+            final titleMatches =
+                st == lowerTarget ||
+                st.contains(lowerTarget) ||
+                lowerTarget.contains(st);
+            final artistMatches =
+                lowerArtist.isEmpty ||
+                lowerArtist == 'unknown artist' ||
+                sa.contains(lowerArtist) ||
+                lowerArtist.contains(sa);
             return titleMatches && artistMatches;
           },
-          orElse: () => songs.firstWhere(
-            (s) {
-              final st = MediaNormalizer.cleanCompactTitle(s.title).toLowerCase();
-              return st == lowerTarget || st.contains(lowerTarget) || lowerTarget.contains(st);
-            },
-            orElse: () => songs.first,
-          ),
+          orElse: () => songs.firstWhere((s) {
+            final st = MediaNormalizer.cleanCompactTitle(s.title).toLowerCase();
+            return st == lowerTarget ||
+                st.contains(lowerTarget) ||
+                lowerTarget.contains(st);
+          }, orElse: () => songs.first),
         );
         final topId = exact.id.replaceFirst('yt-', '').trim();
         if (topId.length == 11) {
-          final direct = await resolveStream(topId);
+          final direct = await resolveStream(topId, quality: quality);
           if (direct != null && direct.url.isNotEmpty) return direct;
         }
       }
@@ -86,46 +103,56 @@ class StreamResolverService {
     return null;
   }
 
-  Future<String?> resolveAudioUrl(String rawVideoId) async {
-    final stream = await resolveStream(rawVideoId);
+  Future<String?> resolveAudioUrl(String rawVideoId, {String? quality}) async {
+    final stream = await resolveStream(rawVideoId, quality: quality);
     return stream?.url;
   }
 
-  Future<ResolvedStream?> resolveStream(String rawVideoId) async {
+  Future<ResolvedStream?> resolveStream(
+    String rawVideoId, {
+    String? quality,
+  }) async {
     final cleanId = rawVideoId.replaceFirst('yt-', '').trim();
     if (cleanId.isEmpty) return null;
 
-    final cached = _cache[cleanId];
+    final cacheKey = quality != null ? '${cleanId}_$quality' : cleanId;
+    final cached = _cache[cacheKey];
     if (cached != null && cached.isFresh) {
       return cached;
     }
 
-    final running = _inflight[cleanId];
+    final running = _inflight[cacheKey];
     if (running != null) {
       return running;
     }
 
-    final future = _resolve(cleanId);
-    _inflight[cleanId] = future;
+    final future = _resolve(cleanId, quality: quality);
+    _inflight[cacheKey] = future;
 
     try {
-      return await future;
+      final res = await future;
+      if (res != null) {
+        _cache[cacheKey] = res;
+      }
+      return res;
     } finally {
-      _inflight.remove(cleanId);
+      _inflight.remove(cacheKey);
     }
   }
 
-  Future<ResolvedStream?> _resolve(String videoId) async {
+  Future<ResolvedStream?> _resolve(String videoId, {String? quality}) async {
     try {
       StreamManifest? manifest;
 
       // 1. Primary: iOS client without watch page (clean AAC audio, NO PoToken, NO 403 on GoogleVideo)
       try {
-        manifest = await _yt.videos.streamsClient.getManifest(
-          videoId,
-          ytClients: [YoutubeApiClient.ios],
-          requireWatchPage: false,
-        ).timeout(const Duration(seconds: 8));
+        manifest = await _yt.videos.streamsClient
+            .getManifest(
+              videoId,
+              ytClients: [YoutubeApiClient.ios],
+              requireWatchPage: false,
+            )
+            .timeout(const Duration(seconds: 8));
       } catch (e) {
         if (kDebugMode) debugPrint('[StreamResolver] ios client notice: $e');
         manifest = null;
@@ -134,25 +161,28 @@ class StreamResolverService {
       // 2. Secondary fallback: androidSdkless with requireWatchPage: false
       if (manifest == null || manifest.audioOnly.isEmpty) {
         try {
-          manifest = await _yt.videos.streamsClient.getManifest(
-            videoId,
-            ytClients: [YoutubeApiClient.androidSdkless],
-            requireWatchPage: false,
-          ).timeout(const Duration(seconds: 8));
+          manifest = await _yt.videos.streamsClient
+              .getManifest(
+                videoId,
+                ytClients: [YoutubeApiClient.androidSdkless],
+                requireWatchPage: false,
+              )
+              .timeout(const Duration(seconds: 8));
         } catch (e) {
-          if (kDebugMode) debugPrint('[StreamResolver] androidSdkless notice: $e');
+          if (kDebugMode)
+            debugPrint('[StreamResolver] androidSdkless notice: $e');
         }
       }
 
       // 3. Tertiary fallback: default client without watch page
       if (manifest == null || manifest.audioOnly.isEmpty) {
         try {
-          manifest = await _yt.videos.streamsClient.getManifest(
-            videoId,
-            requireWatchPage: false,
-          ).timeout(const Duration(seconds: 8));
+          manifest = await _yt.videos.streamsClient
+              .getManifest(videoId, requireWatchPage: false)
+              .timeout(const Duration(seconds: 8));
         } catch (e) {
-          if (kDebugMode) debugPrint('[StreamResolver] default client notice: $e');
+          if (kDebugMode)
+            debugPrint('[StreamResolver] default client notice: $e');
         }
       }
 
@@ -160,13 +190,58 @@ class StreamResolverService {
 
       final audioStreams = manifest.audioOnly.toList();
       final StreamInfo chosen;
+      final qPref = quality ?? SettingsState.instance.audioQuality;
+
       if (audioStreams.isNotEmpty) {
-        // Sort descending by bitrate (highest audio fidelity: 160kbps Opus / 128kbps AAC)
-        audioStreams.sort((a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond));
-        chosen = audioStreams.first;
+        if (qPref == 'ultra_low') {
+          // Ultra Data Saver (~50kbps, itag 249 Opus or itag 139 AAC)
+          audioStreams.sort(
+            (a, b) =>
+                a.bitrate.bitsPerSecond.compareTo(b.bitrate.bitsPerSecond),
+          );
+          chosen = audioStreams.first;
+        } else if (qPref == 'low') {
+          // Data Saver (~70kbps, itag 250 Opus)
+          const target = 70000;
+          audioStreams.sort((a, b) {
+            final aDiff = (a.bitrate.bitsPerSecond - target).abs();
+            final bDiff = (b.bitrate.bitsPerSecond - target).abs();
+            return aDiff.compareTo(bDiff);
+          });
+          chosen = audioStreams.first;
+        } else if (qPref == 'medium') {
+          // Medium / Standard (~128kbps, prefer MP4/AAC itag 140 or 128k Opus)
+          const target = 128000;
+          audioStreams.sort((a, b) {
+            final aMp4 = a.container.name.toLowerCase() == 'mp4' ? 1 : 0;
+            final bMp4 = b.container.name.toLowerCase() == 'mp4' ? 1 : 0;
+            if (aMp4 != bMp4) return bMp4.compareTo(aMp4);
+            final aDiff = (a.bitrate.bitsPerSecond - target).abs();
+            final bDiff = (b.bitrate.bitsPerSecond - target).abs();
+            return aDiff.compareTo(bDiff);
+          });
+          chosen = audioStreams.first;
+        } else {
+          // High / Studio (~160kbps Opus, itag 251 or highest available)
+          audioStreams.sort(
+            (a, b) =>
+                b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond),
+          );
+          chosen = audioStreams.first;
+        }
       } else if (manifest.muxed.isNotEmpty) {
         final muxed = manifest.muxed.toList();
-        muxed.sort((a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond));
+        if (qPref == 'ultra_low') {
+          muxed.sort(
+            (a, b) =>
+                a.bitrate.bitsPerSecond.compareTo(b.bitrate.bitsPerSecond),
+          );
+        } else {
+          muxed.sort(
+            (a, b) =>
+                b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond),
+          );
+        }
         chosen = muxed.first;
       } else {
         return null;
@@ -200,7 +275,8 @@ class StreamResolverService {
       _cache[videoId] = resolved;
       return resolved;
     } catch (e) {
-      if (kDebugMode) debugPrint('[StreamResolver] resolve error for $videoId: $e');
+      if (kDebugMode)
+        debugPrint('[StreamResolver] resolve error for $videoId: $e');
       return null;
     }
   }
@@ -249,7 +325,9 @@ class StreamResolverService {
       final allVideos = manifest.videoOnly
           .where((v) => !v.videoCodec.toLowerCase().contains('av01'))
           .toList();
-      final videoList = allVideos.isNotEmpty ? allVideos : manifest.videoOnly.toList();
+      final videoList = allVideos.isNotEmpty
+          ? allVideos
+          : manifest.videoOnly.toList();
 
       int videoScore(VideoOnlyStreamInfo v) {
         final codec = v.videoCodec.toLowerCase();
@@ -270,7 +348,9 @@ class StreamResolverService {
         pool.sort((a, b) {
           final sCmp = videoScore(b).compareTo(videoScore(a));
           if (sCmp != 0) return sCmp;
-          final hCmp = b.videoResolution.height.compareTo(a.videoResolution.height);
+          final hCmp = b.videoResolution.height.compareTo(
+            a.videoResolution.height,
+          );
           if (hCmp != 0) return hCmp;
           return b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond);
         });
@@ -287,7 +367,10 @@ class StreamResolverService {
 
       if (manifest.muxed.isNotEmpty) {
         final muxed = manifest.muxed.toList()
-          ..sort((a, b) => b.videoResolution.height.compareTo(a.videoResolution.height));
+          ..sort(
+            (a, b) =>
+                b.videoResolution.height.compareTo(a.videoResolution.height),
+          );
         final url = muxed.first.url.toString();
         return (audioUrl: url, videoUrl: url);
       }
@@ -297,7 +380,8 @@ class StreamResolverService {
       }
       return null;
     } catch (e) {
-      if (kDebugMode) debugPrint('[StreamResolver] video error for $videoId: $e');
+      if (kDebugMode)
+        debugPrint('[StreamResolver] video error for $videoId: $e');
       return null;
     }
   }

@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/tokens/app_spacing.dart';
 import '../../design_system/tokens/app_typography.dart';
-import '../../design_system/widgets/glass_surface.dart';
+import '../../design_system/widgets/apple_glass.dart';
 import '../../design_system/widgets/marquee_text.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../services/player_state.dart';
@@ -13,10 +13,7 @@ import '../../utils/media_normalizer.dart';
 
 /// Floating Glass Mini Player anchored 12pt above the bottom tab bar.
 class MiniPlayer extends StatelessWidget {
-  const MiniPlayer({
-    super.key,
-    required this.onTapExpand,
-  });
+  const MiniPlayer({super.key, required this.onTapExpand});
 
   final VoidCallback onTapExpand;
 
@@ -43,119 +40,155 @@ class MiniPlayer extends StatelessWidget {
               ),
             ],
           ),
-          child: GlassSurface(
+          child: AppleGlass(
             borderRadius: BorderRadius.circular(AppSpacing.rCard),
-            child: Stack(
-              children: [
-                // Main Row Content
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    children: [
-                      // Squircle Artwork (44pt)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: SizedBox(
-                          width: 44,
-                          height: 44,
-                          child: CachedNetworkImage(
-                            imageUrl: track.coverUrl,
-                            memCacheWidth: 140,
-                            memCacheHeight: 140,
-                            fit: BoxFit.cover,
-                            placeholder: (context, _) => Container(color: AppColors.surface2),
-                            errorWidget: (context, error, stackTrace) => Container(
-                              color: AppColors.surface2,
-                              child: const Icon(Icons.music_note, color: AppColors.textTertiary, size: 20),
+            shadow: false,
+            interactive: false,
+            child: ListenableBuilder(
+              listenable: LiquidGlassController.instance,
+              builder: (context, _) {
+                final fg = LiquidGlassController.instance.c.foreground;
+                final subFg = fg.withValues(alpha: 0.65);
+                return Stack(
+                  children: [
+                    // Main Row Content
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Row(
+                        children: [
+                          // Squircle Artwork (44pt)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: CachedNetworkImage(
+                                imageUrl: track.coverUrl,
+                                memCacheWidth: 140,
+                                memCacheHeight: 140,
+                                fit: BoxFit.cover,
+                                placeholder: (context, _) =>
+                                    Container(color: AppColors.surface2),
+                                errorWidget: (context, error, stackTrace) =>
+                                    Container(
+                                      color: AppColors.surface2,
+                                      child: Icon(
+                                        Icons.music_note,
+                                        color: subFg,
+                                        size: 20,
+                                      ),
+                                    ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
+                          const SizedBox(width: 12),
 
-                      // Title & Artist Metadata
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            MarqueeText(
-                              MediaNormalizer.cleanCompactTitle(track.title),
-                              active: player.isPlaying,
-                              style: AppTypography.headline.copyWith(fontSize: 14),
-                            ),
-                            const SizedBox(height: 2),
-                            MarqueeText(
-                              MediaNormalizer.formatArtists(track.artist),
-                              active: player.isPlaying,
-                              style: AppTypography.subhead.copyWith(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Play / Pause Button with Snappy Spring & Buffering Spinner
-                      PressableScale(
-                        onTap: () => player.togglePlay(),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          alignment: Alignment.center,
-                          child: player.isBuffering
-                              ? const CupertinoActivityIndicator(color: Colors.white, radius: 10)
-                              : Icon(
-                                  player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                  color: Colors.white,
-                                  size: 28,
+                          // Title & Artist Metadata
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                MarqueeText(
+                                  MediaNormalizer.cleanCompactTitle(
+                                    track.title,
+                                  ),
+                                  active: player.isPlaying,
+                                  style: AppTypography.headline.copyWith(
+                                    fontSize: 14,
+                                    color: fg,
+                                  ),
                                 ),
-                        ),
-                      ),
-
-                      // Next Button
-                      PressableScale(
-                        onTap: () => player.next(),
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.fast_forward_rounded,
-                            color: Colors.white,
-                            size: 24,
+                                const SizedBox(height: 2),
+                                MarqueeText(
+                                  MediaNormalizer.formatArtists(track.artist),
+                                  active: player.isPlaying,
+                                  style: AppTypography.subhead.copyWith(
+                                    fontSize: 12,
+                                    color: subFg,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
 
-                // 2pt Micro Progress Bar Along the Bottom Edge
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: 0,
-                  child: ValueListenableBuilder<Duration>(
-                    valueListenable: player.positionNotifier,
-                    builder: (context, position, _) {
-                      final totalMs = player.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity);
-                      final posMs = position.inMilliseconds.toDouble().clamp(0.0, totalMs);
-                      final progress = (posMs / totalMs).clamp(0.0, 1.0);
-
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(1),
-                        child: SizedBox(
-                          height: 2.0,
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            backgroundColor: Colors.white.withValues(alpha: 0.1),
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+                          // Play / Pause Button with Snappy Spring & Buffering Spinner
+                          PressableScale(
+                            onTap: () => player.togglePlay(),
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              alignment: Alignment.center,
+                              child: player.isBuffering
+                                  ? CupertinoActivityIndicator(
+                                      color: fg,
+                                      radius: 10,
+                                    )
+                                  : Icon(
+                                      player.isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: fg,
+                                      size: 28,
+                                    ),
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
+
+                          // Next Button
+                          PressableScale(
+                            onTap: () => player.next(),
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              alignment: Alignment.center,
+                              child: Icon(
+                                Icons.fast_forward_rounded,
+                                color: fg,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 2pt Micro Progress Bar Along the Bottom Edge
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 0,
+                      child: ValueListenableBuilder<Duration>(
+                        valueListenable: player.positionNotifier,
+                        builder: (context, position, _) {
+                          final totalMs = player.duration.inMilliseconds
+                              .toDouble()
+                              .clamp(1.0, double.infinity);
+                          final posMs = position.inMilliseconds
+                              .toDouble()
+                              .clamp(0.0, totalMs);
+                          final progress = (posMs / totalMs).clamp(0.0, 1.0);
+
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(1),
+                            child: SizedBox(
+                              height: 2.0,
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: 0.1,
+                                ),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppColors.accent,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),

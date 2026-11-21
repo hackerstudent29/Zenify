@@ -1,3 +1,5 @@
+import '../services/settings_service.dart';
+
 /// Universal Media Normalizer for Zenify.
 ///
 /// Ensures clean titles, accurate artist attribution, correct album metadata,
@@ -9,7 +11,9 @@ class MediaNormalizer {
     r'^\s*(\d+(\.\d+)?[KMBkmb]?\+?\s*(plays|views|listeners|subscribers|streams)|\d{1,3}(,\d{3})*\s*(plays|views))\s*$',
     caseSensitive: false,
   );
-  static final RegExp _durationPattern = RegExp(r'^\s*\d{1,2}:\d{2}(:\d{2})?\s*$');
+  static final RegExp _durationPattern = RegExp(
+    r'^\s*\d{1,2}:\d{2}(:\d{2})?\s*$',
+  );
   static final RegExp _yearPattern = RegExp(r'^\s*(19|20)\d{2}\s*$');
   static final RegExp _separatorPattern = RegExp(r'^\s*[•·&,\-|/\\•●¦;]\s*$');
 
@@ -178,15 +182,25 @@ class MediaNormalizer {
     }
 
     // Handles "{name: Foo, id: Bar}" or "name: Foo, id: Bar"
-    final nameFirstRegex = RegExp(r'(?:\{?\s*name:\s*([^,}]+),\s*id:\s*[^}]+\}?)', caseSensitive: false);
+    final nameFirstRegex = RegExp(
+      r'(?:\{?\s*name:\s*([^,}]+),\s*id:\s*[^}]+\}?)',
+      caseSensitive: false,
+    );
     if (nameFirstRegex.hasMatch(s)) {
-      s = s.replaceAllMapped(nameFirstRegex, (m) => m.group(1)?.trim() ?? '').trim();
+      s = s
+          .replaceAllMapped(nameFirstRegex, (m) => m.group(1)?.trim() ?? '')
+          .trim();
     }
 
     // Handles "{id: Bar, name: Foo}" or "id: Bar, name: Foo"
-    final idFirstRegex = RegExp(r'(?:\{?\s*id:\s*[^,]+,\s*name:\s*([^,}]+)\}?)', caseSensitive: false);
+    final idFirstRegex = RegExp(
+      r'(?:\{?\s*id:\s*[^,]+,\s*name:\s*([^,}]+)\}?)',
+      caseSensitive: false,
+    );
     if (idFirstRegex.hasMatch(s)) {
-      s = s.replaceAllMapped(idFirstRegex, (m) => m.group(1)?.trim() ?? '').trim();
+      s = s
+          .replaceAllMapped(idFirstRegex, (m) => m.group(1)?.trim() ?? '')
+          .trim();
     }
 
     // If entire string is just a YouTube Channel ID (e.g. UCbRSywya_rI8YS15Lo9ttsA)
@@ -195,7 +209,12 @@ class MediaNormalizer {
     }
 
     // Clean raw prefixes like "id: ...", "name: ..."
-    s = s.replaceAll(RegExp(r'^\s*\{?\s*id:\s*[^,]+,?\s*', caseSensitive: false), '').trim();
+    s = s
+        .replaceAll(
+          RegExp(r'^\s*\{?\s*id:\s*[^,]+,?\s*', caseSensitive: false),
+          '',
+        )
+        .trim();
     s = s.replaceAll(RegExp(r'^\s*name:\s*', caseSensitive: false), '').trim();
     s = s.replaceAll(RegExp(r'^[\{\}\[\]]+|[\{\}\[\]]+$'), '').trim();
     return s;
@@ -256,12 +275,29 @@ class MediaNormalizer {
     // 7. Strip stray quotes inside or adjacent to leftover brackets/words if unmatched
     final straightQuotes = '"'.allMatches(s).length;
     if (straightQuotes.isOdd) {
-      s = s.replaceAllMapped(RegExp(r'["\u201c\u201d\x27\u2018\u2019]+(\]|\))'), (m) => m.group(1)!).trim();
-      s = s.replaceAllMapped(RegExp(r'(\[|\()+\s*["\u201c\u201d\x27\u2018\u2019]+'), (m) => m.group(1)!).trim();
+      s = s
+          .replaceAllMapped(
+            RegExp(r'["\u201c\u201d\x27\u2018\u2019]+(\]|\))'),
+            (m) => m.group(1)!,
+          )
+          .trim();
+      s = s
+          .replaceAllMapped(
+            RegExp(r'(\[|\()+\s*["\u201c\u201d\x27\u2018\u2019]+'),
+            (m) => m.group(1)!,
+          )
+          .trim();
     }
 
     // 8. Strip surrounding quotes (curly and straight)
-    s = s.replaceAll(RegExp(r'^["\u201c\u201d\x27\u2018\u2019]+|["\u201c\u201d\x27\u2018\u2019]+$'), '').trim();
+    s = s
+        .replaceAll(
+          RegExp(
+            r'^["\u201c\u201d\x27\u2018\u2019]+|["\u201c\u201d\x27\u2018\u2019]+$',
+          ),
+          '',
+        )
+        .trim();
 
     // 9. Strip trailing hyphens, dashes, colons, or slashes e.g. "Song Name - "
     s = s.replaceAll(RegExp(r'[\s\-–—:|•/]+$'), '').trim();
@@ -330,7 +366,15 @@ class MediaNormalizer {
     s = s.replaceAll(RegExp(r'[\(\[]?\s*(?:19|20)\d{2}\s*[\)\]]?$'), '').trim();
 
     // Strip playlist fluff
-    s = s.replaceAll(RegExp(r'\s*(\(|\[)?\s*(?:Official\s*Playlist|Full\s*Album\s*Jukebox|Jukebox|Non\s*Stop)\s*(\]|\))?\s*$', caseSensitive: false), '').trim();
+    s = s
+        .replaceAll(
+          RegExp(
+            r'\s*(\(|\[)?\s*(?:Official\s*Playlist|Full\s*Album\s*Jukebox|Jukebox|Non\s*Stop)\s*(\]|\))?\s*$',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .trim();
 
     s = s.replaceAll(RegExp(r'[\s\-–—:|]+$'), '').trim();
     s = s.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
@@ -344,7 +388,15 @@ class MediaNormalizer {
     if (s.isEmpty) return 'Podcast';
 
     // Strip podcast fluff
-    s = s.replaceAll(RegExp(r'\s*(\(|\[)?\s*(?:Full\s*Episode|Video\s*Podcast|Audio\s*Podcast)\s*(\]|\))?\s*$', caseSensitive: false), '').trim();
+    s = s
+        .replaceAll(
+          RegExp(
+            r'\s*(\(|\[)?\s*(?:Full\s*Episode|Video\s*Podcast|Audio\s*Podcast)\s*(\]|\))?\s*$',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .trim();
     s = s.replaceAll(RegExp(r'[\s\-–—:|]+$'), '').trim();
     s = s.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
     return s.isNotEmpty ? s : 'Podcast';
@@ -356,7 +408,9 @@ class MediaNormalizer {
     var s = decodeHtml(raw).trim();
     s = stripIdNoise(s);
     if (s.isEmpty || isMetadataNoise(s)) return '';
-    if (s.contains("Instance of 'ArtistRef'") || s.contains('Instance of') || s == 'ArtistRef') {
+    if (s.contains("Instance of 'ArtistRef'") ||
+        s.contains('Instance of') ||
+        s == 'ArtistRef') {
       return '';
     }
 
@@ -368,10 +422,25 @@ class MediaNormalizer {
     s = s.replaceAll(_labelTailPattern, '').trim();
 
     // Remove channel branding suffixes
-    s = s.replaceAll(RegExp(r'\s+(?:official(?:\s+(?:channel|music))?|records|vevo)$', caseSensitive: false), '').trim();
+    s = s
+        .replaceAll(
+          RegExp(
+            r'\s+(?:official(?:\s+(?:channel|music))?|records|vevo)$',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .trim();
 
     // Remove surrounding quotes, curly quotes, parentheses, brackets
-    s = s.replaceAll(RegExp(r'^["\u201c\u201d\x27\u2018\u2019\(\[\{]+|["\u201c\u201d\x27\u2018\u2019\)\]\}]+$'), '').trim();
+    s = s
+        .replaceAll(
+          RegExp(
+            r'^["\u201c\u201d\x27\u2018\u2019\(\[\{]+|["\u201c\u201d\x27\u2018\u2019\)\]\}]+$',
+          ),
+          '',
+        )
+        .trim();
 
     // Strip leading/trailing punctuation
     s = s.replaceAll(RegExp(r'^[,\-–—•·|;:/\\]+|[,\-–—•·|;:/\\]+$'), '').trim();
@@ -418,15 +487,20 @@ class MediaNormalizer {
       if (raw.trim().isEmpty) return;
       // Pre-process parenthesized/bracketed features: "(feat. X)" or "[with Y]" -> ", X"
       var s = raw.replaceAllMapped(
-        RegExp(r'[\(\[]\s*(?:feat\.?|ft\.?|featuring|with)\s+([^\]\)]+)[\)\]]', caseSensitive: false),
+        RegExp(
+          r'[\(\[]\s*(?:feat\.?|ft\.?|featuring|with)\s+([^\]\)]+)[\)\]]',
+          caseSensitive: false,
+        ),
         (m) => ', ${m.group(1)}',
       );
 
-      final parts = s.split(RegExp(
-        r'[,;•·●/\\|¦]|(?:\s*//\s*)|(?:\s*--\s*)'
-        r'|(?:\s+(?:&|and|feat\.?|ft\.?|featuring|with|x|X|\+)\s+)',
-        caseSensitive: false,
-      ));
+      final parts = s.split(
+        RegExp(
+          r'[,;•·●/\\|¦]|(?:\s*//\s*)|(?:\s*--\s*)'
+          r'|(?:\s+(?:&|and|feat\.?|ft\.?|featuring|with|x|X|\+)\s+)',
+          caseSensitive: false,
+        ),
+      );
 
       for (final p in parts) {
         addCandidate(p);
@@ -447,7 +521,9 @@ class MediaNormalizer {
           try {
             final dynamic d = item;
             final n = d.name;
-            if (n is String && n.isNotEmpty && !n.contains("Instance of 'ArtistRef'")) {
+            if (n is String &&
+                n.isNotEmpty &&
+                !n.contains("Instance of 'ArtistRef'")) {
               processString(n);
               continue;
             }
@@ -462,7 +538,9 @@ class MediaNormalizer {
       try {
         final dynamic d = rawArtists;
         final n = d.name;
-        if (n is String && n.isNotEmpty && !n.contains("Instance of 'ArtistRef'")) {
+        if (n is String &&
+            n.isNotEmpty &&
+            !n.contains("Instance of 'ArtistRef'")) {
           processString(n);
           return names;
         }
@@ -488,9 +566,18 @@ class MediaNormalizer {
     return '${names.sublist(0, names.length - 1).join(', ')} & ${names.last}';
   }
 
-  static final RegExp _googleDimRe = RegExp(r'=(?:w(\d+)-h(\d+)|s(\d+))([^?#]*)$', caseSensitive: false);
-  static final RegExp _ytimgIdRe = RegExp(r'(?:ytimg\.com|img\.youtube\.com)/vi(?:_webp)?/([A-Za-z0-9_-]{6,20})/', caseSensitive: false);
-  static final RegExp _ytimgLowRe = RegExp(r'/(?:default|mqdefault|sddefault|hqdefault|hq720)\.(?:jpg|webp)(?:\?.*)?$', caseSensitive: false);
+  static final RegExp _googleDimRe = RegExp(
+    r'=(?:w(\d+)-h(\d+)|s(\d+))([^?#]*)$',
+    caseSensitive: false,
+  );
+  static final RegExp _ytimgIdRe = RegExp(
+    r'(?:ytimg\.com|img\.youtube\.com)/vi(?:_webp)?/([A-Za-z0-9_-]{6,20})/',
+    caseSensitive: false,
+  );
+  static final RegExp _ytimgLowRe = RegExp(
+    r'/(?:default|mqdefault|sddefault|hqdefault|hq720)\.(?:jpg|webp)(?:\?.*)?$',
+    caseSensitive: false,
+  );
 
   /// Resolves high-definition InnerTube artwork (retina 720x720 square covers/avatars,
   /// 1920x1080 wide banners, or 1280x720 maxresdefault video thumbnails) optimized
@@ -501,11 +588,36 @@ class MediaNormalizer {
     int targetSize = 720,
     bool isBanner = false,
     bool isArtistAvatar = false,
+    String? qualityOverride,
   }) {
-    if (url == null || url.trim().isEmpty || url.contains('lh3.googleusercontent.com/s/v4/g')) {
+    final imgQuality = qualityOverride ?? SettingsState.instance.imageQuality;
+    final int effectiveTargetSize;
+    if (targetSize != 720) {
+      effectiveTargetSize = targetSize;
+    } else {
+      switch (imgQuality) {
+        case 'high':
+          effectiveTargetSize = 1000;
+          break;
+        case 'low':
+          effectiveTargetSize = 250;
+          break;
+        case 'medium':
+        default:
+          effectiveTargetSize = 540;
+          break;
+      }
+    }
+
+    if (url == null ||
+        url.trim().isEmpty ||
+        url.contains('lh3.googleusercontent.com/s/v4/g')) {
       if (videoId != null && videoId.trim().isNotEmpty) {
         final cleanId = videoId.replaceFirst('yt-', '').trim();
-        return 'https://i.ytimg.com/vi/$cleanId/maxresdefault.jpg';
+        final thumb = imgQuality == 'high'
+            ? 'maxresdefault.jpg'
+            : (imgQuality == 'low' ? 'mqdefault.jpg' : 'hqdefault.jpg');
+        return 'https://i.ytimg.com/vi/$cleanId/$thumb';
       }
       return '';
     }
@@ -522,8 +634,12 @@ class MediaNormalizer {
       }
 
       final dimMatch = _googleDimRe.firstMatch(u);
-      final w = dimMatch != null ? int.tryParse(dimMatch.group(1) ?? dimMatch.group(3) ?? '0') ?? 0 : 0;
-      final h = dimMatch != null ? int.tryParse(dimMatch.group(2) ?? dimMatch.group(3) ?? '0') ?? 0 : 0;
+      final w = dimMatch != null
+          ? int.tryParse(dimMatch.group(1) ?? dimMatch.group(3) ?? '0') ?? 0
+          : 0;
+      final h = dimMatch != null
+          ? int.tryParse(dimMatch.group(2) ?? dimMatch.group(3) ?? '0') ?? 0
+          : 0;
       final preserveLandscape = isBanner || (w > h && w >= 1000);
 
       if (preserveLandscape && !isArtistAvatar) {
@@ -534,27 +650,44 @@ class MediaNormalizer {
             : '$u$bannerSuffix';
       }
 
-      final keepPortrait = isArtistAvatar || u.contains('-p') || u.contains('-c');
+      final keepPortrait =
+          isArtistAvatar || u.contains('-p') || u.contains('-c');
       final squareSuffix = keepPortrait
-          ? '=w$targetSize-h$targetSize-p-l85-rj'
-          : '=w$targetSize-h$targetSize-l85-rj';
+          ? '=w$effectiveTargetSize-h$effectiveTargetSize-p-l85-rj'
+          : '=w$effectiveTargetSize-h$effectiveTargetSize-l85-rj';
 
       if (dimMatch != null) {
-        if (w >= targetSize && w == h && !isArtistAvatar) return u;
+        if (w == effectiveTargetSize && w == h && !isArtistAvatar) return u;
         return u.replaceFirst(_googleDimRe, squareSuffix);
       }
       return '$u$squareSuffix';
     }
 
-    // 2. YouTube Video Thumbnails (i.ytimg.com): upgrade to 1280x720 maxresdefault.jpg
-    // and strip dimension/sqp query params so HD resolution loads cleanly.
+    // 2. YouTube Video Thumbnails (i.ytimg.com): upgrade or downgrade to match selected quality
     if (u.contains('ytimg.com') || u.contains('img.youtube.com')) {
       final idMatch = _ytimgIdRe.firstMatch(u);
-      final resolvedVid = idMatch?.group(1) ?? videoId?.replaceFirst('yt-', '').trim();
-      if (resolvedVid != null && resolvedVid.isNotEmpty && _ytimgLowRe.hasMatch(u)) {
-        return 'https://i.ytimg.com/vi/$resolvedVid/maxresdefault.jpg';
+      final resolvedVid =
+          idMatch?.group(1) ?? videoId?.replaceFirst('yt-', '').trim();
+      if (resolvedVid != null &&
+          resolvedVid.isNotEmpty &&
+          (_ytimgLowRe.hasMatch(u) || u.contains('default'))) {
+        final thumb = imgQuality == 'high'
+            ? 'maxresdefault.jpg'
+            : (imgQuality == 'low' ? 'mqdefault.jpg' : 'hqdefault.jpg');
+        return 'https://i.ytimg.com/vi/$resolvedVid/$thumb';
       }
       return u.split('?').first;
+    }
+
+    // 3. JioSaavn CDN (c.saavncdn.com)
+    if (u.contains('saavncdn.com')) {
+      final saavnSize = imgQuality == 'high'
+          ? '500x500'
+          : (imgQuality == 'low' ? '150x150' : '250x250');
+      return u.replaceAll(
+        RegExp(r'\b(50x50|150x150|250x250|350x350|500x500)\b'),
+        saavnSize,
+      );
     }
 
     return u;
@@ -664,7 +797,8 @@ class MediaNormalizer {
 
   /// Convenience normalizer for plain Maps.
   static NormalizedMediaItem normalizeMap(Map<String, dynamic> map) {
-    dynamic rawArtists = map['artists'] ?? map['artist'] ?? map['subtitle'] ?? map['author'];
+    dynamic rawArtists =
+        map['artists'] ?? map['artist'] ?? map['subtitle'] ?? map['author'];
     String? subtitleStr;
     if (rawArtists is List) {
       subtitleStr = formatArtists(rawArtists);
@@ -678,7 +812,8 @@ class MediaNormalizer {
       id: (map['id'] ?? map['videoId'] ?? '').toString(),
       rawTitle: (map['title'] ?? map['name'])?.toString(),
       rawSubtitle: subtitleStr,
-      rawImageUrl: (map['imageUrl'] ?? map['thumbnail'] ?? map['coverUrl'])?.toString(),
+      rawImageUrl: (map['imageUrl'] ?? map['thumbnail'] ?? map['coverUrl'])
+          ?.toString(),
       defaultType: (map['type'] ?? 'song').toString(),
       year: map['year']?.toString(),
       browseId: map['browseId']?.toString(),

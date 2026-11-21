@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter, lerpDouble;
+import 'dart:ui' show lerpDouble;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
@@ -11,7 +11,6 @@ import 'package:provider/provider.dart';
 import '../../design_system/tokens/app_colors.dart';
 import '../../design_system/zen.dart' hide SpringCurve;
 import '../../design_system/widgets/apple_glass.dart';
-import '../../design_system/widgets/artwork_mesh_background.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/scrubber_slider.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
@@ -31,21 +30,42 @@ import '../../models/track.dart';
 import '../../utils/media_normalizer.dart';
 
 const double _kPaused = 0.86; // artwork shrink while paused
-const double _kMiniH = 58;
-const double _kMiniArt = 40;
+// Mini player geometry. [full] = normal pill, [compact] = narrow pill that
+// sits beside the dock. Art inset is always (height - art) / 2 = 8, so the
+// cover is evenly spaced from the left, top and bottom of the pill.
+const double _kMiniH = 54;
+const double _kMiniArt = 38;
+const double _kMiniSide = 16;
+const double _kMiniHCompact = 50;
+const double _kMiniArtCompact = 34;
+const double _kMiniSideCompact = 76;
+const double _kMiniGap = 12; // between cover and text
+const double _kMiniBtn = 44; // play / next hit area
+
+/// Single source of truth for the mini pill. The pill AND the flying cover
+/// read these numbers, so the cover always lands exactly in the pill's art slot.
+class _MiniGeo {
+  _MiniGeo(this.dp, this.bottom)
+    : side = lerpDouble(_kMiniSideCompact, _kMiniSide, dp)!,
+      h = lerpDouble(_kMiniHCompact, _kMiniH, dp)!,
+      art = lerpDouble(_kMiniArtCompact, _kMiniArt, dp)!;
+  final double dp;
+  final double bottom; // distance from screen bottom to the pill bottom
+  final double side; // left / right margin of the pill
+  final double h;
+  final double art;
+  double get inset => (h - art) / 2;
+  Rect artRect(Size size) =>
+      Rect.fromLTWH(side + inset, size.height - bottom - h + inset, art, art);
+}
 
 /// Artwork corner radii (visual points, independent of the morph scale).
 const double _kRadiusMini = 6;
-const double _kRadiusBig = 10;
+const double _kRadiusBig = 12;
 const double _kRadiusDocked = 7;
 
-/// Lyrics open + no touch for this long → the bottom controls glide away.
+/// Auto-hide bottom controls after 3 seconds of inactivity in lyrics mode.
 const Duration _kIdleHide = Duration(seconds: 3);
-
-/// While the sheet closes with the cover docked in the header, the cover rides
-/// the header down until the sheet is this far open, then settles into the mini
-/// player. (Same path is retraced when opening.)
-const double _kRideEnd = 0.4;
 
 /// Cover docking spring (art <-> header). Critically damped: no bounce.
 const SpringDescription _kDockSpring = SpringDescription(
@@ -57,15 +77,15 @@ const SpringDescription _kDockSpring = SpringDescription(
 /// Sheet close spring. Stiff + critically damped so closing feels instant.
 const SpringDescription _kCloseSpring = SpringDescription(
   mass: 1,
-  stiffness: 520,
-  damping: 46,
+  stiffness: 560,
+  damping: 47,
 );
 
 /// Sheet open spring. Slightly softer than close, tiny settle, like iOS.
 const SpringDescription _kOpenSpring = SpringDescription(
   mass: 1,
-  stiffness: 430,
-  damping: 38,
+  stiffness: 470,
+  damping: 40,
 );
 
 /// Button press: fast, no overshoot. Release: lively bounce back.
@@ -86,26 +106,22 @@ const double _kMiniFadeSpan = 0.22;
 /// Vertical gap used TWICE in the open sheet, so the rhythm is even:
 ///  • between the seekbar and the play / pause row
 ///  • between the play / pause row and the last row (Studio FX · Lyrics · Queue)
-/// Raise it to push the seekbar + title block further up, lower it to bring
-/// them down.
 const double _kRowGap = 56.0;
 
 // Fixed heights of the open-sheet blocks (shared by the layout AND by the
-// full-bleed artwork placement, so the cover always sits right above the title).
+// full-bleed artwork placement, so the cover always sits cleanly above the title).
 const double _kSeekH = 52.0;
 const double _kTransportH = 90.0; // height of the play / pause button box
-const double _kMetaH = 62.0; // title + artist row (incl. its bottom padding)
-const double _kMetaGap = 10.0; // gap between the title row and the seekbar
+const double _kMetaH = 50.0; // title + artist row (incl. its bottom padding)
+const double _kMetaGap = 3.0; // gap between the title row and the seekbar
 
 /// Distance from the screen bottom to the bottom of the seekbar / transport
 /// block (= top of the last row + _kRowGap).
 double _blockBottomInset(EdgeInsets safe) => 44.0 + 16 + safe.bottom + _kRowGap;
 
-/// Where the full-bleed cover sits: centred in the free space between the
-/// status bar and the title, ending just BELOW the top of the title row (the
-/// feathered bottom edge is transparent there, so the visible artwork ends
-/// slightly above the song name). The cover is baked with blurred / feathered
-/// edges, so this square has no visible border.
+/// Where the full-bleed cover sits: positioned in the upper portion between
+/// the top safe area / grabber and the title row, fitting the screen's left
+/// and right sides exactly with guaranteed clearance above the song title.
 Rect _bleedRect(Size size, EdgeInsets safe) {
   final dockedBlockH = _kSeekH + _kRowGap + _kTransportH;
   final titleTop =
@@ -114,13 +130,12 @@ Rect _bleedRect(Size size, EdgeInsets safe) {
       dockedBlockH -
       _kMetaGap -
       _kMetaH;
-  final bottom = titleTop + 14;
-  final topLimit = math.max(safe.top, 24.0) + 8;
-  final side = math
-      .min(size.width, bottom - topLimit)
-      .clamp(180.0, size.width)
-      .toDouble();
-  return Rect.fromLTWH((size.width - side) / 2, bottom - side, side, side);
+  final bottom = titleTop - 16.0;
+  final topLimit = math.max(safe.top, 24.0) + 8.0;
+  final maxH = math.max(180.0, bottom - topLimit);
+  final side = math.min(size.width, maxH).clamp(180.0, size.width).toDouble();
+  final top = bottom - side;
+  return Rect.fromLTWH((size.width - side) / 2, top, side, side);
 }
 
 enum _Axis { none, x, y }
@@ -133,21 +148,15 @@ enum _Panel { art, lyrics, queue }
 ///   Stack(children: [ pages, const Positioned.fill(child: PlayerShell()) ])
 ///
 /// Motion model (all springs):
-///  • `_sheet`  0 = docked mini, 1 = fully open.
+///  • `_sheet`  0 = docked mini, 1 = fully open. It drives the cover flight
+///    (ONE card: mini -> big / bleed / header) and fades the backdrop
+///    0% -> 100%. The sheet itself does NOT slide.
 ///  • `_dock`   0 = big artwork, 1 = artwork docked top-left in the header.
-///    The title / seek / transport block is laid out by a layout delegate that
-///    follows `_dock`: right under the artwork in art mode, glued above the
-///    last button row in lyrics / queue mode.
 ///  • `_chrome` 0 = bottom controls shown, 1 = hidden (lyrics idle). Hiding
-///    NEVER changes layout (only opacity, offset and blur).
+///    NEVER changes layout (only opacity and offset).
 ///  • ONE artwork widget lives in an overlay, laid out once at the big size and
-///    moved/scaled with a matrix between mini → big → header. When docked it
-///    rides the header, so closing the sheet from lyrics mode is the exact
-///    mirror of opening it.
-///
-/// Full bleed: the blurred backdrop of the current cover fills the whole sheet
-/// in EVERY panel (artwork / lyrics / queue) and cross-fades on every song
-/// change (manual skip, auto next, queue jump).
+///    moved/scaled with a matrix. The mini player hides its own cover while
+///    the sheet is open, so there is never a second card.
 class PlayerShell extends StatefulWidget {
   static final ValueNotifier<bool> isPlayerOpenNotifier = ValueNotifier<bool>(
     false,
@@ -219,10 +228,12 @@ class PlayerShellState extends State<PlayerShell>
   int _dir = 1;
   double _travel = 700;
 
-  // idle-hide of the bottom controls while lyrics are open
-  Timer? _idleTimer;
   bool _chromeHidden = false;
+  bool _reordering = false;
+  double _scrollAcc = 0;
   final ValueNotifier<bool> _lyricsImmersive = ValueNotifier<bool>(false);
+
+  Timer? _idleTimer;
   int _activePointers = 0;
   DateTime? _lastBump;
 
@@ -238,17 +249,10 @@ class PlayerShellState extends State<PlayerShell>
   String? _shownCover;
 
   // ── full bleed state ──
-  /// Bake of the CURRENT cover only (null while it is baking / for a new
-  /// cover), so an old cover's artwork can never draw over a new one.
   BleedArtwork? _bleedArt;
-
-  /// Last bake that was ready. Kept while the next cover bakes, so the
-  /// backdrop never flashes, then cross-faded by [BleedBackdrop].
-  BleedArtwork? _backdropArt;
-  String _bleedUrl = ''; // upgraded cover url of the current track
-  String? _bakingUrl; // bake currently running for this url
-  bool _bakeFailed = false; // bake failed for the current track
-  bool _fullBleed = false;
+  String _bleedUrl = '';
+  String? _bakingUrl;
+  bool _bakeFailed = false;
   bool _paletteReady = false;
 
   List<Color> _palette = [
@@ -266,8 +270,6 @@ class PlayerShellState extends State<PlayerShell>
       ) ??
       Colors.white;
 
-  // values picked with context.select in build() so the shell only rebuilds
-  // when something it actually shows changes (not on every PlayerState tick)
   bool _playing = false;
   bool _isVideo = false;
   dynamic _duration;
@@ -304,8 +306,8 @@ class PlayerShellState extends State<PlayerShell>
   @override
   void dispose() {
     PlayerShell.openRequestNotifier.removeListener(_onOpenRequested);
-    _idleTimer?.cancel();
     _mountTimer?.cancel();
+    _idleTimer?.cancel();
     _lyricsImmersive.dispose();
     _prevPulse.dispose();
     _nextPulse.dispose();
@@ -319,19 +321,18 @@ class PlayerShellState extends State<PlayerShell>
 
   void _applyBleed(BleedArtwork art) {
     _bleedArt = art;
-    _backdropArt = art;
     _bakeFailed = false;
   }
 
-  /// Makes sure the current cover is baked (only when full bleed is on).
+  /// Makes sure the current cover is baked in both modes.
   /// Safe to call from build(): it never calls setState synchronously.
   void _ensureBleed() {
-    if (!_fullBleed || _bleedUrl.isEmpty || _bakeFailed) return;
+    if (_bleedUrl.isEmpty || _bakeFailed) return;
     if (_bleedArt?.key == _bleedUrl || _bakingUrl == _bleedUrl) return;
 
     final cached = BleedArtworkService.instance.peek(_bleedUrl);
     if (cached != null) {
-      _applyBleed(cached); // ready on frame 1, no flash
+      _applyBleed(cached);
       return;
     }
 
@@ -346,7 +347,7 @@ class PlayerShellState extends State<PlayerShell>
             if (art != null) {
               _applyBleed(art);
             } else {
-              _bakeFailed = true; // palette gradient takes over
+              _bakeFailed = true;
             }
           });
         });
@@ -357,23 +358,26 @@ class PlayerShellState extends State<PlayerShell>
     if (key == _trackKey) return;
     _trackKey = key;
     final url = (track.coverUrl as String?) ?? '';
-    // render the new cover on frame 1 without a blank flash
-    if (url.isNotEmpty && _shownCover != url) {
-      _shownCover = url;
-    }
-
-    // New cover: never draw the OLD cover's baked artwork over it. The
-    // backdrop keeps the previous bake until the new one is ready and then
-    // cross-fades (see _ensureBleed / BleedBackdrop).
+    _shownCover = url;
     _bleedUrl = MediaNormalizer.upgradeArtworkUrl(url);
     _bakeFailed = false;
-    if (_bleedArt?.key != _bleedUrl) _bleedArt = null;
+    _bleedArt = BleedArtworkService.instance.peek(_bleedUrl);
+    _bakingUrl = null;
 
     // Follow the user's active player mode (e.g. lyrics mode) for the next song too
     if (_open && _preferredMode == _Panel.lyrics && _panel != _Panel.lyrics) {
       _panel = _Panel.lyrics;
       _bodyPanel = _Panel.lyrics;
       _dock.value = 1.0;
+    }
+
+    if (_panel == _Panel.lyrics) {
+      if (_chromeHidden) {
+        _idleTimer?.cancel();
+      } else {
+        _idleTimer?.cancel();
+        _idleTimer = Timer(_kIdleHide, _hideChrome);
+      }
     }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -530,16 +534,12 @@ class PlayerShellState extends State<PlayerShell>
       setState(() {
         _open = true;
         if (restoreLyrics) {
-          // cover + header + controls start flying to their lyrics-mode spots
-          // immediately; the heavy lyrics body mounts a beat later so the
-          // opening spring never drops a frame.
           _panel = _Panel.lyrics;
           _bodyPanel = _Panel.art;
           _dock.value = 1.0;
         }
       });
       if (restoreLyrics) {
-        _activePointers = 0;
         _bumpIdle(force: true);
       }
     }
@@ -553,12 +553,10 @@ class PlayerShellState extends State<PlayerShell>
   void _close({double velocity = 0}) {
     PlayerShell.isPlayerOpenNotifier.value = false;
     if (!_open && _sheet.value <= 0.001) return;
-    _idleTimer?.cancel();
     _mountTimer?.cancel();
+    _idleTimer?.cancel();
+    _activePointers = 0;
 
-    // Bring the controls back immediately so they travel down with the sheet
-    // instead of popping in or staying invisible mid-close. The cover is NOT
-    // touched: it stays docked and rides the header down (see overlay).
     _chromeHidden = false;
     _lyricsImmersive.value = false;
     if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
@@ -570,7 +568,6 @@ class PlayerShellState extends State<PlayerShell>
       _chrome.value = 0;
       _chromeHidden = false;
       _lyricsImmersive.value = false;
-      _activePointers = 0;
       _artX.value = 0;
       setState(() {
         _open = false;
@@ -620,36 +617,42 @@ class PlayerShellState extends State<PlayerShell>
     HapticFeedback.selectionClick();
     _mountTimer?.cancel();
 
-    final immediate = p == _Panel.art || _bodyPanel != _Panel.art;
+    final wasDocked = _docked;
     setState(() {
       _panel = p;
-      if (immediate) _bodyPanel = p;
+      // lyrics <-> queue: swap right away (cross-fade). Going back to art
+      // keeps the old body mounted until it has faded out with the dock.
+      if (p != _Panel.art && wasDocked) _bodyPanel = p;
     });
-    // The heavy lyrics / queue body is mounted only once the cover has landed
-    // (fallback timer in case the spring future is superseded), so the glide
-    // itself never competes with building a big widget tree.
-    void mountBody() {
-      _mountTimer?.cancel();
-      if (mounted && _panel == p && _bodyPanel != p) {
-        setState(() => _bodyPanel = p);
-      }
+
+    if (p != _Panel.art && !wasDocked) {
+      // mount a beat AFTER the glide starts so frame 1 is never blocked
+      _mountTimer = Timer(const Duration(milliseconds: 90), () {
+        if (mounted && _panel == p && _bodyPanel != p) {
+          setState(() => _bodyPanel = p);
+        }
+      });
+    } else if (p == _Panel.art) {
+      // unmount the old body only after it has fully faded out
+      _mountTimer = Timer(const Duration(milliseconds: 500), () {
+        if (mounted && _panel == _Panel.art && _bodyPanel != _Panel.art) {
+          setState(() => _bodyPanel = _Panel.art);
+        }
+      });
     }
 
-    if (!immediate) {
-      _mountTimer = Timer(const Duration(milliseconds: 420), mountBody);
-    }
-    _dock
-        .springTo(
-          p == _Panel.art ? 0 : 1,
-          spring: _kDockSpring,
-          velocity: _dock.velocity, // interruptible, no dead stop
-        )
-        .then((_) => mountBody());
+    _dock.springTo(
+      p == _Panel.art ? 0 : 1,
+      spring: _kDockSpring,
+      velocity: _dock.velocity, // interruptible, no dead stop
+    );
+
     if (p == _Panel.lyrics) {
       _activePointers = 0;
       _bumpIdle(force: true);
     } else {
       _idleTimer?.cancel();
+      _activePointers = 0;
       _chromeHidden = false;
       _lyricsImmersive.value = false;
       if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
@@ -658,7 +661,20 @@ class PlayerShellState extends State<PlayerShell>
 
   void _togglePanel(_Panel p) => _setPanel(_panel == p ? _Panel.art : p);
 
-  /* ───────────── idle hide of the bottom controls (lyrics only) ───────────── */
+  /* ───────────── lyrics scroll hides or shows the controls ───────────── */
+
+  void _setChromeHidden(bool hide) {
+    if (_panel != _Panel.lyrics || _chromeHidden == hide) {
+      return;
+    }
+    _chromeHidden = hide;
+    _lyricsImmersive.value = hide;
+    _chrome.springTo(
+      hide ? 1 : 0,
+      spring: hide ? kSoftSpring : kSnappySpring,
+      velocity: _chrome.velocity,
+    );
+  }
 
   void _bumpIdle({bool force = false}) {
     if (_panel != _Panel.lyrics) return;
@@ -670,7 +686,7 @@ class PlayerShellState extends State<PlayerShell>
       final last = _lastBump;
       if (last != null &&
           DateTime.now().difference(last) < const Duration(milliseconds: 200)) {
-        return; // pointer-move events are frequent: don't re-arm every one
+        return;
       }
     }
     _lastBump = DateTime.now();
@@ -684,18 +700,39 @@ class PlayerShellState extends State<PlayerShell>
       _idleTimer = Timer(const Duration(seconds: 1), _hideChrome);
       return;
     }
-    _chromeHidden = true;
-    _lyricsImmersive.value = true;
-    _chrome.springTo(1, spring: kSoftSpring);
+    _setChromeHidden(true);
   }
 
   void _pointerReleased() {
     _activePointers = math.max(0, _activePointers - 1);
-    _bumpIdle(force: true);
+    if (_activePointers == 0) {
+      _bumpIdle(force: true);
+    }
   }
 
-  /// Where the big artwork rests. Computed (never measured), so nothing has
-  /// to be laid out or rebuilt while the cover is gliding.
+  bool _onLyricsScroll(ScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return false;
+    if (n is ScrollStartNotification &&
+        n.dragDetails != null &&
+        _activePointers > 0) {
+      _bumpIdle();
+    }
+    if (n is ScrollUpdateNotification && n.dragDetails != null) {
+      final dy = n.scrollDelta ?? 0;
+      if (dy == 0) return false;
+      if (_scrollAcc.sign != dy.sign) _scrollAcc = 0;
+      _scrollAcc += dy;
+      if (_scrollAcc > 18) {
+        _setChromeHidden(true);
+      } else if (_scrollAcc < -18) {
+        _setChromeHidden(false);
+        _bumpIdle();
+      }
+    }
+    return false;
+  }
+
+  /// Where the big artwork rests in normal mode (classic Apple Music centered card).
   Rect _bigOrFallback(Size size, EdgeInsets safe) {
     final side = math.min(size.width - 56, 380.0);
     return Rect.fromLTWH(
@@ -849,7 +886,6 @@ class PlayerShellState extends State<PlayerShell>
     }
     final player = context.read<PlayerState>();
 
-    _fullBleed = isFullBleed;
     _syncTrack(track);
     _ensureBleed();
     _syncPlaying(_playing);
@@ -857,7 +893,7 @@ class PlayerShellState extends State<PlayerShell>
     final mq = MediaQuery.of(context);
     final size = mq.size;
     final safe = mq.padding;
-    _travel = size.height * 0.9; // sheet follows the finger almost 1:1
+    _travel = size.height; // sheet follows the finger exactly 1:1
 
     final isExpanded = _open || _sheet.value > 0.05 || _docked;
 
@@ -891,14 +927,15 @@ class PlayerShellState extends State<PlayerShell>
     return 1 - x * x * (3 - 2 * x);
   }
 
+  _MiniGeo _miniGeo(EdgeInsets safe) => _MiniGeo(
+    widget.dockProgress.clamp(0.0, 1.0),
+    widget.miniBottomOffset + safe.bottom,
+  );
+
   Widget _buildMini(PlayerState player, dynamic track, EdgeInsets safe) {
-    final dp = widget.dockProgress.clamp(0.0, 1.0);
-    final miniLeft = lerpDouble(76.0, 16.0, dp)!;
-    final miniRight = lerpDouble(76.0, 16.0, dp)!;
-    final miniH = lerpDouble(52.0, _kMiniH, dp)!;
-    final miniArt = lerpDouble(36.0, _kMiniArt, dp)!;
-    final miniRadius = lerpDouble(26.0, 29.0, dp)!;
-    final padH = lerpDouble(8.0, 9.0, dp)!;
+    final g = _miniGeo(safe);
+    final dp = g.dp;
+    final glyph = lerpDouble(22.0, 24.0, dp)!;
 
     final pill = GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -908,106 +945,136 @@ class PlayerShellState extends State<PlayerShell>
       onPanEnd: _miniEnd,
       onPanCancel: () => _miniEnd(DragEndDetails()),
       child: AppleGlass(
-        borderRadius: BorderRadius.circular(miniRadius),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(padH, 0, 4, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: AnimatedBuilder(
-                  animation: _miniX,
-                  builder: (_, _) => Transform.translate(
-                    offset: Offset(_miniX.value, 0),
-                    child: Row(
-                      children: [
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(_kRadiusMini),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.28),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
+        borderRadius: BorderRadius.circular(g.h / 2),
+        child: ListenableBuilder(
+          listenable: LiquidGlassController.instance,
+          builder: (context, _) {
+            final fg = LiquidGlassController.instance.c.foreground;
+            return Padding(
+              // left inset == top inset, so the cover is evenly spaced
+              padding: EdgeInsets.only(left: g.inset, right: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AnimatedBuilder(
+                      animation: _miniX,
+                      builder: (_, _) => Transform.translate(
+                        offset: Offset(_miniX.value, 0),
+                        child: Row(
+                          children: [
+                            // The overlay draws the (single) cover while the
+                            // sheet is open / opening, so this one hides then.
+                            // It keeps its size, so the text never shifts.
+                            AnimatedBuilder(
+                              animation: _sheet,
+                              builder: (_, child) => Opacity(
+                                opacity: (_open || _sheet.value > 0.001)
+                                    ? 0.0
+                                    : 1.0,
+                                child: child,
                               ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(_kRadiusMini),
-                            child: SizedBox(
-                              width: miniArt,
-                              height: miniArt,
-                              child: _TrackMediaView(
-                                player: player,
-                                coverUrl: (track.coverUrl as String?) ?? '',
-                                isVideo: _isVideo,
-                                videoFit: BoxFit.cover,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(
+                                    _kRadiusMini,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.24,
+                                      ),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 1.5),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    _kRadiusMini,
+                                  ),
+                                  child: SizedBox(
+                                    width: g.art,
+                                    height: g.art,
+                                    child: _TrackMediaView(
+                                      player: player,
+                                      coverUrl:
+                                          (track.coverUrl as String?) ?? '',
+                                      isVideo: _isVideo,
+                                      videoFit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            const SizedBox(width: _kMiniGap),
+                            Expanded(
+                              child: RightEdgeFade(
+                                child: _miniText(track, dp, fg),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: RightEdgeFade(child: _miniText(track, dp)),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-              PressableScale(
-                onTap: player.togglePlay,
-                scale: 0.88,
-                child: SizedBox(
-                  width: lerpDouble(38.0, 46.0, dp)!,
-                  height: lerpDouble(38.0, 46.0, dp)!,
-                  child: _PlayGlyph(
-                    playing: _playing,
-                    size: lerpDouble(22.0, 28.0, dp)!,
+                  PressableScale(
+                    onTap: player.togglePlay,
+                    scale: 0.88,
+                    child: SizedBox(
+                      width: _kMiniBtn,
+                      height: _kMiniBtn,
+                      child: _PlayGlyph(
+                        playing: _playing,
+                        size: glyph,
+                        color: fg,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              ClipRect(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  widthFactor: dp,
-                  child: Opacity(
-                    opacity: dp,
-                    child: PressableScale(
-                      onTap: _next,
-                      scale: 0.88,
-                      child: SizedBox(
-                        width: 46,
-                        height: 46,
-                        child: Center(
-                          child: SpringPop(
-                            pulse: _nextPulse,
-                            dx: 8,
-                            scale: 0.14,
-                            child: const Icon(
-                              CupertinoIcons.forward_fill,
-                              color: Colors.white,
-                              size: 28,
+                  // next button: collapses to zero width in compact mode
+                  ClipRect(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      widthFactor: dp,
+                      child: Opacity(
+                        opacity: dp,
+                        child: PressableScale(
+                          onTap: _next,
+                          scale: 0.88,
+                          child: SizedBox(
+                            width: _kMiniBtn,
+                            height: _kMiniBtn,
+                            child: Center(
+                              child: SpringPop(
+                                pulse: _nextPulse,
+                                dx: 8,
+                                scale: 0.14,
+                                child: Icon(
+                                  CupertinoIcons.forward_fill,
+                                  color: fg,
+                                  size: glyph,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
 
     return Positioned(
-      left: miniLeft,
-      right: miniRight,
-      bottom: widget.miniBottomOffset + safe.bottom,
-      height: miniH,
+      left: g.side,
+      right: g.side,
+      bottom: g.bottom,
+      height: g.h,
       child: AnimatedSlide(
-        offset: widget.hideMini ? const Offset(0, 1.8) : Offset.zero,
+        offset: widget.hideMini ? const Offset(0, 3.5) : Offset.zero,
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
         child: AnimatedOpacity(
@@ -1022,7 +1089,7 @@ class PlayerShellState extends State<PlayerShell>
               return IgnorePointer(
                 ignoring: widget.hideMini || (!_dragging && t > 0.3),
                 child: Opacity(
-                  opacity: o,
+                  opacity: widget.hideMini ? 0.0 : o,
                   child: Transform.scale(
                     scale: 1 - 0.04 * (1 - o),
                     child: child,
@@ -1036,11 +1103,16 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  Widget _miniText(dynamic track, double dp) {
-    final titleSize = lerpDouble(13.5, 15.0, dp)!;
-    final artistSize = lerpDouble(11.5, 13.5, dp)!;
+  Widget _miniText(dynamic track, double dp, [Color color = Colors.white]) {
+    final titleSize = lerpDouble(13.0, 14.5, dp)!;
+    final artistSize = lerpDouble(11.5, 12.5, dp)!;
+
+    final artistString = track is Track
+        ? track.artist
+        : MediaNormalizer.formatArtists(track?.artist?.toString());
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1051,40 +1123,29 @@ class PlayerShellState extends State<PlayerShell>
           dir: _dir,
           style: TextStyle(
             fontFamily: 'SF Pro',
-            color: Colors.white,
+            color: color,
             fontSize: titleSize,
             height: 1.2,
             fontWeight: FontWeight.w600,
             letterSpacing: -0.2,
           ),
         ),
-        InteractiveArtistsText(
-          artists: _artistsOf(track),
+        SwapText(
+          artistString,
+          dir: _dir,
           style: TextStyle(
             fontFamily: 'SF Pro',
-            color: Colors.white.withValues(alpha: 0.65),
+            color: color.withValues(alpha: 0.65),
             fontSize: artistSize,
             height: 1.2,
             fontWeight: FontWeight.w500,
           ),
-          onTapArtist: (artistName) {
-            if (widget.onGoToArtist != null) {
-              widget.onGoToArtist!(artistName);
-            } else {
-              Navigator.push(
-                context,
-                ZenPageRoute(
-                  builder: (_) => ArtistScreen(artistName: artistName),
-                ),
-              );
-            }
-          },
         ),
       ],
     );
   }
 
-  /* ───────────────────────── ARTWORK OVERLAY (the morphing cover) ───────────────────────── */
+  /* ───────────────────────── ARTWORK OVERLAY (the ONE morphing cover) ───────────────────────── */
 
   Widget _buildArtOverlay(
     PlayerState player,
@@ -1100,24 +1161,11 @@ class PlayerShellState extends State<PlayerShell>
         '';
     final currentKey = ValueKey<String>('cover-$url-${_isVideo ? 'v' : 'a'}');
 
-    final dp = widget.dockProgress.clamp(0.0, 1.0);
-    final currentMiniH = lerpDouble(52.0, _kMiniH, dp)!;
-    final currentMiniArt = lerpDouble(36.0, _kMiniArt, dp)!;
-    final currentMiniLeft = lerpDouble(84.0, 25.0, dp)!;
-    final mini = Rect.fromLTWH(
-      currentMiniLeft,
-      size.height -
-          widget.miniBottomOffset -
-          safe.bottom -
-          currentMiniH +
-          (currentMiniH - currentMiniArt) / 2,
-      currentMiniArt,
-      currentMiniArt,
-    );
-    final big = _bigOrFallback(size, safe);
-    // full bleed: centred just above the song name, edges blurred + feathered
-    final bleed = _bleedRect(size, safe);
-    final targetBig = isFullBleed ? bleed : big;
+    // exactly the pill's art slot (shared geometry)
+    final mini = _miniGeo(safe).artRect(size);
+    final targetBig = isFullBleed
+        ? _bleedRect(size, safe)
+        : _bigOrFallback(size, safe);
     final docked = Rect.fromLTWH(24, safe.top + 29, 56, 56);
     final side = targetBig.width; // laid out ONCE at this size
 
@@ -1133,7 +1181,7 @@ class PlayerShellState extends State<PlayerShell>
         width: side,
         height: side,
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 360),
+          duration: const Duration(milliseconds: 220),
           switchInCurve: Curves.easeOutCubic,
           switchOutCurve: Curves.easeIn,
           transitionBuilder: (child, anim) {
@@ -1142,7 +1190,7 @@ class PlayerShellState extends State<PlayerShell>
               opacity: anim,
               child: SlideTransition(
                 position: Tween<Offset>(
-                  begin: Offset((incoming ? 0.10 : -0.10) * _dir, 0),
+                  begin: Offset((incoming ? 0.08 : -0.08) * _dir, 0),
                   end: Offset.zero,
                 ).animate(anim),
                 child: child,
@@ -1153,8 +1201,6 @@ class PlayerShellState extends State<PlayerShell>
             key: currentKey,
             child: isFullBleed
                 ? BleedArtworkImage(
-                    // video keeps its plain frame; everything else gets the
-                    // feathered artwork once its bake is ready
                     art: _isVideo ? null : _bleedArt,
                     plain: media,
                     dock: _dock,
@@ -1166,11 +1212,45 @@ class PlayerShellState extends State<PlayerShell>
       ),
     );
 
-    return Positioned(
-      left: 0.0,
-      right: 0.0,
-      top: 0.0,
-      bottom: 0.0,
+    // Static halo layers: only their OPACITY changes per frame, never their
+    // geometry, so the blur is rasterised once instead of every frame.
+    final glowColor =
+        _bleedArt?.average ??
+        (_palette.isNotEmpty ? _palette.first : const Color(0xFFB4123A));
+    final glow = RepaintBoundary(
+      child: Center(
+        child: Container(
+          width: side * 0.88,
+          height: side * 0.88,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(side * 0.44),
+            boxShadow: [
+              BoxShadow(
+                color: glowColor.withValues(alpha: 0.5),
+                blurRadius: 60,
+                spreadRadius: 8,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    final shadow = RepaintBoundary(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(side * 0.032),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 36,
+              offset: const Offset(0, 16),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return Positioned.fill(
       child: AnimatedBuilder(
         animation: Listenable.merge([_sheet, _dock, _pause, _artX, _press]),
         child: cover,
@@ -1178,37 +1258,17 @@ class PlayerShellState extends State<PlayerShell>
           final t = _sheet.value.clamp(0.0, 1.0);
           if (!_open && t <= 0.001) return const SizedBox.shrink();
 
-          final d = _dock.value.clamp(0.0, 1.0).toDouble(); // no overshoot
-          const overlayOpacity = 1.0;
+          final d = _dock.value.clamp(0.0, 1.0).toDouble();
 
-          // ── Path A (big/bleed artwork): diagonal flight. Horizontal position and
-          // size lead (ease-out) while the vertical position follows the sheet
-          // linearly. The same path is retraced when closing.
+          // ONE card, ONE path: mini -> (big | bleed | header).
+          // Horizontal position + size lead (ease-out), vertical follows the
+          // sheet linearly, so it tracks the finger and retraces on close.
+          final tgt = Rect.lerp(targetBig, docked, d)!;
           final px = Curves.easeOutQuad.transform(t);
           final sp = (t + px) / 2;
-          final bigCx = lerpDouble(mini.center.dx, targetBig.center.dx, px)!;
-          final bigCy = lerpDouble(mini.center.dy, targetBig.center.dy, t)!;
-          final bigW = lerpDouble(mini.width, targetBig.width, sp)!;
-
-          // ── Path B (docked in the header): the cover is glued to the header,
-          // which slides with the sheet, so closing from lyrics mode keeps the
-          // cover on the header until the last part of the travel, then it
-          // settles into the mini player. Opening is the exact reverse.
-          final k = Curves.easeInOutCubic.transform(
-            ((_kRideEnd - t) / _kRideEnd).clamp(0.0, 1.0),
-          );
-          final dockCx = lerpDouble(docked.center.dx, mini.center.dx, k)!;
-          final dockCy = lerpDouble(
-            docked.center.dy + (1 - t) * size.height,
-            mini.center.dy,
-            k,
-          )!;
-          final dockW = lerpDouble(docked.width, mini.width, k)!;
-
-          // blend A↔B with the dock spring (also drives big/bleed↔header glide)
-          final cx = lerpDouble(bigCx, dockCx, d)!;
-          final cy = lerpDouble(bigCy, dockCy, d)!;
-          final rw = lerpDouble(bigW, dockW, d)!;
+          final cx = lerpDouble(mini.center.dx, tgt.center.dx, px)!;
+          final cy = lerpDouble(mini.center.dy, tgt.center.dy, t)!;
+          final rw = lerpDouble(mini.width, tgt.width, sp)!;
 
           final radius = lerpDouble(
             _kRadiusMini,
@@ -1216,8 +1276,6 @@ class PlayerShellState extends State<PlayerShell>
             t,
           )!;
 
-          // Full bleed never shrinks on pause / press: the feathered cover
-          // would otherwise visibly change size.
           final pauseValue = isFullBleed ? 1.0 : _pause.value;
           final pressValue = isFullBleed ? 1.0 : _press.value;
           final pauseScale = (1 - (1 - pauseValue) * (1 - d) * t) * pressValue;
@@ -1228,11 +1286,15 @@ class PlayerShellState extends State<PlayerShell>
           final m = Matrix4.diagonal3Values(scale, scale, 1)
             ..setTranslationRaw(cx + dx - w / 2, cy - w / 2, 0);
           final r = radius / scale; // keep visual radius constant
-          // The feathered full-bleed cover has no edge to cast a shadow from;
-          // only the small docked cover keeps one.
-          final shadowA = isFullBleed
-              ? (lerpDouble(0.0, 0.35, d)! * t)
-              : (lerpDouble(0.28, 0.45, t)! * (1 - 0.5 * d));
+
+          final haloO = isFullBleed
+              ? ((1.0 - d) * t).clamp(0.0, 1.0)
+              : ((lerpDouble(0.28, 0.45, t)! * (1 - 0.5 * d)) / 0.45).clamp(
+                  0.0,
+                  1.0,
+                );
+
+          final skipClip = isFullBleed && d < 0.05 && t > 0.985;
 
           return Stack(
             clipBehavior: Clip.none,
@@ -1244,74 +1306,49 @@ class PlayerShellState extends State<PlayerShell>
                 height: side,
                 child: Transform(
                   transform: m,
-                  child: Opacity(
-                    opacity: overlayOpacity,
-                    child: IgnorePointer(
-                      ignoring: t < 0.95,
-                      child: Semantics(
-                        button: true,
-                        label: _docked ? 'Show album art' : 'Show lyrics',
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTapDown: (_) {
-                            if (!isFullBleed) {
-                              _press.springTo(0.94, spring: _kPressSpring);
-                            }
-                          },
-                          onTapUp: (_) =>
-                              _press.springTo(1, spring: _kReleaseSpring),
-                          onTapCancel: () =>
-                              _press.springTo(1, spring: _kReleaseSpring),
-                          onTap: () =>
-                              _setPanel(_docked ? _Panel.art : _Panel.lyrics),
-                          onPanStart: _docked ? null : _artStart,
-                          onPanUpdate: _docked ? null : _artUpdate,
-                          onPanEnd: _docked ? null : _artEnd,
-                          onPanCancel: _docked
-                              ? null
-                              : () => _artEnd(DragEndDetails()),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              // Shadow is rasterised ONCE on its own layer; only
-                              // its opacity changes while the cover moves.
+                  child: IgnorePointer(
+                    ignoring: t < 0.95,
+                    child: Semantics(
+                      button: true,
+                      label: _docked ? 'Show album art' : 'Show lyrics',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTapDown: (_) {
+                          if (!isFullBleed) {
+                            _press.springTo(0.94, spring: _kPressSpring);
+                          }
+                        },
+                        onTapUp: (_) =>
+                            _press.springTo(1, spring: _kReleaseSpring),
+                        onTapCancel: () =>
+                            _press.springTo(1, spring: _kReleaseSpring),
+                        onTap: () =>
+                            _setPanel(_docked ? _Panel.art : _Panel.lyrics),
+                        onPanStart: _docked ? null : _artStart,
+                        onPanUpdate: _docked ? null : _artUpdate,
+                        onPanEnd: _docked ? null : _artEnd,
+                        onPanCancel: _docked
+                            ? null
+                            : () => _artEnd(DragEndDetails()),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            if (haloO > 0.01)
                               Positioned.fill(
                                 child: IgnorePointer(
                                   child: Opacity(
-                                    opacity: (shadowA / 0.45).clamp(0.0, 1.0),
-                                    child: const RepaintBoundary(
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.all(
-                                            Radius.circular(_kRadiusBig),
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Color(0x73000000),
-                                              blurRadius: 36,
-                                              offset: Offset(0, 16),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                                    opacity: haloO,
+                                    child: isFullBleed ? glow : shadow,
                                   ),
                                 ),
                               ),
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: isFullBleed
-                                      ? Colors.transparent
-                                      : const Color(0xFF27272A),
-                                  borderRadius: BorderRadius.circular(r),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(r),
-                                  child: child,
-                                ),
-                              ),
-                            ],
-                          ),
+                            skipClip
+                                ? child!
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(r),
+                                    child: child,
+                                  ),
+                          ],
                         ),
                       ),
                     ),
@@ -1340,136 +1377,80 @@ class PlayerShellState extends State<PlayerShell>
             : (track?.coverUrl as String?)) ??
         '';
     final coverUrl = MediaNormalizer.upgradeArtworkUrl(rawCover);
+
+    // Built ONCE per setState (not per animation frame). The builder below
+    // reuses these exact instances, so Flutter skips rebuilding them and the
+    // swipe only moves / clips / fades cached layers.
+    final backdropLayer = Positioned.fill(
+      child: IgnorePointer(
+        child: RepaintBoundary(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const ColoredBox(color: Color(0xFF121214)),
+              BleedBackdrop(
+                coverUrl: coverUrl,
+                art: _bakeFailed ? null : _bleedArt,
+                fallback: _fallbackColors(),
+                flow: true,
+                isPlaying: _playing,
+                positionNotifier: player.positionNotifier,
+                duration: player.duration,
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                color: Colors.black.withValues(
+                  alpha: _panel == _Panel.lyrics ? 0.0 : (_docked ? 0.26 : 0),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
     final column = RepaintBoundary(
       child: _sheetColumn(player, track, safe, size, isFullBleed),
     );
 
-    return Positioned(
-      left: 0.0,
-      right: 0.0,
-      top: 0.0,
-      bottom: 0.0,
+    return Positioned.fill(
       child: AnimatedBuilder(
-        // only the sheet progress changes the shell; panel / dock changes
-        // arrive through setState
         animation: _sheet,
-        child: column,
-        builder: (context, child) {
+        builder: (context, _) {
           final t = _sheet.value.clamp(0.0, 1.0);
           if (!_open && t <= 0.001) return const SizedBox.shrink();
-          final isSheetActive = _open || t > 0.05;
+
+          // top corners: round while the sheet rises, square when flush
           final radius = math.min(1.0, (1 - t) * _travel / 140) * 32;
+          final moving = t < 0.98 && radius > 0.1;
+          // controls + header appear only AFTER the card has arrived
+          // (and disappear first when closing)
           final contentOpacity = Curves.easeOut.transform(
-            ((t - 0.25) / 0.75).clamp(0.0, 1.0),
+            ((t - 0.5) / 0.5).clamp(0.0, 1.0),
           );
-          final bgOpacity = Curves.easeInOut.transform(t);
 
-          // The animated mesh is only used without full bleed. With full
-          // bleed the baked backdrop replaces it in EVERY panel (and it is
-          // far cheaper: one static image instead of a running shader).
-          final meshRunning = isSheetActive && player.isPlaying && !isFullBleed;
-
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {}, // absorb taps: prevents background click-through
-            child: Transform.translate(
-              offset: Offset(0, (1 - t) * size.height),
-              child: ClipRRect(
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(t >= 0.98 ? 0.0 : radius),
-                ),
-                clipBehavior: t < 0.98 && radius > 0.1
-                    ? Clip.antiAlias
-                    : Clip.none,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // 1a. Normal mode: fully blurred, fluid artwork mesh.
-                    if (!isFullBleed)
-                      Positioned(
-                        left: -40.0,
-                        right: -40.0,
-                        top: -60.0,
-                        bottom: -80.0,
-                        child: Opacity(
-                          opacity: bgOpacity,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              Container(color: const Color(0xFF121214)),
-                              RepaintBoundary(
-                                child: TickerMode(
-                                  enabled: meshRunning,
-                                  child: ArtworkMeshBackground(
-                                    coverUrl: coverUrl,
-                                    fallbackAsset: 'assets/images/z_logo.png',
-                                    imageProviderBuilder: (url) =>
-                                        CachedNetworkImageProvider(
-                                          MediaNormalizer.upgradeArtworkUrl(
-                                            url,
-                                          ),
-                                        ),
-                                    palette: _palette.isNotEmpty
-                                        ? _palette
-                                        : null,
-                                    paused: !meshRunning,
-                                    speed: player.isPlaying ? 1.0 : 0.35,
-                                    interactive: true,
-                                    backgroundColor: const Color(0xFF121214),
-                                    scrimOpacity: 0.18,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                    // 1b. Full bleed: the blurred cover fills the WHOLE screen
-                    //     in the artwork view, lyrics and queue, and follows
-                    //     every song change.
-                    if (isFullBleed)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: ColoredBox(
-                            color: const Color(0xFF121214),
-                            child: Opacity(
-                              opacity: bgOpacity,
-                              child: BleedBackdrop(
-                                art: _bakeFailed ? null : _backdropArt,
-                                fallback: _fallbackColors(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    // 2. extra dimming for lyrics / queue readability
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutCubic,
-                          color: Colors.black.withValues(
-                            alpha: _panel == _Panel.lyrics
-                                ? 0.0
-                                : (_docked ? 0.26 : 0),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    Opacity(
-                      opacity: contentOpacity,
-                      child: SizedBox.expand(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {},
-                          child: child,
-                        ),
-                      ),
-                    ),
-                  ],
+          return IgnorePointer(
+            ignoring: t < 0.02,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {}, // absorb taps: no click-through
+              // the whole sheet (backdrop included) rises from the bottom
+              child: Transform.translate(
+                offset: Offset(0, (1 - t) * size.height),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(moving ? radius : 0.0),
+                  ),
+                  clipBehavior: moving ? Clip.antiAlias : Clip.none,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      backdropLayer,
+                      // stays mounted (opacity 0 skips painting), so nothing
+                      // is built mid-animation
+                      Opacity(opacity: contentOpacity, child: column),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1479,7 +1460,13 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  Widget _edgeFade(Widget child, {double bottomStop = 0.93}) {
+  /// Top stop is tiny so the first row (sync / shuffle / loop / automix)
+  /// is never faded out.
+  Widget _edgeFade(
+    Widget child, {
+    double topStop = 0.012,
+    double bottomStop = 0.93,
+  }) {
     return ShaderMask(
       blendMode: BlendMode.dstIn,
       shaderCallback: (r) => LinearGradient(
@@ -1491,7 +1478,7 @@ class PlayerShellState extends State<PlayerShell>
           Colors.black,
           Colors.transparent,
         ],
-        stops: [0, 0.05, bottomStop, 1],
+        stops: [0, topStop, bottomStop, 1],
       ).createShader(r),
       child: child,
     );
@@ -1501,6 +1488,7 @@ class PlayerShellState extends State<PlayerShell>
   Widget _dismissOnOverscroll(Widget child) {
     return NotificationListener<ScrollNotification>(
       onNotification: (n) {
+        if (_reordering) return false;
         if (n is OverscrollNotification && n.overscroll < 0) {
           if (!_dragging) _dragStart();
           _dragUpdate(-n.overscroll);
@@ -1537,7 +1525,7 @@ class PlayerShellState extends State<PlayerShell>
               Colors.black,
               Colors.transparent,
             ],
-            stops: [0, 0.05, start, end],
+            stops: [0, 0.02, start, end],
           ).createShader(r),
           child: c,
         );
@@ -1551,31 +1539,24 @@ class PlayerShellState extends State<PlayerShell>
         // empty: the artwork itself is drawn (and animated) by the overlay
         return const SizedBox.expand(key: ValueKey('art'));
       case _Panel.lyrics:
-        return KeyedSubtree(
-          key: ValueKey('lyrics-$_trackKey'),
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (n) {
-              if ((n is ScrollUpdateNotification &&
-                      n.dragDetails != null &&
-                      _activePointers > 0) ||
-                  (n is ScrollStartNotification &&
-                      n.dragDetails != null &&
-                      _activePointers > 0)) {
-                _bumpIdle();
-              }
-              return false;
-            },
-            child: _dismissOnOverscroll(
-              Padding(
-                padding: const EdgeInsets.fromLTRB(0, 2, 0, 0),
-                // bottom fade is almost nothing: the progressive blur below
-                // does the softening, lyrics run underneath it
-                child: _lyricsFade(
-                  TickerMode(
-                    enabled: _open || _sheet.value > 0.05,
-                    child:
-                        widget.lyricsBuilder?.call(context) ??
-                        LyricsSheet(immersiveListenable: _lyricsImmersive),
+        return RepaintBoundary(
+          key: const ValueKey('lyrics-body'),
+          child: KeyedSubtree(
+            key: ValueKey('lyrics-$_trackKey'),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _onLyricsScroll,
+              child: _dismissOnOverscroll(
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 2, 0, 0),
+                  child: _lyricsFade(
+                    TickerMode(
+                      enabled:
+                          (_open || _sheet.value > 0.05) &&
+                          _panel == _Panel.lyrics,
+                      child:
+                          widget.lyricsBuilder?.call(context) ??
+                          LyricsSheet(immersiveListenable: _lyricsImmersive),
+                    ),
                   ),
                 ),
               ),
@@ -1583,51 +1564,23 @@ class PlayerShellState extends State<PlayerShell>
           ),
         );
       case _Panel.queue:
-        return KeyedSubtree(
-          key: const ValueKey('queue'),
-          child: _dismissOnOverscroll(
-            _edgeFade(
-              QueuePanel(
-                onJumpTo: _jumpTo,
-                onPlayHistory: _playHistory,
-                onGoToArtist: widget.onGoToArtist,
+        return RepaintBoundary(
+          key: const ValueKey('queue-body'),
+          child: KeyedSubtree(
+            key: const ValueKey('queue'),
+            child: _dismissOnOverscroll(
+              _edgeFade(
+                QueuePanel(
+                  onJumpTo: _jumpTo,
+                  onPlayHistory: _playHistory,
+                  onGoToArtist: widget.onGoToArtist,
+                  onReorderingChanged: (v) => _reordering = v,
+                ),
               ),
             ),
           ),
         );
     }
-  }
-
-  Widget _panelTransition(Widget c, Animation<double> anim) {
-    return AnimatedBuilder(
-      animation: anim,
-      child: c,
-      builder: (_, child) {
-        final v = anim.value;
-        if (anim.status == AnimationStatus.reverse) {
-          return Opacity(
-            opacity: v.clamp(0.0, 1.0),
-            child: Transform.scale(
-              scale: 0.98 + 0.02 * v.clamp(0.0, 1.0),
-              child: child,
-            ),
-          );
-        }
-        final e = const Cubic(
-          0.18,
-          0.95,
-          0.32,
-          1.0,
-        ).transform(v.clamp(0.0, 1.0));
-        return Opacity(
-          opacity: e.clamp(0.0, 1.0),
-          child: Transform.translate(
-            offset: Offset(0, (1 - e) * 24),
-            child: Transform.scale(scale: 0.97 + 0.03 * e, child: child),
-          ),
-        );
-      },
-    );
   }
 
   /// Fades [child] with the `_dock` spring. Opacity only: no layout happens
@@ -1648,34 +1601,19 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   /// Glides the bottom controls away (and back) with the `_chrome` spring.
-  /// Only opacity, a small downward offset and a blur change: layout never
-  /// moves, so the lyrics stay perfectly still.
+  /// Only opacity and a small downward offset change: layout never moves.
   Widget _chromeCollapse({required Widget child}) {
     return AnimatedBuilder(
       animation: _chrome,
       child: child,
       builder: (_, c) {
         final h = _chrome.value.clamp(0.0, 1.0).toDouble();
-        final f = 1 - h;
-        final sigma = h * 10;
-        // no ImageFiltered layer at all while the controls are visible
-        final Widget content = sigma < 0.05
-            ? c!
-            : ImageFiltered(
-                imageFilter: ImageFilter.blur(
-                  sigmaX: sigma,
-                  sigmaY: sigma,
-                  tileMode: TileMode.decal,
-                ),
-                child: c,
-              );
         return IgnorePointer(
           ignoring: h > 0.35,
-          child: Opacity(
-            opacity: f,
-            child: Transform.translate(
-              offset: Offset(0, h * 26),
-              child: content,
+          child: RepaintBoundary(
+            child: Opacity(
+              opacity: (1 - h * 1.15).clamp(0.0, 1.0),
+              child: Transform.translate(offset: Offset(0, h * 26), child: c),
             ),
           ),
         );
@@ -1683,8 +1621,7 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Plain fade following `_chrome` (used for the backdrop blur layer, which
-  /// must not be blurred itself).
+  /// Plain fade following `_chrome`.
   Widget _chromeFade({required Widget child}) {
     return AnimatedBuilder(
       animation: _chrome,
@@ -1714,12 +1651,10 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  /// Soft shade behind the bottom controls (lyrics mode only).
-  ///
-  /// Full bleed: the backdrop is already blurred, so a plain gradient is
-  /// enough (and costs nothing). Normal mode keeps the progressive backdrop
-  /// blur (strongest at the bottom edge, fading to nothing towards the top).
-  Widget _bottomBlur(double height, bool on, bool light) {
+  /// Soft shade behind the bottom controls (lyrics mode only). The backdrop
+  /// is already blurred, so a plain gradient is enough and costs nothing
+  /// (no BackdropFilter over scrolling lyrics).
+  Widget _bottomBlur(double height, bool on) {
     return Positioned(
       left: 0,
       right: 0,
@@ -1731,42 +1666,21 @@ class PlayerShellState extends State<PlayerShell>
           duration: const Duration(milliseconds: 360),
           curve: Curves.easeOutCubic,
           child: _chromeFade(
-            child: RepaintBoundary(
-              child: light
-                  ? const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0x00000000), Color(0x73000000)],
-                        ),
-                      ),
-                    )
-                  : ShaderMask(
-                      blendMode: BlendMode.dstIn,
-                      shaderCallback: (r) => const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black,
-                          Colors.black,
-                        ],
-                        stops: [0.0, 0.55, 1.0],
-                      ).createShader(r),
-                      child: ClipRect(
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(
-                            sigmaX: 26,
-                            sigmaY: 26,
-                            tileMode: TileMode.mirror,
-                          ),
-                          child: ColoredBox(
-                            color: Colors.black.withValues(alpha: 0.30),
-                          ),
-                        ),
-                      ),
-                    ),
+            child: const RepaintBoundary(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0x00000000),
+                      Color(0x40000000),
+                      Color(0x80000000),
+                    ],
+                    stops: [0.0, 0.6, 1.0],
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -1783,9 +1697,10 @@ class PlayerShellState extends State<PlayerShell>
   ) {
     final isLyrics = _panel == _Panel.lyrics;
     final isQueue = _panel == _Panel.queue;
+    // layout follows the MOUNTED body, so a fading-out queue never jumps
+    // over the controls while it disappears
+    final isQueueBody = _bodyPanel == _Panel.queue;
 
-    // The last row (Studio FX · Lyrics · Queue) is never moved: it keeps the
-    // exact same bottom padding as before.
     final blurH = 300.0 + safe.bottom;
 
     // Vertical rhythm (bottom → top), anchored above the last row:
@@ -1793,14 +1708,10 @@ class PlayerShellState extends State<PlayerShell>
     //   [ last row: Studio FX · Lyrics · Queue ]
     //        ↕ _kRowGap
     //   [ Previous · Play/Pause · Next ]
-    //        ↕ _kRowGap        (same gap, so the spacing feels even)
+    //        ↕ _kRowGap
     //   [ seekbar + times ]
     //        ↕ gMeta
-    //   [ title / artist row ]   (art mode only; collapses into the header
-    //                             in lyrics / queue mode)
-    //
-    // The block is identical in art AND lyrics mode, so nothing below the
-    // title ever moves when the panel changes.
+    //   [ title / artist row ]   (art mode only)
     const gMeta = _kMetaGap;
     const transportH = _kTransportH;
     final blockBottomInset = _blockBottomInset(safe);
@@ -1817,21 +1728,32 @@ class PlayerShellState extends State<PlayerShell>
 
     final middleRegion = Expanded(
       child: Padding(
-        padding: EdgeInsets.only(bottom: isQueue ? queueReserve : 0),
+        padding: EdgeInsets.only(
+          top: isQueueBody ? 4 : 0,
+          bottom: isQueueBody ? queueReserve : 0,
+        ),
         child: SizedBox.expand(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onVerticalDragStart: (_) => _dragStart(),
-            onVerticalDragUpdate: (d) => _dragUpdate(d.delta.dy),
-            onVerticalDragEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-            onVerticalDragCancel: () => _dragEnd(0),
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              reverseDuration: const Duration(milliseconds: 160),
-              transitionBuilder: _panelTransition,
-              layoutBuilder: (cur, prev) =>
-                  Stack(fit: StackFit.expand, children: [...prev, ?cur]),
-              child: _panelBody(track),
+            onVerticalDragStart: isQueueBody ? null : (_) => _dragStart(),
+            onVerticalDragUpdate: isQueueBody
+                ? null
+                : (d) => _dragUpdate(d.delta.dy),
+            onVerticalDragEnd: isQueueBody
+                ? null
+                : (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
+            onVerticalDragCancel: isQueueBody ? null : () => _dragEnd(0),
+            child: RepaintBoundary(
+              child: _dockFade(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (c, a) =>
+                      FadeTransition(opacity: a, child: c),
+                  layoutBuilder: (cur, prev) =>
+                      Stack(fit: StackFit.expand, children: [...prev, ?cur]),
+                  child: _panelBody(track),
+                ),
+              ),
             ),
           ),
         ),
@@ -1867,7 +1789,6 @@ class PlayerShellState extends State<PlayerShell>
     final compactHeader = _dockFade(child: _compactHeader(track));
 
     // Title row: fixed spot above the seekbar, fades out when the cover docks
-    // (the same info lives in the compact header then).
     final meta = Positioned(
       left: 0,
       right: 0,
@@ -1883,7 +1804,7 @@ class PlayerShellState extends State<PlayerShell>
             onVerticalDragCancel: () => _dragEnd(0),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-              child: _rise(begin: 0.34, child: _metaRow(track)),
+              child: _rise(begin: 0.58, child: _metaRow(track)),
             ),
           ),
         ),
@@ -1908,7 +1829,7 @@ class PlayerShellState extends State<PlayerShell>
               mainAxisSize: MainAxisSize.min,
               children: [
                 _rise(
-                  begin: 0.40,
+                  begin: 0.64,
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 420),
@@ -1920,7 +1841,7 @@ class PlayerShellState extends State<PlayerShell>
                           onSeek: (pos) => player.seek(pos),
                           activeColor: _seekTint.withValues(alpha: 0.62),
                           trackColor: _seekTint.withValues(alpha: 0.22),
-                          middleWidget: (isFullBleed && !isLyrics && !isQueue)
+                          middleWidget: (!isLyrics && !isQueue)
                               ? Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,
@@ -1960,10 +1881,9 @@ class PlayerShellState extends State<PlayerShell>
                     ),
                   ),
                 ),
-                // same gap as between the transport row and the last row
                 const SizedBox(height: _kRowGap),
                 _rise(
-                  begin: 0.46,
+                  begin: 0.70,
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 340),
@@ -1999,7 +1919,7 @@ class PlayerShellState extends State<PlayerShell>
               Padding(
                 padding: EdgeInsets.fromLTRB(24, 0, 24, safe.bottom + 16),
                 child: _rise(
-                  begin: 0.52,
+                  begin: 0.76,
                   child: _tools(
                     isLyrics,
                     hasLyrics: player.hasLyrics || player.isLoadingLyrics,
@@ -2016,17 +1936,15 @@ class PlayerShellState extends State<PlayerShell>
       fit: StackFit.expand,
       children: [
         Column(children: [grabber, compactHeader, middleRegion]),
-        _bottomBlur(blurH, isLyrics, isFullBleed),
+        _bottomBlur(blurH, isLyrics),
         meta,
         controls,
         tools,
       ],
     );
 
-    // Raw pointer listener (never steals gestures): any touch while lyrics are
-    // open wakes the bottom controls and re-arms the idle timer.
     return Listener(
-      behavior: HitTestBehavior.opaque,
+      behavior: HitTestBehavior.translucent,
       onPointerDown: (_) {
         _activePointers++;
         _bumpIdle(force: true);
@@ -2111,7 +2029,7 @@ class PlayerShellState extends State<PlayerShell>
 
   Widget _metaRow(dynamic track) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 1),
       child: Row(
         children: [
           Expanded(
@@ -2394,9 +2312,14 @@ class _SpringButtonState extends State<_SpringButton>
 /*  Play / pause glyph: cross-morph + spring bounce on every toggle     */
 /* ------------------------------------------------------------------ */
 class _PlayGlyph extends StatelessWidget {
-  const _PlayGlyph({required this.playing, required this.size});
+  const _PlayGlyph({
+    required this.playing,
+    required this.size,
+    this.color = Colors.white,
+  });
   final bool playing;
   final double size;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -2415,7 +2338,7 @@ class _PlayGlyph extends StatelessWidget {
           child: Icon(
             playing ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
             key: ValueKey(playing),
-            color: Colors.white,
+            color: color,
             size: size,
           ),
         ),

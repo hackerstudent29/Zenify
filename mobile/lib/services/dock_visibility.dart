@@ -116,8 +116,12 @@ class DockActiveTabScope extends InheritedWidget {
   final bool isActive;
 
   static bool isActiveOf(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<DockActiveTabScope>();
-    return scope?.isActive ?? true;
+    try {
+      final scope = context.dependOnInheritedWidgetOfExactType<DockActiveTabScope>();
+      return scope?.isActive ?? true;
+    } catch (_) {
+      return true;
+    }
   }
 
   @override
@@ -126,15 +130,31 @@ class DockActiveTabScope extends InheritedWidget {
 }
 
 /// Convenience mixin for State classes of screens where the navigation dock
-/// (and optionally the miniplayer on full-screen auth flows) must hide.
+/// (and miniplayer on full-screen flows) must hide.
 mixin HideDocksMixin<T extends StatefulWidget> on State<T> {
   final Object _dockToken = Object();
+  Animation<double>? _routeAnimation;
+  bool _isDeactivated = false;
 
-  /// Override to `true` on pre-auth screens so the miniplayer also hides.
-  bool get hideMiniPlayerWhileActive => false;
+  /// Override to `false` only if miniplayer should remain visible while nav dock hides.
+  /// Defaults to `true` so both the dock and miniplayer hide cleanly on focused pages
+  /// (Login, Settings, Profile, Onboarding).
+  bool get hideMiniPlayerWhileActive => true;
+
+  void _onRouteAnimationStatus(AnimationStatus status) {
+    if (!mounted || _isDeactivated) {
+      DockVisibility.release(_dockToken);
+      return;
+    }
+    if (status == AnimationStatus.reverse) {
+      DockVisibility.release(_dockToken);
+    } else if (status == AnimationStatus.forward || status == AnimationStatus.completed) {
+      _syncDockVisibility();
+    }
+  }
 
   void _syncDockVisibility() {
-    if (!mounted) {
+    if (!mounted || _isDeactivated) {
       DockVisibility.release(_dockToken);
       return;
     }
@@ -144,9 +164,16 @@ mixin HideDocksMixin<T extends StatefulWidget> on State<T> {
       return;
     }
     final modal = ModalRoute.of(context);
-    if (modal != null && (modal.animation?.status == AnimationStatus.reverse || !modal.isActive)) {
-      DockVisibility.release(_dockToken);
-      return;
+    if (modal != null) {
+      if (_routeAnimation != modal.animation) {
+        _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+        _routeAnimation = modal.animation;
+        _routeAnimation?.addStatusListener(_onRouteAnimationStatus);
+      }
+      if (modal.animation?.status == AnimationStatus.reverse || !modal.isActive) {
+        DockVisibility.release(_dockToken);
+        return;
+      }
     }
     DockVisibility.acquire(
       hideNav: true,
@@ -174,17 +201,22 @@ mixin HideDocksMixin<T extends StatefulWidget> on State<T> {
   @override
   void activate() {
     super.activate();
+    _isDeactivated = false;
     _syncDockVisibility();
   }
 
   @override
   void deactivate() {
+    _isDeactivated = true;
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
     DockVisibility.release(_dockToken);
     super.deactivate();
   }
 
   @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    _routeAnimation = null;
     DockVisibility.release(_dockToken);
     super.dispose();
   }

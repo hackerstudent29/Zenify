@@ -11,6 +11,7 @@ import '../design_system/widgets/dynamic_island_header.dart';
 import '../models/track.dart';
 import '../utils/media_normalizer.dart';
 import 'api_service.dart';
+import 'artist_service.dart';
 
 /* ------------------------------------------------------------------ */
 /*  Storage                                                             */
@@ -121,7 +122,11 @@ List<ArtistInfo> catalogArtists() {
     if (t.artist.trim().isEmpty) continue;
     final e = m[t.artist];
     if (e == null) {
-      m[t.artist] = ArtistInfo(t.artist, t.coverUrl, 1);
+      m[t.artist] = ArtistInfo(
+        t.artist,
+        ArtistService.getCachedAvatar(t.artist) ?? '',
+        1,
+      );
     } else {
       e.count++;
     }

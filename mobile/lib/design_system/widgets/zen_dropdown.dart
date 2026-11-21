@@ -569,13 +569,21 @@ class _TrackActionSheetContentState extends State<_TrackActionSheetContent> {
 
   String _buildSubtitle() {
     final dur = _formatDuration(widget.durationSeconds);
+    final dl = DownloadService.instance;
+    final trackId = widget.track?.id ?? '';
+    final downloadedItem = trackId.isNotEmpty
+        ? dl.getDownloaded(trackId)
+        : null;
+    final sizeSuffix = downloadedItem != null
+        ? ' • ${downloadedItem.formattedSize}'
+        : '';
     if (dur.isNotEmpty) {
-      return '${widget.artist} • $dur';
+      return '${widget.artist} • $dur$sizeSuffix';
     }
     if (widget.album.isNotEmpty) {
-      return '${widget.artist} • ${widget.album}';
+      return '${widget.artist} • ${widget.album}$sizeSuffix';
     }
-    return widget.artist;
+    return '${widget.artist}$sizeSuffix';
   }
 
   String get _shareUrl {

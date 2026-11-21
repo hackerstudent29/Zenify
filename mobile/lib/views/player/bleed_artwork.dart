@@ -3,28 +3,29 @@ import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 /// Apple Music style artwork + backdrop.
 ///
 /// Every cover is decoded ONCE and baked into two small images:
 ///
-///  1. [BleedArtwork.image]  (720 px square)
-///     The artwork with its EDGES blurred and feathered into transparency on
-///     all four sides. The centre stays perfectly sharp, nothing at the bottom
-///     is blurred more than the other edges, and there is no visible border:
-///     the picture simply melts into the backdrop behind it.
+///  1. [BleedArtwork.image]  (480 px square)
+///     The artwork with its top / bottom edges blurred and feathered into
+///     transparency. The centre stays perfectly sharp.
 ///
 ///  2. [BleedArtwork.backdrop]  (96 px square)
-///     A heavily blurred, slightly more saturated copy. It is drawn
-///     full-screen (BoxFit.cover) behind EVERYTHING (artwork view, lyrics,
+///     A heavily blurred, slightly more saturated copy. It drives the
+///     full-screen fluid backdrop behind EVERYTHING (artwork view, lyrics,
 ///     queue), and cross-fades whenever the song changes.
 ///
 /// Because all blurring is baked, flying / scaling / docking the cover and the
 /// backdrop are plain image draws: no ImageFilter, no BackdropFilter and no
 /// saveLayer per frame.
 
-const int _kBakePx = 720;
+const int _kBakePx = 480;
 const int _kBackdropPx = 96;
 
 // smoothstep-ish alpha ramp used for every feather mask
@@ -38,15 +39,15 @@ const List<Color> _kRamp = [
 const List<double> _kRampStops = [0.0, 0.2, 0.5, 0.8, 1.0];
 
 /// Outer feather: alpha 0 at the very edge -> 1 at this fraction of the side.
-const double _kFeatherOuter = 0.12;
+const double _kFeatherOuter = 0.18;
 
 /// The sharp copy of the artwork fades in between these two fractions, the
 /// blurred copy shows through before that. => only the edges are blurred.
-const double _kSharpFrom = 0.04;
-const double _kSharpTo = 0.22;
+const double _kSharpFrom = 0.06;
+const double _kSharpTo = 0.28;
 
 /// Blur strength of the edge copy (in baked pixels).
-const double _kEdgeSigma = 16;
+const double _kEdgeSigma = 24;
 
 const Color _kFallbackEdge = Color(0xFF2A2A30);
 
@@ -133,26 +134,19 @@ class BleedArtworkService {
   }
 
   Future<BleedArtwork?> _bake(String key, ImageProvider provider) async {
-    // two attempts: a flaky network / decode must not leave the screen
-    // without its backdrop
-    for (var attempt = 0; attempt < 2; attempt++) {
-      ui.Image? src;
-      try {
-        src = await _decode(provider);
-        final art = await _render(key, src);
-        _cache[key] = art;
-        while (_cache.length > _maxEntries) {
-          _cache.remove(_cache.keys.first);
-        }
-        return art;
-      } catch (e) {
-        debugPrint('BleedArtwork: bake failed ($e)');
-        if (attempt == 0) {
-          await Future<void>.delayed(const Duration(milliseconds: 400));
-        }
-      } finally {
-        src?.dispose();
+    ui.Image? src;
+    try {
+      src = await _decode(provider);
+      final art = await _render(key, src);
+      _cache[key] = art;
+      while (_cache.length > _maxEntries) {
+        _cache.remove(_cache.keys.first);
       }
+      return art;
+    } catch (e) {
+      debugPrint('BleedArtwork: fast bake failed ($e)');
+    } finally {
+      src?.dispose();
     }
     return null;
   }
@@ -176,7 +170,7 @@ class BleedArtworkService {
     );
     stream.addListener(listener);
     return completer.future
-        .timeout(const Duration(seconds: 12))
+        .timeout(const Duration(seconds: 4))
         .whenComplete(() => stream.removeListener(listener));
   }
 
@@ -203,10 +197,10 @@ class BleedArtworkService {
     );
   }
 
-  /// Multiplies the layer's alpha by a feather on all four sides:
-  /// 0 at the edge -> 1 at [to] (fractions of the side).
+  /// Multiplies the layer's alpha by a feather ONLY on top and bottom:
+  /// left and right stay 100% crisp and unblurred to fit screen edges.
   static void _edgeMask(Canvas canvas, Rect rect, double from, double to) {
-    final s = rect.width;
+    final s = rect.height;
     void band(Offset a, Offset b) {
       canvas.drawRect(
         rect,
@@ -216,8 +210,6 @@ class BleedArtworkService {
       );
     }
 
-    band(Offset(s * from, 0), Offset(s * to, 0)); // left
-    band(Offset(s * (1 - from), 0), Offset(s * (1 - to), 0)); // right
     band(Offset(0, s * from), Offset(0, s * to)); // top
     band(Offset(0, s * (1 - from)), Offset(0, s * (1 - to))); // bottom
   }
@@ -244,8 +236,7 @@ class BleedArtworkService {
     canvas.drawImageRect(src, srcRect, rect, imgPaint);
     canvas.restore();
 
-    // 2. sharp copy, faded out towards ALL four edges (same on every side,
-    //    so the bottom is never blurred more than the top / left / right)
+    // 2. sharp copy, faded out towards the top / bottom edges
     canvas.saveLayer(rect, Paint());
     canvas.drawImageRect(src, srcRect, rect, imgPaint);
     _edgeMask(canvas, rect, _kSharpFrom, _kSharpTo);
@@ -332,6 +323,7 @@ class BleedArtworkService {
 ///  • when the cover opens from the mini player / docks into the header the
 ///    plain cover takes over again (small covers should not be feathered).
 ///
+/// The baked image is already feathered, so no ShaderMask is needed per frame.
 /// The tree has a fixed shape, so [plain] is never remounted (no flicker).
 class BleedArtworkImage extends StatefulWidget {
   const BleedArtworkImage({
@@ -425,12 +417,116 @@ class _BleedArtworkImageState extends State<BleedArtworkImage>
 /*  Full-screen backdrop                                                   */
 /* ────────────────────────────────────────────────────────────────────── */
 
+/// Slow liquid motion: an opaque base plus four big blobs that drift across
+/// the WHOLE screen. All motion frequencies are INTEGERS, so phase 1.0 wraps
+/// back to phase 0.0 with no visible jump. Each blob shows a different crop
+/// of the cover, so colours really move around instead of one image wobbling
+/// in a corner.
+class _FlowPainter extends CustomPainter {
+  _FlowPainter(this.image, this.t, this.scrim) : super(repaint: t);
+  final ui.Image image;
+  final ValueListenable<double> t;
+  final double scrim;
+
+  // Different crops of the cover so each blob carries different colours.
+  static const _crops = <Rect>[
+    Rect.fromLTWH(0.00, 0.00, 0.60, 0.60),
+    Rect.fromLTWH(0.40, 0.40, 0.60, 0.60),
+    Rect.fromLTWH(0.40, 0.00, 0.60, 0.60),
+    Rect.fromLTWH(0.00, 0.40, 0.60, 0.60),
+  ];
+  static const _kx = [1, 2, 1, 3];
+  static const _ky = [2, 1, 3, 1];
+  static const _dir = [1.0, -1.0, 1.0, -1.0];
+  static const _alpha = [0.80, 0.72, 0.68, 0.62];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final a = t.value * 2 * math.pi;
+    final w = size.width, h = size.height;
+    final iw = image.width.toDouble(), ih = image.height.toDouble();
+
+    // 1. opaque base: cover-fit crop of the whole backdrop
+    final aspect = w / h;
+    final baseSrc = aspect < 1
+        ? Rect.fromLTWH(iw * (1 - aspect) / 2, 0, iw * aspect, ih)
+        : Rect.fromLTWH(0, ih * (1 - 1 / aspect) / 2, iw, ih / aspect);
+    canvas.drawImageRect(
+      image,
+      baseSrc,
+      Offset.zero & size,
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+
+    // 2. four big blobs drifting across the WHOLE screen
+    final side = size.longestSide * 2.2; // edges stay off-screen
+    for (var i = 0; i < _crops.length; i++) {
+      final ph = i * 1.57;
+      final cx = w * (0.5 + 0.42 * math.cos(a * _kx[i] + ph));
+      final cy = h * (0.5 + 0.38 * math.sin(a * _ky[i] + ph * 1.3));
+      final breath = 1.0 + 0.08 * math.sin(a * 2 + ph);
+      final c = _crops[i];
+      final src = Rect.fromLTWH(
+        c.left * iw,
+        c.top * ih,
+        c.width * iw,
+        c.height * ih,
+      );
+
+      canvas.save();
+      canvas.translate(cx, cy);
+      canvas.rotate(a * _dir[i] + ph);
+      canvas.drawImageRect(
+        image,
+        src,
+        Rect.fromCenter(
+          center: Offset.zero,
+          width: side * breath,
+          height: side * breath,
+        ),
+        Paint()
+          ..filterQuality = FilterQuality.medium
+          ..color = Colors.white.withValues(alpha: _alpha[i]),
+      );
+      canvas.restore();
+    }
+
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()..color = Colors.black.withValues(alpha: scrim),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlowPainter o) =>
+      o.image != image || o.scrim != scrim;
+}
+
 class _Layer {
   const _Layer(this.id, this.widget);
   final String id;
   final Widget widget;
 
-  factory _Layer.of(BleedArtwork? art, List<Color> fallback) {
+  factory _Layer.of(
+    String coverUrl,
+    BleedArtwork? art,
+    List<Color> fallback, [
+    ValueListenable<double>? flow,
+  ]) {
+    if (art != null && flow != null) {
+      return _Layer(
+        'flow:${art.key}',
+        KeyedSubtree(
+          key: ValueKey('flow:${art.key}'),
+          child: RepaintBoundary(
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: _FlowPainter(art.backdrop, flow, art.scrim),
+            ),
+          ),
+        ),
+      );
+    }
     if (art != null) {
       return _Layer(
         'art:${art.key}',
@@ -443,6 +539,78 @@ class _Layer {
             filterQuality: FilterQuality.high,
             color: Colors.black.withValues(alpha: art.scrim),
             colorBlendMode: BlendMode.srcOver,
+          ),
+        ),
+      );
+    }
+    if (coverUrl.isNotEmpty) {
+      return _Layer(
+        'url:$coverUrl',
+        KeyedSubtree(
+          key: ValueKey('url:$coverUrl'),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Rich fallback gradient always active underneath: never flashes pitch black
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: fallback,
+                  ),
+                ),
+              ),
+              ImageFiltered(
+                imageFilter: ui.ImageFilter.blur(
+                  sigmaX: 52,
+                  sigmaY: 52,
+                  tileMode: TileMode.clamp,
+                ),
+                child: flow != null
+                    ? ValueListenableBuilder<double>(
+                        valueListenable: flow,
+                        builder: (_, phase, child) {
+                          final a = phase * 2 * math.pi;
+                          return Transform.translate(
+                            offset: Offset(
+                              math.cos(a) * 24,
+                              math.sin(a * 1.3) * 20,
+                            ),
+                            child: Transform.rotate(
+                              angle: math.sin(a * 0.7) * 0.12,
+                              child: Transform.scale(
+                                scale: 1.35 + 0.08 * math.sin(a),
+                                child: child,
+                              ),
+                            ),
+                          );
+                        },
+                        child: CachedNetworkImage(
+                          imageUrl: coverUrl,
+                          memCacheWidth: 120,
+                          memCacheHeight: 120,
+                          fit: BoxFit.cover,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          errorWidget: (_, _, _) => const SizedBox.shrink(),
+                        ),
+                      )
+                    : Transform.scale(
+                        scale: 1.25,
+                        child: CachedNetworkImage(
+                          imageUrl: coverUrl,
+                          memCacheWidth: 120,
+                          memCacheHeight: 120,
+                          fit: BoxFit.cover,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          errorWidget: (_, _, _) => const SizedBox.shrink(),
+                        ),
+                      ),
+              ),
+              ColoredBox(color: Colors.black.withValues(alpha: 0.22)),
+            ],
           ),
         ),
       );
@@ -471,31 +639,118 @@ class _Layer {
 /// in OVER the old one (no dark dip), and if a bake ever fails a palette
 /// gradient is shown instead, so the screen is never left without a backdrop.
 class BleedBackdrop extends StatefulWidget {
-  const BleedBackdrop({super.key, required this.art, required this.fallback});
+  const BleedBackdrop({
+    super.key,
+    this.coverUrl = '',
+    required this.art,
+    required this.fallback,
+    this.flow = true,
+    this.isPlaying = true,
+    this.positionNotifier,
+    this.duration,
+  });
 
+  final String coverUrl;
   final BleedArtwork? art;
 
   /// At least two colours, used only while no baked backdrop exists.
   final List<Color> fallback;
+
+  /// Whether fluid backdrop motion is enabled.
+  final bool flow;
+
+  /// Playback state to pause motion when playback is paused.
+  final bool isPlaying;
+
+  /// Live position notifier for variable song-progress velocity.
+  final ValueListenable<Duration>? positionNotifier;
+
+  /// Total duration of the current track.
+  final Duration? duration;
 
   @override
   State<BleedBackdrop> createState() => _BleedBackdropState();
 }
 
 class _BleedBackdropState extends State<BleedBackdrop>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 700),
+    duration: const Duration(milliseconds: 450),
     value: 1,
   );
-  late _Layer _to = _Layer.of(widget.art, widget.fallback);
+  late final Ticker _ticker = createTicker(_onTick);
+  final ValueNotifier<double> _phaseNotifier = ValueNotifier<double>(0.0);
+  double _phase = 0.0;
+  double _speed = 1.0;
+  Duration? _lastTick;
+
+  late _Layer _to = _Layer.of(
+    widget.coverUrl,
+    widget.art,
+    widget.fallback,
+    widget.flow ? _phaseNotifier : null,
+  );
   _Layer? _from;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncTicker();
+  }
+
+  /// Runs at ~30fps (the motion is slow, 60fps would only double GPU cost)
+  /// with a smoothed speed so play / pause / song progress never jerk it.
+  void _onTick(Duration elapsed) {
+    if (!mounted) return;
+    final last = _lastTick;
+    if (last == null) {
+      _lastTick = elapsed;
+      return;
+    }
+    var dt = (elapsed - last).inMicroseconds / 1000000.0;
+    if (dt < 1 / 30) return; // throttle; _lastTick kept so dt accumulates
+    _lastTick = elapsed;
+    if (dt > 0.1) dt = 1 / 30;
+
+    double target = 0.5; // paused: gentle drift
+    if (widget.isPlaying) {
+      double progress = 0.5;
+      final dur = widget.duration;
+      final pos = widget.positionNotifier?.value;
+      if (dur != null && dur.inMilliseconds > 0 && pos != null) {
+        progress = (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
+      }
+      target = 1.0 + 1.4 * math.sin(math.pi * progress); // 1.0 -> 2.4 -> 1.0
+    }
+    _speed += (target - _speed) * math.min(1.0, dt * 3); // no speed jumps
+
+    const basePeriod = 20.0;
+    _phase = (_phase + (dt / basePeriod) * _speed) % 1.0;
+    _phaseNotifier.value = _phase;
+  }
+
+  void _syncTicker() {
+    final shouldRun = widget.flow;
+    if (shouldRun && !_ticker.isActive) {
+      _lastTick = null;
+      _ticker.start();
+    } else if (!shouldRun && _ticker.isActive) {
+      _ticker.stop();
+      _lastTick = null;
+    }
+  }
 
   @override
   void didUpdateWidget(BleedBackdrop old) {
     super.didUpdateWidget(old);
-    final next = _Layer.of(widget.art, widget.fallback);
+    _syncTicker();
+    final next = _Layer.of(
+      widget.coverUrl,
+      widget.art,
+      widget.fallback,
+      widget.flow ? _phaseNotifier : null,
+    );
     if (next.id == _to.id) return;
     _from = _to;
     _to = next;
@@ -504,6 +759,8 @@ class _BleedBackdropState extends State<BleedBackdrop>
 
   @override
   void dispose() {
+    _ticker.dispose();
+    _phaseNotifier.dispose();
     _c.dispose();
     super.dispose();
   }

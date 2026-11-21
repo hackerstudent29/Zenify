@@ -3,7 +3,6 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/datasources/catalog_datasource.dart';
-import '../views/explore/explore_data_service.dart';
 import '../views/search/search_data_service.dart';
 import 'api_service.dart';
 import 'artist_service.dart';
@@ -22,7 +21,6 @@ class CacheService {
     ArtistService.clearCache();
     ApiService.clearCache();
     InnerTubeService.instance.clearCache();
-    ExploreDataService.instance.clearCache();
     CatalogDataSource.clear();
     StreamResolverService.instance.clearCache();
 

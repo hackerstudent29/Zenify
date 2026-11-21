@@ -7,6 +7,7 @@ import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../design_system/widgets/equalizer_bars.dart';
 import '../../design_system/widgets/pressable_scale.dart';
 import '../../design_system/widgets/zen_dropdown.dart';
 import '../../design_system/tokens/app_colors.dart';
@@ -19,20 +20,31 @@ import '../../utils/media_normalizer.dart';
 import '../details/album_screen.dart';
 import 'player_kit.dart';
 
-/// Apple-Music style queue: History (collapsible) · Now Playing · Playing Next.
-/// Drag handle to reorder, swipe left to remove, long-press for the menu,
-/// shuffle / repeat / autoplay pills, undo toast.
+/// Apple-Music style queue.
+///
+///  [ shuffle ] [ repeat ] [ automix ]      <- fixed pills (never scroll)
+///  History (collapsible)
+///  Playing
+///  In Queue   (songs the user added: drag to reorder, swipe to remove)
+///  Up Next    (rest of the context + automix: drag to reorder, swipe to remove)
+///
+/// Needs `QueueEntry.addedByUser` (bool). See the QueueState notes.
 class QueuePanel extends StatefulWidget {
   const QueuePanel({
     super.key,
     required this.onJumpTo,
     required this.onPlayHistory,
     this.onGoToArtist,
+    this.onReorderingChanged,
   });
 
   final void Function(QueueEntry entry) onJumpTo;
   final void Function(QueueEntry entry) onPlayHistory;
   final void Function(dynamic track)? onGoToArtist;
+
+  /// true while a row is being dragged, so the sheet can ignore the
+  /// overscroll / auto-scroll that a drag near the edge produces.
+  final ValueChanged<bool>? onReorderingChanged;
 
   @override
   State<QueuePanel> createState() => _QueuePanelState();
@@ -46,6 +58,7 @@ class _QueuePanelState extends State<QueuePanel> {
   @override
   void dispose() {
     _undoTimer?.cancel();
+    widget.onReorderingChanged?.call(false);
     super.dispose();
   }
 
@@ -58,6 +71,25 @@ class _QueuePanelState extends State<QueuePanel> {
     }
   }
 
+  /// Maps a drag inside one section onto the full up-next list and keeps the
+  /// same (Flutter style, pre-removal) index contract q.reorder already had.
+  void _reorder(
+    QueueState q,
+    List<QueueEntry> all,
+    List<QueueEntry> sec,
+    int o,
+    int n,
+  ) {
+    if (o < 0 || o >= sec.length) return;
+    final oldG = all.indexOf(sec[o]);
+    final newG = n >= sec.length
+        ? all.indexOf(sec.last) + 1
+        : all.indexOf(sec[n]);
+    if (oldG < 0 || newG < 0) return;
+    HapticFeedback.selectionClick();
+    q.reorder(oldG, newG);
+  }
+
   @override
   Widget build(BuildContext context) {
     final q = context.watch<QueueState>();
@@ -67,156 +99,218 @@ class _QueuePanelState extends State<QueuePanel> {
     final current = player.currentTrack;
     final up = q.upNext;
     final hist = q.history;
+    final queued = up.where((e) => e.isManualPin).toList();
+    final upcoming = up.where((e) => !e.isManualPin).toList();
 
-    return Stack(
+    return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            slivers: [
-              const SliverToBoxAdapter(child: SizedBox(height: 4)),
-              if (hist.isNotEmpty)
-                SliverToBoxAdapter(child: FadeSlideIn(child: _historySection(hist))),
-              const SliverToBoxAdapter(
-                child: FadeSlideIn(
-                  delay: Duration(milliseconds: 40),
-                  child: _SectionTitle('Now Playing'),
-                ),
-              ),
-              if (current != null)
-                SliverToBoxAdapter(
-                  child: FadeSlideIn(
-                    delay: const Duration(milliseconds: 80),
-                    child: _TrackRow(
-                      track: current,
-                      highlight: true,
-                      onTap: () {},
-                      trailing: _EqBars(playing: player.isPlaying),
-                    ),
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 6),
+          child: _pills(q),
+        ),
+        Expanded(
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: CustomScrollView(
+                  // clamping so pull-down-to-dismiss (overscroll) still works
+                  physics: const ClampingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
                   ),
-                ),
-              SliverToBoxAdapter(
-                child: FadeSlideIn(
-                  delay: const Duration(milliseconds: 120),
-                  child: _upNextHeader(q, player, up.length),
-                ),
-              ),
-              if (up.isEmpty)
-                SliverToBoxAdapter(child: _empty(q))
-              else
-                SliverReorderableList(
-                  itemCount: up.length,
-                  onReorderStart: (_) => HapticFeedback.mediumImpact(),
-                  // ignore: deprecated_member_use
-                  onReorder: (o, n) {
-                    HapticFeedback.selectionClick();
-                    q.reorder(o, n);
-                  },
-                  proxyDecorator: _proxy,
-                  findChildIndexCallback: (key) {
-                    if (key is ValueKey<int>) {
-                      final i = up.indexWhere((e) => e.uid == key.value);
-                      return i < 0 ? null : i;
-                    }
-                    return null;
-                  },
-                  itemBuilder: (context, i) {
-                    final e = up[i];
-                    return Dismissible(
-                      key: ValueKey<int>(e.uid),
-                      direction: DismissDirection.endToStart,
-                      onDismissed: (_) {
-                        HapticFeedback.lightImpact();
-                        q.remove(e);
-                      },
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 22),
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF453A),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(CupertinoIcons.trash_fill, color: Colors.white, size: 20),
-                      ),
-                      child: FadeSlideIn(
-                        delay: Duration(milliseconds: i < 8 ? 28 * i : 0),
+                  slivers: [
+                    if (hist.isNotEmpty)
+                      SliverToBoxAdapter(child: _historySection(hist)),
+                    const SliverToBoxAdapter(child: _SectionTitle('Playing')),
+                    if (current != null)
+                      SliverToBoxAdapter(
                         child: _TrackRow(
-                          track: e.track,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            widget.onJumpTo(e);
+                          track: current,
+                          highlight: true,
+                          onTap: () {},
+                          trailing: EqualizerBars(
+                            isPlaying: player.isPlaying,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    if (queued.isNotEmpty) ...[
+                      SliverToBoxAdapter(
+                        child: _SectionTitle(
+                          'In Queue',
+                          count: queued.length,
+                          action: 'Clear',
+                          onAction: () {
+                            HapticFeedback.mediumImpact();
+                            for (final e in List.of(queued)) {
+                              q.remove(e);
+                            }
                           },
-                          onLongPress: () => _menu(q, e),
-                          trailing: ReorderableDragStartListener(
-                            index: i,
-                            child: Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Icon(
-                                Icons.drag_handle_rounded,
+                        ),
+                      ),
+                      _reorderSection(q, up, queued),
+                    ],
+                    SliverToBoxAdapter(
+                      child: _SectionTitle('Up Next', count: upcoming.length),
+                    ),
+                    if (upcoming.isEmpty)
+                      SliverToBoxAdapter(child: _empty(q))
+                    else
+                      _reorderSection(q, up, upcoming),
+                    if (q.autoplay)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Row(
+                            children: [
+                              Icon(
+                                CupertinoIcons.infinite,
+                                size: 16,
                                 color: Colors.white.withValues(alpha: 0.45),
-                                size: 22,
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Automix adds similar songs (genre, language) when the queue runs low.',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.45),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    );
-                  },
+                    const SliverToBoxAdapter(child: SizedBox(height: 48)),
+                  ],
                 ),
-              if (up.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: Center(
-                    child: PressableScale(
-                      onTap: () {
-                        HapticFeedback.mediumImpact();
-                        q.clear();
-                      },
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                        child: Text(
-                          'Clear Queue',
-                          style: TextStyle(
-                            color: AppColors.accent,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              if (q.autoplay)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Row(
-                      children: [
-                        Icon(Icons.all_inclusive_rounded, size: 16, color: Colors.white.withValues(alpha: 0.45)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Autoplay keeps music going when your queue ends.',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 13),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              const SliverToBoxAdapter(child: SizedBox(height: 48)),
+              ),
+              Positioned(left: 24, right: 24, bottom: 10, child: _undoToast(q)),
             ],
           ),
         ),
-        Positioned(left: 24, right: 24, bottom: 10, child: _undoToast(q)),
       ],
     );
   }
 
   /* ───────────────────────── pieces ───────────────────────── */
 
+  Widget _pills(QueueState q) {
+    final repeatOn = q.repeatMode != RepeatMode.off;
+    return Row(
+      children: [
+        Expanded(
+          child: _Pill(
+            icon: CupertinoIcons.shuffle,
+            active: q.shuffle,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              q.toggleShuffle();
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _Pill(
+            icon: q.repeatMode == RepeatMode.one
+                ? CupertinoIcons.repeat_1
+                : CupertinoIcons.repeat,
+            active: repeatOn,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              q.cycleRepeat(); // off -> loop queue -> loop song once -> off
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _Pill(
+            icon: CupertinoIcons.infinite,
+            active: q.autoplay,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              q.toggleAutoplay(); // automix
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
+  Widget _reorderSection(
+    QueueState q,
+    List<QueueEntry> all,
+    List<QueueEntry> sec,
+  ) {
+    return SliverReorderableList(
+      itemCount: sec.length,
+      onReorderStart: (_) {
+        HapticFeedback.mediumImpact();
+        widget.onReorderingChanged?.call(true);
+      },
+      onReorderEnd: (_) => widget.onReorderingChanged?.call(false),
+      onReorderItem: (o, n) {
+        final rawN = n > o ? n + 1 : n;
+        _reorder(q, all, sec, o, rawN);
+      },
+      proxyDecorator: _proxy,
+      findChildIndexCallback: (key) {
+        if (key is ValueKey<int>) {
+          final i = sec.indexWhere((e) => e.uid == key.value);
+          return i < 0 ? null : i;
+        }
+        return null;
+      },
+      itemBuilder: (context, i) {
+        final e = sec[i];
+        return Dismissible(
+          key: ValueKey<int>(e.uid),
+          direction: DismissDirection.endToStart,
+          onDismissed: (_) {
+            HapticFeedback.lightImpact();
+            q.remove(e);
+          },
+          background: Container(
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 22),
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF453A),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              CupertinoIcons.trash_fill,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          child: _TrackRow(
+            track: e.track,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              widget.onJumpTo(e);
+            },
+            onLongPress: () => _menu(q, e),
+            // The handle claims the vertical drag immediately (no long press),
+            // so reordering never fights the list scroll or the sheet.
+            trailing: ReorderableDragStartListener(
+              index: i,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Icon(
+                  CupertinoIcons.line_horizontal_3,
+                  color: Colors.white.withValues(alpha: 0.45),
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Widget _historySection(List<QueueEntry> hist) {
     final shown = hist.length > 30 ? hist.sublist(hist.length - 30) : hist;
@@ -234,24 +328,24 @@ class _QueuePanelState extends State<QueuePanel> {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
                 children: [
-                  const Text(
-                    'History',
+                  const Text('History', style: _kTitle),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${hist.length}',
                     style: TextStyle(
-                      fontFamily: 'SF Pro Display',
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.3,
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 15,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text('${hist.length}', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 15)),
                   const Spacer(),
                   AnimatedRotation(
                     turns: _historyOpen ? 0.25 : 0,
                     duration: const Duration(milliseconds: 320),
                     curve: Curves.easeOutBack,
-                    child: Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.6)),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
                   ),
                 ],
               ),
@@ -285,73 +379,15 @@ class _QueuePanelState extends State<QueuePanel> {
                         const SizedBox(height: 8),
                       ],
                     )
-                  : const SizedBox(key: ValueKey('h-closed'), width: double.infinity),
+                  : const SizedBox(
+                      key: ValueKey('h-closed'),
+                      width: double.infinity,
+                    ),
             ),
           ),
         ),
         const SizedBox(height: 6),
       ],
-    );
-  }
-
-  Widget _upNextHeader(QueueState q, PlayerState p, int count) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 22, bottom: 10),
-      child: Row(
-        children: [
-          const Text(
-            'Playing Next',
-            style: TextStyle(
-              fontFamily: 'SF Pro Display',
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(width: 8),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: Text(
-              '',
-              key: ValueKey(count),
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 15,
-              ),
-            ),
-          ),
-          const Spacer(),
-          _QueueToggle(
-            icon: CupertinoIcons.shuffle,
-            active: q.shuffle,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              q.toggleShuffle();
-            },
-          ),
-          const SizedBox(width: 8),
-          _QueueToggle(
-            icon: q.repeatMode == RepeatMode.one
-                ? CupertinoIcons.repeat_1
-                : CupertinoIcons.repeat,
-            active: q.repeatMode != RepeatMode.off,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              q.cycleRepeat();
-            },
-          ),
-          const SizedBox(width: 8),
-          _QueueToggle(
-            icon: CupertinoIcons.infinite,
-            active: q.autoplay,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              q.toggleAutoplay();
-            },
-          ),
-        ],
-      ),
     );
   }
 
@@ -361,15 +397,30 @@ class _QueuePanelState extends State<QueuePanel> {
         padding: const EdgeInsets.symmetric(vertical: 36),
         child: Column(
           children: [
-            Icon(Icons.queue_music_rounded, size: 44, color: Colors.white.withValues(alpha: 0.3)),
+            Icon(
+              Icons.queue_music_rounded,
+              size: 44,
+              color: Colors.white.withValues(alpha: 0.3),
+            ),
             const SizedBox(height: 12),
-            const Text('Nothing up next',
-                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
+            const Text(
+              'Nothing up next',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
-              q.autoplay ? 'Autoplay will pick what comes next.' : 'Add songs to keep the music going.',
+              q.autoplay
+                  ? 'Automix will pick what comes next.'
+                  : 'Add songs to keep the music going.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 14),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.55),
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -414,7 +465,10 @@ class _QueuePanelState extends State<QueuePanel> {
       transitionBuilder: (c, a) => FadeTransition(
         opacity: a,
         child: SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 1.2), end: Offset.zero).animate(a),
+          position: Tween<Offset>(
+            begin: const Offset(0, 1.2),
+            end: Offset.zero,
+          ).animate(a),
           child: c,
         ),
       ),
@@ -429,7 +483,10 @@ class _QueuePanelState extends State<QueuePanel> {
                   decoration: BoxDecoration(
                     color: const Color(0xCC1C1C1E),
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 0.8),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      width: 0.8,
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -438,7 +495,11 @@ class _QueuePanelState extends State<QueuePanel> {
                           q.undoLabel ?? '',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                       PressableScale(
@@ -448,9 +509,18 @@ class _QueuePanelState extends State<QueuePanel> {
                           q.undo();
                         },
                         child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          child: Text('Undo',
-                              style: TextStyle(color: AppColors.accent, fontSize: 15, fontWeight: FontWeight.w700)),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          child: Text(
+                            'Undo',
+                            style: TextStyle(
+                              color: AppColors.accent,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -507,32 +577,61 @@ class _QueuePanelState extends State<QueuePanel> {
 
 /* ------------------------------------------------------------------ */
 
+const TextStyle _kTitle = TextStyle(
+  fontFamily: 'SF Pro Display',
+  color: Colors.white,
+  fontSize: 20,
+  fontWeight: FontWeight.w700,
+  letterSpacing: -0.3,
+);
+
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
+  const _SectionTitle(this.text, {this.count, this.action, this.onAction});
   final String text;
+  final int? count;
+  final String? action;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 6, bottom: 6),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontFamily: 'SF Pro Display',
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
+    padding: const EdgeInsets.only(top: 18, bottom: 6),
+    child: Row(
+      children: [
+        Text(text, style: _kTitle),
+        if (count != null && count! > 0) ...[
+          const SizedBox(width: 8),
+          Text(
+            '$count',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 15,
+            ),
           ),
-        ),
-      );
+        ],
+        const Spacer(),
+        if (action != null)
+          PressableScale(
+            onTap: onAction,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Text(
+                action!,
+                style: const TextStyle(
+                  color: AppColors.accent,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
-class _QueueToggle extends StatelessWidget {
-  const _QueueToggle({
-    required this.icon,
-    required this.active,
-    required this.onTap,
-  });
+/// Wide translucent pill (shuffle / repeat / automix), like the mock.
+class _Pill extends StatelessWidget {
+  const _Pill({required this.icon, required this.active, required this.onTap});
   final IconData icon;
   final bool active;
   final VoidCallback onTap;
@@ -541,17 +640,16 @@ class _QueueToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return PressableScale(
       onTap: onTap,
-      scale: 0.88,
+      scale: 0.94,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
-        width: 36,
-        height: 36,
+        height: 44,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(22),
           color: active
               ? Colors.white.withValues(alpha: 0.92)
-              : Colors.white.withValues(alpha: 0.14),
+              : Colors.white.withValues(alpha: 0.16),
         ),
         child: Center(
           child: SpringPop(
@@ -565,7 +663,7 @@ class _QueueToggle extends StatelessWidget {
                     ? Colors.black.withValues(alpha: 0.85)
                     : Colors.white,
               ),
-              builder: (_, c, _) => Icon(icon, size: 18, color: c),
+              builder: (_, c, _) => Icon(icon, size: 20, color: c),
             ),
           ),
         ),
@@ -604,7 +702,10 @@ class _TrackRow extends StatelessWidget {
             color: Colors.transparent,
             child: Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
-              padding: EdgeInsets.symmetric(vertical: 6, horizontal: highlight ? 10 : 0),
+              padding: EdgeInsets.symmetric(
+                vertical: 6,
+                horizontal: highlight ? 10 : 0,
+              ),
               decoration: highlight
                   ? BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.10),
@@ -615,7 +716,11 @@ class _TrackRow extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(9),
-                    child: SizedBox(width: 48, height: 48, child: CoverImage(track.coverUrl as String)),
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: CoverImage(track.coverUrl as String),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -623,17 +728,28 @@ class _TrackRow extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          MediaNormalizer.cleanCompactTitle(track.title as String),
+                          MediaNormalizer.cleanCompactTitle(
+                            track.title as String,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          track is Track ? track.displayArtists : MediaNormalizer.formatArtists(track.artist),
+                          track is Track
+                              ? track.displayArtists
+                              : MediaNormalizer.formatArtists(track.artist),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -642,65 +758,6 @@ class _TrackRow extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Little animated now-playing bars. Freeze when paused.
-class _EqBars extends StatefulWidget {
-  const _EqBars({required this.playing});
-  final bool playing;
-
-  @override
-  State<_EqBars> createState() => _EqBarsState();
-}
-
-class _EqBarsState extends State<_EqBars> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.playing) _c.repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant _EqBars old) {
-    super.didUpdateWidget(old);
-    if (widget.playing && !_c.isAnimating) _c.repeat();
-    if (!widget.playing) _c.stop();
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (_, _) => SizedBox(
-          width: 20,
-          height: 20,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(3, (i) {
-              final h = 5 + 13 * (0.5 + 0.5 * math.sin(2 * math.pi * (_c.value + i * 0.33)));
-              return Container(
-                width: 4,
-                height: h,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2)),
-              );
-            }),
           ),
         ),
       ),
