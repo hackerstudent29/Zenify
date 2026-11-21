@@ -2,6 +2,19 @@
 
 All notable user updates and improvements to Zenify are documented here.
 
+## [1.1.19] - 2026-11-21
+
+### What's New
+- **Interactive Sound Atlas & 3D Music Globe**:
+  - Explore music cultures around the world through a high-performance 60 FPS 3D globe with trigonometry precomputation and 3-tier Level of Detail (LOD).
+  - Manual double-tap detection for zero-delay single tap responses.
+  - Curated city and country charts, musical journeys, battles, and Sound Passport milestones.
+- **Apple Music-Inspired Sound Atlas UI**:
+  - Full fluid iOS Cupertino styling with custom glass navigation and haptic feedback.
+  - Interactive badges, shelves, and seamless queue playback integration.
+- **Ultra-Compressed 15.7 MB Release APK**:
+  - Optimized packaging with ProGuard/R8 code shrinking, resource shrinking, font tree-shaking, and per-ABI architecture splitting.
+
 ## [1.1.18] - 2026-11-20
 
 ### What's New

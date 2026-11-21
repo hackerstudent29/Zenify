@@ -350,36 +350,33 @@ const defaultRemoteConfig = {
         homeFeed: false,
     },
     minAppVersion: '1.0.9',
-    latestAppVersion: '1.0.9',
-    isForceUpdate: true,
-    releaseDate: 'November 12, 2026',
-    releaseTime: '08:15 PM IST',
-    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.0.9/zenify-v1.0.9.apk',
+    latestAppVersion: '1.1.19',
+    isForceUpdate: false,
+    releaseDate: 'November 21, 2026',
+    releaseTime: '08:45 PM IST',
+    updateUrl: 'https://github.com/hackerstudent29/Zenify/releases/download/v1.1.19/zenify-v1.1.19.apk',
     features: [
-        'YouTube H.264 video streaming playback directly inside the MiniPlayer and Fullscreen Player via native ExoPlayer Texture',
-        'Redesigned Explore, Search, Profile, Settings & Insights with region-aware onboarding preferences seeding Day-1 Home feeds',
-        'Unified Layer-1 ZenDropdown action/input sheets, Rose-White liquid aurora Welcome screen, and Dedicated Artist Search',
+        'Interactive Sound Atlas: Explore regional and global music cultures via 3D interactive globe, curated city and country charts, and Sound Passport',
+        'Apple Music Styled Sound Atlas UI: Integrated fluid iOS navigation, zero-delay single tap globe interactions, and rich musical identity badges',
+        'Optimized Search & Personalization Engine: Multi-factor ranking, category-specific retrieval, and unified listening insights',
     ],
     fixes: [
-        'Fixed songs starting at the last 50s, failing on start-of-track scrub, or auto-skipping via ExoPlayer DSP offload disable, itag SimpleCache keying/eviction, and /api/utils/stream-youtube fallback',
-        'Fixed YouTube video playback & fullscreen video rendering by selecting H.264/MP4 + AAC streams and falling back cleanly on native video resolution failure',
-        'Fixed MiniPlayer & Bottom Dock overlapping sheets, Profile, Room Together, Settings, Insights & Welcome screens via DockVisibility.runModal and root-navigator dialogs',
-        'Fixed Dynamic Island center alignment across all dock pages, prevented scrolled collapsed MiniPlayer from overlapping an expanded Search bar, and fixed WelcomeScreen compact viewport scroll layout',
-        'Fixed background auto-next playback, real-time notification/lock-screen seekbar & state updates, Dynamic Island alert pill sizing, Artist/Album verified badges, and Smart Queue isolation',
+        'Fixed language server analyzer diagnostics and updated deprecated Flutter members',
+        'Resolved all builder callback warnings and eliminated obsolete dependencies',
+        'Cleaned and organized project structure',
     ],
     improvements: [
-        'Improved MiniPlayer-to-Fullscreen seamless video surface handoff with smooth aspect-ratio rendering',
-        'Ultra-compressed APK packaging (jniLibs compression, split debug symbols & subsetted SF Pro fonts), cutting ARM64 APK from 33.2 MB to 13.7 MB',
-        'Published fresh clean-built v1.0.9 (Build 13) ARM64 (13.7 MB) & Universal (30.6 MB) APKs across web, API, and GitHub Releases',
+        'Compressed release build size with ProGuard and ABI-split optimization (15.7 MB)',
+        'Enhanced memory management and battery efficiency',
     ],
-    releaseNotes: '• Fixed start-of-track playback, seeking from 0:00 & backend stream fallback\n• Fixed playable H.264 YouTube videos in MiniPlayer & Fullscreen Player\n• Hid MiniPlayer & Bottom Dock behind sheets, Profile & Room Together\n• Dead-centered Dynamic Island headers & de-overlapped scrolled Search/MiniPlayer dock\n• Single-song Smart Queue, reliable auto-next & real-time lock-screen controls (v1.0.9 Build 13)',
-    message: 'Update to v1.0.9 (Build 13) for start-of-track playback/seek fixes, fullscreen YouTube video playback, sheet/subpage dock isolation, centered Dynamic Island headers, and Smart Queue fixes',
+    releaseNotes: '• Interactive Sound Atlas: 3D globe, city & country charts, musical journeys & battles\n• Sound Passport with stamped cities and milestones\n• Compressed APK release with ultra-fast startup (15.7 MB)',
+    message: 'Update to v1.1.19 for the brand new Interactive Sound Atlas, Sound Passport, and optimized audio performance',
 };
 
 server.get('/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.9.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.19.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
@@ -389,7 +386,7 @@ server.get('/download/app', async (request, reply) => {
 server.get('/api/download/app', async (request, reply) => {
     const apkPath = path.join(__dirname, '../public/downloads/zenify.apk');
     if (fs.existsSync(apkPath)) {
-        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.0.9.apk"');
+        reply.header('Content-Disposition', 'attachment; filename="zenify-v1.1.19.apk"');
         reply.header('Content-Type', 'application/vnd.android.package-archive');
         return reply.sendFile('downloads/zenify.apk');
     }
