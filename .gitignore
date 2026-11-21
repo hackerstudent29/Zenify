@@ -114,6 +114,7 @@ mobile/android/.gradle/
 *.apk
 !frontend/public/downloads/zenify.apk
 !frontend/public/downloads/zenify-v1.1.18.apk
+!frontend/public/downloads/zenify-v1.1.19.apk
 !frontend/public/downloads/zenify-universal.apk
 !backend/public/downloads/zenify-universal.apk
 backend/public/downloads/*
@@ -122,6 +123,7 @@ frontend/dist/
 frontend/public/downloads/*
 !frontend/public/downloads/zenify.apk
 !frontend/public/downloads/zenify-v1.1.18.apk
+!frontend/public/downloads/zenify-v1.1.19.apk
 !frontend/public/downloads/zenify-universal.apk
 /room_together_guide/
 *.aab
