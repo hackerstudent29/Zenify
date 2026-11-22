@@ -113,8 +113,8 @@ const double _kScrimMax = 0.6;
 /// 0.70 means the sheet starts from 30% height of the screen from bottom.
 const double _kSheetStartY = 0.70;
 
-/// Sheet backdrop is fully visible once the sheet is this far open.
-const double _kSheetFadeSpan = 0.35;
+/// Sheet backdrop and contents reach full opacity (1.0) when reaching 80-85% of travel.
+const double _kSheetFadeSpan = 0.82;
 
 /// Top corner radius while the sheet travels (eases to 0 at the very top).
 const double _kSheetRadius = 28;
@@ -1501,42 +1501,43 @@ class PlayerShellState extends State<PlayerShell>
           if (!visible && !_warm) return const SizedBox.shrink();
 
           final y = (1 - t) * _travel; // starts 30% from bottom, 1:1 with the finger
-          final fade = Curves.easeOut.transform(
+
+          // Sheet opacity starts at 0 at the bottom (t = 0) and gradually increases,
+          // reaching 1.0 (full opacity) when it reaches 80-85% (0.82) of screen height.
+          final sheetOpacity = Curves.easeOutCubic.transform(
             (t / _kSheetFadeSpan).clamp(0.0, 1.0),
           );
+
           // corners stay round throughout travel, then straighten at the very top
           final corner = _kSheetRadius * (1 - _smooth((t - 0.88) / 0.12));
-          final contentOpacity = Curves.easeOut.transform(
-            ((t - 0.45) / 0.55).clamp(0.0, 1.0),
-          );
-
-          // Zero-allocation layer rendering: avoid expensive offscreen textures when opaque/hidden
-          Widget contentLayer;
-          if (contentOpacity <= 0.001) {
-            contentLayer = const SizedBox.shrink();
-          } else if (contentOpacity >= 0.999) {
-            contentLayer = column;
-          } else {
-            contentLayer = Opacity(opacity: contentOpacity, child: column);
-          }
-
-          Widget backdropLayer;
-          if (fade <= 0.001) {
-            backdropLayer = const SizedBox.shrink();
-          } else if (fade >= 0.999) {
-            backdropLayer = backdrop;
-          } else {
-            backdropLayer = Opacity(opacity: fade, child: backdrop);
-          }
 
           final bool needsClip = corner > 0.5;
           final sheetBody = Stack(
             fit: StackFit.expand,
             children: [
-              backdropLayer,
-              contentLayer,
+              backdrop,
+              column,
             ],
           );
+
+          Widget content;
+          if (needsClip) {
+            content = ClipRRect(
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(corner),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: sheetBody,
+            );
+          } else {
+            content = sheetBody;
+          }
+
+          if (sheetOpacity <= 0.001) {
+            content = const SizedBox.shrink();
+          } else if (sheetOpacity < 0.999) {
+            content = Opacity(opacity: sheetOpacity, child: content);
+          }
 
           return TickerMode(
             enabled: visible,
@@ -1549,15 +1550,7 @@ class PlayerShellState extends State<PlayerShell>
                   onTap: () {}, // absorb taps: no click-through
                   child: Transform.translate(
                     offset: Offset(0, y),
-                    child: needsClip
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(corner),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: sheetBody,
-                          )
-                        : sheetBody,
+                    child: content,
                   ),
                 ),
               ),
