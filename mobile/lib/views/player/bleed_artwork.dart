@@ -52,6 +52,15 @@ const double _kEdgeSigma = 28;
 
 const Color _kFallbackEdge = Color(0xFF2A2A30);
 
+/// The backdrop drift is a very slow motion (20 s period): it is repainted at
+/// ~30 fps instead of 60. Visually identical, half the full-screen GPU work.
+const double _kFlowInterval = 1 / 30;
+
+double _smooth01(double x) {
+  final v = x.clamp(0.0, 1.0).toDouble();
+  return v * v * (3 - 2 * v);
+}
+
 // saturation 1.3 (colour matrix), keeps the backdrop lively after blurring
 const double _kSat = 1.3;
 const List<double> _kSatMatrix = [
@@ -331,13 +340,14 @@ class BleedArtworkService {
 /// The cover inside the morphing overlay.
 ///
 ///  • while the bake is not ready (or for video) only [plain] is shown;
-///  • when ready, the feathered square fades in over [plain] and [plain] fades
-///    out (so its hard edges never show under the feathered edges);
-///  • when the cover opens from the mini player / docks into the header the
-///    plain cover takes over again (small covers should not be feathered).
+///  • while the cover FLIES (mini <-> big <-> header) only [plain] is drawn:
+///    a single cheap image draw, no cross-fade, no second layer;
+///  • when the cover has settled in the big position, the feathered square
+///    cross-fades in over [plain] in the last few percent of the open, and
+///    cross-fades out again in the first few percent of a dock / close.
 ///
 /// The baked image is already feathered, so no ShaderMask is needed per frame.
-/// The tree has a fixed shape, so [plain] is never remounted (no flicker).
+/// The tree has a FIXED shape, so [plain] is never remounted (no flicker).
 class BleedArtworkImage extends StatefulWidget {
   const BleedArtworkImage({
     super.key,
@@ -399,15 +409,17 @@ class _BleedArtworkImageState extends State<BleedArtworkImage>
       builder: (_, plain) {
         final t = widget.sheet.value.clamp(0.0, 1.0);
         final d = widget.dock.value.clamp(0.0, 1.0);
-        final open = Curves.easeOut.transform(
-          ((t - 0.3) / 0.7).clamp(0.0, 1.0),
-        );
+        // Only blends in once settled (last 8% of the open) and out again
+        // within the first 15% of the dock glide: never during the flight.
+        final settled = _smooth01((t - 0.92) / 0.08);
+        final undocked = 1 - _smooth01(d / 0.15);
         final appear = Curves.easeOut.transform(_appear.value);
-        final bakedO = art == null ? 0.0 : appear * open * (1 - d);
+        final bakedO = art == null ? 0.0 : appear * settled * undocked;
 
         return Stack(
           fit: StackFit.expand,
           children: [
+            // Opacity(1.0) is free (no layer); it keeps the element tree stable.
             Opacity(opacity: (1 - bakedO).clamp(0.0, 1.0), child: plain),
             if (art != null && bakedO > 0.001)
               Opacity(
@@ -622,6 +634,7 @@ class _BleedBackdropState extends State<BleedBackdrop>
   final ValueNotifier<double> _phaseNotifier = ValueNotifier<double>(0.0);
   double _phase = 0.0;
   double _speed = 1.0;
+  double _sinceRepaint = 0.0;
   Duration? _lastTick;
 
   late _Layer _to = _makeLayer();
@@ -667,7 +680,13 @@ class _BleedBackdropState extends State<BleedBackdrop>
 
     const basePeriod = 20.0;
     _phase = (_phase + (dt / basePeriod) * _speed) % 1.0;
-    _phaseNotifier.value = _phase;
+
+    // Repaint the full-screen painter at ~30 fps only.
+    _sinceRepaint += dt;
+    if (_sinceRepaint >= _kFlowInterval - 0.004) {
+      _sinceRepaint = 0;
+      _phaseNotifier.value = _phase;
+    }
   }
 
   void _syncTicker() {

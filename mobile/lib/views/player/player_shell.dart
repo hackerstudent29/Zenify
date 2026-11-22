@@ -58,8 +58,12 @@ class _MiniGeo {
   double get insetTop => (h - art) / 2;
   double get insetLeft => lerpDouble(10.0, 14.0, dp)!;
   double get inset => insetTop;
-  Rect artRect(Size size) =>
-      Rect.fromLTWH(side + insetLeft, size.height - bottom - h + insetTop, art, art);
+  Rect artRect(Size size) => Rect.fromLTWH(
+    side + insetLeft,
+    size.height - bottom - h + insetTop,
+    art,
+    art,
+  );
 }
 
 /// Artwork corner radii (visual points, independent of the morph scale).
@@ -73,22 +77,23 @@ const Duration _kIdleHide = Duration(seconds: 3);
 /// Cover docking spring (art <-> header). Critically damped: no bounce.
 const SpringDescription _kDockSpring = SpringDescription(
   mass: 1,
-  stiffness: 520,
-  damping: 46,
+  stiffness: 480,
+  damping: 44, // ζ≈1
 );
 
-/// Sheet close spring. Lively, liquid, swift settling with no stuckness.
+/// Sheet close spring. Critically damped: swift settle, no undershoot, so it
+/// can never sit "stuck" below 0 before completing.
 const SpringDescription _kCloseSpring = SpringDescription(
   mass: 1.0,
-  stiffness: 340,
-  damping: 28,
+  stiffness: 420,
+  damping: 41, // ζ≈1
 );
 
-/// Sheet open spring. Slightly softer than close, tiny settle, like iOS.
+/// Sheet open spring. Tiny settle, like iOS.
 const SpringDescription _kOpenSpring = SpringDescription(
   mass: 1.0,
-  stiffness: 320,
-  damping: 28,
+  stiffness: 380,
+  damping: 37,
 );
 
 /// Button press: fast, no overshoot. Release: lively bounce back.
@@ -113,23 +118,36 @@ const double _kScrimMax = 0.6;
 /// 0.70 means the sheet starts from 30% height of the screen from bottom.
 const double _kSheetStartY = 0.70;
 
-/// Sheet backdrop and contents reach full opacity (1.0) when reaching 80-85% of travel.
-const double _kSheetFadeSpan = 0.82;
+/// Sheet opacity: exactly 0% until the sheet has travelled _kSheetFadeStart,
+/// then an ease-in (quadratic) ramp, reaching 100% only at _kSheetFadeEnd.
+///   t=0.20 -> 0%   t=0.50 -> 16%   t=0.80 -> 64%   t>=0.95 -> 100%
+/// (t = fraction of the sheet travel; the sheet top is at 30% + 70%·t of the
+/// screen height). Tune these two numbers to taste.
+const double _kSheetFadeStart = 0.20;
+const double _kSheetFadeEnd = 0.95;
 
-/// Top corner radius while the sheet travels (eases to 0 at the very top).
-const double _kSheetRadius = 28;
+/// Tap vs scroll threshold for the controls show / hide logic.
+const double _kTapSlop = 18.0;
 
 double _smooth(double x) {
   final v = x.clamp(0.0, 1.0).toDouble();
   return v * v * (3 - 2 * v);
 }
 
+double _sheetAlpha(double t) {
+  final x = ((t - _kSheetFadeStart) / (_kSheetFadeEnd - _kSheetFadeStart))
+      .clamp(0.0, 1.0)
+      .toDouble();
+  return x * x;
+}
+
 /// Tap open/close have no finger momentum, so they use softer springs and
 /// the cover flight stays visible. Drag releases keep the stiff ones.
-const SpringDescription _kOpenTapSpring =
-    SpringDescription(mass: 1.0, stiffness: 300, damping: 27);
-const SpringDescription _kCloseTapSpring =
-    SpringDescription(mass: 1.0, stiffness: 320, damping: 28);
+const SpringDescription _kOpenTapSpring = SpringDescription(
+  mass: 1.0,
+  stiffness: 340,
+  damping: 35,
+);
 
 /// Vertical gap used TWICE in the open sheet, so the rhythm is even:
 ///  • between the seekbar and the play / pause row
@@ -180,8 +198,9 @@ enum _Panel { art, lyrics, queue }
 ///    (ONE card: mini -> big / bleed / header) and fades the backdrop
 ///    0% -> 100%. The sheet itself does NOT slide.
 ///  • `_dock`   0 = big artwork, 1 = artwork docked top-left in the header.
-///  • `_chrome` 0 = bottom controls shown, 1 = hidden (lyrics idle). Hiding
-///    NEVER changes layout (only opacity and offset).
+///  • `_chrome` 0 = bottom controls shown, 1 = hidden (lyrics idle / scroll).
+///    Hiding NEVER changes layout (only opacity and offset), except the queue
+///    list which grows to the bottom edge while the controls are hidden.
 ///  • ONE artwork widget lives in an overlay, laid out once at the big size and
 ///    moved/scaled with a matrix. The mini player hides its own cover while
 ///    the sheet is open, so there is never a second card.
@@ -268,7 +287,12 @@ class PlayerShellState extends State<PlayerShell>
 
   Timer? _idleTimer;
   int _activePointers = 0;
-  DateTime? _lastBump;
+  bool _userScrolling = false; // finger is dragging a lyrics / queue list
+  Offset? _downPos;
+  bool _pointerMoved = false;
+  int _closeToken = 0;
+  bool _closing = false;
+  double _lastPublished = 0;
 
   // where (as a fraction of the lyrics region) the lyrics finish fading out
   // above the seekbar / transport block
@@ -324,10 +348,26 @@ class PlayerShellState extends State<PlayerShell>
     _press = AnimationController.unbounded(vsync: this, value: 1);
     PlayerShell.openRequestNotifier.addListener(_onOpenRequested);
     _sheet.addListener(_publishProgress);
+    _sheet.addListener(_syncDockVisibility);
   }
 
+  /// The dock / tab bar (blurred glass) must NOT animate back in while the
+  /// sheet is still travelling down: that was a big part of the heavy close.
+  /// It comes back only when the sheet has almost landed.
+  void _syncDockVisibility() {
+    if (_closing &&
+        _sheet.value < 0.3 &&
+        PlayerShell.isPlayerOpenNotifier.value) {
+      PlayerShell.isPlayerOpenNotifier.value = false;
+    }
+  }
+
+  /// Parent rebuilds on this: only publish meaningful steps + the end points.
   void _publishProgress() {
-    PlayerShell.sheetProgress.value = _sheet.value.clamp(0.0, 1.0).toDouble();
+    final v = _sheet.value.clamp(0.0, 1.0).toDouble();
+    if ((v - _lastPublished).abs() < 0.03 && v != 0.0 && v != 1.0) return;
+    _lastPublished = v;
+    PlayerShell.sheetProgress.value = v;
   }
 
   void _onOpenRequested() {
@@ -343,6 +383,7 @@ class PlayerShellState extends State<PlayerShell>
   void dispose() {
     PlayerShell.openRequestNotifier.removeListener(_onOpenRequested);
     _sheet.removeListener(_publishProgress);
+    _sheet.removeListener(_syncDockVisibility);
     _warmTimer?.cancel();
     _mountTimer?.cancel();
     _idleTimer?.cancel();
@@ -409,14 +450,8 @@ class PlayerShellState extends State<PlayerShell>
       _dock.value = 1.0;
     }
 
-    if (_panel == _Panel.lyrics) {
-      if (_chromeHidden) {
-        _idleTimer?.cancel();
-      } else {
-        _idleTimer?.cancel();
-        _idleTimer = Timer(_kIdleHide, _hideChrome);
-      }
-    }
+    if (_panel == _Panel.lyrics) _scheduleIdle();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
@@ -566,6 +601,8 @@ class PlayerShellState extends State<PlayerShell>
 
   void _openSheet({double velocity = 0}) {
     HapticFeedback.lightImpact();
+    _closeToken++; // cancels any pending close finalizer
+    _closing = false;
     PlayerShell.isPlayerOpenNotifier.value = true;
     final restoreLyrics = _preferredMode == _Panel.lyrics;
     if (!_open) {
@@ -578,7 +615,7 @@ class PlayerShellState extends State<PlayerShell>
         }
       });
       if (restoreLyrics) {
-        _bumpIdle(force: true);
+        _scheduleIdle();
       }
     }
     // interruptible: tapping mid-flight carries the current velocity
@@ -590,49 +627,95 @@ class PlayerShellState extends State<PlayerShell>
           velocity: v,
         )
         .then((_) {
-      if (mounted && _panel == _Panel.lyrics && _bodyPanel != _Panel.lyrics) {
-        setState(() => _bodyPanel = _Panel.lyrics);
-      }
-    });
+          if (mounted &&
+              _panel == _Panel.lyrics &&
+              _bodyPanel != _Panel.lyrics) {
+            setState(() => _bodyPanel = _Panel.lyrics);
+          }
+        });
   }
 
   void _close({double velocity = 0}) {
-    PlayerShell.isPlayerOpenNotifier.value = false;
-    if (!_open && _sheet.value <= 0.001) return;
+    if (!_open && _sheet.value <= 0.001) {
+      PlayerShell.isPlayerOpenNotifier.value = false;
+      return;
+    }
+    _closing = true; // dock returns once the sheet is below 30% (see listener)
     _mountTimer?.cancel();
     _idleTimer?.cancel();
     _activePointers = 0;
+    _userScrolling = false;
+    _scrollAcc = 0;
 
     _chromeHidden = false;
     _lyricsImmersive.value = false;
     if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
     if (_dock.value != 0) _dock.springTo(0, spring: _kCloseSpring);
 
-    final v = velocity != 0 ? velocity : _sheet.velocity;
+    final token = ++_closeToken;
+    final rawV = velocity != 0 ? velocity : _sheet.velocity;
+    // Fluid downward momentum towards 0 so it never hesitates or creeps
+    final v = rawV < -0.5 ? rawV : -1.2;
+
+    late void Function() closeCutoffListener;
+    closeCutoffListener = () {
+      if (!_closing || token != _closeToken) {
+        _sheet.removeListener(closeCutoffListener);
+        return;
+      }
+      // Instant cutoff near bottom: prevents creeping/stalling at the asymptote
+      if (_sheet.value <= 0.045) {
+        _sheet.removeListener(closeCutoffListener);
+        _sheet.stop();
+        _sheet.value = 0;
+        _finishClose(token);
+      }
+    };
+    _sheet.addListener(closeCutoffListener);
+
     _sheet
         .springTo(
           0,
-          spring: v.abs() > 0.08 ? _kCloseSpring : _kCloseTapSpring,
+          spring: const SpringDescription(mass: 0.8, stiffness: 460, damping: 28),
           velocity: v,
         )
         .then((_) {
-      PlayerShell.isPlayerOpenNotifier.value = false;
-      if (!mounted) return;
-      _dock.value = 0;
-      _chrome.value = 0;
-      _chromeHidden = false;
-      _lyricsImmersive.value = false;
-      _artX.value = 0;
-      setState(() {
-        _open = false;
-        _panel = _Panel.art;
-        _bodyPanel = _Panel.art;
-      });
+          _sheet.removeListener(closeCutoffListener);
+          _finishClose(token);
+        });
+
+    // Safety net: force close after 260ms max so it can NEVER get stuck
+    Timer(const Duration(milliseconds: 260), () {
+      if (!mounted || token != _closeToken) return;
+      if (_open || _sheet.value.abs() > 0.0005) {
+        _sheet.removeListener(closeCutoffListener);
+        _sheet.stop();
+        _sheet.value = 0;
+        _finishClose(token);
+      }
+    });
+  }
+
+  void _finishClose(int token) {
+    if (!mounted || token != _closeToken) return;
+    _closing = false;
+    PlayerShell.isPlayerOpenNotifier.value = false;
+    _dock.value = 0;
+    _chrome.value = 0;
+    _chromeHidden = false;
+    _lyricsImmersive.value = false;
+    _artX.value = 0;
+    setState(() {
+      _open = false;
+      _panel = _Panel.art;
+      _bodyPanel = _Panel.art;
     });
   }
 
   void _dragStart() {
     _sheet.stop();
+    _closeToken++; // a drag takes over from any running close
+    _closing = false;
     _dragging = true;
     _startedClosed = !_open;
     // dock hides the instant a drag-open begins
@@ -651,14 +734,21 @@ class PlayerShellState extends State<PlayerShell>
     final vt = -vy / _travel; // t / second, + = opening
     final t = _sheet.value;
     final bool target;
-    if (vy < -40 ||
-        vt > 0.06 ||
-        (_startedClosed && (t > 0.03 || _miniAcc.dy < -18))) {
-      target = true;
-    } else if (vy > 120 || vt < -0.15) {
-      target = false;
+    if (_startedClosed) {
+      if (vy < -40 || vt > 0.06 || t > 0.15 || _miniAcc.dy < -18) {
+        target = true;
+      } else {
+        target = false;
+      }
     } else {
-      target = _startedClosed ? t > 0.20 : t > 0.65;
+      // Closing from open sheet:
+      // If the user pulled down at all or has downward momentum, close smoothly!
+      // Only keep open if user clearly swiped/pulled back UP (vy < -120 or vt > 0.12).
+      if (vy < -120 || vt > 0.12) {
+        target = true; // explicitly pulled/flung back up
+      } else {
+        target = false; // slight downward swipe, downward velocity, or dragged down: close smoothly!
+      }
     }
     target ? _openSheet(velocity: vt) : _close(velocity: vt);
   }
@@ -682,8 +772,10 @@ class PlayerShellState extends State<PlayerShell>
     });
 
     if (p != _Panel.art && !wasDocked) {
-      // mount a beat AFTER the glide starts so frame 1 is never blocked
-      _mountTimer = Timer(const Duration(milliseconds: 90), () {
+      // mount a beat AFTER the glide starts so frame 1 is never blocked.
+      // The body only becomes visible in the 2nd half of the glide
+      // (see _dockFade `from`), so the mount hitch is hidden.
+      _mountTimer = Timer(const Duration(milliseconds: 60), () {
         if (mounted && _panel == p && _bodyPanel != p) {
           setState(() => _bodyPanel = p);
         }
@@ -703,87 +795,123 @@ class PlayerShellState extends State<PlayerShell>
       velocity: _dock.velocity, // interruptible, no dead stop
     );
 
-    if (p == _Panel.lyrics) {
-      _activePointers = 0;
-      _bumpIdle(force: true);
-    } else {
-      _idleTimer?.cancel();
-      _activePointers = 0;
-      _chromeHidden = false;
-      _lyricsImmersive.value = false;
-      if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
-    }
+    _scrollAcc = 0;
+    _userScrolling = false;
+    _activePointers = 0;
+    _idleTimer?.cancel();
+    _showChrome(); // every panel switch starts with the controls visible
+    if (p == _Panel.lyrics) _scheduleIdle();
   }
 
   void _togglePanel(_Panel p) => _setPanel(_panel == p ? _Panel.art : p);
 
-  /* ───────────── lyrics scroll hides or shows the controls ───────────── */
+  /* ───────────── controls show / hide: ONE intent model ─────────────
+   *
+   * 1. A finger touching / moving NEVER shows the controls. Only a real tap
+   *    (no movement) while they are hidden reveals them.
+   * 2. Scroll direction decides (lyrics AND queue): down = hide, up = show.
+   * 3. The 3s idle timer is lyrics-only, and only runs while no finger is
+   *    down and no user scroll / fling is in progress. A touch or scroll
+   *    cancels it, lifting the finger restarts it.
+   * 4. Lyrics auto-scroll (no dragDetails) is ignored entirely.
+   */
 
-  void _setChromeHidden(bool hide) {
-    if (_panel != _Panel.lyrics || _chromeHidden == hide) {
-      return;
-    }
-    _chromeHidden = hide;
-    _lyricsImmersive.value = hide;
-    _chrome.springTo(
-      hide ? 1 : 0,
-      spring: hide ? kSoftSpring : kSnappySpring,
-      velocity: _chrome.velocity,
-    );
+  bool get _chromeCapable => _panel == _Panel.lyrics || _panel == _Panel.queue;
+
+  void _showChrome() {
+    if (!_chromeHidden && _chrome.value <= 0.01) return;
+    _chromeHidden = false;
+    _lyricsImmersive.value = false;
+    _chrome.springTo(0, spring: kSnappySpring, velocity: _chrome.velocity);
   }
 
-  void _bumpIdle({bool force = false}) {
-    if (_panel != _Panel.lyrics) return;
-    if (_chromeHidden || _chrome.value > 0.01) {
-      _chromeHidden = false;
-      _lyricsImmersive.value = false;
-      if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
-    } else if (!force) {
-      final last = _lastBump;
-      if (last != null &&
-          DateTime.now().difference(last) < const Duration(milliseconds: 200)) {
-        return;
-      }
+  void _setChromeHidden(bool hide) {
+    if (!_chromeCapable) return;
+    if (!hide) {
+      _showChrome();
+      return;
     }
-    _lastBump = DateTime.now();
+    if (_chromeHidden) return;
+    _chromeHidden = true;
     _idleTimer?.cancel();
+    _lyricsImmersive.value = _panel == _Panel.lyrics;
+    _chrome.springTo(1, spring: kSoftSpring, velocity: _chrome.velocity);
+  }
+
+  /// (Re)starts the 3s idle countdown. Lyrics only, and only while shown.
+  void _scheduleIdle() {
+    _idleTimer?.cancel();
+    if (_panel != _Panel.lyrics || _chromeHidden) return;
     _idleTimer = Timer(_kIdleHide, _hideChrome);
   }
 
   void _hideChrome() {
-    if (!mounted || _panel != _Panel.lyrics) return;
-    if (_dragging || _activePointers > 0) {
+    if (!mounted || _panel != _Panel.lyrics || _chromeHidden) return;
+    if (_dragging || _activePointers > 0 || _userScrolling) {
       _idleTimer = Timer(const Duration(seconds: 1), _hideChrome);
       return;
     }
     _setChromeHidden(true);
   }
 
-  void _pointerReleased() {
-    _activePointers = math.max(0, _activePointers - 1);
-    if (_activePointers == 0) {
-      _bumpIdle(force: true);
+  void _onPointerDown(PointerDownEvent e) {
+    _activePointers++;
+    if (_activePointers == 1) {
+      _downPos = e.position;
+      _pointerMoved = false;
+    } else {
+      _pointerMoved = true; // multi-touch is never a tap
+    }
+    _idleTimer?.cancel(); // touching = intent to interact, never hide now
+  }
+
+  void _onPointerMove(PointerMoveEvent e) {
+    final p = _downPos;
+    if (!_pointerMoved && p != null && (e.position - p).distance > _kTapSlop) {
+      _pointerMoved = true;
     }
   }
 
-  bool _onLyricsScroll(ScrollNotification n) {
-    if (n.metrics.axis != Axis.vertical) return false;
-    if (n is ScrollStartNotification &&
-        n.dragDetails != null &&
-        _activePointers > 0) {
-      _bumpIdle();
+  void _onPointerEnd(PointerEvent e, {required bool up}) {
+    final wasTap =
+        up && !_pointerMoved && _activePointers == 1 && !_userScrolling;
+    _activePointers = math.max(0, _activePointers - 1);
+    if (wasTap && _chromeHidden) _showChrome(); // tap reveals
+    if (_activePointers == 0) {
+      _downPos = null;
+      _scheduleIdle(); // finger gone: start counting (no-op if hidden / queue)
     }
-    if (n is ScrollUpdateNotification && n.dragDetails != null) {
+  }
+
+  /// Shared by lyrics and queue.
+  bool _onPanelScroll(ScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical || _reordering || _dragging) {
+      return false;
+    }
+    if (n is ScrollStartNotification) {
+      _userScrolling = true;
+      _scrollAcc = 0;
+      _idleTimer?.cancel();
+    } else if (n is ScrollUpdateNotification) {
+      _userScrolling = true;
       final dy = n.scrollDelta ?? 0;
-      if (dy == 0) return false;
-      if (_scrollAcc.sign != dy.sign) _scrollAcc = 0;
-      _scrollAcc += dy;
-      if (_scrollAcc > 18) {
-        _setChromeHidden(true);
-      } else if (_scrollAcc < -18) {
-        _setChromeHidden(false);
-        _bumpIdle();
+      if (dy != 0) {
+        if (_scrollAcc.sign != dy.sign) _scrollAcc = 0;
+        _scrollAcc += dy;
+        // User scrolling down (content moving up): hide bottom controls
+        if (_scrollAcc > 12 && n.metrics.pixels > 5) {
+          _setChromeHidden(true);
+        } else if (_scrollAcc < -10) {
+          // User scrolling up (content moving down): reveal bottom controls
+          _setChromeHidden(false);
+        }
       }
+    } else if (n is ScrollEndNotification) {
+      _userScrolling = false;
+      _scrollAcc = 0;
+      _scheduleIdle();
+    } else if (n is OverscrollNotification && n.overscroll < 0) {
+      _setChromeHidden(false);
     }
     return false;
   }
@@ -995,8 +1123,9 @@ class PlayerShellState extends State<PlayerShell>
           final t = _sheet.value.clamp(0.0, 1.0);
           if (t <= 0.001) return const SizedBox.shrink();
           return ColoredBox(
+            // ease-in: no early dark ramp
             color: Colors.black.withValues(
-              alpha: _kScrimMax * Curves.easeOut.transform(t),
+              alpha: _kScrimMax * Curves.easeIn.transform(t),
             ),
           );
         },
@@ -1300,7 +1429,7 @@ class PlayerShellState extends State<PlayerShell>
     );
 
     // Static halo layers: only their OPACITY changes per frame, never their
-    // geometry, so the blur is rasterised once instead of every frame.
+    // geometry. They are only shown while the cover is at rest (see haloO).
     final glowColor =
         _bleedArt?.average ??
         (_palette.isNotEmpty ? _palette.first : const Color(0xFFB4123A));
@@ -1343,8 +1472,6 @@ class PlayerShellState extends State<PlayerShell>
         child: cover,
         builder: (context, child) {
           final t = _sheet.value.clamp(0.0, 1.0);
-          if (!_open && t <= 0.001) return const SizedBox.shrink();
-
           final d = _dock.value.clamp(0.0, 1.0).toDouble();
 
           // ONE card, ONE path: mini -> (big | bleed | header).
@@ -1374,75 +1501,97 @@ class PlayerShellState extends State<PlayerShell>
             ..setTranslationRaw(cx + dx - w / 2, cy - w / 2, 0);
           final r = radius / scale; // keep visual radius constant
 
-          final haloO = isFullBleed
-              ? ((1.0 - d) * t).clamp(0.0, 1.0)
-              : ((lerpDouble(0.28, 0.45, t)! * (1 - 0.5 * d)) / 0.45).clamp(
-                  0.0,
-                  1.0,
-                );
+          // Big blurs inside a scaling Transform are re-rasterised every frame.
+          // So the halo only exists when the cover is (almost) at rest:
+          // it fades in over the last 10% of the open and out in the first
+          // 12% of the dock glide. During the flight it costs nothing.
+          // While paused the cover shrinks, so the (unscaled) halo fades out
+          // with it instead of showing around a smaller cover.
+          final pauseHalo = isFullBleed
+              ? 1.0
+              : _smooth((pauseValue - _kPaused) / (1 - _kPaused));
+          final haloO =
+              (_smooth((t - 0.9) / 0.1) * (1 - _smooth(d / 0.12)) * pauseHalo)
+                  .clamp(0.0, 1.0)
+                  .toDouble();
 
           final skipClip = isFullBleed && d < 0.05 && t > 0.9;
+          final hidden = !_open && t <= 0.001;
 
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: 0,
-                top: 0,
-                width: side,
-                height: side,
-                child: Transform(
-                  transform: m,
-                  child: IgnorePointer(
-                    ignoring: t < 0.95,
-                    child: Semantics(
-                      button: true,
-                      label: _docked ? 'Show album art' : 'Show lyrics',
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTapDown: (_) {
-                          if (!isFullBleed) {
-                            _press.springTo(0.94, spring: _kPressSpring);
-                          }
-                        },
-                        onTapUp: (_) =>
-                            _press.springTo(1, spring: _kReleaseSpring),
-                        onTapCancel: () =>
-                            _press.springTo(1, spring: _kReleaseSpring),
-                        onTap: () =>
-                            _setPanel(_docked ? _Panel.art : _Panel.lyrics),
-                        onPanStart: _docked ? null : _artStart,
-                        onPanUpdate: _docked ? null : _artUpdate,
-                        onPanEnd: _docked ? null : _artEnd,
-                        onPanCancel: _docked
-                            ? null
-                            : () => _artEnd(DragEndDetails()),
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            if (haloO > 0.01)
-                              Positioned.fill(
-                                child: IgnorePointer(
-                                  child: Opacity(
-                                    opacity: haloO,
-                                    child: isFullBleed ? glow : shadow,
-                                  ),
-                                ),
-                              ),
-                            skipClip
-                                ? child!
-                                : ClipRRect(
-                                    borderRadius: BorderRadius.circular(r),
-                                    child: child,
-                                  ),
-                          ],
+          // CONSTANT tree shape: nothing here is added / removed / swapped
+          // while moving (keys + always-present halo and clip), and the whole
+          // overlay stays mounted (Offstage) when closed, so the cover, its
+          // image and BleedArtworkImage are never rebuilt at open / close.
+          return Offstage(
+            offstage: hidden,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Halo lives OUTSIDE the scaling Transform: fixed size, fixed
+                // blur, only translated + faded. Nothing is re-rasterised.
+                Positioned(
+                  key: const ValueKey('halo'),
+                  left: targetBig.left,
+                  top: targetBig.top,
+                  width: side,
+                  height: side,
+                  child: Transform.translate(
+                    offset: Offset(
+                      cx + dx - targetBig.center.dx,
+                      cy - targetBig.center.dy,
+                    ),
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: haloO,
+                        child: isFullBleed ? glow : shadow,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  key: const ValueKey('cover'),
+                  left: 0,
+                  top: 0,
+                  width: side,
+                  height: side,
+                  child: Transform(
+                    transform: m,
+                    child: IgnorePointer(
+                      ignoring: t < 0.95,
+                      child: Semantics(
+                        button: true,
+                        label: _docked ? 'Show album art' : 'Show lyrics',
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapDown: (_) {
+                            if (!isFullBleed) {
+                              _press.springTo(0.94, spring: _kPressSpring);
+                            }
+                          },
+                          onTapUp: (_) =>
+                              _press.springTo(1, spring: _kReleaseSpring),
+                          onTapCancel: () =>
+                              _press.springTo(1, spring: _kReleaseSpring),
+                          onTap: () =>
+                              _setPanel(_docked ? _Panel.art : _Panel.lyrics),
+                          onPanStart: _docked ? null : _artStart,
+                          onPanUpdate: _docked ? null : _artUpdate,
+                          onPanEnd: _docked ? null : _artEnd,
+                          onPanCancel: _docked
+                              ? null
+                              : () => _artEnd(DragEndDetails()),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(r),
+                            clipBehavior: skipClip ? Clip.none : Clip.antiAlias,
+                            child: child,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -1458,7 +1607,7 @@ class PlayerShellState extends State<PlayerShell>
     EdgeInsets safe,
     bool isFullBleed,
   ) {
-    // Built ONCE per setState; the builder below reuses these instances.
+    // Built ONCE per setState; the builders below reuse these instances.
     final backdrop = IgnorePointer(
       child: RepaintBoundary(
         child: Stack(
@@ -1474,8 +1623,12 @@ class PlayerShellState extends State<PlayerShell>
               isPlaying: _playing,
               positionNotifier: player.positionNotifier,
               duration: player.duration,
-              // drift freezes while the sheet moves: all GPU goes to the motion
-              paused: () => _dragging || _sheet.isAnimating,
+              // drift freezes while anything moves: all GPU goes to the motion
+              paused: () =>
+                  _dragging ||
+                  _sheet.isAnimating ||
+                  _dock.isAnimating ||
+                  _chrome.isAnimating,
             ),
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
@@ -1492,6 +1645,36 @@ class PlayerShellState extends State<PlayerShell>
       child: _sheetColumn(player, track, safe, size, isFullBleed),
     );
 
+    // IMPORTANT: the widget tree below has a CONSTANT shape. Opacity and
+    // ClipRRect are always present (alpha 1.0 / Clip.none cost nothing).
+    // Swapping `child` <-> `Opacity(child)` or `ClipRRect(child)` while the
+    // sheet moves re-mounts the WHOLE sheet (backdrop, controls, lyrics) at
+    // the swap point: that was the hitch at the start of a swipe-down and at
+    // the end of an open.
+    //
+    // Only the backdrop fades (one cheap layer). Controls fade through their
+    // own staggered `_rise`, header / body through `_dockFade(withSheet)`, so
+    // there is no full-screen group-opacity over the whole sheet any more.
+    final backdropLayer = AnimatedBuilder(
+      animation: _sheet,
+      child: backdrop,
+      builder: (_, c) {
+        final t = _sheet.value.clamp(0.0, 1.0).toDouble();
+        final alpha = _sheetAlpha(t);
+        if (alpha <= 0.001) return const SizedBox.shrink();
+        if (alpha >= 0.999) return c!;
+        return Opacity(
+          opacity: alpha,
+          child: c,
+        );
+      },
+    );
+
+    final sheetBody = Stack(
+      fit: StackFit.expand,
+      children: [backdropLayer, column],
+    );
+
     return Positioned.fill(
       child: AnimatedBuilder(
         animation: _sheet,
@@ -1500,44 +1683,8 @@ class PlayerShellState extends State<PlayerShell>
           final visible = _open || t > 0.001;
           if (!visible && !_warm) return const SizedBox.shrink();
 
-          final y = (1 - t) * _travel; // starts 30% from bottom, 1:1 with the finger
-
-          // Sheet opacity starts at 0 at the bottom (t = 0) and gradually increases,
-          // reaching 1.0 (full opacity) when it reaches 80-85% (0.82) of screen height.
-          final sheetOpacity = Curves.easeOutCubic.transform(
-            (t / _kSheetFadeSpan).clamp(0.0, 1.0),
-          );
-
-          // corners stay round throughout travel, then straighten at the very top
-          final corner = _kSheetRadius * (1 - _smooth((t - 0.88) / 0.12));
-
-          final bool needsClip = corner > 0.5;
-          final sheetBody = Stack(
-            fit: StackFit.expand,
-            children: [
-              backdrop,
-              column,
-            ],
-          );
-
-          Widget content;
-          if (needsClip) {
-            content = ClipRRect(
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(corner),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: sheetBody,
-            );
-          } else {
-            content = sheetBody;
-          }
-
-          if (sheetOpacity <= 0.001) {
-            content = const SizedBox.shrink();
-          } else if (sheetOpacity < 0.999) {
-            content = Opacity(opacity: sheetOpacity, child: content);
-          }
+          final y =
+              (1 - t) * _travel; // starts 30% from bottom, 1:1 with the finger
 
           return TickerMode(
             enabled: visible,
@@ -1550,7 +1697,7 @@ class PlayerShellState extends State<PlayerShell>
                   onTap: () {}, // absorb taps: no click-through
                   child: Transform.translate(
                     offset: Offset(0, y),
-                    child: content,
+                    child: sheetBody,
                   ),
                 ),
               ),
@@ -1596,7 +1743,7 @@ class PlayerShellState extends State<PlayerShell>
           return true;
         }
         if (n is ScrollEndNotification && _dragging) {
-          _dragEnd(0);
+          _dragEnd(n.dragDetails?.velocity.pixelsPerSecond.dy ?? 0);
         }
         return false;
       },
@@ -1605,7 +1752,7 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   /// Lyrics fade completely out right above the seekbar, so nothing shows
-  /// through behind the controls. When the controls idle-hide, the fade opens
+  /// through behind the controls. When the controls hide, the fade opens
   /// up to the bottom edge again (lyrics themselves never move).
   Widget _lyricsFade(Widget child) {
     return AnimatedBuilder(
@@ -1614,7 +1761,7 @@ class PlayerShellState extends State<PlayerShell>
       builder: (_, c) {
         final h = _chrome.value.clamp(0.0, 1.0).toDouble();
         final end = lerpDouble(_lyricsFadeEnd, 1.0, h)!;
-        final start = lerpDouble(_lyricsFadeEnd - 0.08, 0.93, h)!;
+        final start = lerpDouble(_lyricsFadeEnd - 0.12, 0.93, h)!;
         return ShaderMask(
           blendMode: BlendMode.dstIn,
           shaderCallback: (r) => LinearGradient(
@@ -1645,7 +1792,7 @@ class PlayerShellState extends State<PlayerShell>
           child: KeyedSubtree(
             key: ValueKey('lyrics-$_trackKey'),
             child: NotificationListener<ScrollNotification>(
-              onNotification: _onLyricsScroll,
+              onNotification: _onPanelScroll,
               child: _dismissOnOverscroll(
                 Padding(
                   padding: const EdgeInsets.fromLTRB(0, 2, 0, 0),
@@ -1669,13 +1816,16 @@ class PlayerShellState extends State<PlayerShell>
           key: const ValueKey('queue-body'),
           child: KeyedSubtree(
             key: const ValueKey('queue'),
-            child: _dismissOnOverscroll(
-              _edgeFade(
-                QueuePanel(
-                  onJumpTo: _jumpTo,
-                  onPlayHistory: _playHistory,
-                  onGoToArtist: widget.onGoToArtist,
-                  onReorderingChanged: (v) => _reordering = v,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _onPanelScroll,
+              child: _dismissOnOverscroll(
+                _edgeFade(
+                  QueuePanel(
+                    onJumpTo: _jumpTo,
+                    onPlayHistory: _playHistory,
+                    onGoToArtist: widget.onGoToArtist,
+                    onReorderingChanged: (v) => _reordering = v,
+                  ),
                 ),
               ),
             ),
@@ -1686,13 +1836,24 @@ class PlayerShellState extends State<PlayerShell>
 
   /// Fades [child] with the `_dock` spring. Opacity only: no layout happens
   /// during the glide, so the lyrics / queue never get resized mid-motion.
-  Widget _dockFade({bool inverse = false, required Widget child}) {
+  /// [from] delays the fade-in until the glide has reached that progress.
+  Widget _dockFade({
+    bool inverse = false,
+    double from = 0.0,
+    bool withSheet = false, // also multiply by the sheet's own fade-in
+    required Widget child,
+  }) {
     return AnimatedBuilder(
-      animation: _dock,
+      animation: withSheet ? Listenable.merge([_dock, _sheet]) : _dock,
       child: child,
       builder: (_, c) {
         final d = _dock.value.clamp(0.0, 1.0).toDouble();
-        final f = inverse ? 1 - d : d;
+        var f = inverse ? 1 - d : ((d - from) / (1 - from)).clamp(0.0, 1.0);
+        if (withSheet) {
+          f *= _sheetAlpha(_sheet.value.clamp(0.0, 1.0).toDouble());
+        }
+        if (f <= 0.001) return const SizedBox.shrink();
+        if (f >= 0.999) return c!;
         return IgnorePointer(
           ignoring: f < 0.6,
           child: Opacity(opacity: f, child: c),
@@ -1702,21 +1863,39 @@ class PlayerShellState extends State<PlayerShell>
   }
 
   /// Glides the bottom controls away (and back) with the `_chrome` spring.
-  /// Only opacity and a small downward offset change: layout never moves.
   Widget _chromeCollapse({required Widget child}) {
     return AnimatedBuilder(
       animation: _chrome,
       child: child,
       builder: (_, c) {
         final h = _chrome.value.clamp(0.0, 1.0).toDouble();
+        if (h >= 0.999) return const SizedBox.shrink();
+        if (h <= 0.001) return c!;
         return IgnorePointer(
           ignoring: h > 0.35,
           child: RepaintBoundary(
             child: Opacity(
-              opacity: (1 - h * 1.15).clamp(0.0, 1.0),
-              child: Transform.translate(offset: Offset(0, h * 26), child: c),
+              opacity: (1 - h).clamp(0.0, 1.0),
+              child: Transform.translate(offset: Offset(0, h * 240), child: c),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  /// Fades a (small) widget with the sheet's own fade-in. Constant tree shape.
+  Widget _sheetFade({required Widget child}) {
+    return AnimatedBuilder(
+      animation: _sheet,
+      child: child,
+      builder: (_, c) {
+        final a = _sheetAlpha(_sheet.value.clamp(0.0, 1.0).toDouble());
+        if (a <= 0.001) return const SizedBox.shrink();
+        if (a >= 0.999) return c!;
+        return Opacity(
+          opacity: a,
+          child: c,
         );
       },
     );
@@ -1828,11 +2007,20 @@ class PlayerShellState extends State<PlayerShell>
         .toDouble();
 
     final middleRegion = Expanded(
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: isQueueBody ? 4 : 0,
-          bottom: isQueueBody ? queueReserve : 0,
-        ),
+      child: AnimatedBuilder(
+        animation: _chrome,
+        builder: (_, child) {
+          final h = _chrome.value.clamp(0.0, 1.0).toDouble();
+          return Padding(
+            padding: EdgeInsets.only(
+              top: isQueueBody ? 4 : 0,
+              // controls shown: the list stops above them. Controls hidden:
+              // the list grows to the bottom edge. Never content under them.
+              bottom: isQueueBody ? lerpDouble(queueReserve, 0, h)! : 0,
+            ),
+            child: child,
+          );
+        },
         child: SizedBox.expand(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -1846,6 +2034,9 @@ class PlayerShellState extends State<PlayerShell>
             onVerticalDragCancel: isQueueBody ? null : () => _dragEnd(0),
             child: RepaintBoundary(
               child: _dockFade(
+                from:
+                    0.45, // body appears after it is mounted: glide stays clean
+                withSheet: true,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
                   transitionBuilder: (c, a) =>
@@ -1861,24 +2052,26 @@ class PlayerShellState extends State<PlayerShell>
       ),
     );
 
-    final grabber = Semantics(
-      button: true,
-      label: 'Close player',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _close,
-        onPanStart: (_) => _dragStart(),
-        onPanUpdate: (d) => _dragUpdate(d.delta.dy),
-        onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
-        child: Padding(
-          padding: EdgeInsets.only(top: safe.top + 12, bottom: 12),
-          child: Center(
-            child: Container(
-              width: 36,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(3),
+    final grabber = _sheetFade(
+      child: Semantics(
+        button: true,
+        label: 'Close player',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _close,
+          onPanStart: (_) => _dragStart(),
+          onPanUpdate: (d) => _dragUpdate(d.delta.dy),
+          onPanEnd: (d) => _dragEnd(d.velocity.pixelsPerSecond.dy),
+          child: Padding(
+            padding: EdgeInsets.only(top: safe.top + 12, bottom: 12),
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(3),
+                ),
               ),
             ),
           ),
@@ -1887,7 +2080,10 @@ class PlayerShellState extends State<PlayerShell>
     );
 
     // Fixed height, fades with the dock: the lyrics region below never moves.
-    final compactHeader = _dockFade(child: _compactHeader(track));
+    final compactHeader = _dockFade(
+      withSheet: true,
+      child: _compactHeader(track),
+    );
 
     // Title row: fixed spot above the seekbar, fades out when the cover docks
     final meta = Positioned(
@@ -2046,13 +2242,10 @@ class PlayerShellState extends State<PlayerShell>
 
     return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) {
-        _activePointers++;
-        _bumpIdle(force: true);
-      },
-      onPointerMove: (_) => _bumpIdle(),
-      onPointerUp: (_) => _pointerReleased(),
-      onPointerCancel: (_) => _pointerReleased(),
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerUp: (e) => _onPointerEnd(e, up: true),
+      onPointerCancel: (e) => _onPointerEnd(e, up: false),
       child: content,
     );
   }
@@ -2119,7 +2312,9 @@ class PlayerShellState extends State<PlayerShell>
             ListenableBuilder(
               listenable: LibraryStore.instance,
               builder: (context, _) => PopLikeButton(
-                liked: LibraryStore.instance.isLikedId(track?.id?.toString() ?? _trackKey),
+                liked: LibraryStore.instance.isLikedId(
+                  track?.id?.toString() ?? _trackKey,
+                ),
                 onToggle: () => _toggleLike(track),
               ),
             ),
@@ -2187,7 +2382,9 @@ class PlayerShellState extends State<PlayerShell>
           ListenableBuilder(
             listenable: LibraryStore.instance,
             builder: (context, _) => PopLikeButton(
-              liked: LibraryStore.instance.isLikedId(track?.id?.toString() ?? _trackKey),
+              liked: LibraryStore.instance.isLikedId(
+                track?.id?.toString() ?? _trackKey,
+              ),
               onToggle: () => _toggleLike(track),
             ),
           ),
