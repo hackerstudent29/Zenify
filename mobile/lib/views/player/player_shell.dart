@@ -77,18 +77,18 @@ const SpringDescription _kDockSpring = SpringDescription(
   damping: 46,
 );
 
-/// Sheet close spring. Stiff + critically damped so closing feels instant.
+/// Sheet close spring. Lively, liquid, swift settling with no stuckness.
 const SpringDescription _kCloseSpring = SpringDescription(
-  mass: 1,
-  stiffness: 560,
-  damping: 47,
+  mass: 1.0,
+  stiffness: 340,
+  damping: 28,
 );
 
 /// Sheet open spring. Slightly softer than close, tiny settle, like iOS.
 const SpringDescription _kOpenSpring = SpringDescription(
-  mass: 1,
-  stiffness: 470,
-  damping: 40,
+  mass: 1.0,
+  stiffness: 320,
+  damping: 28,
 );
 
 /// Button press: fast, no overshoot. Release: lively bounce back.
@@ -109,11 +109,12 @@ const double _kMiniFadeSpan = 0.14;
 /// Page dim behind the sheet (0..1 black) when fully open.
 const double _kScrimMax = 0.6;
 
-/// Where the sheet starts (fraction of screen height). Apple Music: mid-screen.
-const double _kSheetStartY = 0.56;
+/// Where the sheet starts (fraction of screen height from top).
+/// 0.70 means the sheet starts from 30% height of the screen from bottom.
+const double _kSheetStartY = 0.70;
 
 /// Sheet backdrop is fully visible once the sheet is this far open.
-const double _kSheetFadeSpan = 0.45;
+const double _kSheetFadeSpan = 0.35;
 
 /// Top corner radius while the sheet travels (eases to 0 at the very top).
 const double _kSheetRadius = 28;
@@ -126,9 +127,9 @@ double _smooth(double x) {
 /// Tap open/close have no finger momentum, so they use softer springs and
 /// the cover flight stays visible. Drag releases keep the stiff ones.
 const SpringDescription _kOpenTapSpring =
-    SpringDescription(mass: 1, stiffness: 210, damping: 25);
+    SpringDescription(mass: 1.0, stiffness: 300, damping: 27);
 const SpringDescription _kCloseTapSpring =
-    SpringDescription(mass: 1, stiffness: 260, damping: 29);
+    SpringDescription(mass: 1.0, stiffness: 320, damping: 28);
 
 /// Vertical gap used TWICE in the open sheet, so the rhythm is even:
 ///  • between the seekbar and the play / pause row
@@ -605,6 +606,7 @@ class PlayerShellState extends State<PlayerShell>
     _chromeHidden = false;
     _lyricsImmersive.value = false;
     if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
+    if (_dock.value != 0) _dock.springTo(0, spring: _kCloseSpring);
 
     final v = velocity != 0 ? velocity : _sheet.velocity;
     _sheet
@@ -1498,14 +1500,42 @@ class PlayerShellState extends State<PlayerShell>
           final visible = _open || t > 0.001;
           if (!visible && !_warm) return const SizedBox.shrink();
 
-          final y = (1 - t) * _travel; // starts mid-screen, 1:1 with the finger
+          final y = (1 - t) * _travel; // starts 30% from bottom, 1:1 with the finger
           final fade = Curves.easeOut.transform(
             (t / _kSheetFadeSpan).clamp(0.0, 1.0),
           );
-          // corners stay round all the way up, then straighten at the very top
-          final corner = _kSheetRadius * (1 - _smooth((t - 0.86) / 0.14));
+          // corners stay round throughout travel, then straighten at the very top
+          final corner = _kSheetRadius * (1 - _smooth((t - 0.88) / 0.12));
           final contentOpacity = Curves.easeOut.transform(
-            ((t - 0.5) / 0.5).clamp(0.0, 1.0),
+            ((t - 0.45) / 0.55).clamp(0.0, 1.0),
+          );
+
+          // Zero-allocation layer rendering: avoid expensive offscreen textures when opaque/hidden
+          Widget contentLayer;
+          if (contentOpacity <= 0.001) {
+            contentLayer = const SizedBox.shrink();
+          } else if (contentOpacity >= 0.999) {
+            contentLayer = column;
+          } else {
+            contentLayer = Opacity(opacity: contentOpacity, child: column);
+          }
+
+          Widget backdropLayer;
+          if (fade <= 0.001) {
+            backdropLayer = const SizedBox.shrink();
+          } else if (fade >= 0.999) {
+            backdropLayer = backdrop;
+          } else {
+            backdropLayer = Opacity(opacity: fade, child: backdrop);
+          }
+
+          final bool needsClip = corner > 0.5;
+          final sheetBody = Stack(
+            fit: StackFit.expand,
+            children: [
+              backdropLayer,
+              contentLayer,
+            ],
           );
 
           return TickerMode(
@@ -1519,19 +1549,15 @@ class PlayerShellState extends State<PlayerShell>
                   onTap: () {}, // absorb taps: no click-through
                   child: Transform.translate(
                     offset: Offset(0, y),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(corner),
-                      ),
-                      clipBehavior: corner > 0.1 ? Clip.antiAlias : Clip.none,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Opacity(opacity: fade, child: backdrop),
-                          Opacity(opacity: contentOpacity, child: column),
-                        ],
-                      ),
-                    ),
+                    child: needsClip
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(corner),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: sheetBody,
+                          )
+                        : sheetBody,
                   ),
                 ),
               ),

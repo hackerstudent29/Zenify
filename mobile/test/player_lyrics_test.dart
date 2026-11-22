@@ -208,5 +208,64 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 16));
   });
+
+  testWidgets(
+      'Lyrics typography enforces strict uniform font size: 28.0 for normal lines and 21.0 for bracketed backing lines',
+      (tester) async {
+    final pos = ValueNotifier<Duration>(const Duration(seconds: 2));
+
+    final lines = [
+      const LyricLine(
+        start: Duration(seconds: 0),
+        end: Duration(seconds: 5),
+        text: 'Short line',
+      ),
+      const LyricLine(
+        start: Duration(seconds: 6),
+        end: Duration(seconds: 12),
+        text: 'This is a very long line with many words that would have previously shrunk down',
+      ),
+      const LyricLine(
+        start: Duration(seconds: 13),
+        end: Duration(seconds: 20),
+        text: '(backing vocal line)',
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: LyricsView(
+            lines: lines,
+            position: pos,
+            isPlaying: true,
+            isSynced: true,
+            onSeek: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    // Verify normal short line word font size is exactly 28.0
+    final shortWordText = tester.widget<Text>(find.text('Short').first);
+    expect(shortWordText.style?.fontSize, equals(kNormalLyricFontSize));
+    expect(kNormalLyricFontSize, equals(28.0));
+
+    // Verify long line word font size stays strictly 28.0 (no shrinking loop)
+    final longWordText = tester.widget<Text>(find.text('previously').first);
+    expect(longWordText.style?.fontSize, equals(kNormalLyricFontSize));
+
+    // Verify bracketed backing line word font size is strictly 21.0
+    final backingWordText = tester.widget<Text>(find.text('(backing').first);
+    expect(backingWordText.style?.fontSize, equals(kBracketedLyricFontSize));
+    expect(kBracketedLyricFontSize, equals(21.0));
+
+    pos.dispose();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 16));
+  });
 }
 

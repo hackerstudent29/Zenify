@@ -56,6 +56,11 @@ const double _kAnchor = 0.15;
 const double _kWordGap = 0.27; // space between words, x font size
 const double _kLineHeight = 1.2;
 
+/// Fixed uniform typography sizes:
+/// Exactly ONE size for normal lyrics, and exactly ONE size for () bracketed backing lyrics.
+const double kNormalLyricFontSize = 28.0;
+const double kBracketedLyricFontSize = 21.0;
+
 /// Very light weight boost for lyrics (variable-font wght axis, 700 = Bold).
 /// Only a hair above Bold so glyphs never touch / overlap. If SF Pro is
 /// registered as a static font this value is ignored (no change in weight).
@@ -2031,30 +2036,9 @@ class _WordLineState extends State<_WordLine>
     final tokens = widget.text.split(' ').where((t) => t.isNotEmpty).toList();
     final n = tokens.length;
 
-    // Normal lyrics use the full size; bracketed lines are smaller.
-    final primary = (maxW * 0.09).clamp(26.0, 36.0).toDouble();
-    var fs = widget.backing ? (primary * 0.8).roundToDouble() : primary;
-
-    // Very long single lyric: shrink a little so it does not run down the
-    // screen over many rows.
-    if (n > 5 && maxW.isFinite && maxW > 0) {
-      final minFs = fs * 0.72;
-      for (var k = 0; k < 4; k++) {
-        final tp = TextPainter(
-          text: TextSpan(
-            text: tokens.join(' '),
-            style: _style(fs, Colors.white, null),
-          ),
-          textDirection: _isRtl(widget.text)
-              ? TextDirection.rtl
-              : TextDirection.ltr,
-        )..layout(maxWidth: maxW);
-        final rows = tp.computeLineMetrics().length;
-        tp.dispose();
-        if (rows <= 2 || fs <= minFs) break;
-        fs = math.max(minFs, fs * 0.92);
-      }
-    }
+    // Strict uniform sizing: exactly ONE size for normal lyrics,
+    // and exactly ONE size for () bracketed lyrics. Never vary sizes across lines.
+    final double fs = widget.backing ? kBracketedLyricFontSize : kNormalLyricFontSize;
 
     // ---- word timings: ALWAYS ordered first word -> last word ----
     final s = List<double>.filled(n, 0);

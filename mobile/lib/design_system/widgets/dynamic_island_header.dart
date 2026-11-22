@@ -724,7 +724,7 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 
   /// Single unified floating glass capsule matching:
   /// height: 52px; border-radius: 26px; padding: 0 4px;
-  /// Holding [ Back <    Title    Vertical ⋮ ]
+  /// Holding [ Back <    Title (centered)    Vertical ⋮ ]
   Widget _buildUnifiedCapsule(BuildContext context, bool canPop, bool isDock) {
     final h = widget.height;
     final notifier = IslandNotifier.instance;
@@ -736,15 +736,15 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
       child: Container(
         height: h,
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            // Left: back button or logo
-            _buildCapsuleLeft(context, canPop, isDock),
-
-            // Center: Page title / notification
-            Expanded(
+            // Center: Page title / notification (strictly centered on the capsule)
+            Positioned(
+              left: 50,
+              right: 50,
+              top: 0,
+              bottom: 0,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () {
@@ -789,8 +789,21 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
               ),
             ),
 
+            // Left: back button or logo
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Center(child: _buildCapsuleLeft(context, canPop, isDock)),
+            ),
+
             // Right: Three-dot button or profile avatar
-            _buildCapsuleRight(context),
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: Center(child: _buildCapsuleRight(context)),
+            ),
           ],
         ),
       ),
@@ -923,32 +936,22 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 
   Widget _titleContent() {
     final fg = LiquidGlassController.instance.c.foreground;
-    return Row(
-      key: const ValueKey('title'),
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Flexible(
-          child: widget.centerWidget ??
-              _HeaderMarquee(
-                resetKey: widget.title,
-                child: Text(
-                  widget.title,
-                  maxLines: 1,
-                  softWrap: false,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'SF Pro Display',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: fg,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ),
-        ),
-      ],
-    );
+    return widget.centerWidget ??
+        Text(
+          widget.title,
+          key: ValueKey('title-${widget.title}'),
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'SF Pro Display',
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: fg,
+            letterSpacing: -0.3,
+          ),
+        );
   }
 
   /// Discrete right circular button
@@ -1108,118 +1111,5 @@ class IslandTitleFade extends StatelessWidget {
             ),
           );
         },
-      );
-}
-
-/// Smooth right-to-left full loop ticker marquee every 5 seconds for long titles.
-/// Scrolls continuously in one single direction across a full loop (never backs up).
-class _HeaderMarquee extends StatefulWidget {
-  const _HeaderMarquee({required this.child, this.resetKey});
-
-  final Widget child;
-  final Object? resetKey;
-  static const Duration interval = Duration(seconds: 5);
-  static const double speed = 36.0; // px / second
-
-  @override
-  State<_HeaderMarquee> createState() => _HeaderMarqueeState();
-}
-
-class _HeaderMarqueeState extends State<_HeaderMarquee> {
-  final ScrollController _ctrl = ScrollController();
-  final GlobalKey _childKey = GlobalKey();
-  int _run = 0;
-  bool _needsScroll = false;
-  Timer? _waitTimer;
-
-  bool _alive(int id) => mounted && id == _run;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _start());
-  }
-
-  @override
-  void didUpdateWidget(covariant _HeaderMarquee old) {
-    super.didUpdateWidget(old);
-    if (old.resetKey != widget.resetKey) {
-      _waitTimer?.cancel();
-      if (_ctrl.hasClients) _ctrl.jumpTo(0);
-      _needsScroll = false;
-      _start();
-    }
-  }
-
-  @override
-  void dispose() {
-    _run++;
-    _waitTimer?.cancel();
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _sleep(Duration duration, int id) {
-    final completer = Completer<void>();
-    _waitTimer?.cancel();
-    _waitTimer = Timer(duration, () {
-      if (!completer.isCompleted) completer.complete();
-    });
-    return completer.future;
-  }
-
-  Future<void> _start() async {
-    final id = ++_run;
-    while (_alive(id)) {
-      await _sleep(_HeaderMarquee.interval, id);
-      if (!_alive(id) || !_ctrl.hasClients) continue;
-      try {
-        final renderBox = _childKey.currentContext?.findRenderObject() as RenderBox?;
-        final childWidth = renderBox?.size.width ?? 0;
-        final max = _ctrl.position.maxScrollExtent;
-        if (max < 2 || childWidth < 2) continue;
-
-        if (!_needsScroll) {
-          if (mounted) setState(() => _needsScroll = true);
-          await _sleep(const Duration(milliseconds: 100), id);
-          if (!_alive(id) || !_ctrl.hasClients) continue;
-        }
-
-        // Distance for one complete continuous seamless full loop
-        const double gap = 48.0;
-        final double loopDistance = childWidth + gap;
-
-        // Smooth right-to-left animation across the full distance
-        final duration = Duration(milliseconds: (loopDistance / _HeaderMarquee.speed * 1000).round());
-        await _ctrl.animateTo(
-          loopDistance,
-          duration: duration,
-          curve: Curves.linear,
-        );
-
-        if (!_alive(id) || !_ctrl.hasClients) return;
-        // Instant seamless snap to 0 (visually identical duplicate) - full loop completed!
-        _ctrl.jumpTo(0);
-      } catch (_) {
-        return;
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-        controller: _ctrl,
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            KeyedSubtree(key: _childKey, child: widget.child),
-            if (_needsScroll) ...[
-              const SizedBox(width: 48),
-              widget.child,
-            ],
-          ],
-        ),
       );
 }
