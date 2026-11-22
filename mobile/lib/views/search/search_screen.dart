@@ -679,7 +679,8 @@ class _SearchScreenState extends State<SearchScreen>
 
     // Instant local / catalog matches so answers populate live while typing (0ms)
     final localFallback = _dataService.getFallbackResult(q, _selectedFilter);
-    final hasLocalMatches = localFallback.songs.isNotEmpty ||
+    final hasLocalMatches =
+        localFallback.songs.isNotEmpty ||
         localFallback.albums.isNotEmpty ||
         localFallback.artists.isNotEmpty;
 
@@ -990,6 +991,12 @@ class _SearchScreenState extends State<SearchScreen>
       .toList();
 
   void _playCollection(SearchItem item, {bool shuffle = false}) {
+    final activeQ = _textCtrl.text.trim().isNotEmpty
+        ? _textCtrl.text.trim()
+        : _submittedQuery;
+    if (activeQ.isNotEmpty) {
+      _dataService.recordQueryAffinity(activeQ, item);
+    }
     List<Track> tracks = switch (item) {
       SearchAlbumItem a => _tracksForAlbum(a),
       SearchArtistItem a => _tracksForArtist(a.title),
@@ -1008,6 +1015,12 @@ class _SearchScreenState extends State<SearchScreen>
   void _handleItemTap(SearchItem item) {
     HapticFeedback.lightImpact();
     _rememberItem(item);
+    final activeQ = _textCtrl.text.trim().isNotEmpty
+        ? _textCtrl.text.trim()
+        : _submittedQuery;
+    if (activeQ.isNotEmpty) {
+      _dataService.recordQueryAffinity(activeQ, item);
+    }
     final hiRes = _hiResUrl(item);
 
     if (item is SearchSongItem) {
@@ -1701,6 +1714,12 @@ class _SearchScreenState extends State<SearchScreen>
                     onTap: () {
                       HapticFeedback.lightImpact();
                       _rememberItem(s);
+                      final activeQ = _textCtrl.text.trim().isNotEmpty
+                          ? _textCtrl.text.trim()
+                          : _submittedQuery;
+                      if (activeQ.isNotEmpty) {
+                        _dataService.recordQueryAffinity(activeQ, s);
+                      }
                       _playSong([track], 0);
                     },
                     onMore: () => _showMore(s),
@@ -2257,9 +2276,7 @@ class _SearchScreenState extends State<SearchScreen>
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.fromLTRB(32, 80, 32, 48),
-                child: Center(
-                  child: CupertinoActivityIndicator(radius: 13),
-                ),
+                child: Center(child: CupertinoActivityIndicator(radius: 13)),
               )
             else
               _buildEmptyResults()
@@ -2537,7 +2554,8 @@ class _SearchScreenState extends State<SearchScreen>
     // Popularity bonuses based on streams, views, followers, and official credentials
     double popBonus = 0.0;
     if (item is SearchArtistItem) {
-      final subs = item.subscriberCount ??
+      final subs =
+          item.subscriberCount ??
           QueryPreprocessor.parseCountString(item.subscriberText);
       if (subs > 0) {
         // Logarithmic scale: 20M+ followers -> +0.14, 1M+ -> +0.10, 100K+ -> +0.06
@@ -2564,8 +2582,10 @@ class _SearchScreenState extends State<SearchScreen>
       popBonus += rankBonus;
     } else if (item is SearchVideoItem) {
       if (item.views > 0) {
-        popBonus +=
-            (math.log(1.0 + item.views) / math.ln10 / 8.5).clamp(0.0, 0.08);
+        popBonus += (math.log(1.0 + item.views) / math.ln10 / 8.5).clamp(
+          0.0,
+          0.08,
+        );
       }
     }
 
@@ -2626,8 +2646,9 @@ class _SearchScreenState extends State<SearchScreen>
     // Strict layout mode top result priority:
     // When intent is exactArtist, ensure the top matching artist leads.
     if (mode == SearchLayoutMode.exactArtist) {
-      final bestArtist =
-          sorted.where((c) => c.item is SearchArtistItem).firstOrNull;
+      final bestArtist = sorted
+          .where((c) => c.item is SearchArtistItem)
+          .firstOrNull;
       if (bestArtist != null && bestArtist != sorted.first) {
         sorted.remove(bestArtist);
         sorted.insert(0, bestArtist);
@@ -2635,15 +2656,17 @@ class _SearchScreenState extends State<SearchScreen>
     } else if (mode == SearchLayoutMode.albumOrPlaylist) {
       final bestAlbumOrPl = sorted
           .where(
-              (c) => c.item is SearchAlbumItem || c.item is SearchPlaylistItem)
+            (c) => c.item is SearchAlbumItem || c.item is SearchPlaylistItem,
+          )
           .firstOrNull;
       if (bestAlbumOrPl != null && bestAlbumOrPl != sorted.first) {
         sorted.remove(bestAlbumOrPl);
         sorted.insert(0, bestAlbumOrPl);
       }
     } else if (mode == SearchLayoutMode.songTitle) {
-      final bestSong =
-          sorted.where((c) => c.item is SearchSongItem).firstOrNull;
+      final bestSong = sorted
+          .where((c) => c.item is SearchSongItem)
+          .firstOrNull;
       if (bestSong != null && bestSong != sorted.first) {
         sorted.remove(bestSong);
         sorted.insert(0, bestSong);

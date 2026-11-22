@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
@@ -27,6 +28,7 @@ class SearchDataService {
   final SearchTrie _trie = SearchTrie();
   final SearchRawProviderCache _rawProviderCache = SearchRawProviderCache();
   final SearchLruCache _lruCache = SearchLruCache();
+  final Map<String, List<String>> _queryAffinity = {};
 
   bool _initializedRecents = false;
 
@@ -47,6 +49,17 @@ class SearchDataService {
           final weight = math.max(1, 100 - (i * 4));
           _trie.insert(query, frequency: weight);
           ApiService.addRecentSearch(query);
+        }
+      }
+
+      final affStr = prefs.getString('zenify_search_query_affinities');
+      if (affStr != null) {
+        final rawMap = jsonDecode(affStr) as Map<String, dynamic>;
+        for (final entry in rawMap.entries) {
+          if (entry.value is List) {
+            _queryAffinity[entry.key] =
+                (entry.value as List).map((e) => e.toString()).toList();
+          }
         }
       }
     } catch (e) {
@@ -101,6 +114,50 @@ class SearchDataService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_recentPrefKey);
+    } catch (_) {}
+  }
+
+  /// Returns clicked entity keys (IDs and titles) associated with this query.
+  Set<String> getAffinityKeys(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const {};
+    final list = _queryAffinity[q];
+    if (list == null || list.isEmpty) return const {};
+    return list.toSet();
+  }
+
+  /// Records that when searching for [query], the user selected [item].
+  /// Stores item title and ID so subsequent searches for this keyword
+  /// prioritize this entity at the top of results.
+  Future<void> recordQueryAffinity(String query, SearchItem item) async {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return;
+    final keys = <String>{
+      if (item.id.isNotEmpty) item.id.toLowerCase(),
+      if (item.title.isNotEmpty) item.title.trim().toLowerCase(),
+      if (item.subtitle.isNotEmpty) item.subtitle.trim().toLowerCase(),
+    };
+    if (keys.isEmpty) return;
+
+    final list = _queryAffinity[q] ?? <String>[];
+    for (final k in keys) {
+      list.remove(k);
+      list.insert(0, k);
+    }
+    if (list.length > 20) list.removeRange(20, list.length);
+    _queryAffinity[q] = list;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final mapToSave = <String, List<String>>{};
+      final entries = _queryAffinity.entries.take(50);
+      for (final e in entries) {
+        mapToSave[e.key] = e.value;
+      }
+      await prefs.setString(
+        'zenify_search_query_affinities',
+        jsonEncode(mapToSave),
+      );
     } catch (_) {}
   }
 
@@ -486,6 +543,7 @@ class SearchDataService {
       items: candidateItems,
       intent: intent,
       countryCode: country,
+      affinityKeys: getAffinityKeys(q),
       preferredLanguages: userLanguages,
       favoriteArtists: favArtistNames,
       initialTopResult: topResult,
@@ -546,6 +604,7 @@ class SearchDataService {
         items: combinedItems,
         intent: currentResult.intent,
         countryCode: country,
+        affinityKeys: getAffinityKeys(currentResult.originalQuery),
         preferredLanguages: userLanguages,
         initialTopResult: currentResult.topResult,
         didYouMean: currentResult.correctedQuery,
@@ -891,6 +950,7 @@ class SearchDataService {
       items: tracks,
       intent: intent,
       countryCode: CountryService.instance.currentCode,
+      affinityKeys: getAffinityKeys(q),
     );
   }
 }

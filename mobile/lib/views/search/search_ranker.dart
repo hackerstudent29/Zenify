@@ -350,11 +350,37 @@ class SearchIntentDetector {
   };
 
   static final Set<String> _playlistVibeKeywords = {
-    'playlist', 'playlists', 'hits', 'best of', 'top 50', 'top 100',
-    'mix', 'mixes', 'beats', 'chill', 'workout', 'gym', 'party',
-    'lofi', 'radio', 'devotional', 'bhajan', 'meditation', 'sleep',
-    'road trip', 'driving', 'summer', 'winter', 'acoustic', 'unplugged',
-    '90s', '2000s', '2010s', '2020s', 'party songs', 'dance hits',
+    'playlist',
+    'playlists',
+    'hits',
+    'best of',
+    'top 50',
+    'top 100',
+    'mix',
+    'mixes',
+    'beats',
+    'chill',
+    'workout',
+    'gym',
+    'party',
+    'lofi',
+    'radio',
+    'devotional',
+    'bhajan',
+    'meditation',
+    'sleep',
+    'road trip',
+    'driving',
+    'summer',
+    'winter',
+    'acoustic',
+    'unplugged',
+    '90s',
+    '2000s',
+    '2010s',
+    '2020s',
+    'party songs',
+    'dance hits',
   };
 
   /// Fast preliminary intent detection from raw query tokens before dispatching network streams.
@@ -416,7 +442,8 @@ class SearchIntentDetector {
     for (final artist in artistCandidates) {
       final artistNorm = QueryPreprocessor.normalize(artist.name);
       final isExact = effectiveEntity == artistNorm;
-      final isPrefix = (artistNorm.startsWith(effectiveEntity) ||
+      final isPrefix =
+          (artistNorm.startsWith(effectiveEntity) ||
               effectiveEntity.startsWith(artistNorm)) &&
           effectiveEntity.length >= 3;
       final score = isExact
@@ -443,7 +470,8 @@ class SearchIntentDetector {
     for (final album in rawItems.whereType<SearchAlbumItem>()) {
       final albNorm = QueryPreprocessor.normalize(album.title);
       final isExact = effectiveEntity == albNorm;
-      final isPrefix = (albNorm.startsWith(effectiveEntity) ||
+      final isPrefix =
+          (albNorm.startsWith(effectiveEntity) ||
               effectiveEntity.startsWith(albNorm)) &&
           effectiveEntity.length >= 3;
       final score = isExact
@@ -462,14 +490,18 @@ class SearchIntentDetector {
     }
 
     // 4. Playlist / Vibe match check
-    final isPlaylistKeyword =
-        _playlistVibeKeywords.any((kw) => normalized.contains(kw));
-    final isLanguagePlaylist = SearchRanker._countryLanguages.values.any((langs) =>
-        langs.any((l) => normalized.contains(l)) &&
-        (normalized.contains('song') ||
-            normalized.contains('hit') ||
-            normalized.contains('playlist')));
-    final hasPlaylistIntent = intentType == SearchItemType.playlist ||
+    final isPlaylistKeyword = _playlistVibeKeywords.any(
+      (kw) => normalized.contains(kw),
+    );
+    final isLanguagePlaylist = SearchRanker._countryLanguages.values.any(
+      (langs) =>
+          langs.any((l) => normalized.contains(l)) &&
+          (normalized.contains('song') ||
+              normalized.contains('hit') ||
+              normalized.contains('playlist')),
+    );
+    final hasPlaylistIntent =
+        intentType == SearchItemType.playlist ||
         isPlaylistKeyword ||
         isLanguagePlaylist;
 
@@ -548,6 +580,7 @@ class SearchRanker {
     required List<SearchItem> items,
     required SearchIntent intent,
     required String countryCode,
+    Set<String> affinityKeys = const {},
     List<String> preferredLanguages = const [],
     List<String> favoriteArtists = const [],
     SearchTopResult? initialTopResult,
@@ -609,6 +642,7 @@ class SearchRanker {
         maxTextMatch: maxTextMatch,
         rrfScore: rrfScore,
         weights: weights,
+        affinityKeys: affinityKeys,
       );
 
       candidateBreakdowns.add(breakdown);
@@ -634,8 +668,9 @@ class SearchRanker {
         topResult = _createTopResultFromItem(artistItem);
       }
     } else if (intent.layoutMode == SearchLayoutMode.albumOrPlaylist) {
-      final playlistItem =
-          scoredItems.whereType<SearchPlaylistItem>().firstOrNull;
+      final playlistItem = scoredItems
+          .whereType<SearchPlaylistItem>()
+          .firstOrNull;
       final albumItem = scoredItems.whereType<SearchAlbumItem>().firstOrNull;
       if (intent.intentType == SearchItemType.playlist ||
           (playlistItem != null && albumItem == null)) {
@@ -722,6 +757,7 @@ class SearchRanker {
     required double maxTextMatch,
     required double rrfScore,
     required RankingWeights weights,
+    Set<String> affinityKeys = const {},
   }) {
     // 1. Text Component
     final textComponent = textScore * weights.textMatch;
@@ -736,8 +772,7 @@ class SearchRanker {
         final isPrimary =
             item.artists.isNotEmpty &&
             item.artists.first.name.toLowerCase() == aNorm;
-        final isCollab =
-            item.artists.any((a) => a.name.toLowerCase() == aNorm);
+        final isCollab = item.artists.any((a) => a.name.toLowerCase() == aNorm);
         artistMatch = isPrimary ? 1.0 : (isCollab ? 0.85 : 0.35);
       } else if (item is SearchAlbumItem) {
         final isPrimary =
@@ -779,8 +814,9 @@ class SearchRanker {
     final itemLang = _detectItemLanguage(item);
 
     if (itemLang != null && itemLang.isNotEmpty) {
-      final userLangsLower =
-          preferredLanguages.map((l) => l.toLowerCase().trim()).toList();
+      final userLangsLower = preferredLanguages
+          .map((l) => l.toLowerCase().trim())
+          .toList();
       if (userLangsLower.contains(itemLang.toLowerCase().trim())) {
         contextScore += 0.50; // Moderate user language affinity
       }
@@ -793,8 +829,9 @@ class SearchRanker {
       );
       if (isFav) contextScore += 0.40;
     } else if (item is SearchArtistItem) {
-      final isFav =
-          favoriteArtists.any((fa) => item.name.toLowerCase() == fa.toLowerCase());
+      final isFav = favoriteArtists.any(
+        (fa) => item.name.toLowerCase() == fa.toLowerCase(),
+      );
       if (isFav) contextScore += 0.50;
     }
 
@@ -850,6 +887,20 @@ class SearchRanker {
       penalties += 0.25;
     }
 
+    // Affinity Signal: User previously tapped this item for this exact search query.
+    // Boost priority so it surfaces at the top / below top result.
+    double affinityBoost = 0.0;
+    if (affinityKeys.isNotEmpty) {
+      final itemId = item.id.toLowerCase();
+      final itemTitle = item.title.trim().toLowerCase();
+      final itemSub = item.subtitle.trim().toLowerCase();
+      if (affinityKeys.contains(itemId) ||
+          affinityKeys.contains(itemTitle) ||
+          (itemSub.isNotEmpty && affinityKeys.contains(itemSub))) {
+        affinityBoost = 0.50;
+      }
+    }
+
     final rawScore =
         textComponent +
         artistComponent +
@@ -857,7 +908,8 @@ class SearchRanker {
         providerComponent +
         popComponent +
         personalComponent +
-        qualityComponent -
+        qualityComponent +
+        affinityBoost -
         penalties;
 
     final finalScore = rawScore.clamp(0.0, 1.0);
@@ -882,7 +934,8 @@ class SearchRanker {
   /// Reference-scale popularity normalization (log10 benchmark).
   static double _normalizePopularity(SearchItem item) {
     if (item is SearchArtistItem) {
-      final count = item.subscriberCount ??
+      final count =
+          item.subscriberCount ??
           QueryPreprocessor.parseCountString(item.subscriberText);
       if (count > 0) {
         // 20M subscribers = 1.0, 1M = 0.82, 100K = 0.68
@@ -1011,7 +1064,11 @@ class SearchRanker {
 
   static String? _detectItemLanguage(SearchItem item) {
     if (item is SearchSongItem) {
-      return Track.detectLanguage(item.title, item.subtitle, item.albumName ?? '');
+      return Track.detectLanguage(
+        item.title,
+        item.subtitle,
+        item.albumName ?? '',
+      );
     } else if (item is SearchAlbumItem) {
       return Track.detectLanguage(item.title, item.subtitle);
     } else if (item is SearchPlaylistItem) {
@@ -1065,7 +1122,9 @@ class SearchRanker {
           continue; // Discard non-music videos, tech reviews, tutorials, and shorts
         }
       }
-      if (it is SearchSongItem && it.durationSeconds < 60 && it.durationSeconds > 0) {
+      if (it is SearchSongItem &&
+          it.durationSeconds < 60 &&
+          it.durationSeconds > 0) {
         continue; // Discard shorts
       }
 

@@ -613,14 +613,8 @@ class _ShellScreenState extends State<ShellScreen>
                             opacity: hideDocks ? 0.0 : 1.0,
                             duration: const Duration(milliseconds: 200),
                             child: RepaintBoundary(
-                              child: ValueListenableBuilder<bool>(
-                                valueListenable:
-                                    PlayerShell.isPlayerOpenNotifier,
-                                builder: (_, isPlayerOpen, child) =>
-                                    IgnorePointer(
-                                      ignoring: hideDocks || isPlayerOpen,
-                                      child: child!,
-                                    ),
+                              child: ValueListenableBuilder<double>(
+                                valueListenable: PlayerShell.sheetProgress,
                                 child: ValueListenableBuilder<SearchPhase>(
                                   valueListenable: SearchNav.phase,
                                   builder: (_, phase, _) => AppleDock(
@@ -650,6 +644,21 @@ class _ShellScreenState extends State<ShellScreen>
                                     },
                                   ),
                                 ),
+                                builder: (_, p, child) {
+                                  final k = Curves.easeOut.transform(
+                                    (p / 0.2).clamp(0.0, 1.0),
+                                  );
+                                  return IgnorePointer(
+                                    ignoring: hideDocks || k > 0.5,
+                                    child: Opacity(
+                                      opacity: 1 - k,
+                                      child: Transform.translate(
+                                        offset: Offset(0, 90 * k),
+                                        child: child,
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                           ),

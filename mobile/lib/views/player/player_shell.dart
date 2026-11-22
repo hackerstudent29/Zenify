@@ -104,13 +104,24 @@ const SpringDescription _kReleaseSpring = SpringDescription(
 );
 
 /// The mini player pill is fully gone once the sheet is this far open.
-const double _kMiniFadeSpan = 0.22;
+const double _kMiniFadeSpan = 0.14;
 
 /// Page dim behind the sheet (0..1 black) when fully open.
 const double _kScrimMax = 0.6;
 
-/// Sheet backdrop opacity while rising (1.0 on arrival). 1.0 = old look.
-const double _kSheetMinOpacity = 0.82;
+/// Where the sheet starts (fraction of screen height). Apple Music: mid-screen.
+const double _kSheetStartY = 0.56;
+
+/// Sheet backdrop is fully visible once the sheet is this far open.
+const double _kSheetFadeSpan = 0.45;
+
+/// Top corner radius while the sheet travels (eases to 0 at the very top).
+const double _kSheetRadius = 28;
+
+double _smooth(double x) {
+  final v = x.clamp(0.0, 1.0).toDouble();
+  return v * v * (3 - 2 * v);
+}
 
 /// Tap open/close have no finger momentum, so they use softer springs and
 /// the cover flight stays visible. Drag releases keep the stiff ones.
@@ -179,6 +190,9 @@ class PlayerShell extends StatefulWidget {
   );
   static final ValueNotifier<int> openRequestNotifier = ValueNotifier<int>(0);
 
+  /// 0 = mini, 1 = fully open. Drive the dock with it.
+  static final ValueNotifier<double> sheetProgress = ValueNotifier<double>(0);
+
   /// Requests any mounted [PlayerShell] to expand smoothly to the full-screen
   /// Now Playing sheet (e.g., when the user taps a YouTube video card).
   static void requestOpen() {
@@ -243,6 +257,8 @@ class PlayerShellState extends State<PlayerShell>
   bool? _wasPlaying;
   int _dir = 1;
   double _travel = 700;
+  bool _warm = false;
+  Timer? _warmTimer;
 
   bool _chromeHidden = false;
   bool _reordering = false;
@@ -306,6 +322,11 @@ class PlayerShellState extends State<PlayerShell>
     _miniX = AnimationController.unbounded(vsync: this, value: 0);
     _press = AnimationController.unbounded(vsync: this, value: 1);
     PlayerShell.openRequestNotifier.addListener(_onOpenRequested);
+    _sheet.addListener(_publishProgress);
+  }
+
+  void _publishProgress() {
+    PlayerShell.sheetProgress.value = _sheet.value.clamp(0.0, 1.0).toDouble();
   }
 
   void _onOpenRequested() {
@@ -320,6 +341,8 @@ class PlayerShellState extends State<PlayerShell>
   @override
   void dispose() {
     PlayerShell.openRequestNotifier.removeListener(_onOpenRequested);
+    _sheet.removeListener(_publishProgress);
+    _warmTimer?.cancel();
     _mountTimer?.cancel();
     _idleTimer?.cancel();
     _lyricsImmersive.dispose();
@@ -610,6 +633,8 @@ class PlayerShellState extends State<PlayerShell>
     _sheet.stop();
     _dragging = true;
     _startedClosed = !_open;
+    // dock hides the instant a drag-open begins
+    if (_startedClosed) PlayerShell.isPlayerOpenNotifier.value = true;
   }
 
   void _dragUpdate(double dy) {
@@ -924,10 +949,15 @@ class PlayerShellState extends State<PlayerShell>
     _ensureBleed();
     _syncPlaying(_playing);
 
+    // pre-mount the sheet once, so opening never builds it mid-animation
+    _warmTimer ??= Timer(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _warm = true);
+    });
+
     final mq = MediaQuery.of(context);
     final size = mq.size;
     final safe = mq.padding;
-    _travel = size.height; // sheet follows the finger exactly 1:1
+    _travel = size.height * _kSheetStartY; // sheet follows the finger 1:1
 
     final isExpanded = _open || _sheet.value > 0.05 || _docked;
 
@@ -1349,7 +1379,7 @@ class PlayerShellState extends State<PlayerShell>
                   1.0,
                 );
 
-          final skipClip = isFullBleed && d < 0.05 && t > 0.985;
+          final skipClip = isFullBleed && d < 0.05 && t > 0.9;
 
           return Stack(
             clipBehavior: Clip.none,
@@ -1426,41 +1456,33 @@ class PlayerShellState extends State<PlayerShell>
     EdgeInsets safe,
     bool isFullBleed,
   ) {
-    final rawCover =
-        (_shownCover?.isNotEmpty == true
-            ? _shownCover
-            : (track?.coverUrl as String?)) ??
-        '';
-    final coverUrl = MediaNormalizer.upgradeArtworkUrl(rawCover);
-
-    // Built ONCE per setState (not per animation frame). The builder below
-    // reuses these exact instances, so Flutter skips rebuilding them and the
-    // swipe only moves / clips / fades cached layers.
-    final backdropLayer = Positioned.fill(
-      child: IgnorePointer(
-        child: RepaintBoundary(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              const ColoredBox(color: Color(0xFF121214)),
-              BleedBackdrop(
-                coverUrl: coverUrl,
-                art: _bakeFailed ? null : _bleedArt,
-                fallback: _fallbackColors(),
-                flow: true,
-                isPlaying: _playing,
-                positionNotifier: player.positionNotifier,
-                duration: player.duration,
+    // Built ONCE per setState; the builder below reuses these instances.
+    final backdrop = IgnorePointer(
+      child: RepaintBoundary(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF121214)),
+            BleedBackdrop(
+              art: _bakeFailed ? null : _bleedArt,
+              pending:
+                  !_bakeFailed && _bleedArt == null && _bleedUrl.isNotEmpty,
+              fallback: _fallbackColors(),
+              flow: true,
+              isPlaying: _playing,
+              positionNotifier: player.positionNotifier,
+              duration: player.duration,
+              // drift freezes while the sheet moves: all GPU goes to the motion
+              paused: () => _dragging || _sheet.isAnimating,
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutCubic,
+              color: Colors.black.withValues(
+                alpha: _panel == _Panel.lyrics ? 0.0 : (_docked ? 0.26 : 0),
               ),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOutCubic,
-                color: Colors.black.withValues(
-                  alpha: _panel == _Panel.lyrics ? 0.0 : (_docked ? 0.26 : 0),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1472,55 +1494,44 @@ class PlayerShellState extends State<PlayerShell>
       child: AnimatedBuilder(
         animation: _sheet,
         builder: (context, _) {
-          final t = _sheet.value.clamp(0.0, 1.0);
-          if (!_open && t <= 0.001) return const SizedBox.shrink();
+          final t = _sheet.value.clamp(0.0, 1.0).toDouble();
+          final visible = _open || t > 0.001;
+          if (!visible && !_warm) return const SizedBox.shrink();
 
-          final radius = math.min(1.0, (1 - t) * _travel / 140) * 32;
-          // starts as wide as the mini pill, widens as it rises
-          final inset =
-              _miniGeo(safe).side *
-              (1 - Curves.easeOutCubic.transform((t / 0.38).clamp(0.0, 1.0)));
-          final moving = t < 0.98 && (radius > 0.1 || inset > 0.1);
-          // translucent while rising, opaque on arrival
-          final backdropO = lerpDouble(
-            _kSheetMinOpacity,
-            1.0,
-            Curves.easeOut.transform(((t - 0.3) / 0.6).clamp(0.0, 1.0)),
-          )!;
-          // controls + header appear only AFTER the card has arrived
-          // (and disappear first when closing)
+          final y = (1 - t) * _travel; // starts mid-screen, 1:1 with the finger
+          final fade = Curves.easeOut.transform(
+            (t / _kSheetFadeSpan).clamp(0.0, 1.0),
+          );
+          // corners stay round all the way up, then straighten at the very top
+          final corner = _kSheetRadius * (1 - _smooth((t - 0.86) / 0.14));
           final contentOpacity = Curves.easeOut.transform(
             ((t - 0.5) / 0.5).clamp(0.0, 1.0),
           );
 
-          return IgnorePointer(
-            ignoring: t < 0.02,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {}, // absorb taps: no click-through
-              // the whole sheet (backdrop included) rises from the bottom
-              child: Transform.translate(
-                offset: Offset(0, (1 - t) * size.height),
-                child: ClipRRect(
-                  clipper: _SheetClipper(
-                    moving ? inset : 0.0,
-                    moving ? radius : 0.0,
-                  ),
-                  clipBehavior: moving ? Clip.antiAlias : Clip.none,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Opacity(
-                        opacity: backdropO,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [backdropLayer],
-                        ),
+          return TickerMode(
+            enabled: visible,
+            child: Offstage(
+              offstage: !visible,
+              child: IgnorePointer(
+                ignoring: t < 0.02,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {}, // absorb taps: no click-through
+                  child: Transform.translate(
+                    offset: Offset(0, y),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(corner),
                       ),
-                      // stays mounted (opacity 0 skips painting), so nothing
-                      // is built mid-animation
-                      Opacity(opacity: contentOpacity, child: column),
-                    ],
+                      clipBehavior: corner > 0.1 ? Clip.antiAlias : Clip.none,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Opacity(opacity: fade, child: backdrop),
+                          Opacity(opacity: contentOpacity, child: column),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -2488,23 +2499,4 @@ class _TrackMediaView extends StatelessWidget {
       ],
     );
   }
-}
-
-class _SheetClipper extends CustomClipper<RRect> {
-  _SheetClipper(this.inset, this.radius);
-  final double inset;
-  final double radius;
-
-  @override
-  RRect getClip(Size s) => RRect.fromLTRBAndCorners(
-    inset,
-    0,
-    s.width - inset,
-    s.height,
-    topLeft: Radius.circular(radius),
-    topRight: Radius.circular(radius),
-  );
-
-  @override
-  bool shouldReclip(_SheetClipper o) => o.inset != inset || o.radius != radius;
 }
