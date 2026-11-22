@@ -238,7 +238,7 @@ void main() {
           body: LyricsView(
             lines: lines,
             position: pos,
-            isPlaying: true,
+            isPlaying: false,
             isSynced: true,
             onSeek: (_) {},
           ),
@@ -247,7 +247,7 @@ void main() {
     );
 
     await tester.pump();
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
 
     // Verify normal short line word font size is exactly 28.0
     final shortWordText = tester.widget<Text>(find.text('Short').first);
@@ -258,8 +258,14 @@ void main() {
     final longWordText = tester.widget<Text>(find.text('previously').first);
     expect(longWordText.style?.fontSize, equals(kNormalLyricFontSize));
 
+    // Advance position to the bracketed backing line so it animates in as current
+    pos.value = const Duration(seconds: 15);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
     // Verify bracketed backing line word font size is strictly 21.0
-    final backingWordText = tester.widget<Text>(find.text('(backing').first);
+    // (_formatLyricCasing capitalizes words and removes the enclosing parentheses from rendered text)
+    final backingWordText = tester.widget<Text>(find.text('Backing').first);
     expect(backingWordText.style?.fontSize, equals(kBracketedLyricFontSize));
     expect(kBracketedLyricFontSize, equals(21.0));
 
