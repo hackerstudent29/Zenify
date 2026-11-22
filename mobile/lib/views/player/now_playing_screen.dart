@@ -298,14 +298,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           ),
         ),
         const SizedBox(width: 8),
-        PopLikeButton(
-          liked: fav,
-          onToggle: () => b.toggleFavorite(track),
-        ),
+        PopLikeButton(liked: fav, onToggle: () => b.toggleFavorite(track)),
         const SizedBox(width: 8),
         PlayerMoreButton(
           onTap: widget.onMore ?? () {},
-          icon: CupertinoIcons.ellipsis,
+          icon: CupertinoIcons.ellipsis_vertical,
         ),
       ],
     );

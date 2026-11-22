@@ -391,13 +391,18 @@ class PlayerState extends ChangeNotifier
   }
 
   void _onEngineState(ap.PlayerState state) {
-    // Ignore engine chatter during our own fades and track changes, so the
-    // play/pause button never flickers.
-    if (_isTransitioning || _pausing) return;
     if (state == ap.PlayerState.completed) {
       return; // handled by onPlayerComplete
     }
     final playing = state == ap.PlayerState.playing;
+    // If the engine paused or stopped externally (audio focus loss, headphones unplugged, phone call),
+    // never ignore it even if transitioning or pausing.
+    if (!playing) {
+      _isTransitioning = false;
+      _pausing = false;
+    } else if (_isTransitioning || _pausing) {
+      return;
+    }
     if (_isPlaying != playing) {
       _isPlaying = playing;
       notifyListeners();
@@ -1737,6 +1742,9 @@ class PlayerState extends ChangeNotifier
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final isForeground = state == AppLifecycleState.resumed;
     unawaited(_audioPlayer.setLifecycle(isForeground));
+    if (isForeground) {
+      notifyListeners();
+    }
   }
 
   /// Completely stops audio playback, releases engine resources,

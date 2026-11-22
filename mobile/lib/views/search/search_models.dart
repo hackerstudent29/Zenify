@@ -437,6 +437,132 @@ class SearchVideoItem extends SearchItem {
   }
 }
 
+/// Robust filter ensuring only legitimate music video content (music videos, lyric videos,
+/// official audio visualizers, full musical albums/jukeboxes, live performances) is admitted,
+/// while strictly rejecting Shorts, tech reviews, tutorials, vlogs, reactions, memes, and gaming.
+class MusicVideoFilter {
+  MusicVideoFilter._();
+
+  static final RegExp _shortsRegex =
+      RegExp(r'(#shorts?|\bshorts?\b)', caseSensitive: false);
+
+  static final List<String> _bannedNonMusicKeywords = [
+    'tech', 'technology', 'review', 'unboxing', 'unbox', 'tutorial', 'how to',
+    'course', 'lecture', 'class', 'podcast', 'episode', 'interview', 'vlog',
+    'daily vlog', 'gaming', 'gameplay', 'walkthrough', 'news', 'politics',
+    'political', 'roast', 'prank', 'comedy', 'funny', 'meme', 'reaction',
+    'camera test', 'battery test', 'speed test', 'benchmark', 'specifications',
+    'specs', 'trading', 'crypto', 'stock market', 'finance', 'workout routine',
+    'gym routine', 'diet plan', 'recipe', 'cooking', 'diy', 'craft', 'makeup',
+    'haul', 'skincare', 'unfiltered', 'behind the scenes', 'bts interview',
+    'press meet', 'audio launch speech', 'trailer reaction', 'teaser reaction',
+    'movie review', 'teaser breakdown', 'trailer breakdown', 'public review',
+    'theatre response', 'audience reaction', 'press conference', 'status video',
+    'whatsapp status', 'instagram reels',
+  ];
+
+  static final List<String> _musicPositiveKeywords = [
+    'official music video', 'official video', 'music video', 'lyric video',
+    'lyrical video', 'lyrics video', 'official lyrical', 'audio', 'visualizer',
+    'official audio', 'full song', 'full video', 'full video song', 'video song',
+    'song', 'songs', 'track', 'ost', 'mv', 'theme song', 'title track',
+    'live performance', 'live concert', 'concert', 'unplugged', 'acoustic session',
+    'studio session', 'live session', 'acoustic version', 'remix', 'mashup',
+    'jukebox', 'full album', 'audio jukebox', 'video jukebox', 'all songs',
+    'nonstop', 'orchestra', 'symphony', 'musical',
+  ];
+
+  static final List<String> _longMusicAllowedKeywords = [
+    'jukebox', 'full album', 'all songs', 'audio jukebox', 'video jukebox',
+    'concert', 'live at', 'dj mix', 'nonstop', 'mashup', 'compilation',
+    'audio songs', 'playlist', 'discography', 'complete album',
+  ];
+
+  /// Returns true ONLY if the item represents legitimate music video content.
+  static bool isLegitMusicVideo({
+    required String title,
+    required String subtitle,
+    String? channel,
+    int durationSeconds = 0,
+    String? durationText,
+  }) {
+    final tLower = title.toLowerCase();
+    final sLower = subtitle.toLowerCase();
+    final cLower = (channel ?? '').toLowerCase();
+    final fullText = '$tLower $sLower $cLower';
+
+    // 1. Strict ban on Shorts (< 60s or #shorts)
+    if (_shortsRegex.hasMatch(title) || _shortsRegex.hasMatch(subtitle)) {
+      return false;
+    }
+    if (durationSeconds > 0 && durationSeconds < 60) {
+      return false;
+    }
+    if (durationText != null && durationText.isNotEmpty) {
+      final parts = durationText.trim().split(':');
+      if (parts.length == 2) {
+        final mins = int.tryParse(parts[0]) ?? 0;
+        final secs = int.tryParse(parts[1]) ?? 0;
+        if (mins == 0 && secs < 60) return false;
+      }
+    }
+
+    // 2. Strict ban on Lengthy normal non-music videos (> 15 minutes = 900 seconds)
+    // Long videos are ONLY allowed if they are full albums, jukeboxes, or live concerts
+    final dur = durationSeconds > 0
+        ? durationSeconds
+        : _parseDuration(durationText);
+    if (dur > 900) {
+      final isLongMusic =
+          _longMusicAllowedKeywords.any((kw) => fullText.contains(kw));
+      if (!isLongMusic) return false;
+    }
+
+    // 3. Strict ban on Tech, reviews, tutorials, vlogs, reactions, memes, news
+    for (final bad in _bannedNonMusicKeywords) {
+      if (RegExp(r'\b' + RegExp.escape(bad) + r'\b', caseSensitive: false)
+          .hasMatch(fullText)) {
+        // Absolute bans (never permitted)
+        if (bad == 'review' ||
+            bad == 'reaction' ||
+            bad == 'unboxing' ||
+            bad == 'tutorial' ||
+            bad == 'how to' ||
+            bad == 'podcast' ||
+            bad == 'vlog' ||
+            bad == 'gaming' ||
+            bad == 'gameplay' ||
+            bad == 'trailer reaction' ||
+            bad == 'movie review' ||
+            bad == 'public review' ||
+            bad == 'theatre response') {
+          return false;
+        }
+        if (!_musicPositiveKeywords.any((m) => tLower.contains(m))) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  static int _parseDuration(String? text) {
+    if (text == null || !text.contains(':')) return 0;
+    final parts = text.split(':').map((p) => int.tryParse(p.trim())).toList();
+    if (parts.length == 2 && parts[0] != null && parts[1] != null) {
+      return parts[0]! * 60 + parts[1]!;
+    }
+    if (parts.length == 3 &&
+        parts[0] != null &&
+        parts[1] != null &&
+        parts[2] != null) {
+      return parts[0]! * 3600 + parts[1]! * 60 + parts[2]!;
+    }
+    return 0;
+  }
+}
+
 /// Podcast / Episode search result item.
 class SearchPodcastItem extends SearchItem {
   const SearchPodcastItem({

@@ -146,14 +146,26 @@ class DownloadService extends ChangeNotifier {
     final item = _items[trackId];
     if (item == null) return null;
     final file = File(item.audioPath);
-    return file.existsSync() ? file.path : null;
+    if (file.existsSync()) return file.path;
+    if (_downloadsDir != null) {
+      final safeId = trackId.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+      final fallback = File('${_downloadsDir!.path}/$safeId.m4a');
+      if (fallback.existsSync()) return fallback.path;
+    }
+    return null;
   }
 
   String? getLocalLyricsPath(String trackId) {
     final item = _items[trackId];
     if (item?.lyricsPath == null) return null;
     final file = File(item!.lyricsPath!);
-    return file.existsSync() ? file.path : null;
+    if (file.existsSync()) return file.path;
+    if (_downloadsDir != null) {
+      final safeId = trackId.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+      final fallback = File('${_downloadsDir!.path}/$safeId.lyrics.json');
+      if (fallback.existsSync()) return fallback.path;
+    }
+    return null;
   }
 
   LyricsResult? getLocalLyrics(String trackId) {
@@ -194,13 +206,46 @@ class DownloadService extends ChangeNotifier {
         final content = await indexFile.readAsString();
         if (content.trim().isNotEmpty) {
           final List list = jsonDecode(content) as List;
+          bool indexNeedsResave = false;
           for (final raw in list) {
             if (raw is Map<String, dynamic>) {
-              final song = DownloadedSong.fromJson(raw);
-              if (File(song.audioPath).existsSync()) {
+              var song = DownloadedSong.fromJson(raw);
+              var audioFile = File(song.audioPath);
+              if (!audioFile.existsSync() && _downloadsDir != null) {
+                // Resilient path recovery: if stored absolute path moved across app update/container UUID change
+                final fileName = song.audioPath.split(Platform.pathSeparator).last.split('/').last;
+                final relFile = File('${_downloadsDir!.path}/$fileName');
+                if (relFile.existsSync()) {
+                  audioFile = relFile;
+                  final coverName = song.coverPath.split(Platform.pathSeparator).last.split('/').last;
+                  final relCover = File('${_downloadsDir!.path}/$coverName');
+                  final relLyrics = song.lyricsPath != null
+                      ? '${_downloadsDir!.path}/${song.lyricsPath!.split(Platform.pathSeparator).last.split('/').last}'
+                      : null;
+                  song = DownloadedSong(
+                    id: song.id,
+                    title: song.title,
+                    artist: song.artist,
+                    album: song.album,
+                    coverUrl: song.coverUrl,
+                    audioPath: relFile.path,
+                    coverPath: relCover.existsSync() ? relCover.path : song.coverPath,
+                    lyricsPath: relLyrics != null && File(relLyrics).existsSync() ? relLyrics : song.lyricsPath,
+                    durationSeconds: song.durationSeconds,
+                    fileSizeBytes: song.fileSizeBytes,
+                    downloadedAt: song.downloadedAt,
+                    albumBrowseId: song.albumBrowseId,
+                  );
+                  indexNeedsResave = true;
+                }
+              }
+              if (audioFile.existsSync()) {
                 _items[song.id] = song;
               }
             }
+          }
+          if (indexNeedsResave) {
+            unawaited(_saveIndex());
           }
         }
       }

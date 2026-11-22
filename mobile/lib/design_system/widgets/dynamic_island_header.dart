@@ -339,9 +339,9 @@ class DynamicIslandHeader extends StatefulWidget {
     this.centerWidget,
     this.trailing,
     this.onMore,
-    this.height = 44.0,
+    this.height = 52.0,
     this.topPadding,
-    this.horizontalMargin = 14.0,
+    this.horizontalMargin = 16.0,
     this.scrollController,
     this.revealOffset = 120,
     this.isDockPage,
@@ -542,25 +542,16 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 
   @override
   Widget build(BuildContext context) {
-    // Sits slightly lower than before (+4px).
-    final top = widget.topPadding ?? (MediaQuery.paddingOf(context).top + 10);
+    final mqTop = MediaQuery.paddingOf(context).top;
+    final top = widget.topPadding ?? math.max(54.0, mqTop + 4.0);
     final canPop = widget.showBack ?? Navigator.canPop(context);
     final isDock = widget.isDockPage ?? (!canPop && widget.showBack != true);
     final active = IslandNotifier.instance.current;
-    final hasContent = (widget.showCenter && (widget.title.trim().isNotEmpty || widget.centerWidget != null)) || active != null;
+    final hasContent = (widget.showCenter &&
+            (widget.title.trim().isNotEmpty || widget.centerWidget != null)) ||
+        active != null;
 
     final double h = widget.height;
-    // Symmetrical clearance so the Dynamic Island pill remains dead-center relative to screen
-    // On dock root pages, the full transparent logo is ~82px wide.
-    // On subpages with back button, left dock is 44px.
-    final double leftDockW = isDock ? 96.0 : (canPop ? h : 0.0);
-    final double rightDockW = (widget.trailing != null || widget.onMore != null)
-        ? 44.0
-        : (widget.showProfile ? h : 0.0);
-    final double leftClearance = leftDockW > 0 ? leftDockW + 8.0 : 8.0;
-    final double rightClearance = rightDockW > 0 ? rightDockW + 8.0 : 8.0;
-    final double symmetricClearance = math.max(leftClearance, rightClearance);
-
     final double scrollProgress = (_scrollOffset / 50.0).clamp(0.0, 1.0);
 
     return Stack(
@@ -596,122 +587,74 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
           ),
         ),
 
-        // Header interactive controls
+        // Header floating capsule / discrete glass buttons
         Padding(
-          padding: EdgeInsets.fromLTRB(widget.horizontalMargin, top, widget.horizontalMargin, 0),
+          padding: EdgeInsets.fromLTRB(
+            widget.horizontalMargin,
+            top,
+            widget.horizontalMargin,
+            0,
+          ),
           child: SizedBox(
             height: h,
             child: AnimatedBuilder(
-          animation: Listenable.merge([_c, _n, LiquidGlassController.instance]),
-          builder: (context, _) {
-            final double nVal = _n.value.clamp(0.0, 1.0);
-            final double cVal = _c.value.clamp(0.0, 1.0);
-            final double vis = math.max(cVal, nVal);
-            final double f = vis.clamp(0.0, 1.0).toDouble();
+              animation:
+                  Listenable.merge([_c, _n, LiquidGlassController.instance]),
+              builder: (context, _) {
+                final double nVal = _n.value.clamp(0.0, 1.0);
+                final double cVal = _c.value.clamp(0.0, 1.0);
+                final double vis = hasContent ? math.max(cVal, nVal) : 0.0;
+                final double f = vis.clamp(0.0, 1.0).toDouble();
 
-            // Keep strict non-overlapping clearance around left & right docks so notifications
-            // stay compact in the center space and never overlap Back, Brand, or Profile controls.
-            const double dockScale = 1.0;
-            const double dockOpacity = 1.0;
-
-            return Stack(
-              alignment: Alignment.center,
-              children: [
-                // Center Island Pill: strictly bounded symmetrically so it sits dead-center on every page
-                Positioned.fill(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: symmetricClearance),
-                    child: Center(
-                      child: AnimatedOpacity(
-                        opacity: hasContent ? 1 : 0,
-                        duration: const Duration(milliseconds: 240),
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            final cur = IslandNotifier.instance.current;
-                            if (cur != null) {
-                              HapticFeedback.lightImpact();
-                              if (cur.onTap != null) {
-                                cur.onTap!();
-                              }
-                              IslandNotifier.instance.dismiss(id: cur.id);
-                              return;
-                            }
-                            if (widget.onCenterTap != null) {
-                              HapticFeedback.lightImpact();
-                              widget.onCenterTap!();
-                              return;
-                            }
-                            final sc = widget.scrollController;
-                            if (sc != null && sc.hasClients && sc.offset > 0) {
-                              HapticFeedback.lightImpact();
-                              sc.animateTo(
-                                0,
-                                duration: const Duration(milliseconds: 500),
-                                curve: Curves.easeOutCubic,
-                              );
-                            }
-                          },
-                          child: IgnorePointer(
-                            ignoring: !hasContent || f < 0.5,
-                            child: Opacity(
-                              opacity: f,
-                              child: Transform.translate(
-                                offset: Offset(0, (1 - f) * 14),
-                                child: Transform.scale(
-                                  scale: 0.72 + 0.28 * f,
-                                  child: _buildCenterIsland(context),
-                                ),
-                              ),
-                            ),
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // State A: Individual discrete circular glass buttons (Left back & Right more)
+                    // Visible when at top / title not presented
+                    Positioned.fill(
+                      child: Opacity(
+                        opacity: (1.0 - f).clamp(0.0, 1.0),
+                        child: IgnorePointer(
+                          ignoring: f >= 0.5,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              _buildLeftDock(context, canPop, isDock),
+                              _buildRightDock(context),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
 
-                // Left Dock (shrinks and fades as notification appears)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IgnorePointer(
-                    ignoring: false,
-                    child: Transform.scale(
-                      scale: dockScale,
-                      alignment: Alignment.centerLeft,
-                      child: Opacity(
-                        opacity: dockOpacity,
-                        child: _buildLeftDock(context, canPop, isDock),
+                    // State B: Expanded single unified floating glass capsule
+                    // Holding Left <, Page Title, and Right ⋮
+                    if (hasContent)
+                      Positioned.fill(
+                        child: Opacity(
+                          opacity: f.clamp(0.0, 1.0),
+                          child: IgnorePointer(
+                            ignoring: f < 0.5,
+                            child: Transform.scale(
+                              scale: 0.94 + 0.06 * f,
+                              child: _buildUnifiedCapsule(
+                                  context, canPop, isDock),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-
-                // Right Dock (shrinks and fades as notification appears)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IgnorePointer(
-                    ignoring: false,
-                    child: Transform.scale(
-                      scale: dockScale,
-                      alignment: Alignment.centerRight,
-                      child: Opacity(
-                        opacity: dockOpacity,
-                        child: _buildRightDock(context),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+                  ],
+                );
+              },
+            ),
+          ),
         ),
-      ),
-    ),
-  ],
-);
+      ],
+    );
   }
 
+  /// Discrete left circular button
   Widget _buildLeftDock(BuildContext context, bool canPop, bool isDock) {
     if (widget.leading != null) return widget.leading!;
     final h = widget.height;
@@ -730,13 +673,15 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
             );
           }
         },
-        child: SizedBox(
-          height: h,
-          child: Align(
-            alignment: Alignment.centerLeft,
+        child: AppleGlass(
+          borderRadius: BorderRadius.circular(h / 2),
+          child: Container(
+            height: h,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            alignment: Alignment.center,
             child: Image.asset(
               'assets/images/zenify_logo.png',
-              height: 26,
+              height: 28,
               fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
               errorBuilder: (_, _, _) => Image.asset(
@@ -777,53 +722,198 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     );
   }
 
-  Widget _buildCenterIsland(BuildContext context) {
+  /// Single unified floating glass capsule matching:
+  /// height: 52px; border-radius: 26px; padding: 0 4px;
+  /// Holding [ Back <    Title    Vertical ⋮ ]
+  Widget _buildUnifiedCapsule(BuildContext context, bool canPop, bool isDock) {
     final h = widget.height;
     final notifier = IslandNotifier.instance;
     final active = notifier.current;
     final closing = notifier.isClosing;
-    final nVal = _n.value.clamp(0.0, 1.0);
-    // Subtle spring expansion + rose tint pulse when notification is active
-    final pillScale = active != null ? (0.92 + 0.08 * nVal) : 1.0;
 
-    return Transform.scale(
-      scale: pillScale,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(h / 2),
-          border: nVal > 0.02
-              ? Border.all(
-                  color: const Color(0xFFE11D48).withValues(alpha: 0.34 * nVal),
-                  width: 0.8,
-                )
-              : null,
-        ),
-        child: AppleGlass(
-          borderRadius: BorderRadius.circular(h / 2),
-          tint: (active != null && nVal > 0.02)
-              ? const Color(0xFFE11D48).withValues(alpha: 0.20 * nVal)
-              : null,
-          child: Container(
-            height: h,
-            padding: active != null
-                ? const EdgeInsets.symmetric(horizontal: 4)
-                : const EdgeInsets.symmetric(horizontal: 14),
-            child: AnimatedSize(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                child: active != null
-                    ? _NotifTicker(
-                        key: ValueKey(active.id),
-                        notif: active,
-                        isClosing: closing,
-                        onDone: () => IslandNotifier.instance.dismiss(id: active.id),
-                      )
-                    : _titleContent(),
+    return AppleGlass(
+      borderRadius: BorderRadius.circular(h / 2),
+      child: Container(
+        height: h,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Left: back button or logo
+            _buildCapsuleLeft(context, canPop, isDock),
+
+            // Center: Page title / notification
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  final cur = IslandNotifier.instance.current;
+                  if (cur != null) {
+                    HapticFeedback.lightImpact();
+                    cur.onTap?.call();
+                    IslandNotifier.instance.dismiss(id: cur.id);
+                    return;
+                  }
+                  if (widget.onCenterTap != null) {
+                    HapticFeedback.lightImpact();
+                    widget.onCenterTap!();
+                    return;
+                  }
+                  final sc = widget.scrollController;
+                  if (sc != null && sc.hasClients && sc.offset > 0) {
+                    HapticFeedback.lightImpact();
+                    sc.animateTo(
+                      0,
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
+                },
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: active != null
+                        ? _NotifTicker(
+                            key: ValueKey(active.id),
+                            notif: active,
+                            isClosing: closing,
+                            onDone: () =>
+                                IslandNotifier.instance.dismiss(id: active.id),
+                          )
+                        : _titleContent(),
+                  ),
+                ),
               ),
+            ),
+
+            // Right: Three-dot button or profile avatar
+            _buildCapsuleRight(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCapsuleLeft(BuildContext context, bool canPop, bool isDock) {
+    if (widget.leading != null) return widget.leading!;
+    if (isDock) {
+      return PressableScale(
+        scale: 0.94,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          final sc = widget.scrollController;
+          if (sc != null && sc.hasClients && sc.offset > 0) {
+            sc.animateTo(
+              0,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        },
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          alignment: Alignment.center,
+          child: Image.asset(
+            'assets/images/zenify_logo.png',
+            height: 24,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (_, _, _) => Image.asset(
+              'assets/images/z_logo.png',
+              height: 22,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      );
+    }
+    return PressableScale(
+      scale: 0.88,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        if (widget.onBack != null) {
+          widget.onBack!();
+        } else if (canPop) {
+          Navigator.maybePop(context);
+        }
+      },
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: Icon(
+            CupertinoIcons.chevron_back,
+            color: LiquidGlassController.instance.c.foreground,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCapsuleRight(BuildContext context) {
+    if (widget.trailing != null) return widget.trailing!;
+    if (widget.onMore != null) {
+      return PressableScale(
+        scale: 0.88,
+        onTap: () {
+          HapticFeedback.lightImpact();
+          widget.onMore!();
+        },
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Center(
+            child: Icon(
+              CupertinoIcons.ellipsis_vertical,
+              color: LiquidGlassController.instance.c.foreground,
+              size: 20,
+            ),
+          ),
+        ),
+      );
+    }
+    if (!widget.showProfile) return const SizedBox(width: 44);
+    return PressableScale(
+      scale: 0.88,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        if (widget.onProfileTap != null) {
+          widget.onProfileTap!();
+        } else {
+          Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+        }
+      },
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: Consumer<AuthState>(
+              builder: (context, auth, _) {
+                final avatar = auth.user?.avatarUrl;
+                if (avatar != null && avatar.startsWith('http')) {
+                  return ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: avatar,
+                      fit: BoxFit.cover,
+                      placeholder: (_, _) => MonogramAvatar(
+                          name: auth.user?.name ?? 'Z', size: 28),
+                      errorWidget: (_, _, _) => MonogramAvatar(
+                          name: auth.user?.name ?? 'Z', size: 28),
+                    ),
+                  );
+                }
+                return MonogramAvatar(
+                    name: auth.user?.name ?? 'Zenify', size: 28);
+              },
             ),
           ),
         ),
@@ -861,16 +951,17 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
     );
   }
 
+  /// Discrete right circular button
   Widget _buildRightDock(BuildContext context) {
     if (widget.trailing != null) return widget.trailing!;
     if (widget.onMore != null) {
       return DynamicIslandActionButton(
-        icon: CupertinoIcons.ellipsis,
+        icon: CupertinoIcons.ellipsis_vertical,
         onTap: widget.onMore!,
         size: widget.height,
       );
     }
-    if (!widget.showProfile) return const SizedBox(width: 44);
+    if (!widget.showProfile) return SizedBox(width: widget.height);
     final h = widget.height;
 
     return PressableScale(
@@ -880,7 +971,8 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
         if (widget.onProfileTap != null) {
           widget.onProfileTap!();
         } else {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+          Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
         }
       },
       child: AppleGlass(
@@ -900,12 +992,15 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
                       child: CachedNetworkImage(
                         imageUrl: avatar,
                         fit: BoxFit.cover,
-                        placeholder: (_, _) => MonogramAvatar(name: auth.user?.name ?? 'Z', size: 30),
-                        errorWidget: (_, _, _) => MonogramAvatar(name: auth.user?.name ?? 'Z', size: 30),
+                        placeholder: (_, _) => MonogramAvatar(
+                            name: auth.user?.name ?? 'Z', size: 30),
+                        errorWidget: (_, _, _) => MonogramAvatar(
+                            name: auth.user?.name ?? 'Z', size: 30),
                       ),
                     );
                   }
-                  return MonogramAvatar(name: auth.user?.name ?? 'Zenify', size: 30);
+                  return MonogramAvatar(
+                      name: auth.user?.name ?? 'Zenify', size: 30);
                 },
               ),
             ),
@@ -921,10 +1016,10 @@ class _DynamicIslandHeaderState extends State<DynamicIslandHeader> with TickerPr
 class DynamicIslandActionButton extends StatelessWidget {
   const DynamicIslandActionButton({
     super.key,
-    required this.icon,
+    this.icon = CupertinoIcons.ellipsis_vertical,
     required this.onTap,
-    this.size = 44.0,
-    this.iconSize = 18.0,
+    this.size = 52.0,
+    this.iconSize = 20.0,
   });
 
   final IconData icon;

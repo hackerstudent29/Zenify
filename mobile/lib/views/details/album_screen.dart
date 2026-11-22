@@ -1904,7 +1904,7 @@ class _TrackRow extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.all(8),
                     child: Icon(
-                      Icons.more_horiz_rounded,
+                      Icons.more_vert_rounded,
                       color: Colors.white.withValues(alpha: 0.6),
                       size: 20,
                     ),

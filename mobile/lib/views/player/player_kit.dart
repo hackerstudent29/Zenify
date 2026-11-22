@@ -293,7 +293,10 @@ class CoverImage extends StatelessWidget {
       placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
       errorWidget: (_, _, _) {
         if (cleanUrl.contains('maxresdefault.jpg')) {
-          final sdUrl = cleanUrl.replaceAll('maxresdefault.jpg', 'sddefault.jpg');
+          final sdUrl = cleanUrl.replaceAll(
+            'maxresdefault.jpg',
+            'sddefault.jpg',
+          );
           return CachedNetworkImage(
             key: ValueKey(sdUrl),
             imageUrl: sdUrl,
@@ -301,13 +304,17 @@ class CoverImage extends StatelessWidget {
             fadeInDuration: Duration.zero,
             placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
             errorWidget: (_, _, _) {
-              final hqUrl = cleanUrl.replaceAll('maxresdefault.jpg', 'hqdefault.jpg');
+              final hqUrl = cleanUrl.replaceAll(
+                'maxresdefault.jpg',
+                'hqdefault.jpg',
+              );
               return CachedNetworkImage(
                 key: ValueKey(hqUrl),
                 imageUrl: hqUrl,
                 fit: BoxFit.cover,
                 fadeInDuration: Duration.zero,
-                placeholder: (_, _) => Container(color: const Color(0xFF18181B)),
+                placeholder: (_, _) =>
+                    Container(color: const Color(0xFF18181B)),
                 errorWidget: (_, _, _) => _empty(30),
               );
             },
@@ -484,7 +491,7 @@ class PlayerMoreButton extends StatelessWidget {
     super.key,
     required this.onTap,
     this.size = 36.0,
-    this.icon = CupertinoIcons.ellipsis,
+    this.icon = CupertinoIcons.ellipsis_vertical,
   });
 
   final VoidCallback onTap;
@@ -505,13 +512,7 @@ class PlayerMoreButton extends StatelessWidget {
           shape: BoxShape.circle,
           color: Colors.white.withValues(alpha: 0.14),
         ),
-        child: Center(
-          child: Icon(
-            icon,
-            size: 18,
-            color: Colors.white,
-          ),
-        ),
+        child: Center(child: Icon(icon, size: 18, color: Colors.white)),
       ),
     );
   }
@@ -931,4 +932,3 @@ class _SpringSheetRoute<T> extends PopupRoute<T> {
     );
   }
 }
-

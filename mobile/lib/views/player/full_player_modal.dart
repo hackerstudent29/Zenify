@@ -196,7 +196,7 @@ class _FullPlayerModalState extends State<FullPlayerModal> {
                       ),
                       IconButton(
                         icon: const Icon(
-                          Icons.more_horiz_rounded,
+                          Icons.more_vert_rounded,
                           color: Colors.white,
                         ),
                         onPressed: () {

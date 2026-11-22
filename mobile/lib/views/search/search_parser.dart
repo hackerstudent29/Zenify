@@ -357,6 +357,15 @@ class SearchParser {
       );
     } else if (type == 'video') {
       final channel = artistsString.isNotEmpty ? artistsString : (m['channel'] as String?);
+      final durSec = (m['duration'] as num?)?.toInt() ?? 0;
+      if (!MusicVideoFilter.isLegitMusicVideo(
+        title: title,
+        subtitle: channel ?? 'Video',
+        channel: channel,
+        durationSeconds: durSec,
+      )) {
+        return null;
+      }
       return SearchVideoItem(
         id: id,
         title: title,
@@ -370,6 +379,8 @@ class SearchParser {
     } else {
       // Fallback: guess by presence of fields
       if (m.containsKey('duration') || id.length == 11) {
+        final durSec = (m['duration'] as num?)?.toInt() ?? 210;
+        if (durSec < 60) return null; // Reject shorts
         return SearchSongItem(
           id: id,
           title: title,
@@ -787,6 +798,17 @@ class SearchParser {
         // Song / Video Default
         final isVideo = shelfCategory.contains('video') || segments.typeKeyword == 'video';
         if (isVideo) {
+          final channelName = segments.artists.isNotEmpty ? segments.artists.first.name : null;
+          final durationSecs = _parseDurationSeconds(segments.durationText);
+          if (!MusicVideoFilter.isLegitMusicVideo(
+            title: title,
+            subtitle: segments.formattedSubtitle,
+            channel: channelName,
+            durationSeconds: durationSecs,
+            durationText: segments.durationText,
+          )) {
+            return null;
+          }
           return SearchVideoItem(
             id: videoId ?? 'vid-$title',
             title: title,
@@ -795,7 +817,7 @@ class SearchParser {
             thumbnailUrlHiRes: thumbHiRes,
             videoId: videoId,
             browseId: browseId,
-            channel: segments.artists.isNotEmpty ? segments.artists.first.name : null,
+            channel: channelName,
             viewCountText: segments.countText,
             durationText: segments.durationText ?? '3:30',
             views: segments.countValue ?? 0,

@@ -27,6 +27,7 @@ import '../details/album_screen.dart';
 import '../../design_system/widgets/interactive_artists_text.dart';
 import '../../design_system/widgets/media_navigation_sheet.dart';
 import '../../models/track.dart';
+import '../../services/library_store.dart';
 import '../../utils/media_normalizer.dart';
 
 const double _kPaused = 0.86; // artwork shrink while paused
@@ -54,9 +55,11 @@ class _MiniGeo {
   final double side; // left / right margin of the pill
   final double h;
   final double art;
-  double get inset => (h - art) / 2;
+  double get insetTop => (h - art) / 2;
+  double get insetLeft => lerpDouble(10.0, 14.0, dp)!;
+  double get inset => insetTop;
   Rect artRect(Size size) =>
-      Rect.fromLTWH(side + inset, size.height - bottom - h + inset, art, art);
+      Rect.fromLTWH(side + insetLeft, size.height - bottom - h + insetTop, art, art);
 }
 
 /// Artwork corner radii (visual points, independent of the morph scale).
@@ -254,8 +257,6 @@ class PlayerShellState extends State<PlayerShell>
   // above the seekbar / transport block
   double _lyricsFadeEnd = 0.78;
 
-  final Set<String> _liked = {};
-  bool get _isLiked => _liked.contains(_trackKey);
   bool get _docked => _panel != _Panel.art;
 
   String? _trackKey;
@@ -868,19 +869,8 @@ class PlayerShellState extends State<PlayerShell>
   /* ───────────────────────── actions ───────────────────────── */
 
   void _showTrackMenu(dynamic track) {
-    if (track == null) return;
-    final Track t = track is Track
-        ? track
-        : Track(
-            id: track.id?.toString() ?? '',
-            title: track.title?.toString() ?? '',
-            artist: track.artist?.toString() ?? '',
-            album: track.album?.toString() ?? '',
-            coverUrl: track.coverUrl?.toString() ?? '',
-            durationSeconds: track.durationSeconds is int
-                ? track.durationSeconds as int
-                : 0,
-          );
+    if (track == null && _trackKey == null) return;
+    final Track t = _toTrack(track);
     ZenDropdown.showTrackMenu(
       context: context,
       track: t,
@@ -889,10 +879,26 @@ class PlayerShellState extends State<PlayerShell>
     );
   }
 
-  void _toggleLike() {
-    final k = _trackKey;
-    if (k == null) return;
-    setState(() => _liked.contains(k) ? _liked.remove(k) : _liked.add(k));
+  Track _toTrack(dynamic track) {
+    if (track is Track) return track;
+    final id = track?.id?.toString() ?? _trackKey ?? '';
+    final fromStore = LibraryStore.instance.getTrackById(id);
+    if (fromStore != null) return fromStore;
+    return Track(
+      id: id,
+      title: track?.title?.toString() ?? '',
+      artist: track?.artist?.toString() ?? '',
+      album: track?.album?.toString() ?? '',
+      coverUrl: (track?.coverUrl as String?) ?? _shownCover ?? '',
+      durationSeconds: (track?.durationSeconds as num?)?.toInt() ?? 0,
+    );
+  }
+
+  void _toggleLike(dynamic track) {
+    final t = _toTrack(track);
+    if (t.id.isEmpty) return;
+    HapticFeedback.lightImpact();
+    LibraryStore.instance.toggleLike(t);
   }
 
   /* ───────────────────────── build ───────────────────────── */
@@ -997,8 +1003,8 @@ class PlayerShellState extends State<PlayerShell>
           builder: (context, _) {
             final fg = LiquidGlassController.instance.c.foreground;
             return Padding(
-              // left inset == top inset, so the cover is evenly spaced
-              padding: EdgeInsets.only(left: g.inset, right: 4),
+              // Balanced left inset for the capsule curve, perfectly aligned with artRect
+              padding: EdgeInsets.only(left: g.insetLeft, right: 6),
               child: Row(
                 children: [
                   Expanded(
@@ -2080,11 +2086,17 @@ class PlayerShellState extends State<PlayerShell>
               ),
             ),
             const SizedBox(width: 8),
-            PopLikeButton(liked: _isLiked, onToggle: _toggleLike),
+            ListenableBuilder(
+              listenable: LibraryStore.instance,
+              builder: (context, _) => PopLikeButton(
+                liked: LibraryStore.instance.isLikedId(track?.id?.toString() ?? _trackKey),
+                onToggle: () => _toggleLike(track),
+              ),
+            ),
             const SizedBox(width: 8),
             PlayerMoreButton(
               onTap: () => _showTrackMenu(track),
-              icon: CupertinoIcons.ellipsis,
+              icon: CupertinoIcons.ellipsis_vertical,
             ),
           ],
         ),
@@ -2142,11 +2154,17 @@ class PlayerShellState extends State<PlayerShell>
             ),
           ),
           const SizedBox(width: 12),
-          PopLikeButton(liked: _isLiked, onToggle: _toggleLike),
+          ListenableBuilder(
+            listenable: LibraryStore.instance,
+            builder: (context, _) => PopLikeButton(
+              liked: LibraryStore.instance.isLikedId(track?.id?.toString() ?? _trackKey),
+              onToggle: () => _toggleLike(track),
+            ),
+          ),
           const SizedBox(width: 8),
           PlayerMoreButton(
             onTap: () => _showTrackMenu(track),
-            icon: CupertinoIcons.ellipsis,
+            icon: CupertinoIcons.ellipsis_vertical,
           ),
         ],
       ),

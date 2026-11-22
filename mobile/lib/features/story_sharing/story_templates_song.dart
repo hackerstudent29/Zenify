@@ -152,7 +152,7 @@ Widget _player(SongStoryContent c, StoryTemplateArgs a) {
                   ],
                 ),
               ),
-              Icon(CupertinoIcons.ellipsis_circle, size: 22, color: a.fg2),
+              Icon(CupertinoIcons.ellipsis_vertical, size: 22, color: a.fg2),
             ],
           ),
           SizedBox(height: gap),

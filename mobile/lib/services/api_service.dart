@@ -268,6 +268,27 @@ class ApiService {
     return false;
   }
 
+  /// Likes or unlikes a track on the backend database.
+  static Future<bool?> toggleTrackLike(String trackId, [Map<String, dynamic>? metadata]) async {
+    for (final base in _bases) {
+      try {
+        final uri = Uri.parse('$base/api/tracks/$trackId/like');
+        final res = await _client.post(
+          uri,
+          headers: {'Content-Type': 'application/json', ..._headers},
+          body: jsonEncode(metadata ?? {}),
+        ).timeout(const Duration(seconds: 8));
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          final data = jsonDecode(res.body);
+          if (data is Map) return data['liked'] as bool?;
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[ApiService] toggleTrackLike error: $e');
+      }
+    }
+    return null;
+  }
+
   /// Imports a playlist from a YouTube Music, YouTube, or Spotify URL.
   static Future<Map<String, dynamic>?> importPlaylist(String url) async {
     for (final base in _bases) {
@@ -287,6 +308,20 @@ class ApiService {
       }
     }
     return null;
+  }
+
+  /// Deletes a playlist from the backend.
+  static Future<bool> deletePlaylist(String playlistId) async {
+    for (final base in _bases) {
+      try {
+        final uri = Uri.parse('$base/api/playlists/$playlistId');
+        final res = await _client.delete(uri, headers: _headers).timeout(const Duration(seconds: 8));
+        if (res.statusCode >= 200 && res.statusCode < 300) return true;
+      } catch (e) {
+        if (kDebugMode) debugPrint('[ApiService] deletePlaylist error: $e');
+      }
+    }
+    return false;
   }
 
   /// Removes an album from the authenticated user's backend library.

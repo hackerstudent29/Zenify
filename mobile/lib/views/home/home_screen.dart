@@ -2009,7 +2009,7 @@ class _SongRow extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 4),
                   child: IconButton(
                     icon: const Icon(
-                      Icons.more_horiz_rounded,
+                      Icons.more_vert_rounded,
                       color: AppColors.textTertiary,
                       size: 22,
                     ),

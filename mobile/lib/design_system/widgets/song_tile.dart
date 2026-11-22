@@ -122,7 +122,7 @@ class SongTile extends StatelessWidget {
             // Context Menu Button
             const SizedBox(width: 8),
             IconButton(
-              icon: const Icon(Icons.more_horiz, color: AppColors.textSecondary, size: 20),
+              icon: const Icon(Icons.more_vert, color: AppColors.textSecondary, size: 20),
               splashRadius: 20,
               onPressed: onTrailingTap ?? () => _showTrackOptions(context),
             ),

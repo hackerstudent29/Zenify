@@ -110,7 +110,7 @@ class MediaCard extends StatelessWidget {
                             ),
                             child: Center(
                               child: EqualizerBars(
-                                isPlaying: true,
+                                isPlaying: isPlaying,
                                 size: (width * 0.20).clamp(28.0, 32.0),
                                 color: Colors.white,
                               ),

@@ -1149,7 +1149,7 @@ class _Row extends StatelessWidget {
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                     child: Icon(
-                      CupertinoIcons.ellipsis,
+                      CupertinoIcons.ellipsis_vertical,
                       color: AppColors.textSecondary,
                       size: 20,
                     ),

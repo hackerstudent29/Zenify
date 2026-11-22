@@ -31,6 +31,7 @@ import '../details/category_screen.dart';
 import '../player/player_shell.dart';
 import 'search_data_service.dart';
 import 'search_models.dart';
+import 'search_ranker.dart';
 
 // ── Apple-Music style tokens ─────────────────────────────────────────────────
 
@@ -676,13 +677,23 @@ class _SearchScreenState extends State<SearchScreen>
 
     final searchId = ++_searchRequestId;
 
+    // Instant local / catalog matches so answers populate live while typing (0ms)
+    final localFallback = _dataService.getFallbackResult(q, _selectedFilter);
+    final hasLocalMatches = localFallback.songs.isNotEmpty ||
+        localFallback.albums.isNotEmpty ||
+        localFallback.artists.isNotEmpty;
+
     setState(() {
       _liveSuggestions = _dataService.getInstantLocalSuggestions(q);
+      if (hasLocalMatches) {
+        _searchResults = localFallback;
+        _submittedQuery = q;
+      }
       _isLoading = true;
     });
 
-    // 1. Live suggestions (60ms)
-    _suggestTimer = Timer(const Duration(milliseconds: 60), () async {
+    // 1. Live suggestions (40ms)
+    _suggestTimer = Timer(const Duration(milliseconds: 40), () async {
       try {
         final s = await _dataService.getSuggestions(q);
         if (mounted && suggestId == _suggestId) {
@@ -691,8 +702,8 @@ class _SearchScreenState extends State<SearchScreen>
       } catch (_) {}
     });
 
-    // 2. High-speed debounced search execution (200ms)
-    _debounceTimer = Timer(const Duration(milliseconds: 200), () {
+    // 2. High-speed debounced search execution (110ms)
+    _debounceTimer = Timer(const Duration(milliseconds: 110), () {
       if (mounted && _lastTyped == q) {
         _executeSearch(q, searchId, filter: _selectedFilter);
       }
@@ -1147,22 +1158,21 @@ class _SearchScreenState extends State<SearchScreen>
         typing && _liveSuggestions.isNotEmpty && _searchResults.isEmpty;
 
     final _SearchViewPhase phase;
-    if (_submittedQuery.isNotEmpty) {
-      phase = (_isLoading && _searchResults.isEmpty)
-          ? _SearchViewPhase.loading
-          : _SearchViewPhase.results;
+    if (_submittedQuery.isNotEmpty && !_searchResults.isEmpty) {
+      phase = _SearchViewPhase.results;
     } else if (typing && !hasQuery) {
       phase = _SearchViewPhase.recents;
     } else if (category != null) {
       phase = _SearchViewPhase.category;
     } else if (!hasQuery) {
       phase = _SearchViewPhase.landing;
-    } else if (showSuggestions) {
-      phase = _SearchViewPhase.suggestions;
+    } else if (!_searchResults.isEmpty) {
+      // Live answers while typing
+      phase = _SearchViewPhase.results;
     } else if (_isLoading && _searchResults.isEmpty) {
       phase = _SearchViewPhase.loading;
-    } else if (!_searchResults.isEmpty) {
-      phase = _SearchViewPhase.results;
+    } else if (showSuggestions) {
+      phase = _SearchViewPhase.suggestions;
     } else {
       phase = _isLoading ? _SearchViewPhase.loading : _SearchViewPhase.results;
     }
@@ -2466,40 +2476,100 @@ class _SearchScreenState extends State<SearchScreen>
   // or album title no longer forces the artist profile to the top.
 
   double _scoreItem(SearchItem item, List<String> queries, SearchLayoutMode m) {
-    final artistMode =
-        m == SearchLayoutMode.exactArtist || m == SearchLayoutMode.artistType;
     final secondary = item is SearchArtistItem ? '' : item.subtitle;
-    var s = 0.0;
+    final normTitle = _norm(item.title);
+
+    double directTitleScore = 0.0;
+    for (final q in queries) {
+      final nq = _norm(q);
+      if (nq.isEmpty) continue;
+      if (normTitle == nq) {
+        directTitleScore = math.max(directTitleScore, 1.0);
+      } else if (normTitle.startsWith(nq) && nq.length >= 3) {
+        directTitleScore = math.max(
+          directTitleScore,
+          0.90 + 0.10 * (nq.length / normTitle.length).clamp(0.0, 1.0),
+        );
+      } else if (nq.startsWith(normTitle) && normTitle.length >= 3) {
+        directTitleScore = math.max(directTitleScore, 0.88);
+      } else if (normTitle.contains(nq)) {
+        directTitleScore = math.max(directTitleScore, 0.72);
+      }
+    }
+
+    var s = directTitleScore;
     for (final q in queries) {
       s = math.max(s, _matchScore(q, item.title, secondary));
     }
+
+    final isDirectTitleMatch = directTitleScore >= 0.72;
+
     final w = switch (item) {
       SearchArtistItem _ => switch (m) {
-        SearchLayoutMode.exactArtist => 1.05,
-        SearchLayoutMode.artistType => 0.95,
-        SearchLayoutMode.songTitle => 0.50,
-        SearchLayoutMode.albumOrPlaylist => 0.55,
-        _ =>
-          0.65, // Generic search: demote artists so songs/albums are preferred
+        SearchLayoutMode.exactArtist => 1.45,
+        SearchLayoutMode.artistType => 1.30,
+        SearchLayoutMode.songTitle => 0.65,
+        SearchLayoutMode.albumOrPlaylist => 0.65,
+        _ => isDirectTitleMatch ? 1.35 : 0.60,
       },
-      SearchSongItem _ =>
-        m == SearchLayoutMode.songTitle ? 1.15 : (artistMode ? 0.92 : 1.08),
-      SearchAlbumItem _ => m == SearchLayoutMode.albumOrPlaylist ? 1.12 : 1.02,
-      SearchPlaylistItem _ =>
-        m == SearchLayoutMode.albumOrPlaylist ? 1.00 : 0.85,
-      SearchVideoItem _ => 0.90,
-      _ => 0.80,
+      SearchAlbumItem _ => switch (m) {
+        SearchLayoutMode.albumOrPlaylist => 1.45,
+        SearchLayoutMode.exactArtist => 0.90,
+        SearchLayoutMode.songTitle => 0.85,
+        _ => isDirectTitleMatch ? 1.35 : 0.70,
+      },
+      SearchPlaylistItem _ => switch (m) {
+        SearchLayoutMode.albumOrPlaylist => 1.45,
+        SearchLayoutMode.exactArtist => 0.80,
+        SearchLayoutMode.songTitle => 0.80,
+        _ => isDirectTitleMatch ? 1.30 : 0.70,
+      },
+      SearchSongItem _ => switch (m) {
+        SearchLayoutMode.songTitle => 1.40,
+        SearchLayoutMode.exactArtist => isDirectTitleMatch ? 1.25 : 0.85,
+        SearchLayoutMode.albumOrPlaylist => isDirectTitleMatch ? 1.20 : 0.85,
+        _ => isDirectTitleMatch ? 1.35 : 0.85,
+      },
+      SearchVideoItem _ => 0.80,
+      _ => 0.75,
     };
-    // Prioritize popular, streamed, and top server ranked tracks
-    final serverBonus =
-        (1.0 / (1.0 + (item.rawRank < 0 ? 10 : item.rawRank))) * 0.08;
-    final officialBonus = (item is SearchSongItem && item.isOfficialAudio)
-        ? 0.04
-        : 0.0;
-    final durationBonus = (item is SearchSongItem && item.durationSeconds >= 60)
-        ? 0.02
-        : 0.0;
-    return (s * w) + serverBonus + officialBonus + durationBonus;
+
+    // Popularity bonuses based on streams, views, followers, and official credentials
+    double popBonus = 0.0;
+    if (item is SearchArtistItem) {
+      final subs = item.subscriberCount ??
+          QueryPreprocessor.parseCountString(item.subscriberText);
+      if (subs > 0) {
+        // Logarithmic scale: 20M+ followers -> +0.14, 1M+ -> +0.10, 100K+ -> +0.06
+        popBonus += (math.log(1.0 + subs) / math.ln10 / 7.5).clamp(0.0, 0.14);
+      }
+      if (item.isVerified) popBonus += 0.06;
+    } else if (item is SearchSongItem) {
+      if (item.isOfficialAudio) popBonus += 0.06;
+      if (item.durationSeconds >= 60 && item.durationSeconds <= 450) {
+        popBonus += 0.03;
+      }
+      final rankBonus =
+          (1.0 / (1.0 + (item.rawRank < 0 ? 10 : item.rawRank))) * 0.08;
+      popBonus += rankBonus;
+    } else if (item is SearchAlbumItem) {
+      if (item.albumType.toLowerCase() == 'album') popBonus += 0.06;
+      final rankBonus =
+          (1.0 / (1.0 + (item.rawRank < 0 ? 10 : item.rawRank))) * 0.06;
+      popBonus += rankBonus;
+    } else if (item is SearchPlaylistItem) {
+      if (item.isOfficial) popBonus += 0.08;
+      final rankBonus =
+          (1.0 / (1.0 + (item.rawRank < 0 ? 10 : item.rawRank))) * 0.05;
+      popBonus += rankBonus;
+    } else if (item is SearchVideoItem) {
+      if (item.views > 0) {
+        popBonus +=
+            (math.log(1.0 + item.views) / math.ln10 / 8.5).clamp(0.0, 0.08);
+      }
+    }
+
+    return (s * w) + popBonus;
   }
 
   List<_TopCand> _rankTopResults(SearchResult r, List<String> queries) {
@@ -2512,20 +2582,29 @@ class _SearchScreenState extends State<SearchScreen>
     final serviceTop = r.topResult?.item;
     final serviceKey = serviceTop == null ? null : keyOf(serviceTop);
 
-    if (queries.isEmpty) {
-      if (serviceTop != null) return [_TopCand(serviceTop, 1.0)];
-      if (r.songs.isNotEmpty) return [_TopCand(r.songs.first, 1.0)];
-      return const [];
-    }
-
     void add(SearchItem item) {
+      // Validate videos and shorts
+      if (item is SearchVideoItem) {
+        if (!MusicVideoFilter.isLegitMusicVideo(
+          title: item.title,
+          subtitle: item.subtitle,
+          channel: item.channel,
+          durationText: item.durationText,
+        )) {
+          return;
+        }
+      }
+      if (item is SearchSongItem &&
+          item.durationSeconds < 60 &&
+          item.durationSeconds > 0) {
+        return;
+      }
+
       final k = keyOf(item);
       if (cands.containsKey(k)) return;
       var score = _scoreItem(item, queries, mode);
       if (k == serviceKey && score >= 0.5) {
-        if (item is! SearchArtistItem || mode == SearchLayoutMode.exactArtist) {
-          score += 0.03;
-        }
+        score += 0.04;
       }
       cands[k] = _TopCand(item, score);
     }
@@ -2544,15 +2623,36 @@ class _SearchScreenState extends State<SearchScreen>
       return const [];
     }
 
-    if (sorted.first.score < 0.35) {
-      // Nothing matched convincingly: prefer songs unless exact artist was requested
-      if (serviceTop != null &&
-          (serviceTop is! SearchArtistItem ||
-              mode == SearchLayoutMode.exactArtist)) {
-        return [_TopCand(serviceTop, 1.0)];
+    // Strict layout mode top result priority:
+    // When intent is exactArtist, ensure the top matching artist leads.
+    if (mode == SearchLayoutMode.exactArtist) {
+      final bestArtist =
+          sorted.where((c) => c.item is SearchArtistItem).firstOrNull;
+      if (bestArtist != null && bestArtist != sorted.first) {
+        sorted.remove(bestArtist);
+        sorted.insert(0, bestArtist);
       }
-      if (r.songs.isNotEmpty) return [_TopCand(r.songs.first, 1.0)];
+    } else if (mode == SearchLayoutMode.albumOrPlaylist) {
+      final bestAlbumOrPl = sorted
+          .where(
+              (c) => c.item is SearchAlbumItem || c.item is SearchPlaylistItem)
+          .firstOrNull;
+      if (bestAlbumOrPl != null && bestAlbumOrPl != sorted.first) {
+        sorted.remove(bestAlbumOrPl);
+        sorted.insert(0, bestAlbumOrPl);
+      }
+    } else if (mode == SearchLayoutMode.songTitle) {
+      final bestSong =
+          sorted.where((c) => c.item is SearchSongItem).firstOrNull;
+      if (bestSong != null && bestSong != sorted.first) {
+        sorted.remove(bestSong);
+        sorted.insert(0, bestSong);
+      }
+    }
+
+    if (sorted.first.score < 0.35) {
       if (serviceTop != null) return [_TopCand(serviceTop, 1.0)];
+      if (r.songs.isNotEmpty) return [_TopCand(r.songs.first, 1.0)];
       return const [];
     }
 

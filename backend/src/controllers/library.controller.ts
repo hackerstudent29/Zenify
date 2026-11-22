@@ -191,6 +191,8 @@ export class LibraryController {
       Body: {
         albums?: Array<{ title: string; artist: string; cover?: string; browseId?: string }>;
         artists?: Array<{ name: string; cover?: string; browseId?: string }>;
+        liked?: Array<{ id: string; title?: string; artist?: string; coverUrl?: string; duration?: number }>;
+        playlists?: Array<{ id: string; name: string; description?: string; coverUrl?: string; tracks?: string[] }>;
       };
     }>,
     reply: FastifyReply
@@ -200,7 +202,7 @@ export class LibraryController {
       return reply.status(401).send({ error: 'Unauthorized' });
     }
 
-    const { albums, artists } = req.body || {};
+    const { albums, artists, liked, playlists } = req.body || {};
 
     try {
       if (Array.isArray(albums)) {
@@ -252,6 +254,122 @@ export class LibraryController {
               browseId: art.browseId?.trim()
             }
           }).catch(() => {});
+        }
+      }
+
+      if (Array.isArray(liked)) {
+        for (const item of liked) {
+          const trackId = item?.id;
+          if (!trackId) continue;
+          try {
+            let track = await prisma.track.findFirst({
+              where: {
+                OR: [
+                  { id: trackId },
+                  { youtubeId: trackId }
+                ]
+              }
+            });
+            if (!track) {
+              const title = item.title || 'Track';
+              const artistName = item.artist || 'Artist';
+              let artist = await prisma.artist.findFirst({ where: { name: artistName } });
+              if (!artist) {
+                artist = await prisma.artist.create({ data: { name: artistName } }).catch(() => null);
+              }
+              if (artist) {
+                track = await prisma.track.create({
+                  data: {
+                    id: trackId,
+                    title,
+                    artistId: artist.id,
+                    duration: item.duration || 180,
+                    coverUrl: item.coverUrl || '',
+                    source: 'EXTERNAL'
+                  }
+                }).catch(() => null);
+              }
+            }
+            if (track) {
+              await prisma.like.upsert({
+                where: {
+                  userId_trackId: {
+                    userId,
+                    trackId: track.id
+                  }
+                },
+                create: {
+                  userId,
+                  trackId: track.id
+                },
+                update: {}
+              }).catch(() => {});
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (Array.isArray(playlists)) {
+        for (const p of playlists) {
+          if (!p.id || !p.name) continue;
+          try {
+            const playlist = await prisma.playlist.upsert({
+              where: { id: p.id },
+              create: {
+                id: p.id,
+                name: p.name.trim(),
+                description: p.description?.trim(),
+                userId,
+                coverUrl: p.coverUrl?.trim()
+              },
+              update: {
+                name: p.name.trim(),
+                description: p.description?.trim(),
+                coverUrl: p.coverUrl?.trim()
+              }
+            });
+            if (Array.isArray(p.tracks)) {
+              for (const tid of p.tracks) {
+                if (!tid) continue;
+                let track = await prisma.track.findFirst({
+                  where: { OR: [{ id: tid }, { youtubeId: tid }] }
+                });
+                if (!track) {
+                  let defaultArtist = await prisma.artist.findFirst();
+                  if (!defaultArtist) {
+                    defaultArtist = await prisma.artist.create({ data: { name: 'Various Artists' } }).catch(() => null);
+                  }
+                  if (defaultArtist) {
+                    track = await prisma.track.create({
+                      data: {
+                        id: tid,
+                        title: 'Track',
+                        artistId: defaultArtist.id,
+                        duration: 180,
+                        coverUrl: '',
+                        source: 'EXTERNAL'
+                      }
+                    }).catch(() => null);
+                  }
+                }
+                if (track) {
+                  await prisma.playlistTrack.upsert({
+                    where: {
+                      playlistId_trackId: {
+                        playlistId: playlist.id,
+                        trackId: track.id
+                      }
+                    },
+                    create: {
+                      playlistId: playlist.id,
+                      trackId: track.id
+                    },
+                    update: {}
+                  }).catch(() => {});
+                }
+              }
+            }
+          } catch (_) {}
         }
       }
 

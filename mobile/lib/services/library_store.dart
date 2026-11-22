@@ -251,7 +251,69 @@ class LibraryStore extends ChangeNotifier {
               }
             }
           }
+
+          // 4. User playlists
+          final remotePlaylists = remote['playlists'] as List?;
+          if (remotePlaylists != null) {
+            final localPlaylistIds = _playlists.map((p) => p.id).toSet();
+            for (final item in remotePlaylists) {
+              if (item is Map) {
+                final id = (item['id'] as String? ?? '').trim();
+                final name = (item['name'] as String? ?? '').trim();
+                final rawList = item['tracks'] as List? ?? [];
+                final trackIds = rawList.map((x) => '$x'.trim()).where((x) => x.isNotEmpty).toList();
+                if (id.isNotEmpty && !localPlaylistIds.contains(id)) {
+                  _playlists.add(UserPlaylist(
+                    id: id,
+                    name: name.isEmpty ? 'My Playlist' : name,
+                    trackIds: trackIds,
+                  ));
+                  changed = true;
+                }
+              }
+            }
+          }
+
           if (changed) _save();
+
+          // 5. Push local library to cloud DB so nothing is ever lost across installs
+          final remoteLikedIds = (remote['liked'] as List?)
+              ?.map((x) => x is Map ? (x['id'] as String? ?? '') : '')
+              .toSet() ?? {};
+          final unuploadedLiked = _liked.where((id) => !remoteLikedIds.contains(id)).toList();
+          final remotePlaylistIds = (remote['playlists'] as List?)
+              ?.map((x) => x is Map ? (x['id'] as String? ?? '') : '')
+              .toSet() ?? {};
+          final unuploadedPlaylists = _playlists.where((p) => !remotePlaylistIds.contains(p.id)).toList();
+
+          if (unuploadedLiked.isNotEmpty || _albums.isNotEmpty || _artists.isNotEmpty || unuploadedPlaylists.isNotEmpty) {
+            final syncPayload = <String, dynamic>{
+              if (_albums.isNotEmpty)
+                'albums': [
+                  for (final a in _albums)
+                    {'title': a.title, 'artist': a.artist, 'cover': a.cover}
+                ],
+              if (_artists.isNotEmpty)
+                'artists': [
+                  for (final a in _artists)
+                    {'name': a.name, 'cover': a.cover}
+                ],
+              if (unuploadedLiked.isNotEmpty)
+                'liked': [
+                  for (final id in unuploadedLiked)
+                    if (_seen[id] != null)
+                      _seen[id]!.toJson()
+                    else
+                      {'id': id}
+                ],
+              if (unuploadedPlaylists.isNotEmpty)
+                'playlists': [
+                  for (final p in unuploadedPlaylists)
+                    {'id': p.id, 'name': p.name, 'tracks': p.trackIds}
+                ],
+            };
+            unawaited(ApiService.syncUserLibrary(syncPayload));
+          }
         }
       } catch (e) {
         if (kDebugMode) debugPrint('[LibraryStore] Failed to sync remote library: $e');
@@ -442,9 +504,11 @@ class LibraryStore extends ChangeNotifier {
   }
 
   /* ── liked songs ── */
+  Track? getTrackById(String id) => _seen[id];
   List<Track> get likedTracks => _resolve(_liked);
   int get likedCount => _liked.length;
   bool isLiked(Track t) => _liked.contains(_key(t));
+  bool isLikedId(String? id) => id != null && id.isNotEmpty && _liked.contains(id);
 
   void toggleLike(Track t) {
     final k = _key(t);
@@ -472,6 +536,10 @@ class LibraryStore extends ChangeNotifier {
       );
     }
     _save();
+
+    if (_activeUserId != null && _activeUserId!.isNotEmpty) {
+      unawaited(ApiService.toggleTrackLike(t.id, t.toJson()));
+    }
   }
 
   void toggleLove(Track t) => toggleLike(t);
@@ -506,6 +574,12 @@ class LibraryStore extends ChangeNotifier {
       );
     }
     _save();
+
+    if (_activeUserId != null && _activeUserId!.isNotEmpty) {
+      unawaited(ApiService.syncUserLibrary({
+        'artists': [{'name': clean, 'cover': cover}],
+      }));
+    }
   }
 
   /* ── albums ── */
@@ -558,6 +632,16 @@ class LibraryStore extends ChangeNotifier {
   /* ── playlists ── */
   List<UserPlaylist> get playlists => List.unmodifiable(_playlists);
 
+  void _syncPlaylistToCloud(UserPlaylist p) {
+    if (_activeUserId != null && _activeUserId!.isNotEmpty) {
+      unawaited(ApiService.syncUserLibrary({
+        'playlists': [
+          {'id': p.id, 'name': p.name, 'tracks': p.trackIds}
+        ],
+      }));
+    }
+  }
+
   UserPlaylist? playlistById(String id) {
     for (final p in _playlists) {
       if (p.id == id) return p;
@@ -579,6 +663,7 @@ class LibraryStore extends ChangeNotifier {
     }
     _playlists.insert(0, p);
     _save();
+    _syncPlaylistToCloud(p);
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_create_${p.id}',
@@ -602,6 +687,7 @@ class LibraryStore extends ChangeNotifier {
     }
     _playlists.insert(0, p);
     _save();
+    _syncPlaylistToCloud(p);
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_import_${p.id}',
@@ -618,6 +704,7 @@ class LibraryStore extends ChangeNotifier {
     if (p == null || name.trim().isEmpty) return;
     p.name = name.trim();
     _save();
+    _syncPlaylistToCloud(p);
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_rename_$id',
@@ -633,6 +720,9 @@ class LibraryStore extends ChangeNotifier {
     final name = p?.name ?? 'Playlist';
     _playlists.removeWhere((p) => p.id == id);
     _save();
+    if (_activeUserId != null && _activeUserId!.isNotEmpty) {
+      unawaited(ApiService.deletePlaylist(id));
+    }
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_del_$id',
@@ -663,6 +753,7 @@ class LibraryStore extends ChangeNotifier {
     }
     p.trackIds.add(k);
     _save();
+    _syncPlaylistToCloud(p);
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_add_${t.id}_${DateTime.now().millisecondsSinceEpoch}',
@@ -688,6 +779,7 @@ class LibraryStore extends ChangeNotifier {
       }
     }
     _save();
+    _syncPlaylistToCloud(p);
     IslandNotifier.instance.show(
       IslandNotification(
         id: 'playlist_add_batch_${p.id}_${DateTime.now().millisecondsSinceEpoch}',
@@ -704,6 +796,7 @@ class LibraryStore extends ChangeNotifier {
     p?.trackIds.remove(_key(t));
     _save();
     if (p != null) {
+      _syncPlaylistToCloud(p);
       IslandNotifier.instance.show(
         IslandNotification(
           id: 'playlist_rm_${t.id}_${DateTime.now().millisecondsSinceEpoch}',

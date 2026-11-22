@@ -82,11 +82,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         override fun run() {
             val p = player
             val isSuppressed = p?.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
-            val active = p != null && !isSuppressed && (
-                p.isPlaying ||
-                    (p.playWhenReady &&
-                        p.playbackState != Player.STATE_ENDED &&
-                        p.playbackState != Player.STATE_IDLE)
+            val active = p != null && !isSuppressed && p.playWhenReady && (
+                p.isPlaying || p.playbackState == Player.STATE_BUFFERING
             )
             if (active && isAppInForeground) {
                 emitProgressSnapshot(p)
@@ -126,11 +123,8 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
     private fun updateTickerState() {
         val p = player
         val isSuppressed = p?.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
-        val active = p != null && !isSuppressed && (
-            p.isPlaying ||
-                (p.playWhenReady &&
-                    p.playbackState != Player.STATE_ENDED &&
-                    p.playbackState != Player.STATE_IDLE)
+        val active = p != null && !isSuppressed && p.playWhenReady && (
+            p.isPlaying || p.playbackState == Player.STATE_BUFFERING
         )
         if (active && isAppInForeground) {
             startTicker()
@@ -244,13 +238,12 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
         val s = when {
             p.playbackState == Player.STATE_ENDED -> "completed"
             p.playbackState == Player.STATE_IDLE -> "stopped"
-            isSuppressed -> "paused"
+            isSuppressed || !p.playWhenReady -> "paused"
             p.isPlaying -> "playing"
-            p.playWhenReady && p.playbackState == Player.STATE_BUFFERING -> "playing"
-            p.playWhenReady && p.playbackState == Player.STATE_READY -> "playing"
+            p.playWhenReady && p.playbackState == Player.STATE_BUFFERING && !isSuppressed -> "playing"
             else -> "paused"
         }
-        val isBuffering = p.playbackState == Player.STATE_BUFFERING && !isSuppressed
+        val isBuffering = p.playbackState == Player.STATE_BUFFERING && !isSuppressed && p.playWhenReady
         emit(mapOf("type" to "state", "value" to s, "buffering" to isBuffering))
     }
 
@@ -340,15 +333,26 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                 updateTickerState()
             }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (!playWhenReady) {
+                    stopTicker()
+                }
                 emitState()
+                emitProgressSnapshot(p)
                 updateTickerState()
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (!isPlaying && p.playbackState != Player.STATE_BUFFERING) {
+                    stopTicker()
+                }
                 emitState()
                 emitProgressSnapshot(p)
                 updateTickerState()
             }
             override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+                if (playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE) {
+                    p.playWhenReady = false
+                    stopTicker()
+                }
                 emitState()
                 emitProgressSnapshot(p)
                 updateTickerState()
@@ -823,7 +827,10 @@ class ZenAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityA
                     val wasForeground = isAppInForeground
                     isAppInForeground = call.argument<Boolean>("isForeground") ?: true
                     if (!wasForeground && isAppInForeground) {
-                        player?.let { emitProgressSnapshot(it) }
+                        player?.let {
+                            emitState()
+                            emitProgressSnapshot(it)
+                        }
                         updateTickerState()
                     } else if (!isAppInForeground) {
                         stopTicker()

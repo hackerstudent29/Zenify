@@ -253,7 +253,7 @@ private class EqMod(val fs: Float) : Mod() {
             bq[2][c].set(HSHELF, fs, 8000f, 0.8f, g[2])
         }
         val maxBoost = max(0f, max(g[0], max(g[1], g[2])))
-        trim = if (maxBoost > 0.1f) dbToLin(-maxBoost * 0.70f) else 1f
+        trim = if (maxBoost > 0.1f) dbToLin(-maxBoost * 0.25f) else 1f
     }
 
     override fun process(io: FloatArray) {
@@ -695,10 +695,9 @@ private class Engine(val fs: Float, onBands: (FloatArray) -> Unit) {
 
     fun setLoudnessDb(db: Double?) {
         targetLoudnessGain = if (db != null) {
-            // YouTube loudnessDb is positive when track is louder than -14 LUFS.
-            // Target attenuation: -db.
-            // When track is quieter (db < 0), clamp boost to max +3.0 dB to prevent digital clipping.
-            val clampedDb = (-db).coerceIn(-15.0, 3.0).toFloat()
+            // Keep volume punchy between 0 dB and -2 to -3 dB max as required,
+            // preventing drastic -10 dB drops when StudioFX is turned on.
+            val clampedDb = (-db).coerceIn(-2.5, 2.0).toFloat()
             10f.pow(clampedDb / 20f)
         } else {
             1f

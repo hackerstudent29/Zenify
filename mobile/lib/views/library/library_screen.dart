@@ -1364,21 +1364,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
           onTap: () => _openArtist(context, art.name),
         ),
     ];
-    if (items.length < 8) {
-      final keys = s.savedAlbums.map((a) => '${a.title}|${a.artist}').toSet();
-      for (final a in catalogAlbums()) {
-        if (items.length >= 8) break;
-        if (keys.contains('${a.title}|${a.artist}')) continue;
-        items.add(
-          _Item(
-            title: a.title,
-            sub: a.artist,
-            cover: _Cover(a.cover, radius: 0),
-            onTap: () => _openAlbum(context, a.title, a.artist, a.cover),
-          ),
-        );
-      }
-    }
     return items;
   }
 
@@ -1462,21 +1447,32 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 18,
-                  crossAxisSpacing: 16,
-                  mainAxisExtent: w + 56,
+            if (items.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 18,
+                    crossAxisSpacing: 16,
+                    mainAxisExtent: w + 56,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => _Tile(item: items[i], index: i),
+                    childCount: items.length,
+                  ),
                 ),
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _Tile(item: items[i], index: i),
-                  childCount: items.length,
+              )
+            else
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 48),
+                  child: Text(
+                    'Playlists, albums, and artists you add to your library will appear here.',
+                    style: _t(14, c: _sub),
+                  ),
                 ),
               ),
-            ),
           ],
         );
       },
@@ -1749,7 +1745,7 @@ class _PlaylistPage extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _CircleBtn(
-              Icons.more_horiz_rounded,
+              Icons.more_vert_rounded,
               () => _playlistMenu(ctx, p, inDetail: true),
             ),
           ],
@@ -2273,7 +2269,6 @@ class _AddSongsPageState extends State<_AddSongsPage> {
 
       if (isQueryEmpty) {
         final liked = s.likedTracks;
-        final suggested = CatalogDataSource.allTracks;
 
         if (liked.isNotEmpty) {
           slivers.add(sectionHeader('From Favourite Songs'));
@@ -2285,15 +2280,16 @@ class _AddSongsPageState extends State<_AddSongsPage> {
               ),
             ),
           );
-        }
-
-        if (suggested.isNotEmpty) {
-          slivers.add(sectionHeader('Suggested Songs'));
+        } else {
           slivers.add(
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (c, i) => songRow(suggested[i]),
-                childCount: math.min(30, suggested.length),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+                child: Text(
+                  'Search online or through your library to add songs.',
+                  style: TextStyle(color: _sub, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           );
@@ -2390,16 +2386,6 @@ class _ArtistsPageState extends State<_ArtistsPage> {
       bool match(String n) => q.isEmpty || n.toLowerCase().contains(q);
 
       final followed = s.followedArtists.where((a) => match(a.name)).toList();
-      final names = s.followedArtists.map((a) => a.name).toSet();
-      final suggested = catalogArtists()
-          .where((a) => !names.contains(a.name) && match(a.name))
-          .take(40)
-          .toList();
-
-      Widget header(String t) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-        child: Text(t, style: _t(20, w: FontWeight.w700, ls: -0.3)),
-      );
 
       return _page(
         title: 'Artists',
@@ -2412,14 +2398,13 @@ class _ArtistsPageState extends State<_ArtistsPage> {
               onChanged: (_) => setState(() {}),
             ),
           ),
-          SliverToBoxAdapter(child: header('Following')),
           if (followed.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                 child: Text(
                   s.followedArtists.isEmpty
-                      ? 'You aren’t following anyone yet. Follow artists below and they’ll show up here.'
+                      ? 'You aren’t following anyone yet. Follow artists and they’ll show up here.'
                       : 'No followed artist matches “${_q.text.trim()}”.',
                   style: _t(14, c: _sub),
                 ),
@@ -2436,19 +2421,6 @@ class _ArtistsPageState extends State<_ArtistsPage> {
                 childCount: followed.length,
               ),
             ),
-          if (suggested.isNotEmpty) ...[
-            SliverToBoxAdapter(child: header('Suggested Artists')),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (c, i) => _ArtistRow(
-                  name: suggested[i].name,
-                  cover: suggested[i].cover,
-                  sub: _n(suggested[i].count, 'song', 'songs'),
-                ),
-                childCount: suggested.length,
-              ),
-            ),
-          ],
         ],
       );
     },
@@ -2561,15 +2533,6 @@ class _AlbumsPageState extends State<_AlbumsPage> {
       final saved = s.savedAlbums
           .where((a) => match(a.title, a.artist))
           .toList();
-      final keys = s.savedAlbums.map((a) => '${a.title}|${a.artist}').toSet();
-      final browse = catalogAlbums()
-          .where(
-            (a) =>
-                !keys.contains('${a.title}|${a.artist}') &&
-                match(a.title, a.artist),
-          )
-          .take(60)
-          .toList();
 
       final w = (MediaQuery.sizeOf(ctx).width - 40 - 16) / 2;
       final delegate = SliverGridDelegateWithFixedCrossAxisCount(
@@ -2577,11 +2540,6 @@ class _AlbumsPageState extends State<_AlbumsPage> {
         mainAxisSpacing: 18,
         crossAxisSpacing: 16,
         mainAxisExtent: w + 56,
-      );
-
-      Widget header(String t) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
-        child: Text(t, style: _t(20, w: FontWeight.w700, ls: -0.3)),
       );
 
       return _page(
@@ -2595,14 +2553,13 @@ class _AlbumsPageState extends State<_AlbumsPage> {
               onChanged: (_) => setState(() {}),
             ),
           ),
-          SliverToBoxAdapter(child: header('Saved')),
           if (saved.isEmpty)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                 child: Text(
                   s.savedAlbums.isEmpty
-                      ? 'No saved albums yet. Tap + on an album below to add it to your library.'
+                      ? 'No saved albums yet. Save albums to your library to see them here.'
                       : 'No saved album matches “${_q.text.trim()}”.',
                   style: _t(14, c: _sub),
                 ),
@@ -2624,24 +2581,6 @@ class _AlbumsPageState extends State<_AlbumsPage> {
                 ),
               ),
             ),
-          if (browse.isNotEmpty) ...[
-            SliverToBoxAdapter(child: header('Browse')),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverGrid(
-                gridDelegate: delegate,
-                delegate: SliverChildBuilderDelegate(
-                  (c, i) => _AlbumCard(
-                    title: browse[i].title,
-                    artist: browse[i].artist,
-                    cover: browse[i].cover,
-                    index: i,
-                  ),
-                  childCount: browse.length,
-                ),
-              ),
-            ),
-          ],
         ],
       );
     },
@@ -2896,9 +2835,7 @@ class _SongsPageState extends State<_SongsPage> {
     ]),
     builder: (ctx, _) {
       final store = LibraryStore.instance;
-      final allSongs = store.allLibraryTracks.isNotEmpty
-          ? store.allLibraryTracks
-          : CatalogDataSource.allTracks;
+      final allSongs = store.allLibraryTracks;
       final searching = _q.text.trim().isNotEmpty;
       final songs = _filterTracks(allSongs, _q.text, _sort);
       return _page(
@@ -3119,7 +3056,7 @@ class _DownloadedPageState extends State<_DownloadedPage> {
         title: 'Downloaded',
         previous: 'Library',
         trailing: _CircleBtn(
-          Icons.more_horiz_rounded,
+          Icons.more_vert_rounded,
           () => _showDownloadedOptions(ctx),
         ),
         slivers: [
@@ -3607,7 +3544,7 @@ class _MoreBtn extends StatelessWidget {
     child: const SizedBox(
       width: 44,
       height: 44,
-      child: Icon(Icons.more_horiz_rounded, color: _sub, size: 22),
+      child: Icon(Icons.more_vert_rounded, color: _sub, size: 22),
     ),
   );
 }

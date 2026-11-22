@@ -574,7 +574,7 @@ class _RoomTogetherScreenState extends State<RoomTogetherScreen> with HideDocksM
             ]),
           ]),
         ),
-        CircleIconButton(icon: CupertinoIcons.ellipsis, onTap: () => showRoomMenu(context), tooltip: 'Room'),
+        CircleIconButton(icon: CupertinoIcons.ellipsis_vertical, onTap: () => showRoomMenu(context), tooltip: 'Room'),
       ]),
     );
   }

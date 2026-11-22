@@ -160,7 +160,7 @@ class _LiquidGlassStudioState extends State<LiquidGlassStudio>
                     for (final ic in [
                       CupertinoIcons.heart_fill,
                       CupertinoIcons.share,
-                      CupertinoIcons.ellipsis,
+                      CupertinoIcons.ellipsis_vertical,
                     ])
                       Padding(
                         padding: const EdgeInsets.only(right: 10),

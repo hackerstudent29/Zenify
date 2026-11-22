@@ -45,7 +45,7 @@ const FxMap kFxDefaults = {
   'speed8D': 0.15,
   'speed': 1.0,
   'tape': false,
-  'bypass': false,
+  'bypass': true,
 };
 
 const List<String> kSoundKeys = [
@@ -205,7 +205,14 @@ class StudioFxState extends ChangeNotifier {
     try {
       final p = await SharedPreferences.getInstance();
       final cur = p.getString('zenify_fx_current');
-      if (cur != null) _s = FxSettings.defaults().patch(jsonDecode(cur) as FxMap);
+      if (cur != null) {
+        final saved = jsonDecode(cur) as FxMap;
+        // StudioFX is session-only and turned off by default on cold app start.
+        saved['bypass'] = true;
+        _s = FxSettings.defaults().patch(saved);
+      } else {
+        _s = FxSettings.defaults();
+      }
       final list = p.getString('zenify_fx_presets');
       if (list != null) {
         _custom

@@ -349,6 +349,14 @@ class SearchIntentDetector {
     'theme',
   };
 
+  static final Set<String> _playlistVibeKeywords = {
+    'playlist', 'playlists', 'hits', 'best of', 'top 50', 'top 100',
+    'mix', 'mixes', 'beats', 'chill', 'workout', 'gym', 'party',
+    'lofi', 'radio', 'devotional', 'bhajan', 'meditation', 'sleep',
+    'road trip', 'driving', 'summer', 'winter', 'acoustic', 'unplugged',
+    '90s', '2000s', '2010s', '2020s', 'party songs', 'dance hits',
+  };
+
   /// Fast preliminary intent detection from raw query tokens before dispatching network streams.
   static SearchItemType? detectPreliminaryIntent(String rawQuery) {
     final tokens = QueryPreprocessor.tokenize(rawQuery);
@@ -382,30 +390,46 @@ class SearchIntentDetector {
     final entityText = remainingTokens.join(' ').trim();
     final effectiveEntity = entityText.isNotEmpty ? entityText : normalized;
 
-    // Check if there is a strong matching song title
-    final hasStrongSongMatch = rawItems.any(
-      (it) =>
-          it is SearchSongItem &&
-          _computeTextScore(
-                normalized,
-                QueryPreprocessor.normalize(it.title),
-              ) >=
-              0.80,
-    );
+    // 1. Direct song title match check
+    double bestSongScore = 0.0;
+    for (final it in rawItems.whereType<SearchSongItem>()) {
+      final sNorm = QueryPreprocessor.normalize(it.title);
+      final isExact = sNorm == effectiveEntity;
+      final isPrefix =
+          sNorm.startsWith(effectiveEntity) && effectiveEntity.length >= 3;
+      final score = isExact
+          ? 1.0
+          : (isPrefix ? 0.90 : _computeTextScore(effectiveEntity, sNorm));
+      if (score > bestSongScore) {
+        bestSongScore = score;
+      }
+    }
+    final hasStrongSongMatch = bestSongScore >= 0.82;
 
-    // Check if effectiveEntity matches any artist candidate
+    // 2. Direct artist name match check
     bool artistIntent = false;
     String? matchedArtistBrowseId;
     String? matchedArtistName;
+    double bestArtistScore = 0.0;
 
     final artistCandidates = rawItems.whereType<SearchArtistItem>().toList();
     for (final artist in artistCandidates) {
       final artistNorm = QueryPreprocessor.normalize(artist.name);
-      final score = _computeTextScore(effectiveEntity, artistNorm);
       final isExact = effectiveEntity == artistNorm;
-      final isPrefix =
-          artistNorm.startsWith(effectiveEntity) && effectiveEntity.length >= 3;
-      if (isExact || isPrefix || (score >= 0.85 && !hasStrongSongMatch)) {
+      final isPrefix = (artistNorm.startsWith(effectiveEntity) ||
+              effectiveEntity.startsWith(artistNorm)) &&
+          effectiveEntity.length >= 3;
+      final score = isExact
+          ? 1.0
+          : (isPrefix ? 0.92 : _computeTextScore(effectiveEntity, artistNorm));
+      if (score > bestArtistScore) {
+        bestArtistScore = score;
+      }
+      final isExplicitArtist = intentType == SearchItemType.artist;
+      if (isExplicitArtist ||
+          isExact ||
+          (isPrefix && !hasStrongSongMatch) ||
+          (score >= 0.88 && !hasStrongSongMatch)) {
         artistIntent = true;
         matchedArtistBrowseId = artist.browseId;
         matchedArtistName = artist.name;
@@ -413,33 +437,59 @@ class SearchIntentDetector {
       }
     }
 
+    // 3. Direct album / movie title match check
+    bool albumIntent = false;
+    double bestAlbumScore = 0.0;
+    for (final album in rawItems.whereType<SearchAlbumItem>()) {
+      final albNorm = QueryPreprocessor.normalize(album.title);
+      final isExact = effectiveEntity == albNorm;
+      final isPrefix = (albNorm.startsWith(effectiveEntity) ||
+              effectiveEntity.startsWith(albNorm)) &&
+          effectiveEntity.length >= 3;
+      final score = isExact
+          ? 1.0
+          : (isPrefix ? 0.90 : _computeTextScore(effectiveEntity, albNorm));
+      if (score > bestAlbumScore) {
+        bestAlbumScore = score;
+      }
+      final isExplicitAlbum = intentType == SearchItemType.album;
+      if (isExplicitAlbum ||
+          (isExact && !artistIntent) ||
+          (isPrefix && !artistIntent && !hasStrongSongMatch)) {
+        albumIntent = true;
+        break;
+      }
+    }
+
+    // 4. Playlist / Vibe match check
+    final isPlaylistKeyword =
+        _playlistVibeKeywords.any((kw) => normalized.contains(kw));
+    final isLanguagePlaylist = SearchRanker._countryLanguages.values.any((langs) =>
+        langs.any((l) => normalized.contains(l)) &&
+        (normalized.contains('song') ||
+            normalized.contains('hit') ||
+            normalized.contains('playlist')));
+    final hasPlaylistIntent = intentType == SearchItemType.playlist ||
+        isPlaylistKeyword ||
+        isLanguagePlaylist;
+
     // Determine layout mode
     SearchLayoutMode mode;
     if (artistIntent && intentType != null) {
       // 1. Artist + type query (e.g. "anirudh songs", "anirudh albums")
       mode = SearchLayoutMode.artistType;
-    } else if (intentType == SearchItemType.album ||
-        intentType == SearchItemType.playlist) {
-      // 2. Explicit album or playlist query
-      mode = SearchLayoutMode.albumOrPlaylist;
-    } else if (hasStrongSongMatch && !artistIntent) {
-      // 3. Song title query takes precedence over loose artist match
-      mode = SearchLayoutMode.songTitle;
     } else if (artistIntent && intentType == null && modifiers.isEmpty) {
-      // 4. Exact artist query (e.g. "anirudh", "arijit singh", "the weeknd")
+      // 2. Exact artist query (e.g. "anirudh", "anirudh ravichander", "arijit singh")
       mode = SearchLayoutMode.exactArtist;
-    } else if (hasStrongSongMatch) {
-      mode = SearchLayoutMode.songTitle;
-    } else if (rawItems.any(
-      (it) =>
-          it is SearchAlbumItem &&
-          _computeTextScore(
-                normalized,
-                QueryPreprocessor.normalize(it.title),
-              ) >=
-              0.85,
-    )) {
+    } else if (albumIntent ||
+        hasPlaylistIntent ||
+        intentType == SearchItemType.album ||
+        intentType == SearchItemType.playlist) {
+      // 3. Explicit album, movie, or playlist query (e.g. "jailer", "leo", "tamil hits", "workout")
       mode = SearchLayoutMode.albumOrPlaylist;
+    } else if (hasStrongSongMatch) {
+      // 4. Song title query (e.g. "arabic kuthu", "hukum", "chaleya")
+      mode = SearchLayoutMode.songTitle;
     } else {
       // 5. Generic or mixed query
       mode = SearchLayoutMode.generic;
@@ -576,23 +626,38 @@ class SearchRanker {
       return a.id.compareTo(b.id);
     });
 
-    // 6. Resolve Top Result (Hero Card)
-    SearchTopResult? topResult = initialTopResult;
-    if (topResult == null && scoredItems.isNotEmpty) {
-      final best = scoredItems.first;
-      // High-confidence threshold
-      if (best.finalScore >= 0.60) {
-        topResult = _createTopResultFromItem(best);
+    // 6. Resolve Top Result (Hero Card) strictly matching detected intent & popularity
+    SearchTopResult? topResult;
+    if (intent.layoutMode == SearchLayoutMode.exactArtist) {
+      final artistItem = scoredItems.whereType<SearchArtistItem>().firstOrNull;
+      if (artistItem != null) {
+        topResult = _createTopResultFromItem(artistItem);
       }
-    } else if (topResult != null && scoredItems.isNotEmpty) {
-      // For exactArtist layout mode, ensure Top Result is the Artist entity
-      if (intent.layoutMode == SearchLayoutMode.exactArtist &&
-          topResult.type != SearchItemType.artist) {
-        final artistItem =
-            scoredItems.whereType<SearchArtistItem>().firstOrNull;
-        if (artistItem != null) {
-          topResult = _createTopResultFromItem(artistItem);
+    } else if (intent.layoutMode == SearchLayoutMode.albumOrPlaylist) {
+      final playlistItem =
+          scoredItems.whereType<SearchPlaylistItem>().firstOrNull;
+      final albumItem = scoredItems.whereType<SearchAlbumItem>().firstOrNull;
+      if (intent.intentType == SearchItemType.playlist ||
+          (playlistItem != null && albumItem == null)) {
+        if (playlistItem != null) {
+          topResult = _createTopResultFromItem(playlistItem);
         }
+      } else if (albumItem != null) {
+        topResult = _createTopResultFromItem(albumItem);
+      }
+    } else if (intent.layoutMode == SearchLayoutMode.songTitle) {
+      final songItem = scoredItems.whereType<SearchSongItem>().firstOrNull;
+      if (songItem != null) {
+        topResult = _createTopResultFromItem(songItem);
+      }
+    }
+
+    if (topResult == null && initialTopResult != null) {
+      topResult = initialTopResult;
+    } else if (topResult == null && scoredItems.isNotEmpty) {
+      final best = scoredItems.first;
+      if (best.finalScore >= 0.40) {
+        topResult = _createTopResultFromItem(best);
       }
     }
 
@@ -990,6 +1055,20 @@ class SearchRanker {
     final deduped = <SearchItem>[];
 
     for (final it in items) {
+      if (it is SearchVideoItem) {
+        if (!MusicVideoFilter.isLegitMusicVideo(
+          title: it.title,
+          subtitle: it.subtitle,
+          channel: it.channel,
+          durationText: it.durationText,
+        )) {
+          continue; // Discard non-music videos, tech reviews, tutorials, and shorts
+        }
+      }
+      if (it is SearchSongItem && it.durationSeconds < 60 && it.durationSeconds > 0) {
+        continue; // Discard shorts
+      }
+
       if (it is SearchSongItem) {
         if (!seenSongIds.add(it.id)) continue;
 
