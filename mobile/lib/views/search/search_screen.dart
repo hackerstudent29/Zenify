@@ -729,7 +729,10 @@ class _SearchScreenState extends State<SearchScreen>
             onTimeout: () => _dataService.getFallbackResult(query, filter),
           );
       if (!mounted) return;
-      if (id == _searchRequestId || _wantedKey == key || _submittedQuery == query || _lastTyped == query) {
+      if (id == _searchRequestId ||
+          _wantedKey == key ||
+          _submittedQuery.toLowerCase() == query.toLowerCase() ||
+          _lastTyped.toLowerCase() == query.toLowerCase()) {
         _rememberTopFor(query, results, filter);
         setState(() {
           _searchResults = results;
@@ -1522,7 +1525,7 @@ class _SearchScreenState extends State<SearchScreen>
     final cw = ext - 14;
     return _carousel(
       title: 'Albums',
-      height: cw + 64,
+      height: cw + 78,
       extent: cw,
       count: albums.length,
       onSeeAll: seeAll,
@@ -1549,7 +1552,7 @@ class _SearchScreenState extends State<SearchScreen>
     final cw = ext - 14;
     return _carousel(
       title: 'Playlists',
-      height: cw + 64,
+      height: cw + 78,
       extent: cw,
       count: playlists.length,
       onSeeAll: seeAll,
@@ -1573,7 +1576,7 @@ class _SearchScreenState extends State<SearchScreen>
   }) {
     return _carousel(
       title: 'Artists',
-      height: 186,
+      height: 198,
       extent: 130,
       count: artists.length,
       onSeeAll: seeAll,
@@ -2241,7 +2244,15 @@ class _SearchScreenState extends State<SearchScreen>
               ),
             ),
           if (!hasAny)
-            _buildEmptyResults()
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(32, 80, 32, 48),
+                child: Center(
+                  child: CupertinoActivityIndicator(radius: 13),
+                ),
+              )
+            else
+              _buildEmptyResults()
           else
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 320),

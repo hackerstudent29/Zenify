@@ -468,8 +468,8 @@ class _CategoryScreenState extends State<CategoryScreen>
                 final dy = off > 0 ? -off : 0.0;
                 return Transform(
                   alignment: Alignment.topCenter,
-                  transform: Matrix4.translationValues(0, dy, 0)
-                    ..scale(stretch, stretch, 1),
+                  transform: Matrix4.diagonal3Values(stretch, stretch, 1.0)
+                    ..setTranslationRaw(0.0, dy, 0.0),
                   child: child,
                 );
               },

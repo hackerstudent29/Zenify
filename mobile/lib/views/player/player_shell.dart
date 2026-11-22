@@ -103,6 +103,19 @@ const SpringDescription _kReleaseSpring = SpringDescription(
 /// The mini player pill is fully gone once the sheet is this far open.
 const double _kMiniFadeSpan = 0.22;
 
+/// Page dim behind the sheet (0..1 black) when fully open.
+const double _kScrimMax = 0.6;
+
+/// Sheet backdrop opacity while rising (1.0 on arrival). 1.0 = old look.
+const double _kSheetMinOpacity = 0.82;
+
+/// Tap open/close have no finger momentum, so they use softer springs and
+/// the cover flight stays visible. Drag releases keep the stiff ones.
+const SpringDescription _kOpenTapSpring =
+    SpringDescription(mass: 1, stiffness: 210, damping: 25);
+const SpringDescription _kCloseTapSpring =
+    SpringDescription(mass: 1, stiffness: 260, damping: 29);
+
 /// Vertical gap used TWICE in the open sheet, so the rhythm is even:
 ///  • between the seekbar and the play / pause row
 ///  • between the play / pause row and the last row (Studio FX · Lyrics · Queue)
@@ -543,7 +556,15 @@ class PlayerShellState extends State<PlayerShell>
         _bumpIdle(force: true);
       }
     }
-    _sheet.springTo(1, spring: _kOpenSpring, velocity: velocity).then((_) {
+    // interruptible: tapping mid-flight carries the current velocity
+    final v = velocity != 0 ? velocity : _sheet.velocity;
+    _sheet
+        .springTo(
+          1,
+          spring: v.abs() > 0.08 ? _kOpenSpring : _kOpenTapSpring,
+          velocity: v,
+        )
+        .then((_) {
       if (mounted && _panel == _Panel.lyrics && _bodyPanel != _Panel.lyrics) {
         setState(() => _bodyPanel = _Panel.lyrics);
       }
@@ -561,7 +582,14 @@ class PlayerShellState extends State<PlayerShell>
     _lyricsImmersive.value = false;
     if (_chrome.value != 0) _chrome.springTo(0, spring: kSnappySpring);
 
-    _sheet.springTo(0, spring: _kCloseSpring, velocity: velocity).then((_) {
+    final v = velocity != 0 ? velocity : _sheet.velocity;
+    _sheet
+        .springTo(
+          0,
+          spring: v.abs() > 0.08 ? _kCloseSpring : _kCloseTapSpring,
+          velocity: v,
+        )
+        .then((_) {
       PlayerShell.isPlayerOpenNotifier.value = false;
       if (!mounted) return;
       _dock.value = 0;
@@ -911,6 +939,7 @@ class PlayerShellState extends State<PlayerShell>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            _buildScrim(),
             _buildMini(player, track, safe),
             _buildSheet(player, track, size, safe, isFullBleed),
             _buildArtOverlay(player, track, size, safe, isFullBleed),
@@ -919,6 +948,23 @@ class PlayerShellState extends State<PlayerShell>
       ),
     );
   }
+
+  Widget _buildScrim() => Positioned.fill(
+    child: IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _sheet,
+        builder: (_, _) {
+          final t = _sheet.value.clamp(0.0, 1.0);
+          if (t <= 0.001) return const SizedBox.shrink();
+          return ColoredBox(
+            color: Colors.black.withValues(
+              alpha: _kScrimMax * Curves.easeOut.transform(t),
+            ),
+          );
+        },
+      ),
+    ),
+  );
 
   /* ───────────────────────── MINI PLAYER (Apple Music glass pill) ───────────────────────── */
 
@@ -1090,9 +1136,12 @@ class PlayerShellState extends State<PlayerShell>
                 ignoring: widget.hideMini || (!_dragging && t > 0.3),
                 child: Opacity(
                   opacity: widget.hideMini ? 0.0 : o,
-                  child: Transform.scale(
-                    scale: 1 - 0.04 * (1 - o),
-                    child: child,
+                  child: Transform.translate(
+                    offset: Offset(0, 14 * (1 - o)),
+                    child: Transform.scale(
+                      scale: 1 - 0.04 * (1 - o),
+                      child: child,
+                    ),
                   ),
                 ),
               );
@@ -1420,9 +1469,18 @@ class PlayerShellState extends State<PlayerShell>
           final t = _sheet.value.clamp(0.0, 1.0);
           if (!_open && t <= 0.001) return const SizedBox.shrink();
 
-          // top corners: round while the sheet rises, square when flush
           final radius = math.min(1.0, (1 - t) * _travel / 140) * 32;
-          final moving = t < 0.98 && radius > 0.1;
+          // starts as wide as the mini pill, widens as it rises
+          final inset =
+              _miniGeo(safe).side *
+              (1 - Curves.easeOutCubic.transform((t / 0.38).clamp(0.0, 1.0)));
+          final moving = t < 0.98 && (radius > 0.1 || inset > 0.1);
+          // translucent while rising, opaque on arrival
+          final backdropO = lerpDouble(
+            _kSheetMinOpacity,
+            1.0,
+            Curves.easeOut.transform(((t - 0.3) / 0.6).clamp(0.0, 1.0)),
+          )!;
           // controls + header appear only AFTER the card has arrived
           // (and disappear first when closing)
           final contentOpacity = Curves.easeOut.transform(
@@ -1438,14 +1496,21 @@ class PlayerShellState extends State<PlayerShell>
               child: Transform.translate(
                 offset: Offset(0, (1 - t) * size.height),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(moving ? radius : 0.0),
+                  clipper: _SheetClipper(
+                    moving ? inset : 0.0,
+                    moving ? radius : 0.0,
                   ),
                   clipBehavior: moving ? Clip.antiAlias : Clip.none,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      backdropLayer,
+                      Opacity(
+                        opacity: backdropO,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [backdropLayer],
+                        ),
+                      ),
                       // stays mounted (opacity 0 skips painting), so nothing
                       // is built mid-animation
                       Opacity(opacity: contentOpacity, child: column),
@@ -2405,4 +2470,23 @@ class _TrackMediaView extends StatelessWidget {
       ],
     );
   }
+}
+
+class _SheetClipper extends CustomClipper<RRect> {
+  _SheetClipper(this.inset, this.radius);
+  final double inset;
+  final double radius;
+
+  @override
+  RRect getClip(Size s) => RRect.fromLTRBAndCorners(
+    inset,
+    0,
+    s.width - inset,
+    s.height,
+    topLeft: Radius.circular(radius),
+    topRight: Radius.circular(radius),
+  );
+
+  @override
+  bool shouldReclip(_SheetClipper o) => o.inset != inset || o.radius != radius;
 }

@@ -460,6 +460,11 @@ class LyricsSheet extends StatelessWidget {
     final player = context.watch<PlayerState>();
     final track = player.currentTrack;
 
+    // Immediately trigger lyrics fetch if user opens the lyrics sheet
+    if (!player.hasLyrics) {
+      player.requestLyricsNow();
+    }
+
     if (player.isLoadingLyrics && !player.hasLyrics) {
       return Center(
         child: Padding(

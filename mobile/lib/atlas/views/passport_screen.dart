@@ -222,7 +222,7 @@ class _Milestones extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AtlasShelf(
-    height: 96,
+    height: 104,
     count: items.length,
     itemBuilder: (_, i) {
       final (title, desc, icon, on) = items[i];

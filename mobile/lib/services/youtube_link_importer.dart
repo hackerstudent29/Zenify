@@ -32,12 +32,17 @@ class YouTubeLinkImporter {
   /// Resolves any pasted YouTube Music, YouTube, Spotify, Apple Music, or JioSaavn link into a tracklist.
   Future<YouTubeImportResult?> resolve(String rawUrl) async {
     try {
+      final firstAttempt = await _resolveInternal(rawUrl).timeout(
+        const Duration(seconds: 35),
+        onTimeout: () => null,
+      );
+      if (firstAttempt != null && firstAttempt.tracks.isNotEmpty) {
+        return firstAttempt;
+      }
+      // Automatic quick retry if first attempt encountered a cold connection
       return await _resolveInternal(rawUrl).timeout(
         const Duration(seconds: 25),
-        onTimeout: () {
-          if (kDebugMode) debugPrint('[YouTubeLinkImporter] resolve timed out after 25s');
-          return null;
-        },
+        onTimeout: () => null,
       );
     } catch (e) {
       if (kDebugMode) debugPrint('[YouTubeLinkImporter] resolve unhandled error: $e');

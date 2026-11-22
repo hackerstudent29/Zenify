@@ -15,7 +15,7 @@ class AtlasCallout extends StatelessWidget {
   });
 
   static const double width = 296;
-  static const double cardHeight = 128;
+  static const double cardHeight = 140;
   static const double arrowHeight = 9;
   static const double totalHeight = cardHeight + arrowHeight;
 
@@ -36,9 +36,9 @@ class AtlasCallout extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.fromLTRB(
             14,
-            14 + (flipped ? arrowHeight : 0),
+            12 + (flipped ? arrowHeight : 0),
             14,
-            14 + (flipped ? 0 : arrowHeight),
+            12 + (flipped ? 0 : arrowHeight),
           ),
           child: child,
         ),

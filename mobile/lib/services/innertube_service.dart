@@ -1979,7 +1979,7 @@ class InnerTubeService {
               'playlistId': cleanId,
               'browseId': cleanId,
             })
-            .timeout(const Duration(seconds: 10), onTimeout: () => null);
+            .timeout(const Duration(seconds: 20), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final tracks = <Track>[];
           final rawTracks =
@@ -2042,7 +2042,7 @@ class InnerTubeService {
     try {
       final browseRes = await post('browse', {
         'browseId': 'VL$cleanId',
-      }, ttl: const Duration(hours: 6)).timeout(const Duration(seconds: 8));
+      }, ttl: const Duration(hours: 6)).timeout(const Duration(seconds: 16));
 
       final twoCol = browseRes['contents']?['twoColumnBrowseResultsRenderer'];
       final singleCol =
@@ -2157,7 +2157,7 @@ class InnerTubeService {
       try {
         final res = await _nativeChannel
             .invokeMapMethod<String, dynamic>('getSong', {'videoId': cleanId})
-            .timeout(const Duration(seconds: 10), onTimeout: () => null);
+            .timeout(const Duration(seconds: 20), onTimeout: () => null);
 
         if (res != null && res.isNotEmpty) {
           final id = res['id'] as String? ?? cleanId;
@@ -2252,7 +2252,7 @@ class InnerTubeService {
               'videoId': cleanId,
               'playlistId': ?playlistId,
             })
-            .timeout(const Duration(seconds: 10), onTimeout: () => null);
+            .timeout(const Duration(seconds: 20), onTimeout: () => null);
         if (res != null && res.isNotEmpty) {
           final tracks = <Track>[];
           for (final raw in res) {

@@ -105,7 +105,7 @@ class _CountryScreenState extends State<CountryScreen> {
             ),
             SliverToBoxAdapter(
               child: AtlasShelf(
-                height: 100,
+                height: 116,
                 count: cities.length,
                 itemBuilder: (context, i) {
                   final c = cities[i];
@@ -166,7 +166,7 @@ class _CountryScreenState extends State<CountryScreen> {
                     ),
                     SliverToBoxAdapter(
                       child: AtlasShelf(
-                        height: 124,
+                        height: 128,
                         gap: 16,
                         count: artists.length,
                         itemBuilder: (_, i) => AtlasArtistItem(

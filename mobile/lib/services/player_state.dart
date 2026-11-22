@@ -137,6 +137,30 @@ class PlayerState extends ChangeNotifier
   DateTime? _sleepEndsAt;
   bool _sleepAtEndOfTrack = false;
 
+  // Early-skip data saver timers
+  Timer? _prefetchDebounceTimer;
+  Timer? _lyricsFetchTimer;
+  Timer? _radioDebounceTimer;
+  bool _hasPrefetchedNext = false;
+
+  void _cancelEarlyTimers() {
+    _prefetchDebounceTimer?.cancel();
+    _prefetchDebounceTimer = null;
+    _lyricsFetchTimer?.cancel();
+    _lyricsFetchTimer = null;
+    _radioDebounceTimer?.cancel();
+    _radioDebounceTimer = null;
+  }
+
+  /// Immediately triggers lyrics loading (e.g. when user opens lyrics sheet/tab)
+  void requestLyricsNow() {
+    _lyricsFetchTimer?.cancel();
+    _lyricsFetchTimer = null;
+    if (_currentTrack != null && !_isLoadingLyrics && _lyricsLines.isEmpty) {
+      unawaited(_loadLyricsForTrack(_currentTrack!, _playToken));
+    }
+  }
+
   // Studio FX Engine Connection
   StudioFxState? _fxState;
   QueueState? _queueState;
@@ -420,6 +444,12 @@ class PlayerState extends ChangeNotifier
       ..reset()
       ..start();
     _updateLyricIndex(pos);
+
+    // If track has been playing for >= 12s, ensure next track is prefetched for gapless transition
+    if (!_hasPrefetchedNext && pos.inSeconds >= 12 && _currentTrack != null) {
+      _hasPrefetchedNext = true;
+      _prefetchNext();
+    }
   }
 
   // ---- Queue ----------------------------------------------------------------------
@@ -756,7 +786,28 @@ class PlayerState extends ChangeNotifier
 
     notifyListeners();
 
-    unawaited(_loadLyricsForTrack(track, token));
+    _cancelEarlyTimers();
+    _hasPrefetchedNext = false;
+
+    // Check offline downloaded lyrics first (instant, 100% offline, 0 bytes)
+    final offlineLyrics = DownloadService.instance.getLocalLyrics(track.id);
+    if (offlineLyrics != null && offlineLyrics.isNotEmpty) {
+      _lyricsLines = offlineLyrics.lines;
+      _lyricTimes = offlineLyrics.lines
+          .map((l) => ((l['timeMs'] ?? l['startMs']) as num?)?.toInt() ?? 0)
+          .toList();
+      _lyricsSynced = offlineLyrics.synced;
+      _isLoadingLyrics = false;
+      notifyListeners();
+    } else {
+      // Defer lyrics network fetch: only load if user listens for >= 8s or opens lyrics sheet
+      _lyricsFetchTimer = Timer(const Duration(seconds: 8), () {
+        if (token == _playToken && _isPlaying) {
+          unawaited(_loadLyricsForTrack(track, token));
+        }
+      });
+    }
+
     unawaited(_resolveAccent(track, token));
 
     try {
@@ -779,20 +830,49 @@ class PlayerState extends ChangeNotifier
       unawaited(
         _rampVolume(volumeNotifier.value, const Duration(milliseconds: 260)),
       );
-      _prefetchNext();
+
       _playedSessionTrackIds.add(track.id);
       _playedSessionTrackIds.add(track.id.replaceFirst('yt-', ''));
-      if (_queueState != null) {
-        if (!_collectionLocked &&
-            _queueState!.autoplay &&
-            _queueState!.upNext.length <= 2) {
-          unawaited(_queueState!.ensureAutoplay());
-        }
-      } else if (!_collectionLocked &&
-          _autoplay &&
-          (_queue.length - _currentIndex) <= 3) {
-        unawaited(_prepopulateRadio(track));
+
+      // If next track is already cached offline, prepare it immediately (0 network bytes).
+      // Otherwise schedule prefetch after 12s so rapid skips don't download unneeded audio/metadata.
+      Track? peekNext;
+      if (_queueState != null && _queueState!.hasNext) {
+        peekNext = _queueState!.upNext.first.track;
+      } else if (_currentIndex + 1 < _queue.length) {
+        peekNext = _queue[_currentIndex + 1];
       }
+      final nextIsOffline = peekNext != null &&
+          DownloadService.instance.getLocalAudioPath(peekNext.id) != null;
+
+      if (nextIsOffline) {
+        _hasPrefetchedNext = true;
+        _prefetchNext();
+      } else {
+        _prefetchDebounceTimer = Timer(const Duration(seconds: 12), () {
+          if (token == _playToken && _isPlaying && !_hasPrefetchedNext) {
+            _hasPrefetchedNext = true;
+            _prefetchNext();
+          }
+        });
+      }
+
+      // Defer radio / autoplay population until track is verified playing (>=15s)
+      _radioDebounceTimer = Timer(const Duration(seconds: 15), () {
+        if (token == _playToken && _isPlaying) {
+          if (_queueState != null) {
+            if (!_collectionLocked &&
+                _queueState!.autoplay &&
+                _queueState!.upNext.length <= 2) {
+              unawaited(_queueState!.ensureAutoplay());
+            }
+          } else if (!_collectionLocked &&
+              _autoplay &&
+              (_queue.length - _currentIndex) <= 3) {
+            unawaited(_prepopulateRadio(track));
+          }
+        }
+      });
     } catch (e) {
       if (token != _playToken) return;
       if (kDebugMode) debugPrint('Audio playback error: $e');
@@ -1011,7 +1091,7 @@ class PlayerState extends ChangeNotifier
     _lastPrefetchedNextKey = nextKey;
 
     if (nextTrack != null) {
-      unawaited(ApiService.prefetchLyrics(nextTrack));
+      _hasPrefetchedNext = true;
       if (nextTrack.isVideo && videoTextureIdNotifier.value == null) {
         unawaited(_ensureVideoTexturePrepared());
       }
@@ -1028,7 +1108,9 @@ class PlayerState extends ChangeNotifier
           isVideo: nextTrack.isVideo,
         ),
       );
-      if (lookahead.isNotEmpty) {
+      // Only resolve lookahead (tracks N+2, N+3) when the current track is well underway
+      // to avoid speculative InnerTube player network traffic during track skips.
+      if (lookahead.isNotEmpty && positionNotifier.value.inSeconds >= 45) {
         unawaited(_audioPlayer.prefetch(lookahead));
       }
     } else {
@@ -1150,6 +1232,7 @@ class PlayerState extends ChangeNotifier
     required AdvanceReason reason,
     String? autoTransitionMediaId,
   }) async {
+    _cancelEarlyTimers();
     final now = DateTime.now();
     // Guard against completion events firing twice in rapid succession (<800ms)
     if (reason == AdvanceReason.trackCompleted &&
@@ -1659,6 +1742,7 @@ class PlayerState extends ChangeNotifier
   /// Completely stops audio playback, releases engine resources,
   /// and clears the background audio service/notification when the app is exited.
   Future<void> stopAndCleanForExit() async {
+    _cancelEarlyTimers();
     _isPlaying = false;
     notifyListeners();
     try {
@@ -1679,6 +1763,7 @@ class PlayerState extends ChangeNotifier
     for (final s in _subs) {
       s.cancel();
     }
+    _cancelEarlyTimers();
     _sleepTimer?.cancel();
     _audioPlayer.dispose();
     positionNotifier.dispose();

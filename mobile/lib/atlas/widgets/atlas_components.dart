@@ -111,7 +111,7 @@ class AtlasTile extends StatelessWidget {
     required this.child,
     this.onTap,
     this.radius = 14,
-    this.padding = const EdgeInsets.all(14),
+    this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
   });
   final double width;
   final Widget child;

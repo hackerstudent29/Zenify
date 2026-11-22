@@ -323,7 +323,7 @@ class _AtlasScreenState extends State<AtlasScreen>
         ),
         SliverToBoxAdapter(
           child: AtlasShelf(
-            height: 96,
+            height: 108,
             count: _trending.length,
             itemBuilder: (_, i) {
               final c = _trending[i];
@@ -362,7 +362,7 @@ class _AtlasScreenState extends State<AtlasScreen>
         ),
         SliverToBoxAdapter(
           child: AtlasShelf(
-            height: 108,
+            height: 124,
             count: _topCities.length,
             itemBuilder: (_, i) {
               final c = _topCities[i];
@@ -409,7 +409,7 @@ class _AtlasScreenState extends State<AtlasScreen>
         ),
         SliverToBoxAdapter(
           child: AtlasShelf(
-            height: 128,
+            height: 142,
             count: data.journeys.length,
             itemBuilder: (_, i) {
               final j = data.journeys[i];
@@ -472,7 +472,7 @@ class _AtlasScreenState extends State<AtlasScreen>
         ),
         SliverToBoxAdapter(
           child: AtlasShelf(
-            height: 84,
+            height: 94,
             count: _decades.length,
             itemBuilder: (_, i) {
               final (decade, label, emoji) = _decades[i];
@@ -528,7 +528,7 @@ class _AtlasScreenState extends State<AtlasScreen>
           ),
           SliverToBoxAdapter(
             child: AtlasShelf(
-              height: 112,
+              height: 126,
               count: data.battles.length,
               itemBuilder: (_, i) => _BattleTile(
                 battle: data.battles[i],
